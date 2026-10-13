@@ -1,0 +1,23 @@
+.DS_Store
+.idea/
+.vscode/
+
+# the core, fetched (scripts/fetch_core.py): the cache and what it puts in place
+.opamp-core/
+target/
+dist/
+
+# Node.js
+node_modules/
+
+# Python
+__pycache__/
+.venv/
+
+# Java
+build/
+.gradle/
+
+# .NET
+bin/
+obj/
