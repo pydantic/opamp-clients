@@ -1,0 +1,9 @@
+Copyright (c) 2026 Bill Easton. All rights reserved.
+
+This repository is published so that it can be read. No license is granted: you may not use,
+copy, modify, merge, publish, distribute, sublicense or sell any part of it, and no right is
+granted by implication or otherwise. GitHub's Terms of Service let you view and fork it on
+GitHub; nothing beyond that is permitted without written permission from the copyright holder.
+
+Third-party material keeps its own license, stated beside it (spec/proto/, the OpAMP protobuf
+definitions from open-telemetry/opamp-spec, are under the Apache License, Version 2.0).
