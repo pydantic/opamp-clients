@@ -1,0 +1,106 @@
+{
+  "source": "pydantic/opamp-clients",
+  "version": "0.1.0",
+  "commit": "27d07e48171b9c6a5635cc8a0f4cefcbe8f5dbc1",
+  "files": {
+    "native-linux-arm64-libopamp_native.so": {
+      "sha256": "da4d8153d2195eaa98aa7ec6bf023c0d2d6cfec44fe5b6f6386c8b5903f4f919",
+      "kind": "native",
+      "target": "linux-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-arm64-libopamp_native.so": {
+      "sha256": "fdefe783cf3a3c8653b46b67b1a9dee7058750f314fe2e456a5aa06255654a6e",
+      "kind": "native",
+      "target": "linux-musl-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-x64-libopamp_native.so": {
+      "sha256": "b5e70bcf7b89729062d6de7abd6a67bc4ff6fd2c4ceb7853bb801d530df27346",
+      "kind": "native",
+      "target": "linux-musl-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-x64-libopamp_native.so": {
+      "sha256": "9c9b592a5b56bc9b6fc86f0211a0700d875fbab5b2eaee86063a433c1483cd67",
+      "kind": "native",
+      "target": "linux-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-osx-arm64-libopamp_native.dylib": {
+      "sha256": "858da13946fe0d977b09d41c2291b2a70d030c565ee14eb399851bcbbcc449f8",
+      "kind": "native",
+      "target": "osx-arm64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-osx-x64-libopamp_native.dylib": {
+      "sha256": "e8629376cc5dfe3bf318a92fa2be966ea821ddb862706a58a5b19a70ce10ad01",
+      "kind": "native",
+      "target": "osx-x64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-win-arm64-opamp_native.dll": {
+      "sha256": "153d598e6da7185b92d49e4a9be6acd391045e740093c64652deefc4d6bd7943",
+      "kind": "native",
+      "target": "win-arm64",
+      "lib": "opamp_native.dll"
+    },
+    "native-win-x64-opamp_native.dll": {
+      "sha256": "c3471fd122233b5062beab53a9f97e3a8ba67e621c6ae60114bfe34614e2eeee",
+      "kind": "native",
+      "target": "win-x64",
+      "lib": "opamp_native.dll"
+    },
+    "opamp-core-tree.tar.gz": {
+      "sha256": "a4efd433bc2ae171b950c53864c8131a092f72c60ab6405918e1c2b2298c9e4d",
+      "kind": "tree"
+    },
+    "opamp_core.wasm": {
+      "sha256": "fd66f081215aa1d7a1babf0f6140763e460b4b25ea6da841592c652f0d332f03",
+      "kind": "wasm"
+    },
+    "opamp_core_adversary.wasm": {
+      "sha256": "257107a576110486b92c5a75814f977a374f03b0f0ec2d2f73a999de5d4d67f2",
+      "kind": "wasm"
+    },
+    "opamp_sdk_settings.wasm": {
+      "sha256": "b7f00d83941bc83ce027508b0907c9de1ee24413f7ff89dde3e54340c80940f7",
+      "kind": "wasm"
+    },
+    "tool-linux-x64-opamp-tap": {
+      "sha256": "7e8cd43d2dba2e3e3724b6ff1e29a1595da1e5caed6cd700ce5ae22dba4ec5e5",
+      "kind": "tool",
+      "target": "linux-x64",
+      "bin": "opamp-tap"
+    }
+  },
+  "tree": {
+    "proto/opamp/core/v1/core.proto": "a60b9ded377c4356f67f93adb74a581a637ea28386454cfd74ab9720b645d933",
+    "proto/opamp/sdk/v1/settings.proto": "1b299f9423960c55a67d63d1d8be4d1ccdb09988f3affe33fb57fd06c7ff2120",
+    "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
+    "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
+    "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",
+    "spec/shell-contract.md": "2f1d0a4d50282f77541c85b4a4b87bd36760e08f45a0687f232563e1a85f1d23",
+    "tests/shell-tables/README.md": "d33d4f9042caececa79deeb44f2481d55ffb4e22cdf2bc71ea8243d2579c6735",
+    "tests/shell-tables/proxy.json": "caef7e46b5f17e52b3994b81327267d18075cc61c7450030c5fe5641674e0691",
+    "tests/shell-tables/tls.json": "5aee89823ec096a37f28764d4cb2bb2fa213db883f088434b0d79de500f94daf",
+    "tests/shell-tables/tls/ca-truncated.pem": "da6e01d9f7ccb791dad46d04cbc69c923653cb743248f86cc3d6b533bd3a7db8",
+    "tests/shell-tables/tls/ca-two.pem": "66550a8d2fff040912e729feb95acd9e2b436e791ce1d08ab980679fce1d00bf",
+    "tests/shell-tables/tls/ca-with-text.pem": "7a783db40a58bee448b0094515a8b3fbe331fef02fc585a09027c960d02bc5fa",
+    "tests/shell-tables/tls/ca.pem": "85d309d9710a5cb04f8f27bb40f6363aa5300d323be229d52ef0706106781520",
+    "tests/shell-tables/tls/client-ec-both.pem": "d8626e42b59b0e57f73b00ed2873c287b94d4e041cb4d378f52eb2d03f5a8bcc",
+    "tests/shell-tables/tls/client-ec-encrypted.key": "b00718aab74f19c3deef2dc2f2b9cc780ade578bf7b510c14a4ed619c942c0b4",
+    "tests/shell-tables/tls/client-ec-sec1.key": "8d18ee32068559639f58b16a9c157702e523a7fb41e3b8fc72257b4ce01c7949",
+    "tests/shell-tables/tls/client-ec.key": "492a5350a95e1b86a7b590d89f8818aeb9b10eb866378c2294c37ef4483f1144",
+    "tests/shell-tables/tls/client-ec.pem": "2e87533f7913b742877fdf38985b75af64511875c588712a5e01358b76cb967e",
+    "tests/shell-tables/tls/client-rsa-pkcs1.key": "1f7efe72aa4353c329162571e86d0c4df40ad7ce8c813dac7e31a5f29210fdd4",
+    "tests/shell-tables/tls/client-rsa.key": "2b4d2e00fecc319fb124e8699239b5ea5cf9040da8d336ccdfe8f69ef5856174",
+    "tests/shell-tables/tls/client-rsa.pem": "1f2134cd17490e3f8347ce2763ef6b11678e92ccb03843a2b06308030e3e19f0",
+    "tests/shell-tables/tls/empty.pem": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests/shell-tables/tls/gen.sh": "0302abe883c76efcfb1d6379de4119289d31dedd024c45bbba38114afd2a1ae1",
+    "tests/shell-tables/tls/not-pem.pem": "a54683b938b1806d407cd87713393f36cd2feec4c217efc8057def8a35480205",
+    "tests/shell-tables/tls/other-ca.pem": "3b617aef5b7d7b7dca6f99722061a6f49dd1c552dceec7b8a1b20177fc3a05b5",
+    "tests/shell-tables/tls/other-ec.key": "e45d15ab73b11411d54febe31bb9ac2825899dc1e962efe53356f526f2bf4857",
+    "tests/shell-tables/urls.json": "190791fcf19905316ddadde5ab38de63952baafad343c624a05a27dde83c8bab"
+  }
+}
