@@ -17,11 +17,10 @@ opamp-core.json and checks every file against them before writing, so a lock alw
 that were downloaded and matched. Bumping the core is `lock <version>`, `fetch`, and a PR with the
 lock's diff.
 
-Where from: the release `core/v<version>` of the lock's `source` (pydantic/opamp-clients, where
-pydantic/opamp's .github/workflows/client-core.yml publishes it), through the GitHub API (no token
-needed: GH_TOKEN or GITHUB_TOKEN is used if set, for the rate limit), or
---from DIR: a directory holding a release's files (dist/core from scripts/core_dist.py build), for a
-core built locally or CI's own round trip. Downloads are kept in .opamp-core/<version>/.
+Where from: the release `core/v<version>` of the lock's `source` (this repository's releases),
+through the GitHub API (no token needed: GH_TOKEN or GITHUB_TOKEN is used if set, for the rate
+limit), or --from DIR: a directory holding a release's files. Downloads are kept in
+.opamp-core/<version>/.
 """
 from __future__ import annotations
 
@@ -65,15 +64,15 @@ MODULES = {
         "dotnet/Pydantic.OpAmp.Client/opamp_sdk_settings.wasm",
     ],
     # Every SDK's harness test finds it here (or at OPAMP_ADVERSARY_WASM).
-    "opamp_core_adversary.wasm": ["rust/opamp-core-adversary/opamp_core_adversary.wasm"],
+    "opamp_core_adversary.wasm": ["testdata/core/opamp_core_adversary.wasm"],
 }
 # The tree's files land at their own paths, which must be under these: the .proto files (the -I
 # paths the type generators use), the contract the clients are held to, and the shells' tables.
 TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "spec/shell-contract.md")
-# The machine's own library goes where the .NET project and Python's build backend look for one
-# built with cargo (target/release); every platform's, with --all-platforms, where packaging does.
+# The machine's own library goes where the .NET project and Python's build backend look for it
+# (target/release); every platform's, with --all-platforms, where packaging does.
 HOST_LIB_DIR = "target/release"
-# Tools go there too, where the tests and the conformance runner look for one built with cargo.
+# Tools go there too, where the tests and the conformance runner look for them.
 TOOLS = {"opamp-tap"}
 RUNTIMES = "dist/native/runtimes"
 
@@ -182,7 +181,7 @@ def http(url: str, accept: str) -> bytes:
             req = urllib.request.Request(location, headers={"User-Agent": headers["User-Agent"]})
             with urllib.request.urlopen(req, timeout=300) as r:
                 return r.read()
-        raise SystemExit(f"GET {url}: HTTP {e.code} (a private source, or the rate limit, needs GH_TOKEN)") from e
+        raise SystemExit(f"GET {url}: HTTP {e.code} (the rate limit: set GH_TOKEN)") from e
 
 
 def lock(version: str, repo: str, directory: Path | None) -> dict:

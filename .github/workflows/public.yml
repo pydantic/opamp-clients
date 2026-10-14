@@ -1,7 +1,7 @@
 name: Public
 
-# This repository is public: nothing of the core's source, no binary but the core's modules, no
-# credential (scripts/public_check.py). The client SDKs' CI arrives with them.
+# This repository is public: only what PUBLIC_ALLOWLIST names, no binary but the core's modules, no
+# credential (scripts/public_check.py).
 on:
   push:
     branches: [main]
@@ -17,4 +17,5 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 scripts/test_public_check.py
       - run: python3 scripts/public_check.py

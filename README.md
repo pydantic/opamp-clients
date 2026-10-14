@@ -2,11 +2,10 @@
 
 OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 
-The core is the Rust state machine every client wraps. It is built, tested and proved in
-[pydantic/opamp](https://github.com/pydantic/opamp) and arrives here compiled: the WebAssembly
-modules Go, Node.js and Java load, the native library Python and .NET load, and the interface
-(`.proto`) files the clients generate their types from. `opamp-core.lock.json` pins one core
-release and the sha256 of every file in it.
+The core is the state machine every client wraps. It arrives here compiled, as this repository's
+`core/vX.Y.Z` releases: the WebAssembly modules Go, Node.js and Java load, the native library
+Python and .NET load, and the interface (`.proto`) files the clients generate their types from.
+`opamp-core.lock.json` pins one core release and the sha256 of every file in it.
 
 ```bash
 scripts/fetch_core.py fetch                  # download what the lock pins, verify it, put it in place
@@ -17,4 +16,4 @@ scripts/fetch_core.py lock 0.2.0             # move to another core release
 
 Moving to a new core is a PR that changes only the lock.
 
-The SDKs are moving here from pydantic/opamp; see its `bridge/opamp-clients/README.md` for the plan.
+This repository is public and holds only what `PUBLIC_ALLOWLIST` names; see `AGENTS.md`.

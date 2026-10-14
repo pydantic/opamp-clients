@@ -1,0 +1,13 @@
+# Everything this public repository may hold, one pattern a line (scripts/public_check.py):
+# `dir/` allows all under it, anything else is a glob over the whole path. Adding a line is a
+# reviewed change: it widens what can be published.
+.github/workflows/*.yml
+.gitignore
+AGENTS.md
+LICENSE
+PUBLIC_ALLOWLIST
+README.md
+opamp-core.lock.json
+scripts/fetch_core.py
+scripts/public_check.py
+scripts/test_public_check.py
