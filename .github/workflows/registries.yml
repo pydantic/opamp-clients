@@ -123,7 +123,8 @@ jobs:
     name: PyPI
     needs: build
     runs-on: ubuntu-24.04
-    environment: pypi
+    # A pull request's dry run uploads nothing and needs no approval or secret.
+    environment: ${{ github.event_name != 'pull_request' && 'pypi' || '' }}
     permissions:
       id-token: write # trusted publishing: PyPI takes this workflow's OIDC token, no secret
     steps:
@@ -144,7 +145,8 @@ jobs:
     name: npm
     needs: build
     runs-on: ubuntu-24.04
-    environment: npm
+    # A pull request's dry run uploads nothing and needs no approval or secret.
+    environment: ${{ github.event_name != 'pull_request' && 'npm' || '' }}
     permissions:
       id-token: write # trusted publishing and provenance: no token
     steps:
@@ -192,7 +194,8 @@ jobs:
     name: NuGet
     needs: build
     runs-on: ubuntu-24.04
-    environment: nuget
+    # A pull request's dry run uploads nothing and needs no approval or secret.
+    environment: ${{ github.event_name != 'pull_request' && 'nuget' || '' }}
     steps:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:

@@ -5,7 +5,8 @@ The [Registries workflow](../.github/workflows/registries.yml) publishes an SDK 
 that none holds the cores' sources (`scripts/sdk_release.py`, `scripts/native_dist.py`). Then each
 registry's job uploads, but only once the repository variable `SDK_REGISTRIES` names it, for
 example `pypi npm nuget`. Until then each job is a dry run that lists what it would publish. On a
-PR that changes the workflow, all of it runs as a dry run at version 0.0.0.
+PR that changes the workflow, all of it runs as a dry run at version 0.0.0, outside the registries'
+environments, so it waits on no approval.
 
 | Registry | What goes there | Before its name goes in `SDK_REGISTRIES` |
 | --- | --- | --- |
