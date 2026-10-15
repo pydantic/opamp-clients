@@ -391,12 +391,13 @@ export class Client {
     const core = new Core(
       // The core takes the transport from the endpoint, makes the instance UID if none is given
       // (from the entropy and the wall clock), keeps every effect's time (this client carries out
-      // its cancels) and decides what a download's response means.
+      // its cancels) and decides what a download's response means. It makes the backoff's jitter
+      // seed from the entropy too (seed left 0: two clients started in the same tick don't retry
+      // in step).
       create(ConfigSchema, {
         instanceUid: config.instanceUid,
         capabilities: config.capabilities ?? 0n,
         heartbeatIntervalMs: ms(config.heartbeatIntervalMs),
-        seed: BigInt(Date.now()),
         endpoint: config.endpoint,
         headers: Object.entries(config.headers ?? {}).map(([name, value]) => ({ name, value })),
         requestTimeoutMs: ms(config.requestTimeoutMs),

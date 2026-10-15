@@ -440,7 +440,8 @@ public sealed class OpAmpClient
             UnixMs = (ulong)this.time.GetUtcNow().ToUnixTimeMilliseconds(),
             Capabilities = options.Capabilities,
             HeartbeatIntervalMs = (ulong)options.HeartbeatInterval.TotalMilliseconds,
-            Seed = (ulong)this.time.GetUtcNow().UtcTicks,
+            // No Seed: the core makes the backoff's jitter seed from the entropy, so two clients
+            // started in the same tick don't retry in step.
             // As the application wrote it: Uri.ToString() would unescape it (%41 sent as A, %20 as
             // a space the core refuses), so the server would get another target than from every
             // other client (tests/shell-tables/urls.json).

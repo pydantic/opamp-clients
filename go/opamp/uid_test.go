@@ -28,6 +28,11 @@ func TestTheCoreConfig(t *testing.T) {
 	if len(a.Entropy) != 32 || bytes.Equal(a.Entropy, b.Entropy) {
 		t.Fatalf("entropy %x, then %x", a.Entropy, b.Entropy)
 	}
+	// No clock seed: the core makes the backoff's jitter seed from the entropy, so two clients
+	// started in the same tick don't retry in step.
+	if a.Seed != 0 {
+		t.Fatalf("a jitter seed of the client's own: %d", a.Seed)
+	}
 	if d := time.Now().UnixMilli() - int64(a.UnixMs); d < 0 || d > 5000 {
 		t.Fatalf("unix_ms %d ms off", d)
 	}

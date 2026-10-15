@@ -267,7 +267,8 @@ class Client:
         transport = Transport(config.tls, config.proxy, rust=rust)
         # The core takes the transport from the endpoint's scheme, keeps every effect's time (and
         # cancels what it gives up on), decides what a download's status means, and makes the
-        # instance UID if the application chose none.
+        # instance UID if the application chose none, and the backoff's jitter seed from the
+        # entropy (seed left 0: two clients started in the same tick don't retry in step).
         self._core = Core(corepb.Config(
             instance_uid=config.instance_uid or b"",
             entropy=os.urandom(32),
@@ -276,7 +277,6 @@ class Client:
             connect_timeout_ms=config.connect_timeout_ms,
             capabilities=config.capabilities,
             heartbeat_interval_ms=config.heartbeat_interval_ms,
-            seed=time.time_ns() & 0xFFFFFFFFFFFFFFFF,
             endpoint=config.endpoint,
             headers=[corepb.Header(name=k, value=v) for k, v in config.headers.items()],
             request_timeout_ms=config.request_timeout_ms,

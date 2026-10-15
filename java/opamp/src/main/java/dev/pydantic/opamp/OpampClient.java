@@ -532,14 +532,14 @@ public final class OpampClient {
     }
     java.util.function.Function<String, javax.net.ssl.SSLEngine> engines = rust ? Streams.engines(config.tls) : null;
     // The transport is the endpoint's, as the core reads it: this client carries out whichever
-    // effects come. The core keeps every effect's time (this client carries out its cancels) and
-    // decides what a download's status means.
+    // effects come. The core keeps every effect's time (this client carries out its cancels),
+    // decides what a download's status means, and makes the backoff's jitter seed from the
+    // entropy (seed left 0: two clients started in the same tick don't retry in step).
     CoreProto.Config.Builder c = CoreProto.Config.newBuilder()
         .setEntropy(ByteString.copyFrom(entropy()))
         .setUnixMs(System.currentTimeMillis())
         .setCapabilities(config.capabilities)
         .setHeartbeatIntervalMs(ms(config.heartbeatInterval))
-        .setSeed(System.nanoTime())
         .setEndpoint(config.endpoint)
         .setRequestTimeoutMs(ms(config.requestTimeout))
         .setMaxSendBytes(config.maxSendBytes)

@@ -591,7 +591,8 @@ func (cfg Config) connection() (*connection, error) {
 
 // coreConfig is the core's settings. The core takes the transport from the endpoint, keeps every
 // effect's time (the client carries out its cancels), judges a download's status, and with no
-// instance UID makes one from entropy.
+// instance UID makes one from entropy. It makes the backoff's jitter seed from the same entropy
+// (Seed left 0): two clients started in the same tick don't retry in step.
 func coreConfig(cfg Config) (*corepb.Config, error) {
 	var uid []byte
 	if cfg.InstanceUID != ([16]byte{}) {
@@ -607,7 +608,6 @@ func coreConfig(cfg Config) (*corepb.Config, error) {
 		UnixMs:                   unixMs(),
 		Capabilities:             cfg.Capabilities,
 		HeartbeatIntervalMs:      millis(cfg.HeartbeatInterval),
-		Seed:                     uint64(time.Now().UnixNano()),
 		Endpoint:                 cfg.Endpoint,
 		Headers:                  fromHTTP(cfg.Header),
 		RequestTimeoutMs:         millis(cfg.RequestTimeout),
