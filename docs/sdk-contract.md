@@ -157,7 +157,7 @@ The client core's own types are held to the same rule.
   `python/tests/test_redaction.py`, Go `go/opamp/redact_test.go`, .NET
   `dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs`) and the core's
   (`secrets_change_nothing_shown`): random secrets of one length, two runs, the same text. Each
-  redaction dropped in turn must fail its test.
+  redaction dropped in turn must fail its test (each SDK's, by `scripts/redact_mutants.py`).
 - The schedule tests and the adversary of [spec/shell-contract.md](../spec/shell-contract.md).
 - The conformance scenario `callback-throws` checks it in every SDK from outside. The driver's
   callback throws (raises, panics) on the first remote config; the check `callback_failure_stops`

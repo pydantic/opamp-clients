@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -32,11 +33,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 OUT = ROOT / "conformance" / "out"
-TAP = ROOT / "target" / "release" / "opamp-tap"
 ALLOWED = HERE / "shells.toml"
+# Where the core's sources would be: OPAMP_CORE_ROOT (a checkout with them) if set, as in
+# conformance/runner/run.py, else the root.
+CORE_ROOT = Path(os.environ["OPAMP_CORE_ROOT"]).resolve() if os.environ.get("OPAMP_CORE_ROOT") else ROOT
 # The client the others are compared with: the Rust client where the core's sources are (a
-# Cargo.toml at the root) to build it from, and go-core where they aren't.
-CORE_SOURCE = (ROOT / "Cargo.toml").exists()
+# Cargo.toml at CORE_ROOT) to build it from, and go-core where they aren't.
+CORE_SOURCE = (CORE_ROOT / "Cargo.toml").exists()
+# opamp-tap: built from those sources, or the one scripts/fetch_core.py fetch put in the root's target/.
+TAP = (CORE_ROOT if CORE_SOURCE else ROOT) / "target" / "release" / "opamp-tap"
 REFERENCE = "rust" if CORE_SOURCE else "go-core"
 
 
@@ -229,7 +234,7 @@ def main() -> int:
     if not TAP.exists():
         if not CORE_SOURCE:
             sys.exit(f"no {TAP.relative_to(ROOT)}: run scripts/fetch_core.py fetch")
-        subprocess.run(["cargo", "build", "--release", "-p", "opamp-tap"], cwd=ROOT, check=True)
+        subprocess.run(["cargo", "build", "--release", "-p", "opamp-tap"], cwd=CORE_ROOT, check=True)
     lines, found = compare(out, args.reference, [c for c in args.client.split(",") if c], args.scenario,
                            load_rules())
     bad = [d for d in found if not d["allowed"]]

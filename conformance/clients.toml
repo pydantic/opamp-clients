@@ -1,10 +1,13 @@
 # Clients the conformance runner drives. Each has a driver that follows DRIVERS.md.
 #
 # upstream = true: a client we use unchanged. Its failures are recorded, not fixed here.
-# build: command run once before the scenarios (cwd relative to the repository root).
-# run:   the driver command. {bin} is conformance/out/bin, {conf} is conformance/.
+# build: command run once before the scenarios (cwd relative to the repository root; for a `source`
+#   client, to where the core's sources are).
+# run:   the driver command. {bin} is conformance/out/bin, {conf} is conformance/, {core} is where
+#   the core's sources are.
 # source = true: the client is built from the core's sources, so it runs only where they are (a
-#   Cargo.toml at the root); elsewhere the runner leaves it out.
+#   Cargo.toml at the root, or at OPAMP_CORE_ROOT: a checkout with the core's sources); elsewhere
+#   the runner leaves it out.
 # docker = true: the driver runs in a container. The server then listens on every interface and
 #   the driver reaches it as host.docker.internal; conformance/out is mounted at /out. A variable
 #   reaches the driver only if `run` names it with -e: torture.py's must all be there for a client
@@ -31,7 +34,7 @@ features = ["connection_settings", "remote_config_lifecycle", "core", "number_ze
             "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = ".", cmd = ["cargo", "build", "--release", "-p", "driver"] }
-run = ["{conf}/../target/release/driver"]
+run = ["{core}/target/release/driver"]
 
 [go-core]
 # Ours: go/opamp, the shared Rust core (as WebAssembly, in wazero) behind a Go wrapper, in Go mode

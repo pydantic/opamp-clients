@@ -3,7 +3,8 @@
 Every client runs the same scenarios against the same reference server, and the recorded
 traces are checked against the spec. Where the core's sources are (a Cargo.toml at the root),
 the same clients also run against the Rust server built from them (`--server rust`), which checks
-the server as well.
+the server as well. `OPAMP_CORE_ROOT` names a checkout with the core's sources elsewhere: the
+runner then builds what comes from them there and runs it from its `target/`.
 
 - `server/`: the reference server, in Go. It speaks plain HTTP and WebSocket directly
   (not through opamp-go's server) so that it can send a Close frame and wait for the answer,
@@ -32,6 +33,7 @@ python3 conformance/runner/run.py --client go,java        # some clients
 python3 conformance/runner/run.py --scenario close-frame  # some scenarios
 python3 conformance/runner/run.py --list                  # clients, scenarios and checks
 python3 conformance/runner/run.py --server rust           # every client against the Rust server (where it is built)
+OPAMP_CORE_ROOT=../core python3 conformance/runner/run.py --server rust   # the same, the core's sources in ../core
 python3 conformance/runner/run.py --jobs 4                # four runs at once (CI's setting)
 python3 -m unittest conformance/runner/test_checks.py     # the checks' own tests
 ```

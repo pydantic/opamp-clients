@@ -85,7 +85,10 @@ jobs:
           conformance/differential/test_shells.py conformance/torture/test_invariants.py
           conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
           examples/test_integrations.py examples/test_settings_cookbook.py scripts/test_native_dist.py
-          scripts/test_sdk_release.py
+          scripts/test_sdk_release.py scripts/test_redact_mutants.py
+      - name: Every dropped-redaction mutant applies
+        if: ${{ !cancelled() }}
+        run: python3 scripts/redact_mutants.py --check
 
   # ---------------------------------------------------------------- Python
   python-tests:
@@ -511,6 +514,38 @@ jobs:
             target/shim-fuzz/dotnet/*/artifacts/**
             target/shim-fuzz/dotnet/*/fuzz.log
           if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- Secrets
+  # Each SDK redaction dropped, one at a time (scripts/redact-mutants.toml), must fail its SDK's
+  # noninterference test (Python's tests/test_redaction.py, Go's opamp/redact_test.go, .NET's
+  # RedactionTests.cs): two runs that differ only in secrets must show the same.
+  redact-mutants:
+    name: Every SDK redaction dropped is caught
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      # What the Python and .NET mutants' copies take as their native core (target/release).
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - name: Each mutant fails its test, which passes without it
+        run: python3 scripts/redact_mutants.py
 
   # ---------------------------------------------------------------- SDK integrations
   # Each language's integration with its OpenTelemetry SDK (docs/<integration>.md), its unit tests
@@ -1100,6 +1135,7 @@ jobs:
       - java-fray
       - dotnet-tests
       - dotnet-fuzz
+      - redact-mutants
       - integrations
       - native-pack
       - native-smoke
