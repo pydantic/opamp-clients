@@ -770,6 +770,8 @@ func FuzzGoModeRequests(f *testing.F) {
 	f.Add(true, "/pkg", []byte{}, []byte{}, uint16(200), []byte{}, []byte("too big"), uint64(3))
 	f.Add(false, "http://%zz", []byte{}, []byte{}, uint16(200), []byte{}, []byte{}, uint64(10))
 	f.Add(false, "/x", []byte{}, []byte{}, uint16(999), []byte("a:b\na:c"), []byte("12345"), uint64(5))
+	// net/http drops an empty port, so this is sent to "a:", which url.Parse alone keeps as "a://:".
+	f.Add(false, "A://:", []byte{}, []byte{}, uint16(200), []byte{}, []byte{}, uint64(10))
 	f.Fuzz(func(t *testing.T, download bool, rawURL string, reqHeaders, reqBody []byte, status uint16, respHeaders, respBody []byte, max uint64) {
 		target := fuzzURL(rawURL)
 		var mu sync.Mutex
@@ -813,7 +815,8 @@ func FuzzGoModeRequests(f *testing.F) {
 		mu.Lock()
 		defer mu.Unlock()
 
-		u, perr := url.Parse(target)
+		// Where net/http sends the URL: it parses as url.Parse does, then drops an empty port.
+		u, perr := http.NewRequest(http.MethodGet, target, nil)
 		if len(sent) == 0 {
 			if in.GetHttpFailed() == nil && in.GetDownloadFailed() == nil {
 				t.Fatalf("not sent, but answered %v", in)
@@ -827,7 +830,7 @@ func FuzzGoModeRequests(f *testing.F) {
 			t.Fatalf("sent %d times", len(sent))
 		}
 		req := sent[0]
-		if perr != nil || req.URL.String() != u.String() {
+		if perr != nil || req.URL.String() != u.URL.String() {
 			t.Fatalf("sent to %v, but the core said %q", req.URL, target)
 		}
 		if want := map[bool]string{true: http.MethodGet, false: http.MethodPost}[download]; req.Method != want {
