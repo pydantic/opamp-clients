@@ -26,6 +26,11 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"google.golang.org/protobuf/proto"
+
+	"github.com/pydantic/opamp-clients/go/opamp/internal/core"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
 
 func shellTable(t *testing.T, name string, into any) {
@@ -407,28 +412,66 @@ func environmentProxyFor(rawURL string) (string, error) {
 	return p.Scheme + "://" + net.JoinHostPort(host, port), nil
 }
 
-// proxyRoute is a proxy URL as the table writes a route: scheme://host:port, without
-// credentials (no scheme: an HTTP proxy, as the core reads it).
-func proxyRoute(p string) string {
-	if p == "" {
+// coreRoute is where Rust mode's core connects first for rawURL when told choice: the proxy as
+// the table writes a route (scheme://host:port, without credentials), or "" for directly. The
+// core picks it itself: it asks no proxy_query.
+func coreRoute(t *testing.T, choice *corepb.ProxyChoice, rawURL string) string {
+	t.Helper()
+	ctx := context.Background()
+	c, _, err := core.New(ctx, &corepb.Config{InstanceUid: make([]byte, 16), Endpoint: rawURL, Streams: true,
+		Entropy: make([]byte, 32), Proxy: choice})
+	if err != nil {
+		t.Fatalf("%s: %v", rawURL, err)
+	}
+	defer c.Close(ctx)
+	out, err := c.Step(ctx, 1, 1, &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var open *corepb.StreamOpen
+	for _, e := range out.GetEffects() {
+		if q := e.GetProxyQuery(); q != nil {
+			t.Fatalf("%s: the core asked which proxy: %v", rawURL, q)
+		}
+		if o := e.GetStreamOpen(); o != nil {
+			open = o
+		}
+	}
+	if open == nil {
+		t.Fatalf("%s: no stream opened: %v", rawURL, out)
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := u.Port()
+	if port == "" {
+		port = map[string]string{"http": "80", "ws": "80", "https": "443", "wss": "443"}[strings.ToLower(u.Scheme)]
+	}
+	at := net.JoinHostPort(open.GetHost(), strconv.FormatUint(uint64(open.GetPort()), 10))
+	if strings.EqualFold(at, net.JoinHostPort(u.Hostname(), port)) {
 		return ""
 	}
-	if !strings.Contains(p, "://") {
-		p = "http://" + p
-	}
-	u, err := url.Parse(p)
+	// Which kind of proxy: SOCKS5 greets with version 5, an https:// one is TLS first.
+	out, err = c.Step(ctx, 2, 2, &corepb.Input{Kind: &corepb.Input_StreamOpened{StreamOpened: &corepb.Id{Id: open.GetId()}}})
 	if err != nil {
-		return "unparsed: " + p
+		t.Fatal(err)
 	}
-	host, port, err := net.SplitHostPort(proxyAddr(u))
-	if err != nil {
-		return "unparsed: " + p
+	scheme := "http"
+	for _, e := range out.GetEffects() {
+		if w := e.GetStreamWrite(); w != nil && len(w.GetData()) > 0 && w.GetData()[0] == 5 {
+			scheme = "socks5"
+		}
+		if e.GetStreamStartTls() != nil {
+			scheme = "https"
+		}
 	}
-	return u.Scheme + "://" + net.JoinHostPort(host, port)
+	return scheme + "://" + at
 }
 
-// Rust mode: the proxy each case of the table names, by Rust mode's one rule (the core's
-// proxy_query answered from the environment), with no known differences.
+// Rust mode: the proxy each case of the table names, with no known differences. The client hands
+// the core the environment's variables (Config.proxy) and the core picks by Rust mode's one rule:
+// this runs each case through this client's reading of the environment and the core it ships.
 //
 // covers: RULE-PROXY-02
 func TestTheSharedProxyTableRustMode(t *testing.T) {
@@ -446,15 +489,13 @@ func TestTheSharedProxyTableRustMode(t *testing.T) {
 	var wrong []string
 	for _, c := range table.Cases {
 		env := func(name string) (string, bool) { v, ok := c.Env[name]; return v, ok }
-		// As the client answers the core: through Proxy's zero value (the environment's).
-		a := newRustProxies(Proxy{}, env).answer(7, c.URL).GetProxyAnswer()
-		got := proxyRoute(a.GetProxy())
+		got := coreRoute(t, newRustProxies(Proxy{}, env).choice, c.URL)
 		want := ""
 		if c.Proxy != nil {
 			want = *c.Proxy
 		}
-		if got != want || a.GetId() != 7 || len(a.GetHeaders()) > 0 || a.GetResolveLocally() {
-			wrong = append(wrong, fmt.Sprintf("%s: %q (%v), the table says %q (%s)", c.ID, got, a, want, c.Why))
+		if got != want {
+			wrong = append(wrong, fmt.Sprintf("%s: %q, the table says %q (%s)", c.ID, got, want, c.Why))
 		}
 	}
 	if len(wrong) > 0 {
@@ -462,68 +503,52 @@ func TestTheSharedProxyTableRustMode(t *testing.T) {
 	}
 }
 
-// Rust mode's proxy rule: the corners the table leaves out, and what the answer carries.
+// What Rust mode tells the core: the configured proxy (its URL as given, credentials and all, the
+// CONNECT headers, ResolveLocally) and no variables; none with Direct; otherwise each variable
+// the rule reads that is set, even empty, by its own name. A proxy_query (only a core that wasn't
+// told asks) hears the configured proxy or none.
 //
 // covers: RULE-PROXY-02
-func TestRustModeProxyRuleCorners(t *testing.T) {
-	for _, c := range []struct {
-		list, host string
-		want       bool
-	}{
-		{"*", "192.0.2.1", false},
-		{"*", "example.com", true},
-		{"2001:db8::/32", "2001:db8:1::7", true},
-		{"2001:db8::/32", "2001:db9::7", false},
-		{"::ffff:10.0.0.0/104", "::ffff:10.1.2.3", true},
-		{"10.0.0.0/8", "::ffff:10.1.2.3", false},
-		{"fe80::1%eth0", "fe80::1", false}, // a zone: no address, and a name never matches one
-		{"010.0.0.1", "10.0.0.1", false},   // leading zeros: no address
-		{"example.com", "example.com.", false},
-		{".example.com", "a.b.example.com", true},
-		{"b.example.com", "a.b.example.com", true},
-		{"ample.com", "example.com", false},
-		{"EXAMPLE.COM", "Api.Example.Com", true},
-		{"", "example.com", false},
-		{" , ,", "example.com", false},
-	} {
-		if got := rustNoProxy(c.list, c.host); got != c.want {
-			t.Errorf("NO_PROXY=%q for %s: %v, want %v", c.list, c.host, got, c.want)
-		}
-	}
+func TestRustModeTellsTheCoreItsProxy(t *testing.T) {
 	env := func(m map[string]string) func(string) (string, bool) {
 		return func(name string) (string, bool) { v, ok := m[name]; return v, ok }
 	}
-	none := env(nil)
-	// Configured: the URL as given (credentials and all), the CONNECT headers, resolve locally;
-	// whatever the environment says.
-	all := env(map[string]string{"HTTP_PROXY": "http://env:1", "NO_PROXY": "*"})
-	a := newRustProxies(Proxy{URL: "http://u:p%40ss@proxy:3128", ConnectHeader: http.Header{"X-B": {"2"}, "X-A": {"1", "3"}}}, all).
-		answer(3, "http://example.com/").GetProxyAnswer()
-	if a.Proxy != "http://u:p%40ss@proxy:3128" || len(a.Headers) != 3 || a.Headers[0].Name != "X-A" || a.Headers[1].Value != "3" ||
-		a.Headers[2].Name != "X-B" || a.ResolveLocally {
-		t.Errorf("configured: %v", a)
+	all := env(map[string]string{"HTTP_PROXY": "http://env:1", "no_proxy": "", "REQUEST_METHOD": "GET", "OTHER": "x"})
+	p := newRustProxies(Proxy{URL: "http://u:p%40ss@proxy:3128", ConnectHeader: http.Header{"X-B": {"2"}, "X-A": {"1", "3"}}}, all)
+	c := p.choice
+	if c.Url != "http://u:p%40ss@proxy:3128" || len(c.Headers) != 3 || c.Headers[0].Name != "X-A" || c.Headers[1].Value != "3" ||
+		c.Headers[2].Name != "X-B" || c.ResolveLocally || c.Direct || len(c.Environment) != 0 {
+		t.Errorf("configured: %v", c)
 	}
-	a = newRustProxies(Proxy{URL: "socks5://proxy:1080", ResolveLocally: true}, none).answer(3, "wss://example.com/").GetProxyAnswer()
-	if a.Proxy != "socks5://proxy:1080" || !a.ResolveLocally {
-		t.Errorf("configured SOCKS5, resolving locally: %v", a)
+	if a := p.answer(3).GetProxyAnswer(); a.Id != 3 || a.Proxy != c.Url || len(a.Headers) != 3 {
+		t.Errorf("configured, asked: %v", a)
 	}
-	// Direct: none, whatever the environment says.
-	if a := newRustProxies(Proxy{Direct: true}, all).answer(3, "http://example.com/").GetProxyAnswer(); a.Proxy != "" {
-		t.Errorf("direct: %v", a)
+	if c := newRustProxies(Proxy{URL: "socks5://proxy:1080", ResolveLocally: true}, all).choice; !c.ResolveLocally {
+		t.Errorf("configured SOCKS5, resolving locally: %v", c)
 	}
-	// The environment's, with credentials as given; ResolveLocally applies to a SOCKS5 one only.
-	a = newRustProxies(Proxy{ResolveLocally: true}, env(map[string]string{"ALL_PROXY": " socks5h://u:p@s:1 "})).
-		answer(3, "https://example.com/").GetProxyAnswer()
-	if a.Proxy != "socks5h://u:p@s:1" || !a.ResolveLocally {
-		t.Errorf("SOCKS5 from the environment, resolving locally: %v", a)
+	d := newRustProxies(Proxy{Direct: true}, all)
+	if !d.choice.Direct || len(d.choice.Environment) != 0 || d.answer(3).GetProxyAnswer().Proxy != "" {
+		t.Errorf("direct: %v", d.choice)
 	}
-	a = newRustProxies(Proxy{ResolveLocally: true}, env(map[string]string{"https_proxy": "web:3128"})).
-		answer(3, "wss://example.com/").GetProxyAnswer()
-	if a.Proxy != "web:3128" || a.ResolveLocally {
-		t.Errorf("an HTTP proxy from the environment: %v", a)
+	e := newRustProxies(Proxy{ResolveLocally: true}, all)
+	var got []string
+	for _, h := range e.choice.Environment {
+		got = append(got, h.Name+"="+h.Value)
 	}
-	if a := newRustProxies(Proxy{}, none).answer(3, "http://example.com/").GetProxyAnswer(); a.Proxy != "" {
-		t.Errorf("no variable: %v", a)
+	if strings.Join(got, " ") != "REQUEST_METHOD=GET HTTP_PROXY=http://env:1 no_proxy=" || !e.choice.ResolveLocally || e.choice.Url != "" {
+		t.Errorf("the environment's: %v", e.choice)
+	}
+	if a := e.answer(4).GetProxyAnswer(); a.Id != 4 || a.Proxy != "" {
+		t.Errorf("the environment's, asked: %v", a)
+	}
+	// The core reads the variables by the rule: CGI, so none here.
+	if r := coreRoute(t, e.choice, "http://example.com/"); r != "" {
+		t.Errorf("under CGI: %q", r)
+	}
+	// A value that isn't UTF-8 still reaches the core.
+	bad := newRustProxies(Proxy{}, env(map[string]string{"HTTPS_PROXY": "http://caf\xe9:3128"})).choice
+	if _, err := proto.Marshal(bad); err != nil {
+		t.Errorf("%v", err)
 	}
 }
 

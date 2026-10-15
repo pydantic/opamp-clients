@@ -22,7 +22,9 @@ import yarl
 
 from opamp_client._executor import Executor
 from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._transport import TLS, Proxy, Transport, rust_no_proxy, rust_proxy
+from opamp_client._core import Core
+from opamp_client._streams import proxy_choice
+from opamp_client._transport import TLS, Proxy, Transport
 
 TABLES = next(p / "tests" / "shell-tables" for p in Path(__file__).resolve().parents
               if (p / "tests" / "shell-tables").is_dir())
@@ -173,45 +175,70 @@ def test_the_proxy_the_environment_names_python_mode(case: dict) -> None:
     assert got == want, case["why"]
 
 
-def _as_route(proxy: str) -> str:
-    """A proxy URL as a route: scheme://host:port, credentials left out (no scheme: http)."""
-    u = urlsplit(proxy if "://" in proxy else "http://" + proxy)
-    scheme = u.scheme.lower()
-    port = u.port or {"https": 443, "socks5": 1080, "socks5h": 1080}.get(scheme, 80)
-    host = u.hostname or ""
-    return f"{scheme}://{'[' + host + ']' if ':' in host else host}:{port}"
+def _core_route(choice: corepb.ProxyChoice, url: str) -> str | None:
+    """Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+    writes a route (scheme://host:port, credentials left out), or None for directly. The core
+    picks it itself: it asks no proxy_query."""
+    core = Core(corepb.Config(instance_uid=bytes(16), endpoint=url, streams=True, entropy=bytes(32), proxy=choice))
+    try:
+        out = core.step(1, corepb.Input(start=corepb.Empty()))
+        kinds = [e.WhichOneof("kind") for e in out.effects]
+        assert "proxy_query" not in kinds, f"{url}: the core asked which proxy"
+        opens = [e.stream_open for e in out.effects if e.WhichOneof("kind") == "stream_open"]
+        assert opens, f"{url}: no stream opened: {out}"
+        open_ = opens[0]
+        u = urlsplit(url)
+        port = u.port or (443 if u.scheme.lower() in ("https", "wss") else 80)
+        if open_.host.lower() == (u.hostname or "").lower() and open_.port == port:
+            return None
+        # Which kind of proxy: SOCKS5 greets with version 5, an https:// one is TLS first.
+        nxt = core.step(2, corepb.Input(stream_opened=corepb.Id(id=open_.id)))
+        scheme = "http"
+        for e in nxt.effects:
+            kind = e.WhichOneof("kind")
+            if kind == "stream_write" and e.stream_write.data[:1] == b"\x05":
+                scheme = "socks5"
+            if kind == "stream_start_tls":
+                scheme = "https"
+        host = f"[{open_.host}]" if ":" in open_.host else open_.host
+        return f"{scheme}://{host}:{open_.port}"
+    finally:
+        core.close()
 
 
 # covers: RULE-PROXY-02
 @pytest.mark.parametrize("case", PROXY, ids=[c["id"] for c in PROXY])
 def test_the_proxy_the_environment_names_rust_mode(case: dict) -> None:
-    """Rust mode: the answer to the core's proxy_query follows the shared rule, exactly as the table
-    says (tests/shell-tables/README.md): no differences."""
-    answer = Transport(rust=True, _environ=case["env"]).proxy_for(case["url"])
-    got = None if answer is None else _as_route(answer.url)
-    assert got == case["proxy"], case["why"]
+    """Rust mode: the client hands the core the environment's variables (Config.proxy) and the
+    core picks by the shared rule, exactly as the table says (tests/shell-tables/README.md): no
+    differences. Through this client's reading of the environment and the core it ships."""
+    choice = proxy_choice(Transport(rust=True, _environ=case["env"]))
+    assert _core_route(choice, case["url"]) == case["proxy"], case["why"]
 
 
 # covers: RULE-PROXY-02
-def test_rust_modes_proxy_rule_corners() -> None:
-    """The rule's corners beyond the table (as hyper-util takes them), and what a configured proxy
-    changes."""
-    assert rust_proxy({"HTTPS_PROXY": "  socks5://u:pw@s:1080 "}, "wss://example.com/") == "socks5://u:pw@s:1080"
-    assert rust_proxy({"HTTP_PROXY": "socks4://s:1"}, "ws://example.com/") == "socks4://s:1"  # the core refuses it
-    assert rust_proxy({"NO_PROXY": "", "no_proxy": "example.com", "HTTP_PROXY": "http://p:1"},
-                      "http://example.com/") == "http://p:1"
-    assert not rust_no_proxy("::ffff:10.0.0.0/104", "10.1.2.3")
-    assert rust_no_proxy("::ffff:10.0.0.0/104", "::ffff:10.1.2.3")
-    assert not rust_no_proxy("010.1.2.3", "10.1.2.3")
-    assert not rust_no_proxy("10.0.0.0/33", "10.0.0.1")
-    assert not rust_no_proxy("fe80::1%eth0", "fe80::1")
-    assert not rust_no_proxy("example.com", "notexample.com")
-    env = {"ALL_PROXY": "http://a:1"}
-    configured = Transport(proxy="http://configured:8080", rust=True, _environ=env).proxy_for("http://x/")
-    assert configured is not None and configured.url == "http://configured:8080"
-    assert Transport(proxy=Proxy.DIRECT, rust=True, _environ=env).proxy_for("http://x/") is None
+def test_rust_mode_tells_the_core_its_proxy() -> None:
+    """What Rust mode tells the core: the configured proxy and no variables; none with
+    Proxy.DIRECT; otherwise each variable the rule reads that is set, even empty, by its own name.
+    A proxy_query (only a core that wasn't told asks) hears the configured proxy or none."""
+    env = {"HTTP_PROXY": "http://env:1", "no_proxy": "", "REQUEST_METHOD": "GET", "OTHER": "x"}
+    configured = Transport(proxy=Proxy("http://u:p%40ss@configured:8080", headers={"X-A": "1"}), rust=True, _environ=env)
+    assert proxy_choice(configured) == corepb.ProxyChoice(url="http://u:p%40ss@configured:8080",
+                                                          headers=[corepb.Header(name="X-A", value="1")])
+    answer = configured.proxy_for("http://x/")
+    assert answer is not None and answer.url == "http://u:p%40ss@configured:8080"
+    direct = Transport(proxy=Proxy.DIRECT, rust=True, _environ=env)
+    assert proxy_choice(direct) == corepb.ProxyChoice(direct=True)
+    assert direct.proxy_for("http://x/") is None
+    from_env = Transport(rust=True, _environ=env)
+    assert proxy_choice(from_env) == corepb.ProxyChoice(environment=[
+        corepb.Header(name="REQUEST_METHOD", value="GET"), corepb.Header(name="HTTP_PROXY", value="http://env:1"),
+        corepb.Header(name="no_proxy", value="")])
+    assert from_env.proxy_for("http://x/") is None
+    # The core reads them by the rule: CGI, so none.
+    assert _core_route(proxy_choice(from_env), "http://example.com/") is None
     # A value the core can't use is its to refuse (the connection fails): no error here.
-    assert Transport(rust=True, _environ={"HTTP_PROXY": "ftp://x"}).proxy_for("http://x/") is not None
+    assert proxy_choice(Transport(rust=True, _environ={"HTTP_PROXY": "ftp://x"})).environment[0].value == "ftp://x"
 
 
 # TLS.

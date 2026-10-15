@@ -8,8 +8,8 @@
 //   does), read alike, and sent as exactly its target: in Node mode through the Executor (undici's
 //   fetch, the ws package), in Rust mode through the core over the shell's sockets.
 // - proxy.json: the proxy chosen from the environment: in Node mode by Node's convention (Transport's
-//   connector and ws options), with the differences listed below; in Rust mode (the answer to
-//   proxy_query) by the shared rule, exactly (tests/shell-tables/README.md).
+//   connector and ws options), with the differences listed below; in Rust mode (the core, told
+//   the environment's variables) by the shared rule, exactly (tests/shell-tables/README.md).
 // - tls.json: the TLS settings taken or refused (a Transport is built from them; Rust mode's TLS
 //   on a stream is the same Transport's).
 // Where this client differs from a table, by Node's convention, the case is listed below with the
@@ -25,9 +25,10 @@ import { test } from "node:test";
 import { create } from "@bufbuild/protobuf";
 
 import { Executor } from "../src/executor.js";
-import { EffectSchema, type Input } from "../src/gen/opamp/core/v1/core_pb.js";
+import { ConfigSchema, EffectSchema, type Input, InputSchema } from "../src/gen/opamp/core/v1/core_pb.js";
 import { Client } from "../src/index.js";
-import { rustNoProxy, rustProxy, type TlsOptions, type TlsVersion, Transport } from "../src/transport.js";
+import { Core } from "../src/core.js";
+import { type RustProxyChoice, type TlsOptions, type TlsVersion, Transport } from "../src/transport.js";
 
 const TABLES = fileURLToPath(new URL("../../../../tests/shell-tables/", import.meta.url));
 const table = <T>(name: string): T => JSON.parse(readFileSync(TABLES + name, "utf8")) as T;
@@ -240,58 +241,88 @@ test("proxy.json, Node mode: the proxy chosen from the environment, by Node's co
   assert.deepEqual(wrong, []);
 });
 
+/** Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+ * writes a route (scheme://host:port, without credentials), or null for directly. The core picks
+ * it itself: it asks no proxy_query. */
+function coreRoute(choice: RustProxyChoice, url: string): string | null {
+  const core = new Core(
+    create(ConfigSchema, { instanceUid: new Uint8Array(16), endpoint: url, streams: true, entropy: new Uint8Array(32), proxy: choice }),
+  );
+  try {
+    const out = core.step(1, create(InputSchema, { kind: { case: "start", value: {} } }));
+    let open: { id: bigint; host: string; port: number } | undefined;
+    for (const e of out.effects) {
+      assert.notEqual(e.kind.case, "proxyQuery", `${url}: the core asked which proxy`);
+      if (e.kind.case === "streamOpen") open = e.kind.value;
+    }
+    assert.ok(open, `${url}: no stream opened`);
+    const u = new URL(url);
+    const secure = u.protocol === "https:" || u.protocol === "wss:";
+    const host = u.hostname.replace(/^\[(.*)\]$/, "$1").toLowerCase();
+    if (open.host.toLowerCase() === host && open.port === (Number(u.port) || (secure ? 443 : 80))) return null;
+    // Which kind of proxy: SOCKS5 greets with version 5, an https:// one is TLS first.
+    const next = core.step(2, create(InputSchema, { kind: { case: "streamOpened", value: { id: open.id } } }));
+    let scheme = "http";
+    for (const e of next.effects) {
+      if (e.kind.case === "streamWrite" && e.kind.value.data[0] === 5) scheme = "socks5";
+      if (e.kind.case === "streamStartTls") scheme = "https";
+    }
+    return `${scheme}://${open.host.includes(":") ? `[${open.host}]` : open.host}:${open.port}`;
+  } finally {
+    core.close();
+  }
+}
+
+// Rust mode: the client hands the core the environment's variables (Config.proxy) and the core
+// picks by the shared rule: each case through this client's reading of the environment and the
+// core it ships, exactly as the table says.
 // covers: RULE-PROXY-02
 test("proxy.json, Rust mode: the proxy chosen from the environment, exactly as the table says", () => {
   const cases = table<{ cases: ProxyCase[] }>("proxy.json").cases;
   const wrong: string[] = [];
   for (const c of cases) {
     // Rust mode's rule reads the environment whatever Node is told: no NODE_USE_ENV_PROXY.
-    const chosen = new Transport({}, { env: { ...c.env }, execArgv: [] }, true).proxyFor(c.url);
-    const got = chosen === undefined ? null : route(chosen.url);
+    const choice = new Transport({}, { env: { ...c.env }, execArgv: [] }, true).rustProxyChoice();
+    const got = coreRoute(choice, c.url);
     if (got !== c.proxy) wrong.push(`${c.id}: ${got}, the table says ${c.proxy} (${c.why})`);
   }
   assert.deepEqual(wrong, []);
 });
 
-// The rule's corners the table leaves out (tests/shell-tables/README.md, "Rust mode's proxy rule").
+// What Rust mode tells the core: the configured proxy and no variables; none with `false`;
+// otherwise each variable the rule reads that is set, even empty, by its own name. A proxy_query
+// (only a core that wasn't told asks) hears the configured proxy or none.
 // covers: RULE-PROXY-02
-test("Rust mode's proxy rule: its corners", () => {
-  const p = (env: Record<string, string>, url: string) => rustProxy(env, url) ?? null;
-  // An upper-case variable set but empty is unset, and the lower-case one isn't read.
-  assert.equal(p({ HTTP_PROXY: "", http_proxy: "http://lower:1" }, "http://example.com/"), null);
-  assert.equal(p({ NO_PROXY: "", no_proxy: "example.com", HTTP_PROXY: "http://p:1" }, "http://example.com/"), "http://p:1");
-  // Trimmed; given as it is, credentials and all (the core reads it), whatever its scheme.
-  assert.equal(p({ HTTPS_PROXY: "  socks5://u:pw@s:1080 " }, "wss://example.com/"), "socks5://u:pw@s:1080");
-  assert.equal(p({ HTTP_PROXY: "socks4://s:1" }, "ws://example.com/"), "socks4://s:1");
-  // Under CGI nothing, ALL_PROXY included.
-  assert.equal(p({ ALL_PROXY: "http://a:1", REQUEST_METHOD: "" }, "https://example.com/"), null);
-  // Addresses: by address and network entries only; a name entry, * included, never matches one.
-  assert.equal(rustNoProxy("*", "192.0.2.1"), false);
-  assert.equal(rustNoProxy("*", "example.com"), true);
-  assert.equal(rustNoProxy("2001:db8::/32", "2001:db8:1::7"), true);
-  assert.equal(rustNoProxy("2001:db8::/32", "2001:db9::7"), false);
-  assert.equal(rustNoProxy("::ffff:10.0.0.0/104", "::ffff:10.1.2.3"), true);
-  assert.equal(rustNoProxy("10.0.0.0/8", "::ffff:10.1.2.3"), false);
-  assert.equal(rustNoProxy("10.1.2.3/8", "10.200.0.1"), true);
-  assert.equal(rustNoProxy("[::1]", "::1"), false);
-  assert.equal(rustNoProxy("010.1.2.3", "10.1.2.3"), false);
-  assert.equal(rustNoProxy("10.0.0.0/33", "10.0.0.1"), false);
-  // Names: equal or a dotted suffix, ignoring case; a leading dot covers the name itself.
-  assert.equal(rustNoProxy(" , EXAMPLE.com ", "api.example.COM"), true);
-  assert.equal(rustNoProxy(".example.com", "example.com"), true);
-  assert.equal(rustNoProxy("example.com", "notexample.com"), false);
-  assert.equal(rustNoProxy("*.example.com", "api.example.com"), false);
-  assert.equal(rustNoProxy("example.com:8080", "example.com"), false);
-  // resolveLocally (without a url) applies to a SOCKS5 proxy the environment names, only.
-  const t = (url: string) => new Transport({ proxy: { resolveLocally: true } }, { env: { ALL_PROXY: url }, execArgv: [] }, true);
-  assert.equal(t("socks5h://s:1080").proxyFor("https://example.com/")?.resolveLocally, true);
-  assert.equal(t("http://h:3128").proxyFor("https://example.com/")?.resolveLocally, false);
-  // A proxy named wins over the environment; `false` goes direct.
-  const env = { env: { ALL_PROXY: "http://a:1" }, execArgv: [] };
-  assert.equal(new Transport({ proxy: { url: "http://configured:8080" } }, env, true).proxyFor("http://x/")?.url, "http://configured:8080");
-  assert.equal(new Transport({ proxy: false }, env, true).proxyFor("http://x/"), undefined);
+test("Rust mode tells the core its proxy", () => {
+  const env = { env: { HTTP_PROXY: "http://env:1", no_proxy: "", REQUEST_METHOD: "GET", OTHER: "x" }, execArgv: [] };
+  const configured = new Transport({ proxy: { url: "http://u:p%40ss@configured:8080", headers: { "X-A": "1" } } }, env, true);
+  assert.deepEqual(configured.rustProxyChoice(), {
+    direct: false,
+    url: "http://u:p%40ss@configured:8080",
+    headers: [{ name: "X-A", value: "1" }],
+    resolveLocally: false,
+    environment: [],
+  });
+  assert.equal(configured.proxyFor("http://x/")?.url, "http://u:p%40ss@configured:8080");
+  const direct = new Transport({ proxy: false }, env, true);
+  assert.deepEqual(direct.rustProxyChoice(), { direct: true, url: "", headers: [], resolveLocally: false, environment: [] });
+  assert.equal(direct.proxyFor("http://x/"), undefined);
+  const fromEnv = new Transport({ proxy: { resolveLocally: true } }, env, true);
+  assert.deepEqual(fromEnv.rustProxyChoice(), {
+    direct: false,
+    url: "",
+    headers: [],
+    resolveLocally: true,
+    environment: [
+      { name: "REQUEST_METHOD", value: "GET" },
+      { name: "HTTP_PROXY", value: "http://env:1" },
+      { name: "no_proxy", value: "" },
+    ],
+  });
+  assert.equal(fromEnv.proxyFor("http://x/"), undefined);
+  // The core reads them by the rule: CGI, so none.
+  assert.equal(coreRoute(fromEnv.rustProxyChoice(), "http://example.com/"), null);
 });
-
 // httpoxy: under CGI the environment's proxies are ignored, but a proxy the application configured
 // still applies (in both modes: Node mode's connector and Rust mode's proxy_query answers).
 test("under CGI: no proxy from the environment, a configured one still", () => {
@@ -313,7 +344,8 @@ test("Node mode takes proxies from the environment only when Node is told to; Ru
   const env = { HTTP_PROXY: "http://web-proxy:3128", HTTPS_PROXY: "http://secure-proxy:3129" };
   for (const url of ["http://example.com/", "https://example.com/"]) {
     assert.equal(new Transport({}, { env, execArgv: [] }).proxyFor(url), undefined, url);
-    assert.ok(new Transport({}, { env, execArgv: [] }, true).proxyFor(url), url);
+    // Rust mode hands the core the variables, and the core picks.
+    assert.notEqual(coreRoute(new Transport({}, { env, execArgv: [] }, true).rustProxyChoice(), url), null, url);
   }
 });
 

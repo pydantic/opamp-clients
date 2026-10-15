@@ -7,6 +7,7 @@ using System.Net;
 using System.Runtime.CompilerServices;
 using System.Security.Authentication;
 using System.Text.Json;
+using Google.Protobuf;
 using Pydantic.OpAmp.Core;
 using Xunit;
 
@@ -239,8 +240,9 @@ public class ShellTablesTests
         Assert.True(wrong.Count == 0, $"{wrong.Count} of {urls.Count}:\n{string.Join('\n', wrong)}");
     }
 
-    // Rust mode's proxy: the table's, exactly, with no known difference: the answer the client
-    // gives the core's proxy question with no proxy configured, the environment injected.
+    // Rust mode's proxy: the table's, exactly, with no known difference. The client hands the core
+    // the environment's variables (Config.proxy) and the core picks by the shared rule: each case
+    // through this client's reading of the environment (injected) and the core it ships.
     // covers: RULE-PROXY-02
     [Fact]
     public void RustModesProxyIsTheTablesExactly()
@@ -252,8 +254,8 @@ public class ShellTablesTests
         {
             var env = c.GetProperty("env").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
             var url = Str(c, "url")!;
-            var answer = OpAmpClient.ProxyAnswerFor(new OpAmpClientOptions { Endpoint = new Uri(url), Mode = OpAmpMode.Rust }, n => env.GetValueOrDefault(n), url);
-            var got = answer.Proxy.Length == 0 ? null : Route(answer.Proxy);
+            var choice = OpAmpClient.RustProxyChoice(new OpAmpClientOptions { Endpoint = new Uri(url), Mode = OpAmpMode.Rust }, n => env.GetValueOrDefault(n));
+            var got = CoreRoute(choice, url);
             if (got != Str(c, "proxy"))
             {
                 wrong.Add($"{Str(c, "id")}: {got ?? "direct"}, the table says {Str(c, "proxy") ?? "direct"} ({Str(c, "why")})");
@@ -263,61 +265,75 @@ public class ShellTablesTests
         Assert.True(wrong.Count == 0, string.Join('\n', wrong));
     }
 
-    // The rule's corners the table leaves out (tests/shell-tables/README.md, "Rust mode's proxy rule").
+    // What Rust mode tells the core: the configured proxy and no variables; none with
+    // DirectConnection; otherwise each variable the rule reads that is set, even empty, by its own
+    // name. A proxy question (only a core that wasn't told asks) hears the configured proxy or none.
     // covers: RULE-PROXY-02
     [Fact]
-    public void RustModesProxyRuleCorners()
+    public void RustModeTellsTheCoreItsProxy()
     {
-        static string? P(Dictionary<string, string> env, string url) => RustProxy.For(n => env.GetValueOrDefault(n), url);
+        Func<string, string?> env = n => n switch
+        {
+            "HTTP_PROXY" => "http://env:1", "no_proxy" => string.Empty, "REQUEST_METHOD" => "GET", "OTHER" => "x", _ => null,
+        };
+        var configured = new OpAmpClientOptions
+        {
+            Endpoint = new Uri("http://x/"), Mode = OpAmpMode.Rust, Proxy = new Uri("socks5://u:p%40ss@configured:1080"), ProxyUseLocalResolver = true,
+        };
+        Assert.Equal(new ProxyChoice { Url = "socks5://u:p%40ss@configured:1080", ResolveLocally = true }, OpAmpClient.RustProxyChoice(configured, env));
+        Assert.Equal(("socks5://u:p%40ss@configured:1080", true), (OpAmpClient.ProxyAnswerFor(configured).Proxy, OpAmpClient.ProxyAnswerFor(configured).ResolveLocally));
+        var direct = configured with { Proxy = null, DirectConnection = true };
+        Assert.Equal(new ProxyChoice { Direct = true }, OpAmpClient.RustProxyChoice(direct, env));
+        Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(direct).Proxy);
+        var fromEnv = configured with { Proxy = null };
+        var choice = OpAmpClient.RustProxyChoice(fromEnv, env);
+        Assert.Equal(["REQUEST_METHOD=GET", "HTTP_PROXY=http://env:1", "no_proxy="], choice.Environment.Select(h => $"{h.Name}={h.Value}").ToArray());
+        Assert.True(choice.ResolveLocally);
+        Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(fromEnv).Proxy);
 
-        // An upper-case variable set but empty is unset, and the lower-case one isn't read.
-        Assert.Null(P(new() { ["HTTP_PROXY"] = string.Empty, ["http_proxy"] = "http://lower:1" }, "http://example.com/"));
-        Assert.Equal("http://p:1", P(new() { ["NO_PROXY"] = string.Empty, ["no_proxy"] = "example.com", ["HTTP_PROXY"] = "http://p:1" }, "http://example.com/"));
+        // The core reads them by the rule: CGI, so none.
+        Assert.Null(CoreRoute(choice, "http://example.com/"));
+    }
 
-        // Trimmed; given as it is, credentials and all (the core reads it), whatever its scheme.
-        Assert.Equal("socks5://u:pw@s:1080", P(new() { ["HTTPS_PROXY"] = "  socks5://u:pw@s:1080 " }, "wss://example.com/"));
-        Assert.Equal("socks4://s:1", P(new() { ["HTTP_PROXY"] = "socks4://s:1" }, "ws://example.com/"));
+    // Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+    // writes a route (scheme://host:port, credentials left out), or null for directly. The core
+    // picks it itself: it asks no proxy question.
+    private static string? CoreRoute(ProxyChoice choice, string url)
+    {
+        using var core = new CoreInstance(new Config
+        {
+            InstanceUid = ByteString.CopyFrom(new byte[16]), Endpoint = url, Streams = true, Entropy = ByteString.CopyFrom(new byte[32]), Proxy = choice,
+        });
+        var out1 = core.Step(1, 1, new Input { Start = new Empty() });
+        Assert.DoesNotContain(out1.Effects, e => e.KindCase == Effect.KindOneofCase.ProxyQuery);
+        var open = out1.Effects.Where(e => e.KindCase == Effect.KindOneofCase.StreamOpen).Select(e => e.StreamOpen).FirstOrDefault();
+        Assert.True(open is not null, $"{url}: no stream opened");
+        var u = new Uri(url);
+        var secure = u.Scheme is "https" or "wss";
+        var port = u.IsDefaultPort || u.Port < 0 ? (secure ? 443 : 80) : u.Port;
+        var host = u.Host.Trim('[', ']');
+        if (string.Equals(open.Host, host, StringComparison.OrdinalIgnoreCase) && open.Port == port)
+        {
+            return null;
+        }
 
-        // Under CGI nothing, ALL_PROXY included.
-        Assert.Null(P(new() { ["ALL_PROXY"] = "http://a:1", ["REQUEST_METHOD"] = string.Empty }, "https://example.com/"));
+        // Which kind of proxy: SOCKS5 greets with version 5, an https:// one is TLS first.
+        var next = core.Step(2, 2, new Input { StreamOpened = new Id { Id_ = open.Id } });
+        var scheme = "http";
+        foreach (var e in next.Effects)
+        {
+            if (e.KindCase == Effect.KindOneofCase.StreamWrite && e.StreamWrite.Data.Length > 0 && e.StreamWrite.Data[0] == 5)
+            {
+                scheme = "socks5";
+            }
 
-        // Addresses: by address and network entries only; a name entry, * included, never matches one.
-        Assert.False(RustProxy.NoProxy("*", "192.0.2.1"));
-        Assert.True(RustProxy.NoProxy("*", "example.com"));
-        Assert.True(RustProxy.NoProxy("2001:db8::/32", "2001:db8:1::7"));
-        Assert.False(RustProxy.NoProxy("2001:db8::/32", "2001:db9::7"));
-        Assert.True(RustProxy.NoProxy("::ffff:10.0.0.0/104", "::ffff:10.1.2.3"));
-        Assert.False(RustProxy.NoProxy("10.0.0.0/8", "::ffff:10.1.2.3"));
-        Assert.True(RustProxy.NoProxy("10.1.2.3/8", "10.200.0.1"));
-        Assert.True(RustProxy.NoProxy("0.0.0.0/0", "203.0.113.9"));
-        Assert.True(RustProxy.NoProxy("::/0", "2001:db8::1"));
-        Assert.False(RustProxy.NoProxy("[::1]", "::1"));
-        Assert.False(RustProxy.NoProxy("010.1.2.3", "10.1.2.3"));
-        Assert.False(RustProxy.NoProxy("10.0.0.0/33", "10.0.0.1"));
-        Assert.False(RustProxy.NoProxy("10.0.0.0/08", "10.0.0.1"));
-        Assert.True(RustProxy.NoProxy("::1", "0:0:0:0:0:0:0:1"));
+            if (e.KindCase == Effect.KindOneofCase.StreamStartTls)
+            {
+                scheme = "https";
+            }
+        }
 
-        // Names: equal or a dotted suffix, ignoring case; a leading dot covers the name itself.
-        Assert.True(RustProxy.NoProxy(" , EXAMPLE.com ", "api.example.COM"));
-        Assert.True(RustProxy.NoProxy(".example.com", "example.com"));
-        Assert.False(RustProxy.NoProxy("example.com", "notexample.com"));
-        Assert.False(RustProxy.NoProxy("*.example.com", "api.example.com"));
-        Assert.False(RustProxy.NoProxy("example.com:8080", "example.com"));
-
-        // The destination's host is read as text, never resolved; brackets and credentials stripped.
-        Assert.Null(P(new() { ["HTTP_PROXY"] = "http://p:1", ["NO_PROXY"] = "::1" }, "http://user:pw@[::1]:80/"));
-        Assert.Equal("http://p:1", P(new() { ["HTTP_PROXY"] = "http://p:1", ["NO_PROXY"] = "localhost" }, "http://127.0.0.1/"));
-
-        // ProxyUseLocalResolver applies to a SOCKS5 proxy the environment names, only.
-        var local = new OpAmpClientOptions { Endpoint = new Uri("https://example.com/"), Mode = OpAmpMode.Rust, ProxyUseLocalResolver = true };
-        Assert.True(OpAmpClient.ProxyAnswerFor(local, n => n == "ALL_PROXY" ? "socks5h://s:1080" : null, "https://example.com/").ResolveLocally);
-        Assert.False(OpAmpClient.ProxyAnswerFor(local, n => n == "ALL_PROXY" ? "http://h:3128" : null, "https://example.com/").ResolveLocally);
-
-        // A proxy configured wins over the environment; DirectConnection goes direct; under CGI a configured one still applies.
-        Func<string, string?> cgi = n => n switch { "ALL_PROXY" => "http://a:1", "REQUEST_METHOD" => "GET", _ => null };
-        var configured = new OpAmpClientOptions { Endpoint = new Uri("http://x/"), Mode = OpAmpMode.Rust, Proxy = new Uri("http://configured:8080") };
-        Assert.Equal("http://configured:8080", OpAmpClient.ProxyAnswerFor(configured, cgi, "http://x/").Proxy);
-        Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(configured with { Proxy = null, DirectConnection = true }, n => n == "ALL_PROXY" ? "http://a:1" : null, "http://x/").Proxy);
+        return $"{scheme}://{(open.Host.Contains(':') ? $"[{open.Host}]" : open.Host)}:{open.Port}";
     }
 
     // Each TLS setting, in Rust mode: the client starts with it (Rust mode's SslStream takes the

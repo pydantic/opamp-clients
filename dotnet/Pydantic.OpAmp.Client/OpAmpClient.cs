@@ -458,6 +458,8 @@ public sealed class OpAmpClient
             DownloadTimeoutMs = (ulong)options.DownloadTimeout.TotalMilliseconds,
             Streams = rust,
             SpliceDownloads = rust && options.RustSplice,
+            // Rust mode: the core picks each connection's proxy from this.
+            Proxy = rust ? RustProxyChoice(options, seams?.Environment ?? Environment.GetEnvironmentVariable) : null,
         };
         if (options.StateFile is { } stateFile)
         {
@@ -483,9 +485,8 @@ public sealed class OpAmpClient
         this.executor = new Executor(this.transport, this.Enqueue, options.StateFile, this.time, files);
         if (rust)
         {
-            var env = seams?.Environment ?? Environment.GetEnvironmentVariable;
             this.streams = new Streams(
-                this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), url => ProxyAnswerFor(options, env, url), seams?.Net, this.time);
+                this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), _ => ProxyAnswerFor(options), seams?.Net, this.time);
         }
 
         this.stopTimeout = options.StopTimeout > TimeSpan.Zero ? options.StopTimeout : TimeSpan.FromSeconds(5);
@@ -705,26 +706,52 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
-    /// Rust mode's answer to the core's proxy question for <paramref name="url"/>: none if
-    /// DirectConnection; the configured proxy (with its credentials), if any; else the one the
-    /// environment names by the shared rule (<see cref="RustProxy"/>).
+    /// The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+    /// rule"). The core applies the rule; the client only reads them, once.
     /// </summary>
-    internal static ProxyAnswer ProxyAnswerFor(OpAmpClientOptions o, Func<string, string?> env, string url)
+    internal static readonly string[] RustProxyVariables =
+    [
+        "REQUEST_METHOD", "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy",
+    ];
+
+    /// <summary>
+    /// What Rust mode tells the core about proxies, once (Config.proxy): none if DirectConnection;
+    /// the configured proxy (with its credentials), if any; else the environment's variables, from
+    /// which the core picks each connection's proxy by the shared rule.
+    /// </summary>
+    internal static ProxyChoice RustProxyChoice(OpAmpClientOptions o, Func<string, string?> env)
     {
         if (o.DirectConnection)
         {
-            return new ProxyAnswer();
+            return new ProxyChoice { Direct = true };
         }
 
         if (o.Proxy is { } p)
         {
-            return new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver };
+            return new ProxyChoice { Url = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver };
         }
 
-        return RustProxy.For(env, url) is { } named
-            ? new ProxyAnswer { Proxy = named, ResolveLocally = o.ProxyUseLocalResolver && RustProxy.IsSocks5(named) }
-            : new ProxyAnswer();
+        var choice = new ProxyChoice { ResolveLocally = o.ProxyUseLocalResolver };
+        foreach (var name in RustProxyVariables)
+        {
+            if (env(name) is { } value)
+            {
+                choice.Environment.Add(new Header { Name = name, Value = value });
+            }
+        }
+
+        return choice;
     }
+
+    /// <summary>
+    /// Rust mode's answer to the core's proxy question, which the core asks only when it wasn't
+    /// told (<see cref="RustProxyChoice"/>): the configured proxy (with its credentials), or none.
+    /// The environment's rule is the core's.
+    /// </summary>
+    internal static ProxyAnswer ProxyAnswerFor(OpAmpClientOptions o) =>
+        !o.DirectConnection && o.Proxy is { } p
+            ? new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver }
+            : new ProxyAnswer();
 
     private OpAmpNotification? FromCore(Notification n) => n.KindCase switch
     {

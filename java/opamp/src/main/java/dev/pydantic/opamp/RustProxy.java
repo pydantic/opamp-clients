@@ -7,137 +7,33 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Locale;
-import java.util.Map;
 
 /**
- * Rust mode's proxy: the answer to the core's {@code proxy_query} for a URL. A proxy the operator
- * configured is answered as given (its credentials with it, the core uses them); {@link
- * OpampClient.Config.Builder#directConnection} is answered with none; otherwise the environment
- * decides, by the one rule every SDK follows in Rust mode (tests/shell-tables/README.md, "Rust
- * mode's proxy rule", the reference's: the Rust client's), with no differences from
- * proxy.json. Platform mode keeps the JDK's convention ({@code ProxySelector}), and never reads
- * these variables.
+ * Rust mode's proxy: what the core is told, once ({@code Config.proxy}). A proxy the operator
+ * configured goes as given (its credentials with it, the core uses them); {@link
+ * OpampClient.Config.Builder#directConnection} is none; otherwise the environment's variables
+ * ({@link #VARIABLES}), from which the core picks by the one rule every SDK follows in Rust mode
+ * (tests/shell-tables/README.md, "Rust mode's proxy rule"), with no differences from proxy.json.
+ * Platform mode keeps the JDK's convention ({@code ProxySelector}), and never reads these
+ * variables.
  *
  * <p>Nothing here resolves a name: an IP address is recognised by its text alone.
  */
 final class RustProxy {
   private RustProxy() {}
 
-  /**
-   * The proxy URL the environment names for {@code url} (a URL the core accepts), or null for
-   * none: {@code env} is the process environment, or a test's.
-   */
-  static String fromEnvironment(Map<String, String> env, String url) {
-    // 1. Under CGI, HTTP_PROXY may be a request's Proxy header (httpoxy): no variable is taken.
-    if (env.containsKey("REQUEST_METHOD")) {
-      return null;
-    }
-    String scheme = scheme(url);
-    boolean secure = scheme.equals("https") || scheme.equals("wss");
-    // 3. The destination's own variable, else ALL_PROXY.
-    String named = proxy(env, secure ? "HTTPS_PROXY" : "HTTP_PROXY");
-    if (named == null) {
-      named = proxy(env, "ALL_PROXY");
-    }
-    if (named == null) {
-      return null;
-    }
-    // 4. NO_PROXY.
-    String noProxy = read(env, "NO_PROXY");
-    return noProxy != null && bypassed(noProxy, host(url)) ? null : named;
-  }
-
-  /** 2. The upper-case name if it is set at all (even empty), else the lower-case one. */
-  private static String read(Map<String, String> env, String upper) {
-    String v = env.get(upper);
-    return v != null ? v : env.get(upper.toLowerCase(Locale.ROOT));
-  }
-
-  /** A proxy variable, trimmed: empty (or spaces) is unset, with no fall back to the other case. */
-  private static String proxy(Map<String, String> env, String upper) {
-    String v = read(env, upper);
-    if (v == null) {
-      return null;
-    }
-    v = v.strip();
-    return v.isEmpty() ? null : v;
-  }
+  /** The variables Rust mode's proxy rule reads. The core applies the rule; the client only reads them, once. */
+  static final java.util.List<String> VARIABLES = java.util.List.of(
+      "REQUEST_METHOD",
+      "HTTP_PROXY", "http_proxy",
+      "HTTPS_PROXY", "https_proxy",
+      "ALL_PROXY", "all_proxy",
+      "NO_PROXY", "no_proxy");
 
   /** The URL's scheme, lower case. */
   static String scheme(String url) {
     int colon = url.indexOf(':');
     return colon < 0 ? "" : url.substring(0, colon).toLowerCase(Locale.ROOT);
-  }
-
-  /** The URL's host: a name, or an address without its brackets. */
-  static String host(String url) {
-    int start = url.indexOf("://");
-    start = start < 0 ? 0 : start + 3;
-    int end = start;
-    while (end < url.length() && "/?#".indexOf(url.charAt(end)) < 0) {
-      end++;
-    }
-    String authority = url.substring(start, end);
-    authority = authority.substring(authority.lastIndexOf('@') + 1);
-    if (authority.startsWith("[")) {
-      int close = authority.indexOf(']');
-      return close < 0 ? authority.substring(1) : authority.substring(1, close);
-    }
-    int colon = authority.indexOf(':');
-    return colon < 0 ? authority : authority.substring(0, colon);
-  }
-
-  /**
-   * Whether NO_PROXY {@code list} sends {@code host} (a name, or an address without brackets)
-   * directly: an address by the address and network entries, a name by the name entries.
-   */
-  static boolean bypassed(String list, String host) {
-    Ip ip = Ip.parse(host);
-    String name = host.toLowerCase(Locale.ROOT);
-    for (String raw : list.split(",", -1)) {
-      String entry = raw.strip();
-      if (entry.isEmpty()) {
-        continue;
-      }
-      // An address entry: a network (address/prefix) or an address.
-      int slash = entry.indexOf('/');
-      Ip net = Ip.parse(slash < 0 ? entry : entry.substring(0, slash));
-      if (net != null) {
-        int bits = net.v6 ? 128 : 32;
-        int prefix = slash < 0 ? bits : decimal(entry.substring(slash + 1), bits);
-        if (prefix >= 0) {
-          if (ip != null && ip.v6 == net.v6 && ip.value.shiftRight(bits - prefix).equals(net.value.shiftRight(bits - prefix))) {
-            return true;
-          }
-          continue;
-        }
-      }
-      // A name entry: never an address's.
-      if (ip != null) {
-        continue;
-      }
-      String d = entry.toLowerCase(Locale.ROOT);
-      if (d.equals(name) || (d.startsWith(".") && d.substring(1).equals(name))) {
-        return true;
-      }
-      if (name.endsWith(d)) {
-        if (d.startsWith(".") || (name.length() > d.length() && name.charAt(name.length() - d.length() - 1) == '.')) {
-          return true;
-        }
-      } else if (d.equals("*")) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /** A prefix length: decimal, no leading zeros, at most {@code max}; -1 if it isn't one. */
-  private static int decimal(String s, int max) {
-    if (!s.matches("0|[1-9][0-9]{0,2}")) {
-      return -1;
-    }
-    int n = Integer.parseInt(s);
-    return n <= max ? n : -1;
   }
 
   /** An IP address, from its text only: its family and value. */

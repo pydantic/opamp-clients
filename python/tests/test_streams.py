@@ -26,7 +26,7 @@ from opamp_client import _streams
 from opamp_client import opamp_pb2 as pb
 from opamp_client._executor import download_path, downloads_dir
 from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._streams import Streams
+from opamp_client._streams import Streams, proxy_choice
 from opamp_client._transport import Transport
 
 
@@ -709,14 +709,11 @@ def test_proxy_queries_answer_with_the_proxy_as_given(tmp_path, monkeypatch) -> 
         s.do(corepb.Effect(proxy_query=corepb.Url(id=5, url="http://opamp.test/v1/opamp")))
         assert got[-1].proxy_answer == corepb.ProxyAnswer(id=5, proxy="http://proxy.test:3128",
                                                           headers=[corepb.Header(name="X-T", value="1")])
+        # The environment's is the core's to pick (it was told the variables): asked, none.
         monkeypatch.setenv("HTTPS_PROXY", "proxy.test:3128")
-        monkeypatch.setenv("NO_PROXY", "direct.test")
-        s = Streams(got.append, Transport(), None)
+        s = Streams(got.append, Transport(rust=True), None)
         s.do(corepb.Effect(proxy_query=corepb.Url(id=6, url="https://opamp.test/v1/opamp")))
-        assert got[-1].proxy_answer.proxy == "http://proxy.test:3128", "a bare host:port is http://"
-        s.do(corepb.Effect(proxy_query=corepb.Url(id=7, url="https://direct.test/v1/opamp")))
-        s.do(corepb.Effect(proxy_query=corepb.Url(id=8, url="http://opamp.test/v1/opamp")))
-        assert got[-2].proxy_answer == corepb.ProxyAnswer(id=7) and got[-1].proxy_answer == corepb.ProxyAnswer(id=8)
+        assert got[-1].proxy_answer == corepb.ProxyAnswer(id=6)
         assert not s.do(corepb.Effect(store=corepb.Store(id=1))), "not Rust mode's"
 
     asyncio.run(run())
@@ -730,9 +727,10 @@ def test_a_proxy_from_the_environment_that_isnt_utf8_still_reaches_the_core(monk
     async def run() -> None:
         got: list[corepb.Input] = []
         monkeypatch.setenv("HTTPS_PROXY", "http://us\udce9r:pw@proxy.test:3128")
-        s = Streams(got.append, Transport(rust=True), None)
-        s.do(corepb.Effect(proxy_query=corepb.Url(id=1, url="https://opamp.test/v1/opamp")))
-        assert got[-1].proxy_answer.proxy == "http://us�r:pw@proxy.test:3128", got
+        choice = proxy_choice(Transport(rust=True))
+        assert [(h.name, h.value) for h in choice.environment if h.name == "HTTPS_PROXY"] == [
+            ("HTTPS_PROXY", "http://us�r:pw@proxy.test:3128")], choice
+        choice.SerializeToString()
 
     asyncio.run(run())
 

@@ -416,6 +416,7 @@ export class Client {
         entropy: new Uint8Array(randomBytes(32)),
         unixMs: BigInt(Date.now()),
         spliceDownloads: rust && (config.rustSplice ?? true),
+        proxy: rust ? transport.rustProxyChoice() : undefined,
       }),
       tests[TEST_CORE_MODULE],
       tests[TEST_CORE_TAP],

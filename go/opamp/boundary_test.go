@@ -25,7 +25,7 @@ import (
 )
 
 // mustCross fails unless in can be handed to the core (proto.Marshal checks every string is UTF-8).
-func mustCross(t *testing.T, what string, in *corepb.Input) {
+func mustCross(t *testing.T, what string, in proto.Message) {
 	t.Helper()
 	if _, err := proto.Marshal(in); err != nil {
 		t.Errorf("%s can't reach the core: %v (%v)", what, err, in)
@@ -95,9 +95,10 @@ func TestWhatTheClientHandsTheCoreIsUTF8(t *testing.T) {
 		}
 		return "", false
 	}
-	mustCross(t, "the environment's proxy", newRustProxies(Proxy{}, env).answer(1, "https://server/"))
-	mustCross(t, "the configured proxy", newRustProxies(Proxy{URL: "http://u:p\xe9@proxy:3128",
-		ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil).answer(1, "https://server/"))
+	mustCross(t, "the environment's proxy", newRustProxies(Proxy{}, env).choice)
+	configured := newRustProxies(Proxy{URL: "http://u:p\xe9@proxy:3128", ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil)
+	mustCross(t, "the configured proxy", configured.choice)
+	mustCross(t, "the configured proxy, asked", configured.answer(1))
 
 	// A download's file that can't be written, under a directory whose name isn't UTF-8 (Rust mode).
 	r := newStreamRig(t, nil, &slowFS{})

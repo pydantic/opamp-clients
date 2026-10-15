@@ -20,7 +20,7 @@ from ._executor import Executor, clear_downloads, read_state
 from ._files import REAL, AfterClear, Files, Journal
 from ._proto.opamp.core.v1 import core_pb2 as corepb
 from ._proto.opamp.v1 import opamp_pb2 as pb
-from ._streams import Streams
+from ._streams import Streams, proxy_choice
 from ._transport import TLS, Proxy, Transport, redacted_headers, redacted_url
 
 
@@ -292,6 +292,7 @@ class Client:
             download_timeout_ms=config.download_timeout_ms,
             streams=rust,
             splice_downloads=rust and config.rust_splice,
+            proxy=proxy_choice(transport) if rust else None,
         ), _module=_core_module)
         self._stop_timeout = (config.stop_timeout_ms or 5000) / 1000
         self._stop_called: float | None = None  # when stop() was first called (the loop's clock)

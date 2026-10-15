@@ -96,8 +96,9 @@
 // downloads alike; Proxy.Direct tells the client to go direct instead, ignoring the environment.
 // The two modes read the environment by different rules:
 //
-//   - Rust mode, by the one rule every SDK's Rust mode shares (tests/shell-tables/README.md,
-//     "Rust mode's proxy rule"): REQUEST_METHOD set (CGI) means none; each variable's upper-case
+//   - Rust mode, read once when the client starts, by the one rule every SDK's Rust mode shares
+//     (tests/shell-tables/README.md, "Rust mode's proxy rule"), which the core applies:
+//     REQUEST_METHOD set (CGI) means none; each variable's upper-case
 //     name if it is set at all, else its lower-case one, a value empty or only spaces being
 //     unset; HTTP_PROXY for http:// and ws://, HTTPS_PROXY for https:// and wss://, either
 //     falling back to ALL_PROXY (a SOCKS5 proxy too), its value trimmed; NO_PROXY's
@@ -304,12 +305,16 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		return nil, err
 	}
 	var tlsCfg *tls.Config
+	var proxies *rustProxies
 	if rust {
 		// The core speaks HTTP and WebSocket itself, over the streams this gives it.
 		if tlsCfg, err = cfg.TLS.tlsConfig(); err != nil {
 			return nil, fmt.Errorf("opamp: TLS: %w", err)
 		}
 		cc.Streams, cc.SpliceDownloads = true, !cfg.NoRustSplice
+		// The core picks each connection's proxy from these.
+		proxies = newRustProxies(cfg.Proxy, cfg.environ)
+		cc.Proxy = proxies.choice
 	}
 	if cfg.StateFile != "" {
 		// A save or a download a client stopped before on this file left finishing ends first.
@@ -358,7 +363,7 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	if rust {
 		// What the core hands over that isn't a stream's (store, discard, a save's cancel; and
 		// platform effects, should a core emit them) goes to x as in Go mode.
-		x.streams = newStreams(x, tlsCfg, newRustProxies(cfg.Proxy, cfg.environ), cfg.streamNet)
+		x.streams = newStreams(x, tlsCfg, proxies, cfg.streamNet)
 	}
 	if notify == nil {
 		notify = func(*Client, Notification) {}

@@ -285,7 +285,7 @@ func streamFailed(id uint64, detail string) *corepb.Input {
 func (s *streams) do(eff *corepb.Effect) (bool, *report) {
 	switch k := eff.Kind.(type) {
 	case *corepb.Effect_ProxyQuery:
-		return true, &report{in: s.proxies.answer(k.ProxyQuery.Id, k.ProxyQuery.Url)}
+		return true, &report{in: s.proxies.answer(k.ProxyQuery.Id)}
 	case *corepb.Effect_StreamResolve:
 		s.resolve(k.StreamResolve.Id, k.StreamResolve.Host)
 	case *corepb.Effect_StreamOpen:

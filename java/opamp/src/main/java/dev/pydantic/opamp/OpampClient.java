@@ -555,6 +555,10 @@ public final class OpampClient {
         // Rust mode: the core speaks HTTP and WebSocket over the streams this client opens.
         .setStreams(rust)
         .setSpliceDownloads(rust && config.rustSplice);
+    if (rust) {
+      // The core picks each connection's proxy from this.
+      c.setProxy(proxyChoice(config));
+    }
     if (config.stateFile != null) {
       // A save or a download's file work of a client stopped before on this file may still be
       // finishing: it lands before this client reads the file, not after.
@@ -657,20 +661,37 @@ public final class OpampClient {
   }
 
   /**
-   * Rust mode's answer to the core's proxy_query: the proxy configured, as given; none for a
-   * direct connection; otherwise the environment's, by Rust mode's rule ({@link RustProxy}).
+   * What Rust mode tells the core about proxies, once ({@code Config.proxy}): the proxy
+   * configured, as given; none for a direct connection; otherwise the environment's variables,
+   * from which the core picks by Rust mode's rule ({@link RustProxy}).
+   */
+  static CoreProto.ProxyChoice proxyChoice(Config config) {
+    CoreProto.ProxyChoice.Builder c = CoreProto.ProxyChoice.newBuilder();
+    if (config.rustProxy != null) {
+      return c.setUrl(config.rustProxy).setResolveLocally(config.proxyResolveLocally).build();
+    }
+    if (config.direct) {
+      return c.setDirect(true).build();
+    }
+    Map<String, String> env = config.environment != null ? config.environment : System.getenv();
+    for (String name : RustProxy.VARIABLES) {
+      String v = env.get(name);
+      if (v != null) {
+        c.addEnvironment(CoreProto.Header.newBuilder().setName(name).setValue(v));
+      }
+    }
+    return c.build();
+  }
+
+  /**
+   * Rust mode's answer to the core's proxy_query, which the core asks only when it wasn't told
+   * ({@link #proxyChoice}): the proxy configured, or none (the environment's rule is the core's).
    */
   static java.util.function.Function<String, CoreProto.ProxyAnswer.Builder> proxies(Config config) {
-    Map<String, String> env = config.environment != null ? config.environment : System.getenv();
     return url -> {
       CoreProto.ProxyAnswer.Builder a = CoreProto.ProxyAnswer.newBuilder();
       if (config.rustProxy != null) {
         a.setProxy(config.rustProxy).setResolveLocally(config.proxyResolveLocally);
-      } else if (!config.direct) {
-        String p = RustProxy.fromEnvironment(env, url);
-        if (p != null) {
-          a.setProxy(p);
-        }
       }
       return a;
     };

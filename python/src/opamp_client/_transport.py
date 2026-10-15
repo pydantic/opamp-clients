@@ -303,82 +303,10 @@ def _bypass(no_proxy: str, host: str, port: int) -> bool:
     return False
 
 
-def _ip(text: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
-    """`text` as an IP address, or None (a name: nothing is resolved). As the reference parses
-    one: no zone, no brackets."""
-    if "%" in text:
-        return None
-    try:
-        return ipaddress.ip_address(text)
-    except ValueError:
-        return None
-
-
-def rust_no_proxy(no_proxy: str, host: str) -> bool:
-    """Whether NO_PROXY's entries say to reach `host` (a name, or an address without brackets)
-    directly, by Rust mode's rule (tests/shell-tables/README.md; hyper-util's NoProxy, the
-    reference's): an address by the address and network entries, a name by the name entries."""
-    ip = _ip(host)
-    name = host.lower()
-    for raw in no_proxy.split(","):
-        entry = raw.strip()
-        if not entry:
-            continue
-        # An address entry: a network (address/prefix) or an address.
-        addr, slash, prefix = entry.partition("/")
-        net_ip = _ip(addr)
-        if net_ip is not None and (not slash or (prefix.isascii() and prefix.isdigit()
-                                                 and int(prefix) <= net_ip.max_prefixlen)):
-            if ip is not None and ip.version == net_ip.version:
-                if ip in ipaddress.ip_network(f"{net_ip}/{prefix or net_ip.max_prefixlen}", strict=False):
-                    return True
-            continue
-        # A name entry: never an address's.
-        if ip is not None:
-            continue
-        d = entry.lower()
-        if d == name or (d.startswith(".") and d[1:] == name):
-            return True
-        if name.endswith(d):
-            if d.startswith(".") or name[len(name) - len(d) - 1:len(name) - len(d)] == ".":
-                return True
-        elif d == "*":
-            return True
-    return False
-
-
-def rust_proxy(environ: Mapping[str, str], url: str) -> str | None:
-    """Rust mode's proxy rule (tests/shell-tables/README.md, "Rust mode's proxy rule"; the
-    reference's, the Rust client's): the proxy `environ` names for `url`, trimmed, as
-    given; None: directly. The same in every SDK's Rust mode."""
-    # Under CGI, HTTP_PROXY may be a request's Proxy header (httpoxy): no variable is taken.
-    if "REQUEST_METHOD" in environ:
-        return None
-
-    def read(upper: str) -> str | None:
-        # The upper-case name if it is set at all (even empty), else the lower-case one.
-        v = environ.get(upper)
-        return v if v is not None else environ.get(upper.lower())
-
-    def proxy(upper: str) -> str | None:
-        return (read(upper) or "").strip() or None  # empty (or spaces) is unset
-
-    u = urlsplit(url)
-    secure = u.scheme.lower() in ("https", "wss")
-    named = proxy("HTTPS_PROXY" if secure else "HTTP_PROXY") or proxy("ALL_PROXY")
-    if named is None:
-        return None
-    return None if rust_no_proxy(read("NO_PROXY") or "", u.hostname or "") else named
-
-
-@dataclass(frozen=True)
-class _Answer:
-    """Rust mode's answer to the core's proxy question, by the shared rule: the proxy as the
-    environment names it (the core reads it, and refuses a scheme it can't use)."""
-
-    url: str = field(repr=False)
-    headers: Mapping[str, str] = field(default_factory=dict, repr=False)
-    resolve_locally: bool = False
+#: The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+#: rule"). The core applies the rule; the client only reads them, once.
+RUST_PROXY_VARIABLES = ("REQUEST_METHOD", "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy",
+                        "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy")
 
 
 class Transport:
@@ -390,8 +318,9 @@ class Transport:
     when its own is unset (as curl and requests take it), NO_PROXY for hosts to reach directly
     (lower-case names too, and taking precedence; see _bypass).
 
-    In Rust mode (``rust``) the core asks which proxy to use (proxy_for): with no proxy
-    configured, the answer follows the rule every SDK's Rust mode shares (rust_proxy), not
+    In Rust mode (``rust``) the core is told once (Streams' proxy_choice): the configured proxy,
+    none with ``Proxy.DIRECT``, or else the variables of the environment, read once, here
+    (rust_environment), from which the core picks by the rule every SDK's Rust mode shares, not
     urllib's convention."""
 
     def __init__(self, tls: TLS | ssl.SSLContext | None = None, proxy: Proxy | str | None = None, *,
@@ -402,13 +331,16 @@ class Transport:
         self._fixed: _Route | None = None
         self._env: dict[str, str] | None = None
         self._by_scheme: dict[str, _Route] = {}
-        # Rust mode with no proxy configured: the environment the shared rule reads, read once.
-        self._rust_env: dict[str, str] | None = None
+        #: Rust mode with no proxy configured: the variables the shared rule reads that are set.
+        self.rust_environment: dict[str, str] = {}
+        #: A proxy (or Proxy.DIRECT) was configured.
+        self.configured = proxy is not None
         if proxy is not None:
             self._fixed = _route(Proxy(proxy) if isinstance(proxy, str) else proxy)
             return
         if rust:
-            self._rust_env = dict(os.environ if _environ is None else _environ)
+            environ = os.environ if _environ is None else _environ
+            self.rust_environment = {k: environ[k] for k in RUST_PROXY_VARIABLES if k in environ}
             return
         self._env = _proxies_from(os.environ if _environ is None else _environ)
         for scheme in ("http", "https", "all"):
@@ -428,12 +360,16 @@ class Transport:
             return None
         return route
 
-    def proxy_for(self, url: str) -> _Route | _Answer | None:
-        """Rust mode: the proxy for `url` (http(s):// or ws(s)://), if any. Its ``url`` and
+    @property
+    def fixed(self) -> _Route | None:
+        """The configured proxy, if any (None with Proxy.DIRECT, or none configured)."""
+        return self._fixed
+
+    def proxy_for(self, url: str) -> _Route | None:
+        """The proxy for `url` (http(s):// or ws(s)://), if any. In Rust mode, the answer to a
+        proxy question, which the core asks only when it wasn't told (Streams' proxy_choice): the
+        configured proxy, or none (the environment's rule is the core's). Its ``url`` and
         ``headers`` go to the core as given, with ``resolve_locally``."""
-        if self._rust_env is not None:
-            named = rust_proxy(self._rust_env, url)
-            return None if named is None else _Answer(named)
         u = urlsplit(url)
         scheme = u.scheme.lower()
         port = u.port or (443 if scheme in ("https", "wss") else 80)
