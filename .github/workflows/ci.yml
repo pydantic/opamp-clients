@@ -84,7 +84,8 @@ jobs:
           python3 -m unittest conformance/runner/test_checks.py conformance/runner/test_run.py
           conformance/differential/test_shells.py conformance/torture/test_invariants.py
           conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
-          examples/test_integrations.py scripts/test_native_dist.py scripts/test_sdk_release.py
+          examples/test_integrations.py examples/test_settings_cookbook.py scripts/test_native_dist.py
+          scripts/test_sdk_release.py
 
   # ---------------------------------------------------------------- Python
   python-tests:

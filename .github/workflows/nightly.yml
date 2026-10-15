@@ -1,0 +1,561 @@
+name: Nightly
+
+# The clients' longer runs, on seeds no pull request has tried: each fuzz target for five minutes,
+# an hour of torture for every client and transport against the Go test server, thousands of runs
+# of the property, callback model and schedule tests, and the crash scenarios on LazyFS. Every job
+# fetches the core, as CI's do (scripts/fetch_core.py fetch).
+#
+# Runners: GitHub-hosted only (ubuntu-24.04), as in CI. Every job stands for itself: none decides
+# for another, and there is no gathering check (nothing requires this workflow).
+#
+# A pull request that changes this file runs it too, each job briefly (about the per-PR counts,
+# 20 s of fuzzing, 10 minutes of torture, one LazyFS seed): a check that every job is wired up, not
+# a night's work.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/nightly.yml
+
+permissions:
+  contents: read
+
+# A new push to a pull request replaces its run. A scheduled or manual run finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Go's native fuzzing of the Go client's own code around the core (scripts/go_fuzz.sh): five
+  # minutes for each fuzz test, one after another, each on every core of the runner.
+  go-fuzz:
+    name: Fuzz the Go client
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - name: Each fuzz test, five minutes
+        env:
+          SECONDS_EACH: ${{ github.event_name == 'pull_request' && '20' || '300' }}
+        run: scripts/go_fuzz.sh "$SECONDS_EACH"
+      - name: Keep what it found
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: go-fuzz
+          retention-days: 7
+          path: go/opamp/**/testdata/fuzz/
+          if-no-files-found: ignore
+
+  # The Python, Java and .NET clients' own code around the core, as go-fuzz does the Go client's:
+  # each target for five minutes (Atheris, Jazzer, SharpFuzz), what it found kept.
+  shim-fuzz:
+    name: Fuzz the ${{ matrix.name }} client
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Python, family: python, script: py_fuzz.sh }
+          - { name: Java, family: java, script: java_fuzz.sh }
+          - { name: .NET, family: dotnet, script: dotnet_fuzz.sh }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.family == 'python'
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.family == 'java'
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: matrix.family == 'dotnet'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      # libFuzzer's runtime (for libfuzzer-dotnet) is clang's libclang-rt-dev.
+      - if: matrix.family == 'dotnet'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq clang libclang-rt-dev
+      - name: Each target, five minutes
+        env:
+          SCRIPT: ${{ matrix.script }}
+          SECONDS_EACH: ${{ github.event_name == 'pull_request' && '20' || '300' }}
+        run: scripts/"$SCRIPT" "$SECONDS_EACH"
+      - name: Keep what it found
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: shim-fuzz-${{ matrix.family }}
+          retention-days: 7
+          path: |
+            target/shim-fuzz/${{ matrix.family }}/*/artifacts/**
+            target/shim-fuzz/${{ matrix.family }}/*/fuzz.log
+          if-no-files-found: ignore
+
+  # An hour of faults for every client and transport against the Go test server, on today's seed
+  # (conformance/torture). Our clients must survive; the upstream clients' runs are recorded (their
+  # known failures are in conformance/baseline.toml and conformance/torture/baseline.toml).
+  torture:
+    name: Torture ${{ matrix.client }} ${{ matrix.transport }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    continue-on-error: ${{ contains(fromJSON('["go", "java", "dotnet", "python"]'), matrix.client) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { client: go-core, transport: http }
+          - { client: go-core, transport: ws }
+          - { client: go-core-rust, transport: http }
+          - { client: go-core-rust, transport: ws }
+          - { client: node, transport: http }
+          - { client: node, transport: ws }
+          - { client: node-rust, transport: http }
+          - { client: node-rust, transport: ws }
+          - { client: python-core, transport: http }
+          - { client: python-core, transport: ws }
+          - { client: python-core-rust, transport: http }
+          - { client: python-core-rust, transport: ws }
+          - { client: java-core, transport: http }
+          - { client: java-core, transport: ws }
+          - { client: java-core-rust, transport: http }
+          - { client: java-core-rust, transport: ws }
+          - { client: dotnet-core, transport: http }
+          - { client: dotnet-core, transport: ws }
+          - { client: dotnet-core-rust, transport: http }
+          - { client: dotnet-core-rust, transport: ws }
+          # The upstream clients.
+          - { client: go, transport: http }
+          - { client: go, transport: ws }
+          - { client: java, transport: http }
+          - { client: dotnet, transport: http }
+          - { client: dotnet, transport: ws }
+          - { client: python, transport: http }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core and the tap checker, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: conformance/**/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: An hour of faults, on today's seed
+        env:
+          CLIENT: ${{ matrix.client }}
+          TRANSPORT: ${{ matrix.transport }}
+          MINUTES: ${{ github.event_name == 'pull_request' && '10' || '60' }}
+        run: |
+          uv run --quiet --no-project --python 3.13 --with psutil conformance/torture/torture.py \
+            --client "$CLIENT" --transport "$TRANSPORT" --minutes "$MINUTES" --seed "$(date +%Y%m%d)"
+      - name: Keep the run's logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: torture-${{ matrix.client }}-${{ matrix.transport }}
+          retention-days: 7
+          path: conformance/out/torture/
+          if-no-files-found: ignore
+
+  # Each wrapper's property tests, 1,000 runs each: fast-check, Hypothesis, Go's under the race
+  # detector, Java's, FsCheck.
+  wrappers:
+    name: Wrapper properties, many runs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      OPAMP_PROP_RUNS: ${{ github.event_name == 'pull_request' && '100' || '1000' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - name: Node.js (fast-check)
+        working-directory: node/opamp
+        env:
+          FC_RUNS: ${{ env.OPAMP_PROP_RUNS }}
+        run: npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/properties.test.js
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: ${{ !cancelled() }}
+      - name: Python (Hypothesis)
+        if: ${{ !cancelled() }}
+        working-directory: python
+        env:
+          HYPOTHESIS_EXAMPLES: ${{ env.OPAMP_PROP_RUNS }}
+        run: uv run --python 3.13 pytest -q tests/test_properties.py
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: ${{ !cancelled() }}
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - name: Go (race detector)
+        if: ${{ !cancelled() }}
+        working-directory: go
+        run: go test -race -count=1 -run TestCallsFromAnywhere ./opamp/
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ !cancelled() }}
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - name: Java
+        if: ${{ !cancelled() }}
+        working-directory: java/opamp
+        run: mvn -q -B test -Dtest=PropertiesTest -Dsurefire.failIfNoSpecifiedTests=false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: ${{ !cancelled() }}
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - name: .NET (FsCheck)
+        if: ${{ !cancelled() }}
+        working-directory: dotnet
+        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~PropertyTests"
+
+  shells:
+    # The schedule-exploring tests make this the longest night's work: one job per part, so a
+    # failure in one hides none of the rest. Within a part each check runs whatever the one before
+    # it did.
+    name: Shell contract, many seeds (${{ matrix.part }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [Go and Node.js, Python, Java, .NET]
+    env:
+      # The callback model test's many runs are a job of their own (callback-model).
+      OPAMP_MODEL_RUNS: "100"
+      OPAMP_ADVERSARY_SEEDS: ${{ github.event_name == 'pull_request' && '24' || '500' }}
+      # Each prints its seed, and a failure the command that replays it.
+      OPAMP_SCHED_RUNS: ${{ github.event_name == 'pull_request' && '500' || '20000' }}
+      OPAMP_SCHEDULE_RUNS: ${{ github.event_name == 'pull_request' && '200' || '5000' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The adversary module (testdata/core/opamp_core_adversary.wasm) comes with the core.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      # Seeds no PR has tried: a new base every night, printed so a failure replays with
+      # OPAMP_ADVERSARY_BASE (or one seed with OPAMP_ADVERSARY_SEED).
+      - name: The night's seeds
+        run: |
+          base=$(( $(date -u +%s) / 86400 * 1000 ))
+          echo "OPAMP_ADVERSARY_BASE=$base" >> "$GITHUB_ENV"
+          echo "adversary seeds from $base; rerun one with OPAMP_ADVERSARY_SEED=<seed>"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.part == 'Go and Node.js'
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - name: Go
+        if: matrix.part == 'Go and Node.js'
+        working-directory: go
+        run: go test -race -count=1 -timeout 60m -run 'TestCallbackContractModel|TestAdversary$' ./opamp/
+      # A new random base seed each night, printed; -rapid.seed=<seed> replays a failure.
+      - name: Go schedules (synctest + rapid)
+        if: ${{ !cancelled() && matrix.part == 'Go and Node.js' }}
+        working-directory: go
+        env:
+          RAPID_CHECKS: ${{ github.event_name == 'pull_request' && '200' || '10000' }}
+        run: go test -race -count=1 -timeout 90m -run 'TestSchedules$' ./opamp/ -rapid.checks="$RAPID_CHECKS"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ !cancelled() && matrix.part == 'Go and Node.js' }}
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - name: Node.js
+        if: ${{ !cancelled() && matrix.part == 'Go and Node.js' }}
+        working-directory: node/opamp
+        run: >-
+          npm ci --no-audit --no-fund && npm exec -- tsc -p . &&
+          node --test dist/test/callback.properties.test.js dist/test/adversary.properties.test.js dist/test/schedule.properties.test.js
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.part == 'Python'
+      - name: Python
+        if: matrix.part == 'Python'
+        working-directory: python
+        run: uv run --python 3.13 pytest -q tests/test_callback_properties.py tests/test_adversary_properties.py
+      - name: Python schedules (a seeded event loop) and the proxy connector
+        if: ${{ !cancelled() && matrix.part == 'Python' }}
+        working-directory: python
+        run: uv run --python 3.13 pytest -q tests/test_schedules.py tests/test_proxy_properties.py tests/test_sched_loop.py
+        env:
+          HYPOTHESIS_EXAMPLES: ${{ github.event_name == 'pull_request' && '100' || '5000' }}
+          OPAMP_SCHED_LOOP_SEEDS: ${{ github.event_name == 'pull_request' && '2' || '25' }}
+      # Two JDKs: 25 for Fray's own JVM, 21 for the build (the last set up is the default). Fray
+      # jlinks its JVM from JDK25_HOME's jmods, and Temurin's 25 has none (JEP 493): Corretto's has.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.part == 'Java'
+        with:
+          distribution: corretto
+          java-version: "25"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.part == 'Java'
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - name: Java
+        if: matrix.part == 'Java'
+        working-directory: java/opamp
+        run: mvn -q -B test -Dtest='CallbackPropertiesTest,AdversaryPropertiesTest' -Dsurefire.failIfNoSpecifiedTests=false
+      # A scenario that reaches OPAMP_FRAY_BUDGET_S stops there, passing; the run prints how many
+      # schedules each reached, and a failure its seed and recording (java/opamp/README.md).
+      - name: Java schedules (Fray, 1,000 per scenario) and the send/close chain (Lincheck)
+        if: ${{ !cancelled() && matrix.part == 'Java' }}
+        working-directory: java/opamp
+        env:
+          JDK25_HOME: ${{ env.JAVA_HOME_25_X64 }}
+          OPAMP_FRAY_RUNS: ${{ github.event_name == 'pull_request' && '50' || '1000' }}
+          OPAMP_FRAY_BUDGET_S: ${{ github.event_name == 'pull_request' && '60' || '900' }}
+          OPAMP_LINCHECK_ITERATIONS: ${{ github.event_name == 'pull_request' && '5' || '50' }}
+        run: |
+          status=0
+          mvn -q -B -Pfray test -Dfray.only=true || status=1
+          mvn -q -B test -Dtest=ConnLincheckTest -Dsurefire.failIfNoSpecifiedTests=false || status=1
+          exit $status
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: matrix.part == '.NET'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - name: .NET
+        if: matrix.part == '.NET'
+        working-directory: dotnet
+        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~CallbackPropertyTests|FullyQualifiedName~AdversaryPropertyTests|FullyQualifiedName~ScheduleTests"
+
+  # The callback contract (docs/sdk-contract.md) in each SDK's callback model test, 5,000 runs
+  # each (100 on a pull request). Each prints its seed; OPAMP_MODEL_SEED=<seed> replays a run.
+  callback-model:
+    name: Callback model, 5,000 runs (${{ matrix.sdk }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [go, node, python, java, dotnet]
+    env:
+      OPAMP_MODEL_RUNS: ${{ github.event_name == 'pull_request' && '100' || '5000' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - if: matrix.sdk == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - if: matrix.sdk == 'go'
+        working-directory: go
+        run: go test -race -count=1 -timeout 170m -run 'TestCallbackContractModel' ./opamp/
+      - if: matrix.sdk == 'node'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - if: matrix.sdk == 'node'
+        working-directory: node/opamp
+        run: npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/callback.properties.test.js
+      - if: matrix.sdk == 'python'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - if: matrix.sdk == 'python'
+        working-directory: python
+        run: uv run --python 3.13 pytest -q tests/test_callback_properties.py
+      - if: matrix.sdk == 'java'
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - if: matrix.sdk == 'java'
+        working-directory: java/opamp
+        run: mvn -q -B test -Dtest=CallbackPropertiesTest -Dsurefire.failIfNoSpecifiedTests=false
+      - if: matrix.sdk == 'dotnet'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - if: matrix.sdk == 'dotnet'
+        working-directory: dotnet
+        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~CallbackPropertyTests"
+
+  # Each language's Controls flipped through seeded settings documents while workers emit spans and
+  # records through the real SDK (the per-PR runs take a few seconds; here 150 runs each). A
+  # failure prints the seed and the line that replays it.
+  settings-torture:
+    name: Settings flipped under load, every language
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      OPAMP_PROP_RUNS: ${{ github.event_name == 'pull_request' && '5' || '150' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: |
+            go/go.sum
+            go/otel/go.sum
+      - name: Go
+        working-directory: go/otel
+        run: go test -race -count=1 -run TestSettingsFlippedWhileTelemetryFlows .
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: ${{ !cancelled() }}
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+      - name: Node.js
+        if: ${{ !cancelled() }}
+        run: |
+          (cd node/opamp && npm ci --no-audit --no-fund && npm run build)
+          cd node/otel && npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/settings.torture.test.js
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: ${{ !cancelled() }}
+      - name: Python
+        if: ${{ !cancelled() }}
+        working-directory: python/otel
+        run: uv run --python 3.13 pytest -q tests/test_concurrency.py
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: ${{ !cancelled() }}
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: |
+            java/opamp/pom.xml
+            java/opamp-javaagent/pom.xml
+      - name: Java
+        if: ${{ !cancelled() }}
+        run: |
+          mvn -q -B -DskipTests install -f java/opamp/pom.xml
+          mvn -q -B test -f java/opamp-javaagent/pom.xml -Dtest=ControlsTortureTest
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: ${{ !cancelled() }}
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - name: .NET
+        if: ${{ !cancelled() }}
+        working-directory: dotnet
+        run: dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo --filter FullyQualifiedName~ConcurrencyTests
+
+  # The crash scenarios on a real file system that loses what wasn't flushed: LazyFS (FUSE) in a
+  # container (conformance/lazyfs/), every driver's state file on a mount of its own. Each crash
+  # kills the driver and drops what wasn't flushed, or tears a write of the state's temporary file;
+  # the file system comes back and crash_state_consistent judges what is there. 25 seeds a night,
+  # from a new base. The container needs /dev/fuse and CAP_SYS_ADMIN; where the runner can't give
+  # them, the job says so and is skipped (docs/state-file.md, "Real crashes on a real file system").
+  lazyfs:
+    name: Crash consistency on LazyFS
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The container builds the drivers from a copy of the tree, the fetched core with it
+      # (conformance/lazyfs/inside.sh).
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - name: The crash scenarios on LazyFS, every driver of ours, 25 seeds
+        env:
+          LAZYFS_SEEDS: ${{ github.event_name == 'pull_request' && '1' || '25' }}
+          # The crash moments are seconds after start: more at once and a JVM can be killed
+          # before it has done what the scenario crashes it in.
+          LAZYFS_JOBS: "2"
+        run: conformance/lazyfs/run.sh
+      - name: Keep the runs (a failure's seed is in its directory's name)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: lazyfs
+          retention-days: 7
+          path: conformance/out/lazyfs/
+          if-no-files-found: ignore
