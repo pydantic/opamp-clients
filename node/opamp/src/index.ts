@@ -270,10 +270,6 @@ function fromCore(n: CoreNotification, stateFile: string | undefined): Notificat
 
 const EMPTY = create(EmptySchema);
 
-/** All of stop takes the core's stop_timeout_ms (this by default), from stop(): once the core has
- * stopped, what is left of it bounds the wait for what it started to unwind (RULE-SHELL-07); a
- * file write that hangs is let go rather than holding stop up. */
-const STOP_MS = 5000;
 /** The longest delay a Node timer takes (setTimeout takes a longer one as 1 ms). */
 const MAX_DELAY_MS = 2 ** 31 - 1;
 /** Once the core has stopped, at least this for what it gave up on to unwind. */
@@ -282,7 +278,9 @@ const STOP_GRACE_MS = 250;
 /** Effects that open something new: a connection, a download, a stream. */
 const STARTS = new Set(["wsOpen", "download", "streamOpen"]);
 
-const ms = (v: number | undefined): bigint => BigInt(Math.max(0, Math.floor(v ?? 0)));
+/** Milliseconds or bytes for the core. A negative one reaches it as its two's complement, which the
+ * core refuses at start, naming the field and the number meant. */
+const ms = (v: number | undefined): bigint => BigInt.asUintN(64, BigInt(Math.trunc(v ?? 0)));
 
 /** A running OpAMP client. */
 export class Client {
@@ -309,8 +307,11 @@ export class Client {
   #stopAt: number | undefined;
   /** What keeps Node.js running from stop() until the client has stopped. */
   #stopHold: NodeJS.Timeout | undefined;
-  /** How long all of stop may take. */
-  readonly #stopMs: number;
+  /** How long all of stop may take: the core's stop_timeout_ms, as given or by default (its
+   * start reports it), from stop(). Once the core has stopped, what is left of it bounds the wait
+   * for what it started to unwind (RULE-SHELL-07); a file write that hangs is let go rather than
+   * holding stop up. 0 until the core has started. */
+  #stopMs = 0;
   #saidStopped = false;
 
   /** Start a client. `notify` is called for every notification, never before `start` returns (a
@@ -330,7 +331,6 @@ export class Client {
     const transport = new Transport({ tls: config.tls, proxy: config.proxy }, process, rustMode(config));
     this.#notify = notify;
     this.#stateFile = config.stateFile;
-    this.#stopMs = config.stopTimeoutMs !== undefined && config.stopTimeoutMs > 0 ? config.stopTimeoutMs : STOP_MS;
     this.#done = new Promise((resolve, reject) => {
       this.#finish = (err) => (err === undefined ? resolve() : reject(err));
     });
@@ -423,6 +423,7 @@ export class Client {
       tests[TEST_CORE_TAP],
     );
     this.#core = core;
+    this.#stopMs = Number(core.limits?.stopTimeoutMs ?? 0n);
     let ops = tests[TEST_FILE_OPS] ?? REAL;
     if (config.stateFile !== undefined) {
       if (core.tapped) {

@@ -368,10 +368,8 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	if notify == nil {
 		notify = func(*Client, Notification) {}
 	}
-	stopBound := cfg.StopTimeout
-	if stopBound <= 0 {
-		stopBound = 5 * time.Second // the core's default
-	}
+	// Stop is bounded by the core's own stop timeout, as given or its default: init reports it.
+	stopBound := time.Duration(out.GetLimits().GetStopTimeoutMs()) * time.Millisecond
 	l := &loop{core: c, x: x, notify: func(n Notification) { notify(cl, n) }, cmds: cl.cmds, start: time.Now(),
 		queue: first, uid: cl.setUID, stopBound: stopBound}
 	started := make(chan struct{})
@@ -626,7 +624,9 @@ func coreConfig(cfg Config) (*corepb.Config, error) {
 
 // millis is d in whole milliseconds for the core; a negative d is none, the core's default, as 0
 // is (as the Node.js client takes it).
-func millis(d time.Duration) uint64 { return uint64(max(d, 0) / time.Millisecond) }
+// millis is d in milliseconds for the core. A negative one reaches it as its two's complement,
+// which the core refuses at init, naming the field and the number meant.
+func millis(d time.Duration) uint64 { return uint64(d / time.Millisecond) }
 
 func statusInputs(s Status) []*corepb.Input {
 	var in []*corepb.Input

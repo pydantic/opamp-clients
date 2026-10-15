@@ -568,10 +568,11 @@ public final class OpampClient {
     if (config.instanceUid != null) {
       c.setInstanceUid(ByteString.copyFrom(config.instanceUid));
     }
-    this.stopTimeoutMs = ms(config.stopTimeout) == 0 ? 5000 : ms(config.stopTimeout);
     config.headers.forEach((k, v) -> c.addHeaders(CoreProto.Header.newBuilder().setName(k).setValue(v)));
     this.core = Core.of(coreModule, c.build(), tapPath);
     this.instanceUid = core.initOutput().getInstanceUid().toByteArray();
+    // All of stop takes the core's stop timeout, as given or by default: its start reports it.
+    this.stopTimeoutMs = core.initOutput().getLimits().getStopTimeoutMs();
     // The file operations of saves and downloads, journaled into the core tap if there is one.
     Disk files = disk.apply(Disk.REAL);
     if (config.stateFile != null) {
@@ -698,19 +699,16 @@ public final class OpampClient {
   }
 
   /**
-   * {@code d} in whole milliseconds for the core, where 0 is its default: a negative duration is
-   * none, the default, as the Go and Node.js clients take it (as an unsigned number the core would
-   * read it as some 584 million years: a stop that never ends), and one past a {@code long}'s
-   * milliseconds the longest there is.
+   * {@code d} in whole milliseconds for the core (toward zero), where 0 is its default. A negative
+   * one reaches the core as its two's complement, which the core refuses at start, naming the field
+   * and the number meant, as in every SDK. One past a {@code long}'s milliseconds is the longest
+   * there is (or, negative, the most negative).
    */
   static long ms(Duration d) {
-    if (d.isNegative()) {
-      return 0;
-    }
     try {
-      return d.toMillis();
+      return d.isNegative() ? -d.negated().toMillis() : d.toMillis();
     } catch (ArithmeticException tooLong) {
-      return Long.MAX_VALUE;
+      return d.isNegative() ? Long.MIN_VALUE : Long.MAX_VALUE;
     }
   }
 
