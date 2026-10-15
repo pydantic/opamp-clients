@@ -1,0 +1,144 @@
+# Differences between the SDKs' taps of one scenario that are allowed (shells.py), each with
+# its reason and, where it is temporary, the issue that removes it. A difference is allowed when a
+# rule matches its client, scenario and transport (globs; every one by default), its category
+# (calls, notify, saves, send, recv, conn, download, or config for the configuration the core was
+# given), `first`, a regular expression searched in its first lines ("- reference's | + other's",
+# or "field: reference's | other's" for config), and `grouping`, a test of the whole difference
+# named in shells.py (GROUPINGS). Keep each rule as narrow as the reason.
+
+# Rust mode: the core speaks HTTP and WebSocket itself (Config.streams); its wire is not compared.
+[[allow]]
+clients = ["*-rust"]
+category = "config"
+first = "^streams: false \\| true$"
+reason = "Rust mode runs the core with streams: its own HTTP and WebSocket, not the shell's"
+
+# A crash lands at a moment of each client's own progress (the seed picks a time after the driver
+# started, not a point in the run), so what was saved by then, and what the next run starts from,
+# differs: crash_state_consistent judges each client on its own.
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "send"
+reason = "where the crash lands in each client's run is timing"
+
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "saves"
+reason = "where the crash lands in each client's run is timing"
+
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "notify"
+reason = "where the crash lands in each client's run is timing"
+
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "calls"
+reason = "where the crash lands in each client's run is timing"
+
+# Changes that reach the core in one step make one save, in two steps two: one client saving an
+# intermediate state the other doesn't is timing. (Only a store more or fewer: a second answer to
+# a save, `stored`, isn't allowed.)
+[[allow]]
+category = "saves"
+first = "^- +\\| \\+ store |^- store .* \\| \\+ $"
+reason = "changes that reach the core in one step or two make one save or two"
+
+# Package downloads that fail close together reach the core in one step or two, and a save is
+# made per step (one at a time: what comes while one is being written goes in the next). Which
+# failures share a save is timing (packages-redirects-refused-http: f4 and f5 in one client's,
+# f5 and f6 in another's): a save of one intermediate state where the other made another. Only
+# that (shells.py, package_failures_grouped): every save that differs is the same state but for
+# which packages are marked failed, answered stored; failures only accumulate between the saves
+# both made; and both reach the same save after.
+[[allow]]
+scenarios = ["packages-*"]
+category = "saves"
+first = "^- store .*pkgs\\(.* \\| \\+ store .*pkgs\\(.*$"
+grouping = "package-failures"
+reason = "packages that fail close together reach the core in one step or two: which share a save is timing"
+
+# Over WebSocket, after a credential switch the old connection's close and the new one's opening
+# race: their reports interleave either way. The new one may be refused (credential-offer-broken:
+# ws_failed(401)) as well as opened.
+[[allow]]
+scenarios = ["credential-offer*"]
+transports = ["ws"]
+category = "conn"
+first = "^- (ws_closed\\(1000\\)|ws_opened|ws_failed\\(\\d+\\)) \\| \\+ |^-  \\| \\+ (ws_closed\\(1000\\)|ws_opened|ws_failed\\(\\d+\\))$"
+reason = "the old connection's close and the new one's opening (or refusal) race"
+
+# When the new connection's first report reaches the server before the old one's goodbye, the
+# server sees the numbers out of order and asks for the full state: one more ReportFullState
+# received, and one more full report sent, in the client whose connections overlapped.
+[[allow]]
+scenarios = ["credential-offer*"]
+transports = ["ws"]
+category = "recv"
+first = "^- flags=1 \\| \\+ $|^- +\\| \\+ flags=1$"
+reason = "the old connection's goodbye and the new one's first report race: the server may ask for the full state"
+
+[[allow]]
+scenarios = ["credential-offer*"]
+transports = ["ws"]
+category = "send"
+first = "^- uid#\\d+ caps=[0-9a-f]+ desc\\(.*css\\(\\d+\\) \\| \\+ $|^- +\\| \\+ uid#\\d+ caps=[0-9a-f]+ desc\\(.*css\\(\\d+\\)$"
+reason = "the old connection's goodbye and the new one's first report race: a full report the server asked for"
+
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "recv"
+reason = "where the crash lands in each client's run is timing"
+
+[[allow]]
+scenarios = ["crash-mid-*"]
+category = "conn"
+reason = "where the crash lands in each client's run is timing"
+
+# A run that ends while a client is reconnecting: one attempt more or fewer.
+[[allow]]
+category = "conn"
+first = "^- +\\| \\+ ws_open\\(|^- ws_open\\(.*\\) \\| \\+ $"
+reason = "a run ending mid-reconnect: one attempt more or fewer is timing"
+
+# Where the server never lets a connection last (it drops each one, or its certificate is
+# refused), the run ends with the client between attempts, and whether the shell hands the core
+# its goodbye (agent_disconnect) before the driver stops is timing: node in accept-then-drop-ws,
+# go-core in tls-untrusted-http, one run in two on CI. Only that last disconnect, nothing else sent.
+[[allow]]
+scenarios = ["accept-then-drop*", "tls-untrusted*"]
+category = "send"
+first = "^- +\\| \\+ uid#\\d+ caps=[0-9a-f]+ disconnect$|^- uid#\\d+ caps=[0-9a-f]+ disconnect \\| \\+ $"
+reason = "the server never lets a connection last: whether the goodbye reaches the core before the run ends is timing"
+
+# Over WebSocket a client's messages are all numbered 0 until the server has answered one of the
+# run (RULE-CLIENT-20), and one that sent a second before the first was answered (a status the
+# application set, a package's progress: sooner on a loaded machine) showed the server two
+# messages numbered 0, which it took for a gap and answered by asking for the full state. That was
+# allowed here as timing in the restart scenarios. The kernel now holds the second message
+# until the first is answered (RULE-CLIENT-22), so there is no rule: one more ReportFullState
+# received, or one more full report sent, after a restart is a difference to see. So is a full
+# report that says APPLYING for a remote config: after a restart that is the Rust client's answer
+# from the callback losing to the connection's opening (a fix since reverted; RULE-SHELL-10).
+
+# The driver makes its changes (changes_at_s) by its own clock, from when it started; a client in a
+# container (the JVM, .NET) takes seconds over its first exchange, so a change can go in its first
+# message rather than after it, before the server's request for a full report instead of after
+# it, or elsewhere in a hostile server's cycle of holding and answering (java-core, in one run of
+# two: a status report resent once more); and in restart-mid-download the overlapping runs'
+# connections and package reports interleave by the same timing. (The server's faults are timed
+# from the driver's first request now, so the scenarios whose difference was the server's clock,
+# tcp-drop, close-frame, server-restart and throttle-429, are compared alike.)
+[[allow]]
+clients = ["java-core", "java-core-rust", "dotnet-core", "dotnet-core-rust"]
+scenarios = ["request-uid", "request-uid-ignored", "server-capabilities", "restart-mid-download", "hostile-heartbeat",
+             "hostile-settings", "hostile-packages"]
+reason = "the driver's changes are timed by its own clock; a client in a container is slow to its first exchange"
+
+# A callback that fails ends the client at once (RULE-SHELL-02): whether the save of the config it
+# failed on was answered stored by then is timing.
+[[allow]]
+scenarios = ["callback-throws"]
+category = "saves"
+first = "^- +\\| \\+ stored$|^- stored \\| \\+ $"
+reason = "the client ends when the callback fails: whether the config's save was answered by then is timing"

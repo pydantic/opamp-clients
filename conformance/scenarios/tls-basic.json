@@ -1,0 +1,10 @@
+{
+  "description": "The server listens with TLS only; the driver is given the CA that signed its certificate. The client connects over TLS, reports and polls.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["tls"],
+  "driver": {"poll_s": 1},
+  "server": {"tls": {"client_auth": "none"}},
+  "checks": ["connected_over_tls", "sequence_increments_by_one", "first_message_is_full", "reports_after_connecting",
+             "disconnect_is_last", "driver_survives"]
+}

@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pydantic.OpAmp.Extensions.Hosting</PackageId>
+    <Version>0.1.0</Version>
+    <Description>An OpenTelemetry .NET SDK set up in code (services.AddOpenTelemetry()) under an OpAMP server, in one call: .WithOpAmp()</Description>
+    <IsPackable>false</IsPackable>
+    <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The oldest versions it takes, so that an application's own (newer) ones win: the OTLP
+      exporter's first without a known vulnerability (GHSA-4625-4j76-fww9). Its gRPC goes through
+      HttpClientFactory too (since 1.11), which the gate needs.
+    -->
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
+  </ItemGroup>
+
+  <!-- What the package shares with the automatic instrumentation plugin (dotnet/shared): compiled into each. -->
+  <ItemGroup>
+    <Compile Include="../shared/*.cs" LinkBase="shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pydantic.OpAmp.Extensions.Hosting.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shared OpAMP client core, compiled (the native library): a package holding only the
+    library for each platform, under runtimes/<rid>/native, which the .NET runtime loads for the
+    platform it runs on. No assembly and no source: the client (Pydantic.OpAmp.Client) depends
+    on it and calls it through its C interface. CI packs it with every platform's library
+    (OpAmpNativeRuntimes: scripts/native_dist.py).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <PackageId>Pydantic.OpAmp.Core.Native</PackageId>
+    <Version>0.3.0</Version>
+    <Description>The shared OpAMP client core for Pydantic.OpAmp.Client, compiled for each platform</Description>
+    <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <IsPackable>false</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- NU5128: no lib/ for its framework, on purpose: it holds native libraries only. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(OpAmpNativeRuntimes)' != ''">
+    <None Include="$(OpAmpNativeRuntimes)/**/*" Pack="true" PackagePath="runtimes" />
+  </ItemGroup>
+
+</Project>

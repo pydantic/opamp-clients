@@ -1,0 +1,216 @@
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+#
+# Publishes an SDK release to the public registries: PyPI (the client, its native core per
+# platform, otel), npm (the client, otel), Maven Central (the client, the Java agent extension)
+# and NuGet (the client, its native core, the automatic instrumentation plugin). Runs on an
+# sdk/vX.Y.Z tag, or by hand; on a PR that changes it, as a dry run at 0.0.0.
+# Every package is built, stamped with the version (scripts/sdk_release.py) and checked to hold no
+# core source. Each registry uploads only once the variable SDK_REGISTRIES names it ("pypi npm
+# maven nuget"); until then its job says what it would have published. Go needs no upload (the
+# module proxy serves the go/vX.Y.Z tag). What each registry needs set up first:
+# docs/sdk-registries.md. The native core's libraries are built from the core's sources where they
+# are (a Cargo.toml at the root), else taken from the core's release that opamp-core.lock.json pins.
+name: Registries
+
+on:
+  push:
+    tags: ["sdk/v*"]
+  pull_request:
+    paths: [.github/workflows/registries.yml, scripts/sdk_release.py, scripts/native_dist.py, scripts/fetch_core.py,
+            opamp-core.lock.json]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to publish, e.g. 0.2.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: registries-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Every SDK package, built and checked
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The version, from the tag
+        id: version
+        env:
+          VERSION: ${{ github.event_name == 'pull_request' && '0.0.0' || inputs.version || github.ref_name }}
+        run: |
+          version=${VERSION#sdk/v}
+          # Releases alone: registries keep every version for good.
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$version isn't a version like 0.2.0"; exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        with:
+          tool: cargo-zigbuild@0.23.4,cargo-xwin@0.23.1
+      - name: The targets and zig
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        run: |
+          rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
+            x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+          # zig 0.14: glibc 2.17, so the libraries run on any distribution since (scripts/native_dist.py).
+          python3 -m pip install --quiet ziglang==0.14.1
+          mkdir -p "$RUNNER_TEMP/zig" && printf '#!/bin/sh\nexec python3 -m ziglang "$@"\n' > "$RUNNER_TEMP/zig/zig"
+          chmod +x "$RUNNER_TEMP/zig/zig" && echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ hashFiles('Cargo.toml') != '' }}
+        with:
+          path: ~/.cache/cargo-xwin
+          key: cargo-xwin-0.23.1-${{ runner.os }}
+      - name: The core's release, every platform's library (without the core's sources)
+        if: ${{ hashFiles('Cargo.toml') == '' }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms
+      - name: twine and file
+        run: |
+          python3 -m pip install --quiet twine==7.0.0
+          sudo apt-get update -qq && sudo apt-get install -y -qq file
+      - name: Every manifest at the version
+        run: python3 scripts/sdk_release.py stamp "${{ steps.version.outputs.version }}"
+      - name: The native core for every platform (wheels, NuGet packages)
+        run: |
+          python3 scripts/native_dist.py build
+          python3 scripts/native_dist.py pack
+          python3 scripts/native_dist.py check
+      - name: The rest (otel wheel, npm tarballs, Maven jars, the .NET plugin)
+        run: python3 scripts/sdk_release.py pack
+      - name: All there, valid for their registries, and none carries the cores' sources
+        run: |
+          python3 scripts/sdk_release.py check
+          twine check --strict dist/native/wheels/*.whl dist/sdk/wheels/*.whl
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sdk
+          retention-days: 14
+          path: |
+            dist/native/wheels/*.whl
+            dist/native/nuget/*.nupkg
+            dist/sdk
+          if-no-files-found: error
+
+  pypi:
+    name: PyPI
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      id-token: write # trusted publishing: PyPI takes this workflow's OIDC token, no secret
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sdk
+          path: sdk
+      - name: The wheels
+        run: mkdir upload && find sdk -name '*.whl' -exec cp {} upload/ \; && ls upload
+      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+        if: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'pypi') }}
+        with:
+          packages-dir: upload
+      - if: ${{ github.event_name == 'pull_request' || !contains(vars.SDK_REGISTRIES, 'pypi') }}
+        run: echo "::notice::PyPI not enabled (SDK_REGISTRIES), nothing uploaded"
+
+  npm:
+    name: npm
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: npm
+    permissions:
+      id-token: write # trusted publishing and provenance: no token
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sdk
+          path: sdk
+      - name: The tarballs, the client before what depends on it
+        env:
+          PUBLISH: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'npm') }}
+        run: |
+          for tgz in sdk/sdk/npm/*-opamp-client-*.tgz sdk/sdk/npm/*-opamp-otel-*.tgz; do
+            if [ "$PUBLISH" = true ]; then
+              npm publish --provenance --access public "$tgz"
+            else
+              npm publish --dry-run --access public "$tgz"
+            fi
+          done
+          [ "$PUBLISH" = true ] || echo "::notice::npm not enabled (SDK_REGISTRIES): dry run only"
+
+  maven:
+    name: Maven Central
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sdk
+          path: sdk
+      - name: The jars and their poms
+        run: |
+          ls sdk/sdk/maven
+          # Central also wants sources and javadoc jars, every file signed, and a verified
+          # namespace: docs/sdk-registries.md. Until those exist there is nothing to upload to.
+          if ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'maven') }}; then
+            echo "::error::Maven Central publishing isn't wired up yet (docs/sdk-registries.md)"; exit 1
+          fi
+          echo "::notice::Maven Central not enabled (SDK_REGISTRIES): nothing uploaded"
+
+  nuget:
+    name: NuGet
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: nuget
+    steps:
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sdk
+          path: sdk
+      - name: The packages, the core before what depends on it
+        env:
+          PUBLISH: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'nuget') }}
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          ls sdk/native/nuget sdk/sdk/nuget
+          if [ "$PUBLISH" != true ]; then
+            echo "::notice::NuGet not enabled (SDK_REGISTRIES): nothing uploaded"; exit 0
+          fi
+          [ -n "$NUGET_API_KEY" ] || { echo "::error::the nuget environment has no NUGET_API_KEY"; exit 1; }
+          for pkg in sdk/native/nuget/*.Core.Native.*.nupkg sdk/native/nuget/*.Client.*.nupkg sdk/sdk/nuget/*.nupkg; do
+            dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+          done

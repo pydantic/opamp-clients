@@ -1,0 +1,10 @@
+{
+  "description": "The server takes the client's first two messages and drops the connection before answering each (a reply lost on the way back, or a server that took the message and then failed): a new run whose first replies are lost. Each message the client sends again is number 0, so the server sees a new run whichever arrives, until a message is answered; then 1, 2, ... (RULE-CLIENT-20). Over WebSocket each loss is a connection lost before an answer, so the client backs off between them.",
+  "transports": ["http", "ws"],
+  "duration_s": 16,
+  "needs": ["number_zero_until_answered"],
+  "driver": {"poll_s": 1, "changes_at_s": [12]},
+  "server": {"faults": [{"on_message": 1, "action": "tcp_drop"}, {"on_message": 2, "action": "tcp_drop"}]},
+  "checks": ["number_zero_until_answered", "sequence_increments_by_one", "reports_status_capability",
+             "first_message_is_full", "full_report_after_reconnect", "driver_survives"]
+}

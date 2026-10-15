@@ -1,0 +1,1124 @@
+name: CI
+
+# The client SDKs' tests, fuzzing, packaging and conformance. The core is not built here: every job
+# fetches it, compiled and pinned by hash in opamp-core.lock.json (scripts/fetch_core.py fetch),
+# which also places the tap checker (target/release/opamp-tap) and the adversary module
+# (testdata/core/opamp_core_adversary.wasm) the SDKs' adversary tests load.
+#
+# Runners: GitHub-hosted only (ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest). Long
+# suites are cut into matrix shards so no job waits on one 4-vCPU machine. `ci-ok` is the check
+# branch protection requires; it gathers every job here. There is no paths filter: a filtered
+# workflow never reports ci-ok, which would block a docs-only pull request.
+#
+# On a draft pull request conformance doesn't start: it runs when the PR is marked ready for
+# review, and on every push after that. ci-ok counts a skipped job as passed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A new push to a pull request replaces its run. On main a run finishes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Runs of each SDK's callback model test.
+  OPAMP_MODEL_RUNS: "100"
+
+jobs:
+  # The fetched core is what the lock pins, the clients' generated types match the fetched protos,
+  # and the repository's own scripts pass their tests.
+  core:
+    name: Core lock, generated types, scripts' tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: go/go.sum
+      - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          version: "34.1" # generated code records the protoc version: keep in step with local
+          repo-token: ${{ github.token }}
+      - run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+      # The Python types come from protobuf 6's protoc (grpcio-tools, through uvx).
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - working-directory: node/opamp
+        run: npm ci --no-audit --no-fund
+      - name: What is in place is what opamp-core.lock.json pins
+        run: python3 scripts/fetch_core.py check
+      # The type generation of gen_core.py and gen_sdk_settings.py. The modules themselves are the
+      # fetched ones, which the step above checked.
+      - name: Every client's types match the fetched protos
+        if: ${{ !cancelled() }}
+        run: |
+          python3 scripts/gen_core.py --check
+          python3 scripts/gen_sdk_settings.py --check
+      - name: The scripts' own tests (conformance checks, the SDK integrations' checks, packaging)
+        if: ${{ !cancelled() }}
+        run: >-
+          python3 -m unittest conformance/runner/test_checks.py conformance/runner/test_run.py
+          conformance/differential/test_shells.py conformance/torture/test_invariants.py
+          conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
+          examples/test_integrations.py scripts/test_native_dist.py scripts/test_sdk_release.py
+
+  # ---------------------------------------------------------------- Python
+  python-tests:
+    name: Python client (${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: conformance/**/go.sum
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      # The test files, sorted and dealt round-robin: every file in exactly one shard.
+      - name: Python client, this shard's test files
+        working-directory: python
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: "3"
+        run: |
+          mapfile -t files < <(ls tests/test_*.py | sort | awk -v n="$SHARDS" -v i="$SHARD" '(NR - 1) % n == i - 1')
+          printf '%s\n' "${files[@]}"
+          uv run --python 3.13 pytest -q "${files[@]}"
+
+  python-extras:
+    name: Python lock and fuzzing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Python client's lock
+        working-directory: python
+        run: uv lock --check
+      # Each Atheris target of the Python client's own code (python/tests/fuzz) for 20 seconds, one
+      # after another; a crash fails the job and its input is kept in the job's artifacts.
+      - name: Python client, fuzzed
+        if: ${{ !cancelled() }}
+        run: scripts/py_fuzz.sh 20
+      - name: Keep the fuzzers' crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: python-fuzz
+          retention-days: 7
+          path: |
+            target/shim-fuzz/python/*/artifacts/**
+            target/shim-fuzz/python/*/fuzz.log
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- Go
+  go-tests:
+    name: Go client (${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: |
+            go/go.sum
+            conformance/**/go.sum
+      # go/ has few packages and go/opamp holds most of the tests, so the shards are cut by test,
+      # not by package: every top-level Test/Fuzz/Example of every package of the module
+      # (github.com/pydantic/opamp-clients/go), in `go test -list` order, dealt round-robin, then
+      # one `go test -race -run '^(A|B|...)$'` per package.
+      - name: Go client (go test -race), this shard's tests
+        working-directory: go
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: "3"
+        run: |
+          declare -A runs
+          i=0
+          for pkg in $(go list ./...); do
+            for t in $(go test -list . "$pkg" | grep -E '^(Test|Fuzz|Example)' || true); do
+              if [ $((i % SHARDS)) -eq $((SHARD - 1)) ]; then
+                runs[$pkg]+="${runs[$pkg]:+|}$t"
+              fi
+              i=$((i + 1))
+            done
+          done
+          failed=0
+          for pkg in "${!runs[@]}"; do
+            echo "== $pkg: ${runs[$pkg]}"
+            go test -race -count=1 -run "^(${runs[$pkg]})\$" "$pkg" || failed=1
+          done
+          exit $failed
+      - name: Keep the fuzz corpus' findings
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: go-tests-${{ matrix.shard }}
+          retention-days: 7
+          path: go/opamp/**/testdata/fuzz/
+          if-no-files-found: ignore
+
+  go-extras:
+    name: Go vet, fuzzing, conformance server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: |
+            go/go.sum
+            conformance/**/go.sum
+      - name: Go client, vetted
+        working-directory: go
+        run: go vet ./...
+      # Each fuzz test of the Go client's own code (go/opamp, its core and SDK settings packages)
+      # for 20 seconds, one after another; a crash fails the job and its input is kept below.
+      - name: Go client, fuzzed
+        if: ${{ !cancelled() }}
+        run: scripts/go_fuzz.sh 20
+      - name: The Go test server's own tests
+        if: ${{ !cancelled() }}
+        working-directory: conformance/server
+        run: go test -count=1 ./...
+      - name: Keep the fuzzers' crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: go-fuzz
+          retention-days: 7
+          path: go/opamp/**/testdata/fuzz/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- Node.js
+  node-tests:
+    name: Node.js client (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - working-directory: node/opamp
+        run: npm ci --no-audit --no-fund
+      # `npm test` is `tsc -p . && node --test "dist/test/*.test.js"`: the same, with the compiled
+      # test files sorted and dealt round-robin.
+      - name: Node.js client, this shard's test files
+        working-directory: node/opamp
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: "2"
+        run: |
+          npm exec -- tsc -p .
+          mapfile -t files < <(ls dist/test/*.test.js | sort | awk -v n="$SHARDS" -v i="$SHARD" '(NR - 1) % n == i - 1')
+          printf '%s\n' "${files[@]}"
+          node --test "${files[@]}"
+
+  # ---------------------------------------------------------------- Java
+  java-tests:
+    name: Java client (${{ matrix.shard }}/2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: conformance/**/go.sum
+      # `mvn package` with surefire told which classes: every *Test class but Fray's (java-fray
+      # runs those), sorted and dealt round-robin.
+      - name: Java client, this shard's test classes
+        working-directory: java/opamp
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: "2"
+        run: |
+          tests=$(find src/test/java -name '*Test.java' ! -name '*FrayTest.java' -exec basename {} .java \; \
+            | sort | awk -v n="$SHARDS" -v i="$SHARD" '(NR - 1) % n == i - 1' | paste -sd, -)
+          echo "$tests"
+          mvn -q -B package -Dtest="$tests" -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Keep the surefire reports
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: java-tests-${{ matrix.shard }}
+          retention-days: 7
+          path: java/opamp/target/surefire-reports/**
+          if-no-files-found: ignore
+
+  java-fuzz:
+    name: Java client, fuzzed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      # Each Jazzer target of the Java client's own code (ClientFuzz, CoreFuzz) for 20 seconds, one
+      # after another; a crash fails the job and its input is kept in the job's artifacts.
+      - name: Java client, fuzzed
+        run: scripts/java_fuzz.sh 20
+      - name: Keep the fuzzers' crashing inputs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: java-fuzz
+          retention-days: 7
+          path: |
+            target/shim-fuzz/java/*/artifacts/**
+            target/shim-fuzz/java/*/fuzz.log
+          if-no-files-found: ignore
+
+  java-fray:
+    # The Java client's schedule-exploring tests: Maven alone, in Fray's JVM, one Fray test class
+    # to a shard (-Dfray.test, java/opamp/pom.xml's fray profile).
+    name: Java schedules (Fray, ${{ matrix.test }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        test: [RegistryFrayTest, ShellFrayTest, StreamsFrayTest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      # Two JDKs: 25 for Fray's own JVM, 21 for the build (the last set up is the default). Fray
+      # jlinks its JVM from JDK25_HOME's jmods, and Temurin's 25 has none (JEP 493): Corretto's has.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: corretto
+          java-version: "25"
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: java/opamp/pom.xml
+      # Fray's native agent is built for Linux x86-64 (and macOS arm64), which these runners are.
+      - name: Java schedules (Fray, over a fake HttpClient)
+        working-directory: java/opamp
+        env:
+          JDK25_HOME: ${{ env.JAVA_HOME_25_X64 }}
+          FRAY_TEST: ${{ matrix.test }}
+        run: mvn -q -B -Pfray test -Dfray.only=true -Dfray.test="$FRAY_TEST"
+      - name: Keep Fray's reports
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: java-fray-${{ matrix.test }}
+          retention-days: 7
+          path: |
+            java/opamp/target/fray/**
+            java/opamp/target/surefire-reports/**
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- .NET
+  dotnet-tests:
+    name: .NET (${{ matrix.project }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project:
+          - Pydantic.OpAmp.Client.Tests
+          # The SDK set up in code, under an OpAMP server (WithOpAmp).
+          - Pydantic.OpAmp.Extensions.Hosting.Tests
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: conformance/**/go.sum
+      - name: dotnet test
+        working-directory: dotnet
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: dotnet test "$PROJECT" --nologo
+
+  dotnet-fuzz:
+    name: .NET client, fuzzed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      # Each SharpFuzz target of the .NET client's own code (ClientFuzz, CoreFuzz) for 20 seconds,
+      # one after another; a crash fails the job and its input is kept in the job's artifacts.
+      # libFuzzer's runtime (for libfuzzer-dotnet) is clang's libclang-rt-dev.
+      - name: .NET client, fuzzed
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq clang libclang-rt-dev
+          scripts/dotnet_fuzz.sh 20
+      - name: Keep the fuzzers' crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: dotnet-fuzz
+          retention-days: 7
+          path: |
+            target/shim-fuzz/dotnet/*/artifacts/**
+            target/shim-fuzz/dotnet/*/fuzz.log
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- SDK integrations
+  # Each language's integration with its OpenTelemetry SDK (docs/<integration>.md), its unit tests
+  # a job of their own, side by side.
+  integrations:
+    name: ${{ matrix.name }}, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sdk: go, name: Go SDK setup }
+          - { sdk: node, name: Node.js auto-instrumentation }
+          - { sdk: python, name: Python auto-instrumentation }
+          - { sdk: java, name: Java agent extension }
+          - { sdk: dotnet, name: .NET automatic instrumentation }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: matrix.sdk == 'go'
+        with:
+          go-version: "1.25"
+          cache-dependency-path: |
+            go/go.sum
+            go/otel/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.sdk == 'node'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.sdk == 'python'
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.sdk == 'java'
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: |
+            java/opamp/pom.xml
+            java/opamp-javaagent/pom.xml
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: matrix.sdk == 'dotnet'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - name: Go SDK setup (go/otel)
+        if: matrix.sdk == 'go'
+        working-directory: go/otel
+        run: |
+          go vet ./...
+          go test -race ./...
+      - name: Node.js auto-instrumentation (node/otel)
+        if: matrix.sdk == 'node'
+        run: |
+          (cd node/opamp && npm ci --no-audit --no-fund && npm run build)
+          (cd node/otel && npm ci --no-audit --no-fund && npm test)
+      - name: Python auto-instrumentation (python/otel)
+        if: matrix.sdk == 'python'
+        working-directory: python/otel
+        run: |
+          uv lock --check
+          uv run --python 3.13 pytest -q
+      - name: Java agent extension (java/opamp-javaagent)
+        if: matrix.sdk == 'java'
+        run: |
+          mvn -q -B -DskipTests install -f java/opamp/pom.xml
+          mvn -q -B package -f java/opamp-javaagent/pom.xml
+      - name: .NET automatic instrumentation plugin
+        if: matrix.sdk == 'dotnet'
+        working-directory: dotnet
+        run: dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo
+      - name: Keep the test reports
+        if: (failure() || cancelled()) && matrix.sdk == 'java'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: integrations-javaagent
+          retention-days: 7
+          path: java/opamp-javaagent/target/surefire-reports/**
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- Native packaging
+  # The wheels and the NuGet package from every platform's fetched library (fetch --all-platforms),
+  # each checked for its format and machine.
+  native-pack:
+    name: Native core packaged (wheels, NuGet package)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-all-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, every platform's library included, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: "8.0.x"
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq file
+      # The wheels of `native_dist.py build`, made from the fetched libraries rather than built ones.
+      # (Inline until native_dist.py has a step of its own for it.)
+      - name: A core wheel for every platform, and the client's wheel
+        run: |
+          python3 - <<'EOF'
+          import sys
+          sys.path.insert(0, "scripts")
+          import native_dist as n
+          (n.DIST / "wheels").mkdir(parents=True, exist_ok=True)
+          for t in n.TARGETS:
+              lib = n.DIST / "runtimes" / t.rid / "native" / t.lib
+              print("+ wheel", n.build_backend.wheel(lib, t.plat, n.DIST / "wheels").name, flush=True)
+          n.run([sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps", "-w", str(n.DIST / "wheels"), str(n.PYTHON)])
+          EOF
+      - name: Pack the .NET client with every runtime
+        run: python3 scripts/native_dist.py pack
+      - name: Each is the format and machine its name says, and none carries the cores' sources
+        run: python3 scripts/native_dist.py check
+      - name: Keep the wheels and the package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native
+          retention-days: 7
+          path: |
+            dist/native/wheels
+            dist/native/nuget
+
+  # The wheels and the package installed and run on glibc and musl, each architecture on its own
+  # hosted runner (no QEMU): native_dist.py smoke, limited to that runner's platform.
+  native-smoke:
+    name: Native core installed and run (${{ matrix.platform }})
+    needs: native-pack
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux/amd64, runner: ubuntu-24.04 }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ runner.arch }}-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native
+          path: dist/native
+      - name: Install and run them on glibc and musl
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          python3 - "$PLATFORM" <<'EOF'
+          import sys
+          sys.path.insert(0, "scripts")
+          import native_dist as n
+          n.SMOKE = [s for s in n.SMOKE if s[0] == sys.argv[1]]
+          n.smoke()
+          EOF
+
+  # ---------------------------------------------------------------- Collector and Supervisor
+  # Go 1.26: what the Collector (v1.68) and ocb need. setup-go pins GOTOOLCHAIN=local for the
+  # steps after it, so each job sets up that Go rather than asking the go command to fetch it.
+  collector-tests:
+    name: Collector extension and Supervisor, unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            go/go.sum
+            go/opampextension/go.sum
+            go/opampsupervisor/go.sum
+      - name: State encryption (go/statekey), unit tests
+        working-directory: go
+        run: |
+          go vet ./statekey
+          GOOS=darwin go vet ./statekey
+          GOOS=windows go vet ./statekey
+          go test -race ./statekey
+      - name: Collector OpAMP extension, unit and server-backed tests
+        if: ${{ !cancelled() }}
+        working-directory: go/opampextension
+        run: |
+          go vet ./...
+          go test -race ./...
+      - name: Supervisor, unit and server-backed tests
+        if: ${{ !cancelled() }}
+        working-directory: go/opampsupervisor
+        run: |
+          go vet ./...
+          go vet -tags=e2e .
+          go test -race ./...
+
+  # Upstream's Supervisor e2e suite against a collector built here (ocb) with this repository's
+  # extension.
+  collector-e2e:
+    name: Supervisor e2e (upstream's suite)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            go/go.sum
+            go/opampextension/go.sum
+            go/opampsupervisor/go.sum
+      - name: A collector with this repository's extension (ocb)
+        working-directory: go/opampsupervisor
+        run: |
+          # ocb makes the output directory but not its parent.
+          mkdir -p ../../bin
+          go run go.opentelemetry.io/collector/cmd/builder@v0.162.0 --config testdata/collector/manifest.yaml
+          cp ../../bin/e2e-collector/otelcontribcol ../../bin/otelcontribcol_linux_amd64
+      - name: Supervisor e2e, upstream's suite against that collector
+        working-directory: go/opampsupervisor
+        run: go test -tags=e2e -timeout 20m .
+
+  # The Linux packages, their signed apt and yum repositories, and the package installed from one.
+  collector-packages:
+    name: Supervisor Linux packages, repositories and install
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            go/go.sum
+            go/opampsupervisor/go.sum
+      - name: A throwaway signing key, for the packages and their repositories
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-gen-key 'CI throwaway <ci@invalid>' rsa3072 sign never
+          gpg --batch --armor --export-secret-keys >"$RUNNER_TEMP/signing.asc"
+          echo "SIGNING_KEY_FILE=$RUNNER_TEMP/signing.asc" >>"$GITHUB_ENV"
+      - name: The Linux packages (deb, rpm), built
+        id: packages
+        env:
+          VERSION: 0.0.0-ci
+          ARCH: amd64
+        run: go/opampsupervisor/packaging/build.sh
+      # gcloud, which publish.sh uploads with: the runner image has none.
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: "570.0.0"
+      - name: The signed apt and yum repositories, installed from with apt and dnf, and published to a bucket
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apt-utils createrepo-c rpm
+          # publish.sh's tests: gcloud against a GCS bucket fake-gcs-server serves, and an S3 one
+          # moto serves (made with the aws CLI).
+          python3 -m venv "$RUNNER_TEMP/s3"
+          "$RUNNER_TEMP/s3/bin/pip" install -q awscli==1.46.1 'moto[server]==5.2.3'
+          GOBIN="$RUNNER_TEMP/s3/bin" go install github.com/fsouza/fake-gcs-server@v1.52.2
+          go vet -tags=repo .
+          PATH="$RUNNER_TEMP/s3/bin:$PATH" go test -tags=repo -run 'Repo|Publish' -timeout 30m -v .
+          # apt reads it as _apt: in /tmp, not the runner's home.
+          repo=$(mktemp -d /tmp/opamp-repo.XXXXXX)
+          chmod 755 "$repo"
+          REPO_DIR="$repo" REPO_URL="file://$repo" ./repo.sh
+          echo "OPAMP_REPO=$repo" >>"$GITHUB_ENV"
+      - name: The package installed from the apt repository, enrolled with a server that issues a token, and restarted
+        # It installs the package and adds a user: the runner is thrown away after the job.
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          go vet -tags=install .
+          go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
+          sudo OPAMP_REPO="$OPAMP_REPO" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+      - name: The packages, kept
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pydantic-opamp-supervisor-packages
+          path: |
+            go/opampsupervisor/packaging/dist/*.deb
+            go/opampsupervisor/packaging/dist/*.rpm
+
+  # The macOS package, built and installed on a Mac: launchd runs the Supervisor, enrolled with a
+  # server that issues a token, and restarted. (macos-latest is arm64, as ARCH says.)
+  installer-macos:
+    name: macOS package, built, installed and enrolled
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ runner.os }}-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: go/opampsupervisor/go.sum
+      - name: The packaging tests (the enroll scripts)
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          go vet -tags=install .
+          go test .
+      - name: The .pkg, built
+        id: pkg
+        if: ${{ !cancelled() }}
+        env:
+          VERSION: 0.0.0
+          ARCH: arm64
+        run: go/opampsupervisor/packaging/macos/build.sh
+      - name: The .pkg installed, enrolled with a server that issues a token, and restarted
+        # It installs a package and loads a LaunchDaemon: the runner is thrown away after the job.
+        if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
+          sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+      - name: The .pkg, kept
+        if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pydantic-opamp-supervisor-macos
+          path: go/opampsupervisor/packaging/dist/*.pkg
+
+  # The Windows installer, built and installed on Windows: the Service Control Manager runs the
+  # Supervisor, enrolled with a server that issues a token, and restarted.
+  installer-windows:
+    name: Windows installer, built, installed and enrolled
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # (Windows images have `python`, not `python3`.)
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ runner.os }}-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/fetch_core.py fetch
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: go/opampsupervisor/go.sum
+      - name: The packaging tests (the enroll script)
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          go vet -tags=install .
+          go test -run WinEnroll -v .
+      - name: The .msi, built (WiX 5)
+        id: msi
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+          go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
+      - name: The .msi installed, enrolled with a server that issues a token, and restarted
+        # It installs a service: the runner is thrown away after the job. (The job runs elevated.)
+        if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+      - name: The .msi, kept
+        if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pydantic-opamp-supervisor-windows
+          path: go/opampsupervisor/packaging/dist/*.msi
+
+  infra:
+    name: The package hosting's Pulumi program, against Pulumi's mocks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: infra/packages/go.sum
+      - name: Vetted, formatted and tested (what it would make, without a cloud)
+        working-directory: infra/packages
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+
+  # ---------------------------------------------------------------- Conformance
+  # Every scenario, one client to a job, against the Go reference server (conformance/server); an
+  # upstream client must match the baseline.
+  conformance:
+    name: Conformance (${{ matrix.client }})
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { family: go, client: go-core }
+          - { family: go, client: go-core-rust }
+          - { family: go, client: go }
+          - { family: node, client: node }
+          - { family: node, client: node-rust }
+          - { family: python, client: python-core }
+          - { family: python, client: python-core-rust }
+          - { family: python, client: python }
+          - { family: java, client: java-core }
+          - { family: java, client: java-core-rust }
+          - { family: java, client: java }
+          - { family: dotnet, client: dotnet-core }
+          - { family: dotnet, client: dotnet-core-rust }
+          - { family: dotnet, client: dotnet }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core and the tap checker, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      # The Go server, whatever the client.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.25"
+          cache-dependency-path: conformance/**/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.family == 'node'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: node/opamp/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.family == 'python'
+      # A run a core at once (4 on a hosted runner): each has its own server, port and output
+      # directory, and spends most of its time on the scenario's clock.
+      - name: Every scenario; an upstream client must match the baseline
+        env:
+          CLIENT: ${{ matrix.client }}
+        run: python3 conformance/runner/run.py --server go --strict --jobs 4 --client "=$CLIENT"
+      - name: Keep the run's logs
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: conformance-out-${{ matrix.client }}
+          retention-days: 7
+          path: conformance/out/
+          if-no-files-found: ignore
+      # The core taps, for the differential job. (results.json keeps conformance/out/ the root, so
+      # each client's directory keeps its name.)
+      - name: Keep the run's core taps
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: conformance-taps-${{ matrix.client }}
+          retention-days: 3
+          path: |
+            conformance/out/results.json
+            conformance/out/*/*/core-*.tap*
+          if-no-files-found: ignore
+
+  # Every client's taps of each scenario against go-core's: what each SDK told its core should
+  # differ only in timing, or as conformance/differential/shells.toml allows. It reads what the
+  # conformance jobs kept, so it runs after them, whatever they found.
+  conformance-differential:
+    name: Conformance (differential)
+    needs: conformance
+    if: ${{ !cancelled() && github.event.pull_request.draft != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core and the tap checker, fetched and verified against the lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: conformance-taps-*
+          merge-multiple: true
+          path: conformance/out/
+      - name: Each scenario's taps, client against client
+        run: python3 conformance/differential/shells.py --strict --reference go-core
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: conformance-differential
+          retention-days: 7
+          path: conformance/out/differential.*
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------- The required check
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs:
+      - core
+      - python-tests
+      - python-extras
+      - go-tests
+      - go-extras
+      - node-tests
+      - java-tests
+      - java-fuzz
+      - java-fray
+      - dotnet-tests
+      - dotnet-fuzz
+      - integrations
+      - native-pack
+      - native-smoke
+      - collector-tests
+      - collector-e2e
+      - collector-packages
+      - installer-macos
+      - installer-windows
+      - infra
+      - conformance
+      - conformance-differential
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # A skipped job (conformance on a draft) passes; a failed or cancelled one doesn't.
+      - name: Every job passed or was skipped
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) exit 1 ;; esac
+          done

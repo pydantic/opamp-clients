@@ -68,7 +68,7 @@ MODULES = {
 }
 # The tree's files land at their own paths, which must be under these: the .proto files (the -I
 # paths the type generators use), the contract the clients are held to, and the shells' tables.
-TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "spec/shell-contract.md")
+TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "testdata/sdk-settings/", "spec/shell-contract.md")
 # The machine's own library goes where the .NET project and Python's build backend look for it
 # (target/release); every platform's, with --all-platforms, where packaging does.
 HOST_LIB_DIR = "target/release"

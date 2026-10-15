@@ -1,0 +1,8 @@
+{
+  "description": "From 3 s to 8 s every request (or WebSocket upgrade) gets 429 with Retry-After: 4.",
+  "transports": ["http"],
+  "duration_s": 14,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"window_s": [3, 8], "action": "http_status", "status": 429, "retry_after": "4"}]},
+  "checks": ["honours_retry_after", "full_report_after_unaccepted", "sequence_increments_by_one", "driver_survives"]
+}

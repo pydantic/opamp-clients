@@ -1,0 +1,29 @@
+{
+  "description": "Connect, report, poll or heartbeat, stop. No faults.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 8,
+  "driver": {
+    "poll_s": 1
+  },
+  "server": {},
+  "servers": [
+    "go",
+    "rust"
+  ],
+  "checks": [
+    "sequence_increments_by_one",
+    "reports_status_capability",
+    "instance_uid_valid",
+    "first_message_is_full",
+    "reports_after_connecting",
+    "disconnect_is_last",
+    "stop_sends_disconnect",
+    "driver_survives",
+    "http_content_type",
+    "http_instance_uid_header",
+    "server_sees_goodbye"
+  ]
+}

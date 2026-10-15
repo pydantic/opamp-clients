@@ -1,0 +1,9 @@
+{
+  "description": "The server says it doesn't accept the effective config (capabilities without AcceptsEffectiveConfig), then asks for the full state: the full report must leave the effective config out.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "driver": {"poll_s": 1, "changes_at_s": [3]},
+  "server": {"capabilities": 35, "faults": [{"on_message": 3, "action": "report_full_state"}]},
+  "params": {"server_capabilities": 35},
+  "checks": ["respects_server_capabilities", "full_report_after_request", "status_change_reported", "driver_survives"]
+}

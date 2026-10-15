@@ -1,0 +1,8 @@
+{
+  "description": "The server assigns 16 bytes that are not an RFC 4122 UUID. The spec only requires 16 bytes. The run is 10 s: on a cold, busy ARC runner a Java client's first message has come 5.4 s after its start.",
+  "transports": ["http", "ws"],
+  "duration_s": 10,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 1, "action": "assign_uid", "uid": "not-rfc4122"}]},
+  "checks": ["adopts_assigned_uid", "driver_survives"]
+}

@@ -1,0 +1,22 @@
+{
+  "description": "The agent asks the server for an instance UID, but the server ignores the flag: every message goes on asking, under the UID the agent started with. The run is 10 s: on a cold, busy ARC runner a Java client's first message has come 5.4 s after its start.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 10,
+  "needs": [
+    "request_instance_uid"
+  ],
+  "driver": {
+    "poll_s": 1,
+    "request_uid": true,
+    "changes_at_s": [1, 2]
+  },
+  "server": {},
+  "checks": [
+    "requests_uid_until_assigned",
+    "instance_uid_valid",
+    "driver_survives"
+  ]
+}

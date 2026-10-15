@@ -1,0 +1,9 @@
+{
+  "description": "The server tells the agent where to send its own metrics; the agent restarts after applying them: it gets them back at start, and the server has no need to send them again.",
+  "transports": ["http", "ws"],
+  "duration_s": 14,
+  "needs": ["telemetry_settings"],
+  "driver": {"poll_s": 1, "own_telemetry": true, "runs": [7, 7]},
+  "server": {"own_telemetry": {"signal": "metrics", "endpoint": "https://otlp.example/v1/metrics"}},
+  "checks": ["telemetry_settings_applied", "telemetry_settings_kept_across_restart", "driver_survives"]
+}

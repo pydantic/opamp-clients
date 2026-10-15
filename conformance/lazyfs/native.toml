@@ -1,0 +1,21 @@
+# The drivers that run in containers elsewhere (clients.toml), run natively in the LazyFS
+# container instead, where the mount is: `run.py --clients-override conformance/lazyfs/native.toml`.
+# Only what differs; the rest (features, transports) is clients.toml's.
+
+[java-core]
+docker = false
+build = { cwd = "java/opamp", cmd = ["sh", "-c",
+  "mvn -q -B -DskipTests package && javac -d target/driver -cp 'target/classes:target/lib/*' {conf}/drivers/java-core/Driver.java"] }
+# Basic proxy credentials through CONNECT tunnels, which the JDK refuses by default.
+run = ["java", "-Djdk.http.auth.tunneling.disabledSchemes=",
+       "-cp", "{root}/java/opamp/target/driver:{root}/java/opamp/target/classes:{root}/java/opamp/target/lib/*", "Driver"]
+
+[dotnet-core]
+docker = false
+# The native core as the project's own build takes it (no OpAmpNativeLib): built here from the
+# core's sources where they are, else the one fetched into target/release; not in Docker by
+# scripts/native_lib.py, which this container hasn't got.
+native = false
+build = { cwd = "conformance/drivers/dotnet-core", cmd = [
+  "dotnet", "publish", "-c", "Release", "-o", "{conf}/drivers/dotnet-core/out", "--nologo", "-v", "q"] }
+run = ["dotnet", "{conf}/drivers/dotnet-core/out/Driver.dll"]

@@ -1,0 +1,36 @@
+{
+  "description": "The agent asks for an instance UID and the server assigns one; after a restart the agent goes on with it, and doesn't ask again.",
+  "servers": [
+    "go",
+    "rust"
+  ],
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 14,
+  "needs": [
+    "request_instance_uid",
+    "instance_uid_kept"
+  ],
+  "driver": {
+    "poll_s": 1,
+    "uid": "none",
+    "request_uid": true,
+    "runs": [
+      7,
+      7
+    ]
+  },
+  "server": {
+    "honour_uid_request": true
+  },
+  "checks": [
+    "requests_uid_until_assigned",
+    "uid_assigned_once",
+    "uid_not_requested_after_restart",
+    "instance_uid_kept_across_restart",
+    "adopts_assigned_uid",
+    "driver_survives"
+  ]
+}

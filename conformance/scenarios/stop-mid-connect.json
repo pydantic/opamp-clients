@@ -1,0 +1,9 @@
+{
+  "description": "The server never answers: every request and WebSocket upgrade is held open. The client is stopped while it waits. Stop must end within its bound (over HTTP the core waits for the request in flight until then, and cancels it), and by the time the client says it has stopped it must have let go of what the server holds: the driver lingers after stop, so a socket left open shows.",
+  "transports": ["http", "ws"],
+  "duration_s": 3,
+  "needs": ["core"],
+  "driver": {"poll_s": 1, "linger_s": 3},
+  "server": {"hold": {"messages": true}},
+  "checks": ["stop_bounded", "nothing_outlives_stop", "driver_survives"]
+}

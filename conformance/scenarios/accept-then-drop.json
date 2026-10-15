@@ -1,0 +1,9 @@
+{
+  "description": "From 8 s to 40 s the server accepts every WebSocket upgrade and drops the TCP connection at once, without a Close frame, before reading or answering anything (a proxy or load balancer that has lost its backend); the connection open at 8 s goes too. The client backs off between attempts instead of reconnecting at line rate: over 30 s from the first dropped connection, at most 8 connections, and given four gaps or more, the last at least 1 s longer than the first. The window opens after cold client startup on ARC (the Java client has first connected 4.7 s in); a client that comes later meets the window on its first connection and is watched for what is left of it.",
+  "transports": ["ws"],
+  "duration_s": 42,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"window_s": [8, 40], "action": "accept_then_drop"}]},
+  "params": {"backoff_observe_s": 30, "backoff_max_attempts": 8, "backoff_min_growth_s": 1},
+  "checks": ["reconnect_backs_off", "driver_survives"]
+}

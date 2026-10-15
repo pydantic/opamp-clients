@@ -1,0 +1,10 @@
+{
+  "description": "The Rust server is overloaded from 8 s to 11 s: 503 with Retry-After 2 over HTTP, UNAVAILABLE with retry_info over WebSocket. The client waits before trying again and reports in full after. The overload starts after cold client startup on ARC (the .NET client's first request has come 4 s in), so it meets a client that is already connected.",
+  "servers": ["rust"],
+  "transports": ["http", "ws"],
+  "duration_s": 17,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"at_s": 8, "action": "unavailable", "for_s": 3, "retry_after_s": 2}]},
+  "params": {"reconnect_within_s": 10},
+  "checks": ["honours_retry_after", "sequence_increments_by_one", "full_report_after_unaccepted", "driver_survives"]
+}

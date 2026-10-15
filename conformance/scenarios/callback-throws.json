@@ -1,0 +1,9 @@
+{
+  "description": "The server offers a remote config on its answer to the first message, and the application's notification callback throws (raises, panics) on it (RULE-SHELL-02). The client must stop, and only the client: the application hears stopped with that error once and nothing after it, no goodbye is said, and nothing more is sent. The driver reports it as fatal, stays a while (anything more the client did would show), and exits 1.",
+  "transports": ["http", "ws"],
+  "duration_s": 10,
+  "needs": ["callback_failure"],
+  "driver": {"poll_s": 1, "throw_on_config": true, "linger_s": 3},
+  "server": {"faults": [{"on_message": 1, "action": "offer_config", "body": "receivers: {}\n"}]},
+  "checks": ["callback_failure_stops", "sequence_increments_by_one"]
+}

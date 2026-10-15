@@ -1,0 +1,31 @@
+{
+  "description": "The agent asks the server for an instance UID (RequestInstanceUid) and the server assigns one, a second later (the Go server): every message asks until then, none after, and over WebSocket the agent sends nothing more meanwhile (the server would assign a second UID to a second message asking). The run is 10 s: on a cold, busy ARC runner a Java client's first message has come 5.4 s after its start.",
+  "servers": [
+    "go",
+    "rust"
+  ],
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 10,
+  "needs": [
+    "request_instance_uid"
+  ],
+  "driver": {
+    "poll_s": 1,
+    "request_uid": true,
+    "changes_at_s": [0.1, 0.2, 0.3]
+  },
+  "server": {
+    "honour_uid_request": true,
+    "uid_request_delay_s": 1
+  },
+  "checks": [
+    "requests_uid_until_assigned",
+    "uid_assigned_once",
+    "adopts_assigned_uid",
+    "instance_uid_valid",
+    "driver_survives"
+  ]
+}

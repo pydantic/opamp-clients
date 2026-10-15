@@ -1,0 +1,25 @@
+{
+  "description": "Package files behind redirects the client must refuse: a sixth redirect, https to http (at once, and after an upgrade), and Locations with a space in the host, another scheme, or userinfo; then a good package behind one redirect to another origin. Every refused one is INSTALL_FAILED without the client requesting its target, and the good one is installed.",
+  "transports": ["http", "ws"],
+  "duration_s": 25,
+  "needs": ["packages", "core"],
+  "driver": {"poll_s": 1, "packages": true},
+  "server": {
+    "packages": {
+      "offer": [
+        {"name": "f1-six", "version": "1.0.0", "content": "six redirects",
+         "redirect": {"hops": ["same", "relative", "same", "relative_dots", "same", "trap"]}},
+        {"name": "f2-downgrade", "version": "1.0.0", "content": "https to http",
+         "redirect": {"from": "tls", "hops": ["downgrade"]}},
+        {"name": "f3-up-then-down", "version": "1.0.0", "content": "http to https to http",
+         "redirect": {"hops": ["tls", "downgrade"]}},
+        {"name": "f4-bad-host", "version": "1.0.0", "content": "a space in the host", "redirect": {"hops": ["bad_host"]}},
+        {"name": "f5-bad-scheme", "version": "1.0.0", "content": "ftp", "redirect": {"hops": ["bad_scheme"]}},
+        {"name": "f6-userinfo", "version": "1.0.0", "content": "userinfo", "redirect": {"hops": ["userinfo"]}},
+        {"name": "zz-good", "version": "1.0.0", "content": "a good package", "redirect": {"hops": ["other"]}}
+      ]
+    }
+  },
+  "checks": ["refused_redirects_failed", "redirects_followed", "redirect_headers_same_origin", "redirect_hops_bounded",
+             "package_statuses_reported", "driver_survives"]
+}

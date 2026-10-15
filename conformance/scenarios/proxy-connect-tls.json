@@ -1,0 +1,9 @@
+{
+  "description": "TLS through an HTTP proxy: every connection is a CONNECT tunnel, over both transports, and the handshake is with the server inside it.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["tls", "proxy_configured"],
+  "driver": {"poll_s": 1},
+  "server": {"tls": {"client_auth": "none"}, "proxy": {"kind": "connect", "auth": {"user": "agent", "pass": "proxy-secret"}}},
+  "checks": ["went_through_proxy", "connected_over_tls", "first_message_is_full", "driver_survives"]
+}

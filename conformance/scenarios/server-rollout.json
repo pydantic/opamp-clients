@@ -1,0 +1,27 @@
+{
+  "description": "The server wants every agent to run a config: it offers it once, and records it applied.",
+  "servers": [
+    "rust"
+  ],
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 8,
+  "driver": {
+    "poll_s": 1
+  },
+  "server": {
+    "desired_config": {
+      "body": "receivers: {}\n"
+    }
+  },
+  "checks": [
+    "applies_remote_config",
+    "server_offers_config_once_per_connection",
+    "server_records_applied_config",
+    "sequence_increments_by_one",
+    "server_sees_goodbye",
+    "driver_survives"
+  ]
+}

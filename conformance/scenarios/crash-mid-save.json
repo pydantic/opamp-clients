@@ -1,0 +1,13 @@
+{
+  "description": "The machine crashes while the client saves: the runner kills the driver three times, each at a moment the seed picks within its first 2.5 s (while the client saves the UID the server assigns and the remote config it offers), and writes what a crash could have left of the state file's directory (from the run's tap: unflushed data lost, in part or whole; a write cut short; the directory's last changes undone). Every time, the state file must be whole and no older than the last save the client answered stored, and the next run must start from exactly it. core_tap holds every point of every run to the same.",
+  "transports": ["http", "ws"],
+  "duration_s": 14,
+  "seed": 5,
+  "needs": ["remote_config_lifecycle", "instance_uid_kept", "file_journal"],
+  "driver": {"poll_s": 1, "runs": [3, 3, 3, 4], "crash": {"runs": [0, 1, 2], "from_s": 0.1, "to_s": 2.5, "tear": true}},
+  "server": {"faults": [
+    {"on_message": 1, "action": "offer_config", "body": "receivers: {}\n"},
+    {"on_message": 2, "action": "assign_uid", "uid": "v7"}
+  ]},
+  "checks": ["crash_state_consistent", "driver_survives"]
+}

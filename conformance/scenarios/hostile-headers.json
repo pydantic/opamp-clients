@@ -1,0 +1,9 @@
+{
+  "description": "A hostile server offers connection settings with headers no client can send (a control character in the value, a name that isn't a token), an endpoint past 8000 octets, and one more malformed offer the seed picks. The agent reports each FAILED without using it, and carries on.",
+  "transports": ["http", "ws"],
+  "duration_s": 30,
+  "needs": ["connection_settings"],
+  "driver": {"poll_s": 1, "accept_connection_settings": true, "changes_at_s": [4, 8, 12, 16, 20, 24]},
+  "server": {"hostile": {"seed": 2, "settings": ["header_ctl", "header_name", "endpoint_huge", "any"]}},
+  "checks": ["malformed_settings_failed", "no_request_to_malformed", "keeps_reporting", "driver_survives"]
+}

@@ -1,0 +1,34 @@
+# Known torture failures of the upstream clients, beyond the conformance baseline.
+#
+# torture.py takes a MUST failure of an upstream client as known when the conformance baseline of
+# the same server (conformance/baseline.toml, baseline-<server>-server.toml) lists the check as
+# failing or flaky, or this file lists it. Torture's faults are drawn per run, so a known failure
+# that passes is no news.
+#
+# Our clients must pass every run, and a check of the server (server_config_converges, the
+# server_* checks) is the server's: those are excused only by an entry with a `reason`, for a bug
+# of ours that is owned and tracked elsewhere. Remove the entry when the fix lands.
+#
+# Tables are per server, then client/transport.
+
+[go."java/http"]
+# opentelemetry-opamp-client: threads step from 22 to 59 once, mid-run, and stay; RSS climbs about
+# 0.5 MB a minute for the whole hour (75 -> 120 MB) with no GC forced. Nightlies 2026-09-29, 10-02.
+known = ["resources_bounded"]
+
+[go."dotnet/ws"]
+# Never reconnects after a dropped connection (README, Results): offline from the first drop to
+# the end of the run, so no quiet window converges and nothing is sent in any. Its failed sends
+# on the dead socket (one a heartbeat) allocate about 0.9 MB a minute, below the runtime's first
+# gen0 budget: no collection at all in the hour (gen0/1/2 counts 0, heap = all ever allocated),
+# so memory climbs in a line (nightlies 10-08..10-10: 30 -> 68, 31 -> 68, 33 -> 64 MB). With a
+# 4 MB gen0 budget it collects 15 times and stays at 25 -> 28 MB, 2.8 MB live after a full GC:
+# garbage never collected, not a leak.
+known = ["alive_when_quiet", "converges_when_quiet", "resources_bounded"]
+
+# The same upstream clients against the Rust server: what they do on their own side.
+[rust."java/http"]
+known = ["resources_bounded"]
+
+[rust."dotnet/ws"]
+known = ["alive_when_quiet", "converges_when_quiet", "resources_bounded"]

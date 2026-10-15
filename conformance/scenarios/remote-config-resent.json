@@ -1,0 +1,9 @@
+{
+  "description": "A stubborn server puts its remote config in every response: the application gets it once.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["remote_config_lifecycle"],
+  "driver": {"poll_s": 1},
+  "server": {"remote_config": {"body": "receivers: {}\n", "always": true}},
+  "checks": ["remote_config_handed_once", "applies_remote_config", "driver_survives"]
+}

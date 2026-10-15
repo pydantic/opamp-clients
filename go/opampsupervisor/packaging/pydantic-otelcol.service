@@ -1,0 +1,31 @@
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+#
+# The bundled collector on its own, unmanaged: pydantic-otelcol-configure writes its config and
+# encrypted token below. It and the Supervisor (which runs the same collector, managed) conflict.
+[Unit]
+Description=OpenTelemetry Collector, unmanaged
+Documentation=https://github.com/pydantic/opamp-clients/tree/main/go/opampsupervisor/packaging
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/pydantic-opamp/otelcol.yaml
+Conflicts=pydantic-opamp-supervisor.service
+
+[Service]
+User=pydantic-opamp
+Group=pydantic-opamp
+ExecStart=/usr/lib/pydantic-opamp/otelcol --config /etc/pydantic-opamp/otelcol.yaml
+Restart=on-failure
+RestartSec=5s
+# /var/lib/pydantic-otelcol, 0700: for the config's file storage, if it uses any.
+StateDirectory=pydantic-otelcol
+StateDirectoryMode=0700
+# Encrypted to this host (and its TPM, if it has one), decrypted for this service alone into
+# /run/credentials/pydantic-otelcol.service/.
+LoadCredentialEncrypted=otelcol-token:/etc/pydantic-opamp/otelcol-token.cred
+NoNewPrivileges=yes
+ProtectSystem=full
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

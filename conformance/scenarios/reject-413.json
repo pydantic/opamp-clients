@@ -1,0 +1,8 @@
+{
+  "description": "The server rejects the first message (a full status report) with 413 Content Too Large.",
+  "transports": ["http"],
+  "duration_s": 8,
+  "driver": {"poll_s": 1},
+  "server": {"lax": true, "faults": [{"on_message": 1, "action": "reject", "status": 413}]},
+  "checks": ["rejected_not_resent", "full_report_after_unaccepted", "driver_survives"]
+}

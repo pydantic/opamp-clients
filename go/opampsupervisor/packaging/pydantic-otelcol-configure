@@ -1,0 +1,94 @@
+#!/bin/sh
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+#
+# pydantic-otelcol-configure: runs the bundled collector on its own, unmanaged by any OpAMP server,
+# with a config you give it and a token it keeps encrypted.
+#
+#   echo "$TOKEN" | sudo pydantic-otelcol-configure --config otelcol.yaml
+#
+# It encrypts the token to this host with systemd-creds (never on the command line), installs the
+# config as /etc/pydantic-opamp/otelcol.yaml, and starts pydantic-otelcol.service in place of the
+# Supervisor (only one of the two runs). The config reads the token as
+# ${file:/run/credentials/pydantic-otelcol.service/otelcol-token}.
+#
+# OPAMP_ENROLL_ROOT, SYSTEMD_CREDS and SYSTEMCTL are for its tests: a root to write under, and
+# the commands to run in place of systemd's.
+set -eu
+
+usage() {
+	cat >&2 <<'EOF'
+usage: pydantic-otelcol-configure --config PATH [--token-file PATH] [--no-start]
+
+  --config PATH      the collector's config; it reads the token as
+                     ${file:/run/credentials/pydantic-otelcol.service/otelcol-token}
+  --token-file PATH  where to read the token (default: standard input)
+  --no-start         install the config and token, but don't start the service
+EOF
+	exit 2
+}
+
+fail() {
+	echo "pydantic-otelcol-configure: $*" >&2
+	exit 1
+}
+
+root=${OPAMP_ENROLL_ROOT:-}
+creds=${SYSTEMD_CREDS:-systemd-creds}
+systemctl=${SYSTEMCTL:-systemctl}
+etc=$root/etc/pydantic-opamp
+unit=pydantic-otelcol.service
+supervisor=pydantic-opamp-supervisor.service
+
+config=
+token_file=-
+start=yes
+while [ $# -gt 0 ]; do
+	case $1 in
+	--config) [ $# -ge 2 ] || usage; config=$2; shift 2 ;;
+	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
+	--no-start) start=; shift ;;
+	*) usage ;;
+	esac
+done
+
+[ -n "$config" ] || usage
+[ -r "$config" ] && [ -s "$config" ] || fail "can't read $config, or it's empty"
+[ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
+
+if [ "$token_file" = - ]; then
+	token=$(cat)
+else
+	token=$(cat -- "$token_file")
+fi
+# Tokens go into HTTP headers: one line, no surrounding space.
+token=$(printf '%s' "$token" | tr -d '\r\n')
+[ -n "$token" ] || fail "the token is empty"
+case $token in
+*[!A-Za-z0-9._~+/=-]*) fail "the token has characters an HTTP header token can't" ;;
+esac
+
+umask 077
+mkdir -p "$etc"
+chmod 0750 "$etc"
+
+printf '%s' "$token" | "$creds" encrypt --name=otelcol-token - "$etc/otelcol-token.cred.tmp"
+chmod 0600 "$etc/otelcol-token.cred.tmp"
+mv -f "$etc/otelcol-token.cred.tmp" "$etc/otelcol-token.cred"
+
+cp -- "$config" "$etc/otelcol.yaml.tmp"
+chmod 0640 "$etc/otelcol.yaml.tmp"
+mv -f "$etc/otelcol.yaml.tmp" "$etc/otelcol.yaml"
+if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
+	chgrp pydantic-opamp "$etc" "$etc/otelcol.yaml"
+fi
+
+if [ -n "$start" ]; then
+	# The two conflict: disabled, the Supervisor doesn't come back at boot.
+	"$systemctl" disable --now "$supervisor"
+	"$systemctl" enable "$unit"
+	"$systemctl" restart "$unit"
+	echo "the collector is running unmanaged ($unit)"
+else
+	echo "configured; start the collector with: systemctl disable --now $supervisor && systemctl enable --now $unit"
+fi

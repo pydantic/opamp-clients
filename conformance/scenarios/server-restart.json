@@ -1,0 +1,8 @@
+{
+  "description": "The server forgets the agent 3 s in and asks for the full state on the next message.",
+  "transports": ["http", "ws"],
+  "duration_s": 9,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"at_s": 3, "action": "restart"}]},
+  "checks": ["full_report_after_request", "sequence_increments_by_one", "driver_survives"]
+}

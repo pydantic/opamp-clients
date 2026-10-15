@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The Supervisor as the macOS package installs it: a LaunchDaemon, run as root. The package
+     doesn't load it; pydantic-opamp-enroll does, once it has written the config. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>dev.pydantic.opamp-supervisor</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/opt/pydantic-opamp/bin/opampsupervisor</string>
+		<string>--config</string>
+		<string>/opt/pydantic-opamp/etc/supervisor.yaml</string>
+	</array>
+	<key>WorkingDirectory</key>
+	<string>/opt/pydantic-opamp/var</string>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<dict>
+		<key>SuccessfulExit</key>
+		<false/>
+	</dict>
+	<key>ThrottleInterval</key>
+	<integer>5</integer>
+	<key>StandardOutPath</key>
+	<string>/opt/pydantic-opamp/var/log/supervisor.log</string>
+	<key>StandardErrorPath</key>
+	<string>/opt/pydantic-opamp/var/log/supervisor.log</string>
+</dict>
+</plist>

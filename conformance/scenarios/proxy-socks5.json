@@ -1,0 +1,9 @@
+{
+  "description": "The driver is told to use a SOCKS5 proxy that requires a username and password. Every message goes through it.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["proxy_configured", "proxy_socks5"],
+  "driver": {"poll_s": 1},
+  "server": {"proxy": {"kind": "socks5", "auth": {"user": "agent", "pass": "proxy-secret"}}},
+  "checks": ["went_through_proxy", "sequence_increments_by_one", "first_message_is_full", "driver_survives"]
+}

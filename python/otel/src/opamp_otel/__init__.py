@@ -1,0 +1,1615 @@
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+"""OpenTelemetry auto-instrumentation under an OpAMP server.
+
+Installed next to ``opentelemetry-instrument``, this package puts the SDK it sets up under the
+server named by ``OTEL_OPAMP_ENDPOINT`` (docs/python-otel.md). It plugs in where upstream lets a
+distribution plug in:
+
+- ``Distro`` (``opentelemetry_distro``): before anything is built, loads the saved settings and
+  turns the next-start ones into the instrumentation's own switches; gives the instance its UID.
+- ``Configurator`` (``opentelemetry_configurator``): builds the SDK with a sampler and exporters
+  the server's settings can change while it runs, and the instance UID as service.instance.id.
+- ``GatedOtlpMetricExporter`` (``opentelemetry_metrics_exporter``): the OTLP metric exporter,
+  stoppable (metrics have no export-processor hook to wrap).
+- ``start`` (``_opentelemetry_opamp``, upstream's experimental OpAMP hook): starts the OpAMP
+  client once the SDK is built.
+- ``configure``: the same in one call, for an application that sets its SDK up in code rather
+  than under ``opentelemetry-instrument``.
+- ``app_settings``: the application's own settings the server sends (``custom``), for the
+  application to read (docs/app-settings.md).
+
+What the settings mean, what to answer and what to report is the SDK settings layer's
+(``opamp_client.sdk``), the same in every language; this package carries it out on the Python SDK.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import atexit
+import copy
+import dataclasses
+import hashlib
+import concurrent.futures.thread  # noqa: F401 - its exit hook is registered before ours (see _at_exit)
+import logging
+import os
+import re
+import secrets
+import selectors
+import shutil
+import sys
+import tempfile
+import threading
+import time
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import timedelta
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
+
+from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2, save_state
+from opamp_client.sdk import SdkSettings, settings_pb2
+from opentelemetry.instrumentation.distro import BaseDistro
+from opentelemetry.sdk._configuration import _OTelSDKConfigurator
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, LogRecordExporter
+from opentelemetry.sdk.metrics.export import MetricExporter, MetricExportResult
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import Event, ReadableSpan
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
+from opentelemetry.trace import Link, SpanKind, get_current_span
+from opentelemetry.sdk.trace.sampling import (ALWAYS_ON, Decision, ParentBased, Sampler, SamplingResult,
+                                              TraceIdRatioBased)
+
+from . import app_settings
+from ._match import Bucket, Redactor, attribute_text, glob, level_keeps, rebucket, threshold
+from .app_settings import AppSettings
+
+__all__ = ["Configurator", "Distro", "GatedOtlpMetricExporter", "app_settings", "configure", "start"]
+
+_log = logging.getLogger(__name__)
+
+
+class _LastResort(logging.Handler):
+    """Python's last resort for this package's warnings, where nothing else would show them. The
+    OpenTelemetry log handler on the root logger (logging auto-instrumentation) counts as a handler,
+    so Python's own last resort is skipped: a warning would leave only as an exported log record, or
+    not at all with no logs exporter. What a person has to fix still reaches stderr; where the
+    application has a handler of its own, that one shows it and this stays quiet."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        logger: logging.Logger | None = _log
+        while logger:
+            for h in logger.handlers:
+                if h is not self and record.levelno >= h.level and not type(h).__module__.startswith("opentelemetry."):
+                    return
+            logger = logger.parent if logger.propagate else None
+        (logging.lastResort or logging.StreamHandler(sys.stderr)).handle(record)
+
+
+_log.addHandler(_LastResort(logging.WARNING))
+_INSTANCE_ID = "service.instance.id"
+
+
+def headers(spec: str) -> dict[str, str]:
+    """``k=v,k2=v2``, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS. A value with an escape
+    it can't decode is kept as written, with a warning that names the header (not the value: it
+    may be a secret)."""
+    out = {}
+    for pair in spec.split(","):
+        key, eq, value = pair.partition("=")
+        key, value = key.strip(), value.strip()
+        if not (eq and key):
+            continue
+        try:
+            if re.search(r"%(?![0-9A-Fa-f]{2})", value):
+                raise ValueError(value)
+            out[key] = unquote(value, errors="strict")
+        except ValueError:  # UnicodeDecodeError is one
+            _log.warning("OpAMP: OTEL_OPAMP_HEADERS: the value of %r has a percent escape that can't be decoded: "
+                         "it is sent as written", key)
+            out[key] = value
+    return out
+
+
+def duration_ms(value: str) -> int:
+    """``1500`` (milliseconds, as the SDK's variables), or ``500ms``, ``30s``, ``2m``."""
+    m = re.fullmatch(r"\s*(\d+)\s*(ms|s|m)?\s*", value)
+    ms = int(m.group(1)) * {None: 1, "ms": 1, "s": 1000, "m": 60_000}[m.group(2)] if m else -1
+    if not 0 <= ms <= 2**53 - 1:  # as Node's safe integers
+        raise ValueError(f"not a duration: {value!r}")
+    return ms
+
+
+_headers = headers  # Setup.from_env's own headers argument shadows it
+
+
+def uuid7() -> uuid.UUID:
+    """A UUIDv7: the time in milliseconds, then random bits (uuid.uuid7 is Python 3.14)."""
+    b = bytearray(int(time.time() * 1000).to_bytes(6, "big") + secrets.token_bytes(10))
+    b[6] = (b[6] & 0x0F) | 0x70
+    b[8] = (b[8] & 0x3F) | 0x80
+    return uuid.UUID(bytes=bytes(b))
+
+
+#: Processes of one program on one host that each keep their own identity by default.
+SLOTS = 16
+
+
+def program_name(argv=sys.argv) -> str:
+    """The program, as a name: the script run, or the module run with -m."""
+    first = argv[0] if argv and argv[0] not in ("", "-c", "-m") else "python"
+    name = Path(first).name
+    return name[:-3] if name.endswith(".py") else name
+
+
+def _lock(fd: int) -> bool:
+    """Take the operating system's lock on an open file without waiting: held until the process
+    ends, never by a process it starts."""
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def default_state_dir(env=os.environ, argv=sys.argv) -> tuple[Path, int] | None:
+    """Without OTEL_OPAMP_STATE_DIR: a state directory of the user's own, so an instance keeps its
+    UID across restarts with no setup (docs/default-state-dir.md). One per program, service and
+    working directory; a slot in it per process running at once, each held by a lock. The directory
+    and its lock's descriptor, or None where there's none to be had (no home, not writable, every
+    slot taken): then each start is a new instance, as before."""
+    if sys.platform == "win32":
+        base = env.get("LOCALAPPDATA")
+    elif sys.platform == "darwin":
+        base = env.get("HOME") and str(Path(env["HOME"]) / "Library" / "Application Support")
+    else:
+        base = env.get("XDG_STATE_HOME") or (env.get("HOME") and str(Path(env["HOME"]) / ".local" / "state"))
+    if not base:
+        return None
+    attrs = dict(a.split("=", 1) for a in env.get("OTEL_RESOURCE_ATTRIBUTES", "").split(",") if "=" in a)
+    attrs = {k.strip(): unquote(v.strip()) for k, v in attrs.items()}
+    service = env.get("OTEL_SERVICE_NAME", "").strip() or attrs.get("service.name", "") or program_name(argv)
+    try:
+        cwd = os.getcwd()
+    except OSError:
+        cwd = ""
+    key = "\0".join([service, attrs.get("service.namespace", ""), program_name(argv), cwd])
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", service)[:64] or "service"
+    home = Path(base) / "opamp" / f"{name}-{hashlib.sha256(key.encode()).hexdigest()[:8]}"
+    for slot in range(1, SLOTS + 1):
+        d = home / str(slot)
+        try:
+            d.mkdir(mode=0o700, parents=True, exist_ok=True)
+            fd = os.open(d / "lock", os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError as e:
+            _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
+            return None
+        if _lock(fd):
+            return d, fd
+        os.close(fd)
+    _log.info("OpAMP: %d processes of %s already keep their identity here: this one is a new instance "
+              "each start", SLOTS, service)
+    return None
+
+
+def chosen_uid(env) -> uuid.UUID | None:
+    """The service.instance.id OTEL_RESOURCE_ATTRIBUTES gives, if it is a UUID: the instance UID
+    the application chose. None otherwise: it isn't one, or there is none."""
+    for a in env.get("OTEL_RESOURCE_ATTRIBUTES", "").split(","):
+        key, _, value = a.partition("=")
+        if key.strip() == _INSTANCE_ID:
+            try:
+                return uuid.UUID(unquote(value.strip()))
+            except ValueError:
+                return None
+    return None
+
+
+def where(endpoint: str) -> str:
+    """The endpoint as it is safe to log: no user info, query or fragment."""
+    try:
+        u = urlsplit(endpoint)
+    except ValueError:  # an unclosed IPv6 bracket
+        u = None
+    if u is None or not u.scheme or not u.netloc:
+        return endpoint.split("?", 1)[0].split("#", 1)[0].rsplit("@", 1)[-1]
+    # The host and port as written: parsing the port would raise on a bad one.
+    return f"{u.scheme}://{u.netloc.rsplit('@', 1)[-1]}{u.path}"
+
+
+def hint(status: int | None, endpoint_from: str = "OTEL_OPAMP_ENDPOINT",
+         headers_from: str = "OTEL_OPAMP_HEADERS") -> str:
+    """What to check when the server can't be reached, by what went wrong. It names what gave the
+    endpoint and the headers: the argument given in code, else the variable."""
+    if status in (401, 403):
+        return f"the server refused this agent's credentials: check {headers_from} (Authorization=Bearer <token>)"
+    if status == 404:
+        return f"nothing serves OpAMP at that path: check {endpoint_from} (it usually ends in /v1/opamp)"
+    if status is None:
+        return f"check {endpoint_from} and that the server is up"
+    return "the server answered with an error"
+
+
+class Reachability:
+    """Says when the client connects, when it can't (once a run of failures, with what to check),
+    and when it's back: setup that works or doesn't is never silent."""
+
+    def __init__(self, endpoint: str, service: str = "", uid: uuid.UUID | None = None,
+                 endpoint_from: str = "OTEL_OPAMP_ENDPOINT", headers_from: str = "OTEL_OPAMP_HEADERS") -> None:
+        self.endpoint = where(endpoint)
+        self.endpoint_from, self.headers_from = endpoint_from, headers_from
+        self.service = service
+        self.uid = uid
+        self.ever = False
+        self.failing = False
+
+    def notified(self, n: Notification) -> None:
+        if n.kind == "connected":
+            if not self.ever:
+                who = f" as {self.service}" if self.service else ""
+                _log.info("OpAMP: connected to %s; this SDK is managed%s, instance %s", self.endpoint, who, self.uid)
+            elif self.failing:
+                _log.info("OpAMP: connected to %s again", self.endpoint)
+            self.ever, self.failing = True, False
+        elif n.kind == "connect_failed":
+            if not self.failing:
+                why = n.detail or f"HTTP {n.status}"
+                _log.warning("OpAMP: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its "
+                             "current settings meanwhile", self.endpoint, why,
+                             hint(n.status, self.endpoint_from, self.headers_from))
+            else:
+                _log.debug("OpAMP: still can't reach %s: %s", self.endpoint, n.detail)
+            self.failing = True
+
+
+@dataclass
+class Setup:
+    """Where the server is, from OTEL_OPAMP_*; None when the package is off."""
+
+    endpoint: str
+    headers: dict[str, str] = field(default_factory=dict)
+    state_dir: Path | None = None
+    heartbeat_ms: int = 0
+    #: The lock on the default state directory, held while the process runs.
+    state_lock: int | None = None
+    #: What gave the endpoint and the headers, the argument or the variable: the warning when the
+    #: server can't be reached names it.
+    endpoint_from: str = "OTEL_OPAMP_ENDPOINT"
+    headers_from: str = "OTEL_OPAMP_HEADERS"
+
+    @staticmethod
+    def from_env(env=os.environ, *, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
+                 state_dir: str | os.PathLike | None = None,
+                 heartbeat_interval: timedelta | float | str | None = None) -> Setup | None:
+        """The keyword arguments are what the application gave in code: each one given wins over
+        its variable, and a blank one is not given. One it can't use is warned about and is the
+        default, as a variable it can't read is: it never stops the application."""
+        if endpoint is not None and not isinstance(endpoint, str):
+            _log.warning("OpAMP: endpoint should be a string, not %s: this SDK is not managed",
+                         type(endpoint).__name__)
+            return None
+        endpoint = (endpoint or "").strip() or None  # blank: not given
+        named = "OTEL_OPAMP_ENDPOINT" if endpoint is None else "endpoint"
+        endpoint = endpoint or env.get("OTEL_OPAMP_ENDPOINT", "").strip()
+        if not endpoint:
+            return None
+        scheme = endpoint.partition("://")[0].lower() if "://" in endpoint else None
+        if scheme is None:
+            _log.warning("OpAMP: %s %r has no scheme, so it is taken as http://; "
+                         "name it in full, as https://host/v1/opamp or wss://host/v1/opamp", named, where(endpoint))
+            endpoint = f"http://{endpoint}"  # as the warning says: the client refuses it without one
+        elif scheme not in ("http", "https", "ws", "wss"):
+            _log.warning("OpAMP: %s %r is not http(s):// or ws(s)://, so the client can't reach it",
+                         named, where(endpoint))
+        if headers is not None and not (isinstance(headers, Mapping) and all(
+                isinstance(k, str) and isinstance(v, str) for k, v in headers.items())):
+            # Not the values: they may be secrets.
+            _log.warning("OpAMP: headers should map names to values, all strings: none are sent")
+            headers = {}
+        setup = Setup(endpoint, dict(headers) if headers is not None else _headers(env.get("OTEL_OPAMP_HEADERS", "")),
+                      endpoint_from="OTEL_OPAMP_ENDPOINT" if named != "endpoint" else "the endpoint given to configure()",
+                      headers_from="OTEL_OPAMP_HEADERS" if headers is None else "the headers given to configure()")
+        heartbeat = env.get("OTEL_OPAMP_HEARTBEAT_INTERVAL", "").strip()
+        if isinstance(heartbeat_interval, str):
+            # "30s", as the variable; blank: not given.
+            heartbeat, named_heartbeat = heartbeat_interval.strip() or heartbeat, "heartbeat_interval"
+            if heartbeat_interval.strip() == "":
+                named_heartbeat = "OTEL_OPAMP_HEARTBEAT_INTERVAL"
+            heartbeat_interval = None
+        else:
+            named_heartbeat = "OTEL_OPAMP_HEARTBEAT_INTERVAL"
+        if heartbeat_interval is not None:
+            seconds = (heartbeat_interval.total_seconds() if isinstance(heartbeat_interval, timedelta)
+                       else heartbeat_interval)
+            if (isinstance(seconds, (int, float)) and not isinstance(seconds, bool)
+                    and 0 < seconds * 1000 <= 2**53 - 1):  # NaN fails too
+                setup.heartbeat_ms = max(1, round(seconds * 1000))
+            else:
+                _log.warning("OpAMP: heartbeat_interval %r is not a positive duration: using the default, 30s",
+                             heartbeat_interval)
+        elif heartbeat:
+            # One it can't read is the client's default: it warns, and holds nothing up.
+            try:
+                setup.heartbeat_ms = duration_ms(heartbeat)
+            except ValueError:
+                _log.warning("OpAMP: %s %r is not a duration (as 1500, 500ms, 30s or 2m): using the default, "
+                             "30s", named_heartbeat, heartbeat)
+        given_dir = os.fspath(state_dir) if isinstance(state_dir, os.PathLike) else state_dir
+        state_dir_var = env.get("OTEL_OPAMP_STATE_DIR", "")
+        if given_dir is not None and not isinstance(given_dir, str):
+            _log.warning("OpAMP: state_dir should be a path, not %s: using the default", type(state_dir).__name__)
+            given_dir, state_dir_var = None, ""
+        state_dir = (given_dir or "").strip() or state_dir_var.strip()
+        if state_dir.lower() == "none":
+            pass
+        elif state_dir:
+            setup.state_dir = Path(state_dir)
+        elif chosen_uid(env) is None:
+            # A service.instance.id the application chose stays its choice: no default to override
+            # it. One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
+            claimed = default_state_dir(env)
+            if claimed is not None:
+                setup.state_dir, setup.state_lock = claimed
+        return setup
+
+
+@dataclass(frozen=True)
+class _Rule:
+    """A sampling rule, ready to match: the layer checked it."""
+
+    sampler: Sampler  # its rate, by the SDK's own trace-ID ratio sampler
+    name: str | None = None
+    kind: int | None = None  # the Python SDK's SpanKind value
+    path: str | None = None
+    attributes: tuple[tuple[str, str], ...] = ()
+
+    @staticmethod
+    def of(rule: settings_pb2.SamplingRule) -> _Rule:
+        return _Rule(TraceIdRatioBased(rule.rate),
+                     rule.name if rule.HasField("name") else None,
+                     # OTLP numbers kinds from INTERNAL 1; the Python SDK from INTERNAL 0.
+                     rule.kind - 1 if rule.HasField("kind") else None,
+                     rule.path if rule.HasField("path") else None,
+                     tuple(sorted(rule.attributes.items())))
+
+    def matches(self, name: str, kind: int, attributes) -> bool:
+        if self.name is not None and not glob(self.name, name):
+            return False
+        if self.kind is not None and self.kind != kind:
+            return False
+        if self.path is not None:
+            path = _path(attributes)
+            if path is None or not glob(self.path, path):
+                return False
+        for key, pattern in self.attributes:
+            text = attribute_text(attributes.get(key)) if attributes else None
+            if text is None or not glob(pattern, text):
+                return False
+        return True
+
+
+def _path(attributes) -> str | None:
+    """What a rule's `path` matches: url.path, or else http.target up to its query."""
+    if not attributes:
+        return None
+    path = attributes.get("url.path")
+    if isinstance(path, str):
+        return path
+    target = attributes.get("http.target")
+    return target.split("?", 1)[0] if isinstance(target, str) else None
+
+
+@dataclass(frozen=True)
+class _Sampling:
+    """What the sampler does, swapped whole when the settings change (a span reads it once)."""
+
+    current: Sampler  # with no rule matching: the rate, else the SDK's own sampler
+    rules: tuple[_Rule, ...] = ()
+    cap: Bucket | None = None
+    #: The rules or the rate decide new traces; a span with a parent follows it.
+    decides: bool = False
+
+
+_FOLLOW = ParentBased(ALWAYS_ON)
+
+
+class LiveSampler(Sampler):
+    """The SDK's own sampler until the server sets a sampling rate or rules, then those for new
+    traces (a child follows its parent's decision, as the default does), and a cap on the traces
+    started or joined a second. `clock`: the cap's monotonic clock, in nanoseconds."""
+
+    def __init__(self, clock=time.monotonic_ns) -> None:
+        self._clock = clock
+        self._configured: Sampler = ParentBased(ALWAYS_ON)
+        self._rate: float | None = None
+        self._rules: tuple[_Rule, ...] = ()
+        self._rules_from: tuple = ()
+        self._cap: Bucket | None = None
+        self._sampling = _Sampling(self._configured)
+
+    @property
+    def current(self) -> Sampler:
+        """The sampler for a span no rule matches: the rate's, or the SDK's own."""
+        return self._sampling.current
+
+    def wrap(self, configured: Sampler | None) -> LiveSampler:
+        """The sampler the SDK's configuration built. A rate set before (at start) still holds."""
+        self._configured = configured or ParentBased(ALWAYS_ON)
+        self._swap()
+        return self
+
+    def rate(self, rate: float | None) -> None:
+        self._rate = rate
+        self._swap()
+
+    def configure(self, rate: float | None, rules=(), per_second: float | None = None) -> None:
+        """sampling_rate, sampling_rules (as the layer hands them over) and
+        sampling_traces_per_second, at once. The same cap keeps its bucket; a new one is full."""
+        self._rate = rate
+        key = tuple(r.SerializeToString(deterministic=True) for r in rules)
+        if key != self._rules_from:
+            self._rules, self._rules_from = tuple(_Rule.of(r) for r in rules), key
+        self._cap = rebucket(self._cap, per_second, self._clock)
+        self._swap()
+
+    def _swap(self) -> None:
+        rate = self._rate
+        current = self._configured if rate is None else ParentBased(TraceIdRatioBased(rate))
+        self._sampling = _Sampling(current, self._rules, self._cap, bool(self._rules) or rate is not None)
+
+    def should_sample(self, parent_context, trace_id, name, kind=None, attributes=None, links=None,
+                      trace_state=None):
+        s = self._sampling
+        parent = get_current_span(parent_context).get_span_context()
+        sampler, _ = self._choose(s, parent, name, kind, attributes)
+        result = sampler.should_sample(parent_context, trace_id, name, kind, attributes, links, trace_state)
+        cap = s.cap
+        # A sampled root, or a span joining a caller's sampled trace, takes a token; a child of a
+        # span sampled here never does (refusing it would break its trace), nor one the
+        # application's own sampler samples under a caller that didn't sample.
+        takes = not parent.is_valid or (parent.is_remote and parent.trace_flags.sampled)
+        if cap is not None and result.decision.is_sampled() and takes and cap.take(1) == 0:
+            return SamplingResult(Decision.DROP, None, result.trace_state)
+        return result
+
+    @staticmethod
+    def _choose(s: _Sampling, parent, name, kind, attributes) -> tuple[Sampler, int | None]:
+        """The sampler that decides a span, and the index of the rule that chose it, if one did."""
+        if not s.decides:
+            return s.current, None
+        if parent.is_valid:
+            return _FOLLOW, None  # rules and rates decide only new traces
+        kind_ = (kind if kind is not None else SpanKind.INTERNAL).value
+        for i, rule in enumerate(s.rules):
+            if rule.matches(name, kind_, attributes):
+                return rule.sampler, i
+        return s.current, None
+
+    def get_description(self) -> str:
+        s = self._sampling
+        rules = f",rules={len(s.rules)}" if s.rules else ""
+        cap = f",traces_per_second={s.cap.per_second}" if s.cap is not None else ""
+        return f"OpampLiveSampler{{{s.current.get_description()}{rules}{cap}}}"
+
+
+class Counts:
+    """What a signal's gate saw since start, for export health: after the exporter's own retries."""
+
+    #: The error text when an exporter answers FAILURE: the Python exporters log why, and don't say.
+    FAILURE = "the exporter answered FAILURE (its own log says why)"
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._c = settings_pb2.SignalCounts()
+
+    def exported(self, items: int, result) -> None:
+        """An export of `items` came back with `result`: failed when it is FAILURE."""
+        if getattr(result, "name", None) == "FAILURE":
+            self.failed(items, self.FAILURE)
+            return
+        with self._lock:
+            self._c.exports_ok += 1
+            self._c.last_failed = False
+
+    def failed(self, items: int, error: str) -> None:
+        with self._lock:
+            self._c.exports_failed += 1
+            self._c.items_failed += items
+            self._c.last_failed = True
+            self._c.last_error = error
+
+    def filtered(self, items: int) -> None:
+        """Dropped on purpose: send_* false, a level, a cap."""
+        if items:
+            with self._lock:
+                self._c.items_filtered += items
+
+    def proto(self) -> settings_pb2.SignalCounts:
+        with self._lock:
+            out = settings_pb2.SignalCounts()
+            out.CopyFrom(self._c)
+            return out
+
+
+def _export(counts: Counts, items: int, export):
+    """Call the exporter, counting what came of it; an exception is counted, then raised as before."""
+    try:
+        result = export()
+    except Exception as e:
+        counts.failed(items, str(e) or type(e).__name__)
+        raise
+    counts.exported(items, result)
+    return result
+
+
+@dataclass(frozen=True)
+class Gates:
+    """Whether each signal is sent, and what the log and span gates hold exports to: one
+    document's worth, never changed (Controls.apply puts a new one in force)."""
+
+    send_traces: bool = True
+    send_metrics: bool = True
+    send_logs: bool = True
+    #: The lowest SeverityNumber of a log record exported (send_logs_level); None: every one.
+    logs_min_severity: int | None = None
+    #: send_logs_level_by_scope: (pattern, lowest SeverityNumber), as the layer sorts them.
+    logs_scope_levels: tuple[tuple[str, int], ...] = ()
+    #: send_logs_per_second's bucket; None: no cap.
+    logs_cap: Bucket | None = None
+    #: drop_attributes and mask_attributes, for spans and log records at export.
+    redactor: Redactor = field(default_factory=lambda: Redactor((), ()))
+
+
+class Controls:
+    """What the server changes while the SDK runs. `clock`: the monotonic clock the rate caps
+    refill on, in nanoseconds. `app`: where the application reads its own settings (custom)."""
+
+    def __init__(self, clock=time.monotonic_ns, app: AppSettings | None = None) -> None:
+        self._clock = clock
+        self.app = app if app is not None else AppSettings()
+        self.sampler = LiveSampler(clock)
+        #: What each signal's gate counted since start, for export health.
+        self.traces, self.metrics, self.logs_counts = Counts(), Counts(), Counts()
+        #: What the gates export by, swapped whole by apply: a gate reads it once per export, so
+        #: an export is held to one document's settings, never to half of one and half of the next.
+        self.gates = Gates()
+
+    @property
+    def send_traces(self) -> bool:
+        return self.gates.send_traces
+
+    @property
+    def send_metrics(self) -> bool:
+        return self.gates.send_metrics
+
+    @property
+    def send_logs(self) -> bool:
+        return self.gates.send_logs
+
+    @property
+    def logs_min_severity(self) -> int | None:
+        return self.gates.logs_min_severity
+
+    @property
+    def logs_scope_levels(self) -> tuple[tuple[str, int], ...]:
+        return self.gates.logs_scope_levels
+
+    @property
+    def logs_cap(self) -> Bucket | None:
+        return self.gates.logs_cap
+
+    @property
+    def redactor(self) -> Redactor:
+        return self.gates.redactor
+
+    def apply(self, s: settings_pb2.Settings) -> None:
+        """Carry out the live settings; a setting left out is the SDK's own."""
+        self.sampler.configure(s.sampling_rate if s.HasField("sampling_rate") else None, s.sampling_rules,
+                               s.sampling_traces_per_second if s.HasField("sampling_traces_per_second") else None)
+        was = self.gates
+        # The same cap keeps its bucket (a refresh puts the same settings in force); a new one is full.
+        cap = rebucket(was.logs_cap, s.send_logs_per_second if s.HasField("send_logs_per_second") else None,
+                       self._clock)
+        drop, mask = tuple(s.drop_attributes), tuple(s.mask_attributes)
+        redactor = was.redactor if (drop, mask) == (was.redactor.drop, was.redactor.mask) else Redactor(drop, mask)
+        # One store: an export running meanwhile is held to the last document or to this one, whole.
+        self.gates = Gates(
+            send_traces=not s.HasField("send_traces") or s.send_traces,
+            send_metrics=not s.HasField("send_metrics") or s.send_metrics,
+            send_logs=not s.HasField("send_logs") or s.send_logs,
+            logs_min_severity=s.send_logs_min_severity if s.HasField("send_logs_min_severity") else None,
+            logs_scope_levels=tuple((lv.pattern, lv.min_severity) for lv in s.send_logs_scope_levels),
+            logs_cap=cap, redactor=redactor)
+        # Last: a callback the application gave sees the SDK's settings already in force.
+        self.app.put(s.custom)
+
+    def spans(self, to: SpanExporter) -> SpanExporter:
+        return _GatedSpanExporter(to, self)
+
+    def logs(self, to: LogRecordExporter) -> LogRecordExporter:
+        return _GatedLogExporter(to, self)
+
+    def counts(self) -> settings_pb2.ExportCounts:
+        return settings_pb2.ExportCounts(traces=self.traces.proto(), metrics=self.metrics.proto(),
+                                         logs=self.logs_counts.proto())
+
+
+def disabled_instrumentations(s: settings_pb2.Settings, local: str) -> str | None:
+    """OTEL_PYTHON_DISABLED_INSTRUMENTATIONS with the next-start settings added to the SDK's own
+    list; None when they add nothing."""
+    if s.HasField("deactivate_all_instrumentations") and s.deactivate_all_instrumentations:
+        return "*"
+    names = list(s.deactivate_instrumentations.names)
+    if not names:
+        return None
+    own = [n.strip() for n in local.split(",") if n.strip()]
+    return ",".join(dict.fromkeys(own + names))
+
+
+class _GatedSpanExporter(SpanExporter):
+    def __init__(self, to: SpanExporter, controls: Controls) -> None:
+        self._to, self._c = to, controls
+
+    def export(self, spans):
+        """send_traces, then redaction."""
+        c, g = self._c, self._c.gates  # one document's gates for the whole export
+        if not g.send_traces:
+            c.traces.filtered(len(spans))
+            return SpanExportResult.SUCCESS
+        redactor = g.redactor
+        if redactor:
+            spans = [_redacted_span(span, redactor) for span in spans]
+        return _export(c.traces, len(spans), lambda: self._to.export(spans))
+
+    def shutdown(self) -> None:
+        self._to.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._to.force_flush(timeout_millis)
+
+
+class _GatedLogExporter(LogRecordExporter):
+    def __init__(self, to: LogRecordExporter, controls: Controls) -> None:
+        self._to, self._c = to, controls
+
+    def export(self, batch):
+        """send_logs, then the levels, then the rate cap, then redaction; a batch left empty isn't
+        exported. What they drop is counted as filtered."""
+        c, g = self._c, self._c.gates  # one document's gates for the whole export
+        counts, given = c.logs_counts, len(batch)
+        if g.send_logs:
+            floor, levels, cap, redactor = g.logs_min_severity, g.logs_scope_levels, g.logs_cap, g.redactor
+            if floor is None and not levels and cap is None and not redactor:
+                return _export(counts, given, lambda: self._to.export(batch))
+            if floor is not None or levels:
+                batch = [r for r in batch if _kept(r, floor, levels)]
+            if cap is not None and batch:
+                # The first records the tokens allow; the rest are dropped from the end.
+                batch = list(batch)[:cap.take(len(batch))]
+            if redactor and batch:
+                batch = [_redacted_record(r, redactor) for r in batch]
+            counts.filtered(given - len(batch))
+            if batch:
+                return _export(counts, len(batch), lambda: self._to.export(batch))
+        else:
+            counts.filtered(given)
+        from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
+
+        return LogRecordExportResult.SUCCESS
+
+    def shutdown(self) -> None:
+        self._to.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._to.force_flush(timeout_millis)
+
+
+def _kept(record, floor: int | None, levels: tuple[tuple[str, int], ...] = ()) -> bool:
+    """A log record at its scope's level (send_logs_level_by_scope) or send_logs_level, or above;
+    or one with no severity (0 or unset: it can't be judged), unless its scope is off. The scope is
+    the one it is exported under: the Python logger's name, for the logging handler's records."""
+    severity = getattr(getattr(record, "log_record", record), "severity_number", None)
+    number = int(getattr(severity, "value", severity) or 0)
+    if levels:
+        scope = getattr(getattr(record, "instrumentation_scope", None), "name", None) or ""
+        floor = threshold(levels, floor, scope)
+    return level_keeps(floor, number)
+
+
+def _redacted_attributes(attributes, redactor: Redactor):
+    """Attributes as exported, in a container of their own: the original is shared with every
+    other processor and exporter, and stays as it was. What the SDK's limits dropped still counts
+    (a redaction's drop doesn't)."""
+    from opentelemetry.attributes import BoundedAttributes  # noqa: PLC0415
+
+    out = BoundedAttributes(maxlen=None, attributes=redactor.apply(attributes), immutable=True)
+    out.dropped = getattr(attributes, "dropped", 0)
+    return out
+
+
+class _RedactedSpan(ReadableSpan):
+    """A span as exported after redaction: what the SDK dropped by its limits is the original's."""
+
+    def __init__(self, original: ReadableSpan, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._original = original
+
+    @property
+    def dropped_attributes(self) -> int:
+        return self._original.dropped_attributes
+
+    @property
+    def dropped_events(self) -> int:
+        return self._original.dropped_events
+
+    @property
+    def dropped_links(self) -> int:
+        return self._original.dropped_links
+
+
+def _redacted_span(span: ReadableSpan, redactor: Redactor) -> ReadableSpan:
+    """The span with its attributes, its events' and its links' redacted; the span itself when
+    nothing in it matches. A new span, never the original changed."""
+    events, links = span.events or (), span.links or ()
+    if not (redactor.touches(span.attributes) or any(redactor.touches(e.attributes) for e in events)
+            or any(redactor.touches(link.attributes) for link in links)):
+        return span
+
+    def redact(attributes):
+        return _redacted_attributes(attributes, redactor) if redactor.touches(attributes) else attributes
+
+    return _RedactedSpan(
+        span, name=span.name, context=span.get_span_context(), parent=span.parent, resource=span.resource,
+        attributes=redact(span.attributes),
+        events=tuple(Event(e.name, redact(e.attributes), e.timestamp) for e in events),
+        links=tuple(Link(link.context, redact(link.attributes)) for link in links),
+        kind=span.kind, status=span.status, start_time=span.start_time, end_time=span.end_time,
+        instrumentation_scope=span.instrumentation_scope)
+
+
+def _redacted_record(record, redactor: Redactor):
+    """The log record with its attributes redacted; the record itself when none matches. Its
+    LogRecord is shared with every other processor, and ReadableLogRecord is frozen: a copy."""
+    inner = getattr(record, "log_record", None)
+    if inner is None or not redactor.touches(inner.attributes):
+        return record
+    inner = copy.copy(inner)
+    inner.attributes = _redacted_attributes(inner.attributes, redactor)
+    return dataclasses.replace(record, log_record=inner)
+
+
+#: The application's own settings (docs/app-settings.md): declared always, as the application reads
+#: them through app_settings whoever built the SDK.
+APP_SETTINGS = "custom"
+#: The settings the package's sampler carries out, where its Configurator built the SDK.
+SAMPLER = ("sampling_rate", "sampling_rules", "sampling_traces_per_second")
+#: Those of the gate on every trace exporter (the SDK's export span processor wraps them all).
+TRACE_GATE = ("send_traces",)
+#: Those of the gate on every log exporter (the export log record processor, likewise).
+LOG_GATE = ("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second")
+#: Redaction, at both: every span and log record exported has to pass one.
+REDACTION = ("drop_attributes", "mask_attributes")
+#: Debug mode: the layer folds it into the rate and the level, which the timer puts in force.
+DEBUG = ("debug_until", "debug_sampling_rate", "debug_send_logs_level")
+#: The instrumentation switches, which only opentelemetry-instrument reads, at start.
+INSTRUMENTATIONS = ("deactivate_instrumentations", "deactivate_all_instrumentations")
+
+
+def gated_metric_exporters(names: list[str]) -> list[str]:
+    """The metric exporters as the SDK is to build them: the OTLP one in the package's gate (the
+    ``opamp`` exporter, which builds OTLP inside it); metrics have no export-processor hook."""
+    return ["opamp" if n == "otlp" else n for n in names]
+
+
+def _every_metric_exporter_gated(names: list[str]) -> bool:
+    """Whether every metric exporter the SDK builds from `names` goes through the gate (``none``,
+    in any case, is none). One that doesn't (prometheus, console, otlp_proto_http) keeps exporting
+    whatever send_metrics says, so then it isn't carried out at all, rather than by half."""
+    return all(n == "opamp" or not n or n.lower() == "none" for n in gated_metric_exporters(names))
+
+
+def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrumented: bool = True,
+             config_file: bool = False, span_processors: bool = False,
+             log_processors: bool = False) -> settings_pb2.Host:
+    """What this package carries out, declared from what it builds (docs/sdk-settings.md, "The
+    host"); the layer sets aside every setting not named. Where its Configurator built the SDK
+    (`configured`), the sampler and the trace and log gates are its own, but not a span or log
+    record processor the application passed in (`span_processors`, `log_processors`): that one
+    exports past the gate. send_metrics where every metric exporter (`metrics_exporters`, as
+    named) is gated, unless a declarative configuration file (`config_file`) built them. The
+    polling interval at the next start always; the instrumentation switches only under
+    opentelemetry-instrument (`auto_instrumented`). The application's own settings (custom)
+    always: the application reads them, whoever built the SDK."""
+    live: list[str] = [APP_SETTINGS]
+    if configured:
+        live += SAMPLER + DEBUG
+        if not span_processors:
+            live += TRACE_GATE
+        if not log_processors:
+            live += LOG_GATE
+        if not span_processors and not log_processors:
+            live += REDACTION
+    if not config_file and _every_metric_exporter_gated(metrics_exporters):
+        live.append("send_metrics")
+    next_start = ["opamp_polling_interval", *(INSTRUMENTATIONS if auto_instrumented else ())]
+    return settings_pb2.Host(live=live, next_start=next_start)
+
+
+def _undeclared(host: settings_pb2.Host) -> list[str]:
+    """The settings `host` doesn't carry out, for a warning."""
+    every = SAMPLER + TRACE_GATE + LOG_GATE + REDACTION + DEBUG + ("send_metrics",) + INSTRUMENTATIONS
+    return [k for k in every if k not in host.live and k not in host.next_start]
+
+
+#: The package as published, which the inventory names.
+PACKAGE = "pydantic-opamp-otel"
+#: Exporter entry points by the name OTEL_*_EXPORTER gives them in every language: the OTLP ones
+#: by their protocol, and this package's gated OTLP metric exporter, are `otlp`.
+_EXPORTER_NAMES = {"otlp_proto_grpc": "otlp", "otlp_proto_http": "otlp", "opamp": "otlp", "zipkin_json": "zipkin",
+                   "zipkin_proto": "zipkin"}
+
+
+def instrumentations() -> list[settings_pb2.Instrumentation]:
+    """The instrumentations opentelemetry-instrument can run, switched off or not: its entry points
+    (the names OTEL_PYTHON_DISABLED_INSTRUMENTATIONS, and so deactivate_instrumentations, takes),
+    but for those whose library isn't installed or conflicts, which it skips. Each at its
+    distribution's version."""
+    from opentelemetry.instrumentation.dependencies import get_dist_dependency_conflicts  # noqa: PLC0415
+    from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
+
+    out = []
+    for ep in entry_points(group="opentelemetry_instrumentor"):
+        dist = getattr(ep, "dist", None)
+        try:
+            if dist is not None and get_dist_dependency_conflicts(dist) is not None:
+                continue
+        except Exception:  # noqa: BLE001 - a requirement it can't read: listed, as upstream would try it
+            _log.debug("OpAMP: the requirements of %s", ep.name, exc_info=True)
+        out.append(settings_pb2.Instrumentation(name=ep.name, version=getattr(dist, "version", None) or ""))
+    return out
+
+
+def _exporter_name(signal: str, kind: type) -> str:
+    """An exporter's (or a metric reader's) name: its entry point's, as OTEL_*_EXPORTER names it,
+    or else its type's. Only entry points whose module is loaded are looked at: one that isn't
+    can't be this one, and nothing is imported to find out."""
+    from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
+
+    names = []
+    for ep in entry_points(group=f"opentelemetry_{signal}_exporter"):
+        module, _, attr = ep.value.partition(":")
+        found = sys.modules.get(module.strip())
+        if found is None or not attr.strip():
+            continue
+        for part in attr.strip().split("."):
+            found = getattr(found, part, None)
+        if found is kind:
+            names.append(_EXPORTER_NAMES.get(ep.name, ep.name))
+    return min(names) if names else kind.__name__
+
+
+def _processors_exporter(processor):
+    """The exporter a span or log record processor exports to (the SDK's batch and simple ones),
+    or None: a processor that isn't an export processor, or one whose exporter it can't see."""
+    batch = getattr(processor, "_batch_processor", None)
+    for holder, attr in ((batch, "_exporter"), (processor, "span_exporter"), (processor, "_exporter")):
+        exporter = getattr(holder, attr, None) if holder is not None else None
+        if exporter is not None:
+            return exporter
+    return None
+
+
+def exporters(tracer_provider, meter_provider, logger_provider) -> list[settings_pb2.Exporter]:
+    """The exporters the SDK was built with, read off its providers once it is built, each with
+    whether the package's send_* gate wraps it: the trace and log exporters its configurator put
+    behind its export processors, and its OTLP metric exporter. Everything else (a span processor
+    given to configure(), a declarative configuration file's exporters, a Prometheus reader) is
+    ungated, as the host says (sdk_host). A provider that isn't the SDK's has none."""
+    out = []
+    multi = getattr(tracer_provider, "_active_span_processor", None)
+    for p in getattr(multi, "_span_processors", ()):
+        e = _processors_exporter(p)
+        if e is not None:
+            gated = isinstance(e, _GatedSpanExporter)
+            inner = e._to if gated else e  # noqa: SLF001
+            out.append(settings_pb2.Exporter(signal="traces", name=_exporter_name("traces", type(inner)), gated=gated))
+    for reader in getattr(meter_provider, "_metric_readers", ()):
+        # A push exporter is under a periodic reader; a pull one (Prometheus) is the reader itself.
+        inner = getattr(reader, "_exporter", None)
+        inner = reader if inner is None else inner
+        out.append(settings_pb2.Exporter(signal="metrics", name=_exporter_name("metrics", type(inner)),
+                                         gated=isinstance(inner, GatedOtlpMetricExporter)))
+    multi = getattr(logger_provider, "_multi_log_record_processor", None)
+    for p in getattr(multi, "_log_record_processors", ()):
+        e = _processors_exporter(p)
+        if e is not None:
+            gated = isinstance(e, _GatedLogExporter)
+            inner = e._to if gated else e  # noqa: SLF001
+            out.append(settings_pb2.Exporter(signal="logs", name=_exporter_name("logs", type(inner)), gated=gated))
+    return out
+
+
+def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter_provider=None,
+              logger_provider=None) -> settings_pb2.Inventory:
+    """What the package lists of itself and the SDK it runs (docs/available-components.md): the
+    global providers unless others are given. Under `host`, a signal whose send_* setting it
+    can't carry out has no gated exporter: the OTLP metric exporter beside one the package can't
+    stop is gated, but send_metrics is ignored, so nothing reaches it."""
+    from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
+
+    from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
+    from opentelemetry.sdk.version import __version__ as sdk_version  # noqa: PLC0415
+
+    try:
+        own = version(PACKAGE)
+    except PackageNotFoundError:
+        own = ""
+    built = exporters(tracer_provider or trace.get_tracer_provider(), meter_provider or metrics.get_meter_provider(),
+                      logger_provider or _logs.get_logger_provider())
+    if host is not None:
+        carried = {*host.live, *host.next_start}
+        for e in built:
+            e.gated = e.gated and f"send_{e.signal}" in carried
+    return settings_pb2.Inventory(
+        integration=PACKAGE, integration_version=own, sdk_language="python", sdk_version=sdk_version,
+        instrumentations=instrumentations(), exporters=built)
+
+
+class Agent:
+    """The package's state: one per process. `app`: where the application reads its own settings."""
+
+    def __init__(self, app: AppSettings | None = None) -> None:
+        self.controls = Controls(app=app)
+        self.layer: SdkSettings | None = None
+        self.setup: Setup | None = None
+        self.loaded = settings_pb2.Loaded()
+        self.host = settings_pb2.Host()
+        self.current = b"{}"
+        self.effective = opamp_pb2.EffectiveConfig()
+        self.uid: uuid.UUID | None = None
+        #: The package's Configurator built the SDK, so the sampler and exporters are its own.
+        self.configured = False
+        #: What the Configurator was given besides: span and log record processors of the
+        #: application's own (which export past the gates), and metric exporters by name.
+        self.span_processors = False
+        self.log_processors = False
+        self.extra_metric_exporters: list[str] = []
+        self.client: Client | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        # Reentrant: a decision under it re-arms the timer, which takes it too.
+        self._lock = threading.RLock()
+        #: Wakes the timer (refresh_at_unix_ms, export health) when a decision re-arms it.
+        self._wake = threading.Condition(self._lock)
+        #: The clocks: the wall clock in milliseconds since the Unix epoch, which the layer decides
+        #: debug mode by, and the monotonic one in seconds, which the timer waits on.
+        self.wall_ms = lambda: time.time_ns() // 1_000_000
+        self.monotonic = time.monotonic
+        #: When the layer said to call Refresh (refresh_at_unix_ms; 0: never), and that as a
+        #: monotonic deadline (None: never), so a wall-clock jump while it waits doesn't move it.
+        self._refresh_at = 0
+        self._refresh_deadline: float | None = None
+        self._ticking = False
+        #: Export health: the layer's last report, and when to ask it again (monotonic).
+        self._health: settings_pb2.HealthReport | None = None
+        self._health_next = 0.0
+        self._started_ns = time.time_ns()
+        self._saved: bytes | None = None
+        self._metric_exporters: list[str] = []
+        self._auto_instrumented = True
+        self._hooked = False
+        self._inherited: tuple = ()
+        #: The live settings in force, as the layer handed them over.
+        self._applied = settings_pb2.Settings()
+        #: Where the process that talks to the server hands its live settings to the processes
+        #: forked from it; made at the first fork (see _before_fork).
+        self._relay: Path | None = None
+        self._relay_owner = 0
+        self.reachability: Reachability | None = None
+        #: The inventory as reported at start (available components); None before or without.
+        self.components: opamp_pb2.AvailableComponents | None = None
+
+    @property
+    def on(self) -> bool:
+        return self.setup is not None
+
+    def prepare(self, env=os.environ, auto_instrumented: bool = True, **given) -> None:
+        """Before the SDK is built: load the saved settings, put them in force (next-start ones
+        through the instrumentation's own switch, which only opentelemetry-instrument reads: not
+        `auto_instrumented`, they aren't carried out), and name the instance. `given` is the server
+        as the application gave it in code (Setup.from_env)."""
+        self.setup = Setup.from_env(env, **given)
+        if self.setup is None:
+            return
+        self.layer = SdkSettings()
+        names = [n.strip() for n in env.get("OTEL_METRICS_EXPORTER", "otlp").split(",")]
+        self._metric_exporters = names
+        self._auto_instrumented = auto_instrumented
+        self.host = sdk_host(names, auto_instrumented=auto_instrumented)
+        saved = None
+        if self.setup.state_dir is not None:
+            try:
+                # The client's state in it can hold credentials the server issued.
+                self.setup.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+                path = self.setup.state_dir / "sdk-settings.json"
+                saved = path.read_bytes() if path.exists() else None
+            except OSError as e:
+                _log.warning("OpAMP: saved SDK settings unreadable, using the SDK's own: %s", e)
+        self._saved = saved
+        self.loaded = self.layer.load(saved, self.host, self.wall_ms())
+        if self.loaded.warning:
+            _log.warning("OpAMP: %s", self.loaded.warning)
+        self.current = self.loaded.current
+        self.effective = self.loaded.effective
+        self._put_in_force(self.loaded.settings)
+        self._arm(self.loaded.refresh_at_unix_ms)
+        disabled = disabled_instrumentations(self.loaded.settings, env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", ""))
+        if disabled is not None:
+            env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] = disabled
+        env["OTEL_METRICS_EXPORTER"] = ",".join(gated_metric_exporters(names))
+        # The UID reaches the SDK through the Configurator, not the environment: a child process
+        # inherits the environment, and would join the fleet as this instance.
+        self.uid = self._identity(env)
+
+    def _identity(self, env) -> uuid.UUID:
+        """One UID names the instance to the server and in the telemetry: the one saved in the
+        state directory; else a new one, saved there; else, where none can be kept (no state
+        directory, or one it can't be saved in), a UUID service.instance.id given in
+        OTEL_RESOURCE_ATTRIBUTES, which is the same at every start; else a new one."""
+        path = self.setup.state_dir / "instance-uid" if self.setup and self.setup.state_dir else None
+        if path is not None:
+            try:
+                return uuid.UUID(path.read_text().strip())
+            except (OSError, ValueError):
+                pass
+            made = uuid7()
+            try:
+                save_state(str(path), str(made).encode())
+                return made
+            except OSError as e:
+                _log.warning("OpAMP: can't save the instance UID: %s", e)
+        chosen = chosen_uid(env)
+        return chosen if chosen is not None else uuid7()
+
+    def start(self, resource: Resource) -> None:
+        """Once the SDK is built: join the fleet, on a thread of the client's own."""
+        if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
+            return
+        # What was built is known now: the settings it can't carry out are declared no more, so
+        # they are set aside rather than answered as done. The settings loaded at start are loaded
+        # again, to report that.
+        config_file = bool(os.environ.get("OTEL_CONFIG_FILE"))
+        built = sdk_host(self._metric_exporters + self.extra_metric_exporters, configured=self.configured,
+                         auto_instrumented=self._auto_instrumented, config_file=config_file,
+                         span_processors=self.span_processors, log_processors=self.log_processors)
+        if built != self.host:
+            self.host = built
+            lost = ", ".join(_undeclared(built))
+            if config_file:
+                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler and "
+                             "exporters aren't this package's: %s can't be carried out", lost)
+            elif not self.configured:
+                _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
+                             "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
+            else:
+                _log.warning("OpAMP: the processors or metric exporters passed to the configurator export "
+                             "past this package's gates: %s can't be carried out", lost)
+            self.loaded = self.layer.load(self._saved, self.host, self.wall_ms())
+            self.current = self.loaded.current
+            self.effective = self.loaded.effective
+            self._put_in_force(self.loaded.settings)
+            self._arm(self.loaded.refresh_at_unix_ms)
+        loop = _loop_thread("opamp")
+        self._loop = loop
+        s = self.setup
+        at_start = self.loaded.settings
+        heartbeat = at_start.opamp_polling_interval_ms if at_start.HasField("opamp_polling_interval_ms") else s.heartbeat_ms
+        config = Config(endpoint=s.endpoint, instance_uid=self.uid.bytes,
+                        capabilities=opamp_pb2.AgentCapabilities_AcceptsRemoteConfig,
+                        heartbeat_interval_ms=heartbeat, headers=s.headers,
+                        state_file=str(s.state_dir / "opamp-state") if s.state_dir else None,
+                        # A key of its own, offered by the server: taken with a state directory
+                        # (state_file) and kept there; without one the client neither declares
+                        # nor takes it.
+                        accept_connection_settings=True,
+                        # Python mode, asked for by name: the client's requests go through aiohttp,
+                        # which is what the suppressed context below keeps out of the traces.
+                        mode="python")
+        self.reachability = Reachability(s.endpoint, str(resource.attributes.get("service.name", "")), self.uid,
+                                         s.endpoint_from, s.headers_from)
+        with self._lock:
+            first = self._export_health()  # the first report is always sent: with the agent's first message
+        status = Status(description=self.layer.describe(attributes(resource)),
+                        health=self._health_message(first), effective_config=self.effective,
+                        available_components=self._components())
+
+        async def begin() -> None:
+            # The client's own requests aren't the application's: everything it starts inherits
+            # this context, so no instrumentation traces them.
+            _suppress()
+            # Set here, on the loop: the client hands over notifications on the loop as soon as
+            # start returns. Set on this thread after .result(), a loaded machine delivered the
+            # first remote config first, _notified dropped it unanswered, and no remote config
+            # came after it.
+            self.client = Client.start(config, status, self._notified)
+
+        try:
+            _result(asyncio.run_coroutine_threadsafe(begin(), loop), 10)
+        except Exception:  # noqa: BLE001 - the application runs on, unmanaged
+            _log.exception("OpAMP: the client did not start; the SDK runs unmanaged")
+        # With a client or without: the settings loaded at start are in force, and a debug window
+        # in them ends on its own, whether the server can reach the instance or not.
+        self._ticking = True
+        threading.Thread(target=self._timer, name="opamp-timer", daemon=True).start()
+        if not self._hooked:
+            self._hooked = True
+            _at_exit(self.stop)
+            if hasattr(os, "register_at_fork"):
+                os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
+
+    def _components(self) -> opamp_pb2.AvailableComponents | None:
+        """The inventory, once the SDK is built, as the available components: under the same host
+        and clock as the decisions. Nothing the package lists changes while it runs (the host is
+        settled by now), so it is sent once; None, unreported, should it fail."""
+        assert self.layer is not None
+        try:
+            self.components = self.layer.components(inventory(self.host), self.host, self.wall_ms())
+        except Exception:  # noqa: BLE001 - reporting: the instance is managed without it
+            _log.warning("OpAMP: can't list what this SDK runs", exc_info=True)
+            self.components = None
+        return self.components
+
+    def stop(self) -> None:
+        with self._wake:
+            self._ticking = False
+            self._wake.notify_all()
+        client, loop = self.client, self._loop
+        self.client = None
+        if client is not None and loop is not None:
+            try:
+                async def end() -> None:
+                    _suppress()  # the goodbye is the agent's own request too
+                    await client.stop()
+                    # The loop's resolver threads end here, on the loop's thread: under gevent they
+                    # are greenlets of its hub, which no other thread can join at exit.
+                    await loop.shutdown_default_executor()
+
+                # Bounded by the core (stop_timeout_ms, 5 s by default): no race of our own.
+                _result(asyncio.run_coroutine_threadsafe(end(), loop))
+            except Exception:  # noqa: BLE001
+                _log.debug("OpAMP: stopping the client", exc_info=True)
+        if self._relay is not None and self._relay_owner == os.getpid():
+            shutil.rmtree(self._relay.parent, ignore_errors=True)
+            self._relay = None
+
+    def _arm(self, refresh_at_unix_ms: int) -> None:
+        """One timer for the layer's refresh_at_unix_ms (0: none), in place of any earlier one: a
+        decision that came after a timer was armed replaces it, so the old one never fires (the
+        deadline is read under the same lock)."""
+        self._refresh_at = refresh_at_unix_ms
+        if refresh_at_unix_ms:
+            self._refresh_deadline = self.monotonic() + max(refresh_at_unix_ms - self.wall_ms(), 0) / 1000
+        else:
+            self._refresh_deadline = None
+        with self._wake:
+            self._wake.notify_all()
+
+    def _timer(self) -> None:
+        """The timer's thread: wait for the next deadline, or a decision that moves it."""
+        with self._wake:
+            while self._ticking:
+                wait = self._tick()
+                self._wake.wait(wait)
+
+    def _tick(self) -> float | None:
+        """Under the lock: whatever is due now (the refresh, export health); how long until the
+        next deadline (None: none)."""
+        now = self.monotonic()
+        if self._refresh_deadline is not None and now >= self._refresh_deadline:
+            self._refresh()
+        if self._ticking and now >= self._health_next:
+            report = self._export_health()
+            if report.send and self.client is not None:
+                self.client.set_health(self._health_message(report))
+        deadlines = [d for d in (self._refresh_deadline, self._health_next if self._ticking else None) if d is not None]
+        return max(min(deadlines) - self.monotonic(), 0) if deadlines else None
+
+    def _export_health(self) -> settings_pb2.HealthReport:
+        """Under the lock: the layer's export health report from the gates' counts, every
+        HEALTH_INTERVAL seconds. It says whether to send it: at once on a change of health or
+        status, at most a minute apart while only the counters move."""
+        assert self.layer is not None
+        report = self.layer.health(self.controls.counts(), self._health, self.wall_ms(), self._applied)
+        self._health = report
+        self._health_next = self.monotonic() + HEALTH_INTERVAL
+        return report
+
+    def _health_message(self, report: settings_pb2.HealthReport) -> opamp_pb2.ComponentHealth:
+        """The agent's health: healthy, as the application is running; export health under
+        component_health_map["exporters"], which a failing exporter makes unhealthy."""
+        health = opamp_pb2.ComponentHealth(healthy=True, start_time_unix_nano=self._started_ns)
+        health.component_health_map["exporters"].CopyFrom(report.exporters)
+        return health
+
+    def _refresh(self, now_unix_ms: int | None = None) -> None:
+        """Under the lock, at refresh_at_unix_ms: what is in force now (the end of debug mode), put
+        in force and reported, with or without the server. The monotonic deadline decides that it
+        is time: a wall clock set back meanwhile doesn't hold debug mode open."""
+        assert self.layer is not None
+        now = max(self.wall_ms(), self._refresh_at) if now_unix_ms is None else now_unix_ms
+        r = self.layer.refresh(self.current, self.loaded.current, now, self.host)
+        if r.warning:
+            _log.warning("OpAMP: %s", r.warning)
+        self._put_in_force(r.settings)
+        self.effective = r.effective
+        self._arm(r.refresh_at_unix_ms)
+        if self.client is not None:
+            self.client.set_effective_config(self.effective)
+
+    def _put_in_force(self, s: settings_pb2.Settings) -> None:
+        """Carry out the live settings, here and in every process forked from here."""
+        self.controls.apply(s)
+        self._applied = s
+        if self._relay is not None and self._relay_owner == os.getpid():
+            try:
+                save_state(str(self._relay), s.SerializeToString())
+            except OSError as e:
+                _log.warning("OpAMP: forked processes keep their settings: can't hand them on: %s", e)
+
+    def _before_fork(self) -> None:
+        """About to fork, and talking to the server: make the relay the child will follow, once.
+        A forked child is a worker of this process (gunicorn's, Celery's, uWSGI's): it isn't an
+        instance of its own, and the server's live settings reach it through this file."""
+        if self.client is None or self._relay is not None:
+            return
+        # Under the lock, so a remote config decided meanwhile is either in the file or after it.
+        with self._lock:
+            try:
+                relay = Path(tempfile.mkdtemp(prefix="opamp-otel-")) / "live-settings.pb"
+                save_state(str(relay), self._applied.SerializeToString())
+            except OSError as e:
+                _log.warning("OpAMP: forked processes will keep the settings they fork with: %s", e)
+                return
+            self._relay, self._relay_owner = relay, os.getpid()
+
+    def _forked(self) -> None:
+        """In a child forked from this process (gunicorn's workers, multiprocessing's fork): the
+        client, its thread (gone in the child) and its connection are the parent's, as is the
+        instance UID. The child drops its copy without a word to the server; the parent stays the
+        instance, and the child follows the live settings the parent puts in force (the relay)."""
+        # Kept, not dropped: nothing of the parent's is finalized (and closed) in the child.
+        self._inherited = (self.client, self._loop)
+        self.client = None
+        self._loop = None
+        self._lock = threading.RLock()
+        self._wake = threading.Condition(self._lock)
+        self._ticking = False  # the parent's timer: its relay hands on what it puts in force
+        if self._relay is not None:
+            threading.Thread(target=self._follow, args=(self._relay,), name="opamp-relay", daemon=True).start()
+
+    def _follow(self, relay: Path, every: float = 1.0) -> None:
+        """In a forked child: put in force the live settings the parent hands on, until it's gone."""
+        seen = None
+        while True:
+            try:
+                st = os.stat(relay)
+                if (st.st_ino, st.st_mtime_ns, st.st_size) != seen:
+                    seen = (st.st_ino, st.st_mtime_ns, st.st_size)
+                    self.controls.apply(settings_pb2.Settings.FromString(relay.read_bytes()))
+            except FileNotFoundError:
+                return  # the parent stopped: the settings in force now stay
+            except Exception:  # noqa: BLE001 - a torn read is read again next time
+                _log.debug("OpAMP: reading the parent's settings", exc_info=True)
+                seen = None
+            time.sleep(every)
+
+    def _notified(self, n: Notification) -> None:
+        """On the client's loop: keep it quick."""
+        if self.reachability is not None:
+            self.reachability.notified(n)
+        if n.kind == "remote_config" and self.client is not None:
+            answer = self.remote_config(n.remote_config)
+            self.client.set_effective_config(self.effective)
+            self.client.set_remote_config_status(answer)
+        elif n.kind == "instance_uid_changed":
+            self.renamed(uuid.UUID(bytes=n.instance_uid))
+        elif n.kind == "stopped" and n.error is not None:
+            _log.error("OpAMP: the client stopped; the SDK runs unmanaged: %s", n.error)
+
+    def renamed(self, uid: uuid.UUID) -> None:
+        """The server named the instance anew: saved, so the next start uses it for both the
+        OpAMP instance UID and service.instance.id. The running SDK's resource can't change."""
+        self.uid = uid
+        if self.setup is not None and self.setup.state_dir is not None:
+            try:
+                save_state(str(self.setup.state_dir / "instance-uid"), str(uid).encode())
+            except OSError as e:
+                _log.warning("OpAMP: can't save the instance UID the server assigned: %s", e)
+        _log.info("OpAMP: the server named this instance %s; service.instance.id changes at the next start", uid)
+
+    def remote_config(self, config: opamp_pb2.AgentRemoteConfig) -> opamp_pb2.RemoteConfigStatus:
+        """Carry out the layer's decision on a remote config; the answer for the server."""
+        assert self.layer is not None and self.setup is not None
+        with self._lock:
+            now = self.wall_ms()
+            dir_ = self.setup.state_dir
+            save = None if dir_ is None else lambda doc: save_state(str(dir_ / "sdk-settings.json"), doc)
+            d = self.layer.decide(config, self.current, self.loaded.current, self.host, now, save)
+            if d.HasField("apply"):
+                self._put_in_force(d.apply)
+                if d.apply.unsupported:
+                    _log.info("OpAMP: settings this SDK doesn't carry out: %s", ", ".join(d.apply.unsupported))
+                if d.apply.ignored:
+                    _log.info("OpAMP: settings unknown to this SDK: %s", ", ".join(d.apply.ignored))
+            if d.pending_restart:
+                _log.info("OpAMP: %s changed; in force when the application restarts", ", ".join(d.pending_restart))
+            self.current = d.current
+            self.effective = d.effective
+            if not d.HasField("apply") and self._refresh_at and now >= self._refresh_at:
+                # FAILED, so nothing changes, but what is reported is now's: once the wall clock
+                # has passed the end of debug mode (a machine that slept, before the monotonic
+                # timer went off), it ends here, as the report says.
+                self._refresh(now)
+            else:
+                self._arm(d.refresh_at_unix_ms)
+            return d.status
+
+
+def attributes(resource: Resource) -> list[anyvalue_pb2.KeyValue]:
+    """The resource's attributes, typed as OpAMP's KeyValue."""
+    out = []
+    for key, value in resource.attributes.items():
+        if isinstance(value, bool):
+            v = anyvalue_pb2.AnyValue(bool_value=value)
+        elif isinstance(value, int):
+            v = anyvalue_pb2.AnyValue(int_value=value)
+        elif isinstance(value, float):
+            v = anyvalue_pb2.AnyValue(double_value=value)
+        else:
+            v = anyvalue_pb2.AnyValue(string_value=str(value))
+        out.append(anyvalue_pb2.KeyValue(key=key, value=v))
+    return out
+
+
+def _loop_thread(name: str) -> asyncio.AbstractEventLoop:
+    """An event loop running on a thread of its own. Under gevent's monkey patching (Locust,
+    gunicorn's gevent workers) a threading.Thread is a greenlet on the caller's thread, where asyncio
+    runs one loop at a time: the client's would be the only one, and an asyncio loop the
+    application runs in a greenlet (locust-plugins' Playwright users) would fail to start. There
+    the loop gets a thread of the operating system's, and is made on it, so that its selector is
+    that thread's gevent hub's (_GeventLoop)."""
+    monkey = sys.modules.get("gevent.monkey")
+    if not _patched(monkey):
+        loop = asyncio.new_event_loop()
+        threading.Thread(target=loop.run_forever, name=name, daemon=True).start()
+        return loop
+    made: list[asyncio.AbstractEventLoop] = []
+    ready = monkey.get_original("_thread", "allocate_lock")()
+    ready.acquire()
+
+    def run() -> None:
+        loop = _GeventLoop()
+        made.append(loop)
+        loop.call_soon(ready.release)
+        loop.run_forever()
+
+    monkey.get_original("_thread", "start_new_thread")(run, ())
+    ready.acquire()
+    return made[0]
+
+
+class _GeventLoop(asyncio.SelectorEventLoop):
+    """The client's loop under gevent, on a thread of the operating system's. Its selector waits in
+    the thread's gevent hub, which runs that thread's greenlets meanwhile: the threads the client
+    starts (the loop's executor, state saves) are greenlets there. One that finishes a future
+    calls the loop on the loop's own thread, so asyncio doesn't wake the selector, and the loop
+    slept through it, for the rest of its wait (stop: until the core gave up on the goodbye).
+    Here anything scheduled during a wait wakes it."""
+
+    def __init__(self) -> None:
+        selector = selectors.DefaultSelector()  # gevent's, monkey patched
+        wait = selector.select
+
+        def select(timeout=None):
+            self._selecting = True
+            try:
+                return wait(timeout)
+            finally:
+                self._selecting = False
+
+        selector.select = select
+        self._selecting = False
+        super().__init__(selector)
+
+    def call_soon(self, callback, *args, context=None):
+        handle = super().call_soon(callback, *args, context=context)
+        if self._selecting:
+            self._write_to_self()
+        return handle
+
+    def call_at(self, when, callback, *args, context=None):
+        handle = super().call_at(when, callback, *args, context=context)
+        if self._selecting:
+            self._write_to_self()
+        return handle
+
+
+def _patched(monkey) -> bool:
+    return monkey is not None and monkey.is_module_patched("threading")
+
+
+def _result(future: concurrent.futures.Future, timeout: float | None = None):
+    """What the client's loop made of `future`, waited for from another thread. Under gevent the
+    loop is on a thread of the operating system's (_loop_thread), which a gevent wait on this one
+    can't hear from, and blocking this thread outright would stop its greenlets (the
+    application's): this yields to them while it waits."""
+    monkey = sys.modules.get("gevent.monkey")
+    if not _patched(monkey):
+        return future.result(timeout)
+    import gevent
+
+    deadline = None if timeout is None else time.monotonic() + timeout
+    while not future.done() and (deadline is None or time.monotonic() < deadline):
+        gevent.sleep(0.005)
+    return future.result(0)
+
+
+def _suppress() -> None:
+    """Suppress instrumentation in the current context, as OpenTelemetry's own exporters do."""
+    from opentelemetry.context import _SUPPRESS_INSTRUMENTATION_KEY, attach, set_value  # noqa: PLC0415
+
+    attach(set_value(_SUPPRESS_INSTRUMENTATION_KEY, True))
+
+
+def _at_exit(stop) -> None:
+    """Run `stop` as the interpreter exits, before the SDK's own flush and while host names still
+    resolve: with threading's exit hooks, which run before atexit's, last registered first. By
+    atexit the thread pool that resolves host names has shut down, and a goodbye to a server named
+    by host would be lost. That pool's hook is registered at import (above), so ours runs first."""
+    register = getattr(threading, "_register_atexit", None)
+    try:
+        if register is not None:
+            register(stop)
+            return
+    except RuntimeError:  # the interpreter is already exiting
+        pass
+    atexit.register(stop)
+
+
+#: How often the timer asks the layer about export health, in seconds.
+HEALTH_INTERVAL = 30.0
+
+AGENT = Agent(app=app_settings.SETTINGS)
+
+
+class Distro(BaseDistro):
+    """The upstream distro's defaults (OTLP for every signal), and the saved settings put in force
+    before the instrumentations load."""
+
+    def _configure(self, **kwargs) -> None:
+        _otlp_defaults()
+        AGENT.prepare()
+
+
+def _otlp_defaults() -> None:
+    os.environ.setdefault("OTEL_TRACES_EXPORTER", "otlp")
+    os.environ.setdefault("OTEL_METRICS_EXPORTER", "otlp")
+    os.environ.setdefault("OTEL_LOGS_EXPORTER", "otlp")
+    os.environ.setdefault("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")
+
+
+class Configurator(_OTelSDKConfigurator):
+    """The SDK, with a sampler and exporters the server's settings change while it runs."""
+
+    def _configure(self, **kwargs) -> None:
+        if AGENT.on:
+            from opentelemetry.sdk._configuration import _get_sampler, _import_sampler  # noqa: PLC0415
+
+            sampler = kwargs.get("sampler")
+            kwargs["sampler"] = AGENT.controls.sampler.wrap(sampler if sampler is not None
+                                                            else _import_sampler(_get_sampler()))
+            spans = kwargs.get("export_span_processor") or BatchSpanProcessor
+            kwargs["export_span_processor"] = lambda exporter: spans(AGENT.controls.spans(exporter))
+            logs = kwargs.get("export_log_record_processor") or BatchLogRecordProcessor
+            kwargs["export_log_record_processor"] = lambda exporter: logs(AGENT.controls.logs(exporter))
+            kwargs["resource_attributes"] = {**(kwargs.get("resource_attributes") or {}), _INSTANCE_ID: str(AGENT.uid)}
+            # Metric exporters named in code go through the gate as the variable's do; processors
+            # passed in export past the gates, which the host then declares (sdk_host).
+            if kwargs.get("metric_exporter_names"):
+                kwargs["metric_exporter_names"] = gated_metric_exporters(list(kwargs["metric_exporter_names"]))
+            AGENT.extra_metric_exporters = list(kwargs.get("metric_exporter_names") or [])
+            AGENT.span_processors = bool(kwargs.get("span_processors"))
+            AGENT.log_processors = bool(kwargs.get("log_record_processors"))
+            # With a declarative configuration file (newer SDKs) the SDK ignores all of the above.
+            AGENT.configured = not os.environ.get("OTEL_CONFIG_FILE")
+        super()._configure(**kwargs)
+        if AGENT.on and not AGENT.configured:
+            # The file's SDK skips upstream's OpAMP hook (start): join the fleet from here, with
+            # what the file built, so the instance is still managed (its next-start settings, its
+            # identity) and says which settings it can't carry out.
+            from opentelemetry import trace  # noqa: PLC0415
+
+            AGENT.start(getattr(trace.get_tracer_provider(), "resource", None) or Resource.create({}))
+
+
+class GatedOtlpMetricExporter(MetricExporter):
+    """The OTLP metric exporter the protocol variables choose (as ``otlp`` would), or nothing
+    while the server says not to send metrics."""
+
+    def __init__(self, **kwargs) -> None:
+        from opentelemetry.sdk._configuration import _get_exporter_entry_point  # noqa: PLC0415
+        from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
+
+        name = _get_exporter_entry_point("otlp", "metrics")
+        (ep,) = entry_points(group="opentelemetry_metrics_exporter", name=name)
+        self._to: MetricExporter = ep.load()(**kwargs)
+        super().__init__(preferred_temporality=self._to._preferred_temporality,  # noqa: SLF001
+                         preferred_aggregation=self._to._preferred_aggregation)  # noqa: SLF001
+
+    def export(self, metrics_data, timeout_millis: float = 10_000, **kwargs) -> MetricExportResult:
+        counts, points = AGENT.controls.metrics, _points(metrics_data)
+        if not AGENT.controls.gates.send_metrics:
+            counts.filtered(points)
+            return MetricExportResult.SUCCESS
+        return _export(counts, points, lambda: self._to.export(metrics_data, timeout_millis=timeout_millis, **kwargs))
+
+    def force_flush(self, timeout_millis: float = 10_000) -> bool:
+        return self._to.force_flush(timeout_millis=timeout_millis)
+
+    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
+        self._to.shutdown(timeout_millis=timeout_millis, **kwargs)
+
+
+def _points(metrics_data) -> int:
+    """The data points in an export, which health counts metrics by."""
+    try:
+        return sum(len(m.data.data_points) for rm in metrics_data.resource_metrics for sm in rm.scope_metrics
+                   for m in sm.metrics)
+    except (AttributeError, TypeError):
+        return 0
+
+
+def start(resource: Resource) -> None:
+    """Upstream's post_sdk_init_function OpAMP hook: the SDK is built; join the fleet."""
+    AGENT.start(resource)
+
+
+def configure(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
+              state_dir: str | os.PathLike | None = None, heartbeat_interval: timedelta | float | str | None = None,
+              **kwargs) -> None:
+    """Set the SDK up in code as ``opentelemetry-instrument`` would, under the OpAMP server: the
+    tracer, meter and logger providers the OTEL_* variables describe (OTLP by default), set as the
+    global ones, with the live sampler and gated exporters, and the client started. Without an
+    endpoint it is upstream's distro and configurator, unmanaged.
+
+    The server is ``endpoint``, ``headers`` (in place of OTEL_OPAMP_HEADERS, not merged with it),
+    ``state_dir`` ("none": none, not even the default one) and ``heartbeat_interval`` (seconds, a
+    timedelta, or "30s" as the variable) where given and not blank, else the OTEL_OPAMP_*
+    variables. A value it can't use is warned about and is the default; it never raises. Call it
+    once, where the application would build its providers, and before its instrumentors. The other
+    keyword arguments are upstream's configurator's (``sampler``, ``resource_attributes``,
+    ``span_processors``, ...). It instruments nothing, so the instrumentation switches the server
+    sends aren't carried out.
+
+    For example (examples/python-otel/in_code.py)::
+
+        opamp_otel.configure(
+            endpoint="https://opamp.example.com/v1/opamp",
+            headers={"Authorization": f"Bearer {settings.opamp_key}"},
+            state_dir="/var/lib/checkout/opamp",
+            heartbeat_interval=timedelta(seconds=30),
+        )
+        URLLibInstrumentor().instrument()
+    """
+    _otlp_defaults()
+    AGENT.prepare(auto_instrumented=False, endpoint=endpoint, headers=headers, state_dir=state_dir,
+                  heartbeat_interval=heartbeat_interval)
+    # The SDK's configurator starts the client through the package's OpAMP hook (start).
+    Configurator().configure(**kwargs)

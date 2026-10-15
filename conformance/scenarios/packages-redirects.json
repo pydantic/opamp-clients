@@ -1,0 +1,25 @@
+{
+  "description": "Every package file is behind redirects the client must follow: to the same origin (absolute, path-absolute, and a relative path with dot segments), to another origin and back, from http to https, a chain of exactly 5 using 301, 302, 303, 307 and 308, and a file on an https origin. The agent installs each with the file at the chain's end, sends the offer's credentials only to the file's own origin (again on coming back), and none elsewhere.",
+  "transports": ["http", "ws"],
+  "duration_s": 25,
+  "needs": ["packages", "core"],
+  "driver": {"poll_s": 1, "packages": true},
+  "server": {
+    "packages": {
+      "offer": [
+        {"name": "r1-same", "version": "1.0.0", "content": "same origin", "redirect": {"hops": ["same"]}},
+        {"name": "r2-relative", "version": "1.0.0", "content": "relative locations",
+         "redirect": {"hops": ["relative", "relative_dots"]}},
+        {"name": "r3-other", "version": "1.0.0", "content": "on another origin", "redirect": {"hops": ["other"]}},
+        {"name": "r4-other-back", "version": "1.0.0", "content": "there and back",
+         "redirect": {"hops": ["other", "relative", "main"]}},
+        {"name": "r5-five", "version": "1.0.0", "content": "five redirects",
+         "redirect": {"hops": ["same", "relative_dots", "other", "same", "main"]}},
+        {"name": "r6-upgrade", "version": "1.0.0", "content": "http to https", "redirect": {"hops": ["tls"]}},
+        {"name": "r7-https", "version": "1.0.0", "content": "an https file", "redirect": {"from": "tls", "hops": ["same", "relative"]}}
+      ]
+    }
+  },
+  "checks": ["redirects_followed", "redirect_headers_same_origin", "redirect_hops_bounded",
+             "package_statuses_reported", "driver_survives"]
+}

@@ -1,0 +1,8 @@
+{
+  "description": "The server offers a remote config on its answer to the first message.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 1, "action": "offer_config", "body": "receivers: {}\n"}]},
+  "checks": ["applies_remote_config", "sequence_increments_by_one", "driver_survives"]
+}

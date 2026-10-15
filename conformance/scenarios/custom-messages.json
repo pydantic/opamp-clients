@@ -1,0 +1,16 @@
+{
+  "description": "The agent declares a custom capability; the server sends a custom message for it, which the agent answers, and one for a capability the agent never declared, which the application must not see.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["custom_messages"],
+  "driver": {"poll_s": 1, "custom": true},
+  "server": {
+    "custom_capabilities": ["io.opentelemetry.echo"],
+    "faults": [
+      {"on_message": 2, "action": "custom_ping", "body": "hello"},
+      {"on_message": 3, "action": "custom_other"}
+    ]
+  },
+  "checks": ["custom_capabilities_declared", "custom_message_answered", "undeclared_custom_message_ignored",
+             "server_custom_capabilities_told", "driver_survives"]
+}

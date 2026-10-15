@@ -1,0 +1,46 @@
+[project]
+name = "pydantic-opamp-otel"
+version = "0.1.0"
+description = "OpenTelemetry auto-instrumentation under an OpAMP server: install it, and opentelemetry-instrument takes its SDK settings (sampling, what to send, which instrumentations run) from the server"
+readme = "README.md"
+license = "LicenseRef-All-Rights-Reserved"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic-opamp-client",
+    # The OpAMP entry points (_opentelemetry_opamp) came with 1.43.
+    "opentelemetry-sdk>=1.43",
+    "opentelemetry-instrumentation>=0.64b0",
+    "opentelemetry-exporter-otlp>=1.43",
+]
+
+[project.entry-points.opentelemetry_distro]
+opamp = "opamp_otel:Distro"
+
+[project.entry-points.opentelemetry_configurator]
+opamp = "opamp_otel:Configurator"
+
+[project.entry-points.opentelemetry_metrics_exporter]
+opamp = "opamp_otel:GatedOtlpMetricExporter"
+
+[project.entry-points._opentelemetry_opamp]
+post_sdk_init_function = "opamp_otel:start"
+
+[project.urls]
+Repository = "https://github.com/pydantic/opamp-clients"
+
+[dependency-groups]
+dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25"]
+
+[tool.uv.sources]
+pydantic-opamp-client = { path = "..", editable = true }
+pydantic-opamp-core = { path = "../core" }
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opamp_otel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

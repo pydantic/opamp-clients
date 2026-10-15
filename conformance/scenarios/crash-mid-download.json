@@ -1,0 +1,13 @@
+{
+  "description": "The machine crashes while the client downloads a package: the server sends half of the file and holds the rest; the runner kills the driver (2.6 to 3.5 s after it said it started), writes what a crash could have left of the state file, and starts it again on the same directory, the half-written file still there. The server holds only that first download: the client must download it again into a file of its own, never the one left behind, and install the whole file. The first run is killed late (8 to 11 s in) for the same reason as `restart-mid-download`'s is long: on a cold, busy ARC runner a Java client's first exchange has taken more than 3 s, and a kill before the download starts tests nothing.",
+  "transports": ["http", "ws"],
+  "duration_s": 25,
+  "seed": 9,
+  "needs": ["packages", "file_journal"],
+  "driver": {"poll_s": 1, "packages": true, "runs": [12, 10], "crash": {"runs": [0], "from_s": 8.0, "to_s": 11.0}},
+  "server": {
+    "hold": {"downloads": true, "count": 1},
+    "packages": {"offer": [{"name": "held", "version": "1.0.0", "content": "a package the server sent half of before the crash"}]}
+  },
+  "checks": ["crash_state_consistent", "packages_installed_verified", "package_statuses_reported", "driver_survives"]
+}

@@ -1,0 +1,30 @@
+# The Supervisor, as the package installs it. pydantic-opamp-enroll writes its config and the two
+# encrypted credentials below; until then the unit doesn't start (ConditionPathExists).
+[Unit]
+Description=OpAMP Supervisor and the OpenTelemetry Collector it runs
+Documentation=https://github.com/pydantic/opamp-clients/tree/main/go/opampsupervisor
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/pydantic-opamp/supervisor.yaml
+# The unmanaged collector (pydantic-otelcol-configure): only one of the two runs.
+Conflicts=pydantic-otelcol.service
+
+[Service]
+User=pydantic-opamp
+Group=pydantic-opamp
+ExecStart=/usr/lib/pydantic-opamp/opampsupervisor --config /etc/pydantic-opamp/supervisor.yaml
+Restart=on-failure
+RestartSec=5s
+# /var/lib/pydantic-opamp, 0700: the Supervisor's storage directory.
+StateDirectory=pydantic-opamp
+StateDirectoryMode=0700
+# Encrypted to this host (and its TPM, if it has one), decrypted for this service alone into
+# /run/credentials/pydantic-opamp-supervisor.service/.
+LoadCredentialEncrypted=opamp-enroll-token:/etc/pydantic-opamp/enroll-token.cred
+LoadCredentialEncrypted=opamp-state-key:/etc/pydantic-opamp/state-key.cred
+NoNewPrivileges=yes
+ProtectSystem=full
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

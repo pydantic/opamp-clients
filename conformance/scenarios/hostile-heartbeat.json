@@ -1,0 +1,8 @@
+{
+  "description": "A hostile server offers heartbeat intervals at the edges of what the protocol allows: 0, then two huge ones (the seed picks which). The agent survives and keeps reporting, without flooding the server. An answered offer is held 4.5 s: half a poll from the driver's 1 s polls, so whether a poll comes before or after the hold ends isn't a race some clients win.",
+  "transports": ["http", "ws"],
+  "duration_s": 20,
+  "driver": {"poll_s": 1, "accept_connection_settings": true, "changes_at_s": [4, 8, 12, 16]},
+  "server": {"hostile": {"seed": 3, "settings": ["heartbeat_zero", "heartbeat_huge", "heartbeat_huge"], "answer_within_s": 4, "hold_s": 4.5}},
+  "checks": ["keeps_reporting", "sequence_increments_by_one", "driver_survives"]
+}

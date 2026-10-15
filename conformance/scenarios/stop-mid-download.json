@@ -1,0 +1,12 @@
+{
+  "description": "The server offers a package and sends only half of its file, then nothing more. The client is stopped while it downloads. Stop cancels the download at once (and the partial file goes): the client must have let go of it by the time it says it has stopped, and stop must end within its bound. The driver lingers after stop, so a download left running shows.",
+  "transports": ["http", "ws"],
+  "duration_s": 4,
+  "needs": ["packages", "core"],
+  "driver": {"poll_s": 1, "packages": true, "linger_s": 3},
+  "server": {
+    "hold": {"downloads": true},
+    "packages": {"offer": [{"name": "held", "version": "1.0.0", "content": "a file the server sends half of, then nothing more"}]}
+  },
+  "checks": ["stop_bounded", "nothing_outlives_stop", "driver_survives"]
+}
