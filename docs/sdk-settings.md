@@ -481,7 +481,7 @@ integration keeps the settings documents it is handed and passes them back.
 
 | Call | When | Returns |
 |---|---|---|
-| `Load{saved, host, now_unix_ms}` | at start, before the SDK is built, with the document saved at the last change | the settings to start with (next-start ones included), the document in force, the effective config, and a warning if the saved document was unreadable (the SDK then starts with its own); when to ask again (`refresh_at_unix_ms`) |
+| `Load{core_state, saved, host, now_unix_ms}` | at start, before the SDK is built, with the core's saved state and the document saved at the last change ([at start](#at-start)) | the settings to start with (next-start ones included), the document in force, the effective config, and a warning if the saved document was unreadable (the SDK then starts with its own); when to ask again (`refresh_at_unix_ms`) |
 | `Decide{config, current, at_start, host, now_unix_ms}` | a remote config arrived | a `Plan`: the document to save before answering (none when the config is refused) |
 | `Commit{decide, saved, error}` | once the plan's document is saved, or its save failed, or there is nowhere to save it ([the answer](#the-answer)) | the `RemoteConfigStatus` to send, the settings to put in force (only when APPLIED), the document now in force, the effective config, the next-start settings pending a restart, and when to ask again |
 | `Refresh{current, at_start, host, now_unix_ms}` | at the time a `Load`, `Commit` or `Refresh` said to ask again (`refresh_at_unix_ms`, 0 for never): the end of debug mode | the settings to put in force now, the effective config, when to ask again, and a warning if the document in force no longer reads on this clock (one moved back a day, say: the SDK's own settings are then in force) |
@@ -489,6 +489,25 @@ integration keeps the settings documents it is handed and passes them back.
 | `Describe{resource}` | at start | the agent description: `service.name`, `service.namespace` and `service.instance.id` identify the instance; the rest of the resource describes it |
 | `Components{inventory, host, now_unix_ms}` | once the SDK is built, and when what it lists changes | the instance's inventory as its available components, for `set_available_components`: the integration's and SDK's versions, its instrumentations and exporters, and the settings the host carries out ([available-components.md](available-components.md#what-the-sdk-integrations-report)) |
 | `Evaluate{settings, host, input}` | in tests only | what the layer's reference matchers make of one input under a settings document: how a span is sampled, whether a log record passes `send_logs` and the levels, what redaction leaves of a list of attributes, what a rate cap lets through. Each language's tests hold its own matchers to it |
+
+### At start
+
+The settings to start with are those of the last config applied. The client core keeps that
+config in its saved state (beside the last config received, which it hands over again at start):
+it saves it when the application answers APPLIED, and reports APPLIED only once that save has
+landed. `Load` takes the state as the core asked the host to store it (`core_state`) and reads the
+config's `elastic` entry from it with the core's own decoding, so there is one copy of the format.
+A config applied without an `elastic` entry is every setting the SDK's own. So a config the
+application refused, received after the one applied, is never what a restart starts from.
+
+With no config applied in that state (none saved, a state saved before the core kept one, or one
+that doesn't read), `Load` reads `saved`, the document the integration kept itself before
+(`sdk-settings.json`): the settings carry over until a config is applied.
+
+The config applied survives an endpoint change. The core drops the config received from the old
+server (the new server's config wins) but keeps the applied one, as it keeps packages installed:
+its settings are in force on the agent, and stay so until the new server's config is applied. A
+new server then sees in the effective config what the agent actually runs.
 
 ### The host
 
@@ -556,7 +575,8 @@ exporters and a gated pull metric reader), a mapping from the next-start setting
   [available-components.md](available-components.md#what-the-sdk-integrations-report)),
   `health.json` (export health call after call: what is reported, and when it is sent),
   `custom.json` (the application's own settings: the maps taken and refused, and the typed
-  reads). The layer runs every one, and through `Evaluate`; each language's wrapper and
+  reads), `start.json` (the document `Load` starts from: the config applied in the core's saved
+  state, or the one kept before). The layer runs every one, and through `Evaluate`; each language's wrapper and
   integration tests run them too.
 - Random vectors: cases in the formats of `sampling.json`, `logs.json`, `redact.json` and
   `caps.json`, answered by the layer, drawn where languages part ways (case outside ASCII, the

@@ -126,14 +126,16 @@ class Host(_message.Message):
     def __init__(self, live: _Optional[_Iterable[str]] = ..., next_start: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Load(_message.Message):
-    __slots__ = ("saved", "host", "now_unix_ms")
+    __slots__ = ("saved", "host", "now_unix_ms", "core_state")
     SAVED_FIELD_NUMBER: _ClassVar[int]
     HOST_FIELD_NUMBER: _ClassVar[int]
     NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    CORE_STATE_FIELD_NUMBER: _ClassVar[int]
     saved: bytes
     host: Host
     now_unix_ms: int
-    def __init__(self, saved: _Optional[bytes] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ...) -> None: ...
+    core_state: bytes
+    def __init__(self, saved: _Optional[bytes] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., core_state: _Optional[bytes] = ...) -> None: ...
 
 class Loaded(_message.Message):
     __slots__ = ("settings", "current", "effective", "warning", "refresh_at_unix_ms")

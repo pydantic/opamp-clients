@@ -6713,7 +6713,8 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6722,7 +6723,8 @@ java.lang.String defaultValue) {
     boolean hasSaved();
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6751,10 +6753,33 @@ java.lang.String defaultValue) {
      * @return The nowUnixMs.
      */
     long getNowUnixMs();
+
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     * @return Whether the coreState field is set.
+     */
+    boolean hasCoreState();
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     * @return The coreState.
+     */
+    com.google.protobuf.ByteString getCoreState();
   }
   /**
    * <pre>
-   * At start, before the SDK is built: the settings saved at the last change.
+   * At start, before the SDK is built: the settings of the last config applied.
    * </pre>
    *
    * Protobuf type {@code opamp.sdk.v1.Load}
@@ -6766,13 +6791,15 @@ java.lang.String defaultValue) {
       LoadOrBuilder {
     private Load() {
       saved_ = com.google.protobuf.ByteString.EMPTY;
+      coreState_ = com.google.protobuf.ByteString.EMPTY;
     }
     private int bitField0_;
     public static final int SAVED_FIELD_NUMBER = 1;
     private com.google.protobuf.ByteString saved_;
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6784,7 +6811,8 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6796,7 +6824,8 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6809,7 +6838,8 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * unset: nothing saved
+     * The document this host kept itself (sdk-settings.json, before the core kept the last config
+     * applied): read only when core_state holds no config applied. Unset: none.
      * </pre>
      *
      * <code>optional bytes saved = 1;</code>
@@ -6908,6 +6938,65 @@ java.lang.String defaultValue) {
       nowUnixMs_ = 0L;
     }
 
+    public static final int CORE_STATE_FIELD_NUMBER = 4;
+    private com.google.protobuf.ByteString coreState_;
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     * @return Whether the coreState field is set.
+     */
+    @java.lang.Override
+    public boolean hasCoreState() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     * @return The coreState.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getCoreState() {
+      return coreState_;
+    }
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     * @param value The coreState to set.
+     */
+    private void setCoreState(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  bitField0_ |= 0x00000004;
+      coreState_ = value;
+    }
+    /**
+     * <pre>
+     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+     * settings come from the last config applied in it, read with the core's own decoding, even
+     * after an endpoint change. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 4;</code>
+     */
+    private void clearCoreState() {
+      bitField0_ = (bitField0_ & ~0x00000004);
+      coreState_ = getDefaultInstance().getCoreState();
+    }
+
     public static dev.pydantic.opamp.sdk.SettingsProto.Load parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
@@ -6993,7 +7082,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * At start, before the SDK is built: the settings saved at the last change.
+     * At start, before the SDK is built: the settings of the last config applied.
      * </pre>
      *
      * Protobuf type {@code opamp.sdk.v1.Load}
@@ -7011,7 +7100,8 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * unset: nothing saved
+       * The document this host kept itself (sdk-settings.json, before the core kept the last config
+       * applied): read only when core_state holds no config applied. Unset: none.
        * </pre>
        *
        * <code>optional bytes saved = 1;</code>
@@ -7023,7 +7113,8 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * unset: nothing saved
+       * The document this host kept itself (sdk-settings.json, before the core kept the last config
+       * applied): read only when core_state holds no config applied. Unset: none.
        * </pre>
        *
        * <code>optional bytes saved = 1;</code>
@@ -7035,7 +7126,8 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * unset: nothing saved
+       * The document this host kept itself (sdk-settings.json, before the core kept the last config
+       * applied): read only when core_state holds no config applied. Unset: none.
        * </pre>
        *
        * <code>optional bytes saved = 1;</code>
@@ -7049,7 +7141,8 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * unset: nothing saved
+       * The document this host kept itself (sdk-settings.json, before the core kept the last config
+       * applied): read only when core_state holds no config applied. Unset: none.
        * </pre>
        *
        * <code>optional bytes saved = 1;</code>
@@ -7151,6 +7244,66 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+       * settings come from the last config applied in it, read with the core's own decoding, even
+       * after an endpoint change. Unset: none.
+       * </pre>
+       *
+       * <code>optional bytes core_state = 4;</code>
+       * @return Whether the coreState field is set.
+       */
+      @java.lang.Override
+      public boolean hasCoreState() {
+        return instance.hasCoreState();
+      }
+      /**
+       * <pre>
+       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+       * settings come from the last config applied in it, read with the core's own decoding, even
+       * after an endpoint change. Unset: none.
+       * </pre>
+       *
+       * <code>optional bytes core_state = 4;</code>
+       * @return The coreState.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getCoreState() {
+        return instance.getCoreState();
+      }
+      /**
+       * <pre>
+       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+       * settings come from the last config applied in it, read with the core's own decoding, even
+       * after an endpoint change. Unset: none.
+       * </pre>
+       *
+       * <code>optional bytes core_state = 4;</code>
+       * @param value The coreState to set.
+       * @return This builder for chaining.
+       */
+      public Builder setCoreState(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setCoreState(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+       * settings come from the last config applied in it, read with the core's own decoding, even
+       * after an endpoint change. Unset: none.
+       * </pre>
+       *
+       * <code>optional bytes core_state = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearCoreState() {
+        copyOnWrite();
+        instance.clearCoreState();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Load)
     }
     @java.lang.Override
@@ -7171,10 +7324,11 @@ java.lang.String defaultValue) {
               "saved_",
               "host_",
               "nowUnixMs_",
+              "coreState_",
             };
             java.lang.String info =
-                "\u0000\u0003\u0000\u0001\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u100a\u0000\u0002" +
-                "\u1009\u0001\u0003\u0003";
+                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u100a\u0000\u0002" +
+                "\u1009\u0001\u0003\u0003\u0004\u100a\u0002";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

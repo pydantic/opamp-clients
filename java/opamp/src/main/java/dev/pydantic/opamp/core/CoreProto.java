@@ -461,6 +461,27 @@ public final class CoreProto {
      * @return The connectTimeoutMs.
      */
     long getConnectTimeoutMs();
+
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     * @return Whether the proxy field is set.
+     */
+    boolean hasProxy();
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     * @return The proxy.
+     */
+    dev.pydantic.opamp.core.CoreProto.ProxyChoice getProxy();
   }
   /**
    * <pre>
@@ -486,6 +507,7 @@ public final class CoreProto {
       userAgent_ = "";
       entropy_ = com.google.protobuf.ByteString.EMPTY;
     }
+    private int bitField0_;
     public static final int INSTANCE_UID_FIELD_NUMBER = 2;
     private com.google.protobuf.ByteString instanceUid_;
     /**
@@ -1635,6 +1657,79 @@ public final class CoreProto {
     private void clearConnectTimeoutMs() {
 
       connectTimeoutMs_ = 0L;
+    }
+
+    public static final int PROXY_FIELD_NUMBER = 31;
+    private dev.pydantic.opamp.core.CoreProto.ProxyChoice proxy_;
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     */
+    @java.lang.Override
+    public boolean hasProxy() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.ProxyChoice getProxy() {
+      return proxy_ == null ? dev.pydantic.opamp.core.CoreProto.ProxyChoice.getDefaultInstance() : proxy_;
+    }
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setProxy(dev.pydantic.opamp.core.CoreProto.ProxyChoice value) {
+      value.getClass();  // minimal bytecode null check
+      proxy_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeProxy(dev.pydantic.opamp.core.CoreProto.ProxyChoice value) {
+      value.getClass();  // minimal bytecode null check
+      if (proxy_ != null &&
+          proxy_ != dev.pydantic.opamp.core.CoreProto.ProxyChoice.getDefaultInstance()) {
+        proxy_ =
+          dev.pydantic.opamp.core.CoreProto.ProxyChoice.newBuilder(proxy_).mergeFrom(value).buildPartial();
+      } else {
+        proxy_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * With streams: which proxy every connection goes through, the core picking it (no
+     * proxy_query). Unset: the core asks (proxy_query) for each connection.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+     */
+    private void clearProxy() {
+      proxy_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
     }
 
     public static dev.pydantic.opamp.core.CoreProto.Config parseFrom(
@@ -2947,6 +3042,83 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      @java.lang.Override
+      public boolean hasProxy() {
+        return instance.hasProxy();
+      }
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.ProxyChoice getProxy() {
+        return instance.getProxy();
+      }
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      public Builder setProxy(dev.pydantic.opamp.core.CoreProto.ProxyChoice value) {
+        copyOnWrite();
+        instance.setProxy(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      public Builder setProxy(
+          dev.pydantic.opamp.core.CoreProto.ProxyChoice.Builder builderForValue) {
+        copyOnWrite();
+        instance.setProxy(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      public Builder mergeProxy(dev.pydantic.opamp.core.CoreProto.ProxyChoice value) {
+        copyOnWrite();
+        instance.mergeProxy(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * With streams: which proxy every connection goes through, the core picking it (no
+       * proxy_query). Unset: the core asks (proxy_query) for each connection.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.ProxyChoice proxy = 31;</code>
+       */
+      public Builder clearProxy() {  copyOnWrite();
+        instance.clearProxy();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Config)
     }
     @java.lang.Override
@@ -2963,6 +3135,7 @@ public final class CoreProto {
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
               "instanceUid_",
               "capabilities_",
               "heartbeatIntervalMs_",
@@ -2990,13 +3163,14 @@ public final class CoreProto {
               "unixMs_",
               "stopTimeoutMs_",
               "connectTimeoutMs_",
+              "proxy_",
             };
             java.lang.String info =
-                "\u0000\u001a\u0000\u0000\u0002\u001d\u001a\u0000\u0001\u0000\u0002\n\u0003\u0003" +
+                "\u0000\u001b\u0000\u0001\u0002\u001f\u001b\u0000\u0001\u0000\u0002\n\u0003\u0003" +
                 "\u0004\u0003\u0005\u0003\u0006\u0003\u0007\u0003\b\u0003\t\u0208\n\u001b\u000b\u0003" +
                 "\f\u0003\r\u0007\u000e\n\u000f\u0007\u0010\u0003\u0011\u0208\u0013\u0007\u0014\u0003" +
                 "\u0015\u0003\u0016\u0007\u0017\u0007\u0018\n\u0019\u0007\u001a\u0003\u001c\u0003" +
-                "\u001d\u0003";
+                "\u001d\u0003\u001f\u1009\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -3047,6 +3221,1213 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<Config> PARSER;
 
     public static com.google.protobuf.Parser<Config> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface ProxyChoiceOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.ProxyChoice)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * no proxy, whatever the environment says
+     * </pre>
+     *
+     * <code>bool direct = 1;</code>
+     * @return The direct.
+     */
+    boolean getDirect();
+
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @return The url.
+     */
+    java.lang.String getUrl();
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @return The bytes for url.
+     */
+    com.google.protobuf.ByteString
+        getUrlBytes();
+
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    java.util.List<dev.pydantic.opamp.core.CoreProto.Header> 
+        getHeadersList();
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index);
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    int getHeadersCount();
+
+    /**
+     * <pre>
+     * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+     * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+     * </pre>
+     *
+     * <code>bool resolve_locally = 4;</code>
+     * @return The resolveLocally.
+     */
+    boolean getResolveLocally();
+
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    java.util.List<dev.pydantic.opamp.core.CoreProto.Header> 
+        getEnvironmentList();
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    dev.pydantic.opamp.core.CoreProto.Header getEnvironment(int index);
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    int getEnvironmentCount();
+  }
+  /**
+   * <pre>
+   * The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+   * environment names for each destination, by the rule every SDK shares
+   * (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.ProxyChoice}
+   */
+  public  static final class ProxyChoice extends
+      com.google.protobuf.GeneratedMessageLite<
+          ProxyChoice, ProxyChoice.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.ProxyChoice)
+      ProxyChoiceOrBuilder {
+    private ProxyChoice() {
+      url_ = "";
+      headers_ = emptyProtobufList();
+      environment_ = emptyProtobufList();
+    }
+    public static final int DIRECT_FIELD_NUMBER = 1;
+    private boolean direct_;
+    /**
+     * <pre>
+     * no proxy, whatever the environment says
+     * </pre>
+     *
+     * <code>bool direct = 1;</code>
+     * @return The direct.
+     */
+    @java.lang.Override
+    public boolean getDirect() {
+      return direct_;
+    }
+    /**
+     * <pre>
+     * no proxy, whatever the environment says
+     * </pre>
+     *
+     * <code>bool direct = 1;</code>
+     * @param value The direct to set.
+     */
+    private void setDirect(boolean value) {
+      
+      direct_ = value;
+    }
+    /**
+     * <pre>
+     * no proxy, whatever the environment says
+     * </pre>
+     *
+     * <code>bool direct = 1;</code>
+     */
+    private void clearDirect() {
+
+      direct_ = false;
+    }
+
+    public static final int URL_FIELD_NUMBER = 2;
+    private java.lang.String url_;
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @return The url.
+     */
+    @java.lang.Override
+    public java.lang.String getUrl() {
+      return url_;
+    }
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @return The bytes for url.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUrlBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(url_);
+    }
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @param value The url to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUrl(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      url_ = value;
+    }
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     */
+    private void clearUrl() {
+
+      url_ = getDefaultInstance().getUrl();
+    }
+    /**
+     * <pre>
+     * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+     * </pre>
+     *
+     * <code>string url = 2;</code>
+     * @param value The bytes for url to set.
+     */
+    private void setUrlBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      url_ = value.toStringUtf8();
+
+    }
+
+    public static final int HEADERS_FIELD_NUMBER = 3;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> headers_;
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+      return headers_;
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder> 
+        getHeadersOrBuilderList() {
+      return headers_;
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public int getHeadersCount() {
+      return headers_.size();
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+      return headers_.get(index);
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder getHeadersOrBuilder(
+        int index) {
+      return headers_.get(index);
+    }
+    private void ensureHeadersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> tmp = headers_;
+      if (!tmp.isModifiable()) {
+        headers_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.set(index, value);
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(value);
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(index, value);
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void addAllHeaders(
+        java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+      ensureHeadersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, headers_);
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void clearHeaders() {
+      headers_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * for the configured proxy's CONNECT
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void removeHeaders(int index) {
+      ensureHeadersIsMutable();
+      headers_.remove(index);
+    }
+
+    public static final int RESOLVE_LOCALLY_FIELD_NUMBER = 4;
+    private boolean resolveLocally_;
+    /**
+     * <pre>
+     * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+     * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+     * </pre>
+     *
+     * <code>bool resolve_locally = 4;</code>
+     * @return The resolveLocally.
+     */
+    @java.lang.Override
+    public boolean getResolveLocally() {
+      return resolveLocally_;
+    }
+    /**
+     * <pre>
+     * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+     * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+     * </pre>
+     *
+     * <code>bool resolve_locally = 4;</code>
+     * @param value The resolveLocally to set.
+     */
+    private void setResolveLocally(boolean value) {
+      
+      resolveLocally_ = value;
+    }
+    /**
+     * <pre>
+     * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+     * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+     * </pre>
+     *
+     * <code>bool resolve_locally = 4;</code>
+     */
+    private void clearResolveLocally() {
+
+      resolveLocally_ = false;
+    }
+
+    public static final int ENVIRONMENT_FIELD_NUMBER = 5;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> environment_;
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getEnvironmentList() {
+      return environment_;
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder> 
+        getEnvironmentOrBuilderList() {
+      return environment_;
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.Override
+    public int getEnvironmentCount() {
+      return environment_.size();
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Header getEnvironment(int index) {
+      return environment_.get(index);
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    public dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder getEnvironmentOrBuilder(
+        int index) {
+      return environment_.get(index);
+    }
+    private void ensureEnvironmentIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> tmp = environment_;
+      if (!tmp.isModifiable()) {
+        environment_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEnvironment(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvironmentIsMutable();
+      environment_.set(index, value);
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnvironment(dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvironmentIsMutable();
+      environment_.add(value);
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnvironment(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvironmentIsMutable();
+      environment_.add(index, value);
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    private void addAllEnvironment(
+        java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+      ensureEnvironmentIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, environment_);
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    private void clearEnvironment() {
+      environment_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+     * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+     */
+    private void removeEnvironment(int index) {
+      ensureEnvironmentIsMutable();
+      environment_.remove(index);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.ProxyChoice prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+     * environment names for each destination, by the rule every SDK shares
+     * (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.ProxyChoice}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.ProxyChoice, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.ProxyChoice)
+        dev.pydantic.opamp.core.CoreProto.ProxyChoiceOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.ProxyChoice.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * no proxy, whatever the environment says
+       * </pre>
+       *
+       * <code>bool direct = 1;</code>
+       * @return The direct.
+       */
+      @java.lang.Override
+      public boolean getDirect() {
+        return instance.getDirect();
+      }
+      /**
+       * <pre>
+       * no proxy, whatever the environment says
+       * </pre>
+       *
+       * <code>bool direct = 1;</code>
+       * @param value The direct to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDirect(boolean value) {
+        copyOnWrite();
+        instance.setDirect(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * no proxy, whatever the environment says
+       * </pre>
+       *
+       * <code>bool direct = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDirect() {
+        copyOnWrite();
+        instance.clearDirect();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+       * </pre>
+       *
+       * <code>string url = 2;</code>
+       * @return The url.
+       */
+      @java.lang.Override
+      public java.lang.String getUrl() {
+        return instance.getUrl();
+      }
+      /**
+       * <pre>
+       * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+       * </pre>
+       *
+       * <code>string url = 2;</code>
+       * @return The bytes for url.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUrlBytes() {
+        return instance.getUrlBytes();
+      }
+      /**
+       * <pre>
+       * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+       * </pre>
+       *
+       * <code>string url = 2;</code>
+       * @param value The url to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUrl(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setUrl(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+       * </pre>
+       *
+       * <code>string url = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUrl() {
+        copyOnWrite();
+        instance.clearUrl();
+        return this;
+      }
+      /**
+       * <pre>
+       * the configured proxy, as ProxyAnswer.proxy; empty: none configured
+       * </pre>
+       *
+       * <code>string url = 2;</code>
+       * @param value The bytes for url to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUrlBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUrlBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getHeadersList());
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public int getHeadersCount() {
+        return instance.getHeadersCount();
+      }/**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+        return instance.getHeaders(index);
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.setHeaders(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addAllHeaders(
+          java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+        copyOnWrite();
+        instance.addAllHeaders(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder clearHeaders() {
+        copyOnWrite();
+        instance.clearHeaders();
+        return this;
+      }
+      /**
+       * <pre>
+       * for the configured proxy's CONNECT
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder removeHeaders(int index) {
+        copyOnWrite();
+        instance.removeHeaders(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+       * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+       * </pre>
+       *
+       * <code>bool resolve_locally = 4;</code>
+       * @return The resolveLocally.
+       */
+      @java.lang.Override
+      public boolean getResolveLocally() {
+        return instance.getResolveLocally();
+      }
+      /**
+       * <pre>
+       * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+       * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+       * </pre>
+       *
+       * <code>bool resolve_locally = 4;</code>
+       * @param value The resolveLocally to set.
+       * @return This builder for chaining.
+       */
+      public Builder setResolveLocally(boolean value) {
+        copyOnWrite();
+        instance.setResolveLocally(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+       * (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+       * </pre>
+       *
+       * <code>bool resolve_locally = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearResolveLocally() {
+        copyOnWrite();
+        instance.clearResolveLocally();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getEnvironmentList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getEnvironmentList());
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      @java.lang.Override
+      public int getEnvironmentCount() {
+        return instance.getEnvironmentCount();
+      }/**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Header getEnvironment(int index) {
+        return instance.getEnvironment(index);
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder setEnvironment(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.setEnvironment(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder setEnvironment(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.setEnvironment(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder addEnvironment(dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addEnvironment(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder addEnvironment(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addEnvironment(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder addEnvironment(
+          dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnvironment(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder addEnvironment(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnvironment(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder addAllEnvironment(
+          java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+        copyOnWrite();
+        instance.addAllEnvironment(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder clearEnvironment() {
+        copyOnWrite();
+        instance.clearEnvironment();
+        return this;
+      }
+      /**
+       * <pre>
+       * Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+       * all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header environment = 5;</code>
+       */
+      public Builder removeEnvironment(int index) {
+        copyOnWrite();
+        instance.removeEnvironment(index);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.ProxyChoice)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.ProxyChoice();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "direct_",
+              "url_",
+              "headers_",
+              dev.pydantic.opamp.core.CoreProto.Header.class,
+              "resolveLocally_",
+              "environment_",
+              dev.pydantic.opamp.core.CoreProto.Header.class,
+            };
+            java.lang.String info =
+                "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0002\u0000\u0001\u0007\u0002\u0208" +
+                "\u0003\u001b\u0004\u0007\u0005\u001b";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.ProxyChoice> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.ProxyChoice.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.ProxyChoice>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.ProxyChoice)
+    private static final dev.pydantic.opamp.core.CoreProto.ProxyChoice DEFAULT_INSTANCE;
+    static {
+      ProxyChoice defaultInstance = new ProxyChoice();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        ProxyChoice.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.ProxyChoice getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<ProxyChoice> PARSER;
+
+    public static com.google.protobuf.Parser<ProxyChoice> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
@@ -17259,6 +18640,25 @@ public final class CoreProto {
      * @return The instanceUid.
      */
     com.google.protobuf.ByteString getInstanceUid();
+
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     * @return Whether the limits field is set.
+     */
+    boolean hasLimits();
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     * @return The limits.
+     */
+    dev.pydantic.opamp.core.CoreProto.Limits getLimits();
   }
   /**
    * <pre>
@@ -17543,6 +18943,74 @@ public final class CoreProto {
     private void clearInstanceUid() {
 
       instanceUid_ = getDefaultInstance().getInstanceUid();
+    }
+
+    public static final int LIMITS_FIELD_NUMBER = 5;
+    private dev.pydantic.opamp.core.CoreProto.Limits limits_;
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     */
+    @java.lang.Override
+    public boolean hasLimits() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Limits getLimits() {
+      return limits_ == null ? dev.pydantic.opamp.core.CoreProto.Limits.getDefaultInstance() : limits_;
+    }
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setLimits(dev.pydantic.opamp.core.CoreProto.Limits value) {
+      value.getClass();  // minimal bytecode null check
+      limits_ = value;
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeLimits(dev.pydantic.opamp.core.CoreProto.Limits value) {
+      value.getClass();  // minimal bytecode null check
+      if (limits_ != null &&
+          limits_ != dev.pydantic.opamp.core.CoreProto.Limits.getDefaultInstance()) {
+        limits_ =
+          dev.pydantic.opamp.core.CoreProto.Limits.newBuilder(limits_).mergeFrom(value).buildPartial();
+      } else {
+        limits_ = value;
+      }
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <pre>
+     * init's only: the limits in force
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Limits limits = 5;</code>
+     */
+    private void clearLimits() {
+      limits_ = null;
+      bitField0_ = (bitField0_ & ~0x00000002);
     }
 
     public static dev.pydantic.opamp.core.CoreProto.Output parseFrom(
@@ -17928,6 +19396,77 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      @java.lang.Override
+      public boolean hasLimits() {
+        return instance.hasLimits();
+      }
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Limits getLimits() {
+        return instance.getLimits();
+      }
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      public Builder setLimits(dev.pydantic.opamp.core.CoreProto.Limits value) {
+        copyOnWrite();
+        instance.setLimits(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      public Builder setLimits(
+          dev.pydantic.opamp.core.CoreProto.Limits.Builder builderForValue) {
+        copyOnWrite();
+        instance.setLimits(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      public Builder mergeLimits(dev.pydantic.opamp.core.CoreProto.Limits value) {
+        copyOnWrite();
+        instance.mergeLimits(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * init's only: the limits in force
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Limits limits = 5;</code>
+       */
+      public Builder clearLimits() {  copyOnWrite();
+        instance.clearLimits();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Output)
     }
     @java.lang.Override
@@ -17950,10 +19489,11 @@ public final class CoreProto {
               "wakeAtMs_",
               "stopped_",
               "instanceUid_",
+              "limits_",
             };
             java.lang.String info =
-                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0001\u0000\u0001\u001b\u0002\u1003" +
-                "\u0000\u0003\u0007\u0004\n";
+                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u001b\u0002\u1003" +
+                "\u0000\u0003\u0007\u0004\n\u0005\u1009\u0001";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -18004,6 +19544,905 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<Output> PARSER;
 
     public static com.google.protobuf.Parser<Output> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface LimitsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.Limits)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @return The heartbeatIntervalMs.
+     */
+    long getHeartbeatIntervalMs();
+
+    /**
+     * <code>uint64 backoff_initial_ms = 5;</code>
+     * @return The backoffInitialMs.
+     */
+    long getBackoffInitialMs();
+
+    /**
+     * <code>uint64 backoff_max_ms = 6;</code>
+     * @return The backoffMaxMs.
+     */
+    long getBackoffMaxMs();
+
+    /**
+     * <pre>
+     * raised to 1024 if smaller
+     * </pre>
+     *
+     * <code>uint64 max_send_bytes = 7;</code>
+     * @return The maxSendBytes.
+     */
+    long getMaxSendBytes();
+
+    /**
+     * <code>uint64 request_timeout_ms = 11;</code>
+     * @return The requestTimeoutMs.
+     */
+    long getRequestTimeoutMs();
+
+    /**
+     * <code>uint64 max_receive_bytes = 12;</code>
+     * @return The maxReceiveBytes.
+     */
+    long getMaxReceiveBytes();
+
+    /**
+     * <code>uint64 verify_timeout_ms = 16;</code>
+     * @return The verifyTimeoutMs.
+     */
+    long getVerifyTimeoutMs();
+
+    /**
+     * <code>uint64 max_package_bytes = 20;</code>
+     * @return The maxPackageBytes.
+     */
+    long getMaxPackageBytes();
+
+    /**
+     * <code>uint64 download_timeout_ms = 21;</code>
+     * @return The downloadTimeoutMs.
+     */
+    long getDownloadTimeoutMs();
+
+    /**
+     * <code>uint64 stop_timeout_ms = 28;</code>
+     * @return The stopTimeoutMs.
+     */
+    long getStopTimeoutMs();
+
+    /**
+     * <code>uint64 connect_timeout_ms = 29;</code>
+     * @return The connectTimeoutMs.
+     */
+    long getConnectTimeoutMs();
+  }
+  /**
+   * <pre>
+   * The durations and sizes the core goes by, as the configuration gave them or by default (a
+   * field it left at 0), numbered as in Config: a host bounds its own waits by these (stop by
+   * stop_timeout_ms) rather than by its own copy of the defaults. A configuration value above
+   * 2^63 - 1 (a negative number passed as unsigned) is refused at init, naming the field.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.Limits}
+   */
+  public  static final class Limits extends
+      com.google.protobuf.GeneratedMessageLite<
+          Limits, Limits.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.Limits)
+      LimitsOrBuilder {
+    private Limits() {
+    }
+    public static final int HEARTBEAT_INTERVAL_MS_FIELD_NUMBER = 4;
+    private long heartbeatIntervalMs_;
+    /**
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @return The heartbeatIntervalMs.
+     */
+    @java.lang.Override
+    public long getHeartbeatIntervalMs() {
+      return heartbeatIntervalMs_;
+    }
+    /**
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @param value The heartbeatIntervalMs to set.
+     */
+    private void setHeartbeatIntervalMs(long value) {
+      
+      heartbeatIntervalMs_ = value;
+    }
+    /**
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     */
+    private void clearHeartbeatIntervalMs() {
+
+      heartbeatIntervalMs_ = 0L;
+    }
+
+    public static final int BACKOFF_INITIAL_MS_FIELD_NUMBER = 5;
+    private long backoffInitialMs_;
+    /**
+     * <code>uint64 backoff_initial_ms = 5;</code>
+     * @return The backoffInitialMs.
+     */
+    @java.lang.Override
+    public long getBackoffInitialMs() {
+      return backoffInitialMs_;
+    }
+    /**
+     * <code>uint64 backoff_initial_ms = 5;</code>
+     * @param value The backoffInitialMs to set.
+     */
+    private void setBackoffInitialMs(long value) {
+      
+      backoffInitialMs_ = value;
+    }
+    /**
+     * <code>uint64 backoff_initial_ms = 5;</code>
+     */
+    private void clearBackoffInitialMs() {
+
+      backoffInitialMs_ = 0L;
+    }
+
+    public static final int BACKOFF_MAX_MS_FIELD_NUMBER = 6;
+    private long backoffMaxMs_;
+    /**
+     * <code>uint64 backoff_max_ms = 6;</code>
+     * @return The backoffMaxMs.
+     */
+    @java.lang.Override
+    public long getBackoffMaxMs() {
+      return backoffMaxMs_;
+    }
+    /**
+     * <code>uint64 backoff_max_ms = 6;</code>
+     * @param value The backoffMaxMs to set.
+     */
+    private void setBackoffMaxMs(long value) {
+      
+      backoffMaxMs_ = value;
+    }
+    /**
+     * <code>uint64 backoff_max_ms = 6;</code>
+     */
+    private void clearBackoffMaxMs() {
+
+      backoffMaxMs_ = 0L;
+    }
+
+    public static final int MAX_SEND_BYTES_FIELD_NUMBER = 7;
+    private long maxSendBytes_;
+    /**
+     * <pre>
+     * raised to 1024 if smaller
+     * </pre>
+     *
+     * <code>uint64 max_send_bytes = 7;</code>
+     * @return The maxSendBytes.
+     */
+    @java.lang.Override
+    public long getMaxSendBytes() {
+      return maxSendBytes_;
+    }
+    /**
+     * <pre>
+     * raised to 1024 if smaller
+     * </pre>
+     *
+     * <code>uint64 max_send_bytes = 7;</code>
+     * @param value The maxSendBytes to set.
+     */
+    private void setMaxSendBytes(long value) {
+      
+      maxSendBytes_ = value;
+    }
+    /**
+     * <pre>
+     * raised to 1024 if smaller
+     * </pre>
+     *
+     * <code>uint64 max_send_bytes = 7;</code>
+     */
+    private void clearMaxSendBytes() {
+
+      maxSendBytes_ = 0L;
+    }
+
+    public static final int REQUEST_TIMEOUT_MS_FIELD_NUMBER = 11;
+    private long requestTimeoutMs_;
+    /**
+     * <code>uint64 request_timeout_ms = 11;</code>
+     * @return The requestTimeoutMs.
+     */
+    @java.lang.Override
+    public long getRequestTimeoutMs() {
+      return requestTimeoutMs_;
+    }
+    /**
+     * <code>uint64 request_timeout_ms = 11;</code>
+     * @param value The requestTimeoutMs to set.
+     */
+    private void setRequestTimeoutMs(long value) {
+      
+      requestTimeoutMs_ = value;
+    }
+    /**
+     * <code>uint64 request_timeout_ms = 11;</code>
+     */
+    private void clearRequestTimeoutMs() {
+
+      requestTimeoutMs_ = 0L;
+    }
+
+    public static final int MAX_RECEIVE_BYTES_FIELD_NUMBER = 12;
+    private long maxReceiveBytes_;
+    /**
+     * <code>uint64 max_receive_bytes = 12;</code>
+     * @return The maxReceiveBytes.
+     */
+    @java.lang.Override
+    public long getMaxReceiveBytes() {
+      return maxReceiveBytes_;
+    }
+    /**
+     * <code>uint64 max_receive_bytes = 12;</code>
+     * @param value The maxReceiveBytes to set.
+     */
+    private void setMaxReceiveBytes(long value) {
+      
+      maxReceiveBytes_ = value;
+    }
+    /**
+     * <code>uint64 max_receive_bytes = 12;</code>
+     */
+    private void clearMaxReceiveBytes() {
+
+      maxReceiveBytes_ = 0L;
+    }
+
+    public static final int VERIFY_TIMEOUT_MS_FIELD_NUMBER = 16;
+    private long verifyTimeoutMs_;
+    /**
+     * <code>uint64 verify_timeout_ms = 16;</code>
+     * @return The verifyTimeoutMs.
+     */
+    @java.lang.Override
+    public long getVerifyTimeoutMs() {
+      return verifyTimeoutMs_;
+    }
+    /**
+     * <code>uint64 verify_timeout_ms = 16;</code>
+     * @param value The verifyTimeoutMs to set.
+     */
+    private void setVerifyTimeoutMs(long value) {
+      
+      verifyTimeoutMs_ = value;
+    }
+    /**
+     * <code>uint64 verify_timeout_ms = 16;</code>
+     */
+    private void clearVerifyTimeoutMs() {
+
+      verifyTimeoutMs_ = 0L;
+    }
+
+    public static final int MAX_PACKAGE_BYTES_FIELD_NUMBER = 20;
+    private long maxPackageBytes_;
+    /**
+     * <code>uint64 max_package_bytes = 20;</code>
+     * @return The maxPackageBytes.
+     */
+    @java.lang.Override
+    public long getMaxPackageBytes() {
+      return maxPackageBytes_;
+    }
+    /**
+     * <code>uint64 max_package_bytes = 20;</code>
+     * @param value The maxPackageBytes to set.
+     */
+    private void setMaxPackageBytes(long value) {
+      
+      maxPackageBytes_ = value;
+    }
+    /**
+     * <code>uint64 max_package_bytes = 20;</code>
+     */
+    private void clearMaxPackageBytes() {
+
+      maxPackageBytes_ = 0L;
+    }
+
+    public static final int DOWNLOAD_TIMEOUT_MS_FIELD_NUMBER = 21;
+    private long downloadTimeoutMs_;
+    /**
+     * <code>uint64 download_timeout_ms = 21;</code>
+     * @return The downloadTimeoutMs.
+     */
+    @java.lang.Override
+    public long getDownloadTimeoutMs() {
+      return downloadTimeoutMs_;
+    }
+    /**
+     * <code>uint64 download_timeout_ms = 21;</code>
+     * @param value The downloadTimeoutMs to set.
+     */
+    private void setDownloadTimeoutMs(long value) {
+      
+      downloadTimeoutMs_ = value;
+    }
+    /**
+     * <code>uint64 download_timeout_ms = 21;</code>
+     */
+    private void clearDownloadTimeoutMs() {
+
+      downloadTimeoutMs_ = 0L;
+    }
+
+    public static final int STOP_TIMEOUT_MS_FIELD_NUMBER = 28;
+    private long stopTimeoutMs_;
+    /**
+     * <code>uint64 stop_timeout_ms = 28;</code>
+     * @return The stopTimeoutMs.
+     */
+    @java.lang.Override
+    public long getStopTimeoutMs() {
+      return stopTimeoutMs_;
+    }
+    /**
+     * <code>uint64 stop_timeout_ms = 28;</code>
+     * @param value The stopTimeoutMs to set.
+     */
+    private void setStopTimeoutMs(long value) {
+      
+      stopTimeoutMs_ = value;
+    }
+    /**
+     * <code>uint64 stop_timeout_ms = 28;</code>
+     */
+    private void clearStopTimeoutMs() {
+
+      stopTimeoutMs_ = 0L;
+    }
+
+    public static final int CONNECT_TIMEOUT_MS_FIELD_NUMBER = 29;
+    private long connectTimeoutMs_;
+    /**
+     * <code>uint64 connect_timeout_ms = 29;</code>
+     * @return The connectTimeoutMs.
+     */
+    @java.lang.Override
+    public long getConnectTimeoutMs() {
+      return connectTimeoutMs_;
+    }
+    /**
+     * <code>uint64 connect_timeout_ms = 29;</code>
+     * @param value The connectTimeoutMs to set.
+     */
+    private void setConnectTimeoutMs(long value) {
+      
+      connectTimeoutMs_ = value;
+    }
+    /**
+     * <code>uint64 connect_timeout_ms = 29;</code>
+     */
+    private void clearConnectTimeoutMs() {
+
+      connectTimeoutMs_ = 0L;
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Limits parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.Limits prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * The durations and sizes the core goes by, as the configuration gave them or by default (a
+     * field it left at 0), numbered as in Config: a host bounds its own waits by these (stop by
+     * stop_timeout_ms) rather than by its own copy of the defaults. A configuration value above
+     * 2^63 - 1 (a negative number passed as unsigned) is refused at init, naming the field.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.Limits}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.Limits, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.Limits)
+        dev.pydantic.opamp.core.CoreProto.LimitsOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.Limits.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @return The heartbeatIntervalMs.
+       */
+      @java.lang.Override
+      public long getHeartbeatIntervalMs() {
+        return instance.getHeartbeatIntervalMs();
+      }
+      /**
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @param value The heartbeatIntervalMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeartbeatIntervalMs(long value) {
+        copyOnWrite();
+        instance.setHeartbeatIntervalMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeartbeatIntervalMs() {
+        copyOnWrite();
+        instance.clearHeartbeatIntervalMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 backoff_initial_ms = 5;</code>
+       * @return The backoffInitialMs.
+       */
+      @java.lang.Override
+      public long getBackoffInitialMs() {
+        return instance.getBackoffInitialMs();
+      }
+      /**
+       * <code>uint64 backoff_initial_ms = 5;</code>
+       * @param value The backoffInitialMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setBackoffInitialMs(long value) {
+        copyOnWrite();
+        instance.setBackoffInitialMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 backoff_initial_ms = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearBackoffInitialMs() {
+        copyOnWrite();
+        instance.clearBackoffInitialMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 backoff_max_ms = 6;</code>
+       * @return The backoffMaxMs.
+       */
+      @java.lang.Override
+      public long getBackoffMaxMs() {
+        return instance.getBackoffMaxMs();
+      }
+      /**
+       * <code>uint64 backoff_max_ms = 6;</code>
+       * @param value The backoffMaxMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setBackoffMaxMs(long value) {
+        copyOnWrite();
+        instance.setBackoffMaxMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 backoff_max_ms = 6;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearBackoffMaxMs() {
+        copyOnWrite();
+        instance.clearBackoffMaxMs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * raised to 1024 if smaller
+       * </pre>
+       *
+       * <code>uint64 max_send_bytes = 7;</code>
+       * @return The maxSendBytes.
+       */
+      @java.lang.Override
+      public long getMaxSendBytes() {
+        return instance.getMaxSendBytes();
+      }
+      /**
+       * <pre>
+       * raised to 1024 if smaller
+       * </pre>
+       *
+       * <code>uint64 max_send_bytes = 7;</code>
+       * @param value The maxSendBytes to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMaxSendBytes(long value) {
+        copyOnWrite();
+        instance.setMaxSendBytes(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * raised to 1024 if smaller
+       * </pre>
+       *
+       * <code>uint64 max_send_bytes = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearMaxSendBytes() {
+        copyOnWrite();
+        instance.clearMaxSendBytes();
+        return this;
+      }
+
+      /**
+       * <code>uint64 request_timeout_ms = 11;</code>
+       * @return The requestTimeoutMs.
+       */
+      @java.lang.Override
+      public long getRequestTimeoutMs() {
+        return instance.getRequestTimeoutMs();
+      }
+      /**
+       * <code>uint64 request_timeout_ms = 11;</code>
+       * @param value The requestTimeoutMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRequestTimeoutMs(long value) {
+        copyOnWrite();
+        instance.setRequestTimeoutMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 request_timeout_ms = 11;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRequestTimeoutMs() {
+        copyOnWrite();
+        instance.clearRequestTimeoutMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 max_receive_bytes = 12;</code>
+       * @return The maxReceiveBytes.
+       */
+      @java.lang.Override
+      public long getMaxReceiveBytes() {
+        return instance.getMaxReceiveBytes();
+      }
+      /**
+       * <code>uint64 max_receive_bytes = 12;</code>
+       * @param value The maxReceiveBytes to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMaxReceiveBytes(long value) {
+        copyOnWrite();
+        instance.setMaxReceiveBytes(value);
+        return this;
+      }
+      /**
+       * <code>uint64 max_receive_bytes = 12;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearMaxReceiveBytes() {
+        copyOnWrite();
+        instance.clearMaxReceiveBytes();
+        return this;
+      }
+
+      /**
+       * <code>uint64 verify_timeout_ms = 16;</code>
+       * @return The verifyTimeoutMs.
+       */
+      @java.lang.Override
+      public long getVerifyTimeoutMs() {
+        return instance.getVerifyTimeoutMs();
+      }
+      /**
+       * <code>uint64 verify_timeout_ms = 16;</code>
+       * @param value The verifyTimeoutMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setVerifyTimeoutMs(long value) {
+        copyOnWrite();
+        instance.setVerifyTimeoutMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 verify_timeout_ms = 16;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearVerifyTimeoutMs() {
+        copyOnWrite();
+        instance.clearVerifyTimeoutMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 max_package_bytes = 20;</code>
+       * @return The maxPackageBytes.
+       */
+      @java.lang.Override
+      public long getMaxPackageBytes() {
+        return instance.getMaxPackageBytes();
+      }
+      /**
+       * <code>uint64 max_package_bytes = 20;</code>
+       * @param value The maxPackageBytes to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMaxPackageBytes(long value) {
+        copyOnWrite();
+        instance.setMaxPackageBytes(value);
+        return this;
+      }
+      /**
+       * <code>uint64 max_package_bytes = 20;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearMaxPackageBytes() {
+        copyOnWrite();
+        instance.clearMaxPackageBytes();
+        return this;
+      }
+
+      /**
+       * <code>uint64 download_timeout_ms = 21;</code>
+       * @return The downloadTimeoutMs.
+       */
+      @java.lang.Override
+      public long getDownloadTimeoutMs() {
+        return instance.getDownloadTimeoutMs();
+      }
+      /**
+       * <code>uint64 download_timeout_ms = 21;</code>
+       * @param value The downloadTimeoutMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDownloadTimeoutMs(long value) {
+        copyOnWrite();
+        instance.setDownloadTimeoutMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 download_timeout_ms = 21;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDownloadTimeoutMs() {
+        copyOnWrite();
+        instance.clearDownloadTimeoutMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 stop_timeout_ms = 28;</code>
+       * @return The stopTimeoutMs.
+       */
+      @java.lang.Override
+      public long getStopTimeoutMs() {
+        return instance.getStopTimeoutMs();
+      }
+      /**
+       * <code>uint64 stop_timeout_ms = 28;</code>
+       * @param value The stopTimeoutMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStopTimeoutMs(long value) {
+        copyOnWrite();
+        instance.setStopTimeoutMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 stop_timeout_ms = 28;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStopTimeoutMs() {
+        copyOnWrite();
+        instance.clearStopTimeoutMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 connect_timeout_ms = 29;</code>
+       * @return The connectTimeoutMs.
+       */
+      @java.lang.Override
+      public long getConnectTimeoutMs() {
+        return instance.getConnectTimeoutMs();
+      }
+      /**
+       * <code>uint64 connect_timeout_ms = 29;</code>
+       * @param value The connectTimeoutMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setConnectTimeoutMs(long value) {
+        copyOnWrite();
+        instance.setConnectTimeoutMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 connect_timeout_ms = 29;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearConnectTimeoutMs() {
+        copyOnWrite();
+        instance.clearConnectTimeoutMs();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.Limits)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.Limits();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "heartbeatIntervalMs_",
+              "backoffInitialMs_",
+              "backoffMaxMs_",
+              "maxSendBytes_",
+              "requestTimeoutMs_",
+              "maxReceiveBytes_",
+              "verifyTimeoutMs_",
+              "maxPackageBytes_",
+              "downloadTimeoutMs_",
+              "stopTimeoutMs_",
+              "connectTimeoutMs_",
+            };
+            java.lang.String info =
+                "\u0000\u000b\u0000\u0000\u0004\u001d\u000b\u0000\u0000\u0000\u0004\u0003\u0005\u0003" +
+                "\u0006\u0003\u0007\u0003\u000b\u0003\f\u0003\u0010\u0003\u0014\u0003\u0015\u0003" +
+                "\u001c\u0003\u001d\u0003";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.Limits> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.Limits.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.Limits>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.Limits)
+    private static final dev.pydantic.opamp.core.CoreProto.Limits DEFAULT_INSTANCE;
+    static {
+      Limits defaultInstance = new Limits();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        Limits.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Limits getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<Limits> PARSER;
+
+    public static com.google.protobuf.Parser<Limits> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }

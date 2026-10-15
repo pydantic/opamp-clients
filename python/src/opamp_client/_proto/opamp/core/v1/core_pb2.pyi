@@ -28,7 +28,7 @@ STATUS_FIELD_CUSTOM_CAPABILITIES: StatusField
 STATUS_FIELD_PACKAGE_STATUSES: StatusField
 
 class Config(_message.Message):
-    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms")
+    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy")
     INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
     CAPABILITIES_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
@@ -55,6 +55,7 @@ class Config(_message.Message):
     UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     STOP_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     CONNECT_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    PROXY_FIELD_NUMBER: _ClassVar[int]
     instance_uid: bytes
     capabilities: int
     heartbeat_interval_ms: int
@@ -81,7 +82,22 @@ class Config(_message.Message):
     unix_ms: int
     stop_timeout_ms: int
     connect_timeout_ms: int
-    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ...) -> None: ...
+    proxy: ProxyChoice
+    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ..., proxy: _Optional[_Union[ProxyChoice, _Mapping]] = ...) -> None: ...
+
+class ProxyChoice(_message.Message):
+    __slots__ = ("direct", "url", "headers", "resolve_locally", "environment")
+    DIRECT_FIELD_NUMBER: _ClassVar[int]
+    URL_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    RESOLVE_LOCALLY_FIELD_NUMBER: _ClassVar[int]
+    ENVIRONMENT_FIELD_NUMBER: _ClassVar[int]
+    direct: bool
+    url: str
+    headers: _containers.RepeatedCompositeFieldContainer[Header]
+    resolve_locally: bool
+    environment: _containers.RepeatedCompositeFieldContainer[Header]
+    def __init__(self, direct: bool = ..., url: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., resolve_locally: bool = ..., environment: _Optional[_Iterable[_Union[Header, _Mapping]]] = ...) -> None: ...
 
 class Origin(_message.Message):
     __slots__ = ("scheme", "host", "port")
@@ -326,16 +342,44 @@ class Reply(_message.Message):
     def __init__(self, output: _Optional[_Union[Output, _Mapping]] = ..., error: _Optional[str] = ...) -> None: ...
 
 class Output(_message.Message):
-    __slots__ = ("effects", "wake_at_ms", "stopped", "instance_uid")
+    __slots__ = ("effects", "wake_at_ms", "stopped", "instance_uid", "limits")
     EFFECTS_FIELD_NUMBER: _ClassVar[int]
     WAKE_AT_MS_FIELD_NUMBER: _ClassVar[int]
     STOPPED_FIELD_NUMBER: _ClassVar[int]
     INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
+    LIMITS_FIELD_NUMBER: _ClassVar[int]
     effects: _containers.RepeatedCompositeFieldContainer[Effect]
     wake_at_ms: int
     stopped: bool
     instance_uid: bytes
-    def __init__(self, effects: _Optional[_Iterable[_Union[Effect, _Mapping]]] = ..., wake_at_ms: _Optional[int] = ..., stopped: bool = ..., instance_uid: _Optional[bytes] = ...) -> None: ...
+    limits: Limits
+    def __init__(self, effects: _Optional[_Iterable[_Union[Effect, _Mapping]]] = ..., wake_at_ms: _Optional[int] = ..., stopped: bool = ..., instance_uid: _Optional[bytes] = ..., limits: _Optional[_Union[Limits, _Mapping]] = ...) -> None: ...
+
+class Limits(_message.Message):
+    __slots__ = ("heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "request_timeout_ms", "max_receive_bytes", "verify_timeout_ms", "max_package_bytes", "download_timeout_ms", "stop_timeout_ms", "connect_timeout_ms")
+    HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
+    BACKOFF_INITIAL_MS_FIELD_NUMBER: _ClassVar[int]
+    BACKOFF_MAX_MS_FIELD_NUMBER: _ClassVar[int]
+    MAX_SEND_BYTES_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    MAX_RECEIVE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    VERIFY_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    MAX_PACKAGE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    DOWNLOAD_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    STOP_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    CONNECT_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    heartbeat_interval_ms: int
+    backoff_initial_ms: int
+    backoff_max_ms: int
+    max_send_bytes: int
+    request_timeout_ms: int
+    max_receive_bytes: int
+    verify_timeout_ms: int
+    max_package_bytes: int
+    download_timeout_ms: int
+    stop_timeout_ms: int
+    connect_timeout_ms: int
+    def __init__(self, heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., verify_timeout_ms: _Optional[int] = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ...) -> None: ...
 
 class Effect(_message.Message):
     __slots__ = ("http_request", "ws_open", "ws_send", "ws_close", "notify", "store", "download", "discard", "cancel", "proxy_query", "stream_resolve", "stream_open", "stream_start_tls", "stream_write", "stream_close", "download_data", "download_done", "stream_splice")

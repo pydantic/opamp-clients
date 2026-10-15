@@ -740,14 +740,20 @@ func (x *Host) GetNextStart() []string {
 	return nil
 }
 
-// At start, before the SDK is built: the settings saved at the last change.
+// At start, before the SDK is built: the settings of the last config applied.
 type Load struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	Saved []byte                 `protobuf:"bytes,1,opt,name=saved,proto3,oneof" json:"saved,omitempty"` // unset: nothing saved
-	Host  *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	// The document this host kept itself (sdk-settings.json, before the core kept the last config
+	// applied): read only when core_state holds no config applied. Unset: none.
+	Saved []byte `protobuf:"bytes,1,opt,name=saved,proto3,oneof" json:"saved,omitempty"`
+	Host  *Host  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
 	// The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
 	// against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
-	NowUnixMs     uint64 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
+	NowUnixMs uint64 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
+	// The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+	// settings come from the last config applied in it, read with the core's own decoding, even
+	// after an endpoint change. Unset: none.
+	CoreState     []byte `protobuf:"bytes,4,opt,name=core_state,json=coreState,proto3,oneof" json:"core_state,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -801,6 +807,13 @@ func (x *Load) GetNowUnixMs() uint64 {
 		return x.NowUnixMs
 	}
 	return 0
+}
+
+func (x *Load) GetCoreState() []byte {
+	if x != nil {
+		return x.CoreState
+	}
+	return nil
 }
 
 type Loaded struct {
@@ -2885,12 +2898,15 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x04Host\x12\x12\n" +
 	"\x04live\x18\x01 \x03(\tR\x04live\x12\x1d\n" +
 	"\n" +
-	"next_start\x18\x03 \x03(\tR\tnextStartJ\x04\b\x02\x10\x03\"s\n" +
+	"next_start\x18\x03 \x03(\tR\tnextStartJ\x04\b\x02\x10\x03\"\xa6\x01\n" +
 	"\x04Load\x12\x19\n" +
 	"\x05saved\x18\x01 \x01(\fH\x00R\x05saved\x88\x01\x01\x12&\n" +
 	"\x04host\x18\x02 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
-	"\vnow_unix_ms\x18\x03 \x01(\x04R\tnowUnixMsB\b\n" +
-	"\x06_saved\"\xdc\x01\n" +
+	"\vnow_unix_ms\x18\x03 \x01(\x04R\tnowUnixMs\x12\"\n" +
+	"\n" +
+	"core_state\x18\x04 \x01(\fH\x01R\tcoreState\x88\x01\x01B\b\n" +
+	"\x06_savedB\r\n" +
+	"\v_core_state\"\xdc\x01\n" +
 	"\x06Loaded\x122\n" +
 	"\bsettings\x18\x01 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x12\x18\n" +
 	"\acurrent\x18\x02 \x01(\fR\acurrent\x12=\n" +
