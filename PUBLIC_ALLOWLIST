@@ -30,4 +30,7 @@ scripts/gen_core.py
 scripts/gen_sdk_settings.py
 scripts/test_native_dist.py
 scripts/test_sdk_release.py
+scripts/redact_mutants.py
+scripts/redact-mutants.toml
+scripts/test_redact_mutants.py
 scripts/*_fuzz.sh

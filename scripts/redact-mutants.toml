@@ -1,0 +1,132 @@
+# Redactions dropped, one at a time, for scripts/redact_mutants.py: each must fail the
+# noninterference test of its `test` (`python`: python/tests/test_redaction.py; `go`:
+# go/opamp/redact_test.go; `dotnet`: dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs). Each
+# replaces `find`, which must match exactly once in `file`, with `replace`. `shows` says what the
+# dropped redaction lets out.
+
+# ---------------------------------------------------------------------------------------------
+# The Python SDK (python/src/opamp_client).
+
+[[mutant]]
+name = "python-config-headers-shown"
+file = "python/src/opamp_client/_client.py"
+test = "python"
+shows = "the headers sent to the server, in a Config's repr"
+find = """            if name == "headers":
+                return redacted_headers(self.headers)"""
+replace = """            if name == "headers":
+                return self.headers"""
+
+[[mutant]]
+name = "python-proxy-headers-shown"
+file = "python/src/opamp_client/_transport.py"
+test = "python"
+shows = "a proxy's CONNECT headers (Proxy-Authorization), in a Proxy's repr"
+find = """headers={redacted_headers(self.headers)!r}"""
+replace = """headers={dict(self.headers)!r}"""
+
+[[mutant]]
+name = "python-proxy-password-shown"
+file = "python/src/opamp_client/_transport.py"
+test = "python"
+shows = "a proxy URL's password, in a Proxy's and a Config's repr"
+find = """    return re.sub(r"(//[^/@:]*):[^/@]*@", r"\\1:***@", url)"""
+replace = """    return url"""
+
+[[mutant]]
+name = "python-key-shown"
+file = "python/src/opamp_client/_transport.py"
+test = "python"
+shows = "a client certificate's private key and its password, in a TLS's repr"
+find = """    key_pem: str | bytes | None = field(default=None, repr=False)
+    #: The password of an encrypted private key.
+    key_password: str | bytes | None = field(default=None, repr=False)"""
+replace = """    key_pem: str | bytes | None = None
+    #: The password of an encrypted private key.
+    key_password: str | bytes | None = None"""
+
+# ---------------------------------------------------------------------------------------------
+# The Go SDK (go/opamp/redact.go).
+
+[[mutant]]
+name = "go-config-header-shown"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "the headers sent to the server, in a Config printed or logged"
+find = """\t\t"Header":      redactedHeader(c.Header),"""
+replace = """\t\t"Header":      c.Header,"""
+
+[[mutant]]
+name = "go-endpoint-password-shown"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "a password in the endpoint's URL, in a Config printed or logged"
+find = """\t\t"Endpoint":    redactedURL(c.Endpoint),"""
+replace = """\t\t"Endpoint":    c.Endpoint,"""
+
+[[mutant]]
+name = "go-key-shown"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "the client key, in a TLS (and a Config) printed or logged"
+find = """\t\t"KeyPEM":  redactedBytes(t.KeyPEM),"""
+replace = """\t\t"KeyPEM":  string(t.KeyPEM),"""
+
+[[mutant]]
+name = "go-proxy-shown"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "the proxy URL's password and its CONNECT headers (Proxy-Authorization), in a Proxy printed or logged"
+find = """{"URL": redactedURL(p.URL), "ConnectHeader": redactedHeader(p.ConnectHeader)}"""
+replace = """{"URL": p.URL, "ConnectHeader": p.ConnectHeader}"""
+
+[[mutant]]
+name = "go-config-format-dropped"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "every secret of a Config printed with %#v, which then prints its fields as they are"
+find = """func (c Config) Format(f fmt.State, verb rune) { format(f, verb, "opamp.Config", c.String()) }"""
+replace = ""
+
+[[mutant]]
+name = "go-tls-logvalue-dropped"
+file = "go/opamp/redact.go"
+test = "go"
+shows = "the client key of a TLS logged by slog's JSON handler, which then marshals its fields"
+find = """func (t TLS) LogValue() slog.Value { return slog.StringValue(t.String()) }"""
+replace = ""
+
+# ---------------------------------------------------------------------------------------------
+# The .NET SDK (dotnet/Pydantic.OpAmp.Client: Redacted.cs and the options records' PrintMembers).
+
+[[mutant]]
+name = "dotnet-headers-shown"
+file = "dotnet/Pydantic.OpAmp.Client/Redacted.cs"
+test = "dotnet"
+shows = "the headers sent to the server, in OpAmpClientOptions' ToString"
+find = """headers.Keys.Select(k => $"{k} = {Hidden}")"""
+replace = """headers.Keys.Select(k => $"{k} = {headers[k]}")"""
+
+[[mutant]]
+name = "dotnet-url-password-shown"
+file = "dotnet/Pydantic.OpAmp.Client/Redacted.cs"
+test = "dotnet"
+shows = "a password in the endpoint's or the proxy's URL, in OpAmpClientOptions' ToString"
+find = """Password().Replace(uri.OriginalString, "$1:***@")"""
+replace = """uri.OriginalString"""
+
+[[mutant]]
+name = "dotnet-proxy-shown"
+file = "dotnet/Pydantic.OpAmp.Client/OpAmpClient.cs"
+test = "dotnet"
+shows = "the proxy URL's password (Uri.ToString keeps it), in OpAmpClientOptions' ToString"
+find = """(nameof(this.Proxy), Redacted.Url(this.Proxy)),"""
+replace = """(nameof(this.Proxy), this.Proxy),"""
+
+[[mutant]]
+name = "dotnet-key-shown"
+file = "dotnet/Pydantic.OpAmp.Client/ClientTransport.cs"
+test = "dotnet"
+shows = "the client key, in OpAmpTlsOptions' (and OpAmpClientOptions') ToString"
+find = """(nameof(this.ClientKeyPem), Redacted.Secret(this.ClientKeyPem)),"""
+replace = """(nameof(this.ClientKeyPem), this.ClientKeyPem),"""

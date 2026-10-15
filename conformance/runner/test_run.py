@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Bill Easton. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
-"""Tests for run.py's choice of clients, and for scenarios timed against the core's backoff.
+"""Tests for run.py's choice of clients and of where the core's sources are, and for scenarios
+timed against the core's backoff.
 
     python3 -m unittest conformance/runner/test_run.py
 """
@@ -9,6 +10,8 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -42,6 +45,30 @@ class LazyFSClients(unittest.TestCase):
         self.assertIn("dotnet-core", run.need_docker(clients, ["dotnet-core"]))
         self.assertIn("java-core", run.need_docker(clients, ["java-core"]))
         self.assertEqual(run.need_docker(clients, [c for c in ("rust", "go-core") if c in clients]), [])
+
+
+class CoreRoot(unittest.TestCase):
+    def test_unset_the_core_is_looked_for_at_the_root(self):
+        self.assertEqual(run.core_root({}), run.ROOT)
+        self.assertEqual(run.core_root({"OPAMP_CORE_ROOT": ""}), run.ROOT)
+
+    def test_a_checkout_with_the_core_s_sources_is_where_they_are(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "Cargo.toml").write_text("")
+            self.assertEqual(run.core_root({"OPAMP_CORE_ROOT": tmp}), Path(tmp).resolve())
+
+    def test_one_without_them_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(SystemExit, "no Cargo.toml"):
+                run.core_root({"OPAMP_CORE_ROOT": tmp})
+
+    def test_a_client_built_from_the_sources_runs_from_there(self):
+        clients = tomllib.loads((run.CONF / "clients.toml").read_text())
+        for name, c in clients.items():
+            if c.get("source"):
+                self.assertTrue(run.expand(c["run"])[0].startswith(str(run.CORE_ROOT)), name)
+            else:
+                self.assertFalse(any("{core}" in p for p in c["run"]), name)
 
 
 def kernel_backoff_ms() -> tuple[int, int]:

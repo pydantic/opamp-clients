@@ -12,9 +12,11 @@
 
 The scenarios run against the Go server (conformance/server) unless --server rust picks the Rust
 reference server, which is built from the core's sources and so is there only where they are (a
-Cargo.toml at the root). A scenario lists the servers it runs on under "servers" (default: go);
-only the Go server injects faults, serves TLS or runs a proxy. A client whose clients.toml table
-says `source = true` is built from those sources too, and is left out where they aren't.
+Cargo.toml at the root, or at OPAMP_CORE_ROOT: a checkout with the core's sources, where what comes
+from them is built and runs from its target/). A scenario lists the servers it runs on under
+"servers" (default: go); only the Go server injects faults, serves TLS or runs a proxy. A client
+whose clients.toml table says `source = true` is built from those sources too, and is left out
+where they aren't.
 
 Output goes to conformance/out/: per run, the server log, the driver log and the results;
 results.json and a summary table for the whole invocation.
@@ -72,11 +74,26 @@ CONF = Path(__file__).resolve().parent.parent
 ROOT = CONF.parent
 OUT = CONF / "out"
 BIN = OUT / "bin"
-TAP_CHECKER = ROOT / "target" / "release" / "opamp-tap"
-# Whether the core's sources are here (a Cargo.toml at the root): what is built from them (the
+
+
+def core_root(env: dict[str, str] = os.environ) -> Path:
+    """Where the core's sources would be: OPAMP_CORE_ROOT if set (a checkout with the core's
+    sources), else the root. What is built from them is built there, and runs from its target/."""
+    given = env.get("OPAMP_CORE_ROOT")
+    if not given:
+        return ROOT
+    root = Path(given).resolve()
+    if not (root / "Cargo.toml").is_file():
+        sys.exit(f"OPAMP_CORE_ROOT={given}: no Cargo.toml there")
+    return root
+
+
+CORE_ROOT = core_root()
+# Whether the core's sources are here (a Cargo.toml at CORE_ROOT): what is built from them (the
 # Rust server, the clients marked `source`, opamp-tap) runs only then; elsewhere opamp-tap is the
-# one the core's release carries.
-CORE_SOURCE = (ROOT / "Cargo.toml").exists()
+# one the core's release carries (scripts/fetch_core.py fetch puts it in the root's target/).
+CORE_SOURCE = (CORE_ROOT / "Cargo.toml").exists()
+TAP_CHECKER = (CORE_ROOT if CORE_SOURCE else ROOT) / "target" / "release" / "opamp-tap"
 
 
 def sh(cmd: list[str], cwd: Path) -> None:
@@ -96,13 +113,15 @@ def expand(parts: list[str]) -> list[str]:
     m2 = os.environ.get("CONFORMANCE_M2_VOLUME") or "opamp-clients-m2"
     nuget = os.environ.get("CONFORMANCE_NUGET_VOLUME") or "opamp-clients-nuget"
     maven = os.environ.get("CONFORMANCE_MAVEN_IMAGE") or "maven:3.9-eclipse-temurin-21"
-    return [p.format(bin=BIN, root=ROOT, conf=CONF, user=user, m2=m2, nuget=nuget, maven=maven) for p in parts]
+    # {core}: where the core's sources are (CORE_ROOT), for a client built from them.
+    return [p.format(bin=BIN, root=ROOT, core=CORE_ROOT, conf=CONF, user=user, m2=m2, nuget=nuget, maven=maven)
+            for p in parts]
 
 
 SERVERS = {"go": [str(BIN / "server")]}
 if CORE_SOURCE:
     # The suite's checks read every message and reply from the log.
-    SERVERS["rust"] = [str(ROOT / "target" / "release" / "opamp-server"), "-log-messages"]
+    SERVERS["rust"] = [str(CORE_ROOT / "target" / "release" / "opamp-server"), "-log-messages"]
 
 
 def load_clients(override: Path | None) -> dict:
@@ -124,22 +143,23 @@ def need_docker(clients: dict, wanted: list[str]) -> list[str]:
 def build(clients: dict, wanted: list[str], server: str) -> None:
     BIN.mkdir(parents=True, exist_ok=True)
     if server == "rust":
-        sh(["cargo", "build", "--release", "-p", "opamp-server"], ROOT)
+        sh(["cargo", "build", "--release", "-p", "opamp-server"], CORE_ROOT)
     else:
         sh(["go", "build", "-o", str(BIN / "server"), "."], CONF / "server")
     # opamp-tap: built beside its source; elsewhere the core's release carries it.
     if any(not clients[name].get("upstream") for name in wanted):
         if CORE_SOURCE:
-            sh(["cargo", "build", "--release", "-p", "opamp-tap"], ROOT)
+            sh(["cargo", "build", "--release", "-p", "opamp-tap"], CORE_ROOT)
         elif not TAP_CHECKER.exists():
             sys.exit(f"no {TAP_CHECKER.relative_to(ROOT)}: run scripts/fetch_core.py fetch")
     # native: the client's build in Docker takes the native core built for Linux (scripts/native_lib.py).
     if any(clients[name].get("native") for name in wanted):
         sh([sys.executable, str(ROOT / "scripts" / "native_lib.py")], ROOT)
+    # A client built from the core's sources is built where they are.
     for name in wanted:
         b = clients[name].get("build")
         if b:
-            sh(expand(b["cmd"]), ROOT / b["cwd"])
+            sh(expand(b["cmd"]), (CORE_ROOT if clients[name].get("source") else ROOT) / b["cwd"])
 
 
 def read_jsonl(path: Path, source: str) -> list[dict]:
