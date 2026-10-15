@@ -1,0 +1,38 @@
+# Known results of the upstream clients, written by `run.py --write-baseline`.
+# The runner compares every run against this file: a new failure is a regression, and a
+# listed failure that now passes means the baseline is out of date. A check listed as
+# flaky (by hand) races inside the client, so either result is expected.
+
+["dotnet/http"]
+fail = ["adopts_assigned_uid", "no_cookies", "reports_status_capability"]
+warn = ["applies_remote_config", "full_report_after_unaccepted", "honours_retry_after", "http_instance_uid_header"]
+
+["dotnet/ws"]
+fail = ["adopts_assigned_uid", "close_frame_answered", "reports_status_capability"]
+warn = ["applies_remote_config", "full_report_after_unaccepted", "honours_retry_after", "reconnects_after_loss"]
+
+["go/http"]
+fail = ["respects_server_capabilities"]
+warn = ["header_case_kept", "stop_sends_disconnect"]
+
+["go/ws"]
+fail = ["reconnect_backs_off", "respects_server_capabilities"]
+warn = ["full_report_after_reconnect", "honours_retry_after"]
+
+["java/http"]
+fail = ["headers_as_given", "rejected_not_resent", "reports_status_capability"]
+warn = ["http_instance_uid_header", "stop_sends_disconnect"]
+
+["java/ws"]
+fail = ["close_frame_answered", "first_message_is_full", "headers_as_given", "reports_status_capability"]
+warn = ["reconnects_after_loss"]
+# Upstream opamp-java sends its next message on its own schedule after taking a UID that
+# isn't a UUID; on a loaded runner that can fall after the scenario ends (passes locally 3/3).
+# ReportFullState waits for that schedule too: with nothing else to report, the full state goes
+# out with the goodbye, which races the close (in 1 of 4 recorded runs of server-restart it was
+# lost, and the request was never answered).
+flaky = ["adopts_assigned_uid", "full_report_after_request"]
+
+["python/http"]
+fail = ["adopts_assigned_uid", "disconnect_is_last", "headers_as_given", "heartbeat_follows_offer", "no_cookies", "rejected_not_resent", "sequence_increments_by_one"]
+warn = ["honours_retry_after", "http_instance_uid_header"]

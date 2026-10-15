@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- The generated protobuf code has no XML docs. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pydantic.OpAmp.Client</PackageId>
+    <Version>0.1.0</Version>
+    <Description>An OpAMP client for .NET, on the shared OpAMP core (Rust, as a native library)</Description>
+    <!-- Native: the LibraryImport declarations of Native.cs pass byte pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.36.2" />
+  </ItemGroup>
+
+  <!--
+    The native core, beside the assembly. By default it is the one for the machine building, in
+    target/release (scripts/fetch_core.py puts it there), and copied to the output of every project
+    that references this one. OpAmpNativeLib names a library built elsewhere instead (a Linux one built in
+    a container, for a build in Docker: scripts/native_lib.py). Packed, the client carries no
+    library: it depends on Pydantic.OpAmp.Core.Native, which holds one per platform
+    (OpAmpCorePackage: packing it, with the core package's version; the native job in CI).
+    The WebAssembly modules beside this file are not shipped: the tests run them as an oracle.
+  -->
+  <PropertyGroup>
+    <OpAmpRepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))</OpAmpRepoRoot>
+    <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('Windows'))">opamp_native.dll</OpAmpNativeName>
+    <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('OSX'))">libopamp_native.dylib</OpAmpNativeName>
+    <OpAmpNativeName Condition="'$(OpAmpNativeName)' == ''">libopamp_native.so</OpAmpNativeName>
+    <!-- Built only where the core's source is (a Cargo.toml at the root); otherwise the library is
+         the one scripts/fetch_core.py put in target/release. -->
+    <OpAmpBuildNative Condition="'$(OpAmpNativeLib)' == '' and '$(OpAmpCorePackage)' == '' and Exists('$(OpAmpRepoRoot)Cargo.toml')">true</OpAmpBuildNative>
+    <OpAmpNativeLib Condition="'$(OpAmpNativeLib)' == '' and '$(OpAmpCorePackage)' == ''">$(OpAmpRepoRoot)target/release/$(OpAmpNativeName)</OpAmpNativeLib>
+  </PropertyGroup>
+
+  <Target Name="BuildOpAmpNative" BeforeTargets="BeforeBuild" Condition="'$(OpAmpBuildNative)' == 'true'">
+    <Exec Command="cargo build --release --locked -p opamp-native" WorkingDirectory="$(OpAmpRepoRoot)" />
+  </Target>
+
+  <ItemGroup Condition="'$(OpAmpNativeLib)' != ''">
+    <None Include="$(OpAmpNativeLib)" Link="$([System.IO.Path]::GetFileName('$(OpAmpNativeLib)'))" CopyToOutputDirectory="PreserveNewest" Pack="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(OpAmpCorePackage)' != ''">
+    <PackageReference Include="Pydantic.OpAmp.Core.Native" Version="[$(OpAmpCorePackage)]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pydantic.OpAmp.Client.Tests" />
+    <InternalsVisibleTo Include="Pydantic.OpAmp.Client.Fuzz" />
+    <!-- The integrations fill OpAmpAppSettings (AppSettings.cs), which the application reads. -->
+    <InternalsVisibleTo Include="Pydantic.OpAmp.AutoInstrumentation" />
+    <InternalsVisibleTo Include="Pydantic.OpAmp.AutoInstrumentation.Tests" />
+    <InternalsVisibleTo Include="Pydantic.OpAmp.Extensions.Hosting" />
+    <InternalsVisibleTo Include="Pydantic.OpAmp.Extensions.Hosting.Tests" />
+  </ItemGroup>
+
+</Project>

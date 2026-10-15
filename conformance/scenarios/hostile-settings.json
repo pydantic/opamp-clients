@@ -1,0 +1,9 @@
+{
+  "description": "A hostile server offers connection settings with malformed endpoints, one at a time: whitespace in the path, a host that can't be one, no host, a scheme no client speaks. The agent reports each FAILED without using it, and carries on.",
+  "transports": ["http", "ws"],
+  "duration_s": 30,
+  "needs": ["connection_settings"],
+  "driver": {"poll_s": 1, "accept_connection_settings": true, "changes_at_s": [4, 8, 12, 16, 20, 24]},
+  "server": {"hostile": {"seed": 1, "settings": ["endpoint_space", "endpoint_bad_host", "endpoint_no_host", "endpoint_scheme"]}},
+  "checks": ["malformed_settings_failed", "no_request_to_malformed", "keeps_reporting", "driver_survives"]
+}

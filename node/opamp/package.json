@@ -1,0 +1,48 @@
+{
+  "name": "@pydantic/opamp-client",
+  "version": "0.1.0",
+  "description": "An OpAMP client for Node.js, on the shared OpAMP core (Rust, as WebAssembly)",
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pydantic/opamp-clients.git",
+    "directory": "node/opamp"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./sdk": {
+      "types": "./dist/src/sdk.d.ts",
+      "default": "./dist/src/sdk.js"
+    }
+  },
+  "files": [
+    "dist/src",
+    "core/opamp_core.wasm",
+    "core/opamp_sdk_settings.wasm"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test \"dist/test/*.test.js\""
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.15.0",
+    "socks": "2.8.10",
+    "undici": "7.30.0",
+    "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "2.15.0",
+    "@types/node": "24.19.0",
+    "@types/ws": "8.18.1",
+    "fast-check": "4.10.2",
+    "typescript": "7.0.2"
+  }
+}

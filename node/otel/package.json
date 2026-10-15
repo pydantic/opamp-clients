@@ -1,0 +1,60 @@
+{
+  "name": "@pydantic/opamp-otel",
+  "version": "0.1.0",
+  "description": "OpenTelemetry auto-instrumentation for Node.js under an OpAMP server: node --import @pydantic/opamp-otel/register, and the SDK takes its settings (sampling, what to send and which instrumentations are on, while it runs) from the server",
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pydantic/opamp-clients.git",
+    "directory": "node/otel"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./app-settings": {
+      "types": "./dist/src/app-settings.d.ts",
+      "default": "./dist/src/app-settings.js"
+    },
+    "./register": "./dist/src/register.js"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "scripts": {
+    "build": "tsc -p .",
+    "test": "tsc -p . && node --test \"dist/test/*.test.js\""
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "0.80.0",
+    "@opentelemetry/core": "2.11.0",
+    "@opentelemetry/exporter-logs-otlp-grpc": "0.222.0",
+    "@opentelemetry/exporter-logs-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-logs-otlp-proto": "0.222.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "0.222.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-metrics-otlp-proto": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.222.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "0.222.0",
+    "@opentelemetry/instrumentation": "0.222.0",
+    "@opentelemetry/resources": "2.11.0",
+    "@opentelemetry/sdk-logs": "0.222.0",
+    "@opentelemetry/sdk-metrics": "2.11.0",
+    "@opentelemetry/sdk-node": "0.222.0",
+    "@opentelemetry/sdk-trace-base": "2.11.0",
+    "@pydantic/opamp-client": "file:../opamp"
+  },
+  "devDependencies": {
+    "@opentelemetry/otlp-transformer": "0.222.0",
+    "@types/node": "24.19.0",
+    "typescript": "7.0.2"
+  }
+}

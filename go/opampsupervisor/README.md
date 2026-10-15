@@ -1,0 +1,376 @@
+# OpAMP Supervisor for the OpenTelemetry Collector, on the shared core
+
+A downstream fork of upstream's
+[`opampsupervisor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/cmd/opampsupervisor)
+at `cmd/opampsupervisor/v0.162.0`, with its OpAMP client replaced: upstream's runs on opamp-go;
+this one runs on [`go/opamp`](../opamp), the shared core in Go mode (net/http and
+gorilla/websocket, so the configured TLS settings and the environment's proxies apply as before).
+It supervises any vendor's collector, as upstream's does: the collector needs the `opamp`
+extension, upstream's or [ours](../opampextension). The config is upstream's; what differs is
+below, and everything after the next heading is upstream's README.
+
+## Running it
+
+On Linux, the [package](packaging/README.md) brings the Supervisor, a collector with our
+extension and a systemd unit, and enrolls the host in one step:
+
+```sh
+echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
+```
+
+The [macOS .pkg](packaging/README.md#macos) and the [Windows .msi](packaging/README.md#windows)
+do the same with a LaunchDaemon and a Windows service.
+
+Or build and run it yourself:
+
+```sh
+go build -o opampsupervisor .
+./opampsupervisor --config supervisor.yaml
+```
+
+```yaml
+server:
+  endpoint: wss://opamp.example.com/v1/opamp
+  headers:
+    Authorization: "Bearer ${env:OPAMP_ENROLLMENT_TOKEN}"
+capabilities:
+  accepts_remote_config: true
+  reports_effective_config: true
+  reports_health: true
+  accepts_opamp_connection_settings: true
+storage:
+  directory: /var/lib/opampsupervisor
+  state_key: auto
+agent:
+  executable: /usr/bin/otelcol-contrib
+```
+
+## What changes
+
+- **Issued credentials are verified and kept.** With `accepts_opamp_connection_settings`, the
+  server may issue new OpAMP connection settings (per-agent credentials replacing an enrollment
+  token, say). The core tries them, keeps them only once the server has accepted a connection
+  with them, goes back to the old ones otherwise, and keeps them in
+  `<storage.directory>/opamp-client.state` (0600), so a restarted Supervisor connects with the
+  issued credentials, not the ones in its config
+  ([docs/connection-settings.md](../../docs/connection-settings.md)). Upstream's kept them in
+  memory only, and "verified" them by restarting its client. The state file also keeps the
+  remote config received, which is handed to the Supervisor again at start.
+- **The issued credentials can be encrypted at rest.** `storage.state_key` seals the client's
+  state file with AES-256-GCM, its key from the OS: `systemd-creds` (a `LoadCredentialEncrypted=`
+  credential, bound to the host and its TPM), `keychain` (macOS), `dpapi` (Windows), `file:PATH`
+  or `auto` ([docs/state-file.md](../../docs/state-file.md#encrypted-at-rest-go)). A key it can't
+  find stops the client at the start. The Supervisor's own copies of what the server sent (the
+  last received and last working remote configs, and the own-telemetry settings, which may carry
+  an exporter's credentials) are sealed with the same key; files saved before it was set are
+  read as they are and sealed at the next save. The collector's config files in the storage
+  directory aren't sealed: the collector reads them.
+- **Certificate checks stay on.** Upstream's turned certificate verification off
+  (`InsecureSkipVerify`) for an offer without a certificate, a plain token rotation, and then
+  sent the rotated token to a server whose certificate nothing trusted. Here the configured TLS
+  settings apply to every connection.
+- **An `auth` extension runs on every HTTP request, and at every WebSocket upgrade** (a
+  refreshed token is used from the next one). It can't be combined with
+  `accepts_opamp_connection_settings`, since it would overwrite the headers the server issued.
+- **The remote config can be limited** (`agent.remote_config_policy`): to the component types
+  listed for each kind, and the confmap providers listed, so a server can't point a `filelog`
+  receiver at any file the collector reads or `${file:...}` a secret into an exporter. A config
+  refused is FAILED and never runs. Upstream has no limit.
+- **Remote config statuses are about the last config received.** After an automatic rollback
+  (`automatic_config_rollback`) the server keeps the FAILED status of the config that failed;
+  upstream's also reported the restored one APPLIED, under that config's hash. The effective
+  config says what runs.
+- A custom message is handed to the client, which queues it: `ErrCustomMessagePending` never
+  happens, and a message it can't send after all is logged.
+- Health, the effective config, the remote config status and the available components reach the
+  server only with their capability, as before.
+- With `accepts_packages` the Supervisor installs the collector executable the server offers,
+  checked with Cosign, and puts the previous one back if the new one isn't healthy: upstream
+  refuses the capability. See the specification's
+  [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
+
+Every file keeps upstream's license header (Apache-2.0, [LICENSE](LICENSE)); the import paths
+were rewritten to this module's. The files changed beyond that say what changed in their header,
+and the new ones (`supervisor/coreclient.go` and the tests beside it) are this repository's.
+
+## Upstream's README
+
+
+<!-- status autogenerated section -->
+| Status        |           |
+| ------------- |-----------|
+| Stability     | [alpha]: metrics   |
+| Issues        | [![Open issues](https://img.shields.io/github/issues-search/open-telemetry/opentelemetry-collector-contrib?query=is%3Aissue%20is%3Aopen%20label%3Acmd%2Fopampsupervisor%20&label=open&color=orange&logo=opentelemetry)](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues?q=is%3Aopen+is%3Aissue+label%3Acmd%2Fopampsupervisor) [![Closed issues](https://img.shields.io/github/issues-search/open-telemetry/opentelemetry-collector-contrib?query=is%3Aissue%20is%3Aclosed%20label%3Acmd%2Fopampsupervisor%20&label=closed&color=blue&logo=opentelemetry)](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues?q=is%3Aclosed+is%3Aissue+label%3Acmd%2Fopampsupervisor) |
+| [Code Owners](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/CONTRIBUTING.md#becoming-a-code-owner)    | [@evan-bradley](https://www.github.com/evan-bradley), [@atoulme](https://www.github.com/atoulme), [@tigrannajaryan](https://www.github.com/tigrannajaryan), [@douglascamata](https://www.github.com/douglascamata), [@dpaasman00](https://www.github.com/dpaasman00) |
+
+[alpha]: https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/component-stability.md#alpha
+<!-- end autogenerated section -->
+
+This is an implementation of an OpAMP Supervisor that runs a Collector instance using configuration provided from an OpAMP server. This implementation
+is following a design specified [here](./specification/README.md).
+The design is still undergoing changes, and as such this implementation may change as well.
+
+Binary and container images for the Supervisor are available under tags starting with `cmd/opampsupervisor` [here](https://github.com/open-telemetry/opentelemetry-collector-releases/tags).
+
+## More information
+
+If you'd like to learn more about OpAMP, see the
+[OpAMP specification](https://github.com/open-telemetry/opamp-spec/blob/main/specification.md#open-agent-management-protocol).
+For production-ready client and server implementations in Go, see the
+[OpAMP Go repository](https://github.com/open-telemetry/opamp-go).
+
+If you have questions or would like to participate, we'd love to hear from you.
+There is a regular SIG meeting, see the
+[meeting notes](https://docs.google.com/document/d/19WA5-ex8rNFIBIyVb5VqMXfWNmUQwppGhN8zBeNG0f4)
+for more information. You can also get in touch with us in the
+[#otel-opamp](https://cloud-native.slack.com/archives/C02J58HR58R) channel on
+the CNCF Slack workspace.
+
+## Installing the Supervisor
+
+### Binary
+
+Binaries are available as downloadable assets from [OpenTelemetry Collector releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) with tags using the prefix `cmd/opampsupervisor`. You can download the file containing the binary for your OS and architecture, and install it on your machine manually.
+
+#### Linux/macOS
+
+Replace `<VERSION>` with your desired Supervisor version, and `<OS>` and `<ARCH>` with your platform-specific information:
+
+```sh
+curl --proto '=https' --tlsv1.2 -fL -o opampsupervisor \
+"https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fopampsupervisor%2Fv<VERSION>/opampsupervisor_<VERSION>_<OS>_<ARCH>"
+chmod +x opampsupervisor
+```
+
+#### Windows
+
+Replace `<VERSION>` with your desired Supervisor version:
+
+```sh
+Invoke-WebRequest -Uri "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/cmd%2Fopampsupervisor%2Fv<VERSION>/opampsupervisor_<VERSION>_windows_amd64.exe" -OutFile "opampsupervisor.exe"
+Unblock-File -Path "opampsupervisor.exe"
+```
+
+### Container image
+
+Container images are available for download from [GitHub Container registry](https://github.com/open-telemetry/opentelemetry-collector-releases/pkgs/container/opentelemetry-collector-releases%2Fopentelemetry-collector-opampsupervisor):
+
+```sh
+docker pull ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-opampsupervisor
+```
+
+## Using the Supervisor
+
+To use the Supervisor, you will need four things:
+
+1. A Supervisor binary, which can be obtained through the [installation](#installing-the-supervisor) step above.
+2. A Collector binary that you would like to control through the Supervisor.
+3. A Supervisor config file. See examples [here](./examples/).
+4. A running OpAMP server.
+
+To test the Supervisor with an example server, download the
+[opamp-go](https://github.com/open-telemetry/opamp-go) repository, and run the
+OpAMP example server in the `internal/examples/server` directory.
+
+   ```shell
+   git clone git@github.com:open-telemetry/opamp-go.git
+   cd opamp-go/internal/examples/server
+   go run .
+   ```
+
+Visit [localhost:4321](http://localhost:4321) to verify that the server is running.
+
+In a separate directory, create a Supervisor configuration file named `supervisor.yaml`. Copy one of the existing [examples](./examples/) or create a new configuration. The `agent::executable` should be set to the path of your Collector binary:
+
+```yaml
+agent:
+  executable: <COLLECTOR_BINARY>
+```
+
+Start the Supervisor:
+
+```sh
+./opampsupervisor --config=supervisor.yaml
+```
+
+The supervisor's own log encoding is configured under `telemetry.logs.encoding`.
+Use `console` for plain-text logs with ISO8601 timestamps. Leave the field
+unset (or set it to `json`) to keep the default JSON output.
+
+```yaml
+telemetry:
+  logs:
+    encoding: console
+```
+
+The supervisor can also configure resource detection for its own telemetry
+using the experimental `telemetry.resource.detection/development` field.
+
+```yaml
+telemetry:
+  resource:
+    detection/development:
+      detectors:
+        - host: {}
+        - process: {}
+```
+
+Supported detector entries are `container`, `host`, `process`, and `service`.
+
+Do not set the `OTEL_EXPERIMENTAL_CONFIG_FILE` environment variable for the
+Supervisor process. `xotelconf.NewSDK` uses that file to configure the SDK and
+it supersedes the configuration passed by the Supervisor. If the variable is
+set (for example to control the Collector's resource config), it can also
+override the Supervisor's own resource detection and telemetry resource
+settings. The Supervisor logs a warning at startup when the variable is set
+while `telemetry.resource.detection/development` is configured.
+
+The Supervisor's own OTLP exporters take their settings only from its
+`telemetry` config. `OTEL_EXPORTER_OTLP_*` environment variables (endpoint,
+insecure, certificates, headers and the rest) are ignored for them and still
+reach the Collector. Without this, an `http://` endpoint or
+`OTEL_EXPORTER_OTLP_INSECURE=true` in the environment would stop the Supervisor
+from starting with an `https` endpoint in its config. To take a value from the
+environment, use `${env:NAME}` in the config.
+
+Visit [localhost:4321](http://localhost:4321) again to verify that your Collector appears in the Agents list.
+
+## Collector crash log snippets
+
+The Supervisor can include the tail of the Collector's logs in health and remote config failure messages when the Collector process exits unexpectedly. This is disabled by default because Collector logs may contain sensitive data. To enable it, set `agent::collector_crash_log_snippet_kib` to the maximum number of log KiB to include. A value of `0` disables the feature. `4` is a reasonable starting point. The maximum value is `1024` (1 MiB).
+
+```yaml
+agent:
+  collector_crash_log_snippet_kib: 4
+```
+
+## Persistent data storage
+
+The supervisor persists some data to disk in order to mantain state between restarts. The directory where this data is stored may be specified via the supervisor configuration:
+
+```yaml
+storage:
+  directory: "/path/to/storage/dir"
+```
+
+By default, the supervisor will use `/var/lib/otelcol/supervisor` on posix systems, and `%ProgramData%/Otelcol/Supervisor` on Windows.
+
+This directory will be created on supervisor startup if it does not exist.
+
+(Changed here: it also holds `opamp-client.state`, the OpAMP client's state, with any connection
+settings the server issued. It is written readable by the Supervisor's user only, and sealed with
+`storage.state_key` if set.)
+
+## Healthcheck
+
+The Supervisor can be configured to expose a healthcheck endpoint that can be used to determine whether the Supervisor is running and healthy. This can be configured in the Supervisor configuration file:
+
+```yaml
+healthcheck:
+  endpoint: localhost:13133
+```
+
+At the moment this healtcheck checks that the following conditions are met:
+
+- The Supervisor is able to persist state to disk.
+- The Supervisor is able to generate the agent's configuration.
+
+For more details on the healthcheck configuration, see the see the [full list of `ServerConfig` options](https://github.com/open-telemetry/opentelemetry-collector/tree/main/config/confighttp).
+
+Note that the healthceck endpoint is not enabled by default. To enable it, you must explicitly set at least the `endpoint` field in the configuration.
+
+## Startup Fallback Configuration
+
+The Supervisor supports a startup fallback configuration mechanism that provides resilience when the OpAMP server is unreachable at startup and there's no previous configuration state persisted in disk. This is useful for ensuring the Collector can start with a known-good configuration during network outages or server maintenance. When the Supervisor successfully connects to the OpAMP server, the regular configuration (indicated by `agent::config_files`) is restored and any potential remote configuration received from the OpAMP server is applied.
+
+If, when the Supervisor starts, there's previous configuration state persisted in disk, the Supervisor will use it to start the Collector.
+
+### Configuration Options
+
+The following options can be configured under the `agent` section:
+
+```yaml
+agent:
+  startup_fallback_configs:
+  - /path/to/fallback_config.yaml
+```
+
+| Option | Description |
+|--------|-------------|
+| `startup_fallback_configs` | List of paths to startup fallback configuration files to use. If more than one path is specified, they are merged in order. Together, these must form a complete, standalone Collector configuration. |
+
+### Important Notes
+
+- The startup fallback configuration is a set of **standalone configuration files**. It is intentionally not merged with the `agent::config_files` setting. This ensures predictable behavior without dependencies on other configuration files.
+
+- The OpAMP extension and "own telemetry" configuration are automatically added to the fallback configuration. This maintains the Collector's own telemetry flowing and the communication between Supervisor and Collector.
+
+- The Supervisor will continue attempting to reconnect to the OpAMP server even while using the fallback configuration.
+
+### Example
+
+See [examples/supervisor_fallback.yaml](./examples/supervisor_fallback.yaml) for a complete example configuration with fallback enabled.
+
+## Automatic Remote Configuration Rollback
+
+The Supervisor supports automatic rollback when a remote configuration received from
+the OpAMP backend causes the Collector to fail to start correctly. This feature is
+**disabled by default** and can be enabled in the Supervisor configuration file:
+
+```yaml
+agent:
+  automatic_config_rollback: true
+```
+
+When enabled, the Supervisor will watch the health of the Collector after applying remote
+configurations received from the OpAMP backend and it will cache the last working one in
+disk, besides the last received. If a remote configurations causes the Collector
+to fail to start correctly, the Supervisor will automatically swap to the last working one
+and restart the Collector. (Changed here: the FAILED status of the configuration that failed
+stays reported; upstream reported a new "APPLIED" status for the last working one.)
+
+## Status
+
+The OpenTelemetry OpAMP Supervisor is intended to be the reference
+implementation of an OpAMP Supervisor, and as such will support all OpAMP
+capabilities. Additionally, it follows a design document for the features it
+intends to support.
+
+For a list of open issues related to the Supervisor, see [these issues](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues?q=is%3Aopen+is%3Aissue+label%3Acmd%2Fopampsupervisor).
+
+**Key**:
+
+✅: Fully implemented
+
+⚠️: Implemented with caveats
+
+### OpAMP capabilities
+
+| OpAMP capability               | Status                                                                           |
+|--------------------------------|----------------------------------------------------------------------------------|
+| AcceptsRemoteConfig            | ✅                                                                               |
+| ReportsEffectiveConfig         | ✅                                                                               |
+| AcceptsPackages                | ✅ (the collector executable only)                                               |
+| ReportsPackageStatuses         | ✅                                                                               |
+| ReportsOwnTraces               | ✅                                                                               |
+| ReportsOwnMetrics              | ✅                                                                               |
+| ReportsOwnLogs                 | ✅                                                                               |
+| AcceptsOpAMPConnectionSettings | ✅                                                                               |
+| AcceptsOtherConnectionSettings | ✅                                                                               |
+| AcceptsRestartCommand          | ✅                                                                               |
+| ReportsHealth                  | ⚠️                                                                               |
+| ReportsStatus                  | <https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/38729> |
+| ReportsRemoteConfig            | ✅                                                                               |
+| ReportsAvailableComponents     | ✅                                                                               |
+
+### Supervisor specification features
+
+| Feature                                                            | Status                                                                           |
+|--------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| Offers Supervisor configuration including configuring capabilities | ✅                                                                               |
+| Starts and stops a Collector using remote configuration            | ✅                                                                               |
+| Communicates with OpAMP extension running in the Collector         | ✅                                                                               |
+| Updates the Collector binary                                       | <https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/33947> |
+| Configures the Collector to report it's own metrics over OTLP      | ✅                                                                               |
+| Configures the Collector to report it's own logs over OTLP         | ✅                                                                               |
+| Sanitization or restriction of Collector config                    | <https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/24310> |

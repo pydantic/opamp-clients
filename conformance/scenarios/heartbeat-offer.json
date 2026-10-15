@@ -1,0 +1,23 @@
+{
+  "description": "The server offers a 3 s heartbeat; the client's own interval is 8 s.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 16,
+  "driver": {
+    "poll_s": 8
+  },
+  "server": {
+    "heartbeat_interval_s": 3
+  },
+  "servers": [
+    "go",
+    "rust"
+  ],
+  "checks": [
+    "heartbeat_follows_offer",
+    "sequence_increments_by_one",
+    "driver_survives"
+  ]
+}

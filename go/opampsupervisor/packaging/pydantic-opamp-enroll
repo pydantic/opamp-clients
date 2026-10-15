@@ -1,0 +1,144 @@
+#!/bin/sh
+# pydantic-opamp-enroll: enrolls this host with an OpAMP server in one step.
+#
+#   echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
+#
+# It encrypts the enrollment token to this host with systemd-creds (never on the command line),
+# makes the key that encrypts the Supervisor's state (once: a new one would lose the issued
+# credentials), writes the Supervisor's config, and starts the service. The server's issued
+# credentials then replace the enrollment token, kept encrypted in /var/lib/pydantic-opamp.
+#
+# OPAMP_ENROLL_ROOT, SYSTEMD_CREDS and SYSTEMCTL are for its tests: a root to write under, and
+# the commands to run in place of systemd's.
+set -eu
+
+usage() {
+	cat >&2 <<'EOF'
+usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--no-start]
+
+  --endpoint URL     the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
+  --token-file PATH  where to read the enrollment token (default: standard input)
+  --ca-file PATH     a CA bundle to trust for the server, in place of the system's
+  --plaintext        allow ws:// or http:// (the token then crosses the network in the clear)
+  --no-start         write the config and credentials, but don't start the service
+EOF
+	exit 2
+}
+
+fail() {
+	echo "pydantic-opamp-enroll: $*" >&2
+	exit 1
+}
+
+root=${OPAMP_ENROLL_ROOT:-}
+creds=${SYSTEMD_CREDS:-systemd-creds}
+systemctl=${SYSTEMCTL:-systemctl}
+etc=$root/etc/pydantic-opamp
+unit=pydantic-opamp-supervisor.service
+
+endpoint=
+token_file=-
+ca_file=
+plaintext=
+start=yes
+while [ $# -gt 0 ]; do
+	case $1 in
+	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
+	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
+	--ca-file) [ $# -ge 2 ] || usage; ca_file=$2; shift 2 ;;
+	--plaintext) plaintext=yes; shift ;;
+	--no-start) start=; shift ;;
+	*) usage ;;
+	esac
+done
+
+[ -n "$endpoint" ] || usage
+case $endpoint in
+wss://* | https://*) ;;
+ws://* | http://*) [ -n "$plaintext" ] || fail "$endpoint isn't encrypted; pass --plaintext to use it anyway" ;;
+*) fail "the endpoint must be a wss://, https://, ws:// or http:// URL" ;;
+esac
+case $endpoint in
+*'"'* | *'\'* | *' '*) fail "the endpoint can't contain quotes, backslashes or spaces" ;;
+esac
+if [ -n "$ca_file" ]; then
+	[ -r "$ca_file" ] || fail "can't read $ca_file"
+	case $ca_file in
+	/*) ;;
+	*) fail "--ca-file needs an absolute path" ;;
+	esac
+fi
+[ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
+
+if [ "$token_file" = - ]; then
+	token=$(cat)
+else
+	token=$(cat -- "$token_file")
+fi
+# The token goes into an HTTP header: one line, no surrounding space.
+token=$(printf '%s' "$token" | tr -d '\r\n')
+[ -n "$token" ] || fail "the enrollment token is empty"
+case $token in
+*[!A-Za-z0-9._~+/=-]*) fail "the enrollment token has characters a bearer token can't" ;;
+esac
+
+umask 077
+mkdir -p "$etc"
+chmod 0750 "$etc"
+
+printf '%s' "$token" | "$creds" encrypt --name=opamp-enroll-token - "$etc/enroll-token.cred.tmp"
+chmod 0600 "$etc/enroll-token.cred.tmp"
+mv -f "$etc/enroll-token.cred.tmp" "$etc/enroll-token.cred"
+
+if [ ! -e "$etc/state-key.cred" ]; then
+	# A new key can't open a state file sealed with the old one, so it is made only once.
+	head -c 32 /dev/urandom | "$creds" encrypt --name=opamp-state-key - "$etc/state-key.cred.tmp"
+	chmod 0600 "$etc/state-key.cred.tmp"
+	mv "$etc/state-key.cred.tmp" "$etc/state-key.cred"
+fi
+
+tls=
+if [ -n "$ca_file" ]; then
+	tls="  tls:
+    ca_file: \"$ca_file\"
+"
+fi
+cat >"$etc/supervisor.yaml.tmp" <<EOF
+# Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
+server:
+  endpoint: "$endpoint"
+  headers:
+    # The enrollment token, decrypted by systemd for this service alone. Once the server has
+    # issued this agent its own credentials, they are used instead (and kept across restarts).
+    Authorization: "Bearer \${file:/run/credentials/$unit/opamp-enroll-token}"
+$tls
+capabilities:
+  accepts_remote_config: true
+  accepts_opamp_connection_settings: true
+  reports_effective_config: true
+  reports_health: true
+  reports_available_components: true
+
+agent:
+  executable: /usr/lib/pydantic-opamp/otelcol
+
+storage:
+  directory: /var/lib/pydantic-opamp
+  # The issued credentials, encrypted with the key systemd decrypts from state-key.cred.
+  state_key: systemd-creds
+EOF
+chmod 0640 "$etc/supervisor.yaml.tmp"
+mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
+if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
+	chgrp pydantic-opamp "$etc" "$etc/supervisor.yaml"
+fi
+
+if [ -n "$start" ]; then
+	# The unmanaged collector conflicts with the Supervisor: disabled, it doesn't come back at boot.
+	"$systemctl" disable --now pydantic-otelcol.service
+	"$systemctl" enable "$unit"
+	"$systemctl" restart "$unit"
+	echo "enrolled with $endpoint; the Supervisor is running ($unit)"
+else
+	echo "enrolled with $endpoint; start the Supervisor with: systemctl enable --now $unit"
+fi

@@ -1,0 +1,9 @@
+{
+  "description": "The agent restarts after applying the server's remote config: it gets the config back at start, and the server has no need to send it again.",
+  "transports": ["http", "ws"],
+  "duration_s": 14,
+  "needs": ["remote_config_lifecycle"],
+  "driver": {"poll_s": 1, "runs": [7, 7]},
+  "server": {"remote_config": {"body": "receivers: {}\n"}},
+  "checks": ["remote_config_kept_across_restart", "applies_remote_config", "driver_survives"]
+}

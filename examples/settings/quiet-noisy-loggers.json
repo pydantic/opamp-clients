@@ -1,0 +1,1 @@
+{"send_logs_level": "warn", "send_logs_level_by_scope": "com.acme.payments*=debug,urllib3=error,noisy.lib=off"}

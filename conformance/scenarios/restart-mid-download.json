@@ -1,0 +1,12 @@
+{
+  "description": "The client is stopped while it downloads a package (the server sends half of the file and holds the rest), and a client is started on the same state file at once, while the first one's process lingers on (a restart in process). The first must have let go of its download by the time it said it stopped; the second downloads the package again (the server holds only the first download) and must install the whole file: never one the first is still writing, or deletes. The first run is long: its download must have started before the stop, and on a cold, busy ARC runner a Java client's first exchange has taken more than 3 s (the download then started in the second run, and it was that one the server held).",
+  "transports": ["http", "ws"],
+  "duration_s": 25,
+  "needs": ["packages", "core"],
+  "driver": {"poll_s": 1, "packages": true, "runs": [12, 10], "linger_s": 3, "overlap": true},
+  "server": {
+    "hold": {"downloads": true, "count": 1},
+    "packages": {"offer": [{"name": "held", "version": "1.0.0", "content": "a package the first client sent half of"}]}
+  },
+  "checks": ["stop_bounded", "nothing_outlives_stop", "packages_installed_verified", "driver_survives"]
+}

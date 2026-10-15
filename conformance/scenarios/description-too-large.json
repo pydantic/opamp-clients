@@ -1,0 +1,8 @@
+{
+  "description": "The agent's description is over the client's max_send_bytes, so no message carries it, and the server, which never learns the agent, asks for the full state in its answer to every message: the client answers about once per heartbeat, not once per round trip (RULE-CLIENT-21).",
+  "transports": ["http", "ws"],
+  "duration_s": 10,
+  "needs": ["max_send_bytes"],
+  "driver": {"poll_s": 1, "max_send_bytes": 1024, "description_pad": 2048},
+  "checks": ["asks_wait_for_the_heartbeat", "sequence_increments_by_one", "driver_survives"]
+}

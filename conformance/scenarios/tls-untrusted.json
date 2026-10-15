@@ -1,0 +1,9 @@
+{
+  "description": "The server listens with TLS, but the CA the driver is given did not sign its certificate: the client must send it nothing, and should refuse the handshake itself.",
+  "transports": ["http", "ws"],
+  "duration_s": 6,
+  "needs": ["tls"],
+  "driver": {"poll_s": 1},
+  "server": {"tls": {"client_auth": "none", "untrusted": true}},
+  "checks": ["rejects_untrusted_server", "refuses_in_handshake", "driver_survives"]
+}

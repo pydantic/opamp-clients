@@ -1,0 +1,9 @@
+{
+  "description": "The driver is told to use an HTTP proxy that requires credentials (CONNECT, or requests in absolute form for http://). Every message goes through it.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["proxy_configured"],
+  "driver": {"poll_s": 1},
+  "server": {"proxy": {"kind": "connect", "auth": {"user": "agent", "pass": "proxy-secret"}}},
+  "checks": ["went_through_proxy", "sequence_increments_by_one", "first_message_is_full", "driver_survives"]
+}

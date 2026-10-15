@@ -1,0 +1,33 @@
+{
+  "description": "The server assigns the agent a new instance UID: after a restart with the same chosen UID, the agent goes on with the assigned one. The first run is long: the UID is assigned in reply to the second message, and on a cold, busy ARC runner a JVM client's first message has taken 6 s. The second run is long too: a Java client on such a runner has taken more than 4 s from its start to its first message.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 22,
+  "needs": [
+    "instance_uid_kept"
+  ],
+  "driver": {
+    "poll_s": 1,
+    "uid": "01928f3a7c3e7a1b8c2d3e4f5a6b7c8d",
+    "runs": [
+      12,
+      10
+    ]
+  },
+  "server": {
+    "faults": [
+      {
+        "on_message": 2,
+        "action": "assign_uid",
+        "uid": "v7"
+      }
+    ]
+  },
+  "checks": [
+    "instance_uid_kept_across_restart",
+    "adopts_assigned_uid",
+    "driver_survives"
+  ]
+}

@@ -1,0 +1,21 @@
+server:
+  endpoint: ws://{{.url}}/v1/opamp
+
+capabilities:
+  reports_effective_config: true
+  reports_health: true
+  accepts_remote_config: true
+  accepts_packages: true
+
+storage:
+  directory: '{{.storage_dir}}'
+
+agent:
+  executable: ../../bin/otelcontribcol_{{.goos}}_{{.goarch}}{{.extension}}
+  bootstrap_timeout: 10s
+  package:
+    {{- if .verifier_none }}
+    verifier:
+      type: ""
+    {{- end }}
+    health_timeout: 20s

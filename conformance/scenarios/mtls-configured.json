@@ -1,0 +1,9 @@
+{
+  "description": "The server requires a client certificate signed by its CA; the driver is given one. The client presents it on every connection.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["tls", "mtls_configured"],
+  "driver": {"poll_s": 1},
+  "server": {"tls": {"client_auth": "require"}},
+  "checks": ["connected_over_tls", "presented_client_cert", "first_message_is_full", "driver_survives"]
+}

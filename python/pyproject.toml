@@ -1,0 +1,43 @@
+[project]
+name = "pydantic-opamp-client"
+version = "0.1.0"
+description = "An OpAMP client for Python (asyncio), on the shared OpAMP core (Rust, natively)"
+readme = "README.md"
+license = "LicenseRef-All-Rights-Reserved"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.12",  # client middlewares
+    "protobuf>=6.31.1,<8",  # the generated code is protobuf 6's (scripts/gen_core.py)
+    # The shared core, compiled: a library per platform, loaded through its C interface
+    # (opamp_client._native). Closed; this package is the shell around it.
+    "pydantic-opamp-core==0.1.0",
+]
+
+[project.urls]
+Repository = "https://github.com/pydantic/opamp-clients"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.130",
+    "pytest>=9",
+    "trustme>=1.2.1",
+    # The WebAssembly modules, as the oracle the native core is held to and to run a hostile
+    # core (opamp_client._wasm): tests only.
+    "wasmtime>=30",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opamp_client"]
+# The WebAssembly modules are the tests' oracle (opamp_client._wasm), not shipped.
+exclude = ["src/opamp_client/*.wasm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv.sources]
+# Built from the repository (core/build_backend.py) for this machine.
+pydantic-opamp-core = { path = "core" }

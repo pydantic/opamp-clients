@@ -1,0 +1,10 @@
+{
+  "description": "The server closes the WebSocket with a normal Close frame 8 s in, after cold client startup on ARC (the Java client has first connected 4.7 s in).",
+  "transports": ["ws"],
+  "duration_s": 19,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"at_s": 8, "action": "close_frame", "code": 1000}]},
+  "params": {"reconnect_within_s": 9},
+  "checks": ["close_frame_answered", "reconnects_after_loss", "reports_after_connecting",
+             "first_message_is_full", "full_report_after_reconnect", "driver_survives"]
+}

@@ -1,0 +1,22 @@
+{
+  "server": {
+    "faults": [
+      {
+        "on_message": 1,
+        "action": "offer_config",
+        "body": "{\"sampling_ratio\": 0.25}",
+        "content_type": "application/json"
+      },
+      {
+        "on_message": 3,
+        "action": "offer_config",
+        "body": "not json",
+        "content_type": "application/json"
+      }
+    ],
+    "own_telemetry": {
+      "signal": "traces",
+      "token": "example-token"
+    }
+  }
+}

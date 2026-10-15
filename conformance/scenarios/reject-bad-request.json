@@ -1,0 +1,8 @@
+{
+  "description": "The server answers the first message with BAD_REQUEST.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 1, "action": "reject", "status": 400}]},
+  "checks": ["rejected_not_resent", "driver_survives"]
+}

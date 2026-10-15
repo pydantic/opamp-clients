@@ -1,0 +1,9 @@
+{
+  "description": "For its first 15 s (timed from the driver's first request) the server answers every request and upgrade with a redirect elsewhere: the client doesn't follow, and gets in after. Every request carries the core's headers. The run is long enough for the slowest conforming comeback: a 3xx is a failure to back off from (1 s doubling, each wait half to all of it), so the last attempt refused comes before 15 s after at most 4 waits (5 take at least 0.5 + 1 + 2 + 4 + 8 = 15.5 s), and the next wait is at most 16 s: the client is back before 31 s, and the driver runs 40 s: 9 s to spare for the round trips and for the driver's first request coming after its clock starts.",
+  "transports": ["http", "ws"],
+  "duration_s": 40,
+  "needs": ["core"],
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"window_s": [0, 15], "action": "http_status", "status": 307, "location": "/v1/moved"}]},
+  "checks": ["redirects_not_followed", "sends_core_headers", "driver_survives"]
+}

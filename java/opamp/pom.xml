@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>dev.pydantic</groupId>
+  <artifactId>opamp-client</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>OpAMP client</name>
+  <description>An OpAMP client for Java, on the shared OpAMP core (Rust, as WebAssembly, run by Chicory)</description>
+  <url>https://github.com/pydantic/opamp-clients</url>
+  <licenses>
+    <license>
+      <name>All rights reserved</name>
+    </license>
+  </licenses>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <chicory.version>1.7.5</chicory.version>
+    <fray.version>0.9.0</fray.version>
+    <!-- The fray profile: which Fray tests (-Dfray.test=...), and whether to skip the others (-Dfray.only). -->
+    <fray.test>*FrayTest</fray.test>
+    <fray.only>false</fray.only>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>runtime</artifactId>
+      <version>${chicory.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.google.protobuf</groupId>
+      <artifactId>protobuf-javalite</artifactId>
+      <version>4.36.2</version>
+    </dependency>
+    <!-- The adversary (tests' stand-in core) compiled to JVM classes as the tests load it. -->
+    <dependency>
+      <groupId>com.dylibso.chicory</groupId>
+      <artifactId>compiler</artifactId>
+      <version>${chicory.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>6.1.3</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Reads the SDK settings layer's shared test vectors (testdata/sdk-settings). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.22.2</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- An in-memory file system with access-control lists, to test the Windows path anywhere. -->
+    <dependency>
+      <groupId>com.google.jimfs</groupId>
+      <artifactId>jimfs</artifactId>
+      <version>1.3.1</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Fray (schedule exploration): its tests run only in the fray profile's JVM, skipped elsewhere. -->
+    <dependency>
+      <groupId>org.pastalab.fray</groupId>
+      <artifactId>fray-junit</artifactId>
+      <version>${fray.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.pastalab.fray</groupId>
+      <artifactId>fray-core</artifactId>
+      <version>${fray.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Lincheck's model checker, for a connection's send and Close chain (ConnLincheckTest). -->
+    <dependency>
+      <groupId>org.jetbrains.lincheck</groupId>
+      <artifactId>lincheck</artifactId>
+      <version>3.7</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- The two WebAssembly modules, compiled to JVM classes at build time: the JVM runs and
+           optimises them as it does any Java code, rather than Chicory interpreting each
+           instruction. Nothing is compiled at run time, and the jar carries the classes, not the
+           modules (src/main/wasm, written by scripts/gen_core.py and gen_sdk_settings.py). -->
+      <plugin>
+        <groupId>com.dylibso.chicory</groupId>
+        <artifactId>chicory-compiler-maven-plugin</artifactId>
+        <version>${chicory.version}</version>
+        <executions>
+          <execution>
+            <id>core</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <name>dev.pydantic.opamp.core.CoreModule</name>
+              <wasmFile>src/main/wasm/opamp_core.wasm</wasmFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>sdk-settings</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <name>dev.pydantic.opamp.sdk.SdkSettingsModule</name>
+              <wasmFile>src/main/wasm/opamp_sdk_settings.wasm</wasmFile>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.16.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+        <configuration>
+          <!-- Basic proxy credentials through CONNECT tunnels, which the JDK refuses by default: the
+               proxy tests need them, as applications with such a proxy do (README.md). -->
+          <argLine>-Djdk.http.auth.tunneling.disabledSchemes=</argLine>
+          <!-- Fray's tests need Fray's JVM (the fray profile): the JUnit platform can't load them here. -->
+          <excludes>
+            <exclude>**/*FrayTest.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <!-- The conformance driver runs with the dependencies copied next to the classes. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.9.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!-- Jazzer, for scripts/java_fuzz.sh: its driver on the test classpath (the targets are test
+         classes, ClientFuzz and CoreFuzz; FuzzInputsTest runs their seeds and findings without it). -->
+    <profile>
+      <id>jazzer</id>
+      <dependencies>
+        <dependency>
+          <groupId>com.code-intelligence</groupId>
+          <artifactId>jazzer</artifactId>
+          <version>0.30.0</version>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+    </profile>
+    <!-- Fray's schedule-exploring tests (tag FrayTest), in a JVM of Fray's: mvn -Pfray test. -->
+    <profile>
+      <id>fray</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.pastalab.fray.maven</groupId>
+            <artifactId>fray-plugins-maven</artifactId>
+            <version>${fray.version}</version>
+            <executions>
+              <execution>
+                <id>prepare-fray</id>
+                <goals>
+                  <goal>prepare-fray</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>default-test</id>
+                <configuration>
+                  <jvm>${java.home}/bin/java</jvm>
+                  <skip>${fray.only}</skip>
+                </configuration>
+              </execution>
+              <execution>
+                <id>fray</id>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <jvm>${jvm}</jvm>
+                  <test>${fray.test}</test>
+                  <excludes combine.self="override"/>
+                  <argLine>@{argLine} -Djdk.http.auth.tunneling.disabledSchemes=</argLine>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

@@ -1,0 +1,291 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the
+// settings for the state file, its key and for accepting connection settings, and the checks on them;
+// Validate reports a missing server instead of panicking.
+
+package opampextension
+
+import (
+	"context"
+	"crypto/tls"
+	"errors"
+	"fmt"
+	"net/url"
+	"runtime"
+	"time"
+
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/config/configopaque"
+	"go.opentelemetry.io/collector/config/configtls"
+)
+
+// Default value for HTTP client's polling interval, set to 30 seconds in
+// accordance with the OpAMP spec.
+const httpPollingIntervalDefault = 30 * time.Second
+
+// Config contains the configuration for the opamp extension. It is upstream's, so a collector
+// config written for upstream's extension works unchanged, plus StateFile, StateKey and
+// Capabilities.AcceptsOpAMPConnectionSettings.
+type Config struct {
+	Server *OpAMPServer `mapstructure:"server"`
+
+	// InstanceUID is a UUID formatted as a 36 character string in canonical
+	// representation. Auto-generated on start if missing: with a StateFile, once, and kept
+	// across restarts; without one, on every start.
+	InstanceUID string `mapstructure:"instance_uid"`
+
+	// Capabilities contains options to enable a particular OpAMP capability
+	Capabilities Capabilities `mapstructure:"capabilities"`
+
+	// ReportsRawConfig additionally reports the raw, unexpanded Collector
+	// configuration (before environment variable and other provider references
+	// are expanded) alongside the effective configuration. (default: false)
+	//
+	// The raw configuration is reported under the "raw" key of the OpAMP
+	// effective config map; the fully expanded effective configuration is left
+	// unchanged under the "" (empty) key. Requires the
+	// reports_effective_config capability.
+	//
+	// WARNING: the raw configuration can expose secrets that are written
+	// directly in the configuration files. Values sourced from provider
+	// references (for example ${env:TOKEN}) retain their unexpanded form in
+	// the raw configuration, so they are not exposed. Configuration fields
+	// using types meant for opaque information (such as configopaque.String,
+	// commonly used for password fields) are redacted; consult your
+	// components' documentation or source to verify which fields are
+	// automatically redacted. Only enable this if you trust the OpAMP server
+	// with the full contents of your configuration files. It is disabled by
+	// default for this reason.
+	ReportsRawConfig bool `mapstructure:"reports_raw_config"`
+
+	// Agent descriptions contains options to modify the AgentDescription message
+	AgentDescription AgentDescription `mapstructure:"agent_description"`
+
+	// PPID is the process ID of the parent for the collector. If the PPID is specified,
+	// the extension will continuously poll for the status of the parent process, and emit a fatal error
+	// when the parent process is no longer running.
+	// If unspecified, the orphan detection logic does not run.
+	PPID int32 `mapstructure:"ppid"`
+
+	// PPIDPollInterval is the time between polling for whether PPID is running.
+	PPIDPollInterval time.Duration `mapstructure:"ppid_poll_interval"`
+
+	// StateFile is where the client keeps its state across restarts: the instance UID, and the
+	// connection settings the server issued. It holds those credentials, so it is written
+	// readable by the collector's user only (0600). "": nowhere.
+	StateFile string `mapstructure:"state_file"`
+
+	// StateKey encrypts StateFile at rest (AES-256-GCM) with a key from the OS: "systemd-creds",
+	// "systemd-creds:NAME", "keychain", "dpapi", "file:PATH" or "auto". A plaintext state file is
+	// read as-is and sealed at its next write. "": not encrypted.
+	StateKey string `mapstructure:"state_key"`
+}
+
+type AgentDescription struct {
+	// NonIdentifyingAttributes are a map of key-value pairs that may be specified to provide
+	// extra information about the agent to the OpAMP server.
+	NonIdentifyingAttributes map[string]string `mapstructure:"non_identifying_attributes"`
+	// IncludeResourceAttributes determines whether the agent should copy its resource attributes
+	// to the non identifying attributes. (default: false)
+	IncludeResourceAttributes bool `mapstructure:"include_resource_attributes"`
+}
+
+type Capabilities struct {
+	// ReportsEffectiveConfig enables the OpAMP ReportsEffectiveConfig Capability. (default: true)
+	ReportsEffectiveConfig bool `mapstructure:"reports_effective_config"`
+	// ReportsHealth enables the OpAMP ReportsHealth Capability. (default: true)
+	ReportsHealth bool `mapstructure:"reports_health"`
+	// ReportsAvailableComponents enables the OpAMP ReportsAvailableComponents Capability (default: true)
+	ReportsAvailableComponents bool `mapstructure:"reports_available_components"`
+	// AcceptsRestartCommand enables the OpAMP AcceptsRestartCommand Capability (default: false)
+	AcceptsRestartCommand bool `mapstructure:"accepts_restart_command"`
+	// AcceptsOpAMPConnectionSettings takes the server's offers of new OpAMP connection settings
+	// (endpoint and headers: new credentials), verified before they replace the old ones and
+	// kept in StateFile, which it needs. (default: false)
+	AcceptsOpAMPConnectionSettings bool `mapstructure:"accepts_opamp_connection_settings"`
+}
+
+func (caps Capabilities) toAgentCapabilities() protobufs.AgentCapabilities {
+	// All Agents MUST report status.
+	agentCapabilities := protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus
+
+	if caps.ReportsEffectiveConfig {
+		agentCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig
+	}
+	if caps.ReportsHealth {
+		agentCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth
+	}
+	if caps.ReportsAvailableComponents {
+		agentCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents
+	}
+	if caps.AcceptsRestartCommand {
+		agentCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand
+	}
+	// (AcceptsOpAMPConnectionSettings: the client adds its bits, with Config.AcceptConnectionSettings.)
+	return agentCapabilities
+}
+
+type commonFields struct {
+	Endpoint string                         `mapstructure:"endpoint"`
+	TLS      configtls.ClientConfig         `mapstructure:"tls,omitempty"`
+	Headers  map[string]configopaque.String `mapstructure:"headers,omitempty"`
+	Auth     component.ID                   `mapstructure:"auth,omitempty"`
+}
+
+func (c *commonFields) Scheme() string {
+	uri, err := url.ParseRequestURI(c.Endpoint)
+	if err != nil {
+		return ""
+	}
+	return uri.Scheme
+}
+
+func (c *commonFields) Validate() error {
+	if c.Endpoint == "" {
+		return errors.New("opamp server endpoint must be provided")
+	}
+	return nil
+}
+
+type httpFields struct {
+	commonFields `mapstructure:",squash"`
+
+	PollingInterval time.Duration `mapstructure:"polling_interval"`
+}
+
+func (h *httpFields) Validate() error {
+	if err := h.commonFields.Validate(); err != nil {
+		return err
+	}
+
+	if h.PollingInterval < 0 {
+		return errors.New("polling interval must be 0 or greater")
+	}
+
+	return nil
+}
+
+// OpAMPServer contains the OpAMP transport configuration.
+type OpAMPServer struct {
+	WS   *commonFields `mapstructure:"ws,omitempty"`
+	HTTP *httpFields   `mapstructure:"http,omitempty"`
+}
+
+func (s OpAMPServer) GetHeaders() map[string]configopaque.String {
+	if s.WS != nil {
+		return s.WS.Headers
+	} else if s.HTTP != nil {
+		return s.HTTP.Headers
+	}
+	return map[string]configopaque.String{}
+}
+
+// GetTLSConfig returns a TLS config if the endpoint is secure (wss or https)
+func (s OpAMPServer) GetTLSConfig(ctx context.Context) (*tls.Config, error) {
+	parsedURL, err := url.Parse(s.GetEndpoint())
+	if err != nil {
+		return nil, fmt.Errorf("parse server endpoint: %w", err)
+	}
+
+	if parsedURL.Scheme != "wss" && parsedURL.Scheme != "https" {
+		return nil, nil
+	}
+
+	return s.getTLS().LoadTLSConfig(ctx)
+}
+
+func (s OpAMPServer) getTLS() configtls.ClientConfig {
+	if s.WS != nil {
+		return s.WS.TLS
+	} else if s.HTTP != nil {
+		return s.HTTP.TLS
+	}
+	return configtls.ClientConfig{}
+}
+
+func (s OpAMPServer) GetEndpoint() string {
+	if s.WS != nil {
+		return s.WS.Endpoint
+	} else if s.HTTP != nil {
+		return s.HTTP.Endpoint
+	}
+	return ""
+}
+
+func (s OpAMPServer) GetAuthExtensionID() component.ID {
+	if s.WS != nil {
+		return s.WS.Auth
+	} else if s.HTTP != nil {
+		return s.HTTP.Auth
+	}
+
+	var emptyComponentID component.ID
+	return emptyComponentID
+}
+
+func (s OpAMPServer) GetPollingInterval() time.Duration {
+	if s.HTTP != nil && s.HTTP.PollingInterval > 0 {
+		return s.HTTP.PollingInterval
+	}
+
+	return httpPollingIntervalDefault
+}
+
+// Validate checks if the extension configuration is valid
+func (cfg *Config) Validate() error {
+	switch {
+	case cfg.Capabilities.AcceptsRestartCommand && !remoteRestartsGate.IsEnabled():
+		return errors.New("extension.opampextension.RemoteRestarts feature gate must be enabled to use the accepts_restart_command capability")
+	case cfg.Capabilities.AcceptsRestartCommand && remoteRestartsGate.IsEnabled() && runtime.GOOS == "windows":
+		return errors.New("remote restart functionality is not available on the windows operating system")
+	case cfg.Server == nil || cfg.Server.WS == nil && cfg.Server.HTTP == nil:
+		return errors.New("opamp server must have at least ws or http set")
+	case cfg.Server.WS != nil && cfg.Server.HTTP != nil:
+		return errors.New("opamp server must have only ws or http set")
+	case cfg.Server.WS != nil:
+		if err := cfg.Server.WS.Validate(); err != nil {
+			return err
+		}
+	case cfg.Server.HTTP != nil:
+		if err := cfg.Server.HTTP.Validate(); err != nil {
+			return err
+		}
+	}
+
+	if cfg.ReportsRawConfig && !cfg.Capabilities.ReportsEffectiveConfig {
+		return errors.New("reports_raw_config requires reports_effective_config to be enabled")
+	}
+
+	if cfg.Capabilities.AcceptsOpAMPConnectionSettings {
+		if cfg.StateFile == "" {
+			// Settings the server issued and the client forgot at a restart would lock the
+			// agent out once the server has dropped the old ones.
+			return errors.New("accepts_opamp_connection_settings requires state_file")
+		}
+		if cfg.Server.GetAuthExtensionID() != (component.ID{}) {
+			// The auth extension would replace the headers the server issued.
+			return errors.New("accepts_opamp_connection_settings can't be used with an auth extension")
+		}
+	}
+
+	if cfg.StateKey != "" && cfg.StateFile == "" {
+		return errors.New("state_key requires state_file")
+	}
+
+	if cfg.Server.WS != nil && cfg.Server.WS.Auth != (component.ID{}) {
+		// The client has no hook to ask the auth extension for headers at each upgrade.
+		return errors.New("an auth extension is supported over http only, not ws")
+	}
+
+	if cfg.InstanceUID != "" {
+		_, err := parseInstanceIDString(cfg.InstanceUID)
+		if err != nil {
+			return errors.New("opamp instance_uid is invalid")
+		}
+	}
+
+	return nil
+}

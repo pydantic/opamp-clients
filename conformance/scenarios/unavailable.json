@@ -1,0 +1,10 @@
+{
+  "description": "The server answers the second message with UNAVAILABLE (WebSocket) or 503 (HTTP), retry after 4 s.",
+  "transports": ["http", "ws"],
+  "duration_s": 14,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 2, "action": "unavailable", "retry_after_s": 4}]},
+  "params": {"reconnect_within_s": 10},
+  "checks": ["disconnect_is_last", "honours_retry_after", "full_report_after_unaccepted", "reconnects_after_loss",
+             "reconnect_says_goodbye", "driver_survives"]
+}

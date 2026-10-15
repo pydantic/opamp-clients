@@ -1,0 +1,9 @@
+{
+  "description": "A hostile server offers three packages with a malformed download URL (whitespace, no host) or header name, then a good one. The agent reports each bad one INSTALL_FAILED without fetching it, installs the good one, and carries on.",
+  "transports": ["http", "ws"],
+  "duration_s": 90,
+  "needs": ["packages"],
+  "driver": {"poll_s": 1, "packages": true, "changes_at_s": [10, 30, 50, 70]},
+  "server": {"hostile": {"seed": 2, "packages": ["url_space", "url_no_host", "header_name"]}},
+  "checks": ["malformed_packages_failed", "no_request_to_malformed", "keeps_reporting", "driver_survives"]
+}

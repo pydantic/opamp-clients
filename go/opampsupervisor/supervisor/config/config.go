@@ -1,0 +1,526 @@
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: Validate
+// refuses server.auth with accepts_opamp_connection_settings (the extension's headers would
+// overwrite the issued credentials); HealthCheck.Validate refuses an endpoint that isn't host:port.
+// Agent has remote_config_policy.
+
+package config
+
+import (
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/config/confighttp"
+	"go.opentelemetry.io/collector/config/confignet"
+	"go.opentelemetry.io/collector/config/configopaque"
+	"go.opentelemetry.io/collector/config/configoptional"
+	"go.opentelemetry.io/collector/config/configtelemetry"
+	"go.opentelemetry.io/collector/config/configtls"
+	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
+	config "go.opentelemetry.io/contrib/otelconf/v0.3.0"
+	xotelconf "go.opentelemetry.io/contrib/otelconf/x"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/extensions"
+)
+
+var _ confmap.Validator = (*Supervisor)(nil)
+
+// Supervisor is the Supervisor config file format.
+type Supervisor struct {
+	Server       OpAMPServer       `mapstructure:"server"`
+	Agent        Agent             `mapstructure:"agent"`
+	Capabilities Capabilities      `mapstructure:"capabilities"`
+	Storage      Storage           `mapstructure:"storage"`
+	Telemetry    Telemetry         `mapstructure:"telemetry"`
+	HealthCheck  HealthCheck       `mapstructure:"healthcheck"`
+	Extensions   extensions.Config `mapstructure:"extensions,omitempty"`
+}
+
+// Load loads the Supervisor config from a file.
+func Load(configFile string) (Supervisor, error) {
+	if configFile == "" {
+		return Supervisor{}, errors.New("path to config file cannot be empty")
+	}
+
+	conf, err := ResolveURI(configFile)
+	if err != nil {
+		return Supervisor{}, err
+	}
+
+	cfg := DefaultSupervisor()
+	if err := conf.Unmarshal(&cfg); err != nil {
+		return Supervisor{}, err
+	}
+
+	return cfg, nil
+}
+
+func (s *Supervisor) Validate() error {
+	if s.Server.Auth == (component.ID{}) {
+		return nil
+	}
+	if ok := s.Extensions.Exists(s.Server.Auth); !ok {
+		return fmt.Errorf(
+			"server.auth references %q which is not configured under extensions",
+			s.Server.Auth,
+		)
+	}
+	// The extension's headers would overwrite the credentials the server issues on every request.
+	if s.Capabilities.AcceptsOpAMPConnectionSettings {
+		return errors.New("server.auth can't be used with capabilities.accepts_opamp_connection_settings")
+	}
+	return nil
+}
+
+type Storage struct {
+	// Directory is the directory where the Supervisor will store its data.
+	Directory string `mapstructure:"directory"`
+	// StateKey encrypts the OpAMP client's state file (the credentials the server issued) at
+	// rest, with a key from the OS: systemd-creds[:NAME], keychain, dpapi, file:PATH or auto.
+	// Changed here. "": not encrypted.
+	StateKey string `mapstructure:"state_key"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+// Capabilities is the set of capabilities that the Supervisor supports.
+type Capabilities struct {
+	AcceptsRemoteConfig            bool `mapstructure:"accepts_remote_config"`
+	AcceptsRestartCommand          bool `mapstructure:"accepts_restart_command"`
+	AcceptsOpAMPConnectionSettings bool `mapstructure:"accepts_opamp_connection_settings"`
+	ReportsEffectiveConfig         bool `mapstructure:"reports_effective_config"`
+	ReportsOwnMetrics              bool `mapstructure:"reports_own_metrics"`
+	ReportsOwnLogs                 bool `mapstructure:"reports_own_logs"`
+	ReportsOwnTraces               bool `mapstructure:"reports_own_traces"`
+	ReportsHealth                  bool `mapstructure:"reports_health"`
+	ReportsAvailableComponents     bool `mapstructure:"reports_available_components"`
+	ReportsHeartbeat               bool `mapstructure:"reports_heartbeat"`
+	AcceptsPackages                bool `mapstructure:"accepts_packages"`
+
+	// Deprecated: ReportsRemoteConfig has no effect. AcceptsRemoteConfig enables both the
+	// AcceptsRemoteConfig and ReportsRemoteConfig OpAMP capabilities. This field will be
+	// removed in a future release.
+	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/49763
+	ReportsRemoteConfig bool `mapstructure:"reports_remote_config"`
+}
+
+func (c Capabilities) SupportedCapabilities() protobufs.AgentCapabilities {
+	supportedCapabilities := protobufs.AgentCapabilities_AgentCapabilities_ReportsStatus
+
+	if c.ReportsEffectiveConfig {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig
+	}
+
+	if c.ReportsHealth {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth
+	}
+
+	if c.ReportsOwnMetrics {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnMetrics
+	}
+
+	if c.ReportsOwnLogs {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnLogs
+	}
+
+	if c.ReportsOwnTraces {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnTraces
+	}
+
+	// AcceptsRemoteConfig enables both the AcceptsRemoteConfig and ReportsRemoteConfig
+	// OpAMP capabilities; accepting remote config without reporting its status is not useful.
+	if c.AcceptsRemoteConfig {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig
+	}
+
+	if c.AcceptsRestartCommand {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand
+	}
+
+	if c.AcceptsOpAMPConnectionSettings {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings
+	}
+
+	if c.ReportsAvailableComponents {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents
+	}
+	if c.ReportsHeartbeat {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat
+	}
+
+	// AcceptsPackages is not yet fully implemented. It is included here for completeness.
+	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/47272
+	// AcceptsPackages enables both the AcceptsPackages and ReportsPackageStatuses
+	// OpAMP capabilities; accepting packages without reporting their statuses is not useful.
+	if c.AcceptsPackages {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsPackageStatuses
+	}
+
+	return supportedCapabilities
+}
+
+type OpAMPServer struct {
+	Endpoint string                 `mapstructure:"endpoint"`
+	Headers  http.Header            `mapstructure:"headers"`
+	TLS      configtls.ClientConfig `mapstructure:"tls,omitempty"`
+	// Auth references an extension in the top-level extensions: block that
+	// implements extensionauth.HTTPClient. When set, the supervisor uses the
+	// extension's RoundTripper to populate auth headers on the OpAMP
+	// connection. The extensions feature gate must be enabled.
+	Auth component.ID `mapstructure:"auth,omitempty"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+func (o OpAMPServer) OpaqueHeaders() map[string][]configopaque.String {
+	opaque := make(map[string][]configopaque.String, len(o.Headers))
+
+	for key, values := range o.Headers {
+		opaque[key] = make([]configopaque.String, len(values))
+		for i, val := range values {
+			opaque[key][i] = configopaque.String(val)
+		}
+	}
+
+	return opaque
+}
+
+func (o OpAMPServer) Validate() error {
+	if o.Endpoint == "" {
+		return errors.New("server::endpoint must be specified")
+	}
+
+	url, err := url.Parse(o.Endpoint)
+	if err != nil {
+		return fmt.Errorf("invalid URL for server::endpoint: %w", err)
+	}
+
+	switch url.Scheme {
+	case "http", "https", "ws", "wss":
+	default:
+		return fmt.Errorf(`invalid scheme %q for server::endpoint, must be one of "http", "https", "ws", or "wss"`, url.Scheme)
+	}
+
+	err = o.TLS.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid server::tls settings: %w", err)
+	}
+
+	return nil
+}
+
+type Agent struct {
+	Executable                  string            `mapstructure:"executable"`
+	InstanceID                  string            `mapstructure:"instance_id"`
+	OrphanDetectionInterval     time.Duration     `mapstructure:"orphan_detection_interval"`
+	Description                 AgentDescription  `mapstructure:"description"`
+	ConfigApplyTimeout          time.Duration     `mapstructure:"config_apply_timeout"`
+	BootstrapTimeout            time.Duration     `mapstructure:"bootstrap_timeout"`
+	OpAMPServerPort             int               `mapstructure:"opamp_server_port"`
+	PassthroughLogs             bool              `mapstructure:"passthrough_logs"`
+	CollectorCrashLogSnippetKiB int               `mapstructure:"collector_crash_log_snippet_kib"`
+	AutomaticConfigRollback     bool              `mapstructure:"automatic_config_rollback"`
+	UseHUPConfigReload          bool              `mapstructure:"use_hup_config_reload"`
+	ValidateConfig              bool              `mapstructure:"validate_config"`
+	ConfigFiles                 []string          `mapstructure:"config_files"`
+	Arguments                   []string          `mapstructure:"args"`
+	Env                         map[string]string `mapstructure:"env"`
+	// StartupFallbackConfigs is an ordered list of fallback configuration files to use
+	// when the OpAMP server is unreachable. Configs are merged in order.
+	StartupFallbackConfigs []string `mapstructure:"startup_fallback_configs"`
+	// Package configures how collector executable updates are formatted and verified.
+	Package AgentPackage `mapstructure:"package"`
+	// RemoteConfigPolicy limits what the server's remote config may configure. Changed here:
+	// upstream has no limit.
+	RemoteConfigPolicy RemoteConfigPolicy `mapstructure:"remote_config_policy"`
+}
+
+func (a Agent) Validate() error {
+	if a.OrphanDetectionInterval <= 0 {
+		return errors.New("agent::orphan_detection_interval must be positive")
+	}
+
+	if a.BootstrapTimeout <= 0 {
+		return errors.New("agent::bootstrap_timeout must be positive")
+	}
+
+	if a.OpAMPServerPort < 0 || a.OpAMPServerPort > 65535 {
+		return errors.New("agent::opamp_server_port must be a valid port number")
+	}
+
+	if a.CollectorCrashLogSnippetKiB < 0 {
+		return errors.New("agent::collector_crash_log_snippet_kib must be non-negative")
+	}
+
+	if a.CollectorCrashLogSnippetKiB > 1024 {
+		return errors.New("agent::collector_crash_log_snippet_kib must be less than or equal to 1024")
+	}
+
+	if a.InstanceID != "" {
+		if _, err := uuid.Parse(a.InstanceID); err != nil {
+			return fmt.Errorf("agent::instance_id must be a valid UUID string when set: %w", err)
+		}
+	}
+
+	if a.Executable == "" {
+		return errors.New("agent::executable must be specified")
+	}
+
+	_, err := os.Stat(a.Executable)
+	if err != nil {
+		return fmt.Errorf("could not stat agent::executable path: %w", err)
+	}
+
+	if a.ConfigApplyTimeout <= 0 {
+		return errors.New("agent::config_apply_timeout must be valid duration")
+	}
+
+	for _, file := range a.ConfigFiles {
+		if !strings.HasPrefix(file, "$") {
+			continue
+		}
+		if !slices.Contains(SpecialConfigFiles, SpecialConfigFile(file)) {
+			return fmt.Errorf("agent::config_files contains invalid special file: %q. Must be one of %v", file, SpecialConfigFiles)
+		}
+	}
+
+	if runtime.GOOS == "windows" && a.UseHUPConfigReload {
+		return errors.New("agent::use_hup_config_reload is not supported on Windows")
+	}
+
+	if err := a.validateFallbackConfigs(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a Agent) validateFallbackConfigs() error {
+	// If no fallback configs are specified, no validation is needed.
+	if len(a.StartupFallbackConfigs) == 0 {
+		return nil
+	}
+
+	// Validate that the fallback config files exist.
+	for i, cfgPath := range a.StartupFallbackConfigs {
+		if cfgPath == "" {
+			return fmt.Errorf("agent::startup_fallback_configs[%d] cannot be empty", i)
+		}
+		if _, err := os.Stat(cfgPath); err != nil {
+			return fmt.Errorf("could not stat agent::startup_fallback_configs[%d] path %q: %w", i, cfgPath, err)
+		}
+	}
+	if err := a.validateFallbackConfigsWithColBin(); err != nil {
+		return fmt.Errorf("could not validate startup fallback configs with agent::executable: %w", err)
+	}
+
+	return nil
+}
+
+func (a Agent) validateFallbackConfigsWithColBin() error {
+	cfgValidateCommand := []string{a.Executable, "validate"}
+	for _, cfgPath := range a.StartupFallbackConfigs {
+		cfgValidateCommand = append(cfgValidateCommand, "--config", cfgPath)
+	}
+	cfgValidateCommand = append(cfgValidateCommand, a.Arguments...)
+
+	cmd := exec.Command(cfgValidateCommand[0], cfgValidateCommand[1:]...) // #nosec G204
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// FallbackEnabled returns true if fallback configuration is enabled.
+func (a Agent) FallbackEnabled() bool {
+	return len(a.StartupFallbackConfigs) > 0
+}
+
+type SpecialConfigFile string
+
+const (
+	SpecialConfigFileOwnTelemetry   SpecialConfigFile = "$OWN_TELEMETRY_CONFIG"
+	SpecialConfigFileOpAMPExtension SpecialConfigFile = "$OPAMP_EXTENSION_CONFIG"
+	SpecialConfigFileRemoteConfig   SpecialConfigFile = "$REMOTE_CONFIG"
+)
+
+var SpecialConfigFiles = []SpecialConfigFile{
+	SpecialConfigFileOwnTelemetry,
+	SpecialConfigFileOpAMPExtension,
+	SpecialConfigFileRemoteConfig,
+}
+
+type AgentDescription struct {
+	IdentifyingAttributes     map[string]string `mapstructure:"identifying_attributes"`
+	NonIdentifyingAttributes  map[string]string `mapstructure:"non_identifying_attributes"`
+	IncludeResourceAttributes bool              `mapstructure:"include_resource_attributes"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+type Telemetry struct {
+	// TODO: Add more telemetry options
+	// Issue here: https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/35582
+	Logs    Logs                           `mapstructure:"logs"`
+	Metrics Metrics                        `mapstructure:"metrics"`
+	Traces  otelconftelemetry.TracesConfig `mapstructure:"traces"`
+
+	Resource ResourceConfig `mapstructure:"resource"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+type ResourceConfig struct {
+	otelconftelemetry.ResourceConfig `mapstructure:",squash"`
+	DetectionDevelopment             configoptional.Optional[xotelconf.ExperimentalResourceDetection] `mapstructure:"detection/development,omitempty"`
+}
+
+type HealthCheck struct {
+	ServerConfig confighttp.ServerConfig `mapstructure:",squash"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+func (h HealthCheck) Port() int64 {
+	_, port, err := net.SplitHostPort(h.ServerConfig.NetAddr.Endpoint)
+	if err != nil {
+		return 0
+	}
+	parsedPort, err := strconv.ParseInt(port, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return parsedPort
+}
+
+// Validate accepts no endpoint (the health check is off) or a host:port one. An endpoint that
+// isn't host:port would otherwise turn the health check off without a word, as Port reads it as 0.
+func (h HealthCheck) Validate() error {
+	endpoint := h.ServerConfig.NetAddr.Endpoint
+	if endpoint == "" {
+		return nil
+	}
+	_, port, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return fmt.Errorf("healthcheck::endpoint must be host:port: %w", err)
+	}
+	parsedPort, err := strconv.ParseInt(port, 10, 64)
+	if err != nil {
+		return fmt.Errorf("healthcheck::endpoint must contain a valid port number, got %q", port)
+	}
+	if parsedPort < 0 || parsedPort > 65535 {
+		return fmt.Errorf("healthcheck::endpoint must contain a valid port number, got %d", parsedPort)
+	}
+	return nil
+}
+
+type Logs struct {
+	Level            zapcore.Level `mapstructure:"level"`
+	ErrorOutputPaths []string      `mapstructure:"error_output_paths"`
+	OutputPaths      []string      `mapstructure:"output_paths"`
+	// Encoding sets the logger's encoding. Valid values are "json" and "console".
+	// Defaults to "json".
+	Encoding string `mapstructure:"encoding"`
+	// Processors allow configuration of log record processors to emit logs to
+	// any number of supported backends.
+	Processors []config.LogRecordProcessor `mapstructure:"processors,omitempty"`
+}
+
+type Metrics struct {
+	Level   configtelemetry.Level `mapstructure:"level"`
+	Readers []config.MetricReader `mapstructure:"readers"`
+	// prevent unkeyed literal initialization
+	_ struct{}
+}
+
+// DefaultSupervisor returns the default supervisor config
+func DefaultSupervisor() Supervisor {
+	defaultStorageDir := "/var/lib/otelcol/supervisor"
+	if runtime.GOOS == "windows" {
+		// Windows default is "%ProgramData%\Otelcol\Supervisor"
+		// If the ProgramData environment variable is not set,
+		// it falls back to C:\ProgramData
+		programDataDir := os.Getenv("ProgramData")
+		if programDataDir == "" {
+			programDataDir = `C:\ProgramData`
+		}
+
+		defaultStorageDir = filepath.Join(programDataDir, "Otelcol", "Supervisor")
+	}
+
+	defaultAgentBinary := "otelcol-contrib"
+	if runtime.GOOS == "windows" {
+		defaultAgentBinary += ".exe"
+	}
+
+	serverConfig := confighttp.NewDefaultServerConfig()
+	serverConfig.NetAddr = confignet.AddrConfig{
+		Transport: confignet.TransportTypeTCP,
+	}
+	return Supervisor{
+		Capabilities: Capabilities{
+			AcceptsRemoteConfig:            false,
+			AcceptsRestartCommand:          false,
+			AcceptsOpAMPConnectionSettings: false,
+			ReportsEffectiveConfig:         true,
+			ReportsOwnMetrics:              true,
+			ReportsOwnLogs:                 false,
+			ReportsOwnTraces:               false,
+			ReportsHealth:                  true,
+			ReportsRemoteConfig:            false,
+			ReportsAvailableComponents:     false,
+			ReportsHeartbeat:               true,
+			AcceptsPackages:                false,
+		},
+		Storage: Storage{
+			Directory: defaultStorageDir,
+		},
+		Agent: Agent{
+			OrphanDetectionInterval:     5 * time.Second,
+			ConfigApplyTimeout:          5 * time.Second,
+			BootstrapTimeout:            3 * time.Second,
+			PassthroughLogs:             false,
+			CollectorCrashLogSnippetKiB: 0,
+			ValidateConfig:              false,
+			Package: AgentPackage{
+				AgentBinary:   defaultAgentBinary,
+				Verifier:      Verifier{Type: VerifierTypeCosign, Cosign: DefaultCosignVerifier()},
+				HealthTimeout: 30 * time.Second,
+			},
+		},
+		Telemetry: Telemetry{
+			Logs: Logs{
+				Level:            zapcore.InfoLevel,
+				OutputPaths:      []string{"stdout"},
+				ErrorOutputPaths: []string{"stderr"},
+			},
+		},
+		HealthCheck: HealthCheck{
+			ServerConfig: serverConfig,
+		},
+	}
+}

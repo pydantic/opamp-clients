@@ -1,0 +1,8 @@
+{
+  "description": "The server sets ReportFullState on its answer to the third message. The agent's status never changes, so nothing but that request brings a full report: a change after it would have a client that ignored the request send its description anyway.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 3, "action": "report_full_state"}]},
+  "checks": ["full_report_after_request", "sequence_increments_by_one", "driver_survives"]
+}

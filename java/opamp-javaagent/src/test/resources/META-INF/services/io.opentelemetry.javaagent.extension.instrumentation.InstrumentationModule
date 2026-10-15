@@ -1,0 +1,4 @@
+dev.pydantic.opamp.javaagent.TestInstrumentations$SpringWebmvc
+# One the agent can't make: skipped.
+dev.pydantic.opamp.javaagent.TestInstrumentations$Missing
+dev.pydantic.opamp.javaagent.TestInstrumentations$Jdbc

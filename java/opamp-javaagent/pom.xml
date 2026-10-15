@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>dev.pydantic</groupId>
+  <artifactId>opamp-javaagent-extension</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <name>OpAMP for the OpenTelemetry Java agent</name>
+  <description>An extension for the upstream OpenTelemetry Java agent: the agent joins an OpAMP server's
+    fleet and takes its SDK settings (sampling, what to send, which instrumentations) from it</description>
+  <url>https://github.com/pydantic/opamp-clients</url>
+  <licenses>
+    <license>
+      <name>All rights reserved</name>
+    </license>
+  </licenses>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- The agent release the extension is built and tested against. -->
+    <otel.agent.version>2.31.1</otel.agent.version>
+    <otel.sdk.version>1.66.0</otel.sdk.version>
+    <!-- The declarative configuration model the agent bundles: the model changes from one release to
+         the next, so this must be the agent's own. -->
+    <otel.declarative.version>1.65.0-alpha</otel.declarative.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${otel.sdk.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Ours, shaded into the extension. -->
+    <dependency>
+      <groupId>dev.pydantic</groupId>
+      <artifactId>opamp-client</artifactId>
+      <version>0.1.0-SNAPSHOT</version>
+    </dependency>
+    <!-- The agent provides these. -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-extension-autoconfigure-spi</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry.javaagent</groupId>
+      <artifactId>opentelemetry-javaagent-extension-api</artifactId>
+      <version>${otel.agent.version}-alpha</version>
+      <scope>provided</scope>
+    </dependency>
+    <!-- Declarative configuration (otel.config.file): its customizer SPI and model. -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-extension-declarative-config</artifactId>
+      <version>${otel.declarative.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>6.1.3</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-sdk-testing</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Reads the SDK settings layer's shared test vectors (testdata/sdk-settings). -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.22.2</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- The console exporters, for building an SDK from a configuration file in the tests. -->
+    <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-exporter-logging</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <!-- The version, as the inventory reports it; nothing else is filtered. -->
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+        <includes>
+          <include>dev/pydantic/opamp/javaagent/version.properties</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+        <excludes>
+          <exclude>dev/pydantic/opamp/javaagent/version.properties</exclude>
+        </excludes>
+      </resource>
+    </resources>
+    <plugins>
+      <!-- Pinned, as in the client: an older Maven's default (3.1) compiles for Java 5 and
+           ignores maven.compiler.release. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.16.0</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+      </plugin>
+      <!-- The application's side of its own settings (docs/app-settings.md): a second, small jar,
+           opamp-javaagent-extension-<version>-app-settings.jar, holding dev.pydantic.opamp.AppSettings
+           and its listener alone, for the application to compile against and run with. The
+           extension fills it through the bootstrap class loader (AppSettingsSink). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <id>app-settings</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>app-settings</classifier>
+              <includes>
+                <include>dev/pydantic/opamp/AppSettings.class</include>
+                <include>dev/pydantic/opamp/AppSettings$*.class</include>
+                <include>dev/pydantic/opamp/AppSettingsListener.class</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- One jar for -Dotel.javaagent.extensions: the client, its WebAssembly runtime and protobuf,
+           relocated so nothing collides with what the agent or the application loads. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.2</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <relocations>
+                <relocation>
+                  <pattern>com.google.protobuf</pattern>
+                  <shadedPattern>dev.pydantic.opamp.javaagent.shaded.protobuf</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.dylibso.chicory</pattern>
+                  <shadedPattern>dev.pydantic.opamp.javaagent.shaded.chicory</shadedPattern>
+                </relocation>
+              </relocations>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                    <exclude>module-info.class</exclude>
+                    <exclude>META-INF/versions/*/module-info.class</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

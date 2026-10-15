@@ -1,0 +1,54 @@
+<!--
+  Copyright (c) 2026 Bill Easton. All rights reserved.
+  SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+
+  The Windows installer (WiX 5): the Supervisor, the collector it runs and pydantic-opamp-enroll.ps1
+  in Program Files\pydantic-opamp, and the pydantic-opamp-supervisor service, run as LocalSystem.
+  The service is installed stopped and set to start on demand; pydantic-opamp-enroll.ps1 writes
+  its config under ProgramData\pydantic-opamp, sets it to start automatically and starts it.
+  Uninstalling stops and removes the service but keeps ProgramData\pydantic-opamp, for a
+  reinstall. build.ps1 passes Version and Bin (the directory with the two executables).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Pydantic OpAMP Supervisor" Manufacturer="Pydantic" Version="$(var.Version)"
+           UpgradeCode="a7c976d2-a6db-4393-86bc-e59b0fb90c66" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of the Pydantic OpAMP Supervisor is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="pydantic-opamp" />
+    </StandardDirectory>
+
+    <ComponentGroup Id="Supervisor" Directory="INSTALLFOLDER">
+      <Component>
+        <File Id="Supervisor" Source="$(var.Bin)\opampsupervisor.exe" KeyPath="yes" />
+        <ServiceInstall Name="pydantic-opamp-supervisor" DisplayName="Pydantic OpAMP Supervisor"
+                        Description="OpAMP Supervisor and the OpenTelemetry Collector it runs"
+                        Type="ownProcess" Start="demand" ErrorControl="normal" Account="LocalSystem"
+                        Arguments="--config &quot;[CommonAppDataFolder]pydantic-opamp\supervisor.yaml&quot;" />
+        <ServiceControl Id="Supervisor" Name="pydantic-opamp-supervisor" Stop="both" Remove="uninstall" Wait="yes" />
+        <!-- The Supervisor logs to the Application event log under the service's name. -->
+        <RegistryKey Root="HKLM" Key="SYSTEM\CurrentControlSet\Services\EventLog\Application\pydantic-opamp-supervisor">
+          <RegistryValue Name="EventMessageFile" Type="expandable" Value="%SystemRoot%\System32\EventCreate.exe" />
+          <RegistryValue Name="TypesSupported" Type="integer" Value="7" />
+        </RegistryKey>
+      </Component>
+      <Component>
+        <File Source="$(var.Bin)\otelcol.exe" KeyPath="yes" />
+      </Component>
+      <Component>
+        <File Source="pydantic-opamp-enroll.ps1" KeyPath="yes" />
+      </Component>
+      <Component>
+        <File Source="..\..\..\..\LICENSE" Name="LICENSE.txt" KeyPath="yes" />
+      </Component>
+      <Component>
+        <File Source="..\..\LICENSE" Name="LICENSE.Apache-2.0.txt" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <Feature Id="Main">
+      <ComponentGroupRef Id="Supervisor" />
+    </Feature>
+  </Package>
+</Wix>

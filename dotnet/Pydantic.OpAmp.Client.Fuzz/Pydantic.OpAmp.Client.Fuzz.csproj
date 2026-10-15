@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The SharpFuzz targets for the .NET client's own code around the core (Targets/): never packed
+    or shipped. scripts/dotnet_fuzz.sh builds this, instruments the client's assembly in its output
+    (sharpfuzz) and runs a target under libFuzzer (libfuzzer-dotnet). The tests compile Targets/ too
+    and run every seed and every input under crashes/ (FuzzInputsTests).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpFuzz" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Rust mode's in-memory network, as the tests have it. -->
+    <Compile Include="../Pydantic.OpAmp.Client.Tests/MemNet.cs" Link="MemNet.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
+  </ItemGroup>
+
+</Project>

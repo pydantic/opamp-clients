@@ -1,0 +1,30 @@
+# The collector the e2e tests supervise (e2e_test.go wants it at
+# ../../bin/otelcontribcol_<os>_<arch>), with this repository's opamp extension in place of
+# upstream's: the Supervisor and the extension tested together. Build it from go/opampsupervisor:
+#   go run go.opentelemetry.io/collector/cmd/builder@v0.162.0 --config testdata/collector/manifest.yaml
+# (output_path and the replaces are relative to go/opampsupervisor and bin/e2e-collector).
+dist:
+  name: otelcontribcol
+  description: Collector for the Supervisor's e2e tests
+  output_path: ../../bin/e2e-collector
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.162.0
+  - gomod: go.opentelemetry.io/collector/receiver/nopreceiver v0.162.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.162.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.162.0
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/nopexporter v0.162.0
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.162.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.162.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.162.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.162.0
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.162.0
+  - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.0.0
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.68.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.68.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.68.0
+replaces:
+  - github.com/pydantic/opamp-clients/go => ../../go
+  - github.com/pydantic/opamp-clients/go/opampextension => ../../go/opampextension

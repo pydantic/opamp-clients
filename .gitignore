@@ -6,6 +6,10 @@
 .opamp-core/
 target/
 dist/
+/spec/
+/proto/
+/tests/shell-tables/
+/testdata/sdk-settings/
 
 # Node.js
 node_modules/

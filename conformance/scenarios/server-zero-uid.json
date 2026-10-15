@@ -1,0 +1,21 @@
+{
+  "description": "The agent starts with an all-zero instance UID: the server assigns a UUID v7 and the agent adopts it. The run is 10 s: on a cold, busy ARC runner a Java client's first message has come 5.4 s after its start.",
+  "servers": [
+    "rust"
+  ],
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 10,
+  "driver": {
+    "poll_s": 1,
+    "uid": "zero"
+  },
+  "server": {},
+  "checks": [
+    "server_assigns_v7_uids",
+    "adopts_assigned_uid",
+    "driver_survives"
+  ]
+}

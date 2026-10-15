@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Smoke test of the packed client (scripts/native_dist.py smoke): an application that takes
+       the package from a local feed, as a user's would from NuGet, on each platform's image. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Pydantic.OpAmp.Client" Version="$(OpAmpVersion)" />
+  </ItemGroup>
+
+</Project>

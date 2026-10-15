@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Pydantic.OpAmp.AutoInstrumentation</PackageId>
+    <Version>0.1.0</Version>
+    <Description>A plugin for OpenTelemetry .NET automatic instrumentation: the SDK under an OpAMP server</Description>
+    <IsPackable>false</IsPackable>
+    <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exactly the versions automatic instrumentation 1.17.0 ships (docs/dotnet-otel.md). -->
+    <PackageReference Include="OpenTelemetry.AutoInstrumentation.PluginApi" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+    <!--
+      For the type in the plugin's IConfigureTracesOptions<AspNetCoreTraceInstrumentationOptions>
+      only (the Filter is set by reflection): automatic instrumentation ships the assembly, and
+      PrivateAssets keeps it, and ASP.NET Core's framework, from flowing to the application.
+    -->
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
+  </ItemGroup>
+
+  <!-- What the plugin shares with the hosting package (dotnet/shared): compiled into each. -->
+  <ItemGroup>
+    <Compile Include="../shared/*.cs" LinkBase="shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pydantic.OpAmp.AutoInstrumentation.Tests" />
+  </ItemGroup>
+
+</Project>

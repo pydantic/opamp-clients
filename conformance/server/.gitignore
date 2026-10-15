@@ -1,0 +1,2 @@
+# The runner builds the server into conformance/out/bin; a local `go build` lands here.
+/server

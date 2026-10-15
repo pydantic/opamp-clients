@@ -1,0 +1,108 @@
+// Copyright (c) 2026 Bill Easton. All rights reserved.
+// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+
+package packaging
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
+)
+
+// macEnroll runs macos/pydantic-opamp-enroll under root, with a launchctl stand-in that logs its
+// arguments to tools/launchctl.log.
+func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string, error) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the enroll script is for macOS")
+	}
+	launchctl := filepath.Join(tools, "launchctl")
+	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"), 0o755))
+	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
+	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl)
+	cmd.Stdin = strings.NewReader(stdin)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// One step on macOS: the token in a file only root reads, the config written for the
+// LaunchDaemon, and the daemon (re)loaded; the config is one the Supervisor loads.
+func TestMacEnroll(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "s3cr3t-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+
+	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
+	token, err := os.ReadFile(filepath.Join(etc, "enroll-token"))
+	require.NoError(t, err)
+	assert.Equal(t, "s3cr3t-token", string(token))
+	for _, name := range []string{"", "enroll-token", "supervisor.yaml"} {
+		info, err := os.Stat(filepath.Join(etc, name))
+		require.NoError(t, err)
+		assert.Zero(t, info.Mode().Perm()&0o077, "%q is readable beyond root", name)
+	}
+	cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(cfg), "s3cr3t-token")
+
+	log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
+	require.NoError(t, err)
+	assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+		"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
+
+	collector := filepath.Join(t.TempDir(), "otelcol")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.NewReplacer(
+		"/opt/pydantic-opamp/etc/enroll-token", filepath.Join(etc, "enroll-token"),
+		"/opt/pydantic-opamp/bin/otelcol", collector,
+		"/opt/pydantic-opamp/var", t.TempDir(),
+	).Replace(string(cfg))), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "wss://opamp.example.com/v1/opamp", loaded.Server.Endpoint)
+	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
+	assert.Equal(t, "keychain", loaded.Storage.StateKey)
+	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
+}
+
+func TestMacEnrollNoStart(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "http://127.0.0.1:4320/v1/opamp", "--plaintext", "--no-start")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "sudo launchctl bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist")
+	_, err = os.Stat(filepath.Join(tools, "launchctl.log"))
+	assert.ErrorIs(t, err, os.ErrNotExist, "--no-start loaded the daemon")
+}
+
+// What it refuses, before it writes anything.
+func TestMacEnrollRefuses(t *testing.T) {
+	for _, tt := range []struct {
+		name, stdin, want string
+		args              []string
+	}{
+		{"no endpoint", "t", "usage:", nil},
+		{"a plaintext endpoint", "t", "isn't encrypted", []string{"--endpoint", "ws://x/v1/opamp"}},
+		{"a quote in the endpoint", "t", "can't contain", []string{"--endpoint", `wss://x/"`}},
+		{"an empty token", "\n", "token is empty", []string{"--endpoint", "wss://x"}},
+		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"--endpoint", "wss://x"}},
+		{"a relative CA file", "t", "absolute path", []string{"--endpoint", "wss://x", "--ca-file", "enroll_test.go"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			root := t.TempDir()
+			out, err := macEnroll(t, root, t.TempDir(), tt.stdin, tt.args...)
+			require.Error(t, err)
+			assert.Contains(t, out, tt.want)
+			_, err = os.Stat(filepath.Join(root, "opt"))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}

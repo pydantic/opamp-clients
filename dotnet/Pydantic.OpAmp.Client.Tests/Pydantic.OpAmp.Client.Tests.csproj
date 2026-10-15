@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <!-- The tests wait on real sockets; cancelling them early buys nothing. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" Version="4.9.1" />
+    <PackageReference Include="FsCheck" Version="3.4.0" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <!-- The WebAssembly modules, as an oracle for the native core and to run a hostile core (WasmCore.cs). -->
+    <PackageReference Include="Wasmtime" Version="48.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../Pydantic.OpAmp.Client/opamp_core.wasm" Link="opamp_core.wasm" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../Pydantic.OpAmp.Client/opamp_sdk_settings.wasm" Link="opamp_sdk_settings.wasm" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The SharpFuzz targets, run on their seeds and on every input kept under crashes/ (FuzzInputsTests). -->
+    <Compile Include="../Pydantic.OpAmp.Client.Fuzz/Targets/*.cs" Link="Fuzz/%(Filename)%(Extension)" />
+    <None Include="../Pydantic.OpAmp.Client.Fuzz/crashes/**/*" Link="fuzz-crashes/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
+  </ItemGroup>
+
+</Project>

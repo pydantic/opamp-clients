@@ -1,0 +1,1 @@
+{"sampling_rate": "0.25", "sampling_rules": [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 1, "name": "POST /checkout*"}]}

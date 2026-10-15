@@ -1,0 +1,25 @@
+{
+  "description": "The application chooses no instance UID: the client makes one up, and keeps it across a restart. The first run is long: a client must store the UID it made up durably before it sends it, and on a cold, busy ARC runner that first write has taken more than 4 s. The second run is long too: a Java client on such a runner has taken more than 4 s from its start to its first message.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 22,
+  "needs": [
+    "instance_uid_kept"
+  ],
+  "driver": {
+    "poll_s": 1,
+    "uid": "none",
+    "runs": [
+      12,
+      10
+    ]
+  },
+  "server": {},
+  "checks": [
+    "instance_uid_kept_across_restart",
+    "instance_uid_valid",
+    "driver_survives"
+  ]
+}

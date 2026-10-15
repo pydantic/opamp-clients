@@ -1,0 +1,21 @@
+{
+  "description": "The server offers three packages, one of them with the wrong content hash. The agent downloads the good ones with the offered credentials, installs them, refuses the bad one, and reports each. Then the server offers a new version of one and drops another: the agent upgrades the first and removes the second.",
+  "transports": ["http", "ws"],
+  "duration_s": 25,
+  "needs": ["packages"],
+  "driver": {"poll_s": 1, "packages": true},
+  "server": {
+    "packages": {
+      "offer": [
+        {"name": "addon-a", "version": "1.0.0", "content": "addon a, version 1"},
+        {"name": "addon-b", "version": "1.0.0", "content": "addon b", "corrupt": true},
+        {"name": "addon-c", "version": "1.0.0", "content": "addon c"}
+      ],
+      "then": [
+        {"name": "addon-a", "version": "2.0.0", "content": "addon a, version 2"}
+      ]
+    }
+  },
+  "checks": ["package_statuses_reported", "packages_installed_verified", "corrupt_package_refused",
+             "unoffered_package_removed", "package_download_credentials", "driver_survives"]
+}

@@ -1,0 +1,9 @@
+{
+  "description": "The agent reports its components as a hash; the server asks for them in full once, and gets them in the next message, then the hash again.",
+  "transports": ["http", "ws"],
+  "duration_s": 8,
+  "needs": ["available_components"],
+  "driver": {"poll_s": 1, "components": true},
+  "server": {"faults": [{"on_message": 2, "action": "ask_components"}]},
+  "checks": ["components_hash_first", "components_in_full_when_asked", "driver_survives"]
+}

@@ -1,0 +1,8 @@
+{
+  "description": "The server assigns a UUID v7 instance UID in its first answer. The run is 10 s: on a cold, busy ARC runner a Java client's first message has come 5.4 s after its start.",
+  "transports": ["http", "ws"],
+  "duration_s": 10,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"on_message": 1, "action": "assign_uid", "uid": "v7"}]},
+  "checks": ["adopts_assigned_uid", "instance_uid_valid", "driver_survives"]
+}

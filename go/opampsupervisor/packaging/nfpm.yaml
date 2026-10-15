@@ -1,0 +1,63 @@
+# The Linux packages (deb and rpm): the Supervisor, the collector it runs, their systemd units,
+# pydantic-opamp-enroll and pydantic-otelcol-configure (the collector unmanaged). build.sh builds
+# the two binaries into dist/ and then runs nfpm with it.
+name: pydantic-opamp-supervisor
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: Pydantic <hello@pydantic.dev>
+description: |
+  The OpAMP Supervisor on Pydantic's shared OpAMP client core, with an OpenTelemetry Collector to run.
+  Credentials the OpAMP server issues are verified, kept across restarts, and encrypted with a
+  key systemd keeps for the service. Enroll with pydantic-opamp-enroll, or run the collector
+  unmanaged with pydantic-otelcol-configure.
+vendor: Pydantic
+homepage: https://github.com/pydantic/opamp-clients
+# The shared core (go/opamp and its embedded WebAssembly) is all rights reserved; the files
+# derived from OpenTelemetry's Supervisor and opamp extension keep Apache-2.0.
+license: LicenseRef-All-Rights-Reserved AND Apache-2.0
+depends:
+  # systemd-creds and LoadCredentialEncrypted=.
+  - systemd (>= 250)
+rpm:
+  # Signed with SIGNING_KEY_FILE when build.sh has it (repo.sh signs the repositories with the same
+  # key): dnf checks it. Unset, the rpm isn't signed.
+  signature:
+    key_file: ${SIGNING_KEY_FILE}
+overrides:
+  rpm:
+    depends:
+      - systemd >= 250
+contents:
+  - src: dist/opampsupervisor
+    dst: /usr/lib/pydantic-opamp/opampsupervisor
+    file_info: {mode: 0755}
+  - src: dist/otelcol/otelcol
+    dst: /usr/lib/pydantic-opamp/otelcol
+    file_info: {mode: 0755}
+  - src: pydantic-opamp-enroll
+    dst: /usr/sbin/pydantic-opamp-enroll
+    file_info: {mode: 0755}
+  - src: pydantic-otelcol-configure
+    dst: /usr/sbin/pydantic-otelcol-configure
+    file_info: {mode: 0755}
+  - src: pydantic-otelcol.service
+    dst: /usr/lib/systemd/system/pydantic-otelcol.service
+    file_info: {mode: 0644}
+  - src: pydantic-opamp-supervisor.service
+    dst: /usr/lib/systemd/system/pydantic-opamp-supervisor.service
+    file_info: {mode: 0644}
+  - src: ../../../LICENSE
+    dst: /usr/share/doc/pydantic-opamp-supervisor/LICENSE
+    file_info: {mode: 0644}
+  - src: ../LICENSE
+    dst: /usr/share/doc/pydantic-opamp-supervisor/LICENSE.Apache-2.0
+    file_info: {mode: 0644}
+  - dst: /etc/pydantic-opamp
+    type: dir
+    file_info: {mode: 0750}
+scripts:
+  postinstall: postinstall.sh
+  preremove: preremove.sh

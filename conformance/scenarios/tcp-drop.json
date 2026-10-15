@@ -1,0 +1,10 @@
+{
+  "description": "The server drops the TCP connection under the WebSocket 8 s in, without a Close frame, after cold client startup on ARC (the Java client has first connected 4.7 s in).",
+  "transports": ["ws"],
+  "duration_s": 19,
+  "driver": {"poll_s": 1},
+  "server": {"faults": [{"at_s": 8, "action": "tcp_drop"}]},
+  "params": {"reconnect_within_s": 9},
+  "checks": ["reconnects_after_loss", "reports_after_connecting", "first_message_is_full", "full_report_after_reconnect",
+             "driver_survives"]
+}

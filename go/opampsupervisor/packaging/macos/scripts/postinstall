@@ -1,0 +1,13 @@
+#!/bin/sh
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+#
+# Starts the Supervisor again after an upgrade, if the host is enrolled. A first install leaves
+# it stopped until pydantic-opamp-enroll has run.
+set -e
+mkdir -p /opt/pydantic-opamp/var/log
+chmod 0700 /opt/pydantic-opamp/var
+if [ -f /opt/pydantic-opamp/etc/supervisor.yaml ]; then
+	launchctl bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist
+fi
+exit 0

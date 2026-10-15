@@ -1,0 +1,25 @@
+{
+  "description": "The agent's description changes twice.",
+  "transports": [
+    "http",
+    "ws"
+  ],
+  "duration_s": 9,
+  "driver": {
+    "poll_s": 1,
+    "changes_at_s": [
+      3,
+      5
+    ]
+  },
+  "server": {},
+  "servers": [
+    "go",
+    "rust"
+  ],
+  "checks": [
+    "status_change_reported",
+    "sequence_increments_by_one",
+    "driver_survives"
+  ]
+}
