@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import sys
 import json
+import subprocess
 import tempfile
+import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -847,6 +850,81 @@ class RustLog(unittest.TestCase):
             path = Path(directory) / "server.jsonl"
             path.write_text(json.dumps({"event": "otlp", "t": 20, "wall": 100, "ends_wall": [95, 99]}) + "\n")
             self.assertEqual(read_log(path)[0]["ends"], [15, 19])
+
+
+class Main(unittest.TestCase):
+    """main(): a try.py's checks, one after another or side by side (--jobs)."""
+
+    TRY = textwrap.dedent("""\
+        import sys, time
+        from pathlib import Path
+        sys.path.insert(0, {examples!r})
+        from integrations import main
+        out = Path({out!r})
+
+        def prepare():
+            with (out / "prepared").open("a") as f:
+                f.write("x")
+
+        def check(name, seconds, passes=True):
+            def run():
+                (out / name).write_text(" ".join(sys.argv[1:]))
+                time.sleep(seconds)
+                print("  a line of " + name)
+                return passes
+            return run
+
+        CHECKS = {{"a": check("a", 1.5), "b": check("b", 1.5), "c": check("c", 0.1), "bad": check("bad", 0.1, False)}}
+        sys.exit(main(CHECKS, prepare, options=("--local",)))
+        """)
+
+    def setUp(self) -> None:
+        self.out = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.out, ignore_errors=True))
+        self.script = self.out / "try.py"
+        self.script.write_text(self.TRY.format(examples=str(Path(__file__).resolve().parent), out=str(self.out)))
+
+    def run_try(self, *args: str) -> tuple[subprocess.CompletedProcess, float]:
+        start = time.monotonic()
+        r = subprocess.run([sys.executable, str(self.script), *args], capture_output=True, text=True, check=False)
+        return r, time.monotonic() - start
+
+    def test_checks_run_one_after_another_by_default(self):
+        r, took = self.run_try("a", "c")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertGreaterEqual(took, 1.5)
+        self.assertRegex(r.stdout, r"(?s)=== a\n  a line of a\n=== a: passed in \d+ s\n=== c\n  a line of c\n=== c: passed")
+        self.assertEqual((self.out / "prepared").read_text(), "x")
+
+    def test_with_jobs_checks_run_side_by_side_after_one_build(self):
+        r, took = self.run_try("--local", "--jobs", "2", "a", "b", "c")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        # Each check's output whole, in the order given; the build once, in the first process.
+        self.assertRegex(r.stdout, r"(?s)^=== a\n  a line of a\n=== a: passed in \d+ s\n=== b\n  a line of b\n"
+                                   r"=== b: passed in \d+ s\n=== c\n  a line of c\n=== c: passed in \d+ s\n$")
+        self.assertEqual((self.out / "prepared").read_text(), "x")
+        # a and b at once: in less than the 3 s they take one after the other (the interpreter
+        # starts aside).
+        self.assertLess(took, 3.0 + 1.5)
+        # Each check's process is given the try.py's own flags.
+        self.assertEqual((self.out / "a").read_text(), "--local --prepared a")
+
+    def test_a_check_that_fails_fails_the_run_side_by_side_too(self):
+        for args in (["c", "bad"], ["--jobs", "2", "c", "bad"]):
+            r, _ = self.run_try(*args)
+            self.assertEqual(r.returncode, 1, args)
+            self.assertIn("=== c: passed", r.stdout)
+            self.assertIn("=== bad: FAILED", r.stdout)
+
+    def test_jobs_must_be_a_count(self):
+        for args in (["--jobs"], ["--jobs", "0", "a"], ["--jobs", "x", "a"]):
+            r, _ = self.run_try(*args)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--jobs", r.stderr)
+        self.assertFalse((self.out / "prepared").exists())
+        r, _ = self.run_try("--jobs", "2", "nope")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("no such check: nope", r.stderr)
 
 
 if __name__ == "__main__":

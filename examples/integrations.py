@@ -92,6 +92,7 @@ saved settings), and no /changed.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import functools
 import itertools
@@ -979,7 +980,9 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
             st = statuses(events)
             return len(st) >= 5 and len(pings(events, st[-1][0])) > REQUESTS
 
-        seven = run(launch, app_settings_scenario(), state, "run7", seconds[0], listen, target_, until=done,
+        # (Its files are app7 and app8: an integration's own runs 7 to 9 write run7 to run9 in the same
+        # directory, and the two checks may run at once, main()'s --jobs.)
+        seven = run(launch, app_settings_scenario(), state, "app7", seconds[0], listen, target_, until=done,
                     settle=MARGIN, env=env)
         print(f"run 7: remote config statuses {[s for _, s, _ in statuses(seven)]}, "
               f"{len(requests(seven, '/feature'))} /feature and {len(requests(seven, '/changed'))} /changed requests")
@@ -989,7 +992,7 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
             a2s = [e for e in events if e["event"] == "a2s"]
             return bool(a2s) and len(pings(events, a2s[0]["t"])) > 2 * REQUESTS
 
-        eight = run(launch, {"server": {}}, state, "run8", seconds[1], listen, target_, until=enough,
+        eight = run(launch, {"server": {}}, state, "app8", seconds[1], listen, target_, until=enough,
                     settle=MARGIN, env=env)
         print(f"run 8: {len(pings(eight))} application requests, {len(requests(eight, '/feature'))} /feature")
         expect(judge_app_settings_restart(eight))
@@ -999,26 +1002,58 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
 
 
 def main(checks: dict[str, Callable[[], bool]], prepare: Callable[[], object] = lambda: None,
-         argv: list[str] | None = None, options: tuple[str, ...] = ()) -> int:
+         argv: list[str] | None = None, options: tuple[str, ...] = (), script: str | None = None) -> int:
     """An integration's try.py: run the checks it names (`checks`, each independent of the others:
     its own server, state directory and logs), in order, every one by default; the exit status.
 
-        try.py                 # every check, after prepare() (the integration's build)
-        try.py signals setup   # those alone, as one of CI's jobs runs its share
-        try.py --list          # their names
+        try.py                    # every check, after prepare() (the integration's build)
+        try.py signals setup      # those alone, as one of CI's jobs runs its share
+        try.py --jobs 4 signals   # up to four at once, each in a process of its own, after one prepare()
+        try.py --list             # their names
 
-    `options`: the flags of the try.py's own (`--local`), left for it to read."""
-    argv = [a for a in (sys.argv[1:] if argv is None else argv) if a not in options]
+    A check waits on its scenario's clock (one message a second), not on the machine, so several
+    run side by side in the time of the longest; each one's output is printed whole when it ends.
+    `options`: the flags of the try.py's own (`--local`), left for it to read, and given to each
+    check's process. `script`: the try.py, for those processes (the program run, by default)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    given = [a for a in argv if a in options]
+    argv = [a for a in argv if a not in options]
     if argv == ["--list"]:
         print("\n".join(checks))
         return 0
+    jobs, prepared = 1, False
+    while argv[:1] in (["--jobs"], ["--prepared"]):
+        if argv[0] == "--prepared":
+            # (A check's process under --jobs: the build is done.)
+            prepared, argv = True, argv[1:]
+        elif len(argv) < 2 or not argv[1].isdigit() or int(argv[1]) < 1:
+            print("--jobs: how many checks at once, 1 or more", file=sys.stderr)
+            return 2
+        else:
+            jobs, argv = int(argv[1]), argv[2:]
     unknown = [a for a in argv if a not in checks]
     if unknown:
         print(f"no such check: {' '.join(unknown)}; the checks: {' '.join(checks)}", file=sys.stderr)
         return 2
-    prepare()
+    if not prepared:
+        prepare()
+    names = argv or list(checks)
+    if jobs > 1 and len(names) > 1:
+        program = script or sys.argv[0]
+
+        def one(name: str) -> tuple[str, int]:
+            r = subprocess.run([sys.executable, program, *given, "--prepared", name], stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, check=False)
+            return r.stdout, r.returncode
+
+        ok = True
+        with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
+            for output, code in pool.map(one, names):
+                print(output, end="", flush=True)
+                ok &= code == 0
+        return 0 if ok else 1
     ok = True
-    for name in argv or checks:
+    for name in names:
         print(f"=== {name}", flush=True)
         start = time.monotonic()
         passed = checks[name]()
