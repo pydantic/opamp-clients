@@ -59,19 +59,29 @@ internal sealed class Reachability(Uri endpoint, SettingNames names, string serv
         _ => "the server answered with an error",
     };
 
+    /// <summary>
+    /// The endpoint the client uses now, as the client gives it (null, or null from it: the
+    /// configured one): after the server moved the agent, the one it moved it to.
+    /// </summary>
+    public Func<string?>? InUse { get; init; }
+
+    /// <summary>The endpoint the client uses now, as it is safe to log.</summary>
+    public string At() => this.InUse?.Invoke() is { Length: > 0 } e ? Where(e) : this.endpoint;
+
     public void Notified(OpAmpNotification n)
     {
+        var endpoint = this.At();
         switch (n)
         {
             case OpAmpNotification.Connected:
                 if (!this.ever)
                 {
                     var who = service.Length > 0 ? $" as {service}" : string.Empty;
-                    log.Info($"connected to {this.endpoint}; this SDK is managed{who}, instance {uid}");
+                    log.Info($"connected to {endpoint}; this SDK is managed{who}, instance {uid}");
                 }
                 else if (this.failing)
                 {
-                    log.Info($"connected to {this.endpoint} again");
+                    log.Info($"connected to {endpoint} again");
                 }
 
                 this.ever = true;
@@ -81,12 +91,12 @@ internal sealed class Reachability(Uri endpoint, SettingNames names, string serv
                 if (!this.failing)
                 {
                     var why = string.IsNullOrEmpty(f.Detail) ? $"HTTP {f.Status}" : f.Detail;
-                    log.Warn($"can't reach {this.endpoint} ({why}): {Hint(f.Status, names)}. Retrying in the background; " +
+                    log.Warn($"can't reach {endpoint} ({why}): {Hint(f.Status, names)}. Retrying in the background; " +
                              "the SDK keeps its current settings meanwhile");
                 }
                 else
                 {
-                    log.Debug?.Invoke($"still can't reach {this.endpoint}: {f.Detail}");
+                    log.Debug?.Invoke($"still can't reach {endpoint}: {f.Detail}");
                 }
 
                 this.failing = true;

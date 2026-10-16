@@ -20,7 +20,7 @@ rm -rf "$stage"
 bin=$stage/root/opt/pydantic-opamp/bin
 doc=$stage/root/opt/pydantic-opamp/share/doc
 mkdir -p "$bin" "$doc" "$stage/root/Library/LaunchDaemons"
-(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.162.0 --config packaging/collector.yaml)
+(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config packaging/collector.yaml)
 cp dist/otelcol/otelcol "$bin/otelcol"
 (cd .. && go build -trimpath -o "packaging/$bin/opampsupervisor" .)
 install -m 0755 macos/pydantic-opamp-enroll "$bin/"

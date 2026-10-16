@@ -31,7 +31,7 @@ internal sealed class OpAmpAgent : IDisposable
     private readonly bool gateable;
     private readonly OtlpTls? tls;
     private TracerProviderBuilder? tracing;
-    private HashSet<Signal> ungated = [];
+    private (TracerProvider? Tracing, MeterProvider? Metrics, LoggerProvider? Logs)? built;
     private ComponentHealth? health;
 
     public OpAmpAgent(IOptions<OpAmpOptions> options, IConfiguration? configuration = null)
@@ -90,34 +90,32 @@ internal sealed class OpAmpAgent : IDisposable
     /// (docs/sdk-settings.md, "The host"): never the instrumentation switches (the application
     /// names its instrumentations in code); the sampling rate only while the live sampler can be the
     /// tracer provider's; a signal's sending only while every exporter it has can be gated
-    /// (<see cref="Exporters"/>); the polling interval at the next start.
+    /// (<see cref="Exporters"/>, read from the built providers each time: a processor the application
+    /// adds to one later is found); the polling interval at the next start.
     /// </summary>
     public Host HostNow(bool providersBuilt)
     {
+        // Before the providers are built, an exporter not yet seen may still be gated.
+        var ungated = providersBuilt ? this.Ungated() : [];
         var h = new Host { NextStart = { "opamp_polling_interval" } };
         if (this.gateable)
         {
-            // Before the providers are built, an exporter not yet seen may still be gated.
-            foreach (var signal in Enum.GetValues<Signal>().Where(s => !providersBuilt || !this.ungated.Contains(s)))
+            foreach (var signal in Enum.GetValues<Signal>().Where(s => !ungated.Contains(s)))
             {
                 h.Live.Add($"send_{signal.ToString().ToLowerInvariant()}");
             }
 
-            if (!providersBuilt || !this.ungated.Contains(Signal.Logs))
+            if (!ungated.Contains(Signal.Logs))
             {
                 // The levels are held at the logs gate, which every exporter of the logs is behind.
                 h.Live.Add("send_logs_level");
+                h.Live.Add("send_logs_level_by_scope");
+                h.Live.Add("send_logs_per_second");
             }
         }
 
-        if (this.gateable && !this.ungated.Contains(Signal.Logs))
-        {
-            h.Live.Add("send_logs_level_by_scope");
-            h.Live.Add("send_logs_per_second");
-        }
-
         // Redaction is at the traces and logs gates: every span and log record exported has to go through one.
-        if (this.gateable && !this.ungated.Contains(Signal.Traces) && !this.ungated.Contains(Signal.Logs))
+        if (this.gateable && !ungated.Contains(Signal.Traces) && !ungated.Contains(Signal.Logs))
         {
             h.Live.Add("drop_attributes");
             h.Live.Add("mask_attributes");
@@ -214,17 +212,21 @@ internal sealed class OpAmpAgent : IDisposable
             this.log.Sink.Warn("the tracer provider's sampler was set after WithOpAmp(): sampling_rate is not carried out. Call WithOpAmp() last.");
         }
 
-        // Which signals go to an exporter the gate isn't in front of is known now: their send_* is ignored.
-        var exporters = this.Agent is not null ? Exporters.Read(tracing, metrics, logs) : ([], []);
-        this.ungated = this.gateable ? exporters.Ungated : [];
-        foreach (var signal in this.ungated)
+        // Which signals go to an exporter the gate isn't in front of is known now: their send_* is
+        // ignored. The providers are read again before each decision, and on the health timer.
+        this.built = (tracing, metrics, logs);
+        foreach (var signal in this.Ungated())
         {
             var name = signal.ToString().ToLowerInvariant();
             this.log.Sink.Info($"{name} go to an exporter that can't be stopped (not OTLP, an endpoint with a path of its own, or an HttpClientFactory of its own): send_{name} is not carried out");
         }
 
-        this.Agent?.Start(resource, this.Inventory(exporters.Built, tracing, metrics, logs), this.health);
+        this.Agent?.Start(resource, () => this.Inventory(Exporters.Read(tracing, metrics, logs).Built, tracing, metrics, logs), this.health);
     }
+
+    /// <summary>The signals some exporter of which the built providers send through past the gates, read now; none before they are built.</summary>
+    private HashSet<Signal> Ungated() =>
+        this.Agent is not null && this.gateable && this.built is { } b ? Exporters.Read(b.Tracing, b.Metrics, b.Logs).Ungated : [];
 
     /// <summary>
     /// What it runs (docs/available-components.md): the instrumentations the application added to
@@ -240,7 +242,8 @@ internal sealed class OpAmpAgent : IDisposable
             .OfType<object>()
             .Select(i => i.GetType().Assembly)
             .Select(a => new Instrumentation { Name = InstrumentationName(a.GetName().Name ?? string.Empty), Version = Inventories.Version(a) });
-        var exporters = built.Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated && this.gateable && !this.ungated.Contains(e.Signal)));
+        var ungated = this.Ungated();
+        var exporters = built.Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated && this.gateable && !ungated.Contains(e.Signal)));
         return Inventories.Of(typeof(OpAmpAgent).Assembly, instrumentations, exporters);
     }
 

@@ -64,13 +64,30 @@ gives the wrong one, and the wrong one when the code gives the right one. The co
 times. With the wrong token, the agent's warning names the headers given in code, not
 `OTEL_OPAMP_HEADERS`. With the right token, the agent is accepted.
 
+Then `check_rotation` (the check `rotation`) runs the application against the same kind of server,
+whose operator rotates the agent's key and then moves it to the server's second listener, and
+starts it once more with the first endpoint still configured:
+
+| What the operator does | What the run checks |
+|---|---|
+| rotates the key the agent took | the agent takes the second key: the server confirms it, refusing no request |
+| moves the agent to another port, with a third key | the agent takes it there, refusing no request, opens no connection to the first port after it, and is traced throughout |
+| (the next start) | the agent goes straight to the second port on the key it was given there, takes no new key, and none of its requests is refused |
+
 Each check is independent of the others (its own server, state directory and logs), so one can
-run alone, by name, and CI deals each integration's checks to jobs side by side:
+run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
+second), not on the machine, so with `--jobs` they take about as long as the longest of them:
 
 ```sh
-python3 examples/python-otel/try.py --list          # its checks: first, signals, setup, ...
-python3 examples/python-otel/try.py signals setup   # those two alone
+python3 examples/python-otel/try.py --list                    # its checks: first, signals, setup, ...
+python3 examples/python-otel/try.py signals setup             # those two alone
+python3 examples/python-otel/try.py --jobs 4 signals setup next  # up to four at once, after one build
 ```
+
+Under `--jobs`, each check runs in a process of its own and its output is printed whole when it
+ends. Two checks of one integration that run at once must not name their runs alike: the runs'
+files share the integration's directory (`check_app_settings` names its runs `app7` and `app8`
+for that reason).
 
 A new check goes into one of its integration's `checks:` lists in the CI workflow that runs
 them. Each run prints how long each check took, for keeping those jobs even.
@@ -82,6 +99,31 @@ checked by `check_app_settings` (the check `app`): its example application reads
 | Setting | What the run checks |
 |---|---|
 | `custom` | none of `/feature` before the first config (the default); `/feature` once the flag is `on`, still after a bad map is FAILED naming `custom.example.feature`, none once `custom` is left out, again from a map in a string; `/changed` three times (on, off, on), not for the FAILED config or the same map sent again; after a restart with no offer, `/feature` from the start |
+
+`check_truth` (the checks `truth-<setup>`) runs an integration under a setup where a setting may
+not reach the telemetry: something the application does to the SDK beside the integration, named
+in `EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
+out again by the next: `send_traces`, `send_metrics`, `send_logs`, `sampling_rate` 0,
+`send_logs_level`, `send_logs_level_by_scope`, `sampling_rules`, `mask_attributes`,
+`drop_attributes` and both rate caps (and `deactivate_all_instrumentations` where it is live). Each
+must either show at the sink, measured as `check_signals` measures it, or be named as set aside in
+the effective config the agent reports. An APPLIED setting that is neither fails. So does a setup
+whose settings set aside differ from the ones its try.py expects: more is control given up, fewer
+is a table out of date.
+
+| Integration | Setup | What the application does | Set aside |
+|---|---|---|---|
+| Python | `late-processor` | adds a span and a log record processor of its own, exporting over OTLP, once the SDK is built | the trace and log gates' settings and redaction; the sampler's stay |
+| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | the sampler's settings, `send_traces`, redaction and the instrumentation switches |
+| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | `send_metrics` |
+| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | the log settings and redaction |
+| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own | the sampler's settings, `send_traces` and redaction |
+| Node.js | `own-logger-provider` | the same for the logger provider | the log settings and redaction |
+| Node.js | `own-meter-provider` | the same for the meter provider | `send_metrics` |
+| Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | the trace, metric and log gates' settings and redaction; the sampler's stay |
+| Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | the sampler's settings |
+| .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | the trace and log gates' settings and redaction; the sampler's stay |
+| .NET plugin | `own-sdk` | sets `OTEL_DOTNET_AUTO_SETUP_SDK=false` and builds its own tracer and meter providers | `send_traces`, `send_metrics`, the sampler's settings and redaction; the logs' stay |
 
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.

@@ -893,6 +893,24 @@ test("connecting, failing and recovering are each said once", () => {
   assert.ok(!all.includes("secret") && !all.includes("token=x"));
 });
 
+test("after the server moved the agent, what is said names the endpoint the client uses now", () => {
+  let inUse: string | undefined; // none yet: the configured one
+  const lines = said(() => {
+    const r = new Reachability("https://a.example.com/v1/opamp");
+    r.inUse = () => inUse;
+    r.notified({ kind: "connected" });
+    inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+    r.notified({ kind: "connectFailed", detail: "connection refused" });
+    r.notified({ kind: "connected" });
+  }).filter(([level]) => level !== "debug");
+  assert.equal(lines.length, 3, JSON.stringify(lines));
+  assert.ok(lines[0]![1].startsWith("OpAMP: connected to https://a.example.com/v1/opamp;"), lines[0]![1]);
+  assert.ok(lines[1]![1].startsWith("OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)"), lines[1]![1]);
+  assert.equal(lines[2]![1], "OpAMP: connected to https://b.example.com/v1/opamp again");
+  const all = lines.map(([, m]) => m).join("\n");
+  assert.ok(!all.includes("secret") && !all.includes("token=x"));
+});
+
 test("the warning names what gave the server: the option given in code, else the variable", () => {
   const env = { ...NO_DEFAULT_DIR, OTEL_OPAMP_ENDPOINT: "http://env/v1/opamp", OTEL_OPAMP_HEADERS: "a=env" };
   const cases: [Options, string, string][] = [

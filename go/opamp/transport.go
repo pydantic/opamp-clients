@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -52,7 +53,14 @@ type executor struct {
 	// stopped before, say) can touch them.
 	instance string
 	lastSave chan struct{} // closed when the last save asked for has ended
+	// used is the URL of the OpAMP request or connection whose outcome came last (Go mode only:
+	// in Rust mode the core makes them itself).
+	used atomic.Pointer[string]
 }
+
+// tried records url as the one the latest request or connection went to, before its outcome
+// reaches the core: a notification of that outcome finds it in place.
+func (x *executor) tried(url string) { x.used.Store(&url) }
 
 // newExecutor carries out effects over conn. (Compression is off: the core asks for identity, and
 // Go only decompresses what it asked for itself.)
@@ -95,7 +103,11 @@ func (x *executor) do(eff *corepb.Effect) *report {
 	switch k := eff.Kind.(type) {
 	case *corepb.Effect_HttpRequest:
 		e := x.fl.add(k.HttpRequest.Id)
-		x.fl.spawn(func() { x.emit(report{e: e, in: x.post(e.ctx, k.HttpRequest), last: true}) })
+		x.fl.spawn(func() {
+			in := x.post(e.ctx, k.HttpRequest)
+			x.tried(k.HttpRequest.Url)
+			x.emit(report{e: e, in: in, last: true})
+		})
 	case *corepb.Effect_WsOpen:
 		e := x.fl.add(k.WsOpen.Id)
 		e.cmds = newMailbox[*corepb.Effect]()
@@ -428,6 +440,11 @@ func location(requested *url.URL, given string) (string, *corepb.Origin) {
 		return lossy(given), nil
 	}
 	u := requested.ResolveReference(ref)
+	// A URL with no host (`a:/.//` resolves to `a://`) is no place to go, and it reads back as
+	// another (`a:`).
+	if u.Host == "" {
+		return lossy(given), nil
+	}
 	var port uint64
 	if p := u.Port(); p != "" {
 		// Port 0 is no port to go to, and an origin's 0 means the scheme's default.
@@ -522,6 +539,7 @@ func (x *executor) post(ctx context.Context, r *corepb.HttpRequest) *corepb.Inpu
 // any point, drops it: the dial is aborted, or the connection closed without a word.
 func (x *executor) connect(e *effect, o *corepb.WsOpen) {
 	conn, resp, err := x.conn.dialWebSocket(e.ctx, o.Url, toHTTP(o.Headers))
+	x.tried(o.Url)
 	if err != nil {
 		f := &corepb.WsFailed{Id: o.Id, Detail: lossy(err.Error()), UnixMs: unixMs()}
 		if resp != nil {

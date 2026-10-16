@@ -38,6 +38,8 @@ final class Inventory {
 
   /** The exporters the SDK was built with, by signal, as the customizers or the model named them. */
   private final Map<String, List<SettingsProto.Exporter>> exporters = new TreeMap<>();
+  /** What another extension added past the gates, by signal ({@link #outside}). */
+  private final Map<String, List<SettingsProto.Exporter>> outside = new TreeMap<>();
   /** The instrumentations the agent can run: its InstrumentationModules, read once, at start. */
   Supplier<List<SettingsProto.Instrumentation>> instrumentations =
       () -> instrumentations(Inventory.class.getClassLoader());
@@ -62,6 +64,16 @@ final class Inventory {
     return names.contains("none") ? List.of() : names;
   }
 
+  /**
+   * What another extension added to the SDK's {@code signal} past the gate (a processor, by its
+   * exporter's class or its own, or a metric reader), each ungated, beside the configured ones.
+   */
+  synchronized void outside(String signal, List<String> names) {
+    List<SettingsProto.Exporter> added = new ArrayList<>(outside.getOrDefault(signal, List.of()));
+    names.forEach(n -> added.add(exporter(signal, n, false)));
+    outside.put(signal, List.copyOf(added));
+  }
+
   /** The exporters of one signal, in place of any listed before. */
   synchronized void exporters(String signal, List<SettingsProto.Exporter> built) {
     exporters.put(signal, List.copyOf(built));
@@ -83,6 +95,7 @@ final class Inventory {
         .setIntegrationVersion(VERSION).setSdkLanguage(language == null ? "java" : language)
         .setSdkVersion(version == null ? "" : version).addAllInstrumentations(instrumentations.get());
     exporters.values().forEach(b::addAllExporters);
+    outside.values().forEach(b::addAllExporters);
     return b.build();
   }
 

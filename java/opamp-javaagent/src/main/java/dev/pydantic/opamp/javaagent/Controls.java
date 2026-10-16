@@ -126,11 +126,21 @@ final class Controls {
   }
 
   /**
+   * One of the extension's gates: how a processor around one is told apart from a processor
+   * another extension added ({@link Outside}).
+   */
+  interface Gate {}
+
+  private abstract static class SpanGate implements SpanExporter, Gate {}
+
+  private abstract static class LogGate implements LogRecordExporter, Gate {}
+
+  /**
    * The agent's span exporter, or nothing while the server says not to send traces; with
    * redaction, each span as {@link Redaction} leaves it.
    */
   SpanExporter spans(SpanExporter to) {
-    return new SpanExporter() {
+    return new SpanGate() {
       @Override
       public CompletableResultCode export(Collection<SpanData> spans) {
         Gates g = gates;
@@ -306,7 +316,7 @@ final class Controls {
    * redaction: each record as {@link Redaction} leaves it.
    */
   LogRecordExporter logs(LogRecordExporter to) {
-    return new LogRecordExporter() {
+    return new LogGate() {
       @Override
       public CompletableResultCode export(Collection<LogRecordData> logs) {
         int given = logs.size();

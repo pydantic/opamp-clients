@@ -54,8 +54,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_signals, key_in_code, main,  # noqa: E402
-                          read_log, server_binary, statuses, stop_group, target)
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth,  # noqa: E402
+                          key_in_code, main, read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("node-otel")
@@ -78,11 +78,10 @@ APP = "app.cjs"
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-    base = f"http://127.0.0.1:{port}"
     telemetry = f"http://127.0.0.1:{telemetry_port}"
     env = dict(os.environ,
                OTEL_SERVICE_NAME="checkout",
-               OTEL_OPAMP_ENDPOINT=f"{base}/v1/opamp",
+               OTEL_OPAMP_ENDPOINT=opamp_url(port),
                OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
                OTEL_OPAMP_STATE_DIR=str(state),
                OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
@@ -96,7 +95,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         # The server in the application's own settings, given to register() in code; none in
         # OTEL_OPAMP_*, here or inherited (a run may set one, to show the code wins).
         env = {k: v for k, v in env.items() if not k.startswith("OTEL_OPAMP_")}
-        env.update(APP_OPAMP_URL=f"{base}/v1/opamp", APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
+        env.update(APP_OPAMP_URL=opamp_url(port), APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
         command = ["node", str(HERE / APP)]
     else:
         command = ["node", "--import", str(OTEL / "dist/src/register.js"), str(HERE / APP)]
@@ -240,7 +239,7 @@ def answered(server: Server, n: int, seconds: float = 60) -> list[float]:
 def settings_app(sink: Sink, opamp_port: str, state: Path, name: str):
     env = dict(os.environ,
                OTEL_SERVICE_NAME="checkout",
-               OTEL_OPAMP_ENDPOINT=f"http://127.0.0.1:{opamp_port}/v1/opamp",
+               OTEL_OPAMP_ENDPOINT=opamp_url(opamp_port),
                OTEL_OPAMP_STATE_DIR=str(state),
                OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
                OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{sink.port}",
@@ -376,6 +375,20 @@ def check_settings() -> bool:
     return ok
 
 
+# --- check_truth's setups (setups.cjs) ----------------------------------------------------------
+
+#: What a tracer provider the application registers in place of the register's takes from the
+#: package's control: its own spans go past the sampler and the trace gate, so the settings either
+#: holds are set aside. Redaction too, which needs every span and log record.
+OWN_TRACER_PROVIDER = {"send_traces", "sampling_rate", "sampling_rules", "sampling_traces_per_second",
+                       "mask_attributes", "drop_attributes"}
+#: A logger provider of its own: the log gate's settings, and redaction.
+OWN_LOGGER_PROVIDER = {"send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
+                       "mask_attributes", "drop_attributes"}
+#: A meter provider of its own: send_metrics.
+OWN_METER_PROVIDER = {"send_metrics"}
+
+
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
     """A shared check of `app`, in a directory of its own: run_check(directory)."""
     def run_() -> bool:
@@ -403,10 +416,20 @@ CHECKS = {
     "first-in-code": of("in-code.mjs", lambda d: check(launch, "http,net,dns", d, switch_at_once=True)),
     "setup-in-code": of("in-code.mjs", lambda d: check_setup(launch, d, key=key_in_code("APP_OPAMP_TOKEN"),
                                                              named="the headers given to register()")),
+    "rotation": of("app.cjs", lambda d: check_rotation(launch, d)),
     "settings": check_settings,
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))
     for app in ["app.cjs", "app.mjs"]
+} | {
+    # The application's own spans aren't an instrumentation's: deactivate_all_instrumentations
+    # doesn't stop them, and the check can't tell them apart, so it isn't judged there.
+    "truth-own-tracer-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-tracer-provider",
+                                                                     OWN_TRACER_PROVIDER)),
+    "truth-own-logger-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-logger-provider",
+                                                                     OWN_LOGGER_PROVIDER, switch_at_once=True)),
+    "truth-own-meter-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-meter-provider",
+                                                                    OWN_METER_PROVIDER, switch_at_once=True)),
 }
 
 if __name__ == "__main__":

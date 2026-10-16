@@ -910,6 +910,70 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
     assert "send_traces" in run.stderr  # warned at start
 
 
+def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_and_says_so(tmp_path):
+    """A span or log record processor the application adds to the SDK after the configurator built
+    it exports past the gates, as one passed in code does. The settings in force through those gates
+    are then set aside: the effective config names them, and is reported again, rather than leaving
+    them answered APPLIED while the new processor goes on exporting (#431)."""
+    answered = tmp_path / "answered"
+    offer = config('{"sampling_rate":"1","send_traces":"false","send_logs":"false","drop_attributes":"x"}')
+
+    def reply(msg):
+        if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
+            answered.touch()
+        if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
+            return None
+        return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
+
+    server = _Server(reply=reply)
+    child = textwrap.dedent(f"""
+        import json, pathlib, time, opamp_otel
+        from opentelemetry import _logs, trace
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogExporter
+        from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+        opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = opamp_otel.AGENT
+        deadline = time.monotonic() + 10
+        while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        def report(when):
+            entries = agent.effective.config_map.config_map
+            aside = entries["elastic.set_aside"].body.decode() if "elastic.set_aside" in entries else "{{}}"
+            print(when, json.dumps([json.loads(entries["elastic"].body), json.loads(aside)]))
+        report("before")
+        trace.get_tracer_provider().add_span_processor(span_processor=SimpleSpanProcessor(ConsoleSpanExporter()))
+        report("spans")
+        _logs.get_logger_provider().add_log_record_processor(log_record_processor=BatchLogRecordProcessor(ConsoleLogExporter()))
+        report("logs")
+        trace.get_tracer("t").start_span("after").end()
+        assert agent.controls.send_traces and agent.controls.send_logs
+        assert agent.controls.sampler._rate == 1
+        time.sleep(0.5)  # the next heartbeat carries the effective config
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env(OTEL_TRACES_EXPORTER="none", OTEL_METRICS_EXPORTER="none",
+                                            OTEL_LOGS_EXPORTER="none"))
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    said = {line.split(" ", 1)[0]: json.loads(line.split(" ", 1)[1]) for line in run.stdout.splitlines()
+            if line.split(" ", 1)[0] in ("before", "spans", "logs")}
+    assert said["before"] == [{"sampling_rate": "1", "send_traces": "false", "send_logs": "false",
+                               "drop_attributes": "x"}, {}]
+    # The span processor: send_traces, and redaction, which needs every span, set aside.
+    assert said["spans"] == [{"sampling_rate": "1", "send_logs": "false"},
+                             {"ignored": [], "unsupported": ["drop_attributes", "send_traces"]}]
+    assert said["logs"] == [{"sampling_rate": "1"},
+                            {"ignored": [], "unsupported": ["drop_attributes", "send_logs", "send_traces"]}]
+    assert '"name": "after"' in run.stdout  # the application's own processor exports
+    assert "past this package's gate: send_traces" in run.stderr
+    # The server is told: the last effective config it got names them.
+    last = [m.effective_config for m in server.got if m.HasField("effective_config")][-1]
+    assert json.loads(last.config_map.config_map["elastic.set_aside"].body)["unsupported"] == [
+        "drop_attributes", "send_logs", "send_traces"]
+
+
 def test_a_metric_exporter_beside_otlp_keeps_send_metrics_from_being_answered_done(tmp_path):
     # OTLP beside prometheus. Only the OTLP one would stop, so neither does.
     agent, env = prepared(tmp_path, OTEL_METRICS_EXPORTER="otlp,prometheus")
@@ -1153,6 +1217,24 @@ def test_connecting_failing_and_recovering_are_each_said_once(caplog):
                           "its current settings meanwhile"),
         (logging.INFO, "OpAMP: connected to https://opamp.example.com/v1/opamp again"),
     ]
+    assert "secret" not in caplog.text and "token=x" not in caplog.text
+
+
+def test_what_is_said_names_the_endpoint_in_use(caplog):
+    """After the server moved the agent to another endpoint, what it says names the one the client
+    uses now (logged without credentials), not the one configured."""
+    caplog.set_level(logging.INFO, logger="opamp_otel")
+    in_use: list[str | None] = [None]  # none yet: the configured one
+    r = opamp_otel.Reachability("https://a.example.com/v1/opamp")
+    r.in_use = lambda: in_use[0]
+    r.notified(Notification("connected"))
+    in_use[0] = "https://user:secret@b.example.com/v1/opamp?token=x"
+    r.notified(Notification("connect_failed", detail="connection refused"))
+    r.notified(Notification("connected"))
+    said = [rec.getMessage() for rec in caplog.records if rec.levelno >= logging.INFO]
+    assert said[0].startswith("OpAMP: connected to https://a.example.com/v1/opamp;")
+    assert said[1].startswith("OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)")
+    assert said[2:] == ["OpAMP: connected to https://b.example.com/v1/opamp again"]
     assert "secret" not in caplog.text and "token=x" not in caplog.text
 
 

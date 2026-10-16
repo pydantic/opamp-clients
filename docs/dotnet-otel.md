@@ -112,12 +112,36 @@ answered APPLIED and not done ([the host](sdk-settings.md#the-host)):
   carries the same. Files it can't use (missing, unreadable, an encrypted key, a certificate
   without its key) leave every exporter as it is, and none of the three is carried out.
   `send_logs_level` is held at the logs gate, so it is carried out exactly where `send_logs` is.
+- A signal some exporter of which another plugin added. A plugin named in
+  `OTEL_DOTNET_AUTO_PLUGINS` beside ours can add a processor or an exporter to the providers
+  automatic instrumentation builds (in `AfterConfigureTracerProvider`, `TracerProviderInitialized`
+  or `ConfigureLogsOptions(OpenTelemetryLoggerOptions)`, say). The plugin reads what each built
+  provider exports through, as `WithOpAmp()` does ([below](#in-code-withopamp)). Any exporter
+  that isn't the gated OTLP one sends past the gate, so that signal's settings are set aside:
+  its `send_*`, for logs the levels and the log cap too, and redaction for traces or logs. It
+  reads the tracer and meter providers as it joins the fleet. Automatic instrumentation builds a
+  logger provider for each logger factory the application creates, later. The plugin adds a
+  processor of its own to each, which exports nothing. On the provider's first log record, before
+  any exporter has it, the plugin reads that provider. If a setting in force is set aside then,
+  the plugin reports the effective config again. A logger provider the application disposes
+  exports nothing more, and is no reason from then on.
+- `send_traces`, `send_metrics`, the sampling settings and redaction, when automatic
+  instrumentation leaves the SDK to the application (`OTEL_DOTNET_AUTO_SETUP_SDK=false`). It then
+  builds no tracer or meter provider, and the application's own aren't the plugin's. The logs
+  are still automatic instrumentation's, and their settings are carried out.
 - `sampling_rate`, when the application runs with no tracer provider (traces off).
 - With file-based configuration (`OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED=true`), the
   instrumentation switches and the exporter gates: the file is read before any plugin runs, and
   its exporters' TLS settings can't be kept. Sampling still works: the plugin reads the sampler the
   file configures from the SDK's builder (an internal property) and wraps it, or, if that ever
   can't be read, doesn't carry `sampling_rate` out.
+
+What the plugin can't see: a tracer or meter provider the application builds itself beside
+automatic instrumentation's (`Sdk.CreateTracerProviderBuilder()`). It listens to the same
+instrumentations, with its own sampler and exporters, and .NET has no way to list the listeners
+of an `ActivitySource`. Its telemetry goes on whatever the server says, and the settings stay
+answered APPLIED. Add exporters through a plugin instead, or set the SDK up in code with
+`WithOpAmp()`.
 
 ### One process per state directory
 
@@ -283,7 +307,10 @@ and the server is sent their hash, and them in full when it asks. It lists:
   configuration the exporters are the file's, which the plugin can't read, so none is listed.
 - `settings`: the ones it carries out, from the same host it answers by.
 
-It is reported once: what an SDK runs doesn't change while the process does.
+It is reported as the agent joins the fleet. It is reported again only if an exporter that isn't
+gated shows up later (another plugin's logger provider, or a processor added to a built provider
+under `WithOpAmp()`): then the signal's exporters are no longer `gated`, and its settings are no
+longer listed.
 
 ## In code: `WithOpAmp()`
 
@@ -325,6 +352,13 @@ the signal's exporters can't be stopped: one that isn't OTLP (console, in-memory
 OTLP exporter given an endpoint with a path of its own, and one given an `HttpClientFactory` of
 its own. Which these are is read from the providers once they are built (from the SDK's internals,
 as the sampler is); a processor or reader it can't see into counts as one that can't be stopped.
+It doesn't matter where in the builder the exporter is added, before `WithOpAmp()` or after.
+The providers are read again before each remote config is decided, and every 30 s on the health
+timer. So a processor the application adds to a built provider (`tracerProvider.AddProcessor`,
+`loggerProvider.AddProcessor`) sets its signal's settings aside from the next decision on. A
+config already in force is decided again within 30 s, and the effective config is reported again.
+A tracer or meter provider the application builds on its own (`Sdk.CreateTracerProviderBuilder()`)
+isn't under `WithOpAmp()`, and isn't seen.
 Tests: `dotnet/Pydantic.OpAmp.Extensions.Hosting.Tests`, a host against an OpAMP server and a
 collector on loopback.
 
@@ -410,6 +444,14 @@ told of.
     full;
   - live changes and reverting: rules, levels, caps and redaction come and go, a stale debug timer
     does nothing, the gate counts each attempt by its status;
+  - telemetry past the gates (`OwnExportersTests`): another plugin's span exporter sets the traces
+    settings aside, and the plugin's own gated exporter alone sets nothing aside; another plugin's
+    log processor sets the logs settings aside once its provider handles a record, with a config
+    already in force, and its provider disposed is no reason any more;
+    `OTEL_DOTNET_AUTO_SETUP_SDK=false` sets traces and metrics aside but not logs. Under
+    `WithOpAmp()` (the hosting tests), a processor added to a built tracer provider sets traces
+    aside at the next decision, and one added to the logger provider sets logs aside at the next
+    check, reported to the server;
   - the application's own settings (`AppSettingsTests`): reads before any config and once a key is
     left out; the typed reads against `custom.json`'s `typed` vectors and their edges; every
     `custom.json` case through the .NET wrapper's `Decide` and `Controls`, and through the plugin's
@@ -430,5 +472,10 @@ told of.
   window ending on the agent's timer, and export health through a minute of refused exports. Last,
   `check_app_settings` ([app-settings.md](app-settings.md#how-it-is-checked)): the server turns
   `example.feature` on and off, a bad map is FAILED and changes nothing, the same map again tells
-  nothing, and the next start has the saved value from the start.
+  nothing, and the next start has the saved value from the start. Then `check_truth`
+  (`examples/integrations.py`) under two setups (`examples/dotnet-otel/Setups.cs`): each setting
+  must show in the telemetry or be named as set aside, and the set-aside ones must be exactly
+  those the setup takes from the plugin. `truth-plugin-exporters`: a plugin of the application's
+  own adds a span exporter and a log processor over OTLP. `truth-own-sdk`: with
+  `OTEL_DOTNET_AUTO_SETUP_SDK=false`, the application builds its own tracer and meter providers.
   `--local` runs it with this host's .NET SDK and native core instead of Docker.

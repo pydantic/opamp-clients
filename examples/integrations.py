@@ -75,6 +75,20 @@ For an application that gives the token in code (key_in_code()), the same runs w
 given in code and OTEL_OPAMP_HEADERS set to the other one, which the code wins over: run 5's
 warning names the option given in code, not OTEL_OPAMP_HEADERS, and run 6 is accepted.
 
+check_rotation runs one more (and its next start) against the same kind of server, whose operator
+then rotates and moves the agent (docs/connection-settings.md, "Moves and rotations"): once the
+agent's own key is confirmed, the operator gives it a second key at the same endpoint; once that
+one is confirmed, a third at the server's second listener, the same server on another port. The
+agent takes each (three keys confirmed) without a refused request, and once it has reached the
+second listener it opens no connection to the first. The next start, with the same state
+directory and the first endpoint still configured, goes straight to the second listener on the
+key it was given there: no connection to the first, nothing refused, no new key.
+
+check_truth runs one more, under a setup (EXAMPLE_SETUP) where a setting may not reach the
+telemetry: the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each
+is either carried out (the sink shows it) or named as set aside in the effective config, never
+APPLIED and neither. The settings set aside must be the ones the setup expects.
+
 check_app_settings runs two more, for an integration that lets the application read its own
 settings (docs/app-settings.md). Its example application reads the custom key `example.feature`
 with the default `off` each round, and while it is `on` also requests /feature; it asks to be told
@@ -92,6 +106,7 @@ saved settings), and no /changed.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import functools
 import itertools
@@ -131,6 +146,31 @@ DEBUG = 10
 # AcceptsOpAMPConnectionSettings and ReportsConnectionSettingsStatus: what an agent declares for the
 # server to hand it a key of its own.
 TAKES_KEYS = 0x100 | 0x8000
+
+
+def websocket() -> bool:
+    """Whether the applications talk to the server over a WebSocket (OPAMP_EXAMPLES_TRANSPORT
+    `websocket`) or plain HTTP (`http`, the default)."""
+    transport = os.environ.get("OPAMP_EXAMPLES_TRANSPORT", "http")
+    if transport not in ("http", "websocket"):
+        sys.exit(f"OPAMP_EXAMPLES_TRANSPORT={transport}: http or websocket")
+    return transport == "websocket"
+
+
+def opamp_url(port: str, host: str = "127.0.0.1") -> str:
+    """The OpAMP endpoint an application is given for the server on `port`: plain HTTP, or a
+    WebSocket (websocket()). The checks are the same over either, and judge_transport() holds
+    every run, and every next start, to the one asked for."""
+    return f"{'ws' if websocket() else 'http'}://{host}:{port}/v1/opamp"
+
+
+def judge_transport(events: list[dict]) -> list[tuple[str, bool]]:
+    """Every message the server took came over the transport asked for (opamp_url())."""
+    want = "ws" if websocket() else "http"
+    a2s = [e for e in events if e["event"] == "a2s"]
+    came = sorted({e.get("transport") for e in a2s}, key=str)
+    return [(f"every message came over {'a WebSocket' if want == 'ws' else 'plain HTTP'} ({len(a2s)}, {came})",
+             bool(a2s) and came == [want])]
 
 
 def target(name: str) -> Path:
@@ -254,7 +294,12 @@ def server_binary(target_: Path) -> Path:
     """The server, built if this process hasn't yet, in `target_` (run() starts it from there)."""
     target_.mkdir(parents=True, exist_ok=True)
     binary = target_ / "server"
-    shutil.copy2(built_server(), binary)
+    # Copied aside, then renamed over it: a check running at once (main()'s --jobs) may be running
+    # the server there, and Linux refuses to write a file being run (ETXTBSY). The rename leaves
+    # that one running the file it started.
+    aside = target_ / f".server-{os.getpid()}"
+    shutil.copy2(built_server(), aside)
+    os.replace(aside, binary)
     return binary
 
 
@@ -845,6 +890,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
                   until=lambda events: len(statuses(events)) >= 5, settle=10)
         print(f"run 1: remote config statuses {[s for _, s, _ in statuses(one)]}")
         expect(judge_first(one, service, switch_at_once))
+        expect(judge_transport(one))
         expect(judge_inventory(one, instrumentation, switch_at_once, switches, versioned))
 
         # Until the application has made its requests with the agent connected, then long enough
@@ -854,6 +900,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
         print(f"run 2: {sum(e['event'] == 'a2s' for e in two)} messages, {len(pings(two))} application requests, "
               f"{len(spans(two))} span exports")
         expect(judge_second(one, two, switches))
+        expect(judge_transport(two))
     finally:
         # Files a container wrote as root may stay; the next check makes a directory of its own.
         shutil.rmtree(state, ignore_errors=True)
@@ -880,6 +927,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
         print(f"run 3: remote config statuses {[s for _, s, _ in statuses(three)]}, "
               f"{len(signal(three, 'metrics'))} metrics and {len(signal(three, 'logs'))} log exports")
         expect(judge_signals(three, service, switch_at_once))
+        expect(judge_transport(three))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]
@@ -889,6 +937,149 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
                    until=enough, settle=2 * MARGIN, env=SIGNALS)
         print(f"run 4: {sum(e['event'] == 'a2s' for e in four)} messages, {len(pings(four))} application requests")
         expect(judge_signals_restart(four))
+        expect(judge_transport(four))
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+#: check_truth's documents, `TRUTH_GAP` messages apart: each sets one setting beside
+#: sampling_rate 1 (the first, the baseline, nothing else), and the next leaves it out again, so
+#: each window shows that setting alone. (The setting judged, the document.)
+TRUTH: list[tuple[str | None, dict]] = [
+    (None, {"sampling_rate": "1"}),
+    ("send_traces", {"sampling_rate": "1", "send_traces": "false"}),
+    ("send_metrics", {"sampling_rate": "1", "send_metrics": "false"}),
+    ("send_logs", {"sampling_rate": "1", "send_logs": "false"}),
+    ("sampling_rate", {"sampling_rate": "0"}),
+    ("send_logs_level", {"sampling_rate": "1", "send_logs_level": "warn"}),
+    ("send_logs_level_by_scope", {"sampling_rate": "1",
+                                  "send_logs_level_by_scope": "app*=off, rust_otel_example*=off"}),
+    ("sampling_rules", {"sampling_rate": "1", "sampling_rules": [{"rate": 0, "kind": "client"}]}),
+    ("mask_attributes", {"sampling_rate": "1", "mask_attributes": "url.full, http.url"}),
+    ("drop_attributes", {"sampling_rate": "1", "drop_attributes": "url.full, http.url"}),
+    ("sampling_traces_per_second", {"sampling_rate": "1", "sampling_traces_per_second": "1"}),
+    ("send_logs_per_second", {"sampling_rate": "1", "send_logs_per_second": "1"}),
+]
+#: Where the instrumentation switches are live (switch_at_once), last: nothing traced after it.
+TRUTH_SWITCH = ("deactivate_all_instrumentations", {"sampling_rate": "1", "deactivate_all_instrumentations": "true"})
+#: Messages between check_truth's documents: at one a second, a window of some eight seconds past
+#: MARGIN, long enough for a rate cap of one a second to show.
+TRUTH_GAP = 12
+
+
+def truth_scenario(switch_at_once: bool = False, gap: int = TRUTH_GAP) -> dict:
+    """check_truth's offers (TRUTH), `gap` messages apart."""
+    documents = [body for _, body in TRUTH] + ([TRUTH_SWITCH[1]] if switch_at_once else [])
+    return {"server": {"faults": [
+        {"on_message": 1 + i * gap, "action": "offer_config", "config_key": "elastic", "body": json.dumps(body),
+         "content_type": SETTINGS} for i, body in enumerate(documents)]}}
+
+
+def set_aside(events: list[dict], after: float, before: float) -> tuple[set[str], set[str]]:
+    """What the effective configs the agent reported between `after` and `before` name: (the
+    settings set aside, `unsupported` in elastic.set_aside; the settings in force, in elastic)."""
+    aside: set[str] = set()
+    in_force: set[str] = set()
+    for e in effective_configs(events, after, before):
+        aside |= set((e.get("elastic.set_aside") or {}).get("unsupported") or [])
+        in_force |= set(e.get("elastic") or {})
+    return aside, in_force
+
+
+def carried_out(events: list[dict], setting: str, applied: float, end: float) -> tuple[bool, str]:
+    """Whether the telemetry the sink received shows `setting` carried out, in the window from
+    when its document was APPLIED (`applied`) until the next was offered (`end`): (whether it
+    does, what was seen). A window with too few of the application's requests to tell shows
+    nothing carried out."""
+    made = len(pings(events, applied + MARGIN, end - DRIFT))
+    window = end - DRIFT - (applied + MARGIN)
+    if made <= REQUESTS:
+        return False, f"{made} requests, too few to tell"
+    if setting in ("send_traces", TRUTH_SWITCH[0]):
+        late = ended(events, applied + DRIFT, arrived_before=end)
+        return not late, f"{len(late)} spans, {made} requests"
+    if setting in ("send_metrics", "send_logs"):
+        late = signal(events, setting.removeprefix("send_"), applied + MARGIN, end)
+        return not late, f"{len(late)} exports, {made} requests"
+    if setting in ("sampling_rate", "sampling_rules"):
+        # A rate of 0 for new traces, or a rule of rate 0 for client spans: every example's
+        # requests are its HTTP client's root spans.
+        n = traced(events, applied + DRIFT, end - DRIFT)
+        return not n, f"{n} of {made} requests traced"
+    if setting in ("send_logs_level", "send_logs_level_by_scope"):
+        per, made = per_request(events, applied + MARGIN, end)
+        return per <= 0.1, f"{per:.2f} log records a request, {made} requests"
+    if setting in ("mask_attributes", "drop_attributes"):
+        names = ending(events, applied + DRIFT, 1e9, arrived_before=end)
+        shown = [n for n in names if "://" in n or (setting == "drop_attributes" and n == "[REDACTED]")]
+        return bool(names) and not shown, f"{len(names)} spans, {shown[:2]}"
+    if setting == "sampling_traces_per_second":
+        # Spans, not exports: a span two exporters send is still one span the cap let through. (The
+        # sink gives each export's end times on the log's clock, which can differ by a millisecond.)
+        n = len({(name, round(at, 2)) for e in spans(events)
+                 for name, at in zip(e.get("spans") or [], e.get("ends") or []) if applied + MARGIN < at < end - DRIFT})
+        return window > 3 and 0 < n <= window + 3, f"{n} spans in {window:.1f} s of {made} requests"
+    if setting == "send_logs_per_second":
+        n = records(events, applied + MARGIN, end)
+        return window > 3 and 0 < n <= window + 3, f"{n} log records in {window:.1f} s of {made} requests"
+    raise ValueError(f"no measure of {setting}")
+
+
+def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bool = False,
+                service: str = "checkout") -> list[tuple[str, bool]]:
+    """check_truth's checks (what, whether it holds): every document APPLIED; the baseline's spans,
+    metrics and log records arrive; and each setting either shows in the telemetry or is named as
+    set aside in the effective config, never neither (an APPLIED answer for a setting the SDK
+    didn't carry out). The settings named as set aside must be `expected_aside`: no more (a setting
+    this setup could carry out, given up), and no fewer (the integration's table out of date)."""
+    judged = [s for s, _ in TRUTH] + ([TRUTH_SWITCH[0]] if switch_at_once else [])
+    st = statuses(events)
+    out = [(f"{len(judged)} configs answered APPLIED ({[s for _, s, _ in st]})",
+            [s for _, s, _ in st] == ["APPLIED"] * len(judged))]
+    if len(st) != len(judged):
+        return out
+    times = [t for t, _, _ in st]
+    nexts = [offered_before(events, t) for t in times[1:]] + [max(e["t"] for e in events)]
+    for name in ("traces", "metrics", "logs"):
+        got = spans(events, times[0], nexts[0]) if name == "traces" else signal(events, name, times[0], nexts[0])
+        out.append((f"baseline: {name} arrive", any(e.get("services") in (None, [service]) for e in got)))
+    aside_seen: set[str] = set()
+    for setting, applied, end in zip(judged[1:], times[1:], nexts[1:]):
+        aside, in_force = set_aside(events, offered_before(events, applied), end)
+        if setting in aside:
+            aside_seen.add(setting)
+            out.append((f"{setting}: set aside, and not reported in force", setting not in in_force))
+            continue
+        done, seen = carried_out(events, setting, applied, end)
+        out.append((f"{setting}: APPLIED and carried out ({seen})" if done else
+                    f"{setting}: APPLIED, not set aside, and the telemetry didn't change ({seen})", done))
+    extra = sorted(aside_seen - expected_aside)
+    missing = sorted(expected_aside & set(judged) - aside_seen)
+    out.append((f"set aside as this setup expects ({sorted(aside_seen)}; not expected: {extra}; "
+                f"expected, carried out: {missing})", not extra and not missing))
+    return out
+
+
+def check_truth(launch: Launch, target_: Path, setup: str, expected_aside: set[str], env: dict[str, str] | None = None,
+                switch_at_once: bool = False, service: str = "checkout", listen: str = "127.0.0.1:0",
+                seconds: float = 360) -> bool:
+    """One run of TRUTH's documents under `setup`, the application's setup the matrix in
+    docs/sdk-settings.md names as one where a setting may not reach the telemetry (EXAMPLE_SETUP in
+    its environment, beside `env`); every check printed; True when all pass."""
+    state = Path(tempfile.mkdtemp(prefix=f"state-truth-{setup}-", dir=target_))
+    state.chmod(0o777)
+    ok = True
+    try:
+        judged = len(TRUTH) + switch_at_once
+        events = run(launch, truth_scenario(switch_at_once), state, f"truth-{setup}", seconds, listen, target_,
+                     # The last window as long as the others: some eight seconds of requests.
+                     until=lambda ev: len(statuses(ev)) >= judged and len(pings(ev, statuses(ev)[-1][0])) > 8 * REQUESTS,
+                     settle=2, env={**SIGNALS, **(env or {}), "EXAMPLE_SETUP": setup})
+        print(f"truth ({setup}): remote config statuses {[s for _, s, _ in statuses(events)]}")
+        for what, cond in judge_truth(events, expected_aside, switch_at_once, service) + judge_transport(events):
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -952,7 +1143,92 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
               f"key {'confirmed' if promoted(six) else 'not confirmed'}; the next start: "
               f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
         expect(judge_right_key(six))
+        expect(judge_transport(six))
         expect(judge_own_key(again))
+        expect(judge_transport(again))
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+def connections(events: list[dict], listener: str) -> list[dict]:
+    """The connections the fixture accepted on `listener` ("first" or "second"; with a move)."""
+    return [e for e in events if e["event"] == "connection" and e.get("listener") == listener]
+
+
+def judge_rotation(nine: list[dict]) -> list[tuple[str, bool]]:
+    """The rotation run's checks: (what, whether it holds)."""
+    keys = [e for e in nine if e["event"] == "key_promoted"]
+    done = [(e.get("action"), e.get("agents", 0)) for e in nine if e["event"] == "operator"]
+    second = connections(nine, "second")
+    reached = second[0]["t"] if second else None
+    back = [e for e in connections(nine, "first") if reached is not None and e["t"] > reached]
+    after = [e for e in nine if e["event"] == "a2s" and reached is not None and e["t"] > reached]
+    return [
+        (f"the operator rotated the agent's key and then moved it ({done})",
+         [a for a, _ in done] == ["rotate", "move"] and all(n >= 1 for _, n in done)),
+        (f"the agent took its own key, the second and the moved one: three confirmed ({len(keys)})", len(keys) == 3),
+        (f"no request refused ({len(rejected(nine))})", not rejected(nine)),
+        ("it reached the second listener", reached is not None),
+        (f"and opened no connection to the first after that ({len(back)})", reached is not None and not back),
+        (f"the server heard from it there ({len(after)} messages)", len(after) > 1),
+        ("the application's requests are traced after the move",
+         reached is not None and any("/ping" in u for e in spans(nine, after=reached) for u in e.get("spans") or [])),
+    ]
+
+
+def judge_moved_start(again: list[dict]) -> list[tuple[str, bool]]:
+    """The checks of the rotation run's next start: (what, whether it holds)."""
+    a2s = [e for e in again if e["event"] == "a2s" and not e["disconnect"]]
+    return [
+        (f"the next start goes straight to the second listener ({len(connections(again, 'second'))} connections), "
+         f"none to the first ({len(connections(again, 'first'))})",
+         bool(connections(again, "second")) and not connections(again, "first")),
+        (f"on the key it was given there: the server accepted it ({len(a2s)} messages), refusing none",
+         len(a2s) > 1 and not rejected(again)),
+        ("with no new key to take", not promoted(again)),
+        ("the application's requests are traced",
+         any("/ping" in u for e in spans(again) for u in e.get("spans") or [])),
+    ]
+
+
+def check_rotation(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
+                   env: dict[str, str] | None = None, key: Callable[[str], dict[str, str]] = key_from_env,
+                   host: str = "127.0.0.1") -> bool:
+    """The rotation run and its next start, and every check printed; True when all pass. `env` and
+    `key` as check_setup's; `host`: what the application reaches the server by (opamp_url()), which
+    the move names too."""
+    target_.mkdir(parents=True, exist_ok=True)
+    state = Path(tempfile.mkdtemp(prefix="state-rotation-", dir=target_))
+    state.chmod(0o777)
+    scenario_ = {"server": {"enrollment_key": "example", "after_promotion": ["rotate", "move"], "move_host": host}}
+    env = env or {}
+    ok = True
+
+    def expect(results: list[tuple[str, bool]]) -> None:
+        nonlocal ok
+        for what, cond in results:
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+
+    try:
+        def moved(events: list[dict]) -> bool:
+            second = connections(events, "second")
+            return (sum(e["event"] == "key_promoted" for e in events) >= 3 and bool(second)
+                    and bool(spans(events, after=second[0]["t"])))
+
+        def accepted(events: list[dict]) -> bool:
+            return sum(e["event"] == "a2s" for e in events) > 5 and bool(spans(events))
+
+        nine, again = run_and_restart(launch, scenario_, state, "rotation", seconds, listen, target_, until=moved,
+                                      again=accepted, settle=MARGIN, env=env | key("example"))
+        print(f"the rotation run: {sum(e['event'] == 'key_promoted' for e in nine)} keys confirmed, "
+              f"{len(connections(nine, 'second'))} connections to the second listener; the next start: "
+              f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
+        expect(judge_rotation(nine))
+        expect(judge_transport(nine))
+        expect(judge_moved_start(again))
+        expect(judge_transport(again))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -979,46 +1255,84 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
             st = statuses(events)
             return len(st) >= 5 and len(pings(events, st[-1][0])) > REQUESTS
 
-        seven = run(launch, app_settings_scenario(), state, "run7", seconds[0], listen, target_, until=done,
+        # (Its files are app7 and app8: an integration's own runs 7 to 9 write run7 to run9 in the same
+        # directory, and the two checks may run at once, main()'s --jobs.)
+        seven = run(launch, app_settings_scenario(), state, "app7", seconds[0], listen, target_, until=done,
                     settle=MARGIN, env=env)
         print(f"run 7: remote config statuses {[s for _, s, _ in statuses(seven)]}, "
               f"{len(requests(seven, '/feature'))} /feature and {len(requests(seven, '/changed'))} /changed requests")
         expect(judge_app_settings(seven))
+        expect(judge_transport(seven))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]
             return bool(a2s) and len(pings(events, a2s[0]["t"])) > 2 * REQUESTS
 
-        eight = run(launch, {"server": {}}, state, "run8", seconds[1], listen, target_, until=enough,
+        eight = run(launch, {"server": {}}, state, "app8", seconds[1], listen, target_, until=enough,
                     settle=MARGIN, env=env)
         print(f"run 8: {len(pings(eight))} application requests, {len(requests(eight, '/feature'))} /feature")
         expect(judge_app_settings_restart(eight))
+        expect(judge_transport(eight))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
 
 
 def main(checks: dict[str, Callable[[], bool]], prepare: Callable[[], object] = lambda: None,
-         argv: list[str] | None = None, options: tuple[str, ...] = ()) -> int:
+         argv: list[str] | None = None, options: tuple[str, ...] = (), script: str | None = None) -> int:
     """An integration's try.py: run the checks it names (`checks`, each independent of the others:
     its own server, state directory and logs), in order, every one by default; the exit status.
 
-        try.py                 # every check, after prepare() (the integration's build)
-        try.py signals setup   # those alone, as one of CI's jobs runs its share
-        try.py --list          # their names
+        try.py                    # every check, after prepare() (the integration's build)
+        try.py signals setup      # those alone, as one of CI's jobs runs its share
+        try.py --jobs 4 signals   # up to four at once, each in a process of its own, after one prepare()
+        try.py --list             # their names
 
-    `options`: the flags of the try.py's own (`--local`), left for it to read."""
-    argv = [a for a in (sys.argv[1:] if argv is None else argv) if a not in options]
+    A check waits on its scenario's clock (one message a second), not on the machine, so several
+    run side by side in the time of the longest; each one's output is printed whole when it ends.
+    `options`: the flags of the try.py's own (`--local`), left for it to read, and given to each
+    check's process. `script`: the try.py, for those processes (the program run, by default)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    given = [a for a in argv if a in options]
+    argv = [a for a in argv if a not in options]
     if argv == ["--list"]:
         print("\n".join(checks))
         return 0
+    jobs, prepared = 1, False
+    while argv[:1] in (["--jobs"], ["--prepared"]):
+        if argv[0] == "--prepared":
+            # (A check's process under --jobs: the build is done.)
+            prepared, argv = True, argv[1:]
+        elif len(argv) < 2 or not argv[1].isdigit() or int(argv[1]) < 1:
+            print("--jobs: how many checks at once, 1 or more", file=sys.stderr)
+            return 2
+        else:
+            jobs, argv = int(argv[1]), argv[2:]
     unknown = [a for a in argv if a not in checks]
     if unknown:
         print(f"no such check: {' '.join(unknown)}; the checks: {' '.join(checks)}", file=sys.stderr)
         return 2
-    prepare()
+    if not prepared:
+        prepare()
+    names = argv or list(checks)
+    if jobs > 1 and len(names) > 1:
+        program = script or sys.argv[0]
+
+        def one(name: str) -> tuple[str, int]:
+            r = subprocess.run([sys.executable, program, *given, "--prepared", name], stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, check=False)
+            return r.stdout, r.returncode
+
+        ok = True
+        # Each check's output as soon as it ends: a job cut short keeps what had finished.
+        with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
+            for done in concurrent.futures.as_completed([pool.submit(one, name) for name in names]):
+                output, code = done.result()
+                print(output, end="", flush=True)
+                ok &= code == 0
+        return 0 if ok else 1
     ok = True
-    for name in argv or checks:
+    for name in names:
         print(f"=== {name}", flush=True)
         start = time.monotonic()
         passed = checks[name]()

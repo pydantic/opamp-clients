@@ -26,7 +26,7 @@ function Sign([string[]]$paths) {
 
 Push-Location (Split-Path -Parent $packaging)
 try {
-    go run go.opentelemetry.io/collector/cmd/builder@v0.162.0 --config packaging/collector.yaml
+    go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config packaging/collector.yaml
     Copy-Item packaging\dist\otelcol\otelcol.exe (Join-Path $bin 'otelcol.exe') -Force
     go build -trimpath -o (Join-Path $bin 'opampsupervisor.exe') .
 } finally {

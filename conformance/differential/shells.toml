@@ -62,7 +62,7 @@ reason = "packages that fail close together reach the core in one step or two: w
 # race: their reports interleave either way. The new one may be refused (credential-offer-broken:
 # ws_failed(401)) as well as opened.
 [[allow]]
-scenarios = ["credential-offer*"]
+scenarios = ["credential-offer*", "credential-rotation", "endpoint-move"]
 transports = ["ws"]
 category = "conn"
 first = "^- (ws_closed\\(1000\\)|ws_opened|ws_failed\\(\\d+\\)) \\| \\+ |^-  \\| \\+ (ws_closed\\(1000\\)|ws_opened|ws_failed\\(\\d+\\))$"
@@ -72,14 +72,14 @@ reason = "the old connection's close and the new one's opening (or refusal) race
 # server sees the numbers out of order and asks for the full state: one more ReportFullState
 # received, and one more full report sent, in the client whose connections overlapped.
 [[allow]]
-scenarios = ["credential-offer*"]
+scenarios = ["credential-offer*", "credential-rotation", "endpoint-move"]
 transports = ["ws"]
 category = "recv"
 first = "^- flags=1 \\| \\+ $|^- +\\| \\+ flags=1$"
 reason = "the old connection's goodbye and the new one's first report race: the server may ask for the full state"
 
 [[allow]]
-scenarios = ["credential-offer*"]
+scenarios = ["credential-offer*", "credential-rotation", "endpoint-move"]
 transports = ["ws"]
 category = "send"
 first = "^- uid#\\d+ caps=[0-9a-f]+ desc\\(.*css\\(\\d+\\) \\| \\+ $|^- +\\| \\+ uid#\\d+ caps=[0-9a-f]+ desc\\(.*css\\(\\d+\\)$"

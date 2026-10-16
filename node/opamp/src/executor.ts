@@ -251,6 +251,9 @@ export class Executor {
   #lastSave: Promise<void> = Promise.resolve();
   /** Saves, downloads and deletions under way. */
   readonly #work = new Set<Promise<void>>();
+  /** The URL of the OpAMP request or connection whose outcome came last (undefined: none yet).
+   * Set before the outcome reaches the core: a notification of it finds it in place. */
+  used: string | undefined;
 
   constructor(
     deliver: Deliver,
@@ -273,7 +276,8 @@ export class Executor {
         const abort = new AbortController();
         if (!this.#f.start(k.value.id, () => abort.abort())) break;
         const id = k.value.id;
-        void this.#post(k.value, abort.signal).then((i) => this.#f.finish(id, i));
+        const url = k.value.url;
+        void this.#post(k.value, abort.signal).then((i) => this.#outcome(url, id, i));
         break;
       }
       case "wsOpen":
@@ -474,6 +478,15 @@ export class Executor {
     }
   }
 
+  /** Hand the core the outcome of a request or a connection to url, having noted url as the latest
+   * one tried: a notification of the outcome finds it in place. An outcome the core no longer waits
+   * for (its effect was cancelled) leaves the URL noted before. */
+  #outcome(url: string, id: bigint, i: Input): void {
+    const before = this.used;
+    this.used = url;
+    if (!this.#f.finish(id, i)) this.used = before;
+  }
+
   #open(o: WsOpen): void {
     const id = o.id;
     let ws: WebSocket | undefined;
@@ -502,7 +515,7 @@ export class Executor {
     // An open connection doesn't keep Node.js running (see Config).
     socket.on("upgrade", (res) => res.socket.unref());
     socket.on("unexpected-response", (_req, res) => {
-      this.#f.finish(id, failed(`upgrade refused: ${res.statusCode}`, res.statusCode, fromHeaders(Object.entries(res.headers))));
+      this.#outcome(o.url, id, failed(`upgrade refused: ${res.statusCode}`, res.statusCode, fromHeaders(Object.entries(res.headers))));
       res.resume();
       socket.terminate();
     });
@@ -511,6 +524,7 @@ export class Executor {
       // Opened after its cancel (or shutdown): closed at once, and nothing said of it (S1).
       if (e === undefined) return void socket.terminate();
       e.ws = socket;
+      this.used = o.url;
       this.#f.report(id, input({ case: "wsOpened", value: { $typeName: "opamp.core.v1.Id", id } }));
     });
     socket.on("message", (data: Buffer, isBinary: boolean) => {
@@ -528,13 +542,14 @@ export class Executor {
     socket.on("error", (err: Error) => {
       const e = this.#f.get(id);
       if (e === undefined) return;
-      this.#f.finish(id, e.ws ? lost(err.message) : failed(err.message));
+      if (e.ws) this.#f.finish(id, lost(err.message));
+      else this.#outcome(o.url, id, failed(err.message));
     });
     socket.on("close", (code: number) => {
       const e = this.#f.get(id);
       if (e === undefined) return;
       if (!e.ws) {
-        this.#f.finish(id, failed("closed before it opened"));
+        this.#outcome(o.url, id, failed("closed before it opened"));
       } else if (code === 1006) {
         // No Close frame at all: the connection dropped.
         this.#f.finish(id, lost(e.closing ? "connection dropped while closing" : "connection dropped"));

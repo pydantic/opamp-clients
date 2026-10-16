@@ -196,6 +196,11 @@ class Notification:
     error: BaseException | None = None
 
 
+#: Once the core has stopped, at least this for what it gave up on to unwind (a download's file
+#: deleted once the write in flight is over, a cancelled request's task ended), however much of
+#: the stop timeout the core took: stop returns within stop_timeout_ms and this.
+STOP_GRACE_S = 1.0
+
 # The inputs that report an effect's outcome, each naming the effect by its id.
 _RESULTS = frozenset({"http_response", "http_failed", "ws_opened", "ws_failed", "ws_message", "ws_closed", "ws_lost",
                       "stored", "store_failed", "downloaded", "download_failed", "download_response"})
@@ -355,6 +360,15 @@ class Client:
         """The instance UID in use: the application's, one saved before a restart, one the core
         made, or one the server assigned (``instance_uid_changed`` tells of a new one)."""
         return self._core.instance_uid
+
+    @property
+    def endpoint(self) -> str | None:
+        """The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
+        went, which after the server moved the agent (an offer of connection settings) is the
+        offered one, or the configured one again once an offer failed. None before any outcome,
+        and in Rust mode, where the core makes the requests itself (the configured one is all
+        there is to name then). The URL is as the core gave it: redact it before logging."""
+        return None if self._streams is not None else self._x.used
 
     def _release(self) -> None:
         """Deliver what came while starting, now that the caller has the client."""
@@ -535,12 +549,22 @@ class Client:
 
         async def finish() -> None:
             # The core has already waited for the goodbye: anything left is dropped. All of stop
-            # takes stop_timeout: what the core took of it (from stop()) is not given again.
-            begun = self._loop.time() if self._stop_called is None else self._stop_called
-            await self._x.close(max(0.0, begun + self._stop_timeout - self._loop.time()))
+            # takes stop_timeout: what the core took of it (from stop()) is not given again, but
+            # for STOP_GRACE_S at least for what was given up on to unwind (RULE-SHELL-07: it is
+            # released, the deletion of a download's file included, by the time stop returns). A
+            # core that takes all of its stop timeout and then says stopped with a download's file
+            # still being written leaves the shell to delete it: given nothing, it was deleted
+            # after stop had returned.
+            loop = self._loop
+            begun = loop.time() if self._stop_called is None else self._stop_called
+            left = begun + self._stop_timeout - loop.time()
+            released_by = loop.time() + max(left, STOP_GRACE_S)
+            # A save still writing lands whole whenever it does: waited for within the stop
+            # timeout only.
+            await self._x.close(max(0.0, left), release=released_by - loop.time())
             # Rust mode: files still being written are deleted once their write in flight is over.
             if self._streams is not None:
-                await self._streams.shutdown(max(0.0, begun + self._stop_timeout - self._loop.time()))
+                await self._streams.shutdown(max(0.0, released_by - loop.time()))
             if not self._done.done():
                 if err is None:
                     self._done.set_result(None)

@@ -7,17 +7,25 @@ check passes a good run and fails a bad one, and none passes for want of anythin
 """
 from __future__ import annotations
 
+import os
 import sys
 import json
+import re
+import subprocess
 import tempfile
+import textwrap
+import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, TAKES_KEYS, app_settings_scenario, key_from_env, key_in_code,  # noqa: E402
-                          judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
-                          judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
-                          judge_wrong_key, read_log, wait_for)
+from integrations import (APP_KEY, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+                          judge_truth, key_from_env, key_in_code, truth_scenario, judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
+                          judge_moved_start, judge_own_key, judge_right_key, judge_rotation, judge_second, judge_signals, judge_signals_restart,
+                          judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
+                          wait_for)
+import integrations  # noqa: E402
 
 UID = "01928f3a7c3e7a1b8c2d3e4f5a6b7c8d"
 PING = "http://127.0.0.1:1/ping"
@@ -233,6 +241,43 @@ def failed(results: list[tuple[str, bool]]) -> list[str]:
     return [what for what, ok in results if not ok]
 
 
+class Transport(unittest.TestCase):
+    def setUp(self) -> None:
+        self.was = os.environ.pop("OPAMP_EXAMPLES_TRANSPORT", None)
+
+    def tearDown(self) -> None:
+        os.environ.pop("OPAMP_EXAMPLES_TRANSPORT", None)
+        if self.was is not None:
+            os.environ["OPAMP_EXAMPLES_TRANSPORT"] = self.was
+
+    @staticmethod
+    def over(*transports: str) -> list[dict]:
+        return [{"event": "a2s", "t": i, "transport": t} for i, t in enumerate(transports)]
+
+    def test_plain_http_by_default(self):
+        self.assertEqual(opamp_url("4320"), "http://127.0.0.1:4320/v1/opamp")
+        self.assertEqual(judge_transport(self.over("http", "http"))[0][1], True)
+
+    def test_a_websocket_when_asked(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "websocket"
+        self.assertEqual(opamp_url("4320", "host.docker.internal"), "ws://host.docker.internal:4320/v1/opamp")
+        self.assertEqual(judge_transport(self.over("ws", "ws"))[0][1], True)
+
+    def test_a_message_over_the_other_transport_fails(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "websocket"
+        self.assertEqual(judge_transport(self.over("ws", "http"))[0][1], False)
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "http"
+        self.assertEqual(judge_transport(self.over("ws"))[0][1], False)
+
+    def test_no_message_fails(self):
+        self.assertEqual(judge_transport([])[0][1], False)
+
+    def test_an_unknown_transport_is_refused(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "grpc"
+        with self.assertRaises(SystemExit):
+            opamp_url("4320")
+
+
 class Wait(unittest.TestCase):
     def run_clock(self, holds_at: float, seconds: float, settle: float) -> float:
         now = [0.0]
@@ -405,6 +450,109 @@ class Second(unittest.TestCase):
 
     def test_no_effective_config_fails(self):
         self.assertNotEqual(failed(judge_second(self.one, second(config=False).events)), [])
+
+
+def truth(aside: frozenset[str] = frozenset(), unchanged: frozenset[str] = frozenset(), switch_at_once: bool = False,
+          named_in_force: frozenset[str] = frozenset(), statuses: str = "APPLIED") -> Log:
+    """check_truth's run as it should go, a document every 10 s: the baseline (every signal), then
+    each setting of TRUTH alone, carried out. A setting in `aside` is named as set aside in the
+    effective config reported with its answer, and its window looks like the baseline; one in
+    `unchanged` is not named, and its window looks like the baseline all the same (the defect);
+    one in `named_in_force` is named as set aside and in force at once."""
+    judged = [s for s, _ in TRUTH] + ([TRUTH_SWITCH[0]] if switch_at_once else [])
+    log = Log().a2s(0, config=True)
+    for i, setting in enumerate(judged):
+        start, end = 10.0 * i + 10, 10.0 * i + 20
+        effective: dict = {"elastic": {"sampling_rate": "1"}}
+        if setting in aside or setting in named_in_force:
+            effective["elastic.set_aside"] = {"ignored": [], "unsupported": [setting]}
+        if setting in named_in_force:
+            effective["elastic"][setting] = "x"
+        log.offer(start - 0.5).a2s(start, status=statuses, effective=effective)
+        shown = setting is None or setting in aside or setting in unchanged or setting in named_in_force
+        log.pings(start, end)
+        t = start
+        while t < end:
+            for signal in ("metrics", "logs"):
+                if shown or setting not in (f"send_{signal}", "send_logs_level", "send_logs_level_by_scope",
+                                            "send_logs_per_second"):
+                    log.export(t + 0.3, signal)
+            t += 0.5
+        if not shown and setting == "send_logs_per_second":
+            for second in range(int(start), int(end)):
+                log.export(second + 0.3, "logs", count=1)
+        name = {"mask_attributes": "[REDACTED]", "drop_attributes": "GET"}.get(setting, PING) if not shown else PING
+        silent = ("send_traces", "sampling_rate", "sampling_rules", TRUTH_SWITCH[0])
+        t = start
+        while t < end:
+            capped = setting == "sampling_traces_per_second" and not shown and round(t * 5) % 5
+            if (shown or setting not in silent) and not capped:
+                log.span(t + 0.5, url=name, ended=t + 0.05)
+            t += 0.2
+    return log.a2s(10.0 * len(judged) + 10, disconnect=True)
+
+
+class Truth(unittest.TestCase):
+    def test_every_setting_carried_out_passes(self):
+        for at_once in (False, True):
+            with self.subTest(switch_at_once=at_once):
+                self.assertEqual(failed(judge_truth(truth(switch_at_once=at_once).events, set(), at_once)), [])
+
+    def test_a_setting_named_as_set_aside_passes_where_the_setup_expects_it(self):
+        aside = frozenset({"send_traces", "mask_attributes", "send_logs_per_second"})
+        self.assertEqual(failed(judge_truth(truth(aside=aside).events, set(aside))), [])
+
+    def test_a_setting_applied_not_set_aside_and_not_carried_out_fails(self):
+        for setting, _ in TRUTH[1:]:
+            with self.subTest(setting=setting):
+                out = failed(judge_truth(truth(unchanged=frozenset({setting})).events, set()))
+                self.assertEqual(len(out), 1)
+                self.assertTrue(out[0].startswith(f"{setting}: APPLIED, not set aside, and the telemetry didn't change"))
+
+    def test_spans_after_the_live_switch_fail(self):
+        events = truth(unchanged=frozenset({TRUTH_SWITCH[0]}), switch_at_once=True).events
+        self.assertTrue(failed(judge_truth(events, set(), True))[0].startswith(f"{TRUTH_SWITCH[0]}: APPLIED, not"))
+
+    def test_more_set_aside_than_the_setup_expects_fails(self):
+        out = failed(judge_truth(truth(aside=frozenset({"send_traces"})).events, set()))
+        self.assertEqual(len(out), 1)
+        self.assertIn("not expected: ['send_traces']", out[0])
+
+    def test_fewer_set_aside_than_the_setup_expects_fails(self):
+        out = failed(judge_truth(truth().events, {"send_logs"}))
+        self.assertEqual(len(out), 1)
+        self.assertIn("expected, carried out: ['send_logs']", out[0])
+
+    def test_a_setting_named_as_set_aside_and_in_force_fails(self):
+        out = failed(judge_truth(truth(named_in_force=frozenset({"send_logs"})).events, {"send_logs"}))
+        self.assertEqual(out, ["send_logs: set aside, and not reported in force"])
+
+    def test_a_failed_document_fails(self):
+        out = failed(judge_truth(truth(statuses="FAILED").events, set()))
+        self.assertTrue(out[0].startswith("12 configs answered APPLIED"))
+
+    def test_a_window_with_too_few_requests_shows_nothing_carried_out(self):
+        log = truth()
+        log.events = [e for e in log.events if not (e["event"] == "stray_request" and 20 < e["t"] < 30)]
+        self.assertTrue(any("too few to tell" in f for f in failed(judge_truth(log.events, set()))))
+
+    def test_no_baseline_telemetry_fails(self):
+        log = truth()
+        log.events = [e for e in log.events if not (e["event"] == "otlp" and e["signal"] == "metrics" and e["t"] < 20)]
+        self.assertEqual(failed(judge_truth(log.events, set())), ["baseline: metrics arrive"])
+
+    def test_a_span_two_exporters_send_counts_once_against_the_cap(self):
+        log = truth()
+        log.events += [{**e, "t": e["t"] + 0.1, "ends": [e["ends"][0] + 0.001]} for e in list(log.events)
+                       if e["event"] == "otlp" and e["signal"] == "traces" and 110 < e["t"] < 120]
+        self.assertEqual(failed(judge_truth(log.events, set())), [])
+
+    def test_the_scenario_offers_each_document_once_in_order(self):
+        for at_once in (False, True):
+            faults = truth_scenario(at_once)["server"]["faults"]
+            bodies = [json.loads(f["body"]) for f in faults]
+            self.assertEqual(bodies, [b for _, b in TRUTH] + ([TRUTH_SWITCH[1]] if at_once else []))
+            self.assertEqual(len({f["on_message"] for f in faults}), len(faults))
 
 
 class Signals(unittest.TestCase):
@@ -769,6 +917,75 @@ class OwnKey(unittest.TestCase):
         self.assertNotEqual(failed(judge_own_key(again(every=30).events)), [])
 
 
+def rotated(back: bool = False, moved: bool = True, refused: bool = False) -> Log:
+    """The rotation run as it should go: the agent's own key confirmed, the operator rotates it,
+    the second confirmed, the operator moves it, the third confirmed at the second listener.
+    moved=False: the agent never takes the move."""
+    log = Log().pings(0, 20).a2s(0.5).a2s(1)
+    log.events += [{"event": "connection", "t": 0.4, "listener": "first"},
+                   {"event": "key_promoted", "t": 2, "uid": UID},
+                   {"event": "operator", "t": 2.1, "action": "rotate", "agents": 1},
+                   {"event": "key_promoted", "t": 4, "uid": UID},
+                   {"event": "operator", "t": 4.1, "action": "move", "agents": 1}]
+    if moved:
+        log.events += [{"event": "connection", "t": 5, "listener": "second"},
+                       {"event": "key_promoted", "t": 6, "uid": UID}]
+    if back:
+        log.events.append({"event": "connection", "t": 8, "listener": "first"})
+    if refused:
+        log.events.append({"event": "request_rejected", "t": 7, "status": 401})
+    return log.a2s(5.5).a2s(6.5).a2s(7.5).span(9)
+
+
+def moved_start(first: bool = False) -> Log:
+    """The rotation run's next start: straight to the second listener."""
+    log = Log().pings(0, 10).a2s(0.5).a2s(1).a2s(2).span(3)
+    log.events.append({"event": "connection", "t": 0.4, "listener": "second"})
+    if first:
+        log.events.append({"event": "connection", "t": 0.3, "listener": "first"})
+    return log
+
+
+class Rotation(unittest.TestCase):
+    def test_a_good_run_passes(self):
+        self.assertEqual(failed(judge_rotation(rotated().events)), [])
+
+    def test_a_connection_back_to_the_first_listener_fails(self):
+        self.assertEqual(failed(judge_rotation(rotated(back=True).events)),
+                         ["and opened no connection to the first after that (1)"])
+
+    def test_a_move_never_taken_fails(self):
+        self.assertIn("it reached the second listener", failed(judge_rotation(rotated(moved=False).events)))
+
+    def test_a_refused_request_fails(self):
+        self.assertEqual(failed(judge_rotation(rotated(refused=True).events)), ["no request refused (1)"])
+
+    def test_a_move_before_the_rotation_fails(self):
+        log = rotated()
+        ops = [e for e in log.events if e["event"] == "operator"]
+        ops[0]["action"], ops[1]["action"] = "move", "rotate"
+        self.assertIn("the operator rotated the agent's key and then moved it "
+                      "([('move', 1), ('rotate', 1)])", failed(judge_rotation(log.events)))
+
+    def test_an_operator_that_changed_no_agent_fails(self):
+        log = rotated()
+        next(e for e in log.events if e["event"] == "operator")["agents"] = 0
+        self.assertNotEqual(failed(judge_rotation(log.events)), [])
+
+
+class MovedStart(unittest.TestCase):
+    def test_a_good_start_passes(self):
+        self.assertEqual(failed(judge_moved_start(moved_start().events)), [])
+
+    def test_a_start_at_the_configured_endpoint_fails(self):
+        self.assertNotEqual(failed(judge_moved_start(moved_start(first=True).events)), [])
+
+    def test_a_new_key_fails(self):
+        log = moved_start()
+        log.events.append({"event": "key_promoted", "t": 1, "uid": UID})
+        self.assertEqual(failed(judge_moved_start(log.events)), ["with no new key to take"])
+
+
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,
             again: bool = True, changes: int = 3, error: str = f"custom.{APP_KEY}: values must be strings, numbers "
             "or booleans") -> Log:
@@ -847,6 +1064,105 @@ class RustLog(unittest.TestCase):
             path = Path(directory) / "server.jsonl"
             path.write_text(json.dumps({"event": "otlp", "t": 20, "wall": 100, "ends_wall": [95, 99]}) + "\n")
             self.assertEqual(read_log(path)[0]["ends"], [15, 19])
+
+
+class ServerBinary(unittest.TestCase):
+    def test_the_server_is_put_in_place_while_another_check_runs_it(self):
+        # Checks side by side (main()'s --jobs) each put the server in the integration's directory
+        # and run it from there; writing over a file being run fails with ETXTBSY.
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        # (A program, not a script: the kernel refuses writes only to a file it is executing.)
+        built = root / "built"
+        __import__("shutil").copy2(__import__("shutil").which("sleep"), built)
+        with unittest.mock.patch.dict("os.environ", {"OPAMP_EXAMPLES_SERVER": str(built)}):
+            integrations.built_server.cache_clear()
+            self.addCleanup(integrations.built_server.cache_clear)
+            running = subprocess.Popen([str(server_binary(root / "t")), "5"])
+            try:
+                self.assertEqual(server_binary(root / "t"), root / "t" / "server")
+                self.assertEqual(sorted(p.name for p in (root / "t").iterdir()), ["server"])
+            finally:
+                running.kill()
+                running.wait()
+
+
+class Main(unittest.TestCase):
+    """main(): a try.py's checks, one after another or side by side (--jobs)."""
+
+    TRY = textwrap.dedent("""\
+        import sys, time
+        from pathlib import Path
+        sys.path.insert(0, {examples!r})
+        from integrations import main
+        out = Path({out!r})
+
+        def prepare():
+            with (out / "prepared").open("a") as f:
+                f.write("x")
+
+        def check(name, seconds, passes=True):
+            def run():
+                (out / name).write_text(" ".join(sys.argv[1:]))
+                time.sleep(seconds)
+                print("  a line of " + name)
+                return passes
+            return run
+
+        CHECKS = {{"a": check("a", 1.5), "b": check("b", 1.5), "c": check("c", 0.1), "bad": check("bad", 0.1, False)}}
+        sys.exit(main(CHECKS, prepare, options=("--local",)))
+        """)
+
+    def setUp(self) -> None:
+        self.out = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.out, ignore_errors=True))
+        self.script = self.out / "try.py"
+        self.script.write_text(self.TRY.format(examples=str(Path(__file__).resolve().parent), out=str(self.out)))
+
+    def run_try(self, *args: str) -> tuple[subprocess.CompletedProcess, float]:
+        start = time.monotonic()
+        r = subprocess.run([sys.executable, str(self.script), *args], capture_output=True, text=True, check=False)
+        return r, time.monotonic() - start
+
+    def test_checks_run_one_after_another_by_default(self):
+        r, took = self.run_try("a", "c")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertGreaterEqual(took, 1.5)
+        self.assertRegex(r.stdout, r"(?s)=== a\n  a line of a\n=== a: passed in \d+ s\n=== c\n  a line of c\n=== c: passed")
+        self.assertEqual((self.out / "prepared").read_text(), "x")
+
+    def test_with_jobs_checks_run_side_by_side_after_one_build(self):
+        r, took = self.run_try("--local", "--jobs", "3", "a", "b", "c")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        # Each check's output whole, as it ends (c, the short one, before a and b); the build once,
+        # in the first process.
+        blocks = re.findall(r"=== (\w+)\n  a line of \1\n=== \1: passed in \d+ s\n", r.stdout)
+        self.assertEqual("".join(re.findall(r"=== \w+\n  a line of \w+\n=== \w+: passed in \d+ s\n", r.stdout)), r.stdout)
+        self.assertEqual(sorted(blocks), ["a", "b", "c"])
+        self.assertEqual(blocks[0], "c")
+        self.assertEqual((self.out / "prepared").read_text(), "x")
+        # a and b at once: in less than the 3 s they take one after the other (the interpreter
+        # starts aside).
+        self.assertLess(took, 3.0 + 1.5)
+        # Each check's process is given the try.py's own flags.
+        self.assertEqual((self.out / "a").read_text(), "--local --prepared a")
+
+    def test_a_check_that_fails_fails_the_run_side_by_side_too(self):
+        for args in (["c", "bad"], ["--jobs", "2", "c", "bad"]):
+            r, _ = self.run_try(*args)
+            self.assertEqual(r.returncode, 1, args)
+            self.assertIn("=== c: passed", r.stdout)
+            self.assertIn("=== bad: FAILED", r.stdout)
+
+    def test_jobs_must_be_a_count(self):
+        for args in (["--jobs"], ["--jobs", "0", "a"], ["--jobs", "x", "a"]):
+            r, _ = self.run_try(*args)
+            self.assertEqual(r.returncode, 2, args)
+            self.assertIn("--jobs", r.stderr)
+        self.assertFalse((self.out / "prepared").exists())
+        r, _ = self.run_try("--jobs", "2", "nope")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("no such check: nope", r.stderr)
 
 
 if __name__ == "__main__":

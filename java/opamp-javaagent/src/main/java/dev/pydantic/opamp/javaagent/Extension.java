@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opamp.proto.v1.Anyvalue;
@@ -76,6 +77,9 @@ final class Extension {
       "metrics", List.of("send_metrics"),
       "logs", List.of("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
           "debug_send_logs_level", "drop_attributes", "mask_attributes"));
+  /** What the extension's sampler holds: carried out only where the SDK's sampler is the extension's. */
+  static final List<String> SAMPLED = List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
+      "debug_sampling_rate");
   /**
    * Every setting: autoconfigure wraps every exporter it builds, and so does a configuration file
    * of batch and simple processors and periodic and pull readers ({@link Declarative#ungated}).
@@ -84,8 +88,19 @@ final class Extension {
 
   /** The host where the exporters of {@code ungated} signals pass no gate of the agent's. */
   static SettingsProto.Host host(Set<String> ungated) {
+    return host(ungated, false);
+  }
+
+  /**
+   * The host where the exporters of {@code ungated} signals pass no gate of the agent's, and, with
+   * {@code samplerOutside}, the SDK samples with a sampler other than the extension's.
+   */
+  static SettingsProto.Host host(Set<String> ungated, boolean samplerOutside) {
     Set<String> out = new HashSet<>();
     ungated.forEach(signal -> out.addAll(GATED.get(signal)));
+    if (samplerOutside) {
+      out.addAll(SAMPLED);
+    }
     return SettingsProto.Host.newBuilder().addAllLive(LIVE.stream().filter(k -> !out.contains(k)).toList())
         .addAllNextStart(NEXT_START).build();
   }
@@ -108,6 +123,8 @@ final class Extension {
   private Map<String, String> appBefore;
 
   final Controls controls = new Controls();
+  /** What another extension added to the SDK past the gates, under autoconfigure. */
+  final Outside outside = new Outside();
   /** What the agent runs, as the exporters were built: reported at start, as available components. */
   final Inventory inventory = new Inventory();
   private volatile Opamp.AvailableComponents components;
@@ -127,8 +144,14 @@ final class Extension {
    * server APPLIED once that is saved, as in every language.
    */
   private boolean canSave;
-  /** What the agent carries out ({@link #HOST}, narrowed by {@link #notGated}); {@link #host} adds {@code custom}. */
+  /**
+   * What the agent carries out ({@link #HOST}, narrowed by {@link #notGated}, {@link #outside} and
+   * {@link #built}); {@link #host} adds {@code custom}.
+   */
   private SettingsProto.Host declared = HOST;
+  /** The signals whose telemetry goes past a gate, and whether the SDK's sampler isn't the extension's. */
+  private final Set<String> ungated = new java.util.TreeSet<>();
+  private boolean samplerOutside;
   /** The settings loaded at start: the next-start ones in force until the next restart. */
   private SettingsProto.Loaded loaded;
   private volatile ByteString current;
@@ -411,7 +434,13 @@ final class Extension {
    * when it's back: setup that works or doesn't is never silent. On the client's thread.
    */
   static final class Reachability {
+    /** The configured endpoint, as {@link #where} gives it. */
     private final String endpoint;
+    /**
+     * The endpoint the client uses now, as the client gives it (null, or null from it: the
+     * configured one): after the server moved the agent, the one it moved it to.
+     */
+    volatile Supplier<String> inUse;
     private final String service;
     private final UUID uid;
     private boolean ever;
@@ -423,7 +452,15 @@ final class Extension {
       this.uid = uid;
     }
 
+    /** The endpoint the client uses now, as it is safe to log. */
+    String at() {
+      Supplier<String> f = inUse;
+      String e = f == null ? null : f.get();
+      return e == null || e.isEmpty() ? endpoint : where(e);
+    }
+
     synchronized void notified(Notification n) {
+      String endpoint = at();
       if (n instanceof Notification.Connected) {
         if (!ever) {
           String who = service == null || service.isEmpty() ? "" : " as " + service;
@@ -490,6 +527,8 @@ final class Extension {
   synchronized Map<String, String> properties(ConfigProperties config, Map<String, String> env) {
     hooked = true;
     declared = HOST;
+    ungated.clear();
+    samplerOutside = false;
     setup = Setup.from(config, env, System.getProperty("sun.java.command"));
     if (setup == null) {
       return Map.of();
@@ -528,15 +567,66 @@ final class Extension {
    * again without it, before the SDK is built.
    */
   synchronized void notGated(Set<String> signals) {
-    SettingsProto.Host narrowed = host(signals);
-    if (narrowed.equals(declared) || loaded == null) {
+    ungated.addAll(signals);
+    if (!narrow().isEmpty()) {
+      LOG.warning("OpAMP: the configuration file's " + String.join(", ", new java.util.TreeSet<>(signals))
+          + " pass a processor or reader other than batch, simple, periodic or pull, which the agent can't"
+          + " gate; the server's settings for them aren't carried out");
+    }
+  }
+
+  /**
+   * Under autoconfigure, once every customizer has run: another extension added {@code added} (a
+   * span or log record processor, or a metric reader, by name) to the SDK's {@code signal}, and
+   * what it exports goes past the gate. The gate's settings for that signal are set aside: the
+   * settings are loaded again without them, before the SDK is built. The inventory lists each as
+   * ungated.
+   */
+  synchronized void outside(String signal, List<String> added) {
+    if (added.isEmpty()) {
       return;
     }
+    inventory.outside(signal, added);
+    ungated.add(signal);
+    List<String> lost = narrow();
+    if (!lost.isEmpty()) {
+      LOG.warning("OpAMP: another extension added " + String.join(", ", added) + " to the SDK's " + signal
+          + ", which exports past this extension's gate; set aside, as it can't carry them out: "
+          + String.join(", ", lost));
+    }
+  }
+
+  /**
+   * Once the SDK is built, before the client starts: whether it samples with the extension's
+   * sampler. Another extension's tracer provider customizer can set a sampler of its own in its
+   * place, and then the settings the extension's sampler holds are set aside.
+   */
+  synchronized void built(io.opentelemetry.sdk.OpenTelemetrySdk sdk) {
+    if (setup == null || samplerOutside || sdk.getSdkTracerProvider().getSampler() == controls.sampler) {
+      return;
+    }
+    samplerOutside = true;
+    List<String> lost = narrow();
+    if (!lost.isEmpty()) {
+      LOG.warning("OpAMP: the SDK samples with " + sdk.getSdkTracerProvider().getSampler().getDescription()
+          + ", which another extension set in place of this extension's sampler; set aside, as it can't carry"
+          + " them out: " + String.join(", ", lost));
+    }
+  }
+
+  /**
+   * Declare only what the agent still carries out, and load the settings again under that host.
+   * The live settings it declares no more, in order (none: nothing changed).
+   */
+  private List<String> narrow() {
+    SettingsProto.Host narrowed = host(ungated, samplerOutside);
+    if (narrowed.equals(declared) || loaded == null) {
+      return List.of();
+    }
+    List<String> lost = declared.getLiveList().stream().filter(k -> !narrowed.getLiveList().contains(k)).toList();
     declared = narrowed;
-    LOG.warning("OpAMP: the configuration file's " + String.join(", ", new java.util.TreeSet<>(signals))
-        + " pass a processor or reader other than batch, simple, periodic or pull, which the agent can't"
-        + " gate; the server's settings for them aren't carried out");
     start(null, loaded.getCurrent().toByteArray());
+    return lost;
   }
 
   private void start(byte[] coreState, byte[] saved) {
@@ -714,6 +804,10 @@ final class Extension {
     // through the JDK's HTTP client, one of the agent's own that isn't traced.
     b.mode(OpampClient.Mode.JAVA).httpClient(untracedHttpClient());
     reachability = new Reachability(s.endpoint(), resource.getAttribute(SERVICE_NAME), uid);
+    reachability.inUse = () -> {
+      OpampClient c = client.getNow(null);
+      return c == null ? null : c.endpoint();
+    };
     // Export health from the first message: the layer always sends its first report.
     health(controls.counts(), inForce, wallClock.getAsLong());
     // The inventory, once: the agent builds its SDK and instrumentations once, and the settings it
@@ -1048,6 +1142,11 @@ final class Extension {
   /** For tests: where the server is, and the state directory. */
   synchronized Setup setupForTest() {
     return setup;
+  }
+
+  /** For tests: the endpoint what the agent says of reaching its server names now. */
+  String endpointSaidForTest() {
+    return reachability.at();
   }
 
   /** For tests: stop the client, as the shutdown hook does (the server hears the agent go). */

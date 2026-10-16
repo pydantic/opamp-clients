@@ -2,8 +2,9 @@ name: Nightly
 
 # The clients' longer runs, on seeds no pull request has tried: each fuzz target for five minutes,
 # an hour of torture for every client and transport against the Go test server, thousands of runs
-# of the property, callback model and schedule tests, and the crash scenarios on LazyFS. Every job
-# fetches the core, as CI's do (scripts/fetch_core.py fetch).
+# of the property, callback model and schedule tests, and the crash scenarios on LazyFS. Each job
+# that runs a client fetches the core, as CI's do (scripts/fetch_core.py fetch). One more job looks
+# for a contrib Collector release newer than the forked extension and Supervisor.
 #
 # Runners: GitHub-hosted only (ubuntu-24.04), as in CI. Every job stands for itself: none decides
 # for another, and there is no gathering check (nothing requires this workflow).
@@ -28,6 +29,20 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The forks of contrib's opamp extension and Supervisor, against contrib's newest release: red
+  # when one is out, with what upstream changed in the forked directories since ours. A pull
+  # request's run only reports it.
+  upstream-collector:
+    name: Upstream Collector release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: No contrib release newer than the forks
+        env:
+          REPORT_ONLY: ${{ github.event_name == 'pull_request' && '--report-only' || '' }}
+        run: python3 scripts/collector_release.py latest $REPORT_ONLY
+
   # Go's native fuzzing of the Go client's own code around the core (scripts/go_fuzz.sh): five
   # minutes for each fuzz test, one after another, each on every core of the runner.
   go-fuzz:
