@@ -67,6 +67,8 @@ across restarts (upstream makes up a new one at every start).
   once, and a message the client can't send after all is logged. Before the extension has started,
   `SendMessage` returns an error.
 - The available components' hash is the core's.
+- With upstream's `socket` setting, the client dials the socket for each connection, over `http`
+  and `ws` alike, and uses no proxy for it.
 
 ## License
 
