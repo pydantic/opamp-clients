@@ -14,6 +14,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -24,12 +25,21 @@ import (
 )
 
 // newHTTPClient is the client go/opamp runs on (Go mode): net/http with the extension's TLS
-// settings and the environment's proxies, through the auth extension if one is configured over
+// settings and the environment's proxies (or the configured socket), through the auth extension if one is configured over
 // plain HTTP. Over WebSocket go/opamp takes the TLS settings, proxy and dialer of its transport,
 // and the auth extension gives its headers through newAuthHeader.
 func newHTTPClient(serverCfg *OpAMPServer, tlsCfg *tls.Config, host component.Host) (*http.Client, error) {
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	base.TLSClientConfig = tlsCfg
+	// With a local IPC socket (a Unix domain socket or a Windows named pipe), each connection
+	// dials it in place of TCP, over HTTP and WebSocket alike, and no proxy is used. The
+	// endpoint then gives only the URL scheme, request path and Host header.
+	if socket := serverCfg.GetSocket(); socket != nil {
+		base.Proxy = nil
+		base.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return socket.Dial(ctx)
+		}
+	}
 
 	if serverCfg.HTTP == nil {
 		return &http.Client{Transport: base}, nil

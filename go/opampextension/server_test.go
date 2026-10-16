@@ -6,10 +6,12 @@ package opampextension
 import (
 	"bytes"
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -22,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 	"go.opentelemetry.io/collector/extension/extensioncapabilities"
@@ -55,6 +58,11 @@ type testServer struct {
 }
 
 func newTestServer(t *testing.T) *testServer {
+	return newTestServerOn(t, nil)
+}
+
+// newTestServerOn is newTestServer listening on ln (a local TCP port when nil).
+func newTestServerOn(t *testing.T, ln net.Listener) *testServer {
 	ts := &testServer{t: t, changed: make(chan struct{}, 1)}
 	srv := server.New(nil)
 	handler, connContext, err := srv.Attach(server.Settings{Callbacks: types.Callbacks{
@@ -86,6 +94,10 @@ func newTestServer(t *testing.T) *testServer {
 	}})
 	require.NoError(t, err)
 	hs := httptest.NewUnstartedServer(http.HandlerFunc(handler))
+	if ln != nil {
+		_ = hs.Listener.Close()
+		hs.Listener = ln
+	}
 	hs.Config.ConnContext = connContext
 	hs.Start()
 	t.Cleanup(hs.Close)
@@ -411,4 +423,38 @@ func TestStartRefusesAMissingStateKey(t *testing.T) {
 	require.ErrorContains(t, err, "opamp-state-key")
 	_, statErr := os.Stat(cfg.StateFile)
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
+}
+
+// With a socket set, the extension dials it in place of the endpoint's host and port, over both
+// transports. The endpoint names localhost on the default port, where nothing listens, so a
+// message reaches the server only through the socket.
+func TestConnectsOverUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no Unix domain sockets on Windows")
+	}
+	// macOS limits a socket path to about 104 bytes, which t.TempDir() can exceed.
+	dir, err := os.MkdirTemp("/tmp", "opampuds") //nolint:usetesting // see above
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	path := filepath.Join(dir, "opamp.sock")
+	ln, err := net.Listen("unix", path)
+	require.NoError(t, err)
+	ts := newTestServerOn(t, ln)
+	socket := &confignet.AddrConfig{Transport: confignet.TransportTypeUnix, Endpoint: path}
+	for name, srv := range map[string]*OpAMPServer{
+		"ws":   {WS: &commonFields{Endpoint: "ws://localhost/v1/opamp", Socket: socket}},
+		"http": {HTTP: &httpFields{commonFields: commonFields{Endpoint: "http://localhost/v1/opamp", Socket: socket}, PollingInterval: 100 * time.Millisecond}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ts.forget()
+			cfg := createDefaultConfig().(*Config)
+			cfg.Server = srv
+			o := startAgent(t, cfg)
+			defer stopAgent(t, o)
+			msg := ts.waitMsg("a message over the socket", func(m *protobufs.AgentToServer) bool {
+				return m.AgentDescription != nil
+			})
+			assert.Equal(t, "otelcol-test", attr(msg.AgentDescription.IdentifyingAttributes, string(semconv.ServiceNameKey)))
+		})
+	}
 }
