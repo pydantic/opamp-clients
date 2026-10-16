@@ -148,8 +148,11 @@ type Config struct {
 	// ws_closed or ws_lost when the connection has ended.
 	StopTimeoutMs    uint64 `protobuf:"varint,28,opt,name=stop_timeout_ms,json=stopTimeoutMs,proto3" json:"stop_timeout_ms,omitempty"`          // stop, and any closing handshake; default 5 s
 	ConnectTimeoutMs uint64 `protobuf:"varint,29,opt,name=connect_timeout_ms,json=connectTimeoutMs,proto3" json:"connect_timeout_ms,omitempty"` // a WebSocket to open; default 30 s
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// With streams: which proxy every connection goes through, the core picking it (no
+	// proxy_query). Unset: the core asks (proxy_query) for each connection.
+	Proxy         *ProxyChoice `protobuf:"bytes,31,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Config) Reset() {
@@ -364,6 +367,96 @@ func (x *Config) GetConnectTimeoutMs() uint64 {
 	return 0
 }
 
+func (x *Config) GetProxy() *ProxyChoice {
+	if x != nil {
+		return x.Proxy
+	}
+	return nil
+}
+
+// The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+// environment names for each destination, by the rule every SDK shares
+// (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+type ProxyChoice struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Direct  bool                   `protobuf:"varint,1,opt,name=direct,proto3" json:"direct,omitempty"`  // no proxy, whatever the environment says
+	Url     string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`         // the configured proxy, as ProxyAnswer.proxy; empty: none configured
+	Headers []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"` // for the configured proxy's CONNECT
+	// Resolve the server's name here and give a SOCKS5 proxy an address: for a configured proxy
+	// (an error with an http:// or https:// one), and for a SOCKS5 proxy the environment names.
+	ResolveLocally bool `protobuf:"varint,4,opt,name=resolve_locally,json=resolveLocally,proto3" json:"resolve_locally,omitempty"`
+	// Each of REQUEST_METHOD, HTTP_PROXY, http_proxy, HTTPS_PROXY, https_proxy, ALL_PROXY,
+	// all_proxy, NO_PROXY and no_proxy that is set (even empty), by that name, as read at the start.
+	Environment   []*Header `protobuf:"bytes,5,rep,name=environment,proto3" json:"environment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProxyChoice) Reset() {
+	*x = ProxyChoice{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProxyChoice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProxyChoice) ProtoMessage() {}
+
+func (x *ProxyChoice) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProxyChoice.ProtoReflect.Descriptor instead.
+func (*ProxyChoice) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ProxyChoice) GetDirect() bool {
+	if x != nil {
+		return x.Direct
+	}
+	return false
+}
+
+func (x *ProxyChoice) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *ProxyChoice) GetHeaders() []*Header {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *ProxyChoice) GetResolveLocally() bool {
+	if x != nil {
+		return x.ResolveLocally
+	}
+	return false
+}
+
+func (x *ProxyChoice) GetEnvironment() []*Header {
+	if x != nil {
+		return x.Environment
+	}
+	return nil
+}
+
 // Where a URL is, as the client's URL library reads it.
 type Origin struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -376,7 +469,7 @@ type Origin struct {
 
 func (x *Origin) Reset() {
 	*x = Origin{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[1]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -388,7 +481,7 @@ func (x *Origin) String() string {
 func (*Origin) ProtoMessage() {}
 
 func (x *Origin) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[1]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -401,7 +494,7 @@ func (x *Origin) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Origin.ProtoReflect.Descriptor instead.
 func (*Origin) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{1}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Origin) GetScheme() string {
@@ -435,7 +528,7 @@ type Header struct {
 
 func (x *Header) Reset() {
 	*x = Header{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[2]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -447,7 +540,7 @@ func (x *Header) String() string {
 func (*Header) ProtoMessage() {}
 
 func (x *Header) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[2]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -460,7 +553,7 @@ func (x *Header) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Header.ProtoReflect.Descriptor instead.
 func (*Header) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{2}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Header) GetName() string {
@@ -486,7 +579,7 @@ type Headers struct {
 
 func (x *Headers) Reset() {
 	*x = Headers{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[3]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -498,7 +591,7 @@ func (x *Headers) String() string {
 func (*Headers) ProtoMessage() {}
 
 func (x *Headers) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[3]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -511,7 +604,7 @@ func (x *Headers) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Headers.ProtoReflect.Descriptor instead.
 func (*Headers) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{3}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Headers) GetHeaders() []*Header {
@@ -529,7 +622,7 @@ type Empty struct {
 
 func (x *Empty) Reset() {
 	*x = Empty{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[4]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -541,7 +634,7 @@ func (x *Empty) String() string {
 func (*Empty) ProtoMessage() {}
 
 func (x *Empty) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[4]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -554,7 +647,7 @@ func (x *Empty) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Empty.ProtoReflect.Descriptor instead.
 func (*Empty) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{4}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{5}
 }
 
 type Detail struct {
@@ -566,7 +659,7 @@ type Detail struct {
 
 func (x *Detail) Reset() {
 	*x = Detail{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[5]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +671,7 @@ func (x *Detail) String() string {
 func (*Detail) ProtoMessage() {}
 
 func (x *Detail) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[5]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +684,7 @@ func (x *Detail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Detail.ProtoReflect.Descriptor instead.
 func (*Detail) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{5}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *Detail) GetDetail() string {
@@ -648,7 +741,7 @@ type Input struct {
 
 func (x *Input) Reset() {
 	*x = Input{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[6]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +753,7 @@ func (x *Input) String() string {
 func (*Input) ProtoMessage() {}
 
 func (x *Input) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[6]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +766,7 @@ func (x *Input) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Input.ProtoReflect.Descriptor instead.
 func (*Input) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{6}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *Input) GetKind() isInput_Kind {
@@ -1217,7 +1310,7 @@ type ProxyAnswer struct {
 
 func (x *ProxyAnswer) Reset() {
 	*x = ProxyAnswer{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[7]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1229,7 +1322,7 @@ func (x *ProxyAnswer) String() string {
 func (*ProxyAnswer) ProtoMessage() {}
 
 func (x *ProxyAnswer) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[7]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1242,7 +1335,7 @@ func (x *ProxyAnswer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProxyAnswer.ProtoReflect.Descriptor instead.
 func (*ProxyAnswer) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{7}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ProxyAnswer) GetId() uint64 {
@@ -1283,7 +1376,7 @@ type StreamResolved struct {
 
 func (x *StreamResolved) Reset() {
 	*x = StreamResolved{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[8]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1295,7 +1388,7 @@ func (x *StreamResolved) String() string {
 func (*StreamResolved) ProtoMessage() {}
 
 func (x *StreamResolved) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[8]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1308,7 +1401,7 @@ func (x *StreamResolved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamResolved.ProtoReflect.Descriptor instead.
 func (*StreamResolved) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{8}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StreamResolved) GetId() uint64 {
@@ -1334,7 +1427,7 @@ type Name struct {
 
 func (x *Name) Reset() {
 	*x = Name{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[9]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1346,7 +1439,7 @@ func (x *Name) String() string {
 func (*Name) ProtoMessage() {}
 
 func (x *Name) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[9]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1359,7 +1452,7 @@ func (x *Name) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Name.ProtoReflect.Descriptor instead.
 func (*Name) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{9}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Name) GetName() string {
@@ -1381,7 +1474,7 @@ type PackageInstalled struct {
 
 func (x *PackageInstalled) Reset() {
 	*x = PackageInstalled{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[10]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1393,7 +1486,7 @@ func (x *PackageInstalled) String() string {
 func (*PackageInstalled) ProtoMessage() {}
 
 func (x *PackageInstalled) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[10]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1406,7 +1499,7 @@ func (x *PackageInstalled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PackageInstalled.ProtoReflect.Descriptor instead.
 func (*PackageInstalled) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{10}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PackageInstalled) GetName() string {
@@ -1447,7 +1540,7 @@ type Downloaded struct {
 
 func (x *Downloaded) Reset() {
 	*x = Downloaded{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[11]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1459,7 +1552,7 @@ func (x *Downloaded) String() string {
 func (*Downloaded) ProtoMessage() {}
 
 func (x *Downloaded) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[11]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1472,7 +1565,7 @@ func (x *Downloaded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Downloaded.ProtoReflect.Descriptor instead.
 func (*Downloaded) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{11}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *Downloaded) GetId() uint64 {
@@ -1506,7 +1599,7 @@ type DownloadResponse struct {
 
 func (x *DownloadResponse) Reset() {
 	*x = DownloadResponse{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[12]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1518,7 +1611,7 @@ func (x *DownloadResponse) String() string {
 func (*DownloadResponse) ProtoMessage() {}
 
 func (x *DownloadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[12]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1531,7 +1624,7 @@ func (x *DownloadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DownloadResponse.ProtoReflect.Descriptor instead.
 func (*DownloadResponse) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{12}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DownloadResponse) GetId() uint64 {
@@ -1578,7 +1671,7 @@ type Id struct {
 
 func (x *Id) Reset() {
 	*x = Id{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[13]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1590,7 +1683,7 @@ func (x *Id) String() string {
 func (*Id) ProtoMessage() {}
 
 func (x *Id) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[13]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1603,7 +1696,7 @@ func (x *Id) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Id.ProtoReflect.Descriptor instead.
 func (*Id) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{13}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Id) GetId() uint64 {
@@ -1623,7 +1716,7 @@ type Failed struct {
 
 func (x *Failed) Reset() {
 	*x = Failed{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[14]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1635,7 +1728,7 @@ func (x *Failed) String() string {
 func (*Failed) ProtoMessage() {}
 
 func (x *Failed) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[14]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1648,7 +1741,7 @@ func (x *Failed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Failed.ProtoReflect.Descriptor instead.
 func (*Failed) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{14}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Failed) GetId() uint64 {
@@ -1678,7 +1771,7 @@ type HttpResponse struct {
 
 func (x *HttpResponse) Reset() {
 	*x = HttpResponse{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[15]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1690,7 +1783,7 @@ func (x *HttpResponse) String() string {
 func (*HttpResponse) ProtoMessage() {}
 
 func (x *HttpResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[15]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1703,7 +1796,7 @@ func (x *HttpResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpResponse.ProtoReflect.Descriptor instead.
 func (*HttpResponse) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{15}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *HttpResponse) GetId() uint64 {
@@ -1754,7 +1847,7 @@ type WsFailed struct {
 
 func (x *WsFailed) Reset() {
 	*x = WsFailed{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[16]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1766,7 +1859,7 @@ func (x *WsFailed) String() string {
 func (*WsFailed) ProtoMessage() {}
 
 func (x *WsFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[16]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1779,7 +1872,7 @@ func (x *WsFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsFailed.ProtoReflect.Descriptor instead.
 func (*WsFailed) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{16}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *WsFailed) GetId() uint64 {
@@ -1827,7 +1920,7 @@ type WsMessage struct {
 
 func (x *WsMessage) Reset() {
 	*x = WsMessage{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[17]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1839,7 +1932,7 @@ func (x *WsMessage) String() string {
 func (*WsMessage) ProtoMessage() {}
 
 func (x *WsMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[17]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1852,7 +1945,7 @@ func (x *WsMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsMessage.ProtoReflect.Descriptor instead.
 func (*WsMessage) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{17}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *WsMessage) GetId() uint64 {
@@ -1879,7 +1972,7 @@ type WsClosed struct {
 
 func (x *WsClosed) Reset() {
 	*x = WsClosed{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[18]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1891,7 +1984,7 @@ func (x *WsClosed) String() string {
 func (*WsClosed) ProtoMessage() {}
 
 func (x *WsClosed) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[18]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1904,7 +1997,7 @@ func (x *WsClosed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsClosed.ProtoReflect.Descriptor instead.
 func (*WsClosed) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{18}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *WsClosed) GetId() uint64 {
@@ -1933,7 +2026,7 @@ type Step struct {
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[19]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1945,7 +2038,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[19]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1958,7 +2051,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{19}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Step) GetNowMs() uint64 {
@@ -1994,7 +2087,7 @@ type Reply struct {
 
 func (x *Reply) Reset() {
 	*x = Reply{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[20]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2006,7 +2099,7 @@ func (x *Reply) String() string {
 func (*Reply) ProtoMessage() {}
 
 func (x *Reply) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[20]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2019,7 +2112,7 @@ func (x *Reply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reply.ProtoReflect.Descriptor instead.
 func (*Reply) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{20}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Reply) GetOutput() *Output {
@@ -2042,15 +2135,16 @@ type Output struct {
 	Effects  []*Effect              `protobuf:"bytes,1,rep,name=effects,proto3" json:"effects,omitempty"`                            // in order
 	WakeAtMs *uint64                `protobuf:"varint,2,opt,name=wake_at_ms,json=wakeAtMs,proto3,oneof" json:"wake_at_ms,omitempty"` // when to step with a timer next, if at all
 	// The client has stopped: nothing the core started is still running; release everything.
-	Stopped       bool   `protobuf:"varint,3,opt,name=stopped,proto3" json:"stopped,omitempty"`
-	InstanceUid   []byte `protobuf:"bytes,4,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // the UID in use now (16 bytes)
+	Stopped       bool    `protobuf:"varint,3,opt,name=stopped,proto3" json:"stopped,omitempty"`
+	InstanceUid   []byte  `protobuf:"bytes,4,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // the UID in use now (16 bytes)
+	Limits        *Limits `protobuf:"bytes,5,opt,name=limits,proto3" json:"limits,omitempty"`                              // init's only: the limits in force
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Output) Reset() {
 	*x = Output{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[21]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2062,7 +2156,7 @@ func (x *Output) String() string {
 func (*Output) ProtoMessage() {}
 
 func (x *Output) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[21]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2075,7 +2169,7 @@ func (x *Output) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Output.ProtoReflect.Descriptor instead.
 func (*Output) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{21}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Output) GetEffects() []*Effect {
@@ -2104,6 +2198,141 @@ func (x *Output) GetInstanceUid() []byte {
 		return x.InstanceUid
 	}
 	return nil
+}
+
+func (x *Output) GetLimits() *Limits {
+	if x != nil {
+		return x.Limits
+	}
+	return nil
+}
+
+// The durations and sizes the core goes by, as the configuration gave them or by default (a
+// field it left at 0), numbered as in Config: a host bounds its own waits by these (stop by
+// stop_timeout_ms) rather than by its own copy of the defaults. A configuration value above
+// 2^63 - 1 (a negative number passed as unsigned) is refused at init, naming the field.
+type Limits struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	HeartbeatIntervalMs uint64                 `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
+	BackoffInitialMs    uint64                 `protobuf:"varint,5,opt,name=backoff_initial_ms,json=backoffInitialMs,proto3" json:"backoff_initial_ms,omitempty"`
+	BackoffMaxMs        uint64                 `protobuf:"varint,6,opt,name=backoff_max_ms,json=backoffMaxMs,proto3" json:"backoff_max_ms,omitempty"`
+	MaxSendBytes        uint64                 `protobuf:"varint,7,opt,name=max_send_bytes,json=maxSendBytes,proto3" json:"max_send_bytes,omitempty"` // raised to 1024 if smaller
+	RequestTimeoutMs    uint64                 `protobuf:"varint,11,opt,name=request_timeout_ms,json=requestTimeoutMs,proto3" json:"request_timeout_ms,omitempty"`
+	MaxReceiveBytes     uint64                 `protobuf:"varint,12,opt,name=max_receive_bytes,json=maxReceiveBytes,proto3" json:"max_receive_bytes,omitempty"`
+	VerifyTimeoutMs     uint64                 `protobuf:"varint,16,opt,name=verify_timeout_ms,json=verifyTimeoutMs,proto3" json:"verify_timeout_ms,omitempty"`
+	MaxPackageBytes     uint64                 `protobuf:"varint,20,opt,name=max_package_bytes,json=maxPackageBytes,proto3" json:"max_package_bytes,omitempty"`
+	DownloadTimeoutMs   uint64                 `protobuf:"varint,21,opt,name=download_timeout_ms,json=downloadTimeoutMs,proto3" json:"download_timeout_ms,omitempty"`
+	StopTimeoutMs       uint64                 `protobuf:"varint,28,opt,name=stop_timeout_ms,json=stopTimeoutMs,proto3" json:"stop_timeout_ms,omitempty"`
+	ConnectTimeoutMs    uint64                 `protobuf:"varint,29,opt,name=connect_timeout_ms,json=connectTimeoutMs,proto3" json:"connect_timeout_ms,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *Limits) Reset() {
+	*x = Limits{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Limits) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Limits) ProtoMessage() {}
+
+func (x *Limits) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Limits.ProtoReflect.Descriptor instead.
+func (*Limits) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *Limits) GetHeartbeatIntervalMs() uint64 {
+	if x != nil {
+		return x.HeartbeatIntervalMs
+	}
+	return 0
+}
+
+func (x *Limits) GetBackoffInitialMs() uint64 {
+	if x != nil {
+		return x.BackoffInitialMs
+	}
+	return 0
+}
+
+func (x *Limits) GetBackoffMaxMs() uint64 {
+	if x != nil {
+		return x.BackoffMaxMs
+	}
+	return 0
+}
+
+func (x *Limits) GetMaxSendBytes() uint64 {
+	if x != nil {
+		return x.MaxSendBytes
+	}
+	return 0
+}
+
+func (x *Limits) GetRequestTimeoutMs() uint64 {
+	if x != nil {
+		return x.RequestTimeoutMs
+	}
+	return 0
+}
+
+func (x *Limits) GetMaxReceiveBytes() uint64 {
+	if x != nil {
+		return x.MaxReceiveBytes
+	}
+	return 0
+}
+
+func (x *Limits) GetVerifyTimeoutMs() uint64 {
+	if x != nil {
+		return x.VerifyTimeoutMs
+	}
+	return 0
+}
+
+func (x *Limits) GetMaxPackageBytes() uint64 {
+	if x != nil {
+		return x.MaxPackageBytes
+	}
+	return 0
+}
+
+func (x *Limits) GetDownloadTimeoutMs() uint64 {
+	if x != nil {
+		return x.DownloadTimeoutMs
+	}
+	return 0
+}
+
+func (x *Limits) GetStopTimeoutMs() uint64 {
+	if x != nil {
+		return x.StopTimeoutMs
+	}
+	return 0
+}
+
+func (x *Limits) GetConnectTimeoutMs() uint64 {
+	if x != nil {
+		return x.ConnectTimeoutMs
+	}
+	return 0
 }
 
 // Something the client must do.
@@ -2136,7 +2365,7 @@ type Effect struct {
 
 func (x *Effect) Reset() {
 	*x = Effect{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[22]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2148,7 +2377,7 @@ func (x *Effect) String() string {
 func (*Effect) ProtoMessage() {}
 
 func (x *Effect) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[22]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2161,7 +2390,7 @@ func (x *Effect) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Effect.ProtoReflect.Descriptor instead.
 func (*Effect) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{22}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Effect) GetKind() isEffect_Kind {
@@ -2463,7 +2692,7 @@ type StreamClose struct {
 
 func (x *StreamClose) Reset() {
 	*x = StreamClose{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[23]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +2704,7 @@ func (x *StreamClose) String() string {
 func (*StreamClose) ProtoMessage() {}
 
 func (x *StreamClose) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[23]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +2717,7 @@ func (x *StreamClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamClose.ProtoReflect.Descriptor instead.
 func (*StreamClose) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{23}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StreamClose) GetId() uint64 {
@@ -2515,7 +2744,7 @@ type Url struct {
 
 func (x *Url) Reset() {
 	*x = Url{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[24]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2527,7 +2756,7 @@ func (x *Url) String() string {
 func (*Url) ProtoMessage() {}
 
 func (x *Url) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[24]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2540,7 +2769,7 @@ func (x *Url) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Url.ProtoReflect.Descriptor instead.
 func (*Url) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{24}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Url) GetId() uint64 {
@@ -2567,7 +2796,7 @@ type StreamName struct {
 
 func (x *StreamName) Reset() {
 	*x = StreamName{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[25]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2579,7 +2808,7 @@ func (x *StreamName) String() string {
 func (*StreamName) ProtoMessage() {}
 
 func (x *StreamName) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[25]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2592,7 +2821,7 @@ func (x *StreamName) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamName.ProtoReflect.Descriptor instead.
 func (*StreamName) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{25}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *StreamName) GetId() uint64 {
@@ -2620,7 +2849,7 @@ type StreamSplice struct {
 
 func (x *StreamSplice) Reset() {
 	*x = StreamSplice{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[26]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2632,7 +2861,7 @@ func (x *StreamSplice) String() string {
 func (*StreamSplice) ProtoMessage() {}
 
 func (x *StreamSplice) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[26]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2645,7 +2874,7 @@ func (x *StreamSplice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamSplice.ProtoReflect.Descriptor instead.
 func (*StreamSplice) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{26}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *StreamSplice) GetId() uint64 {
@@ -2680,7 +2909,7 @@ type StreamOpen struct {
 
 func (x *StreamOpen) Reset() {
 	*x = StreamOpen{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[27]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2692,7 +2921,7 @@ func (x *StreamOpen) String() string {
 func (*StreamOpen) ProtoMessage() {}
 
 func (x *StreamOpen) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[27]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2705,7 +2934,7 @@ func (x *StreamOpen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamOpen.ProtoReflect.Descriptor instead.
 func (*StreamOpen) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{27}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *StreamOpen) GetId() uint64 {
@@ -2743,7 +2972,7 @@ type Download struct {
 
 func (x *Download) Reset() {
 	*x = Download{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[28]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2755,7 +2984,7 @@ func (x *Download) String() string {
 func (*Download) ProtoMessage() {}
 
 func (x *Download) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[28]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2768,7 +2997,7 @@ func (x *Download) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Download.ProtoReflect.Descriptor instead.
 func (*Download) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{28}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Download) GetId() uint64 {
@@ -2818,7 +3047,7 @@ type Store struct {
 
 func (x *Store) Reset() {
 	*x = Store{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[29]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2830,7 +3059,7 @@ func (x *Store) String() string {
 func (*Store) ProtoMessage() {}
 
 func (x *Store) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[29]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2843,7 +3072,7 @@ func (x *Store) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Store.ProtoReflect.Descriptor instead.
 func (*Store) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{29}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *Store) GetId() uint64 {
@@ -2874,7 +3103,7 @@ type HttpRequest struct {
 
 func (x *HttpRequest) Reset() {
 	*x = HttpRequest{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[30]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2886,7 +3115,7 @@ func (x *HttpRequest) String() string {
 func (*HttpRequest) ProtoMessage() {}
 
 func (x *HttpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[30]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2899,7 +3128,7 @@ func (x *HttpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HttpRequest.ProtoReflect.Descriptor instead.
 func (*HttpRequest) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{30}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *HttpRequest) GetId() uint64 {
@@ -2957,7 +3186,7 @@ type WsOpen struct {
 
 func (x *WsOpen) Reset() {
 	*x = WsOpen{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[31]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2969,7 +3198,7 @@ func (x *WsOpen) String() string {
 func (*WsOpen) ProtoMessage() {}
 
 func (x *WsOpen) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[31]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2982,7 +3211,7 @@ func (x *WsOpen) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WsOpen.ProtoReflect.Descriptor instead.
 func (*WsOpen) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{31}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *WsOpen) GetId() uint64 {
@@ -3048,7 +3277,7 @@ type Notification struct {
 
 func (x *Notification) Reset() {
 	*x = Notification{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[32]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3060,7 +3289,7 @@ func (x *Notification) String() string {
 func (*Notification) ProtoMessage() {}
 
 func (x *Notification) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[32]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3073,7 +3302,7 @@ func (x *Notification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Notification.ProtoReflect.Descriptor instead.
 func (*Notification) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{32}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Notification) GetKind() isNotification_Kind {
@@ -3363,7 +3592,7 @@ type SaveStalled struct {
 
 func (x *SaveStalled) Reset() {
 	*x = SaveStalled{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[33]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3375,7 +3604,7 @@ func (x *SaveStalled) String() string {
 func (*SaveStalled) ProtoMessage() {}
 
 func (x *SaveStalled) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[33]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3388,7 +3617,7 @@ func (x *SaveStalled) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveStalled.ProtoReflect.Descriptor instead.
 func (*SaveStalled) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{33}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SaveStalled) GetStalled() bool {
@@ -3416,7 +3645,7 @@ type InstallPackage struct {
 
 func (x *InstallPackage) Reset() {
 	*x = InstallPackage{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[34]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3428,7 +3657,7 @@ func (x *InstallPackage) String() string {
 func (*InstallPackage) ProtoMessage() {}
 
 func (x *InstallPackage) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[34]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3441,7 +3670,7 @@ func (x *InstallPackage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallPackage.ProtoReflect.Descriptor instead.
 func (*InstallPackage) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{34}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *InstallPackage) GetName() string {
@@ -3475,7 +3704,7 @@ type CustomMessageNotSent struct {
 
 func (x *CustomMessageNotSent) Reset() {
 	*x = CustomMessageNotSent{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[35]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3487,7 +3716,7 @@ func (x *CustomMessageNotSent) String() string {
 func (*CustomMessageNotSent) ProtoMessage() {}
 
 func (x *CustomMessageNotSent) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[35]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3500,7 +3729,7 @@ func (x *CustomMessageNotSent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CustomMessageNotSent.ProtoReflect.Descriptor instead.
 func (*CustomMessageNotSent) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{35}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *CustomMessageNotSent) GetMessage() *protobufs.CustomMessage {
@@ -3527,7 +3756,7 @@ type NotifyConnectFailed struct {
 
 func (x *NotifyConnectFailed) Reset() {
 	*x = NotifyConnectFailed{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[36]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3539,7 +3768,7 @@ func (x *NotifyConnectFailed) String() string {
 func (*NotifyConnectFailed) ProtoMessage() {}
 
 func (x *NotifyConnectFailed) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[36]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3552,7 +3781,7 @@ func (x *NotifyConnectFailed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotifyConnectFailed.ProtoReflect.Descriptor instead.
 func (*NotifyConnectFailed) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{36}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *NotifyConnectFailed) GetStatus() uint32 {
@@ -3579,7 +3808,7 @@ type ErrorResponse struct {
 
 func (x *ErrorResponse) Reset() {
 	*x = ErrorResponse{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[37]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3591,7 +3820,7 @@ func (x *ErrorResponse) String() string {
 func (*ErrorResponse) ProtoMessage() {}
 
 func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[37]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3604,7 +3833,7 @@ func (x *ErrorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorResponse.ProtoReflect.Descriptor instead.
 func (*ErrorResponse) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{37}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ErrorResponse) GetKind() int32 {
@@ -3632,7 +3861,7 @@ type StatusTooLarge struct {
 
 func (x *StatusTooLarge) Reset() {
 	*x = StatusTooLarge{}
-	mi := &file_opamp_core_v1_core_proto_msgTypes[38]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3644,7 +3873,7 @@ func (x *StatusTooLarge) String() string {
 func (*StatusTooLarge) ProtoMessage() {}
 
 func (x *StatusTooLarge) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_core_v1_core_proto_msgTypes[38]
+	mi := &file_opamp_core_v1_core_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3657,7 +3886,7 @@ func (x *StatusTooLarge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusTooLarge.ProtoReflect.Descriptor instead.
 func (*StatusTooLarge) Descriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{38}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *StatusTooLarge) GetField() StatusField {
@@ -3685,7 +3914,7 @@ var File_opamp_core_v1_core_proto protoreflect.FileDescriptor
 
 const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\n" +
-	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\xe6\b\n" +
+	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\x98\t\n" +
 	"\x06Config\x12!\n" +
 	"\finstance_uid\x18\x02 \x01(\fR\vinstanceUid\x12\"\n" +
 	"\fcapabilities\x18\x03 \x01(\x04R\fcapabilities\x122\n" +
@@ -3715,7 +3944,14 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\x10splice_downloads\x18\x19 \x01(\bR\x0fspliceDownloads\x12\x17\n" +
 	"\aunix_ms\x18\x1a \x01(\x04R\x06unixMs\x12&\n" +
 	"\x0fstop_timeout_ms\x18\x1c \x01(\x04R\rstopTimeoutMs\x12,\n" +
-	"\x12connect_timeout_ms\x18\x1d \x01(\x04R\x10connectTimeoutMsJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fR\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_status\"H\n" +
+	"\x12connect_timeout_ms\x18\x1d \x01(\x04R\x10connectTimeoutMs\x120\n" +
+	"\x05proxy\x18\x1f \x01(\v2\x1a.opamp.core.v1.ProxyChoiceR\x05proxyJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fR\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_status\"\xca\x01\n" +
+	"\vProxyChoice\x12\x16\n" +
+	"\x06direct\x18\x01 \x01(\bR\x06direct\x12\x10\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\x12/\n" +
+	"\aheaders\x18\x03 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\x12'\n" +
+	"\x0fresolve_locally\x18\x04 \x01(\bR\x0eresolveLocally\x127\n" +
+	"\venvironment\x18\x05 \x03(\v2\x15.opamp.core.v1.HeaderR\venvironment\"H\n" +
 	"\x06Origin\x12\x16\n" +
 	"\x06scheme\x18\x01 \x01(\tR\x06scheme\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
@@ -3827,14 +4063,27 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\aunix_ms\x18\x03 \x01(\x04R\x06unixMs\"L\n" +
 	"\x05Reply\x12-\n" +
 	"\x06output\x18\x01 \x01(\v2\x15.opamp.core.v1.OutputR\x06output\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xa8\x01\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xd7\x01\n" +
 	"\x06Output\x12/\n" +
 	"\aeffects\x18\x01 \x03(\v2\x15.opamp.core.v1.EffectR\aeffects\x12!\n" +
 	"\n" +
 	"wake_at_ms\x18\x02 \x01(\x04H\x00R\bwakeAtMs\x88\x01\x01\x12\x18\n" +
 	"\astopped\x18\x03 \x01(\bR\astopped\x12!\n" +
-	"\finstance_uid\x18\x04 \x01(\fR\vinstanceUidB\r\n" +
-	"\v_wake_at_ms\"\x9f\b\n" +
+	"\finstance_uid\x18\x04 \x01(\fR\vinstanceUid\x12-\n" +
+	"\x06limits\x18\x05 \x01(\v2\x15.opamp.core.v1.LimitsR\x06limitsB\r\n" +
+	"\v_wake_at_ms\"\xee\x03\n" +
+	"\x06Limits\x122\n" +
+	"\x15heartbeat_interval_ms\x18\x04 \x01(\x04R\x13heartbeatIntervalMs\x12,\n" +
+	"\x12backoff_initial_ms\x18\x05 \x01(\x04R\x10backoffInitialMs\x12$\n" +
+	"\x0ebackoff_max_ms\x18\x06 \x01(\x04R\fbackoffMaxMs\x12$\n" +
+	"\x0emax_send_bytes\x18\a \x01(\x04R\fmaxSendBytes\x12,\n" +
+	"\x12request_timeout_ms\x18\v \x01(\x04R\x10requestTimeoutMs\x12*\n" +
+	"\x11max_receive_bytes\x18\f \x01(\x04R\x0fmaxReceiveBytes\x12*\n" +
+	"\x11verify_timeout_ms\x18\x10 \x01(\x04R\x0fverifyTimeoutMs\x12*\n" +
+	"\x11max_package_bytes\x18\x14 \x01(\x04R\x0fmaxPackageBytes\x12.\n" +
+	"\x13download_timeout_ms\x18\x15 \x01(\x04R\x11downloadTimeoutMs\x12&\n" +
+	"\x0fstop_timeout_ms\x18\x1c \x01(\x04R\rstopTimeoutMs\x12,\n" +
+	"\x12connect_timeout_ms\x18\x1d \x01(\x04R\x10connectTimeoutMs\"\x9f\b\n" +
 	"\x06Effect\x12?\n" +
 	"\fhttp_request\x18\x01 \x01(\v2\x1a.opamp.core.v1.HttpRequestH\x00R\vhttpRequest\x120\n" +
 	"\aws_open\x18\x02 \x01(\v2\x15.opamp.core.v1.WsOpenH\x00R\x06wsOpen\x123\n" +
@@ -3968,149 +4217,155 @@ func file_opamp_core_v1_core_proto_rawDescGZIP() []byte {
 }
 
 var file_opamp_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_opamp_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 39)
+var file_opamp_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_opamp_core_v1_core_proto_goTypes = []any{
 	(StatusField)(0),                           // 0: opamp.core.v1.StatusField
 	(*Config)(nil),                             // 1: opamp.core.v1.Config
-	(*Origin)(nil),                             // 2: opamp.core.v1.Origin
-	(*Header)(nil),                             // 3: opamp.core.v1.Header
-	(*Headers)(nil),                            // 4: opamp.core.v1.Headers
-	(*Empty)(nil),                              // 5: opamp.core.v1.Empty
-	(*Detail)(nil),                             // 6: opamp.core.v1.Detail
-	(*Input)(nil),                              // 7: opamp.core.v1.Input
-	(*ProxyAnswer)(nil),                        // 8: opamp.core.v1.ProxyAnswer
-	(*StreamResolved)(nil),                     // 9: opamp.core.v1.StreamResolved
-	(*Name)(nil),                               // 10: opamp.core.v1.Name
-	(*PackageInstalled)(nil),                   // 11: opamp.core.v1.PackageInstalled
-	(*Downloaded)(nil),                         // 12: opamp.core.v1.Downloaded
-	(*DownloadResponse)(nil),                   // 13: opamp.core.v1.DownloadResponse
-	(*Id)(nil),                                 // 14: opamp.core.v1.Id
-	(*Failed)(nil),                             // 15: opamp.core.v1.Failed
-	(*HttpResponse)(nil),                       // 16: opamp.core.v1.HttpResponse
-	(*WsFailed)(nil),                           // 17: opamp.core.v1.WsFailed
-	(*WsMessage)(nil),                          // 18: opamp.core.v1.WsMessage
-	(*WsClosed)(nil),                           // 19: opamp.core.v1.WsClosed
-	(*Step)(nil),                               // 20: opamp.core.v1.Step
-	(*Reply)(nil),                              // 21: opamp.core.v1.Reply
-	(*Output)(nil),                             // 22: opamp.core.v1.Output
-	(*Effect)(nil),                             // 23: opamp.core.v1.Effect
-	(*StreamClose)(nil),                        // 24: opamp.core.v1.StreamClose
-	(*Url)(nil),                                // 25: opamp.core.v1.Url
-	(*StreamName)(nil),                         // 26: opamp.core.v1.StreamName
-	(*StreamSplice)(nil),                       // 27: opamp.core.v1.StreamSplice
-	(*StreamOpen)(nil),                         // 28: opamp.core.v1.StreamOpen
-	(*Download)(nil),                           // 29: opamp.core.v1.Download
-	(*Store)(nil),                              // 30: opamp.core.v1.Store
-	(*HttpRequest)(nil),                        // 31: opamp.core.v1.HttpRequest
-	(*WsOpen)(nil),                             // 32: opamp.core.v1.WsOpen
-	(*Notification)(nil),                       // 33: opamp.core.v1.Notification
-	(*SaveStalled)(nil),                        // 34: opamp.core.v1.SaveStalled
-	(*InstallPackage)(nil),                     // 35: opamp.core.v1.InstallPackage
-	(*CustomMessageNotSent)(nil),               // 36: opamp.core.v1.CustomMessageNotSent
-	(*NotifyConnectFailed)(nil),                // 37: opamp.core.v1.NotifyConnectFailed
-	(*ErrorResponse)(nil),                      // 38: opamp.core.v1.ErrorResponse
-	(*StatusTooLarge)(nil),                     // 39: opamp.core.v1.StatusTooLarge
-	(*protobufs.AgentDescription)(nil),         // 40: opamp.proto.v1.AgentDescription
-	(*protobufs.ComponentHealth)(nil),          // 41: opamp.proto.v1.ComponentHealth
-	(*protobufs.EffectiveConfig)(nil),          // 42: opamp.proto.v1.EffectiveConfig
-	(*protobufs.RemoteConfigStatus)(nil),       // 43: opamp.proto.v1.RemoteConfigStatus
-	(*protobufs.ConnectionSettingsStatus)(nil), // 44: opamp.proto.v1.ConnectionSettingsStatus
-	(*protobufs.AvailableComponents)(nil),      // 45: opamp.proto.v1.AvailableComponents
-	(*protobufs.CustomCapabilities)(nil),       // 46: opamp.proto.v1.CustomCapabilities
-	(*protobufs.CustomMessage)(nil),            // 47: opamp.proto.v1.CustomMessage
-	(*protobufs.AgentRemoteConfig)(nil),        // 48: opamp.proto.v1.AgentRemoteConfig
-	(*protobufs.ServerToAgentCommand)(nil),     // 49: opamp.proto.v1.ServerToAgentCommand
-	(*protobufs.ConnectionSettingsOffers)(nil), // 50: opamp.proto.v1.ConnectionSettingsOffers
-	(*protobufs.PackageAvailable)(nil),         // 51: opamp.proto.v1.PackageAvailable
+	(*ProxyChoice)(nil),                        // 2: opamp.core.v1.ProxyChoice
+	(*Origin)(nil),                             // 3: opamp.core.v1.Origin
+	(*Header)(nil),                             // 4: opamp.core.v1.Header
+	(*Headers)(nil),                            // 5: opamp.core.v1.Headers
+	(*Empty)(nil),                              // 6: opamp.core.v1.Empty
+	(*Detail)(nil),                             // 7: opamp.core.v1.Detail
+	(*Input)(nil),                              // 8: opamp.core.v1.Input
+	(*ProxyAnswer)(nil),                        // 9: opamp.core.v1.ProxyAnswer
+	(*StreamResolved)(nil),                     // 10: opamp.core.v1.StreamResolved
+	(*Name)(nil),                               // 11: opamp.core.v1.Name
+	(*PackageInstalled)(nil),                   // 12: opamp.core.v1.PackageInstalled
+	(*Downloaded)(nil),                         // 13: opamp.core.v1.Downloaded
+	(*DownloadResponse)(nil),                   // 14: opamp.core.v1.DownloadResponse
+	(*Id)(nil),                                 // 15: opamp.core.v1.Id
+	(*Failed)(nil),                             // 16: opamp.core.v1.Failed
+	(*HttpResponse)(nil),                       // 17: opamp.core.v1.HttpResponse
+	(*WsFailed)(nil),                           // 18: opamp.core.v1.WsFailed
+	(*WsMessage)(nil),                          // 19: opamp.core.v1.WsMessage
+	(*WsClosed)(nil),                           // 20: opamp.core.v1.WsClosed
+	(*Step)(nil),                               // 21: opamp.core.v1.Step
+	(*Reply)(nil),                              // 22: opamp.core.v1.Reply
+	(*Output)(nil),                             // 23: opamp.core.v1.Output
+	(*Limits)(nil),                             // 24: opamp.core.v1.Limits
+	(*Effect)(nil),                             // 25: opamp.core.v1.Effect
+	(*StreamClose)(nil),                        // 26: opamp.core.v1.StreamClose
+	(*Url)(nil),                                // 27: opamp.core.v1.Url
+	(*StreamName)(nil),                         // 28: opamp.core.v1.StreamName
+	(*StreamSplice)(nil),                       // 29: opamp.core.v1.StreamSplice
+	(*StreamOpen)(nil),                         // 30: opamp.core.v1.StreamOpen
+	(*Download)(nil),                           // 31: opamp.core.v1.Download
+	(*Store)(nil),                              // 32: opamp.core.v1.Store
+	(*HttpRequest)(nil),                        // 33: opamp.core.v1.HttpRequest
+	(*WsOpen)(nil),                             // 34: opamp.core.v1.WsOpen
+	(*Notification)(nil),                       // 35: opamp.core.v1.Notification
+	(*SaveStalled)(nil),                        // 36: opamp.core.v1.SaveStalled
+	(*InstallPackage)(nil),                     // 37: opamp.core.v1.InstallPackage
+	(*CustomMessageNotSent)(nil),               // 38: opamp.core.v1.CustomMessageNotSent
+	(*NotifyConnectFailed)(nil),                // 39: opamp.core.v1.NotifyConnectFailed
+	(*ErrorResponse)(nil),                      // 40: opamp.core.v1.ErrorResponse
+	(*StatusTooLarge)(nil),                     // 41: opamp.core.v1.StatusTooLarge
+	(*protobufs.AgentDescription)(nil),         // 42: opamp.proto.v1.AgentDescription
+	(*protobufs.ComponentHealth)(nil),          // 43: opamp.proto.v1.ComponentHealth
+	(*protobufs.EffectiveConfig)(nil),          // 44: opamp.proto.v1.EffectiveConfig
+	(*protobufs.RemoteConfigStatus)(nil),       // 45: opamp.proto.v1.RemoteConfigStatus
+	(*protobufs.ConnectionSettingsStatus)(nil), // 46: opamp.proto.v1.ConnectionSettingsStatus
+	(*protobufs.AvailableComponents)(nil),      // 47: opamp.proto.v1.AvailableComponents
+	(*protobufs.CustomCapabilities)(nil),       // 48: opamp.proto.v1.CustomCapabilities
+	(*protobufs.CustomMessage)(nil),            // 49: opamp.proto.v1.CustomMessage
+	(*protobufs.AgentRemoteConfig)(nil),        // 50: opamp.proto.v1.AgentRemoteConfig
+	(*protobufs.ServerToAgentCommand)(nil),     // 51: opamp.proto.v1.ServerToAgentCommand
+	(*protobufs.ConnectionSettingsOffers)(nil), // 52: opamp.proto.v1.ConnectionSettingsOffers
+	(*protobufs.PackageAvailable)(nil),         // 53: opamp.proto.v1.PackageAvailable
 }
 var file_opamp_core_v1_core_proto_depIdxs = []int32{
-	3,  // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
-	3,  // 1: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
-	5,  // 2: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
-	40, // 3: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
-	41, // 4: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
-	42, // 5: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
-	43, // 6: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
-	5,  // 7: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
-	5,  // 8: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
-	16, // 9: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
-	15, // 10: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
-	14, // 11: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
-	17, // 12: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
-	18, // 13: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
-	19, // 14: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
-	15, // 15: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
-	14, // 16: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
-	15, // 17: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
-	44, // 18: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
-	45, // 19: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
-	46, // 20: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	47, // 21: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
-	11, // 22: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
-	10, // 23: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.Name
-	12, // 24: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
-	15, // 25: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
-	8,  // 26: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
-	9,  // 27: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
-	14, // 28: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
-	14, // 29: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
-	18, // 30: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
-	14, // 31: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
-	15, // 32: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
-	14, // 33: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
-	13, // 34: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
-	4,  // 35: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
-	3,  // 36: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
-	2,  // 37: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
-	3,  // 38: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
-	3,  // 39: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
-	7,  // 40: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
-	22, // 41: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
-	23, // 42: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
-	31, // 43: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
-	32, // 44: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
-	18, // 45: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
-	14, // 46: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
-	33, // 47: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
-	30, // 48: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
-	29, // 49: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
-	14, // 50: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
-	14, // 51: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
-	25, // 52: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
-	26, // 53: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
-	28, // 54: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
-	26, // 55: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
-	18, // 56: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
-	24, // 57: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
-	18, // 58: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
-	14, // 59: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
-	27, // 60: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
-	3,  // 61: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
-	3,  // 62: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
-	3,  // 63: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
-	5,  // 64: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
-	37, // 65: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
-	38, // 66: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
-	48, // 67: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	49, // 68: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
-	39, // 69: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
-	6,  // 70: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
-	5,  // 71: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
-	50, // 72: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
-	47, // 73: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
-	46, // 74: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	36, // 75: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
-	35, // 76: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
-	10, // 77: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
-	34, // 78: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
-	51, // 79: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
-	47, // 80: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
-	0,  // 81: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
-	82, // [82:82] is the sub-list for method output_type
-	82, // [82:82] is the sub-list for method input_type
-	82, // [82:82] is the sub-list for extension type_name
-	82, // [82:82] is the sub-list for extension extendee
-	0,  // [0:82] is the sub-list for field type_name
+	4,  // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
+	2,  // 1: opamp.core.v1.Config.proxy:type_name -> opamp.core.v1.ProxyChoice
+	4,  // 2: opamp.core.v1.ProxyChoice.headers:type_name -> opamp.core.v1.Header
+	4,  // 3: opamp.core.v1.ProxyChoice.environment:type_name -> opamp.core.v1.Header
+	4,  // 4: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
+	6,  // 5: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
+	42, // 6: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
+	43, // 7: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
+	44, // 8: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
+	45, // 9: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
+	6,  // 10: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
+	6,  // 11: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
+	17, // 12: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
+	16, // 13: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
+	15, // 14: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
+	18, // 15: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
+	19, // 16: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
+	20, // 17: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
+	16, // 18: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
+	15, // 19: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
+	16, // 20: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
+	46, // 21: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
+	47, // 22: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
+	48, // 23: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	49, // 24: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
+	12, // 25: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
+	11, // 26: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.Name
+	13, // 27: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
+	16, // 28: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
+	9,  // 29: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
+	10, // 30: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
+	15, // 31: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
+	15, // 32: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
+	19, // 33: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
+	15, // 34: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
+	16, // 35: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
+	15, // 36: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
+	14, // 37: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
+	5,  // 38: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
+	4,  // 39: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
+	3,  // 40: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
+	4,  // 41: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
+	4,  // 42: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
+	8,  // 43: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
+	23, // 44: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
+	25, // 45: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
+	24, // 46: opamp.core.v1.Output.limits:type_name -> opamp.core.v1.Limits
+	33, // 47: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
+	34, // 48: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
+	19, // 49: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
+	15, // 50: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
+	35, // 51: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
+	32, // 52: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
+	31, // 53: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
+	15, // 54: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
+	15, // 55: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
+	27, // 56: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
+	28, // 57: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
+	30, // 58: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
+	28, // 59: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
+	19, // 60: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
+	26, // 61: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
+	19, // 62: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
+	15, // 63: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
+	29, // 64: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
+	4,  // 65: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
+	4,  // 66: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
+	4,  // 67: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
+	6,  // 68: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
+	39, // 69: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
+	40, // 70: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
+	50, // 71: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	51, // 72: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
+	41, // 73: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
+	7,  // 74: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
+	6,  // 75: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
+	52, // 76: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
+	49, // 77: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
+	48, // 78: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	38, // 79: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
+	37, // 80: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
+	11, // 81: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
+	36, // 82: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
+	53, // 83: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
+	49, // 84: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
+	0,  // 85: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
+	86, // [86:86] is the sub-list for method output_type
+	86, // [86:86] is the sub-list for method input_type
+	86, // [86:86] is the sub-list for extension type_name
+	86, // [86:86] is the sub-list for extension extendee
+	0,  // [0:86] is the sub-list for field type_name
 }
 
 func init() { file_opamp_core_v1_core_proto_init() }
@@ -4118,7 +4373,7 @@ func file_opamp_core_v1_core_proto_init() {
 	if File_opamp_core_v1_core_proto != nil {
 		return
 	}
-	file_opamp_core_v1_core_proto_msgTypes[6].OneofWrappers = []any{
+	file_opamp_core_v1_core_proto_msgTypes[7].OneofWrappers = []any{
 		(*Input_Start)(nil),
 		(*Input_SetDescription)(nil),
 		(*Input_SetHealth)(nil),
@@ -4154,9 +4409,9 @@ func file_opamp_core_v1_core_proto_init() {
 		(*Input_DownloadResponse)(nil),
 		(*Input_SetAuthHeaders)(nil),
 	}
-	file_opamp_core_v1_core_proto_msgTypes[16].OneofWrappers = []any{}
-	file_opamp_core_v1_core_proto_msgTypes[21].OneofWrappers = []any{}
-	file_opamp_core_v1_core_proto_msgTypes[22].OneofWrappers = []any{
+	file_opamp_core_v1_core_proto_msgTypes[17].OneofWrappers = []any{}
+	file_opamp_core_v1_core_proto_msgTypes[22].OneofWrappers = []any{}
+	file_opamp_core_v1_core_proto_msgTypes[24].OneofWrappers = []any{
 		(*Effect_HttpRequest)(nil),
 		(*Effect_WsOpen)(nil),
 		(*Effect_WsSend)(nil),
@@ -4176,7 +4431,7 @@ func file_opamp_core_v1_core_proto_init() {
 		(*Effect_DownloadDone)(nil),
 		(*Effect_StreamSplice)(nil),
 	}
-	file_opamp_core_v1_core_proto_msgTypes[32].OneofWrappers = []any{
+	file_opamp_core_v1_core_proto_msgTypes[34].OneofWrappers = []any{
 		(*Notification_Connected)(nil),
 		(*Notification_ConnectFailed)(nil),
 		(*Notification_ErrorResponse)(nil),
@@ -4195,14 +4450,14 @@ func file_opamp_core_v1_core_proto_init() {
 		(*Notification_RemovePackage)(nil),
 		(*Notification_SaveStalled)(nil),
 	}
-	file_opamp_core_v1_core_proto_msgTypes[36].OneofWrappers = []any{}
+	file_opamp_core_v1_core_proto_msgTypes[38].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_opamp_core_v1_core_proto_rawDesc), len(file_opamp_core_v1_core_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   39,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

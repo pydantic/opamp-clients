@@ -54,106 +54,107 @@ namespace Pydantic.OpAmp.Client.Sdk {
             "BV9raW5kQgcKBV9wYXRoIjMKClNjb3BlTGV2ZWwSDwoHcGF0dGVybhgBIAEo",
             "CRIUCgxtaW5fc2V2ZXJpdHkYAiABKA0iFgoFTmFtZXMSDQoFbmFtZXMYASAD",
             "KAkiLgoESG9zdBIMCgRsaXZlGAEgAygJEhIKCm5leHRfc3RhcnQYAyADKAlK",
-            "BAgCEAMiWwoETG9hZBISCgVzYXZlZBgBIAEoDEgAiAEBEiAKBGhvc3QYAiAB",
-            "KAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgDIAEoBEII",
-            "CgZfc2F2ZWQipAEKBkxvYWRlZBIoCghzZXR0aW5ncxgBIAEoCzIWLm9wYW1w",
-            "LnNkay52MS5TZXR0aW5ncxIPCgdjdXJyZW50GAIgASgMEjIKCWVmZmVjdGl2",
-            "ZRgDIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIPCgd3",
-            "YXJuaW5nGAQgASgJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgFIAEoBCKbAQoG",
-            "RGVjaWRlEjEKBmNvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50",
-            "UmVtb3RlQ29uZmlnEg8KB2N1cnJlbnQYAiABKAwSEAoIYXRfc3RhcnQYAyAB",
-            "KAwSIAoEaG9zdBgFIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191",
-            "bml4X21zGAYgASgESgQIBBAFIiIKBFBsYW4SEQoEc2F2ZRgBIAEoDEgAiAEB",
-            "QgcKBV9zYXZlIqYBCgZDb21taXQSJAoGZGVjaWRlGAEgASgLMhQub3BhbXAu",
-            "c2RrLnYxLkRlY2lkZRIpCgVzYXZlZBgCIAEoDjIaLm9wYW1wLnNkay52MS5D",
-            "b21taXQuU2F2ZWQSDQoFZXJyb3IYAyABKAkiPAoFU2F2ZWQSEQoNU0FWRURf",
-            "Tk9XSEVSRRAAEg4KClNBVkVEX0RPTkUQARIQCgxTQVZFRF9GQUlMRUQQAiLl",
-            "AQoIRGVjaXNpb24SMgoGc3RhdHVzGAEgASgLMiIub3BhbXAucHJvdG8udjEu",
-            "UmVtb3RlQ29uZmlnU3RhdHVzEiUKBWFwcGx5GAIgASgLMhYub3BhbXAuc2Rr",
-            "LnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAyABKAwSMgoJZWZmZWN0aXZlGAUg",
-            "ASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhcKD3BlbmRp",
-            "bmdfcmVzdGFydBgGIAMoCRIaChJyZWZyZXNoX2F0X3VuaXhfbXMYByABKARK",
-            "BAgEEAUiYwoHUmVmcmVzaBIPCgdjdXJyZW50GAEgASgMEhAKCGF0X3N0YXJ0",
-            "GAIgASgMEiAKBGhvc3QYAyABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtu",
-            "b3dfdW5peF9tcxgEIAEoBCKWAQoJUmVmcmVzaGVkEigKCHNldHRpbmdzGAEg",
-            "ASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEjIKCWVmZmVjdGl2ZRgCIAEo",
-            "CzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIaChJyZWZyZXNo",
-            "X2F0X3VuaXhfbXMYAyABKAQSDwoHd2FybmluZxgEIAEoCSKhAQoGSGVhbHRo",
-            "EioKBmNvdW50cxgBIAEoCzIaLm9wYW1wLnNkay52MS5FeHBvcnRDb3VudHMS",
-            "LAoIcHJldmlvdXMYAiABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0",
-            "EhMKC25vd191bml4X21zGAMgASgEEigKCHNldHRpbmdzGAQgASgLMhYub3Bh",
-            "bXAuc2RrLnYxLlNldHRpbmdzIpEBCgxFeHBvcnRDb3VudHMSKgoGdHJhY2Vz",
-            "GAEgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cxIrCgdtZXRyaWNz",
-            "GAIgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cxIoCgRsb2dzGAMg",
-            "ASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cyKRAQoMU2lnbmFsQ291",
-            "bnRzEhIKCmV4cG9ydHNfb2sYASABKAQSFgoOZXhwb3J0c19mYWlsZWQYAiAB",
-            "KAQSFAoMaXRlbXNfZmFpbGVkGAMgASgEEhYKDml0ZW1zX2ZpbHRlcmVkGAQg",
-            "ASgEEhMKC2xhc3RfZmFpbGVkGAUgASgIEhIKCmxhc3RfZXJyb3IYBiABKAki",
-            "ZgoMSGVhbHRoUmVwb3J0EgwKBHNlbmQYASABKAgSMgoJZXhwb3J0ZXJzGAIg",
-            "ASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9uZW50SGVhbHRoEhQKDHNlbnRf",
-            "dW5peF9tcxgDIAEoBCI2CghEZXNjcmliZRIqCghyZXNvdXJjZRgBIAMoCzIY",
-            "Lm9wYW1wLnByb3RvLnYxLktleVZhbHVlIm8KCkNvbXBvbmVudHMSKgoJaW52",
-            "ZW50b3J5GAEgASgLMhcub3BhbXAuc2RrLnYxLkludmVudG9yeRIgCgRob3N0",
-            "GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyAB",
-            "KAQizAEKCUludmVudG9yeRITCgtpbnRlZ3JhdGlvbhgBIAEoCRIbChNpbnRl",
-            "Z3JhdGlvbl92ZXJzaW9uGAIgASgJEhQKDHNka19sYW5ndWFnZRgDIAEoCRIT",
-            "CgtzZGtfdmVyc2lvbhgEIAEoCRI3ChBpbnN0cnVtZW50YXRpb25zGAUgAygL",
-            "Mh0ub3BhbXAuc2RrLnYxLkluc3RydW1lbnRhdGlvbhIpCglleHBvcnRlcnMY",
-            "BiADKAsyFi5vcGFtcC5zZGsudjEuRXhwb3J0ZXIiMAoPSW5zdHJ1bWVudGF0",
-            "aW9uEgwKBG5hbWUYASABKAkSDwoHdmVyc2lvbhgCIAEoCSI3CghFeHBvcnRl",
-            "chIOCgZzaWduYWwYASABKAkSDAoEbmFtZRgCIAEoCRINCgVnYXRlZBgDIAEo",
-            "CCKCAgoIRXZhbHVhdGUSEAoIc2V0dGluZ3MYASABKAwSIAoEaG9zdBgCIAEo",
-            "CzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAcgASgEEicK",
-            "BHNwYW4YAyABKAsyFy5vcGFtcC5zZGsudjEuU3BhblN0YXJ0SAASJgoDbG9n",
-            "GAQgASgLMhcub3BhbXAuc2RrLnYxLkxvZ1JlY29yZEgAEi4KCmF0dHJpYnV0",
-            "ZXMYBSABKAsyGC5vcGFtcC5zZGsudjEuQXR0cmlidXRlc0gAEiMKA2NhcBgG",
-            "IAEoCzIULm9wYW1wLnNkay52MS5DYXBSdW5IAEIHCgVpbnB1dCJ9CgZDYXBS",
-            "dW4SKwoGc2lnbmFsGAEgASgOMhsub3BhbXAuc2RrLnYxLkNhcFJ1bi5TaWdu",
-            "YWwSJgoGZXZlbnRzGAIgAygLMhYub3BhbXAuc2RrLnYxLkNhcEV2ZW50Ih4K",
-            "BlNpZ25hbBIKCgZUUkFDRVMQABIICgRMT0dTEAEiYQoIQ2FwRXZlbnQSDQoF",
-            "YXRfbnMYASABKAQSJAoGcGFyZW50GAIgASgOMhQub3BhbXAuc2RrLnYxLlBh",
-            "cmVudBIPCgdzYW1wbGVkGAMgASgIEg8KB3JlY29yZHMYBCABKAQiOgoKQXR0",
-            "cmlidXRlcxIsCgphdHRyaWJ1dGVzGAEgAygLMhgub3BhbXAucHJvdG8udjEu",
-            "S2V5VmFsdWUiLAoJTG9nUmVjb3JkEg0KBXNjb3BlGAEgASgJEhAKCHNldmVy",
-            "aXR5GAIgASgNIpMBCglTcGFuU3RhcnQSDAoEbmFtZRgBIAEoCRIkCgRraW5k",
-            "GAIgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kEiwKCmF0dHJpYnV0ZXMY",
-            "AyADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIkCgZwYXJlbnQYBCAB",
-            "KA4yFC5vcGFtcC5zZGsudjEuUGFyZW50IqIBCglFdmFsdWF0ZWQSDwoHcmVm",
-            "dXNlZBgBIAEoCRIsCghzYW1wbGluZxgCIAEoCzIaLm9wYW1wLnNkay52MS5T",
-            "cGFuU2FtcGxpbmcSEQoEa2VwdBgDIAEoCEgAiAEBEioKCHJlZGFjdGVkGAQg",
-            "AygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUSDgoGcGFzc2VkGAUgAygE",
-            "QgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3Bh",
-            "bXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQY",
-            "AiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93",
-            "EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQ",
-            "AkIHCgVfcnVsZSLfAgoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAu",
-            "c2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEu",
-            "RGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVz",
-            "Y3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFs",
-            "dWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVz",
-            "aEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIu",
-            "Cgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNI",
-            "ABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SABCBgoE",
-            "Y2FsbCKpAwoFUmVwbHkSJgoGbG9hZGVkGAEgASgLMhQub3BhbXAuc2RrLnYx",
-            "LkxvYWRlZEgAEioKCGRlY2lzaW9uGAIgASgLMhYub3BhbXAuc2RrLnYxLkRl",
-            "Y2lzaW9uSAASNwoLZGVzY3JpcHRpb24YAyABKAsyIC5vcGFtcC5wcm90by52",
-            "MS5BZ2VudERlc2NyaXB0aW9uSAASDwoFZXJyb3IYBCABKAlIABIsCglldmFs",
-            "dWF0ZWQYBSABKAsyFy5vcGFtcC5zZGsudjEuRXZhbHVhdGVkSAASLAoJcmVm",
-            "cmVzaGVkGAYgASgLMhcub3BhbXAuc2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhl",
-            "YWx0aF9yZXBvcnQYByABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0",
-            "SAASQwoUYXZhaWxhYmxlX2NvbXBvbmVudHMYCCABKAsyIy5vcGFtcC5wcm90",
-            "by52MS5BdmFpbGFibGVDb21wb25lbnRzSAASIgoEcGxhbhgJIAEoCzISLm9w",
-            "YW1wLnNkay52MS5QbGFuSABCCAoGcmVzdWx0KpkBCghTcGFuS2luZBIZChVT",
-            "UEFOX0tJTkRfVU5TUEVDSUZJRUQQABIWChJTUEFOX0tJTkRfSU5URVJOQUwQ",
-            "ARIUChBTUEFOX0tJTkRfU0VSVkVSEAISFAoQU1BBTl9LSU5EX0NMSUVOVBAD",
-            "EhYKElNQQU5fS0lORF9QUk9EVUNFUhAEEhYKElNQQU5fS0lORF9DT05TVU1F",
-            "UhAFKocBCgZQYXJlbnQSDwoLUEFSRU5UX05PTkUQABIYChRQQVJFTlRfTE9D",
-            "QUxfU0FNUExFRBABEhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBMRUQQAhIZChVQ",
-            "QVJFTlRfUkVNT1RFX1NBTVBMRUQQAxIbChdQQVJFTlRfUkVNT1RFX1VOU0FN",
-            "UExFRBAEQn4KFmRldi5weWRhbnRpYy5vcGFtcC5zZGtCDVNldHRpbmdzUHJv",
-            "dG9aOWdpdGh1Yi5jb20vcHlkYW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFt",
-            "cC9zZGsvc2V0dGluZ3NwYqoCGVB5ZGFudGljLk9wQW1wLkNsaWVudC5TZGti",
-            "BnByb3RvMw=="));
+            "BAgCEAMigwEKBExvYWQSEgoFc2F2ZWQYASABKAxIAIgBARIgCgRob3N0GAIg",
+            "ASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQS",
+            "FwoKY29yZV9zdGF0ZRgEIAEoDEgBiAEBQggKBl9zYXZlZEINCgtfY29yZV9z",
+            "dGF0ZSKkAQoGTG9hZGVkEigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2Rr",
+            "LnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAiABKAwSMgoJZWZmZWN0aXZlGAMg",
+            "ASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEg8KB3dhcm5p",
+            "bmcYBCABKAkSGgoScmVmcmVzaF9hdF91bml4X21zGAUgASgEIpsBCgZEZWNp",
+            "ZGUSMQoGY29uZmlnGAEgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1v",
+            "dGVDb25maWcSDwoHY3VycmVudBgCIAEoDBIQCghhdF9zdGFydBgDIAEoDBIg",
+            "CgRob3N0GAUgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhf",
+            "bXMYBiABKARKBAgEEAUiIgoEUGxhbhIRCgRzYXZlGAEgASgMSACIAQFCBwoF",
+            "X3NhdmUipgEKBkNvbW1pdBIkCgZkZWNpZGUYASABKAsyFC5vcGFtcC5zZGsu",
+            "djEuRGVjaWRlEikKBXNhdmVkGAIgASgOMhoub3BhbXAuc2RrLnYxLkNvbW1p",
+            "dC5TYXZlZBINCgVlcnJvchgDIAEoCSI8CgVTYXZlZBIRCg1TQVZFRF9OT1dI",
+            "RVJFEAASDgoKU0FWRURfRE9ORRABEhAKDFNBVkVEX0ZBSUxFRBACIuUBCghE",
+            "ZWNpc2lvbhIyCgZzdGF0dXMYASABKAsyIi5vcGFtcC5wcm90by52MS5SZW1v",
+            "dGVDb25maWdTdGF0dXMSJQoFYXBwbHkYAiABKAsyFi5vcGFtcC5zZGsudjEu",
+            "U2V0dGluZ3MSDwoHY3VycmVudBgDIAEoDBIyCgllZmZlY3RpdmUYBSABKAsy",
+            "Hy5vcGFtcC5wcm90by52MS5FZmZlY3RpdmVDb25maWcSFwoPcGVuZGluZ19y",
+            "ZXN0YXJ0GAYgAygJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgHIAEoBEoECAQQ",
+            "BSJjCgdSZWZyZXNoEg8KB2N1cnJlbnQYASABKAwSEAoIYXRfc3RhcnQYAiAB",
+            "KAwSIAoEaG9zdBgDIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191",
+            "bml4X21zGAQgASgEIpYBCglSZWZyZXNoZWQSKAoIc2V0dGluZ3MYASABKAsy",
+            "Fi5vcGFtcC5zZGsudjEuU2V0dGluZ3MSMgoJZWZmZWN0aXZlGAIgASgLMh8u",
+            "b3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhoKEnJlZnJlc2hfYXRf",
+            "dW5peF9tcxgDIAEoBBIPCgd3YXJuaW5nGAQgASgJIqEBCgZIZWFsdGgSKgoG",
+            "Y291bnRzGAEgASgLMhoub3BhbXAuc2RrLnYxLkV4cG9ydENvdW50cxIsCghw",
+            "cmV2aW91cxgCIAEoCzIaLm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnQSEwoL",
+            "bm93X3VuaXhfbXMYAyABKAQSKAoIc2V0dGluZ3MYBCABKAsyFi5vcGFtcC5z",
+            "ZGsudjEuU2V0dGluZ3MikQEKDEV4cG9ydENvdW50cxIqCgZ0cmFjZXMYASAB",
+            "KAsyGi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzEisKB21ldHJpY3MYAiAB",
+            "KAsyGi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzEigKBGxvZ3MYAyABKAsy",
+            "Gi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzIpEBCgxTaWduYWxDb3VudHMS",
+            "EgoKZXhwb3J0c19vaxgBIAEoBBIWCg5leHBvcnRzX2ZhaWxlZBgCIAEoBBIU",
+            "CgxpdGVtc19mYWlsZWQYAyABKAQSFgoOaXRlbXNfZmlsdGVyZWQYBCABKAQS",
+            "EwoLbGFzdF9mYWlsZWQYBSABKAgSEgoKbGFzdF9lcnJvchgGIAEoCSJmCgxI",
+            "ZWFsdGhSZXBvcnQSDAoEc2VuZBgBIAEoCBIyCglleHBvcnRlcnMYAiABKAsy",
+            "Hy5vcGFtcC5wcm90by52MS5Db21wb25lbnRIZWFsdGgSFAoMc2VudF91bml4",
+            "X21zGAMgASgEIjYKCERlc2NyaWJlEioKCHJlc291cmNlGAEgAygLMhgub3Bh",
+            "bXAucHJvdG8udjEuS2V5VmFsdWUibwoKQ29tcG9uZW50cxIqCglpbnZlbnRv",
+            "cnkYASABKAsyFy5vcGFtcC5zZGsudjEuSW52ZW50b3J5EiAKBGhvc3QYAiAB",
+            "KAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgDIAEoBCLM",
+            "AQoJSW52ZW50b3J5EhMKC2ludGVncmF0aW9uGAEgASgJEhsKE2ludGVncmF0",
+            "aW9uX3ZlcnNpb24YAiABKAkSFAoMc2RrX2xhbmd1YWdlGAMgASgJEhMKC3Nk",
+            "a192ZXJzaW9uGAQgASgJEjcKEGluc3RydW1lbnRhdGlvbnMYBSADKAsyHS5v",
+            "cGFtcC5zZGsudjEuSW5zdHJ1bWVudGF0aW9uEikKCWV4cG9ydGVycxgGIAMo",
+            "CzIWLm9wYW1wLnNkay52MS5FeHBvcnRlciIwCg9JbnN0cnVtZW50YXRpb24S",
+            "DAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJIjcKCEV4cG9ydGVyEg4K",
+            "BnNpZ25hbBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWdhdGVkGAMgASgIIoIC",
+            "CghFdmFsdWF0ZRIQCghzZXR0aW5ncxgBIAEoDBIgCgRob3N0GAIgASgLMhIu",
+            "b3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYByABKAQSJwoEc3Bh",
+            "bhgDIAEoCzIXLm9wYW1wLnNkay52MS5TcGFuU3RhcnRIABImCgNsb2cYBCAB",
+            "KAsyFy5vcGFtcC5zZGsudjEuTG9nUmVjb3JkSAASLgoKYXR0cmlidXRlcxgF",
+            "IAEoCzIYLm9wYW1wLnNkay52MS5BdHRyaWJ1dGVzSAASIwoDY2FwGAYgASgL",
+            "MhQub3BhbXAuc2RrLnYxLkNhcFJ1bkgAQgcKBWlucHV0In0KBkNhcFJ1bhIr",
+            "CgZzaWduYWwYASABKA4yGy5vcGFtcC5zZGsudjEuQ2FwUnVuLlNpZ25hbBIm",
+            "CgZldmVudHMYAiADKAsyFi5vcGFtcC5zZGsudjEuQ2FwRXZlbnQiHgoGU2ln",
+            "bmFsEgoKBlRSQUNFUxAAEggKBExPR1MQASJhCghDYXBFdmVudBINCgVhdF9u",
+            "cxgBIAEoBBIkCgZwYXJlbnQYAiABKA4yFC5vcGFtcC5zZGsudjEuUGFyZW50",
+            "Eg8KB3NhbXBsZWQYAyABKAgSDwoHcmVjb3JkcxgEIAEoBCI6CgpBdHRyaWJ1",
+            "dGVzEiwKCmF0dHJpYnV0ZXMYASADKAsyGC5vcGFtcC5wcm90by52MS5LZXlW",
+            "YWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkSEAoIc2V2ZXJpdHkY",
+            "AiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJEiQKBGtpbmQYAiAB",
+            "KA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0cmlidXRlcxgDIAMo",
+            "CzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBhcmVudBgEIAEoDjIU",
+            "Lm9wYW1wLnNkay52MS5QYXJlbnQiogEKCUV2YWx1YXRlZBIPCgdyZWZ1c2Vk",
+            "GAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAuc2RrLnYxLlNwYW5T",
+            "YW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVkYWN0ZWQYBCADKAsy",
+            "GC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIOCgZwYXNzZWQYBSADKARCBwoF",
+            "X2tlcHQisgEKDFNwYW5TYW1wbGluZxIrCgNob3cYASABKA4yHi5vcGFtcC5z",
+            "ZGsudjEuU3BhblNhbXBsaW5nLkhvdxIWCg5wYXJlbnRfc2FtcGxlZBgCIAEo",
+            "CBIMCgRyYXRlGAMgASgBEhEKBHJ1bGUYBCABKA1IAIgBASIzCgNIb3cSEQoN",
+            "Rk9MTE9XX1BBUkVOVBAAEggKBFJBVEUQARIPCgtBUFBfU0FNUExFUhACQgcK",
+            "BV9ydWxlIt8CCgdSZXF1ZXN0EiIKBGxvYWQYASABKAsyEi5vcGFtcC5zZGsu",
+            "djEuTG9hZEgAEiYKBmRlY2lkZRgCIAEoCzIULm9wYW1wLnNkay52MS5EZWNp",
+            "ZGVIABIqCghkZXNjcmliZRgDIAEoCzIWLm9wYW1wLnNkay52MS5EZXNjcmli",
+            "ZUgAEioKCGV2YWx1YXRlGAQgASgLMhYub3BhbXAuc2RrLnYxLkV2YWx1YXRl",
+            "SAASKAoHcmVmcmVzaBgFIAEoCzIVLm9wYW1wLnNkay52MS5SZWZyZXNoSAAS",
+            "JgoGaGVhbHRoGAYgASgLMhQub3BhbXAuc2RrLnYxLkhlYWx0aEgAEi4KCmNv",
+            "bXBvbmVudHMYByABKAsyGC5vcGFtcC5zZGsudjEuQ29tcG9uZW50c0gAEiYK",
+            "BmNvbW1pdBgIIAEoCzIULm9wYW1wLnNkay52MS5Db21taXRIAEIGCgRjYWxs",
+            "IqkDCgVSZXBseRImCgZsb2FkZWQYASABKAsyFC5vcGFtcC5zZGsudjEuTG9h",
+            "ZGVkSAASKgoIZGVjaXNpb24YAiABKAsyFi5vcGFtcC5zZGsudjEuRGVjaXNp",
+            "b25IABI3CgtkZXNjcmlwdGlvbhgDIAEoCzIgLm9wYW1wLnByb3RvLnYxLkFn",
+            "ZW50RGVzY3JpcHRpb25IABIPCgVlcnJvchgEIAEoCUgAEiwKCWV2YWx1YXRl",
+            "ZBgFIAEoCzIXLm9wYW1wLnNkay52MS5FdmFsdWF0ZWRIABIsCglyZWZyZXNo",
+            "ZWQYBiABKAsyFy5vcGFtcC5zZGsudjEuUmVmcmVzaGVkSAASMwoNaGVhbHRo",
+            "X3JlcG9ydBgHIAEoCzIaLm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnRIABJD",
+            "ChRhdmFpbGFibGVfY29tcG9uZW50cxgIIAEoCzIjLm9wYW1wLnByb3RvLnYx",
+            "LkF2YWlsYWJsZUNvbXBvbmVudHNIABIiCgRwbGFuGAkgASgLMhIub3BhbXAu",
+            "c2RrLnYxLlBsYW5IAEIICgZyZXN1bHQqmQEKCFNwYW5LaW5kEhkKFVNQQU5f",
+            "S0lORF9VTlNQRUNJRklFRBAAEhYKElNQQU5fS0lORF9JTlRFUk5BTBABEhQK",
+            "EFNQQU5fS0lORF9TRVJWRVIQAhIUChBTUEFOX0tJTkRfQ0xJRU5UEAMSFgoS",
+            "U1BBTl9LSU5EX1BST0RVQ0VSEAQSFgoSU1BBTl9LSU5EX0NPTlNVTUVSEAUq",
+            "hwEKBlBhcmVudBIPCgtQQVJFTlRfTk9ORRAAEhgKFFBBUkVOVF9MT0NBTF9T",
+            "QU1QTEVEEAESGgoWUEFSRU5UX0xPQ0FMX1VOU0FNUExFRBACEhkKFVBBUkVO",
+            "VF9SRU1PVEVfU0FNUExFRBADEhsKF1BBUkVOVF9SRU1PVEVfVU5TQU1QTEVE",
+            "EARCfgoWZGV2LnB5ZGFudGljLm9wYW1wLnNka0INU2V0dGluZ3NQcm90b1o5",
+            "Z2l0aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1wL3Nk",
+            "ay9zZXR0aW5nc3BiqgIZUHlkYW50aWMuT3BBbXAuQ2xpZW50LlNka2IGcHJv",
+            "dG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.AnyvalueReflection.Descriptor, global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Client.Sdk.SpanKind), typeof(global::Pydantic.OpAmp.Client.Sdk.Parent), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -162,7 +163,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.ScopeLevel), global::Pydantic.OpAmp.Client.Sdk.ScopeLevel.Parser, new[]{ "Pattern", "MinSeverity" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Names), global::Pydantic.OpAmp.Client.Sdk.Names.Parser, new[]{ "Names_" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Host), global::Pydantic.OpAmp.Client.Sdk.Host.Parser, new[]{ "Live", "NextStart" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Load), global::Pydantic.OpAmp.Client.Sdk.Load.Parser, new[]{ "Saved", "Host", "NowUnixMs" }, new[]{ "Saved" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Load), global::Pydantic.OpAmp.Client.Sdk.Load.Parser, new[]{ "Saved", "Host", "NowUnixMs", "CoreState" }, new[]{ "Saved", "CoreState" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Loaded), global::Pydantic.OpAmp.Client.Sdk.Loaded.Parser, new[]{ "Settings", "Current", "Effective", "Warning", "RefreshAtUnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Decide), global::Pydantic.OpAmp.Client.Sdk.Decide.Parser, new[]{ "Config", "Current", "AtStart", "Host", "NowUnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Plan), global::Pydantic.OpAmp.Client.Sdk.Plan.Parser, new[]{ "Save" }, new[]{ "Save" }, null, null, null),
@@ -2195,7 +2196,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
   }
 
   /// <summary>
-  /// At start, before the SDK is built: the settings saved at the last change.
+  /// At start, before the SDK is built: the settings of the last config applied.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class Load : pb::IMessage<Load>
@@ -2235,6 +2236,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       saved_ = other.saved_;
       host_ = other.host_ != null ? other.host_.Clone() : null;
       nowUnixMs_ = other.nowUnixMs_;
+      coreState_ = other.coreState_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -2250,7 +2252,8 @@ namespace Pydantic.OpAmp.Client.Sdk {
 
     private pb::ByteString saved_;
     /// <summary>
-    /// unset: nothing saved
+    /// The document this host kept itself (sdk-settings.json, before the core kept the last config
+    /// applied): read only when core_state holds no config applied. Unset: none.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -2301,6 +2304,37 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "core_state" field.</summary>
+    public const int CoreStateFieldNumber = 4;
+    private readonly static pb::ByteString CoreStateDefaultValue = pb::ByteString.Empty;
+
+    private pb::ByteString coreState_;
+    /// <summary>
+    /// The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
+    /// settings come from the last config applied in it, read with the core's own decoding, even
+    /// after an endpoint change. Unset: none.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pb::ByteString CoreState {
+      get { return coreState_ ?? CoreStateDefaultValue; }
+      set {
+        coreState_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+    /// <summary>Gets whether the "core_state" field is set</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool HasCoreState {
+      get { return coreState_ != null; }
+    }
+    /// <summary>Clears the value of the "core_state" field</summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void ClearCoreState() {
+      coreState_ = null;
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -2319,6 +2353,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (Saved != other.Saved) return false;
       if (!object.Equals(Host, other.Host)) return false;
       if (NowUnixMs != other.NowUnixMs) return false;
+      if (CoreState != other.CoreState) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -2329,6 +2364,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (HasSaved) hash ^= Saved.GetHashCode();
       if (host_ != null) hash ^= Host.GetHashCode();
       if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
+      if (HasCoreState) hash ^= CoreState.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -2359,6 +2395,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(24);
         output.WriteUInt64(NowUnixMs);
       }
+      if (HasCoreState) {
+        output.WriteRawTag(34);
+        output.WriteBytes(CoreState);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -2381,6 +2421,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(24);
         output.WriteUInt64(NowUnixMs);
       }
+      if (HasCoreState) {
+        output.WriteRawTag(34);
+        output.WriteBytes(CoreState);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -2399,6 +2443,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (NowUnixMs != 0UL) {
         size += 1 + pb::CodedOutputStream.ComputeUInt64Size(NowUnixMs);
+      }
+      if (HasCoreState) {
+        size += 1 + pb::CodedOutputStream.ComputeBytesSize(CoreState);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -2423,6 +2470,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (other.NowUnixMs != 0UL) {
         NowUnixMs = other.NowUnixMs;
+      }
+      if (other.HasCoreState) {
+        CoreState = other.CoreState;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -2458,6 +2508,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
             NowUnixMs = input.ReadUInt64();
             break;
           }
+          case 34: {
+            CoreState = input.ReadBytes();
+            break;
+          }
         }
       }
     #endif
@@ -2490,6 +2544,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
           }
           case 24: {
             NowUnixMs = input.ReadUInt64();
+            break;
+          }
+          case 34: {
+            CoreState = input.ReadBytes();
             break;
           }
         }
