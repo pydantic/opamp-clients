@@ -23,6 +23,7 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings } from "@pydantic/opamp-client/sdk";
+import { keepApplied } from "./kept.js";
 
 import {
   Agent,
@@ -324,14 +325,15 @@ test("resource attributes reach the server typed, lists as lists", () => {
     [{ case: "intValue", value: 1n }, { case: "intValue", value: 2n }]);
 });
 
-test("live settings are applied at once, saved and reported; a wrong config changes nothing", () => {
+test("live settings are applied at once and reported, the package saving nothing; a wrong config changes nothing", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const { agent } = prepared(dir);
   const s = agent.remoteConfig(config('{"sampling_rate":"0.5","send_logs":"false"}'));
   assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.sendLogs, false);
   assert.deepEqual(effective(agent), { sampling_rate: "0.5", send_logs: "false" });
-  assert.equal(readFileSync(join(dir, "sdk-settings.json"), "utf8"), '{"sampling_rate":"0.5","send_logs":"false"}');
+  // The client keeps the config applied, in its own state: nothing of the package's own.
+  assert.equal(existsSync(join(dir, "sdk-settings.json")), false);
   const bad = agent.remoteConfig(config('{"send_logs":"true","sampling_rate":"2"}'));
   assert.equal(bad.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.match(bad.errorMessage, /^sampling_rate:/);
@@ -347,6 +349,7 @@ test("instrumentations are switched at once, reported, and still switched at the
     RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.off(http), true);
   assert.deepEqual(effective(agent), { deactivate_instrumentations: "http" });
+  keepApplied(dir, '{"deactivate_instrumentations":"http"}'); // as the client does, before APPLIED goes out
   const { agent: next, env } = prepared(dir, { OTEL_NODE_DISABLED_INSTRUMENTATIONS: "fs" });
   next.instrument([loaded("http")]);
   assert.equal(next.controls.off(http), true);
@@ -523,11 +526,21 @@ test("OTEL_SDK_DISABLED: the package stays out of the way too", () => {
   assert.throws(() => readFileSync(join(dir, "instance-uid")));
 });
 
-test("saved settings are written for the agent's user only", () => {
+test("the settings to start with are the config the client kept applied, else the file kept before", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
-  const { agent } = prepared(dir);
-  agent.remoteConfig(config('{"sampling_rate":"0.5"}'));
-  assert.equal(statSync(join(dir, "sdk-settings.json")).mode & 0o777, 0o600);
+  const rate = () => prepared(dir).agent.controls.sampler.samplingRate;
+  // Kept before the client kept the config applied (an earlier release): it carries over.
+  writeFileSync(join(dir, "sdk-settings.json"), '{"sampling_rate":"0.25"}');
+  assert.equal(rate(), 0.25);
+  // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+  keepApplied(dir, '{"sampling_rate":"0.5"}');
+  assert.equal(rate(), 0.5);
+  // A config applied with no settings entry: every setting the SDK's own, not the old file's.
+  keepApplied(dir, "{}");
+  assert.equal(rate(), undefined);
+  // A client state that doesn't read: the old file again.
+  writeFileSync(join(dir, "opamp-state"), new Uint8Array([0xff, 0xff]));
+  assert.equal(rate(), 0.25);
 });
 
 /** The process that held the default state directory ends. */

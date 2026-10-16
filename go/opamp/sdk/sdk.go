@@ -84,8 +84,15 @@ func (l *Layer) Load(ctx context.Context, saved []byte, host *settingspb.Host) (
 // LoadAt is Load at nowUnixMs, the wall clock in milliseconds since the Unix epoch, which debug
 // mode is decided by (0: none).
 func (l *Layer) LoadAt(ctx context.Context, saved []byte, host *settingspb.Host, nowUnixMs uint64) (*settingspb.Loaded, error) {
+	return l.LoadFrom(ctx, nil, saved, host, nowUnixMs)
+}
+
+// LoadFrom is LoadAt with coreState, the OpAMP core's saved state (what it asked the host to store;
+// nil: none). The settings then come from the last config applied in it, and saved is read only
+// when it holds none (a document kept before the core kept the config applied).
+func (l *Layer) LoadFrom(ctx context.Context, coreState, saved []byte, host *settingspb.Host, nowUnixMs uint64) (*settingspb.Loaded, error) {
 	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Load{Load: &settingspb.Load{
-		Saved: saved, Host: host, NowUnixMs: nowUnixMs}}})
+		Saved: saved, Host: host, NowUnixMs: nowUnixMs, CoreState: coreState}}})
 	if err != nil {
 		return nil, err
 	}

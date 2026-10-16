@@ -5,7 +5,7 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type IncomingMessage } from "node:http";
@@ -14,12 +14,14 @@ import { beforeEach, test } from "node:test";
 
 import {
   AgentCapabilities,
+  AgentRemoteConfigSchema,
   AgentToServerSchema,
   type AvailableComponents,
   ConnectionSettingsOffersSchema,
   ConnectionSettingsStatuses,
   create,
   fromBinary,
+  RemoteConfigStatuses,
   ServerToAgentFlags,
   ServerToAgentSchema,
   toBinary,
@@ -313,6 +315,57 @@ test("bad values given in code are warned about and the program runs: a scheme t
  * that says it takes connection settings a key of its own in its answer to the agent's first
  * message with the enrollment key; once the agent uses its own key, the enrollment key speaks for
  * it no more (401). */
+/** An OpAMP server that offers `offer` (an `elastic` settings document) in its first answer, if
+ * given: the statuses it is sent, and the settings each first message reports in force. */
+async function configServer(offer?: string) {
+  const seen = { polls: 0, applied: false, firstEffective: [] as string[] };
+  const s = createServer(async (req, res) => {
+    const msg = fromBinary(AgentToServerSchema, await body(req));
+    seen.polls++;
+    const status = msg.remoteConfigStatus;
+    if (status?.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED) seen.applied = true;
+    const elastic = msg.effectiveConfig?.configMap?.configMap.elastic;
+    if (msg.sequenceNum === 0n && elastic) seen.firstEffective.push(new TextDecoder().decode(elastic.body));
+    const reply = create(ServerToAgentSchema, { instanceUid: msg.instanceUid });
+    if (offer !== undefined && seen.polls === 1) {
+      const body = new TextEncoder().encode(offer);
+      reply.remoteConfig = create(AgentRemoteConfigSchema, {
+        configHash: body, config: { configMap: { elastic: { body, contentType: "application/json" } } },
+      });
+    }
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.end(toBinary(ServerToAgentSchema, reply));
+  });
+  await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
+  return { seen, endpoint: `http://127.0.0.1:${(s.address() as AddressInfo).port}/v1/opamp`, close: () => s.close() };
+}
+
+test("a config applied through the server is where the next start begins, with no file of the package's own", async () => {
+  // The server hears APPLIED once the client has saved the config with its state.
+  const first = await configServer('{"sampling_rate":"0.5"}');
+  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-state-"));
+  const env = { OTEL_OPAMP_STATE_DIR: dir };
+  try {
+    const r = await run("setInterval(() => {}, 1000);", first.endpoint, (kill) => void (async () => {
+      const deadline = Date.now() + 12_000;
+      while (!first.seen.applied && Date.now() < deadline) await new Promise((w) => setTimeout(w, 20));
+      kill("SIGTERM");
+    })(), first.seen, env);
+    assert.ok(first.seen.applied, `never APPLIED: ${r.out}`);
+  } finally {
+    first.close();
+  }
+  assert.equal(existsSync(join(dir, "sdk-settings.json")), false);
+  // The next start, against a server that sends nothing: the settings applied, in force from the first message.
+  const second = await configServer();
+  try {
+    const r = await run("setTimeout(() => {}, 1000);", second.endpoint, undefined, undefined, env);
+    assert.deepEqual(second.seen.firstEffective.map((e) => JSON.parse(e)), [{ sampling_rate: "0.5" }], r.out);
+  } finally {
+    second.close();
+  }
+});
+
 async function keyServer() {
   const takesKeys = BigInt(AgentCapabilities.AgentCapabilities_AcceptsOpAMPConnectionSettings)
     | BigInt(AgentCapabilities.AgentCapabilities_ReportsConnectionSettingsStatus);

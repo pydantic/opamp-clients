@@ -8,6 +8,7 @@ using Google.Protobuf;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 
 namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
@@ -588,7 +589,6 @@ public class AppSettingsTests
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
             agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"},\"sampling_rate\":\"0.5\"}"));
-            var saved = File.ReadAllBytes(Path.Combine(dir, "sdk-settings.json"));
             foreach (var (body, why) in new[]
             {
                 ("{\"custom\":{\"a\":\"2\",\"b\":[\"x\"]},\"sampling_rate\":\"1\"}", "custom.b: values must be"),
@@ -607,7 +607,7 @@ public class AppSettingsTests
             Assert.Equal(0.5, agent.Controls.Sampler.Policy.Rate);
             Assert.True(SameJson(Effective(agent), "{\"custom\":\"{\\\"a\\\":\\\"1\\\"}\",\"sampling_rate\":\"0.5\"}"), Effective(agent));
             told.Want((M(("a", "1")), new[] { "a" }));
-            Assert.Equal(saved, File.ReadAllBytes(Path.Combine(dir, "sdk-settings.json")));
+            Assert.False(File.Exists(Path.Combine(dir, "sdk-settings.json"))); // the client keeps the config applied
         }
         finally
         {
@@ -703,6 +703,7 @@ public class AppSettingsTests
         var dir = TempDir();
         var first = Prepare(new AppSettingsStore(), dir);
         first.RemoteConfig(Vectors.Config("{\"custom\":{\"checkout.new_flow\":\"on\"}}"));
+        Kept.KeepApplied(dir, "{\"custom\":{\"checkout.new_flow\":\"on\"}}"); // as the client does, before APPLIED goes out
         first.Stop(TimeSpan.Zero); // the process exits
 
         // The next start, before any config arrives: in force as the plugin prepares, before the
@@ -747,6 +748,7 @@ public class AppSettingsTests
         var dir = TempDir();
         var first = Prepare(new AppSettingsStore(), dir);
         first.RemoteConfig(Vectors.Config("{\"custom\":{\"example.feature\":\"on\"},\"deactivate_instrumentations\":\"httpclient\"}"));
+        Kept.KeepApplied(dir, "{\"custom\":{\"example.feature\":\"on\"},\"deactivate_instrumentations\":\"httpclient\"}");
         first.Stop(TimeSpan.Zero);
 
         var app = new AppSettingsStore();

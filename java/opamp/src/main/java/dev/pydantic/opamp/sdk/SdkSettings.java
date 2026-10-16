@@ -53,9 +53,22 @@ public final class SdkSettings {
    * what is no setting throws {@link IllegalArgumentException}.
    */
   public SettingsProto.Loaded load(byte[] saved, SettingsProto.Host host, long nowUnixMs) {
+    return loadFrom(null, saved, host, nowUnixMs);
+  }
+
+  /**
+   * As {@link #load(byte[], SettingsProto.Host, long)}, with {@code coreState}: the OpAMP core's
+   * saved state (what it asked the host to store; {@code null}: none). The settings then come from
+   * the last config applied in it, and {@code saved} is read only when it holds none (a document
+   * kept before the core kept the config applied).
+   */
+  public SettingsProto.Loaded loadFrom(byte[] coreState, byte[] saved, SettingsProto.Host host, long nowUnixMs) {
     SettingsProto.Load.Builder l = SettingsProto.Load.newBuilder().setNowUnixMs(nowUnixMs);
     if (saved != null) {
       l.setSaved(ByteString.copyFrom(saved));
+    }
+    if (coreState != null) {
+      l.setCoreState(ByteString.copyFrom(coreState));
     }
     if (host != null) {
       l.setHost(host);

@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 
 namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
@@ -53,46 +54,19 @@ public class DebugTests
     private static string SetAside(EffectiveConfig e) =>
         e.ConfigMap?.ConfigMap.TryGetValue("elastic.set_aside", out var c) == true ? c.Body.ToStringUtf8() : "null";
 
-    // Runs f with the settings file in dir made unsavable when fail: a directory, not empty, stands
-    // where it goes. What was saved before is put back after.
-    private static T FailingSave<T>(string? dir, bool fail, Func<T> f)
-    {
-        if (!fail || dir == null)
-        {
-            return f();
-        }
-
-        var path = Path.Combine(dir, "sdk-settings.json");
-        var kept = Path.Combine(dir, "sdk-settings.kept");
-        if (File.Exists(path))
-        {
-            File.Move(path, kept);
-        }
-
-        Directory.CreateDirectory(Path.Combine(path, "in-the-way"));
-        try
-        {
-            return f();
-        }
-        finally
-        {
-            Directory.Delete(path, true);
-            if (File.Exists(kept))
-            {
-                File.Move(kept, path);
-            }
-        }
-    }
-
     // Every case of testdata/debug.json and saving.json, each step through the agent the plugin
-    // runs: a decide is a remote config (its save failing where the step says), a load a restart (a
-    // new agent on the same state directory), a refresh the timer's call, each at the step's time on
-    // the agent's clock.
+    // runs: a decide is a remote config (kept applied as the client keeps it, where there is a state
+    // directory), a load a restart (a new agent on the same state directory), a refresh the timer's
+    // call, each at the step's time on the agent's clock. saving.json's cases whose save fails are
+    // the layer's: here the client keeps the config applied, and its save failing holds APPLIED back
+    // rather than refusing the config (the client's tests).
     [Fact]
     public void EveryDebugAndSavingVectorThroughTheAgent()
     {
         var failed = new List<string>();
-        foreach (var c in Vectors.Cases("debug.json").Concat(Vectors.Cases("saving.json")))
+        var cases = Vectors.Cases("debug.json").Concat(Vectors.Cases("saving.json").Where(c =>
+            !c.GetProperty("steps").EnumerateArray().Any(s => s.TryGetProperty("save", out var v) && v.GetString() == "failed")));
+        foreach (var c in cases)
         {
             var name = c.GetProperty("name").GetString()!;
             var steps = c.GetProperty("steps").EnumerateArray().ToList();
@@ -110,9 +84,13 @@ public class DebugTests
                     switch (step.GetProperty("call").GetString())
                     {
                         case "decide":
-                            var running = agent;
-                            var fail = step.TryGetProperty("save", out var sv) && sv.GetString() == "failed";
-                            status = FailingSave(dir, fail, () => running.RemoteConfig(Vectors.Config(step.GetProperty("document").GetString()!)));
+                            var document = step.GetProperty("document").GetString()!;
+                            status = agent.RemoteConfig(Vectors.Config(document));
+                            if (status.Status == RemoteConfigStatuses.Applied && dir != null)
+                            {
+                                Kept.KeepApplied(dir, document); // as the client does, before APPLIED goes out
+                            }
+
                             break;
                         case "load":
                             agent.Stop(TimeSpan.FromSeconds(1));

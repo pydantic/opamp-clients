@@ -65,10 +65,13 @@ export class SdkSettings {
    * last change (undefined: nothing saved). Put all of them in force, next-start ones too.
    * `host`: the settings the SDK carries out, at once or at the next start; one it leaves out is set
    * aside, never in force (left out: none carried out). `nowUnixMs`: the wall
-   * clock, which debug mode is decided by (0: none, and debug mode is ignored).
+   * clock, which debug mode is decided by (0: none, and debug mode is ignored). `coreState`: the
+   * OpAMP core's saved state (what it asked the host to store; undefined: none). The settings then
+   * come from the last config applied in it, and `saved` is read only when it holds none (a
+   * document kept before the core kept the config applied).
    */
-  load(saved?: Uint8Array, host?: HostInit, nowUnixMs = 0n): Loaded {
-    const r = this.#call({ call: { case: "load", value: { saved, nowUnixMs, ...(host ? { host } : {}) } } });
+  load(saved?: Uint8Array, host?: HostInit, nowUnixMs = 0n, coreState?: Uint8Array): Loaded {
+    const r = this.#call({ call: { case: "load", value: { saved, coreState, nowUnixMs, ...(host ? { host } : {}) } } });
     if (r.result.case !== "loaded") throw new Error(`load answered ${r.result.case}`);
     return r.result.value;
   }

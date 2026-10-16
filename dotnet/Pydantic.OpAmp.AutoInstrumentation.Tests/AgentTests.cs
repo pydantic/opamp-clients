@@ -6,6 +6,7 @@ using OpAmp.Proto.V1;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 
 namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
@@ -68,6 +69,9 @@ public class AgentTests
         Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
         Assert.False(agent.Controls.SendLogs);
         Assert.Empty(p.Set); // the instrumentations were read already: nothing changes until the restart
+        // The client keeps the config applied, in its own state: nothing of the plugin's own.
+        Assert.False(File.Exists(Path.Combine(p.Env["OTEL_OPAMP_STATE_DIR"]!, "sdk-settings.json")));
+        Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, "{\"sampling_rate\":\"0.25\",\"send_logs\":\"false\",\"deactivate_instrumentations\":\"httpclient\"}");
 
         agent.Stop(TimeSpan.Zero); // the process exits
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = p.Env["OTEL_OPAMP_STATE_DIR"] } };
@@ -77,6 +81,37 @@ public class AgentTests
         Assert.Equal("false", next.Set["OTEL_DOTNET_AUTO_TRACES_HTTPCLIENT_INSTRUMENTATION_ENABLED"]);
         Assert.Equal("false", next.Set["OTEL_DOTNET_AUTO_METRICS_HTTPCLIENT_INSTRUMENTATION_ENABLED"]);
         Assert.Equal(3, next.Set.Count);
+    }
+
+    [Fact]
+    public void TheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore()
+    {
+        var dir = TempDir();
+        double? Rate()
+        {
+            var agent = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } }.Prepare()!;
+            try
+            {
+                return agent.Controls.Sampler.Policy.Rate;
+            }
+            finally
+            {
+                agent.Stop(TimeSpan.Zero);
+            }
+        }
+
+        // Kept before the client kept the config applied (an earlier release): it carries over.
+        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), "{\"sampling_rate\":\"0.25\"}");
+        Assert.Equal(0.25, Rate());
+        // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+        Kept.KeepApplied(dir, "{\"sampling_rate\":\"0.5\"}");
+        Assert.Equal(0.5, Rate());
+        // A config applied with no settings entry: every setting the SDK's own, not the old file's.
+        Kept.KeepApplied(dir, "{}");
+        Assert.Null(Rate());
+        // A client state that doesn't read: the old file again.
+        File.WriteAllBytes(Path.Combine(dir, "opamp-state"), [0xff, 0xff]);
+        Assert.Equal(0.25, Rate());
     }
 
     [Fact]
@@ -148,6 +183,7 @@ public class AgentTests
         Assert.Null(child.Prepare());
         Assert.Empty(child.Set);
 
+        Kept.KeepApplied(dir, "{\"deactivate_instrumentations\":\"httpclient\"}"); // as the client does, before APPLIED goes out
         agent.Stop(TimeSpan.Zero);
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
         Assert.Equal(agent.Uid, next.Prepare()!.Uid);
@@ -169,7 +205,8 @@ public class AgentTests
     /// <summary>
     /// The first notification (a remote config in the answer to the first message) is answered
     /// through the client it comes with: callbacks wait for Start to return, so nothing holds the
-    /// answers until the agent has stored the client.
+    /// answers until the agent has stored the client. The config applied is where the next start
+    /// begins: the client keeps it with its state, and the server hears APPLIED once that is saved.
     /// </summary>
     [Fact]
     public async Task TheFirstNotificationIsAnsweredThroughItsClient()
@@ -219,12 +256,13 @@ public class AgentTests
         }
 
         var serving = Task.Run(Serve, cancel);
+        var dir = TempDir();
         var agent = new Process
         {
             Env =
             {
                 ["OTEL_OPAMP_ENDPOINT"] = $"http://127.0.0.1:{port}/v1/opamp",
-                ["OTEL_OPAMP_STATE_DIR"] = TempDir(),
+                ["OTEL_OPAMP_STATE_DIR"] = dir,
                 ["OTEL_OPAMP_HEARTBEAT_INTERVAL"] = "100ms",
             },
         }.Prepare()!;
@@ -240,6 +278,17 @@ public class AgentTests
             agent.Stop(TimeSpan.FromSeconds(10));
             listener.Close();
             await serving;
+        }
+
+        Assert.False(File.Exists(Path.Combine(dir, "sdk-settings.json")));
+        var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } }.Prepare()!;
+        try
+        {
+            Assert.False(next.Controls.SendLogs); // in force from the start
+        }
+        finally
+        {
+            next.Stop(TimeSpan.Zero);
         }
     }
 

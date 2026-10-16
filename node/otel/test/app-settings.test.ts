@@ -7,16 +7,17 @@
 // reject, order, unsubscribing, a FAILED config, the timer's Refresh, and restarts.
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { type HostInit, SdkSettings } from "@pydantic/opamp-client/sdk";
 
 import * as standalone from "../src/app-settings.js";
+import { keepApplied } from "./kept.js";
 import {
   Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, settingsKeptOnFailure,
 } from "../src/index.js";
@@ -106,6 +107,19 @@ class TestAgent extends Agent {
 
   get app(): AppSettings {
     return this.controls.app;
+  }
+
+  /**
+   * The remote config answered, and, APPLIED with a state directory, kept as the client keeps it
+   * (in its state, before APPLIED goes out): this agent has no client, so a restart finds it there.
+   */
+  override remoteConfig(config: AgentRemoteConfig): RemoteConfigStatus {
+    const s = super.remoteConfig(config);
+    const dir = this.setup?.stateDir;
+    if (s.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED && dir !== undefined) {
+      keepApplied(dir, config.config?.configMap.elastic?.body ?? new Uint8Array());
+    }
+    return s;
   }
 
   get timer() {
@@ -401,19 +415,15 @@ test("a FAILED config leaves the values, tells nothing, and the effective config
   assert.equal(agent.controls.sampler.samplingRate, 0.5);
 });
 
-test("a config that can't be saved is FAILED, and the application's values stay", () => {
+test("the package saves nothing: the client keeps the config applied", () => {
   const dir = stateDir();
   const { app, told } = recorded();
   const agent = new TestAgent(dir, app);
-  agent.remoteConfig(config(doc({ "example.feature": "on" })));
-  // The file it is saved to made a directory: the save fails.
-  rmSync(join(dir, "sdk-settings.json"));
-  mkdirSync(join(dir, "sdk-settings.json"));
-  const s = agent.remoteConfig(config(doc({ "example.feature": "off" })));
-  assert.equal(s.status, FAILED);
-  assert.match(s.errorMessage, /^can't save the settings/);
-  assert.equal(app.get("example.feature", "def"), "on");
-  assert.equal(told.length, 1);
+  assert.equal(agent.remoteConfig(config(doc({ "example.feature": "on" }))).status, APPLIED);
+  assert.equal(agent.remoteConfig(config(doc({ "example.feature": "off" }))).status, APPLIED);
+  assert.equal(existsSync(join(dir, "sdk-settings.json")), false);
+  assert.equal(app.get("example.feature", "def"), "off");
+  assert.equal(told.length, 2);
 });
 
 test("the timer's Refresh (debug mode's end) puts the same map in force again: nothing to tell", () => {
@@ -560,7 +570,7 @@ test("a restart with a state directory: the values in force at exit, from the st
   const dir = stateDir();
   const first = new TestAgent(dir);
   first.remoteConfig(config(doc({ "example.feature": "on", limit: "25" })));
-  assert.match(readFileSync(join(dir, "sdk-settings.json"), "utf8"), /"custom"/);
+  assert.equal(existsSync(join(dir, "sdk-settings.json")), false); // the client keeps it
   // The next start: in force before any config, and the server not reached at all.
   const { app, told } = recorded();
   const second = new TestAgent(dir, app);
@@ -604,10 +614,8 @@ test("a restart without a state directory starts from the defaults", () => {
 test("a saved document with a bad custom map: the SDK's own settings, the defaults, and a warning", () => {
   const dir = stateDir();
   new TestAgent(dir).remoteConfig(config(doc({ a: "1" })));
-  // Written by hand, not by the agent: a map the layer refuses.
-  rmSync(join(dir, "sdk-settings.json"));
-  const { writeFileSync } = createRequire(import.meta.url)("node:fs") as typeof import("node:fs");
-  writeFileSync(join(dir, "sdk-settings.json"), doc({ "a b": "1" }));
+  // Written by hand, not by the client: a map the layer refuses.
+  keepApplied(dir, doc({ "a b": "1" }));
   const agent = new TestAgent(dir);
   assert.equal(agent.app.get("a b", "def"), "def");
   assert.equal(agent.app.get("a", "def"), "def");

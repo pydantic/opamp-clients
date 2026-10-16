@@ -252,6 +252,7 @@ class AppSettingsExtensionTest {
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
     assertEquals(Map.of(), first.bridge.current());
     assertEquals(APPLIED, e.remoteConfig(config("{\"custom\":{\"example.feature\":\"on\"}}")).getStatus());
+    Kept.keepApplied(dir, "{\"custom\":{\"example.feature\":\"on\"}}"); // as the client does, before APPLIED goes out
 
     // The next start: in force at Load, before any config arrives, and told to whoever listened.
     App second = new App();
@@ -275,7 +276,8 @@ class AppSettingsExtensionTest {
     assertEquals(Map.of("a", "1"), app.bridge.current());
     e.remoteConfig(config("{}"));
     assertEquals(Map.of(), app.bridge.current());
-    assertEquals("{}", Files.readString(dir.resolve("sdk-settings.json"), StandardCharsets.UTF_8));
+    // The file kept before is left as it was: the client keeps the config applied now.
+    assertEquals("{\"custom\":{\"a\":\"1\"}}", Files.readString(dir.resolve("sdk-settings.json"), StandardCharsets.UTF_8));
   }
 
   @Test
@@ -383,7 +385,8 @@ class AppSettingsExtensionTest {
     assertEquals(List.of("APPLIED", "FAILED", "APPLIED", "APPLIED", "APPLIED"), statuses);
     assertEquals(3, app.told.size());
     assertEquals(Map.of("example.feature", "on"), app.bridge.current());
-    // The restart: on from the start.
+    // The restart, from the config the client kept applied (the last one): on from the start.
+    Kept.keepApplied(dir, "{\"custom\":{\"example.feature\":\"on\"},\"sampling_rate\":\"1\"}");
     App next = new App();
     Extension again = Extension.forTest(null, next.sink);
     again.properties(DefaultConfigProperties.createFromMap(props(dir)));

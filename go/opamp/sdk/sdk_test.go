@@ -5,6 +5,7 @@ package sdk
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -492,5 +493,53 @@ func TestCompilingTheLayerLeavesNoGarbageResident(t *testing.T) {
 	}
 	if resident > 4<<20 {
 		t.Fatalf("%d MB of heap resident after compiling the layer", resident>>20)
+	}
+}
+
+// The shared start vectors (testdata/sdk-settings/start.json): the settings to start with come from
+// the last config applied in the core's saved state, else from the document kept before.
+func TestTheStartVectors(t *testing.T) {
+	ctx := context.Background()
+	l, err := New(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close(ctx)
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "sdk-settings", "start.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		Cases []struct {
+			Name      string  `json:"name"`
+			CoreState *string `json:"core_state"`
+			Saved     *string `json:"saved"`
+			Want      *string `json:"want"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range v.Cases {
+		var coreState, saved []byte
+		if c.CoreState != nil {
+			if coreState, err = hex.DecodeString(*c.CoreState); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if c.Saved != nil {
+			saved = []byte(*c.Saved)
+		}
+		loaded, err := l.LoadFrom(ctx, coreState, saved, nil, 0)
+		if err != nil {
+			t.Fatalf("%s: %v", c.Name, err)
+		}
+		want := "{}"
+		if c.Want != nil {
+			want = *c.Want
+		}
+		if string(loaded.GetCurrent()) != want {
+			t.Errorf("%s: started from %s, want %s", c.Name, loaded.GetCurrent(), want)
+		}
 	}
 }

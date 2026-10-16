@@ -6,9 +6,8 @@ package opampotel
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -128,58 +127,32 @@ func sameJSON(t testing.TB, got string, want json.RawMessage) bool {
 	return reflect.DeepEqual(g, w)
 }
 
-// failingSave makes the settings file in dir unsavable, if fail: a directory, not empty, stands
-// where it goes. The function it returns puts back what was saved before.
-func failingSave(t *testing.T, dir string, fail bool) func() {
-	t.Helper()
-	if !fail {
-		return func() {}
-	}
-	path, kept := filepath.Join(dir, "sdk-settings.json"), filepath.Join(dir, "sdk-settings.kept")
-	_, err := os.Stat(path)
-	had := err == nil
-	if had {
-		if err := os.Rename(path, kept); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := os.MkdirAll(filepath.Join(path, "in-the-way"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	return func() {
-		if err := os.RemoveAll(path); err != nil {
-			t.Fatal(err)
-		}
-		if had {
-			if err := os.Rename(kept, path); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-}
-
 // Debug mode over time, and what the answer comes to with each save, through the agent
-// (debug.json, saving.json): its decisions at each step's clock, a restart that loads what it
-// saved, and its timer going off on its own, without the server, when the layer said to ask again.
+// (debug.json, saving.json): its decisions at each step's clock, a restart that loads what the
+// client kept applied, and its timer going off on its own, without the server, when the layer said
+// to ask again. saving.json's cases whose save fails are the layer's: here the client keeps the
+// config applied, and its save failing holds APPLIED back rather than refusing the config (the
+// client's own tests).
 func TestTheDebugAndSavingVectors(t *testing.T) {
+	type step struct {
+		Call     string `json:"call"`
+		Document string `json:"document"`
+		Save     string `json:"save"`
+		Now      uint64 `json:"now_unix_ms"`
+		Want     struct {
+			Status       string          `json:"status"`
+			Error        string          `json:"error"`
+			SamplingRate json.RawMessage `json:"sampling_rate"`
+			RefreshAt    *uint64         `json:"refresh_at_unix_ms"`
+			Effective    json.RawMessage `json:"effective"`
+			SetAside     json.RawMessage `json:"set_aside"`
+		} `json:"want"`
+	}
 	type vectors struct {
 		About string
 		Cases []struct {
 			Name  string `json:"name"`
-			Steps []struct {
-				Call     string `json:"call"`
-				Document string `json:"document"`
-				Save     string `json:"save"`
-				Now      uint64 `json:"now_unix_ms"`
-				Want     struct {
-					Status       string          `json:"status"`
-					Error        string          `json:"error"`
-					SamplingRate json.RawMessage `json:"sampling_rate"`
-					RefreshAt    *uint64         `json:"refresh_at_unix_ms"`
-					Effective    json.RawMessage `json:"effective"`
-					SetAside     json.RawMessage `json:"set_aside"`
-				} `json:"want"`
-			} `json:"steps"`
+			Steps []step `json:"steps"`
 		}
 	}
 	var v, saving vectors
@@ -189,6 +162,9 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 		t.Fatalf("%d and %d cases: debug.json or saving.json was cut short", len(v.Cases), len(saving.Cases))
 	}
 	for _, c := range append(v.Cases, saving.Cases...) {
+		if slices.ContainsFunc(c.Steps, func(s step) bool { return s.Save == "failed" }) {
+			continue
+		}
 		t.Run(c.Name, func(t *testing.T) {
 			dir, ft := t.TempDir(), newFakeTime(0)
 			ft.set(c.Steps[0].Now)
@@ -204,9 +180,10 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 					} else {
 						a.server.stateDir = dir
 					}
-					restore := failingSave(t, dir, s.Save == "failed")
 					status = a.remoteConfig(context.Background(), remote(s.Document))
-					restore()
+					if status.GetStatus() == applied && s.Save != "nowhere" {
+						keepApplied(t, dir, s.Document) // as the client does, before APPLIED goes out
+					}
 					if !strings.HasPrefix(status.GetErrorMessage(), s.Want.Error) {
 						t.Fatalf("step %d: error %q, want %q...", i, status.GetErrorMessage(), s.Want.Error)
 					}

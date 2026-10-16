@@ -17,6 +17,7 @@ from opamp_client import opamp_pb2
 from opamp_client.sdk import SdkSettings, settings_pb2
 
 import opamp_otel
+from kept import keep_applied
 from opamp_otel import Agent, app_settings
 from opamp_otel.app_settings import AppSettings
 
@@ -341,7 +342,7 @@ def test_a_wrong_custom_entry_fails_the_config_and_nothing_changes(tmp_path):
     assert agent.controls.sampler._rate == 0.5
     assert effective(agent) == {"custom": '{"a":"1"}', "sampling_rate": "0.5"}
     assert len(told.calls) == 1
-    assert (tmp_path / "sdk-settings.json").read_text() == '{"custom":{"a":"1"},"sampling_rate":"0.5"}'
+    assert not (tmp_path / "sdk-settings.json").exists()  # the client keeps the config applied
 
 
 def test_a_config_without_custom_puts_every_key_back_to_its_default(tmp_path):
@@ -374,7 +375,8 @@ def test_a_callback_that_raises_does_not_break_the_answer(tmp_path, caplog):
 
 def test_values_survive_a_restart_with_a_state_directory(tmp_path):
     agent = prepared(tmp_path)
-    agent.remote_config(config('{"custom":{"checkout.new_flow":"on"}}'))
+    assert agent.remote_config(config('{"custom":{"checkout.new_flow":"on"}}')).status == APPLIED
+    keep_applied(tmp_path, b'{"custom":{"checkout.new_flow":"on"}}')  # as the client does, before APPLIED goes out
     again = prepared(tmp_path)  # the next start: before any config arrives
     assert again.controls.app.get("checkout.new_flow", "off") == "on"
     assert effective(again) == {"custom": '{"checkout.new_flow":"on"}'}
@@ -388,7 +390,8 @@ def test_without_a_state_directory_a_restart_starts_from_the_defaults(tmp_path):
 
 
 def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path):
-    prepared(tmp_path).remote_config(config('{"custom":{"a":"1"}}'))
+    assert prepared(tmp_path).remote_config(config('{"custom":{"a":"1"}}')).status == APPLIED
+    keep_applied(tmp_path, b'{"custom":{"a":"1"}}')
     app, told = AppSettings(), Told()
     app.on_change(told)
     agent = Agent(app=app)

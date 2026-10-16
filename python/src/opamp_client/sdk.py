@@ -20,14 +20,19 @@ class SdkSettings:
     """The layer. Thread-safe."""
 
     def load(self, saved: bytes | None, host: settings_pb2.Host | None = None,
-             now_unix_ms: int = 0) -> settings_pb2.Loaded:
+             now_unix_ms: int = 0, core_state: bytes | None = None) -> settings_pb2.Loaded:
         """At start, before the SDK is built: the settings to start with, from the document saved at
         the last change (None: nothing saved). Put all of them in force, next-start ones too.
         `host`: the settings the SDK carries out, at once or at the next start; one it leaves out
         is set aside, never in force (None: none carried out), and one that is no setting raises
         ValueError. `now_unix_ms`: the wall clock, which debug mode is decided by (0: none, and
-        debug mode is ignored)."""
+        debug mode is ignored). `core_state`: the OpAMP core's saved state (what it asked the host
+        to store; None: none). The settings then come from the last config applied in it, and
+        `saved` is read only when it holds none (a document kept before the core kept the config
+        applied)."""
         load = settings_pb2.Load(saved=saved) if saved is not None else settings_pb2.Load()
+        if core_state is not None:
+            load.core_state = core_state
         load.now_unix_ms = now_unix_ms
         if host is not None:
             load.host.CopyFrom(host)

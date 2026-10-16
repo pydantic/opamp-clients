@@ -132,7 +132,7 @@ internal sealed class SdkAgent
         this.layer = new SdkSettings();
         this.host = hostNow(false);
         var now = this.clock.WallMs();
-        this.atStart = this.layer.Load(this.ReadSaved(), this.host, now);
+        this.atStart = this.layer.Load(this.ReadSaved(), this.host, now, this.ReadCoreState());
         if (this.atStart.Warning.Length > 0)
         {
             log.Warn(this.atStart.Warning);
@@ -254,7 +254,7 @@ internal sealed class SdkAgent
             // What this SDK turned out to carry out is known now: answer and report by it.
             this.host = this.hostNow(true);
             var now = this.clock.WallMs();
-            var loaded = this.layer.Load(this.ReadSaved(), this.host, now);
+            var loaded = this.layer.Load(this.ReadSaved(), this.host, now, this.ReadCoreState());
             this.atStart = loaded;
             this.current = loaded.Current;
             this.effective = loaded.Effective;
@@ -403,9 +403,11 @@ internal sealed class SdkAgent
     {
         lock (this.gate)
         {
-            var dir = this.server.StateDir;
+            // With a state directory the client keeps the config this applies, in its own state, and
+            // tells the server APPLIED once that is saved: nothing for the agent to save. Without one,
+            // nothing is kept, and a next-start change is refused.
             var now = this.clock.WallMs();
-            Action<byte[]>? save = dir == null ? null : doc => Write(Path.Combine(dir, "sdk-settings.json"), doc);
+            Action<byte[]>? save = this.server.StateDir == null ? null : _ => { };
             var d = this.layer.Decide(config, this.current, this.atStart.Current, this.host, now, save);
             if (d.Apply is { } apply)
             {
@@ -614,7 +616,19 @@ internal sealed class SdkAgent
         }
     }
 
-    private byte[]? ReadSaved()
+    /// <summary>
+    /// What this agent kept itself before the client kept the config applied (sdk-settings.json):
+    /// read only while the client's state holds no config applied.
+    /// </summary>
+    private byte[]? ReadSaved() => this.ReadStateFile("sdk-settings.json");
+
+    /// <summary>
+    /// The client's saved state (opamp-state), raw: the settings to start with are the last config
+    /// applied, which the client keeps there.
+    /// </summary>
+    private byte[]? ReadCoreState() => this.ReadStateFile("opamp-state");
+
+    private byte[]? ReadStateFile(string name)
     {
         if (this.server.StateDir is not { } dir)
         {
@@ -624,7 +638,7 @@ internal sealed class SdkAgent
         try
         {
             Directory.CreateDirectory(dir);
-            var path = Path.Combine(dir, "sdk-settings.json");
+            var path = Path.Combine(dir, name);
             return File.Exists(path) ? File.ReadAllBytes(path) : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

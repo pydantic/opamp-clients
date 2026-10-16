@@ -292,3 +292,16 @@ def test_the_inventory_without_a_host_lists_no_setting() -> None:
     # No host: one that declares nothing, as for load and decide.
     got = components_json(SdkSettings().components(inventory_of({}), None, NOW))
     assert got["settings"] == {}
+
+
+START = json.loads((VECTORS / "start.json").read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", START, ids=[c["name"] for c in START])
+def test_the_start_vectors(case: dict) -> None:
+    """testdata/sdk-settings/start.json: the settings to start with come from the last config
+    applied in the core's saved state, else from the document kept before."""
+    core_state = bytes.fromhex(case["core_state"]) if "core_state" in case else None
+    saved = case["saved"].encode() if "saved" in case else None
+    loaded = SdkSettings().load(saved, None, 0, core_state=core_state)
+    assert loaded.current == (case["want"] or "{}").encode()

@@ -139,10 +139,17 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second}
 	changed := func() { go a.scopesChanged() }
 	controls.scopes.changed.Store(&changed)
-	var saved []byte
+	var saved, coreState []byte
 	if s.stateDir != "" {
 		if err := os.MkdirAll(s.stateDir, 0o700); err != nil {
 			slog.Warn("opamp: the state directory is unusable", "error", err)
+		}
+		// The settings to start with are the last config applied, which the client keeps in its
+		// state (opamp-state); sdk-settings.json is what this package kept itself before, read
+		// only while the client's state holds no config applied.
+		coreState, err = os.ReadFile(filepath.Join(s.stateDir, "opamp-state"))
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			slog.Warn("opamp: the client's saved state unreadable, using the SDK's own settings", "error", err)
 		}
 		saved, err = os.ReadFile(filepath.Join(s.stateDir, "sdk-settings.json"))
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -150,7 +157,7 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 		}
 	}
 	start := a.now()
-	loaded, err := layer.LoadAt(ctx, saved, s.host(), unixMs(start))
+	loaded, err := layer.LoadFrom(ctx, coreState, saved, s.host(), unixMs(start))
 	if err != nil {
 		_ = layer.Close(ctx)
 		return nil, err
@@ -463,9 +470,12 @@ func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteC
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
+	// With a state directory the client keeps the config this applies, in its own state, and tells
+	// the server APPLIED once that is saved: nothing for this package to save. Without one, nothing
+	// is kept, and a next-start change is refused.
 	var save func([]byte) error
-	if dir := a.server.stateDir; dir != "" {
-		save = func(doc []byte) error { return write(filepath.Join(dir, "sdk-settings.json"), doc) }
+	if a.server.stateDir != "" {
+		save = func([]byte) error { return nil }
 	}
 	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.server.host(), unixMs(now), save)
 	if err != nil {

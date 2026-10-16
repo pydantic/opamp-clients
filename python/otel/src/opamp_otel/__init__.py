@@ -816,6 +816,14 @@ def _every_metric_exporter_gated(names: list[str]) -> bool:
     return all(n == "opamp" or not n or n.lower() == "none" for n in gated_metric_exporters(names))
 
 
+def read_if_there(path: Path) -> bytes | None:
+    """The file's bytes, or None if there is none."""
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
 def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrumented: bool = True,
              config_file: bool = False, span_processors: bool = False,
              log_processors: bool = False) -> settings_pb2.Host:
@@ -1002,6 +1010,7 @@ class Agent:
         self._health_next = 0.0
         self._started_ns = time.time_ns()
         self._saved: bytes | None = None
+        self._core_state: bytes | None = None
         self._metric_exporters: list[str] = []
         self._auto_instrumented = True
         self._hooked = False
@@ -1033,17 +1042,20 @@ class Agent:
         self._metric_exporters = names
         self._auto_instrumented = auto_instrumented
         self.host = sdk_host(names, auto_instrumented=auto_instrumented)
-        saved = None
+        saved = core_state = None
         if self.setup.state_dir is not None:
             try:
                 # The client's state in it can hold credentials the server issued.
                 self.setup.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                path = self.setup.state_dir / "sdk-settings.json"
-                saved = path.read_bytes() if path.exists() else None
+                # The settings to start with are the last config applied, which the client keeps in
+                # its state (opamp-state); sdk-settings.json is what this package kept itself
+                # before, read only while the client's state holds no config applied.
+                core_state = read_if_there(self.setup.state_dir / "opamp-state")
+                saved = read_if_there(self.setup.state_dir / "sdk-settings.json")
             except OSError as e:
                 _log.warning("OpAMP: saved SDK settings unreadable, using the SDK's own: %s", e)
-        self._saved = saved
-        self.loaded = self.layer.load(saved, self.host, self.wall_ms())
+        self._saved, self._core_state = saved, core_state
+        self.loaded = self.layer.load(saved, self.host, self.wall_ms(), core_state=core_state)
         if self.loaded.warning:
             _log.warning("OpAMP: %s", self.loaded.warning)
         self.current = self.loaded.current
@@ -1101,7 +1113,7 @@ class Agent:
             else:
                 _log.warning("OpAMP: the processors or metric exporters passed to the configurator export "
                              "past this package's gates: %s can't be carried out", lost)
-            self.loaded = self.layer.load(self._saved, self.host, self.wall_ms())
+            self.loaded = self.layer.load(self._saved, self.host, self.wall_ms(), core_state=self._core_state)
             self.current = self.loaded.current
             self.effective = self.loaded.effective
             self._put_in_force(self.loaded.settings)
@@ -1339,8 +1351,10 @@ class Agent:
         assert self.layer is not None and self.setup is not None
         with self._lock:
             now = self.wall_ms()
-            dir_ = self.setup.state_dir
-            save = None if dir_ is None else lambda doc: save_state(str(dir_ / "sdk-settings.json"), doc)
+            # With a state directory the client keeps the config this applies, in its own state,
+            # and tells the server APPLIED once that is saved: nothing for this package to save.
+            # Without one, nothing is kept, and a next-start change is refused.
+            save = None if self.setup.state_dir is None else lambda doc: None
             d = self.layer.decide(config, self.current, self.loaded.current, self.host, now, save)
             if d.HasField("apply"):
                 self._put_in_force(d.apply)
