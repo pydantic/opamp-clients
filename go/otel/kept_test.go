@@ -15,8 +15,8 @@ import (
 // the server has heard APPLIED: what the next start's settings come from. A test without a client
 // writes it here. The bytes are a state the client saved before it kept the config applied (the
 // shared vectors' start.json), with the config applied added: its field 16, a message, which
-// protobuf takes from the end of the encoding.
-func coreState(t testing.TB, document string) []byte {
+// protobuf takes from the end of the encoding. The config holds doc as its only policy file.
+func coreState(t testing.TB, doc string) []byte {
 	t.Helper()
 	start := readVectors[struct {
 		Cases []struct {
@@ -24,7 +24,7 @@ func coreState(t testing.TB, document string) []byte {
 			CoreState string `json:"core_state"`
 		} `json:"cases"`
 	}](t, "start.json")
-	const before = "a core state saved before the core kept the config applied: the document kept before carries over"
+	const before = "a core state saved before the core kept the config applied: the policy kept before carries over"
 	for _, c := range start.Cases {
 		if c.Name != before {
 			continue
@@ -34,7 +34,7 @@ func coreState(t testing.TB, document string) []byte {
 			t.Fatal(err)
 		}
 		applied, err := proto.Marshal(&protobufs.AgentRemoteConfig{ConfigHash: []byte("applied"), Config: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigObject{"elastic": {Body: []byte(document), ContentType: "application/json"}}}})
+			ConfigMap: map[string]*protobufs.AgentConfigObject{policyFile: {Body: []byte(doc), ContentType: "application/json"}}}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,10 +44,10 @@ func coreState(t testing.TB, document string) []byte {
 	return nil
 }
 
-// keepApplied leaves in dir what the client would after a config with document was applied.
-func keepApplied(t testing.TB, dir, document string) {
+// keepApplied leaves in dir what the client would after a config with the policy doc was applied.
+func keepApplied(t testing.TB, dir, doc string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, "opamp-state"), coreState(t, document), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "opamp-state"), coreState(t, doc), 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import io.opentelemetry.common.ComponentLoader;
 import io.opentelemetry.context.Context;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
@@ -79,15 +78,7 @@ class OutsideTest {
     return new TreeSet<>(e.host().getLiveList());
   }
 
-  /** The settings the effective config names as unsupported. */
-  static Set<String> unsupported(Extension e) throws Exception {
-    Set<String> out = new TreeSet<>();
-    JsonNode aside = Vectors.JSON.readTree(ExtensionTest.setAside(e));
-    if (aside != null && aside.has("unsupported")) {
-      aside.get("unsupported").forEach(n -> out.add(n.asText()));
-    }
-    return out;
-  }
+  private static final String UNSUPPORTED = "this SDK cannot apply the requested override";
 
   /** A processor that only adds an attribute as a span starts, as the agent's thread details does. */
   static final class OnStart implements SpanProcessor {
@@ -175,12 +166,18 @@ class OutsideTest {
       assertTrue(declared.containsAll(List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
           "debug_until", "debug_sampling_rate")), declared.toString());
 
-      // A config with a gate's settings: APPLIED, and they are named as set aside, not in force.
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config("elastic",
-          "{\"sampling_rate\":\"0.5\",\"send_traces\":\"false\",\"send_logs_level\":\"warn\",\"send_metrics\":\"false\"}"));
+      // A policy that overrides a gate's control is refused, naming it, and changes nothing.
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.v2(
+          "head_sampling", Vectors.override("\"ratio\":0.5"), "signal_exports", Vectors.exports("off", "off", ""),
+          "log_levels", Vectors.override("\"level\":\"warn\""))));
+      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
+      assertEquals("signal_exports.traces: " + UNSUPPORTED, s.getErrorMessage());
+      assertTrue(e.controls.gates.sendTraces());
+      // One that overrides only what the extension still carries out is applied.
+      String sampled = Vectors.v1("head_sampling", Vectors.override("\"ratio\":0.5"));
+      s = e.remoteConfig(ExtensionTest.config(sampled));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
-      assertEquals(Set.of("send_logs_level", "send_metrics", "send_traces"), unsupported(e));
-      assertEquals("{\"sampling_rate\":\"0.5\"}", ExtensionTest.effective(e));
+      assertEquals(Vectors.JSON.readTree(sampled), Vectors.JSON.readTree(ExtensionTest.effective(e)));
       assertTrue(e.controls.gates.sendTraces());
 
       // The inventory lists what the other extension added, ungated, beside the configured ones.
@@ -227,11 +224,16 @@ class OutsideTest {
       assertTrue(declared.containsAll(List.of("send_traces", "mask_attributes", "debug_until", "send_logs_level")),
           declared.toString());
 
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config("elastic",
-          "{\"sampling_rate\":\"0\",\"sampling_traces_per_second\":\"1\",\"send_traces\":\"false\"}"));
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.v2(
+          "head_sampling", Vectors.override("\"ratio\":0"), "trace_rate_limit", Vectors.override("\"traces_per_second\":1"),
+          "signal_exports", Vectors.exports("off", "", ""))));
+      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
+      assertEquals("head_sampling: " + UNSUPPORTED, s.getErrorMessage());
+      assertTrue(e.controls.gates.sendTraces());
+      String tracesOff = Vectors.v1("signal_exports", Vectors.exports("off", "", ""));
+      s = e.remoteConfig(ExtensionTest.config(tracesOff));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
-      assertEquals(Set.of("sampling_rate", "sampling_traces_per_second"), unsupported(e));
-      assertEquals("{\"send_traces\":\"false\"}", ExtensionTest.effective(e));
+      assertEquals(Vectors.JSON.readTree(tracesOff), Vectors.JSON.readTree(ExtensionTest.effective(e)));
       assertFalse(e.controls.gates.sendTraces());
     }
   }

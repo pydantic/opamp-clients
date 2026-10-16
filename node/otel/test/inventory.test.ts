@@ -14,24 +14,15 @@ import { test } from "node:test";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { SDK_INFO } from "@opentelemetry/core";
 import type { Instrumentation } from "@opentelemetry/instrumentation";
-import {
-  AgentRemoteConfigSchema,
-  type AvailableComponents,
-  type ComponentDetails,
-  create,
-  RemoteConfigStatuses,
-} from "@pydantic/opamp-client";
+import { type AvailableComponents, type ComponentDetails, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings } from "@pydantic/opamp-client/sdk";
 
+import { config as policyConfig, policy } from "./policy.js";
 import { Agent, exporterNames, hostFromEnv, inventory } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
+const config = (body: string) => policyConfig(body, body);
 /** 2026-10-14T12:00:00Z. */
 const NOW = 1_791_979_200_000;
 const PACKAGE = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { name: string; version: string };
@@ -111,7 +102,7 @@ test("every instrumentation getNodeAutoInstrumentations loads is listed, with it
     const [name, version] = Object.entries(listed).find(([n]) => `@opentelemetry/instrumentation-${n}` === i.instrumentationName)!;
     assert.equal(version, i.instrumentationVersion, name);
     // The name listed is the one the server switches it by.
-    const s = agent.remoteConfig(config(JSON.stringify({ deactivate_instrumentations: name })));
+    const s = agent.remoteConfig(config(policy({ instrumentations: { disabled: [name] } })));
     assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
     assert.equal(agent.controls.off(i.instrumentationName), true, name);
     assert.equal(all.filter((j) => agent.controls.off(j.instrumentationName)).length, 1, name);
@@ -188,11 +179,11 @@ test("an instrumentation given twice is listed once; one outside upstream's name
     instrumentation("my-own-instrumentation", "1.0.0"),
   ]).components());
   assert.deepEqual(c.instrumentations, { http: "0.222.0", pg: "0.60.0,0.61.0" });
-  // As deactivate_instrumentations has it: no name switches one outside upstream's names.
+  // As the instrumentations control has it: no name switches one outside upstream's names.
   const agent = built({}, [instrumentation("my-own-instrumentation")]);
-  agent.remoteConfig(config('{"deactivate_instrumentations":"my-own-instrumentation"}'));
+  agent.remoteConfig(config(policy({ instrumentations: { disabled: ["my-own-instrumentation"] } })));
   assert.equal(agent.controls.off("my-own-instrumentation"), false);
-  agent.remoteConfig(config('{"deactivate_all_instrumentations":"true"}'));
+  agent.remoteConfig(config(policy({ instrumentations: { all_disabled: true } })));
   assert.equal(agent.controls.off("my-own-instrumentation"), true);
 });
 

@@ -7,17 +7,17 @@
 app.py has no OpenTelemetry code: the urllib instrumentation traces its requests. The checks are
 every integration's (examples/integrations.py), run for app.py and again for in_code.py, the same
 program with its SDK set up in code (opamp_otel.configure()) and the server given there, with no
-OTEL_OPAMP_* variable set. It instruments itself, so the instrumentation switch is ignored. For
-app.py, then check_next: the newer settings, one after another in one run against the same server
-and sink (docs/python-otel.md#the-newer-settings):
+OTEL_OPAMP_* variable set. It instruments itself, so it refuses the instrumentation switch. For
+app.py, then check_next: the newer controls, one policy after another in one run against the same
+server and sink (docs/python-otel.md#the-newer-settings):
 
   1. sampling_rules: a rule of rate 0 on the /health requests: only /ping is traced;
-  2. mask_attributes url.full and http.url: the sink sees each span's URL as [REDACTED];
-  3. drop_attributes url.full and http.url: the sink sees no URL, only the span name, GET;
-  4. send_logs_level_by_scope app.noisy=off: one log record a round, not two;
-  5. sampling_traces_per_second 1 and send_logs_per_second 1: about one of each a second;
-  6. sampling_rate 0 with debug_until a few seconds ahead: traced until then, and then not,
-     with no word from the server;
+  2. attribute_redaction mask url.full and http.url: the sink sees each span's URL as [REDACTED];
+  3. attribute_redaction drop url.full and http.url: the sink sees no URL, only the span name, GET;
+  4. log_levels scopes app.noisy off: one log record a round, not two;
+  5. trace_rate_limit 1 and log_rate_limit 1: about one of each a second;
+  6. head_sampling 0 with debug until a few seconds ahead: traced until then, and then not, with
+     no word from the server;
 and export health throughout: the metrics go to a port nothing listens on, so a health report
 follows the first one, when the timer finds the metric exports failing. Then check_app_settings:
 app.py reads the feature flag example.feature (opamp_otel.app_settings), which the server turns on
@@ -26,7 +26,6 @@ and off (docs/app-settings.md).
 from __future__ import annotations
 
 import datetime
-import json
 import os
 import signal
 import subprocess
@@ -36,8 +35,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (DRIFT, MARGIN, ROOT, SETTINGS, check, check_app_settings, check_setup,  # noqa: E402
-                          key_in_code,
+from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup,  # noqa: E402
+                          key_in_code, offer,
                           check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
@@ -78,16 +77,19 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     return lambda: stop_group(app, signal.SIGINT)  # as Ctrl-C would: atexit runs
 
 
-# check_next's offers: (message, settings). The agent checks in every second.
+# check_next's offers: (message, overrides), each offered as a policy. The agent checks in every second.
 NEXT = [
-    (1, {"sampling_rate": "1",
-         "sampling_rules": [{"rate": 0, "kind": "client", "attributes": {"http.url": "*/health"}},
-                            {"rate": 0, "kind": "client", "attributes": {"url.full": "*/health"}}]}),
-    (16, {"sampling_rate": "1", "mask_attributes": "url.full, http.url"}),
-    (26, {"sampling_rate": "1", "drop_attributes": "URL.FULL, http.url"}),  # keys match ignoring case
-    (36, {"sampling_rate": "1", "send_logs_level_by_scope": "app.noisy=off"}),
-    (50, {"sampling_rate": "1", "sampling_traces_per_second": "1", "send_logs_per_second": "1"}),
-    (66, {"sampling_rate": "0", "debug_until": None}),  # filled in: DEBUG seconds after it is sent
+    (1, {"head_sampling": {"ratio": 1},
+         "sampling_rules": {"rules": [{"rate": 0, "kind": "client", "attributes": {"http.url": "*/health"}},
+                                      {"rate": 0, "kind": "client", "attributes": {"url.full": "*/health"}}]}}),
+    (16, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["url.full", "http.url"]}}),
+    # Keys match ignoring case.
+    (26, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"drop": ["URL.FULL", "http.url"]}}),
+    (36, {"head_sampling": {"ratio": 1}, "log_levels": {"scopes": {"app.noisy": "off"}}}),
+    (50, {"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 1},
+          "log_rate_limit": {"records_per_second": 1}}),
+    # check_next fills the time in: DEBUG seconds after the offer is sent.
+    (66, {"head_sampling": {"ratio": 0}, "debug": {"until": None}}),
 ]
 DEBUG = 12.0
 
@@ -114,14 +116,14 @@ def judge_next(events: list[dict], debug_until: float) -> list[tuple[str, bool]]
     out.append((f"sampling_rules: /ping traced, /health not ({len(names)} spans)",
                 any(n.endswith("/ping") for n in names) and not any(n.endswith("/health") for n in names)))
     names = ending(events, t[1] + DRIFT, t[2] - DRIFT)
-    out.append((f"mask_attributes: every URL [REDACTED] ({len(names)} spans)",
+    out.append((f"attribute_redaction mask: every URL [REDACTED] ({len(names)} spans)",
                 bool(names) and set(names) == {"[REDACTED]"}))
     names = ending(events, t[2] + DRIFT, t[3] - DRIFT)
-    out.append((f"drop_attributes: no URL, only the span's name ({sorted(set(names))})",
+    out.append((f"attribute_redaction drop: no URL, only the span's name ({sorted(set(names))})",
                 bool(names) and set(names) == {"GET"}))
     before = records(events, t[1] + MARGIN, t[3]) / max(len(pings(events, t[1] + MARGIN, t[3])), 1)
     after = records(events, t[3] + MARGIN, t[4]) / max(len(pings(events, t[3] + MARGIN, t[4])), 1)
-    out.append((f"send_logs_level_by_scope: log records a round {before:.2f}, then {after:.2f} with app.noisy off",
+    out.append((f"log_levels scopes: log records a round {before:.2f}, then {after:.2f} with app.noisy off",
                 before > 1.6 and 0.6 < after < 1.3))
     window = t[5] - (t[4] + MARGIN)
     traced = len(ending(events, t[4] + MARGIN, t[5]))
@@ -131,7 +133,7 @@ def judge_next(events: list[dict], debug_until: float) -> list[tuple[str, bool]]
                 window > 5 and made > 3 * window and 0 < traced <= window + 3 and 0 < logged <= window + 3))
     during = ending(events, t[5] + DRIFT, debug_until - DRIFT)
     late = ending(events, debug_until + MARGIN, t[6])
-    out.append((f"debug_until: traced in the window ({len(during)} spans), not after it ({len(late)} spans, "
+    out.append((f"debug: traced in the window ({len(during)} spans), not after it ({len(late)} spans, "
                 f"{t[6] - debug_until - MARGIN:.0f} s), with no word from the server",
                 bool(during) and not late and t[6] - debug_until - MARGIN > 3))
     health = [e for e in events if e["event"] == "a2s" and "health" in e["fields"]]
@@ -141,29 +143,28 @@ def judge_next(events: list[dict], debug_until: float) -> list[tuple[str, bool]]
 
 
 def check_next(launch, target_: Path, seconds: float = 200) -> bool:
-    """The newer settings in one run (above); every check printed; True when all pass."""
+    """The newer controls in one run (above); every check printed; True when all pass."""
     import shutil
     import tempfile
 
     state = Path(tempfile.mkdtemp(prefix="state-next-", dir=target_))
-    # debug_until is a time: as late as the offer could be sent, plus DEBUG. The agent's first
+    # debug's until is a time: as late as the offer could be sent, plus DEBUG. The agent's first
     # message comes once its environment is resolved (done before), so a second a message.
     debug_until = time.time() + NEXT[-1][0] + 30 + DEBUG
     offers = []
-    for n, body in NEXT:
-        if "debug_until" in body:
+    for n, overrides in NEXT:
+        if "debug" in overrides:
             when = datetime.datetime.fromtimestamp(debug_until, datetime.UTC)
-            body = {**body, "debug_until": when.isoformat(timespec="seconds").replace("+00:00", "Z")}
+            overrides = {**overrides, "debug": {"until": when.isoformat(timespec="seconds").replace("+00:00", "Z")}}
             debug_until = when.timestamp()
-        offers.append({"on_message": n, "action": "offer_config", "config_key": "elastic",
-                       "body": json.dumps(body), "content_type": SETTINGS})
+        offers.append(offer(n, overrides))
     env = {"APP_HEALTH_CHECKS": "1", "OTEL_LOGS_EXPORTER": "otlp", "OTEL_BLRP_SCHEDULE_DELAY": "500",
            # Nothing listens on port 9: every metric export fails, and export health says so.
            "OTEL_METRICS_EXPORTER": "otlp", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT": "http://127.0.0.1:9/v1/metrics",
            "OTEL_METRIC_EXPORT_INTERVAL": "2000", "OTEL_EXPORTER_OTLP_METRICS_TIMEOUT": "1"}
     ok = True
     try:
-        # The server's log times are the same host's clock in seconds since it started: debug_until
+        # The server's log times are the same host's clock in seconds since it started: debug's until
         # in the log's time is found from an event's wall clock.
         def done(events: list[dict]) -> bool:
             return len(statuses(events)) >= 6 and time.time() > debug_until + MARGIN + 8
@@ -198,7 +199,7 @@ def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
     return run_
 
 
-# The signals runs need deactivate_all, which configure() can't carry out; the next-settings run
+# The signals runs need instrumentations all_disabled, which configure() cannot carry out; the next-settings run
 # needs app.py's health checks and second logger: app.py's alone. The setup runs are both's: the key
 # in OTEL_OPAMP_HEADERS, then given to configure() (from CHECKOUT_OPAMP_KEY) with the other key in
 # OTEL_OPAMP_HEADERS, which the code wins over.

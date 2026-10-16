@@ -191,7 +191,7 @@ internal static class CoreFuzz
                         var m = new AgentConfigMap();
                         for (var n = r.U8() % 3; n > 0; n--)
                         {
-                            m.ConfigMap[r.Text(16)] = new AgentConfigObject
+                            m.ConfigMap[r.Bit() ? "logfire-sdk-policy.json" : r.Text(16)] = new AgentConfigObject
                             {
                                 Body = r.Bytes(1024), ContentType = r.Pick([string.Empty, "application/json", "text/yaml", r.Text(16)]),
                             };
@@ -209,7 +209,8 @@ internal static class CoreFuzz
                             resource.Add(new KeyValue { Key = r.Text(16), Value = new AnyValue { StringValue = r.Text(32) } });
                         }
 
-                        Layer.Value.Describe(resource);
+                        var host = r.Bit() ? new Sdk.Host { Live = { "sampling_rate", "send_logs" }, NextStart = { "opamp_polling_interval" } } : null;
+                        Layer.Value.Describe(resource, host, r.Bit() ? 1_791_979_200_000UL : 0);
                         break;
                     }
             }

@@ -53,9 +53,45 @@ class AgreesWithLayerTest {
     }
   }
 
-  static SettingsProto.Evaluate.Builder request(ObjectNode document) {
+  static SettingsProto.Evaluate.Builder request(ObjectNode settings) {
     return SettingsProto.Evaluate.newBuilder().setHost(Vectors.ALL).setNowUnixMs(Vectors.NOW)
-        .setSettings(ByteString.copyFrom(document.toString(), StandardCharsets.UTF_8));
+        .setSettings(ByteString.copyFrom(policy(settings), StandardCharsets.UTF_8));
+  }
+
+  /**
+   * The version 2 policy for the generated settings. The generators fill a flat object of the
+   * fields they vary, and this puts each field under its control.
+   */
+  static String policy(ObjectNode settings) {
+    List<String> set = new ArrayList<>();
+    if (settings.has("rules") && !settings.get("rules").isEmpty()) {
+      set.addAll(List.of("sampling_rules", Vectors.override("\"rules\":" + settings.get("rules"))));
+    }
+    if (settings.has("ratio")) {
+      set.addAll(List.of("head_sampling", Vectors.override("\"ratio\":" + settings.get("ratio"))));
+    }
+    List<String> levels = new ArrayList<>();
+    for (String field : List.of("level", "scopes")) {
+      if (settings.has(field)) {
+        levels.add("\"" + field + "\":" + settings.get(field));
+      }
+    }
+    if (!levels.isEmpty()) {
+      set.addAll(List.of("log_levels", Vectors.override(String.join(",", levels))));
+    }
+    if (settings.has("logs")) {
+      set.addAll(List.of("signal_exports", Vectors.exports("", "", "off")));
+    }
+    List<String> redaction = new ArrayList<>();
+    for (String field : List.of("drop", "mask")) {
+      if (settings.has(field)) {
+        redaction.add("\"" + field + "\":" + settings.get(field));
+      }
+    }
+    if (!redaction.isEmpty()) {
+      set.addAll(List.of("attribute_redaction", Vectors.override(String.join(",", redaction))));
+    }
+    return Vectors.v2(set.toArray(String[]::new));
   }
 
   static String text(Random r, int max) {
@@ -153,7 +189,7 @@ class AgreesWithLayerTest {
     Random r = new Random(1);
     for (int run = 0; run < RUNS; run++) {
       ObjectNode doc = Vectors.JSON.createObjectNode();
-      ArrayNode rules = doc.putArray("sampling_rules");
+      ArrayNode rules = doc.putArray("rules");
       for (int i = r.nextInt(4); i > 0; i--) {
         ObjectNode rule = rules.addObject();
         rule.put("rate", new double[] {0, 0.25, 1}[r.nextInt(3)]);
@@ -172,7 +208,7 @@ class AgreesWithLayerTest {
         }
       }
       if (r.nextBoolean()) {
-        doc.put("sampling_rate", "0.5");
+        doc.put("ratio", 0.5);
       }
       String name = text(r, 3);
       String kind = KINDS[r.nextInt(KINDS.length)];
@@ -190,13 +226,13 @@ class AgreesWithLayerTest {
 
       Controls c = new Controls();
       c.sampler.wrap(VectorsTest.APP);
-      c.apply(Vectors.settings(doc.toString(), Vectors.NOW));
+      c.apply(Vectors.settings(policy(doc), Vectors.NOW));
       LiveSampler.Decision got = c.sampler.decide(Span.fromContext(VectorsTest.parent(parent)).getSpanContext(), name,
           VectorsTest.kind(kind), java(attrs));
       String what = doc + " " + name + " " + kind + " " + parent + " " + attrs;
       SettingsProto.SpanSampling w = want.getSampling();
-      if (w.getHow() == SettingsProto.SpanSampling.How.APP_SAMPLER || doc.get("sampling_rules").isEmpty()
-          && !doc.has("sampling_rate")) {
+      if (w.getHow() == SettingsProto.SpanSampling.How.APP_SAMPLER || doc.get("rules").isEmpty()
+          && !doc.has("ratio")) {
         // With nothing set the agent's own sampler decides children too (as before these
         // settings); the layer's reference follows the parent. Anything set, they agree.
         assertEquals(LiveSampler.How.APP_SAMPLER, got.how(), what);
@@ -222,22 +258,21 @@ class AgreesWithLayerTest {
     String[] scopes = {"", "a", "a.b", "a.bc", "b", "c", "é.x"};
     for (int run = 0; run < RUNS; run++) {
       ObjectNode doc = Vectors.JSON.createObjectNode();
-      List<String> entries = new ArrayList<>();
-      Set<String> used = new HashSet<>();
+      ObjectNode entries = Vectors.JSON.createObjectNode();
       for (int i = r.nextInt(4); i > 0; i--) {
         String p = patterns[r.nextInt(patterns.length)];
-        if (used.add(p)) {
-          entries.add(p + "=" + levels[r.nextInt(levels.length)]);
+        if (!entries.has(p)) {
+          entries.put(p, levels[r.nextInt(levels.length)]);
         }
       }
       if (!entries.isEmpty()) {
-        doc.put("send_logs_level_by_scope", String.join(",", entries));
+        doc.set("scopes", entries);
       }
       if (r.nextBoolean()) {
-        doc.put("send_logs_level", levels[r.nextInt(levels.length - 1)]);
+        doc.put("level", levels[r.nextInt(levels.length - 1)]);
       }
       if (r.nextInt(8) == 0) {
-        doc.put("send_logs", "false");
+        doc.put("logs", "off");
       }
       String scope = scopes[r.nextInt(scopes.length)];
       int severity = r.nextInt(25);
@@ -246,7 +281,7 @@ class AgreesWithLayerTest {
       assertEquals("", want.getRefused(), doc.toString());
 
       Controls c = new Controls();
-      c.apply(Vectors.settings(doc.toString(), Vectors.NOW));
+      c.apply(Vectors.settings(policy(doc), Vectors.NOW));
       InMemoryLogRecordExporter out = InMemoryLogRecordExporter.create();
       c.logs(out).export(List.of(TestLogRecordData.builder().setBody("x")
           .setInstrumentationScopeInfo(InstrumentationScopeInfo.create(scope))
@@ -260,13 +295,16 @@ class AgreesWithLayerTest {
     Random r = new Random(3);
     for (int run = 0; run < RUNS; run++) {
       ObjectNode doc = Vectors.JSON.createObjectNode();
-      for (String key : List.of("drop_attributes", "mask_attributes")) {
+      for (String key : List.of("drop", "mask")) {
         if (r.nextBoolean()) {
-          List<String> ps = new ArrayList<>();
-          for (int i = r.nextInt(3) + 1; i > 0; i--) {
-            ps.add(text(r, 3).replace("?", ""));
+          ArrayNode ps = doc.putArray(key);
+          // The policy refuses an empty glob.
+          while (ps.size() < 1 || r.nextInt(3) == 0 && ps.size() < 3) {
+            String p = text(r, 3).replace("?", "");
+            if (!p.isEmpty()) {
+              ps.add(p);
+            }
           }
-          doc.put(key, String.join(",", ps));
         }
       }
       List<Attr> attrs = new ArrayList<>();
@@ -282,7 +320,7 @@ class AgreesWithLayerTest {
       assertEquals("", want.getRefused(), doc.toString());
 
       Controls c = new Controls();
-      c.apply(Vectors.settings(doc.toString(), Vectors.NOW));
+      c.apply(Vectors.settings(policy(doc), Vectors.NOW));
       InMemoryLogRecordExporter out = InMemoryLogRecordExporter.create();
       Attributes given = java(attrs);
       c.logs(out).export(List.of(TestLogRecordData.builder().setBody("x").setSeverity(Severity.INFO)

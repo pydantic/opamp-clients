@@ -61,9 +61,9 @@ final class Extension {
 
   /**
    * The settings this integration carries out at once, and at the next start, declared to the
-   * layer (docs/sdk-settings.md#the-host): one left out is set aside, never in force, so the agent
-   * never answers APPLIED for one it doesn't carry out. Instrumentations are switched as the agent
-   * starts, by its properties.
+   * layer (docs/sdk-settings.md#the-host). The layer refuses a policy that overrides one left out,
+   * so the agent never answers APPLIED for one it does not carry out, and the description lists only
+   * the controls declared. Instrumentations are switched as the agent starts, by its properties.
    */
   static final List<String> LIVE = List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
       "debug_until", "debug_sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_level",
@@ -106,7 +106,8 @@ final class Extension {
   }
 
   /**
-   * The application's own settings, {@code custom} (docs/app-settings.md): declared where the
+   * The application's own settings, {@code custom}, the policy's app_settings control
+   * (docs/app-settings.md): declared where the
    * application can read them, that is when the bridge to {@code dev.pydantic.opamp.AppSettings} is
    * in place ({@link Controls#app}).
    */
@@ -814,7 +815,7 @@ final class Extension {
     // carries out (its host, the application's own among them once they're read) don't change
     // while it runs.
     components = layer().components(inventory.build(), host(), wallClock.getAsLong());
-    OpampClient.Status status = new OpampClient.Status(layer().describe(attributes(resource)), health, effective,
+    OpampClient.Status status = new OpampClient.Status(layer().describe(attributes(resource), host(), wallClock.getAsLong()), health, effective,
         null, components);
     try {
       // The client's own requests aren't the application's. Everything it does runs on its
@@ -920,13 +921,6 @@ final class Extension {
     if (d.hasApply()) {
       controls.apply(d.getApply());
       inForce = d.getApply();
-      if (d.getApply().getUnsupportedCount() > 0) {
-        LOG.info("OpAMP: settings this agent doesn't carry out: "
-            + String.join(", ", d.getApply().getUnsupportedList()));
-      }
-      if (d.getApply().getIgnoredCount() > 0) {
-        LOG.info("OpAMP: settings unknown to this agent: " + String.join(", ", d.getApply().getIgnoredList()));
-      }
     }
     if (d.getPendingRestartCount() > 0) {
       LOG.info("OpAMP: " + String.join(", ", d.getPendingRestartList())

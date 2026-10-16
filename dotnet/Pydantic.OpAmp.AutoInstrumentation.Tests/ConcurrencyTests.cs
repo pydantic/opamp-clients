@@ -16,6 +16,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 using static Pydantic.OpAmp.AutoInstrumentation.Tests.Otlp;
 using SdkSpanKind = Pydantic.OpAmp.Client.Sdk.SpanKind;
@@ -23,9 +24,9 @@ using SdkSpanKind = Pydantic.OpAmp.Client.Sdk.SpanKind;
 namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
 
 /// <summary>
-/// The controls under fire. One applier flips through a seeded run of settings documents (rules
+/// The controls under fire. One applier flips through a seeded run of Logfire SDK policies (rules
 /// that overlap and change order, caps coming and going, levels per scope, redaction lists growing
-/// and shrinking, <c>send_*</c> on and off, debug windows on and off, the empty document) while
+/// and shrinking, <c>send_*</c> on and off, debug windows on and off, every control local) while
 /// workers emit spans (roots and children, with attributes, events and links) and log records
 /// through the real SDK pipeline: ActivitySource and ILogger, the batch processors, the OTLP
 /// exporters (http/protobuf or gRPC, gzip or not), the gates, and a collector that checks each
@@ -56,7 +57,7 @@ public class ConcurrencyTests(ITestOutputHelper output)
     /// </summary>
     private enum Kind
     {
-        /// <summary>Anything, the empty document too: only what holds of every document can be checked.</summary>
+        /// <summary>Anything, every control local too: only what holds of every document can be checked.</summary>
         Anything,
 
         /// <summary>Every document drops <c>always.drop</c> and masks <c>always.mask</c> (and drops it in none).</summary>
@@ -122,15 +123,15 @@ public class ConcurrencyTests(ITestOutputHelper output)
 
     // Controls.Apply put send_* in force before the policy the gates hold exports to, and a gate
     // read the two apart: between them, an export went out under the new document's send_* and the
-    // old document's policy. From {"send_logs": false} to {"drop_attributes": "secret"}, a record
+    // old document's policy. From a document that stops the logs to one that drops "secret", a record
     // was sent with "secret" in it: neither document lets that through. The gates now read one
     // snapshot of both.
     [Fact]
     public void AnExportIsHeldToOneDocumentNeverToSendOfOneAndThePolicyOfAnother()
     {
         var controls = new Controls();
-        var off = Vectors.Settings("{\"send_traces\":\"false\",\"send_logs\":\"false\"}");
-        var on = Vectors.Settings("{\"drop_attributes\":\"secret\"}");
+        var off = Vectors.Settings(Policy.Stop("traces", "logs"));
+        var on = Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["secret"]}""")));
         controls.Apply(off);
         var leaks = new Leaks();
         var logs = Logs(ScopeLogs("app", [Record(9, "r", Str("secret", "s"), Str("kept", "k"))]));
@@ -213,7 +214,7 @@ public class ConcurrencyTests(ITestOutputHelper output)
 
     private sealed record LogPlan(string Category, LogLevel Level, int Shape);
 
-    /// <summary>A settings document and what the layer makes of it, with what it should do to telemetry, worked out here on its own.</summary>
+    /// <summary>A policy and what the layer makes of it, with what it should do to telemetry, worked out here on its own.</summary>
     private sealed class Doc(string json, Settings settings)
     {
         public string Json { get; } = json;
@@ -411,7 +412,7 @@ public class ConcurrencyTests(ITestOutputHelper output)
         private static readonly string[] Categories = ["app", "app.db", "app.dbx", "noisy", "lib.http", "other"];
         private static readonly string[] ScopePatterns = ["app", "app*", "app.db", "app.db*", "noisy", "*", "lib*"];
         private static readonly string[] Levels = ["trace", "debug", "info", "warn", "error", "fatal"];
-        private static readonly string[] Caps = ["0.5", "1", "2", "5", "1000"];
+        private static readonly double[] Caps = [0.5, 1, 2, 5, 1000];
         private static readonly ActivityKind[] Kinds = [ActivityKind.Internal, ActivityKind.Server, ActivityKind.Client, ActivityKind.Producer, ActivityKind.Consumer];
 
         private readonly long seed;
@@ -890,10 +891,12 @@ public class ConcurrencyTests(ITestOutputHelper output)
             return [.. keys.Select(k => (k.Key, k.Value(this.rng)))];
         }
 
-        /// <summary>A settings document of the run's kind; the last one's rates 0 or 1 (so whether a root is sampled is known).</summary>
+        /// <summary>A policy of the run's kind; the last one's rates 0 or 1 (so whether a root is sampled is known).</summary>
         private Doc Document(bool last)
         {
-            var d = new JsonObject();
+            // Each control the policy overrides, with the fields of its override; the rest are local.
+            var d = new Dictionary<string, JsonObject>();
+            JsonObject Override(string control) => d.TryGetValue(control, out var o) ? o : d[control] = [];
             var r = this.rng;
             T Pick<T>(T[] from) => from[r.Next(from.Length)];
             double Rate() => last ? r.Next(2) : Pick(new[] { 0, 0.25, 0.5, 1 });
@@ -901,12 +904,12 @@ public class ConcurrencyTests(ITestOutputHelper output)
 
             if (this.Kind == Kind.Anything && r.Next(6) == 0)
             {
-                return new Doc("{}", Vectors.Settings("{}")); // the empty document
+                return new Doc(Policy.Local, Vectors.Settings(Policy.Local)); // every control local
             }
 
             if (r.Next(2) == 0)
             {
-                d["sampling_rate"] = Rate().ToString(CultureInfo.InvariantCulture);
+                Override("head_sampling")["ratio"] = Rate();
             }
 
             if (r.Next(2) == 0)
@@ -934,32 +937,37 @@ public class ConcurrencyTests(ITestOutputHelper output)
                     rules.Add(rule);
                 }
 
-                d["sampling_rules"] = rules;
+                Override("sampling_rules")["rules"] = rules;
             }
 
-            // A quiet document sends neither traces nor logs, and keeps user.password; every other
+            // A quiet policy sends neither traces nor logs, and keeps user.password; every other
             // one drops it. (Not the last: what comes out after the flipping is checked against it.)
             var quiet = !last && r.Next(4) == 0;
-            foreach (var send in new[] { "send_traces", "send_metrics", "send_logs" })
+            foreach (var signal in new[] { "traces", "metrics", "logs" })
             {
-                if ((send == "send_logs" && this.Kind == Kind.LogsOff) || (quiet && send != "send_metrics"))
+                if ((signal == "logs" && this.Kind == Kind.LogsOff) || (quiet && signal != "metrics"))
                 {
-                    d[send] = "false";
+                    Override($"signal_exports.{signal}")["enabled"] = false;
                 }
                 else if (r.Next(3) == 0)
                 {
-                    d[send] = r.Next(3) == 0 ? "false" : "true";
+                    Override($"signal_exports.{signal}")["enabled"] = r.Next(3) != 0;
                 }
             }
 
             if (r.Next(3) == 0)
             {
-                d["send_logs_level"] = Pick(Levels);
+                Override("log_levels")["level"] = Pick(Levels);
             }
 
             if (r.Next(3) == 0)
             {
-                d["send_logs_level_by_scope"] = string.Join(",", Some(ScopePatterns, 3).Select(p => $"{p}={Pick(Levels.Append("off").ToArray())}"));
+                var scopes = Some(ScopePatterns, 3);
+                if (scopes.Count > 0)
+                {
+                    Override("log_levels")["scopes"] = new JsonObject(scopes.Select(p =>
+                        KeyValuePair.Create(p, (JsonNode?)Pick(Levels.Append("off").ToArray()))));
+                }
             }
 
             var drops = Some(this.Kind == Kind.Anything ? AnyDrops : SafeDrops, 3);
@@ -977,45 +985,45 @@ public class ConcurrencyTests(ITestOutputHelper output)
 
             if (drops.Count > 0)
             {
-                d["drop_attributes"] = string.Join(",", drops.Distinct());
+                Override("attribute_redaction")["drop"] = new JsonArray([.. drops.Distinct().Select(x => (JsonNode)x)]);
             }
 
             if (masks.Count > 0)
             {
-                d["mask_attributes"] = string.Join(",", masks.Distinct());
+                Override("attribute_redaction")["mask"] = new JsonArray([.. masks.Distinct().Select(x => (JsonNode)x)]);
             }
 
             if (r.Next(3) == 0)
             {
-                d["sampling_traces_per_second"] = Pick(Caps);
+                Override("trace_rate_limit")["traces_per_second"] = Pick(Caps);
             }
 
             if (r.Next(3) == 0)
             {
-                d["send_logs_per_second"] = Pick(Caps);
+                Override("log_rate_limit")["records_per_second"] = Pick(Caps);
             }
 
             switch (r.Next(4))
             {
                 case 0: // a debug window, over
-                    d["debug_until"] = "2026-10-14T11:00:00Z";
+                    Override("debug")["until"] = "2026-10-14T11:00:00Z";
                     break;
                 case 1: // a debug window, open at the vectors' clock
-                    d["debug_until"] = "2026-10-14T12:30:00Z";
+                    Override("debug")["until"] = "2026-10-14T12:30:00Z";
                     if (r.Next(2) == 0)
                     {
-                        d["debug_sampling_rate"] = Rate().ToString(CultureInfo.InvariantCulture);
+                        Override("debug")["sampling_ratio"] = Rate();
                     }
 
                     if (r.Next(2) == 0)
                     {
-                        d["debug_send_logs_level"] = Pick(Levels);
+                        Override("debug")["log_level"] = Pick(Levels);
                     }
 
                     break;
             }
 
-            var json = d.ToJsonString();
+            var json = Policy.Of([.. d.Select(kv => (kv.Key, kv.Value.ToJsonString()))]);
             return new Doc(json, Vectors.Settings(json));
         }
     }

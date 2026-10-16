@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using OpAmp.Proto.V1;
 using OpenTelemetry;
 using OpenTelemetry.Trace;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 
 namespace Pydantic.OpAmp.Extensions.Hosting.Tests;
@@ -44,14 +45,14 @@ public sealed class AppSettingsTests : IDisposable
         return b.Build();
     }
 
-    // The server's custom map is what the application reads, a handler it added is told, and with a
+    // The server's app_settings values are what the application reads, a handler it added is told, and with a
     // state directory the values are in force again at the next start, before any config arrives.
     [Fact]
     public async Task WithOpAmpFillsWhatTheApplicationReadsAndKeepsItAcrossARestart()
     {
         OpAmpAppSettings.Store.Put(null);
         var dir = Kit.TempDir();
-        const string body = "{\"sampling_rate\":\"0.5\",\"custom\":{\"example.feature\":\"on\",\"limit\":\"9\"}}";
+        var body = Policy.Of(("head_sampling", """{"ratio":0.5}"""), ("app_settings", """{"values":{"example.feature":"on","limit":"9"}}"""));
         var told = new List<string>();
         using (OpAmpAppSettings.OnChange((_, changed) => { lock (told) { told.Add(string.Join(",", changed)); } }))
         {

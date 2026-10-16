@@ -13,14 +13,9 @@ namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
 
 public class AgentTests
 {
-    private static AgentRemoteConfig Config(string body) => new()
-    {
-        ConfigHash = ByteString.CopyFromUtf8(body),
-        Config = new AgentConfigMap
-        {
-            ConfigMap = { ["elastic"] = new AgentConfigObject { Body = ByteString.CopyFromUtf8(body), ContentType = "application/json" } },
-        },
-    };
+    private static AgentRemoteConfig Config(string policy) => Policy.Config(policy);
+
+    private static readonly string DisableHttpClient = Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""));
 
     private static string TempDir()
     {
@@ -65,13 +60,17 @@ public class AgentTests
     {
         var p = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir() } };
         var agent = p.Prepare()!;
-        var status = agent.RemoteConfig(Config("{\"sampling_rate\":\"0.25\",\"send_logs\":\"false\",\"deactivate_instrumentations\":\"httpclient\"}"));
+        var policy = Policy.Of(
+            ("head_sampling", """{"ratio":0.25}"""),
+            ("signal_exports.logs", """{"enabled":false}"""),
+            ("instrumentations", """{"disabled":["httpclient"]}"""));
+        var status = agent.RemoteConfig(Config(policy));
         Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
         Assert.False(agent.Controls.SendLogs);
         Assert.Empty(p.Set); // the instrumentations were read already: nothing changes until the restart
         // The client keeps the config applied, in its own state: nothing of the plugin's own.
         Assert.False(File.Exists(Path.Combine(p.Env["OTEL_OPAMP_STATE_DIR"]!, "sdk-settings.json")));
-        Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, "{\"sampling_rate\":\"0.25\",\"send_logs\":\"false\",\"deactivate_instrumentations\":\"httpclient\"}");
+        Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, policy);
 
         agent.Stop(TimeSpan.Zero); // the process exits
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = p.Env["OTEL_OPAMP_STATE_DIR"] } };
@@ -101,13 +100,13 @@ public class AgentTests
         }
 
         // Kept before the client kept the config applied (an earlier release): it carries over.
-        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), "{\"sampling_rate\":\"0.25\"}");
+        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), Policy.HeadSampling(0.25));
         Assert.Equal(0.25, Rate());
-        // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
-        Kept.KeepApplied(dir, "{\"sampling_rate\":\"0.5\"}");
+        // Once the client keeps a config applied, that is where a start begins: the old file is not read.
+        Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         Assert.Equal(0.5, Rate());
-        // A config applied with no settings entry: every setting the SDK's own, not the old file's.
-        Kept.KeepApplied(dir, "{}");
+        // A config applied with every control local: every setting the SDK's own, not the old file's.
+        Kept.KeepApplied(dir, Policy.Local);
         Assert.Null(Rate());
         // A client state that doesn't read: the old file again.
         File.WriteAllBytes(Path.Combine(dir, "opamp-state"), [0xff, 0xff]);
@@ -119,10 +118,10 @@ public class AgentTests
     {
         var p = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir() } };
         var agent = p.Prepare()!;
-        agent.RemoteConfig(Config("{\"send_traces\":\"false\"}"));
-        var status = agent.RemoteConfig(Config("{\"sampling_rate\":\"7\",\"send_traces\":\"true\"}"));
+        agent.RemoteConfig(Config(Policy.Stop("traces")));
+        var status = agent.RemoteConfig(Config(Policy.Of(("head_sampling", """{"ratio":7}"""), ("signal_exports.traces", """{"enabled":true}"""))));
         Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
-        Assert.StartsWith("sampling_rate:", status.ErrorMessage);
+        Assert.StartsWith("head_sampling:", status.ErrorMessage);
         Assert.False(agent.Controls.SendTraces);
     }
 
@@ -130,8 +129,10 @@ public class AgentTests
     public void WithoutAStateDirectoryANextStartChangeIsRefused()
     {
         var agent = new Process().Prepare()!;
-        Assert.Equal(RemoteConfigStatuses.Failed, agent.RemoteConfig(Config("{\"deactivate_all_instrumentations\":\"true\"}")).Status);
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config("{\"send_metrics\":\"false\"}")).Status);
+        var refused = agent.RemoteConfig(Config(Policy.Of(("instrumentations", """{"all_disabled":true}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("instrumentations: takes effect at the next start, which needs somewhere to keep state", refused.ErrorMessage);
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("metrics"))).Status);
         Assert.False(agent.Controls.SendMetrics);
     }
 
@@ -176,14 +177,14 @@ public class AgentTests
         var dir = TempDir();
         var parent = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
         var agent = parent.Prepare()!;
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config("{\"deactivate_instrumentations\":\"httpclient\"}")).Status);
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(DisableHttpClient)).Status);
 
         // A child the application starts inherits the variables: it doesn't take the parent's UID or state.
         var child = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
         Assert.Null(child.Prepare());
         Assert.Empty(child.Set);
 
-        Kept.KeepApplied(dir, "{\"deactivate_instrumentations\":\"httpclient\"}"); // as the client does, before APPLIED goes out
+        Kept.KeepApplied(dir, DisableHttpClient); // as the client does, before APPLIED goes out
         agent.Stop(TimeSpan.Zero);
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } };
         Assert.Equal(agent.Uid, next.Prepare()!.Uid);
@@ -211,7 +212,7 @@ public class AgentTests
     [Fact]
     public async Task TheFirstNotificationIsAnsweredThroughItsClient()
     {
-        const string body = "{\"send_logs\":\"false\"}";
+        var body = Policy.Stop("logs");
         var cancel = TestContext.Current.CancellationToken;
         var port = FreePort();
         using var listener = new System.Net.HttpListener();
@@ -309,7 +310,7 @@ public class AgentTests
     }
 
     [Fact]
-    public void ASignalThatCantBeStoppedIsNotCarriedOut()
+    public void AnOverrideOfASignalThatCantBeStoppedIsRefused()
     {
         var p = new Process
         {
@@ -320,14 +321,17 @@ public class AgentTests
         };
         var agent = p.Prepare()!;
         Assert.Equal(new[] { "send_traces" }, agent.HostNow(providersBuilt: false).Undeclared());
-        var status = agent.RemoteConfig(Config("{\"send_traces\":\"false\",\"send_logs\":\"false\"}"));
-        Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
-        Assert.True(agent.Controls.SendTraces); // ignored: nothing could stop it
+        var status = agent.RemoteConfig(Config(Policy.Stop("traces", "logs")));
+        Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
+        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", status.ErrorMessage);
+        Assert.True(agent.Controls.SendTraces); // nothing could stop it
+        Assert.True(agent.Controls.SendLogs); // a refused policy changes nothing
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("logs"))).Status);
         Assert.False(agent.Controls.SendLogs);
     }
 
-    // OTLP beside another exporter: only OTLP could be stopped, so the setting isn't carried out
-    // at all, rather than half (and the OTLP one isn't gated either).
+    // OTLP beside another exporter: only OTLP could be stopped, so the setting is not carried out
+    // at all, rather than half (and the OTLP one is not gated either). A policy that overrides it is refused.
     [Fact]
     public void ASignalWithAnotherExporterBesideOtlpIsNotCarriedOut()
     {
@@ -343,14 +347,14 @@ public class AgentTests
         var agent = p.Prepare()!;
         Assert.Equal(new[] { "send_metrics" }, agent.HostNow(providersBuilt: false).Undeclared());
         Assert.DoesNotContain("send_metrics", agent.HostNow(providersBuilt: true).Live);
-        var status = agent.RemoteConfig(Config("{\"send_metrics\":\"false\",\"send_logs\":\"false\"}"));
-        Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
+        var status = agent.RemoteConfig(Config(Policy.Stop("metrics", "logs")));
+        Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
+        Assert.Equal("signal_exports.metrics: this SDK cannot apply the requested override", status.ErrorMessage);
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("logs"))).Status);
         Assert.True(agent.Controls.SendMetrics);
         Assert.False(agent.Controls.SendLogs);
-        // The server is told only what is in force.
-        var effective = agent.Effective.ConfigMap.ConfigMap["elastic"].Body.ToStringUtf8();
-        Assert.Contains("send_logs", effective);
-        Assert.DoesNotContain("send_metrics", effective);
+        // The server is told what is in force.
+        Assert.Equal("""{"signal_exports.logs":{"enabled":false}}""", Policy.Overrides(agent.Effective));
 
         var options = new OpenTelemetry.Exporter.OtlpExporterOptions();
         var own = options.HttpClientFactory;
@@ -377,8 +381,10 @@ public class AgentTests
         var unusable = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir(), ["OTEL_EXPORTER_OTLP_CERTIFICATE"] = "/nonexistent/ca.pem" } };
         var agent = unusable.Prepare()!;
         Assert.Equal(new[] { "send_traces", "send_metrics", "send_logs", "send_logs_level" }, agent.HostNow(providersBuilt: false).Undeclared().Where(u => u.StartsWith("send_", StringComparison.Ordinal)));
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config("{\"send_traces\":\"false\"}")).Status);
-        Assert.True(agent.Controls.SendTraces); // ignored: nothing could stop it
+        var refused = agent.RemoteConfig(Config(Policy.Stop("traces")));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", refused.ErrorMessage);
+        Assert.True(agent.Controls.SendTraces); // nothing could stop it
     }
 
     [Fact]
@@ -386,8 +392,12 @@ public class AgentTests
     {
         var p = new Process { Env = { ["OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED"] = "true", ["OTEL_OPAMP_STATE_DIR"] = TempDir() } };
         var first = p.Prepare()!;
-        first.RemoteConfig(Config("{\"deactivate_instrumentations\":\"httpclient\"}"));
+        var refused = first.RemoteConfig(Config(DisableHttpClient));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", refused.ErrorMessage);
         first.Stop(TimeSpan.Zero);
+        // A policy kept from a start that could carry it out switches nothing off here.
+        Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, DisableHttpClient);
         var next = new Process { Env = { ["OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED"] = "true", ["OTEL_OPAMP_STATE_DIR"] = p.Env["OTEL_OPAMP_STATE_DIR"] } };
         var agent = next.Prepare()!;
         Assert.Empty(next.Set);
@@ -403,14 +413,17 @@ public class AgentTests
         var p = new Process { Env = { ["OTEL_LOGS_EXPORTER"] = "console" } };
         var agent = p.Prepare()!;
         Assert.Equal(new[] { "send_logs", "send_logs_level" }, agent.HostNow(providersBuilt: false).Undeclared());
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config("{\"send_logs_level\":\"error\"}")).Status);
-        Assert.Equal(0u, agent.Controls.LogsFloor); // ignored: nothing could hold it
+        var errors = Policy.Of(("log_levels", """{"level":"error"}"""));
+        var refused = agent.RemoteConfig(Config(errors));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("log_levels: level: this SDK cannot apply the requested override", refused.ErrorMessage);
+        Assert.Equal(0u, agent.Controls.LogsFloor); // nothing could hold it
 
         var otlp = new Process().Prepare()!;
         Assert.DoesNotContain("send_logs_level", otlp.HostNow(providersBuilt: false).Undeclared());
-        Assert.Equal(RemoteConfigStatuses.Applied, otlp.RemoteConfig(Config("{\"send_logs_level\":\"error\"}")).Status);
+        Assert.Equal(RemoteConfigStatuses.Applied, otlp.RemoteConfig(Config(errors)).Status);
         Assert.Equal(17u, otlp.Controls.LogsFloor);
-        otlp.RemoteConfig(Config("{}"));
+        otlp.RemoteConfig(Config(Policy.Local));
         Assert.Equal(0u, otlp.Controls.LogsFloor);
     }
 

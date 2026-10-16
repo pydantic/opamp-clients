@@ -20,8 +20,8 @@ import opamp.proto.v1.Opamp;
 
 /**
  * The SDK settings layer's shared test vectors (testdata/sdk-settings), which every
- * language's controls are held to, and the layer itself, to read each case's settings document
- * into typed settings as a decision hands them over.
+ * language's controls are held to, and the layer itself, to read each case's policy into typed
+ * settings as a decision hands them over. Also the policies the tests send.
  */
 final class Vectors {
   static final ObjectMapper JSON = new ObjectMapper();
@@ -60,15 +60,18 @@ final class Vectors {
     }
   }
 
-  /** A remote config of one settings document, as the server sends it. */
+  /** The remote config's only file. */
+  static final String POLICY_FILE = "logfire-sdk-policy.json";
+
+  /** A remote config of one policy, as the server sends it. */
   static Opamp.AgentRemoteConfig config(String document) {
     return Opamp.AgentRemoteConfig.newBuilder().setConfig(Opamp.AgentConfigMap.newBuilder()
-        .putConfigMap("elastic", Opamp.AgentConfigObject.newBuilder().setContentType("application/json")
+        .putConfigMap(POLICY_FILE, Opamp.AgentConfigObject.newBuilder().setContentType("application/json")
             .setBody(ByteString.copyFromUtf8(document)).build()))
         .setConfigHash(ByteString.copyFromUtf8(document)).build();
   }
 
-  /** The settings a document puts in force, every setting declared, at {@code nowUnixMs}. */
+  /** The settings a policy puts in force, every setting declared, at {@code nowUnixMs}. */
   static SettingsProto.Settings settings(String document, long nowUnixMs) {
     SettingsProto.Decision d = LAYER.decide(config(document), ByteString.EMPTY, ByteString.EMPTY, ALL,
         nowUnixMs, null);
@@ -80,5 +83,74 @@ final class Vectors {
   /** A case's settings, at its clock. */
   static SettingsProto.Settings settings(JsonNode c) {
     return settings(c.get("settings").toString(), c.has("now_unix_ms") ? c.get("now_unix_ms").asLong() : NOW);
+  }
+
+  /** The controls of a policy in order: version 1 has the first two. */
+  static final List<String> CONTROLS = List.of("head_sampling", "signal_exports", "sampling_rules",
+      "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
+      "instrumentations", "polling_interval");
+
+  /** A version 1 policy: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
+  static String v1(String... set) {
+    return policy("logfire-sdk-policy/v1", 2, set);
+  }
+
+  /** A version 2 draft policy: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
+  static String v2(String... set) {
+    return policy("logfire-sdk-policy/v2-draft", CONTROLS.size(), set);
+  }
+
+  /** A control's override with the given fields. */
+  static String override(String fields) {
+    return "{\"mode\":\"override\"," + fields + "}";
+  }
+
+  /** A signal_exports control: each of traces, metrics and logs is "" (local), "on" or "off". */
+  static String exports(String traces, String metrics, String logs) {
+    return "{\"traces\":" + signal(traces) + ",\"metrics\":" + signal(metrics) + ",\"logs\":" + signal(logs) + "}";
+  }
+
+  private static String signal(String s) {
+    return switch (s) {
+      case "on" -> override("\"enabled\":true");
+      case "off" -> override("\"enabled\":false");
+      default -> "{\"mode\":\"local\"}";
+    };
+  }
+
+  private static String policy(String schema, int n, String... set) {
+    java.util.Map<String, String> given = new java.util.HashMap<>();
+    for (int i = 0; i + 1 < set.length; i += 2) {
+      if (!CONTROLS.subList(0, n).contains(set[i])) {
+        throw new IllegalArgumentException("no control " + set[i] + " in " + schema);
+      }
+      given.put(set[i], set[i + 1]);
+    }
+    StringBuilder b = new StringBuilder("{\"schema\":\"" + schema + "\"");
+    for (String c : CONTROLS.subList(0, n)) {
+      String v = given.getOrDefault(c, c.equals("signal_exports") ? exports("", "", "") : "{\"mode\":\"local\"}");
+      b.append(",\"").append(c).append("\":").append(v);
+    }
+    return b.append('}').toString();
+  }
+
+  private static final ObjectMapper SORTED = new ObjectMapper()
+      .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+  /** A policy as the layer writes a version 2 effective config: compact, keys sorted. */
+  static String sorted(String doc) {
+    try {
+      return SORTED.writeValueAsString(SORTED.readValue(doc, Object.class));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /** The policy an effective config reports: the test fails if it holds another file. */
+  static String effective(Opamp.EffectiveConfig e) {
+    var files = e.getConfigMap().getConfigMapMap();
+    assertEquals(List.of(POLICY_FILE), List.copyOf(files.keySet()));
+    assertEquals("application/json", files.get(POLICY_FILE).getContentType());
+    return files.get(POLICY_FILE).getBody().toStringUtf8();
   }
 }

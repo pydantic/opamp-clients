@@ -1,1 +1,18 @@
-{"sampling_rate": "1", "sampling_traces_per_second": "50", "send_logs_per_second": "200"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "override", "ratio": 1},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "override", "traces_per_second": 50},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "override", "records_per_second": 200},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}

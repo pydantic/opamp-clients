@@ -157,7 +157,7 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		"logs": {"console": true}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("exporters %v, want %v", got, want)
 	}
-	// The settings: those of the host Load and Decide are given, send_metrics unsupported.
+	// The settings: those of the host Load and Decide are given, without send_metrics.
 	settings := listed(c.GetComponents()["settings"])
 	if _, ok := settings["send_metrics"]; ok || settings["send_traces"]["applies"] != "at once" ||
 		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" ||
@@ -175,7 +175,7 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		off = append(off, name)
 	}
 	if st := sdk.agent.remoteConfig(context.Background(),
-		remote(`{"deactivate_instrumentations":"`+strings.Join(off, ",")+`"}`)); st.GetStatus() != applied {
+		remote(v2("instrumentations", override(`"disabled":["`+strings.Join(off, `","`)+`"]`)))); st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
 	}
 	for _, scope := range []string{otelhttp, autoexportScope, "checkout.db"} {

@@ -3,6 +3,10 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.override;
+import static dev.pydantic.opamp.javaagent.Vectors.v1;
+import static dev.pydantic.opamp.javaagent.Vectors.v2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -16,7 +20,7 @@ import io.opentelemetry.sdk.trace.samplers.Sampler;
 import org.junit.jupiter.api.Test;
 
 class ControlsTest {
-  /** A document's settings, read by the shared layer, every newer setting declared. */
+  /** A policy's settings, read by the shared layer, every setting declared. */
   static dev.pydantic.opamp.sdk.SettingsProto.Settings settings(String json) {
     dev.pydantic.opamp.sdk.SettingsProto.Loaded l =
         Vectors.LAYER.load(json.getBytes(java.nio.charset.StandardCharsets.UTF_8), Vectors.ALL, Vectors.NOW);
@@ -31,12 +35,12 @@ class ControlsTest {
         "otel.instrumentation.kafka-clients.enabled", "false",
         "otel.instrumentation.common.default-enabled", "false"),
         Controls.startProperties(settings(
-            "{\"deactivate_instrumentations\":\"jdbc,,kafka-clients\",\"deactivate_all_instrumentations\":\"true\"}")));
-    assertEquals(java.util.Map.of(), Controls.startProperties(settings("{\"deactivate_all_instrumentations\":\"false\"}")));
-    assertEquals(java.util.Map.of(), Controls.startProperties(settings("{}")));
+            v2("instrumentations", override("\"disabled\":[\"jdbc\",\"kafka-clients\"],\"all_disabled\":true")))));
+    assertEquals(java.util.Map.of(), Controls.startProperties(settings(v2("instrumentations", override("\"all_disabled\":false")))));
+    assertEquals(java.util.Map.of(), Controls.startProperties(settings(v1())));
     // The agent reads `-` and `.` as the same in property names, not `_`.
     assertEquals(java.util.Map.of("otel.instrumentation.spring-webmvc-6.0.enabled", "false"),
-        Controls.startProperties(settings("{\"deactivate_instrumentations\":\"spring_webmvc-6.0\"}")));
+        Controls.startProperties(settings(v2("instrumentations", override("\"disabled\":[\"spring_webmvc-6.0\"]")))));
   }
 
   @Test
@@ -45,17 +49,17 @@ class ControlsTest {
     Sampler agents = Sampler.alwaysOff();
     c.sampler.wrap(agents);
     assertSame(agents, c.sampler.current());
-    c.apply(settings("{\"sampling_rate\":\"0.25\"}"));
+    c.apply(settings(v1("head_sampling", override("\"ratio\":0.25"))));
     assertEquals(Sampler.parentBased(Sampler.traceIdRatioBased(0.25)).getDescription(),
         c.sampler.current().getDescription());
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     assertSame(agents, c.sampler.current());
   }
 
   @Test
   void aRateSavedBeforeTheAgentBuildsItsSamplerStillHolds() {
     Controls c = new Controls();
-    c.apply(settings("{\"sampling_rate\":\"0\"}"));
+    c.apply(settings(v1("head_sampling", override("\"ratio\":0"))));
     c.sampler.wrap(Sampler.alwaysOn());
     assertEquals(Sampler.parentBased(Sampler.traceIdRatioBased(0)).getDescription(),
         c.sampler.current().getDescription());
@@ -70,9 +74,9 @@ class ControlsTest {
         .addSpanProcessor(SimpleSpanProcessor.create(c.spans(out))).build();
     var tracer = OpenTelemetrySdk.builder().setTracerProvider(tp).build().getTracer("t");
     tracer.spanBuilder("one").startSpan().end();
-    c.apply(settings("{\"send_traces\":\"false\"}"));
+    c.apply(settings(v1("signal_exports", exports("off", "", ""))));
     tracer.spanBuilder("dropped").startSpan().end();
-    c.apply(settings("{\"send_traces\":\"true\"}"));
+    c.apply(settings(v1("signal_exports", exports("on", "", ""))));
     tracer.spanBuilder("two").startSpan().end();
     assertEquals(java.util.List.of("one", "two"), out.getFinishedSpanItems().stream().map(s -> s.getName()).toList());
   }
@@ -86,9 +90,9 @@ class ControlsTest {
         .registerMetricReader(c.reader(pull)).build();
     mp.get("t").counterBuilder("c").build().add(1);
     assertEquals(1, pull.collectAllMetrics().size());
-    c.apply(settings("{\"send_metrics\":\"false\"}"));
+    c.apply(settings(v1("signal_exports", exports("", "off", ""))));
     assertTrue(pull.collectAllMetrics().isEmpty());
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     assertEquals(1, pull.collectAllMetrics().size());
   }
 
@@ -107,12 +111,12 @@ class ControlsTest {
         .setSampler(c.sampler.wrap(Sampler.alwaysOn()))
         .addSpanProcessor(SimpleSpanProcessor.create(c.spans(out))).build();
     var tracer = tp.get("t");
-    c.apply(settings("{\"sampling_rate\":\"0\"}"));
+    c.apply(settings(v1("head_sampling", override("\"ratio\":0"))));
     for (int i = 0; i < 100; i++) {
       tracer.spanBuilder("s").startSpan().end();
     }
     assertTrue(out.getFinishedSpanItems().isEmpty());
-    c.apply(settings("{\"sampling_rate\":\"1\"}"));
+    c.apply(settings(v1("head_sampling", override("\"ratio\":1"))));
     tracer.spanBuilder("s").startSpan().end();
     assertEquals(1, out.getFinishedSpanItems().size());
   }
@@ -142,7 +146,7 @@ class ControlsTest {
     emit.accept("debug", debug);
     assertEquals(java.util.List.of("debug"), bodies.get());
 
-    c.apply(settings("{\"send_logs_level\":\"WARNING\"}"));
+    c.apply(settings(v2("log_levels", override("\"level\":\"warn\""))));
     emit.accept("debug", debug);
     emit.accept("info", info);
     emit.accept("warn", warn);
@@ -152,12 +156,12 @@ class ControlsTest {
     assertEquals(java.util.List.of("warn", "warn2", "error", "none"), bodies.get());
 
     // send_logs: false still drops everything.
-    c.apply(settings("{\"send_logs_level\":\"warn\",\"send_logs\":\"false\"}"));
+    c.apply(settings(v2("signal_exports", exports("", "", "off"), "log_levels", override("\"level\":\"warn\""))));
     emit.accept("error", error);
     emit.accept("none", none);
     assertTrue(bodies.get().isEmpty());
 
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     emit.accept("debug", debug);
     emit.accept("none", none);
     assertEquals(java.util.List.of("debug", "none"), bodies.get());
@@ -187,7 +191,7 @@ class ControlsTest {
     };
 
     // A scope's level is lower than the global one (debug under warn), off drops severity 0 too.
-    c.apply(settings("{\"send_logs_level\":\"warn\",\"send_logs_level_by_scope\":\"com.acme.db*=debug, noisy.lib=off\"}"));
+    c.apply(settings(v2("log_levels", override("\"level\":\"warn\",\"scopes\":{\"com.acme.db*\":\"debug\",\"noisy.lib\":\"off\"}"))));
     emitAll.run();
     assertEquals(java.util.List.of(
         "com.acme.db:DEBUG", "com.acme.db:WARN", "com.acme.db:UNDEFINED_SEVERITY_NUMBER",
@@ -195,7 +199,7 @@ class ControlsTest {
         "app:WARN", "app:UNDEFINED_SEVERITY_NUMBER"), exported.get());
 
     // Changed live: an exact entry beats a prefix of the same name; no global level now.
-    c.apply(settings("{\"send_logs_level_by_scope\":\"com.acme.db*=error, com.acme.db=debug, noisy.lib=warn\"}"));
+    c.apply(settings(v2("log_levels", override("\"scopes\":{\"com.acme.db*\":\"error\",\"com.acme.db\":\"debug\",\"noisy.lib\":\"warn\"}"))));
     emitAll.run();
     assertEquals(java.util.List.of(
         "com.acme.db:DEBUG", "com.acme.db:WARN", "com.acme.db:UNDEFINED_SEVERITY_NUMBER",
@@ -204,12 +208,12 @@ class ControlsTest {
         "app:DEBUG", "app:WARN", "app:UNDEFINED_SEVERITY_NUMBER"), exported.get());
 
     // send_logs false still drops everything, whatever a scope's level.
-    c.apply(settings("{\"send_logs\":\"false\",\"send_logs_level_by_scope\":\"*=trace\"}"));
+    c.apply(settings(v2("signal_exports", exports("", "", "off"), "log_levels", override("\"scopes\":{\"*\":\"trace\"}"))));
     emitAll.run();
     assertTrue(exported.get().isEmpty());
 
     // Withdrawn: every record again.
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     emitAll.run();
     assertEquals(12, exported.get().size());
   }
@@ -234,23 +238,23 @@ class ControlsTest {
       return out.getFinishedLogRecordItems().stream().map(r -> r.getBodyValue().asString()).toList();
     };
 
-    c.apply(settings("{\"send_logs_per_second\":\"3\"}"));
+    c.apply(settings(v2("log_rate_limit", override("\"records_per_second\":3"))));
     assertEquals(java.util.List.of("r0", "r1", "r2"), batch.apply(5));
     assertTrue(batch.apply(5).isEmpty());
     now[0] = 500_000_000L; // half a second: 1.5 tokens, so one record
     assertEquals(java.util.List.of("r0"), batch.apply(5));
     // The same cap again (a re-sent config) keeps the bucket; 0.5 token left.
-    c.apply(settings("{\"send_logs_per_second\":\"3\"}"));
+    c.apply(settings(v2("log_rate_limit", override("\"records_per_second\":3"))));
     assertTrue(batch.apply(1).isEmpty());
     // A new cap starts a full bucket.
-    c.apply(settings("{\"send_logs_per_second\":\"2\"}"));
+    c.apply(settings(v2("log_rate_limit", override("\"records_per_second\":2"))));
     assertEquals(java.util.List.of("r0", "r1"), batch.apply(5));
     // Records the level drops take no tokens: only the info ones (even numbers) count.
-    c.apply(settings("{\"send_logs_per_second\":\"2\",\"send_logs_level_by_scope\":\"noisy=off\"}"));
+    c.apply(settings(v2("log_levels", override("\"scopes\":{\"noisy\":\"off\"}"), "log_rate_limit", override("\"records_per_second\":2"))));
     now[0] += 1_000_000_000L;
     assertEquals(java.util.List.of("r0", "r2"), batch.apply(8));
     // Removed: every record at once.
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     assertEquals(8, batch.apply(8).size());
   }
 
@@ -282,8 +286,7 @@ class ControlsTest {
           .end();
     };
 
-    c.apply(settings("{\"drop_attributes\":\"http.request.header.*, AUTHORIZATION\","
-        + "\"mask_attributes\":\"card.number, *password*, *token*\"}"));
+    c.apply(settings(v2("attribute_redaction", override("\"drop\":[\"http.request.header.*\",\"AUTHORIZATION\"],\"mask\":[\"card.number\",\"*password*\",\"*token*\"]"))));
     span.run();
     var out = gated.getFinishedSpanItems().get(0);
     var orig = plain.getFinishedSpanItems().get(0);
@@ -309,14 +312,14 @@ class ControlsTest {
         io.opentelemetry.api.common.AttributeKey.stringKey("user.password")));
 
     // Changed live, then withdrawn: as the application made it.
-    c.apply(settings("{\"mask_attributes\":\"user.id\"}"));
+    c.apply(settings(v2("attribute_redaction", override("\"mask\":[\"user.id\"]"))));
     gated.reset();
     span.run();
     assertEquals("[REDACTED]", gated.getFinishedSpanItems().get(0).getAttributes().get(
         io.opentelemetry.api.common.AttributeKey.stringKey("user.id")));
     assertEquals("Bearer x", gated.getFinishedSpanItems().get(0).getAttributes().get(
         io.opentelemetry.api.common.AttributeKey.stringKey("http.request.header.authorization")));
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     gated.reset();
     plain.reset();
     span.run();
@@ -333,7 +336,7 @@ class ControlsTest {
     var lp = io.opentelemetry.sdk.logs.SdkLoggerProvider.builder()
         .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(c.logs(gated)))
         .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(plain)).build();
-    c.apply(settings("{\"drop_attributes\":\"session.*\",\"mask_attributes\":\"user.email\"}"));
+    c.apply(settings(v2("attribute_redaction", override("\"drop\":[\"session.*\"],\"mask\":[\"user.email\"]"))));
     lp.get("app").logRecordBuilder().setBody("user.email=a@b.c logged in").setSeverity(io.opentelemetry.api.logs.Severity.INFO)
         .setAttribute(io.opentelemetry.api.common.AttributeKey.stringKey("user.email"), "a@b.c")
         .setAttribute(io.opentelemetry.api.common.AttributeKey.stringKey("Session.Id"), "s1")
@@ -380,8 +383,7 @@ class ControlsTest {
       return n;
     };
 
-    c.apply(settings("{\"sampling_rate\":\"1\",\"sampling_rules\":[{\"rate\":0,\"kind\":\"server\",\"path\":\"/health*\"},"
-        + "{\"rate\":1,\"name\":\"checkout *\"}]}"));
+    c.apply(settings(v2("head_sampling", override("\"ratio\":1"), "sampling_rules", override("\"rules\":[{\"rate\":0,\"kind\":\"server\",\"path\":\"/health*\"},{\"rate\":1,\"name\":\"checkout *\"}]"))));
     request.accept("GET", "/healthz");
     request.accept("GET", "/orders");
     // Rate 0 on the root: its child isn't sampled either; the trace is whole or not at all.
@@ -396,19 +398,19 @@ class ControlsTest {
     assertEquals(java.util.List.of("GET"), names.get());
 
     // http.target, its query removed, when there is no url.path.
-    c.apply(settings("{\"sampling_rules\":[{\"rate\":0,\"path\":\"/health\"}],\"sampling_rate\":\"1\"}"));
+    c.apply(settings(v2("head_sampling", override("\"ratio\":1"), "sampling_rules", override("\"rules\":[{\"rate\":0,\"path\":\"/health\"}]"))));
     tracer.spanBuilder("GET").setAttribute("http.target", "/health?verbose=1").startSpan().end();
     tracer.spanBuilder("GET").setAttribute("http.target", "/healthy").startSpan().end();
     assertEquals(1, names.get().size());
 
     // No rule matches and no sampling_rate: the agent's own sampler (always_off here).
-    c.apply(settings("{\"sampling_rules\":[{\"rate\":1,\"name\":\"checkout *\"}]}"));
+    c.apply(settings(v2("sampling_rules", override("\"rules\":[{\"rate\":1,\"name\":\"checkout *\"}]"))));
     tracer.spanBuilder("checkout cart").startSpan().end();
     tracer.spanBuilder("GET").startSpan().end();
     assertEquals(java.util.List.of("checkout cart"), names.get());
 
     // Rules withdrawn: the agent's own sampler again, for everything.
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     tracer.spanBuilder("checkout cart").startSpan().end();
     assertTrue(names.get().isEmpty());
     assertSame(Sampler.alwaysOff(), c.sampler.current());
@@ -418,7 +420,7 @@ class ControlsTest {
   void aRuleOfRateOneHalfSamplesHalfOfTenThousandTraces() {
     Controls c = new Controls();
     c.sampler.wrap(Sampler.alwaysOff());
-    c.apply(settings("{\"sampling_rules\":[{\"rate\":0.5,\"kind\":\"client\"}]}"));
+    c.apply(settings(v2("sampling_rules", override("\"rules\":[{\"rate\":0.5,\"kind\":\"client\"}]"))));
     var ids = io.opentelemetry.sdk.trace.IdGenerator.random();
     int sampled = 0;
     for (int i = 0; i < 10_000; i++) {
@@ -455,7 +457,7 @@ class ControlsTest {
       return n;
     };
 
-    c.apply(settings("{\"sampling_traces_per_second\":\"2\"}"));
+    c.apply(settings(v2("trace_rate_limit", override("\"traces_per_second\":2"))));
     for (int i = 0; i < 5; i++) {
       trace.run();
     }
@@ -477,7 +479,7 @@ class ControlsTest {
     out.reset();
     // With a rule of rate 0 for some, only those sampled take tokens.
     now[0] += 1_000_000_000L;
-    c.apply(settings("{\"sampling_traces_per_second\":\"2\",\"sampling_rules\":[{\"rate\":0,\"name\":\"noise\"}]}"));
+    c.apply(settings(v2("sampling_rules", override("\"rules\":[{\"rate\":0,\"name\":\"noise\"}]"), "trace_rate_limit", override("\"traces_per_second\":2"))));
     for (int i = 0; i < 5; i++) {
       tracer.spanBuilder("noise").startSpan().end();
     }
@@ -485,7 +487,7 @@ class ControlsTest {
     trace.run();
     assertEquals(2, traces.getAsInt());
     // Removed: no cap at once.
-    c.apply(settings("{}"));
+    c.apply(settings(v1()));
     for (int i = 0; i < 5; i++) {
       trace.run();
     }
@@ -544,14 +546,14 @@ class ControlsTest {
     gate.export(java.util.List.of(span));
     assertFalse(c.counts().getTraces().getLastFailed());
     // send_traces false: dropped on purpose, not exported.
-    c.apply(settings("{\"send_traces\":\"false\"}"));
+    c.apply(settings(v1("signal_exports", exports("off", "", ""))));
     gate.export(java.util.List.of(span, span));
     assertEquals(2, c.counts().getTraces().getItemsFiltered());
     assertEquals(2, c.counts().getTraces().getExportsOk());
 
     // Logs: the levels and the cap count as filtered; redaction drops attributes, not records.
     var logs = c.logs(io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create());
-    c.apply(settings("{\"send_logs_level\":\"warn\",\"send_logs_per_second\":\"1\",\"drop_attributes\":\"*\"}"));
+    c.apply(settings(v2("log_levels", override("\"level\":\"warn\""), "log_rate_limit", override("\"records_per_second\":1"), "attribute_redaction", override("\"drop\":[\"*\"]"))));
     c.nanoTime = () -> 0;
     java.util.function.Function<io.opentelemetry.api.logs.Severity, io.opentelemetry.sdk.logs.data.LogRecordData> rec =
         sev -> io.opentelemetry.sdk.testing.logs.TestLogRecordData.builder().setSeverity(sev).setBody("b")
@@ -570,23 +572,25 @@ class ControlsTest {
     var counter = mp.get("m").counterBuilder("c").build();
     counter.add(1, io.opentelemetry.api.common.Attributes.of(io.opentelemetry.api.common.AttributeKey.stringKey("a"), "1"));
     counter.add(1, io.opentelemetry.api.common.Attributes.of(io.opentelemetry.api.common.AttributeKey.stringKey("a"), "2"));
-    c.apply(settings("{\"send_metrics\":\"false\"}"));
+    c.apply(settings(v1("signal_exports", exports("", "off", ""))));
     mp.forceFlush().join(5, java.util.concurrent.TimeUnit.SECONDS);
     assertEquals(2, c.counts().getMetrics().getItemsFiltered());
     mp.close();
   }
 
   /**
-   * Flips the controls between {@code {"send_<signal>":"false"}} and
-   * {@code {"send_<signal>":"true","drop_attributes":"*password*"}} on one thread, from the first,
+   * Flips the controls between a policy that switches the signal's export off and one that switches
+   * it on and drops {@code *password*}, on one thread, from the first,
    * while this one exports with {@code export} as fast as it can, for two seconds or until it says
    * user.password reached the exporter: which neither document would let through, but a gate that
    * read the second's send flag beside the first's redaction would. Whether it did.
    */
   static boolean aPasswordGetsThroughWhileFlipping(Controls c, String signal,
       java.util.function.BooleanSupplier export) throws InterruptedException {
-    var off = settings("{\"send_" + signal + "\":\"false\"}");
-    var on = settings("{\"send_" + signal + "\":\"true\",\"drop_attributes\":\"*password*\"}");
+    boolean traces = signal.equals("traces");
+    var off = settings(v1("signal_exports", traces ? exports("off", "", "") : exports("", "", "off")));
+    var on = settings(v2("signal_exports", traces ? exports("on", "", "") : exports("", "", "on"),
+        "attribute_redaction", override("\"drop\":[\"*password*\"]")));
     c.apply(off);
     var stop = new java.util.concurrent.atomic.AtomicBoolean();
     Thread applier = new Thread(() -> {

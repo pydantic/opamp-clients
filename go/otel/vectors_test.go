@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 
@@ -19,7 +20,7 @@ import (
 )
 
 // The shared vectors (testdata/sdk-settings), run through this package's own code:
-// each case's settings document goes through the layer as this package's host declares it, the
+// each case's policy goes through the layer as this package's host declares it, the
 // settings it hands over are applied to Controls, and the sampler or the gate decides.
 
 const vectorNow = uint64(1_791_979_200_000) // 2026-10-14T12:00:00Z, the vectors' clock
@@ -43,8 +44,9 @@ func testLayer(t testing.TB) *sdk.Layer {
 // goHost is the host this package declares (agent.go).
 func goHost() *settingspb.Host { return (&server{}).host() }
 
-// settingsOf is what the layer hands this package for a settings document at now (0: the
-// vectors' clock), as at a start with the document saved.
+// settingsOf is what the layer hands this package for a policy at now (0: the vectors' clock),
+// as at a start with the policy saved. The test fails if the layer refuses the policy: this
+// package's host carries out every control.
 func settingsOf(t testing.TB, doc []byte, now uint64) *settingspb.Settings {
 	t.Helper()
 	if now == 0 {
@@ -57,10 +59,79 @@ func settingsOf(t testing.TB, doc []byte, now uint64) *settingspb.Settings {
 	if loaded.GetWarning() != "" {
 		t.Fatalf("the layer refused %s: %s", doc, loaded.GetWarning())
 	}
-	if set := append(loaded.GetSettings().GetIgnored(), loaded.GetSettings().GetUnsupported()...); len(set) > 0 {
-		t.Fatalf("this package's host sets %v of %s aside: it should carry out every one", set, doc)
-	}
 	return loaded.GetSettings()
+}
+
+const policyFile = "logfire-sdk-policy.json"
+
+// The controls of a policy in order: version 1 has the first two.
+var policyControls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
+	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval"}
+
+// exportsLocal is a signal_exports control that leaves every export as the SDK has it.
+const exportsLocal = `{"traces":{"mode":"local"},"metrics":{"mode":"local"},"logs":{"mode":"local"}}`
+
+// exports is a signal_exports control: each of traces, metrics and logs is "" (local), "on" or "off".
+func exports(traces, metrics, logs string) string {
+	one := func(s string) string {
+		switch s {
+		case "on":
+			return `{"mode":"override","enabled":true}`
+		case "off":
+			return `{"mode":"override","enabled":false}`
+		}
+		return `{"mode":"local"}`
+	}
+	return `{"traces":` + one(traces) + `,"metrics":` + one(metrics) + `,"logs":` + one(logs) + `}`
+}
+
+// policy is a policy of the schema with its first n controls, each local unless set gives it: set
+// holds pairs of a control's name and its JSON value.
+func policy(schema string, n int, set ...string) string {
+	given := map[string]string{}
+	for i := 0; i+1 < len(set); i += 2 {
+		if !slices.Contains(policyControls[:n], set[i]) {
+			panic("no control " + set[i] + " in " + schema)
+		}
+		given[set[i]] = set[i+1]
+	}
+	b := `{"schema":"` + schema + `"`
+	for _, c := range policyControls[:n] {
+		v, ok := given[c]
+		if !ok {
+			v = `{"mode":"local"}`
+			if c == "signal_exports" {
+				v = exportsLocal
+			}
+		}
+		b += `,"` + c + `":` + v
+	}
+	return b + "}"
+}
+
+// v1 is a version 1 policy, every control local unless set gives it.
+func v1(set ...string) string { return policy("logfire-sdk-policy/v1", 2, set...) }
+
+// v2 is a version 2 draft policy, every control local unless set gives it.
+func v2(set ...string) string {
+	return policy("logfire-sdk-policy/v2-draft", len(policyControls), set...)
+}
+
+// override is a control's override with the given fields.
+func override(fields string) string { return `{"mode":"override",` + fields + `}` }
+
+// sorted is a policy as the layer writes a version 2 effective config: compact, keys sorted.
+func sorted(t testing.TB, doc string) string {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal([]byte(doc), &v); err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
 
 func readVectors[T any](t testing.TB, name string) T {

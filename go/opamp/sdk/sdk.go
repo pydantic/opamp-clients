@@ -74,9 +74,9 @@ func (l *Layer) Close(ctx context.Context) error {
 
 // Load is for the start, before the SDK is built: the settings to start with, from the document
 // saved at the last change (nil: nothing saved). Put all of them in force, next-start ones too.
-// host names the settings the SDK carries out, at once or at the next start; one it leaves out is
-// set aside, never in force (nil: none carried out), and one that is no setting is an error.
-// Without the time, so debug mode is ignored: see LoadAt.
+// host names the settings the SDK carries out, at once or at the next start (nil: none carried
+// out). A name that is no setting is an error. Without the time, the SDK does not carry out debug
+// mode: see LoadAt.
 func (l *Layer) Load(ctx context.Context, saved []byte, host *settingspb.Host) (*settingspb.Loaded, error) {
 	return l.LoadAt(ctx, saved, host, 0)
 }
@@ -105,9 +105,10 @@ func (l *Layer) LoadFrom(ctx context.Context, coreState, saved []byte, host *set
 // The layer decides what to keep for the next start; save keeps it (whole or not at all, where
 // Load reads it then), or returns why it can't; the layer then answers from how that went: a
 // config whose save failed is refused, saying why. A nil save: the SDK keeps no state across
-// restarts, so a config that changes a next-start setting is refused.
+// restarts, so a config that changes a next-start setting is refused. A policy that overrides a
+// control host does not carry out is refused too.
 //
-// Without the time, so debug mode is ignored: see DecideAt.
+// Without the time, the SDK does not carry out debug mode: see DecideAt.
 func (l *Layer) Decide(ctx context.Context, config *protobufs.AgentRemoteConfig, current, atStart []byte,
 	host *settingspb.Host, save func(doc []byte) error) (*settingspb.Decision, error) {
 	return l.DecideAt(ctx, config, current, atStart, host, 0, save)
@@ -166,7 +167,7 @@ func (l *Layer) Health(ctx context.Context, counts *settingspb.ExportCounts, pre
 }
 
 // Evaluate is for tests: what the layer's reference matchers make of one input under a settings
-// document (how a span is sampled, whether a log record passes the levels, what redaction leaves
+// policy (how a span is sampled, whether a log record passes the levels, what redaction leaves
 // of attributes, what a rate cap lets through), to hold an integration's own matchers to.
 func (l *Layer) Evaluate(ctx context.Context, e *settingspb.Evaluate) (*settingspb.Evaluated, error) {
 	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Evaluate{Evaluate: e}})
@@ -176,9 +177,13 @@ func (l *Layer) Evaluate(ctx context.Context, e *settingspb.Evaluate) (*settings
 	return r.GetEvaluated(), nil
 }
 
-// Describe gives the agent description from the SDK's resource attributes.
-func (l *Layer) Describe(ctx context.Context, resource []*protobufs.KeyValue) (*protobufs.AgentDescription, error) {
-	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Describe{Describe: &settingspb.Describe{Resource: resource}}})
+// Describe gives the agent description from the SDK's resource attributes. It adds the policy
+// formats the layer reads and the controls host carries out at nowUnixMs (as LoadAt), so that a
+// server knows which overrides this SDK can apply.
+func (l *Layer) Describe(ctx context.Context, resource []*protobufs.KeyValue, host *settingspb.Host,
+	nowUnixMs uint64) (*protobufs.AgentDescription, error) {
+	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Describe{Describe: &settingspb.Describe{
+		Resource: resource, Host: host, NowUnixMs: nowUnixMs}}})
 	if err != nil {
 		return nil, err
 	}

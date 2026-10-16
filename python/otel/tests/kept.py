@@ -10,10 +10,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from _policy import config_map
 from opamp_client import opamp_pb2
 
 START = Path(__file__).resolve().parents[3] / "testdata" / "sdk-settings" / "start.json"
-BEFORE = "a core state saved before the core kept the config applied: the document kept before carries over"
+BEFORE = "a core state saved before the core kept the config applied: the policy kept before carries over"
 
 
 def _varint(n: int) -> bytes:
@@ -25,15 +26,15 @@ def _varint(n: int) -> bytes:
             return bytes(out)
 
 
-def core_state(document: bytes) -> bytes:
-    """A client state whose config applied has `document` as its settings entry."""
+def core_state(document: bytes | None) -> bytes:
+    """A client state whose config applied has `document` as its policy (None: a config with no
+    policy)."""
     base = next(c for c in json.loads(START.read_text())["cases"] if c["name"] == BEFORE)["core_state"]
-    m = opamp_pb2.AgentConfigMap()
-    m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=document, content_type="application/json"))
+    m = config_map(document)
     applied = opamp_pb2.AgentRemoteConfig(config=m, config_hash=b"applied").SerializeToString()
     return bytes.fromhex(base) + b"\x82\x01" + _varint(len(applied)) + applied
 
 
-def keep_applied(state_dir: Path, document: bytes) -> None:
+def keep_applied(state_dir: Path, document: bytes | None) -> None:
     """Leave in `state_dir` what the client would after a config with `document` was applied."""
     (state_dir / "opamp-state").write_bytes(core_state(document))

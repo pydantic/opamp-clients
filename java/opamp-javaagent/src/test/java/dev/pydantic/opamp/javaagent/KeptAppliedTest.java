@@ -27,13 +27,14 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class KeptAppliedTest {
   /**
-   * An OpAMP server over plain HTTP that offers {@code offer} (an {@code elastic} settings
-   * document), if given, in its first answer: whether it heard APPLIED, and the settings each first
-   * message reported in force.
+   * An OpAMP server over plain HTTP that offers {@code offer} (a policy), if given, in its first
+   * answer: whether it heard APPLIED, the policy each first message reported in force, and the
+   * description each first message carried.
    */
   static final class ConfigServer implements AutoCloseable {
     final HttpServer http;
     final List<String> firstEffective = new ArrayList<>();
+    final List<Opamp.AgentDescription> descriptions = new ArrayList<>();
     int polls;
     boolean applied;
 
@@ -47,14 +48,17 @@ class KeptAppliedTest {
           if (m.getRemoteConfigStatus().getStatus() == Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED) {
             applied = true;
           }
-          var elastic = m.getEffectiveConfig().getConfigMap().getConfigMapMap().get("elastic");
-          if (m.getSequenceNum() == 0 && elastic != null) {
-            firstEffective.add(elastic.getBody().toString(StandardCharsets.UTF_8));
+          var policy = m.getEffectiveConfig().getConfigMap().getConfigMapMap().get(Vectors.POLICY_FILE);
+          if (m.getSequenceNum() == 0 && policy != null) {
+            firstEffective.add(policy.getBody().toString(StandardCharsets.UTF_8));
+          }
+          if (m.getSequenceNum() == 0 && m.hasAgentDescription()) {
+            descriptions.add(m.getAgentDescription());
           }
           if (offer != null && polls == 1) {
             ByteString body = ByteString.copyFromUtf8(offer);
             r.setRemoteConfig(Opamp.AgentRemoteConfig.newBuilder().setConfigHash(body)
-                .setConfig(Opamp.AgentConfigMap.newBuilder().putConfigMap("elastic",
+                .setConfig(Opamp.AgentConfigMap.newBuilder().putConfigMap(Vectors.POLICY_FILE,
                     Opamp.AgentConfigObject.newBuilder().setBody(body).setContentType("application/json").build())));
           }
         }
@@ -104,7 +108,8 @@ class KeptAppliedTest {
 
   @Test
   void aConfigAppliedThroughTheServerIsWhereTheNextStartBegins(@TempDir Path dir) throws Exception {
-    try (ConfigServer first = new ConfigServer("{\"sampling_rate\":\"0.5\"}")) {
+    String half = Vectors.v1("head_sampling", Vectors.override("\"ratio\":0.5"));
+    try (ConfigServer first = new ConfigServer(half)) {
       runAgent(first, dir, "the config offered was never APPLIED", () -> first.applied);
     }
     assertFalse(Files.exists(dir.resolve("sdk-settings.json")));
@@ -112,8 +117,33 @@ class KeptAppliedTest {
     try (ConfigServer second = new ConfigServer(null)) {
       runAgent(second, dir, "the next start never reached the server", () -> !second.firstEffective.isEmpty());
       synchronized (second) {
-        assertEquals("{\"sampling_rate\":\"0.5\"}", second.firstEffective.get(0));
+        assertEquals(half, second.firstEffective.get(0));
       }
+    }
+  }
+
+  /**
+   * The description the agent sends at start names the policy formats the layer reads and the
+   * controls the agent carries out.
+   */
+  @Test
+  void theDescriptionNamesThePolicyAndTheControls(@TempDir Path dir) throws Exception {
+    try (ConfigServer server = new ConfigServer(null)) {
+      runAgent(server, dir, "no description sent", () -> !server.descriptions.isEmpty());
+      java.util.Map<String, String> attrs = new java.util.HashMap<>();
+      synchronized (server) {
+        for (var kv : server.descriptions.get(0).getNonIdentifyingAttributesList()) {
+          attrs.put(kv.getKey(), kv.getValue().hasArrayValue()
+              ? String.join(",", kv.getValue().getArrayValue().getValuesList().stream()
+                  .map(opamp.proto.v1.Anyvalue.AnyValue::getStringValue).toList())
+              : kv.getValue().getStringValue());
+        }
+      }
+      assertEquals("logfire-sdk-policy/v1", attrs.get("logfire.opamp.config_format"));
+      assertEquals("logfire-sdk-policy/v1,logfire-sdk-policy/v2-draft", attrs.get("logfire.opamp.config_formats"));
+      assertEquals("head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
+          + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,instrumentations,polling_interval",
+          attrs.get("logfire.opamp.supported_controls"));
     }
   }
 }

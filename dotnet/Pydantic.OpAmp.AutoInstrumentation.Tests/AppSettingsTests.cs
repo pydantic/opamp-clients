@@ -87,10 +87,11 @@ public class AppSettingsTests
             setenv ?? ((_, _) => { }),
             app: app)!;
 
-    private static string Effective(Agent agent) =>
-        agent.Effective.ConfigMap?.ConfigMap.TryGetValue("elastic", out var c) == true ? c.Body.ToStringUtf8() : "{}";
+    /// <summary>The overrides of the policy the agent reports in force (<see cref="Policy.Overrides(string)"/>).</summary>
+    private static string Effective(Agent agent) => Policy.Overrides(agent.Effective);
 
-    private static bool SameJson(string a, string b) => JsonNode.DeepEquals(JsonNode.Parse(a), JsonNode.Parse(b));
+    /// <summary>A policy whose only override is <c>app_settings</c>, with these values (a JSON object).</summary>
+    private static string Values(string values) => Policy.Of(("app_settings", $"{{\"values\":{values}}}"));
 
     private static JsonElement CustomJson()
     {
@@ -237,7 +238,7 @@ public class AppSettingsTests
         app.Put(M(("b", "2"), ("a", "1"))); // the same again: nothing changed
         app.Put(M(("a", "1"), ("b", "3"), ("c", ""))); // b changed, c added
         app.Put(M(("a", "1"))); // b and c left out: back to their defaults
-        app.Put(null); // custom left out
+        app.Put(null); // app_settings local
         app.Put(M()); // and again: nothing
         told.Want(
             (M(("a", "1"), ("b", "2")), new[] { "a", "b" }),
@@ -430,8 +431,8 @@ public class AppSettingsTests
             }
             else
             {
-                using var probe = new ScratchAgent();
-                host = probe.Agent.HostNow(providersBuilt: false);
+                host = Vectors.Declaring();
+                host.Live.Add("custom");
             }
 
             var d = layer.Decide(config, ByteString.Empty, ByteString.Empty, host, Vectors.Now);
@@ -473,14 +474,16 @@ public class AppSettingsTests
                     failed.Add($"{name}: told {told.All.Count} times");
                 }
 
-                var body = d.Effective.ConfigMap.ConfigMap.TryGetValue("elastic", out var e) ? e.Body.ToStringUtf8() : "{}";
-                if (!SameJson(body, c.GetProperty("effective").GetRawText()))
+                var body = Policy.Text(d.Effective);
+                if (body != c.GetProperty("effective").GetString())
                 {
                     failed.Add($"{name}: effective {body}");
                 }
             }
 
-            if (h.ValueKind == JsonValueKind.Undefined)
+            // The plugin's agent too, where its host carries out the policy: a case refused, or one
+            // that overrides nothing but app_settings.
+            if (h.ValueKind == JsonValueKind.Undefined && (c.TryGetProperty("refused", out _) || OnlyAppSettings(document)))
             {
                 // The plugin's agent, as the client hands the config over.
                 var app = new AppSettingsStore();
@@ -502,9 +505,14 @@ public class AppSettingsTests
                         failed.Add($"{name}: the agent put {JsonSerializer.Serialize(app.Snapshot())} in force");
                     }
 
-                    if (c.TryGetProperty("effective", out var effective) && !SameJson(Effective(agent), effective.GetRawText()))
+                    if (status.Status == RemoteConfigStatuses.Failed && status.ErrorMessage != c.GetProperty("refused").GetString())
                     {
-                        failed.Add($"{name}: the agent reports {Effective(agent)}");
+                        failed.Add($"{name}: the agent refused it: {status.ErrorMessage}");
+                    }
+
+                    if (c.TryGetProperty("effective", out var effective) && Policy.Text(agent.Effective) != effective.GetString())
+                    {
+                        failed.Add($"{name}: the agent reports {Policy.Text(agent.Effective)}");
                     }
                 }
                 finally
@@ -515,6 +523,18 @@ public class AppSettingsTests
         }
 
         Assert.Empty(failed);
+    }
+
+    private static bool OnlyAppSettings(string document)
+    {
+        try
+        {
+            return JsonNode.Parse(Policy.Overrides(document))!.AsObject().All(kv => kv.Key == "app_settings");
+        }
+        catch (Exception e) when (e is JsonException or ArgumentException)
+        {
+            return false; // a document that repeats a key
+        }
     }
 
     [Fact]
@@ -539,12 +559,14 @@ public class AppSettingsTests
                 rate = agent.Controls.Sampler.Policy.Rate; // last: the SDK's settings beside them already in force
                 told.Handler(s, c);
             });
-            var status = agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"0.5\",\"custom\":{\"checkout.new_flow\":\"on\",\"limit\":25}}"));
+            var status = agent.RemoteConfig(Vectors.Config(Policy.Of(
+                ("head_sampling", """{"ratio":0.5}"""),
+                ("app_settings", """{"values":{"checkout.new_flow":"on","limit":25}}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             Assert.Equal(0.5, rate);
             Assert.Equal("on", app.Get("checkout.new_flow", "off"));
             Assert.Equal(25, app.GetInt64("limit", 0));
-            Assert.True(SameJson(Effective(agent), "{\"custom\":\"{\\\"checkout.new_flow\\\":\\\"on\\\",\\\"limit\\\":\\\"25\\\"}\",\"sampling_rate\":\"0.5\"}"), Effective(agent));
+            Assert.Equal("""{"app_settings":{"values":{"checkout.new_flow":"on","limit":"25"}},"head_sampling":{"ratio":0.5}}""", Effective(agent));
             told.Want((M(("checkout.new_flow", "on"), ("limit", "25")), new[] { "checkout.new_flow", "limit" }));
         }
         finally
@@ -562,10 +584,14 @@ public class AppSettingsTests
         {
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
-            agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\",\"b\":\"2\"}}"));
-            // New configs (other hashes) whose map is the same: in a string, keys in another order, a
-            // number for its text, another SDK setting beside it.
-            foreach (var body in new[] { "{\"custom\":\"{\\\"b\\\":\\\"2\\\",\\\"a\\\":1}\"}", "{\"custom\":{\"a\":\"1\",\"b\":\"2\"},\"sampling_rate\":\"1\"}" })
+            agent.RemoteConfig(Vectors.Config(Values("""{"a":"1","b":"2"}""")));
+            // New configs (other hashes) whose map is the same: keys in another order, a number for
+            // its text, another control beside it.
+            foreach (var body in new[]
+            {
+                Values("""{"b":"2","a":1}"""),
+                Policy.Of(("head_sampling", """{"ratio":1}"""), ("app_settings", """{"values":{"a":"1","b":"2"}}""")),
+            })
             {
                 Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(body)).Status);
             }
@@ -588,14 +614,14 @@ public class AppSettingsTests
         {
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
-            agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"},\"sampling_rate\":\"0.5\"}"));
+            agent.RemoteConfig(Vectors.Config(Policy.Of(("head_sampling", """{"ratio":0.5}"""), ("app_settings", """{"values":{"a":"1"}}"""))));
             foreach (var (body, why) in new[]
             {
-                ("{\"custom\":{\"a\":\"2\",\"b\":[\"x\"]},\"sampling_rate\":\"1\"}", "custom.b: values must be"),
-                ("{\"custom\":{\"a b\":\"2\"}}", "custom: \"a b\" is not a key"),
-                ("{\"custom\":{\"a\":\"2\",\"a\":\"3\"}}", "custom.a: sent more than once"),
-                ("{\"custom\":{\"a\":\"" + new string('x', 4097) + "\"}}", "custom.a: 4097 bytes, at most 4096"),
-                ("{\"custom\":7}", "custom: must be a JSON object"),
+                (Policy.Of(("head_sampling", """{"ratio":1}"""), ("app_settings", """{"values":{"a":"2","b":["x"]}}""")), "app_settings: values must be an object"),
+                (Values("""{"a b":"2"}"""), "app_settings: values: \"a b\" is not a key"),
+                (Values("""{"a":"2","a":"3"}"""), "app_settings: values.a: sent more than once"),
+                (Values("{\"a\":\"" + new string('x', 4097) + "\"}"), "app_settings: values.a: 4097 bytes, at most 4096"),
+                (Values("7"), "app_settings: values must be an object"),
             })
             {
                 var status = agent.RemoteConfig(Vectors.Config(body));
@@ -605,7 +631,7 @@ public class AppSettingsTests
 
             Assert.Equal("1", app.Get("a", null));
             Assert.Equal(0.5, agent.Controls.Sampler.Policy.Rate);
-            Assert.True(SameJson(Effective(agent), "{\"custom\":\"{\\\"a\\\":\\\"1\\\"}\",\"sampling_rate\":\"0.5\"}"), Effective(agent));
+            Assert.Equal("""{"app_settings":{"values":{"a":"1"}},"head_sampling":{"ratio":0.5}}""", Effective(agent));
             told.Want((M(("a", "1")), new[] { "a" }));
             Assert.False(File.Exists(Path.Combine(dir, "sdk-settings.json"))); // the client keeps the config applied
         }
@@ -616,7 +642,7 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void AConfigWithoutCustomPutsEveryKeyBackToItsDefault()
+    public void APolicyWithAppSettingsLocalPutsEveryKeyBackToItsDefault()
     {
         var app = new AppSettingsStore();
         var agent = Prepare(app, TempDir());
@@ -624,12 +650,18 @@ public class AppSettingsTests
         {
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
-            agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"}}"));
-            agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"1\"}"));
+            agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}""")));
+            // A version 1 policy has no app_settings control: it is local.
+            agent.RemoteConfig(Vectors.Config(Policy.HeadSampling(1)));
             Assert.Equal("default", app.Get("a", "default"));
-            agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"}}"));
-            // A remote config with no settings entry at all.
-            agent.RemoteConfig(new AgentRemoteConfig { ConfigHash = ByteString.CopyFromUtf8("none"), Config = new AgentConfigMap() });
+            agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}""")));
+            // A remote config with no policy at all is refused, and changes nothing.
+            var none = agent.RemoteConfig(new AgentRemoteConfig { ConfigHash = ByteString.CopyFromUtf8("none"), Config = new AgentConfigMap() });
+            Assert.Equal(RemoteConfigStatuses.Failed, none.Status);
+            Assert.StartsWith("config_map:", none.ErrorMessage, StringComparison.Ordinal);
+            Assert.Equal("1", app.Get("a", "default"));
+            // A version 2 policy with every control local.
+            agent.RemoteConfig(Vectors.Config(Policy.OfV2()));
             Assert.Equal("default", app.Get("a", "default"));
             told.Want((M(("a", "1")), new[] { "a" }), (M(), new[] { "a" }), (M(("a", "1")), new[] { "a" }), (M(), new[] { "a" }));
         }
@@ -649,10 +681,10 @@ public class AppSettingsTests
             var errors = new List<string>();
             app.Error = errors.Add; // after Prepare, which points it at the plugin's standard error
             using var sub = app.OnChange((_, _) => throw new InvalidOperationException("nope"));
-            var status = agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"}}"));
+            var status = agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}""")));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             Assert.Equal("1", app.Get("a", null));
-            Assert.True(SameJson(Effective(agent), "{\"custom\":\"{\\\"a\\\":\\\"1\\\"}\"}"), Effective(agent));
+            Assert.Equal("""{"app_settings":{"values":{"a":"1"}}}""", Effective(agent));
             Assert.Single(errors);
         }
         finally
@@ -682,7 +714,10 @@ public class AppSettingsTests
         {
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
-            var status = agent.RemoteConfig(Vectors.Config("{\"debug_until\":\"2026-10-14T12:10:00Z\",\"sampling_rate\":\"0.1\",\"custom\":{\"a\":\"1\"}}"));
+            var status = agent.RemoteConfig(Vectors.Config(Policy.Of(
+                ("head_sampling", """{"ratio":0.1}"""),
+                ("debug", """{"until":"2026-10-14T12:10:00Z"}"""),
+                ("app_settings", """{"values":{"a":"1"}}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             agent.Sdk.Refresh(Vectors.Now + 300_000); // while debug mode lasts
             agent.Sdk.Refresh(Vectors.Now + 600_000); // and at its end
@@ -702,8 +737,9 @@ public class AppSettingsTests
     {
         var dir = TempDir();
         var first = Prepare(new AppSettingsStore(), dir);
-        first.RemoteConfig(Vectors.Config("{\"custom\":{\"checkout.new_flow\":\"on\"}}"));
-        Kept.KeepApplied(dir, "{\"custom\":{\"checkout.new_flow\":\"on\"}}"); // as the client does, before APPLIED goes out
+        var policy = Values("""{"checkout.new_flow":"on"}""");
+        first.RemoteConfig(Vectors.Config(policy));
+        Kept.KeepApplied(dir, policy); // as the client does, before APPLIED goes out
         first.Stop(TimeSpan.Zero); // the process exits
 
         // The next start, before any config arrives: in force as the plugin prepares, before the
@@ -715,7 +751,7 @@ public class AppSettingsTests
         try
         {
             Assert.Equal("on", app.Get("checkout.new_flow", "off"));
-            Assert.True(SameJson(Effective(again), "{\"custom\":\"{\\\"checkout.new_flow\\\":\\\"on\\\"}\"}"), Effective(again));
+            Assert.Equal("""{"app_settings":{"values":{"checkout.new_flow":"on"}}}""", Effective(again));
             told.Want((M(("checkout.new_flow", "on")), new[] { "checkout.new_flow" }));
         }
         finally
@@ -729,7 +765,7 @@ public class AppSettingsTests
     {
         var app = new AppSettingsStore();
         var agent = Prepare(app, null);
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config("{\"custom\":{\"a\":\"1\"}}")).Status); // live: no state needed
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}"""))).Status); // live: no state needed
         Assert.Equal("1", app.Get("a", null));
         agent.Stop(TimeSpan.Zero);
 
@@ -747,8 +783,9 @@ public class AppSettingsTests
     {
         var dir = TempDir();
         var first = Prepare(new AppSettingsStore(), dir);
-        first.RemoteConfig(Vectors.Config("{\"custom\":{\"example.feature\":\"on\"},\"deactivate_instrumentations\":\"httpclient\"}"));
-        Kept.KeepApplied(dir, "{\"custom\":{\"example.feature\":\"on\"},\"deactivate_instrumentations\":\"httpclient\"}");
+        var policy = Policy.Of(("app_settings", """{"values":{"example.feature":"on"}}"""), ("instrumentations", """{"disabled":["httpclient"]}"""));
+        first.RemoteConfig(Vectors.Config(policy));
+        Kept.KeepApplied(dir, policy);
         first.Stop(TimeSpan.Zero);
 
         var app = new AppSettingsStore();
@@ -979,16 +1016,16 @@ public sealed class GlobalAppSettingsTests : IDisposable
             var told = new AppSettingsTests.Told();
             using (OpAmpAppSettings.OnChange(told.Handler))
             {
-                agent.RemoteConfig(Vectors.Config("{\"custom\":{\"example.feature\":\"on\",\"limit\":\"9\",\"ratio\":\"0.25\",\"beta\":\"TRUE\"}}"));
+                agent.RemoteConfig(Vectors.Config(Policy.Of(("app_settings", """{"values":{"example.feature":"on","limit":"9","ratio":"0.25","beta":"TRUE"}}"""))));
                 Assert.Equal("on", OpAmpAppSettings.Get("example.feature", "off"));
                 Assert.Equal(9, OpAmpAppSettings.GetInt64("limit", 0));
                 Assert.Equal(0.25, OpAmpAppSettings.GetDouble("ratio", 0));
                 Assert.True(OpAmpAppSettings.GetBool("beta", false));
                 Assert.Equal(["beta", "example.feature", "limit", "ratio"], OpAmpAppSettings.Snapshot().Keys);
-                agent.RemoteConfig(Vectors.Config("{\"custom\":{\"example.feature\":\"off\"}}"));
+                agent.RemoteConfig(Vectors.Config(Policy.Of(("app_settings", """{"values":{"example.feature":"off"}}"""))));
             }
 
-            agent.RemoteConfig(Vectors.Config("{}"));
+            agent.RemoteConfig(Vectors.Config(Policy.Local));
             Assert.Equal(2, told.All.Count); // unsubscribed before the third
             Assert.Equal(["beta", "example.feature", "limit", "ratio"], told.All[1].Changed);
             Assert.Equal("default", OpAmpAppSettings.Get("example.feature", "default"));

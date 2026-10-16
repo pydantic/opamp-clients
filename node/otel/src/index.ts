@@ -1286,12 +1286,13 @@ export function builds(signal: Signal, env: NodeJS.ProcessEnv = process.env): bo
 
 /**
  * What this package carries out, declared to the settings layer (docs/sdk-settings.md, "The
- * host"), which sets aside any setting not named: the sampler's settings and the instrumentation
- * switches always, at once (instrumentations are switched while the application runs); a
- * signal's sending, and what its gate holds, only where this package builds every one of its
- * exporters (`builds`); the polling interval at the next start. `own`: the signals the
- * application registered a global provider of its own for (watchProviders). Their telemetry
- * goes past the gate, and for traces past the sampler, so those settings aren't declared.
+ * host"). The layer refuses an override of any setting not named, and sets it aside in a policy in
+ * force. The host always names the sampler's settings and the instrumentation switches, at once
+ * (instrumentations are switched while the application runs). It names a signal's sending, and
+ * what its gate holds, only where this package builds every one of its exporters (`builds`). It
+ * names the polling interval at the next start. `own`: the signals the application registered a
+ * global provider of its own for (watchProviders). Their telemetry goes past the gate, and for
+ * traces past the sampler, so those settings aren't declared.
  */
 export function hostFromEnv(env: NodeJS.ProcessEnv = process.env, own: ReadonlySet<ApiSignal> = new Set()): HostInit {
   // The sampler is this package's whatever the exporters, but it samples only the spans of the
@@ -1821,7 +1822,7 @@ export class Agent {
           mode: "node",
         },
         {
-          description: layer.describe(attributes(resource)),
+          description: layer.describe(attributes(resource), this.host, BigInt(this.now())),
           health: this.reportHealth(),
           ...(this.effective ? { effectiveConfig: this.effective } : {}),
           ...(availableComponents ? { availableComponents } : {}),
@@ -1919,10 +1920,6 @@ export class Agent {
     );
     if (d.apply) {
       this.controls.apply(d.apply);
-      if (d.apply.unsupported.length > 0) {
-        diag.info(`OpAMP: settings this SDK doesn't carry out: ${d.apply.unsupported.join(", ")}`);
-      }
-      if (d.apply.ignored.length > 0) diag.info(`OpAMP: settings unknown to this SDK: ${d.apply.ignored.join(", ")}`);
       this.#unloaded();
     }
     if (d.pendingRestart.length > 0) {

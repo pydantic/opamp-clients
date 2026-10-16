@@ -386,8 +386,8 @@ func (p *passwordSink) Shutdown(context.Context) error   { return nil }
 // A sends nothing; B sends, dropping *password*: neither exports user.password. An export while
 // one is applied over the other is held to one of them, never to B's send_* and A's redaction.
 func TestAnExportIsHeldToOneDocumentWhileTheyFlip(t *testing.T) {
-	a := settingsOf(t, []byte(`{"send_traces":"false","send_logs":"false"}`), 0)
-	b := settingsOf(t, []byte(`{"send_traces":"true","send_logs":"true","drop_attributes":"*password*"}`), 0)
+	a := settingsOf(t, []byte(v1("signal_exports", exports("off", "", "off"))), 0)
+	b := settingsOf(t, []byte(v2("signal_exports", exports("on", "", "on"), "attribute_redaction", override(`"drop":["*password*"]`))), 0)
 	password := attribute.String("user.password", "hunter2")
 	span := tracetest.SpanStub{Name: "s", Attributes: []attribute.KeyValue{password}}.Snapshot()
 	// A record as the SDK makes it (one made here would keep no attribute: its limits are zero).

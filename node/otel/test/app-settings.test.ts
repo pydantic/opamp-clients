@@ -18,27 +18,26 @@ import { type HostInit, SdkSettings } from "@pydantic/opamp-client/sdk";
 
 import * as standalone from "../src/app-settings.js";
 import { keepApplied } from "./kept.js";
+import { config as policyConfig, FILE, overridden, type Overrides, policy, reported } from "./policy.js";
 import {
   Agent, AppSettings, type AppSettingsMap, appSettings, Controls, hostFromEnv, preparing, settingsKeptOnFailure,
 } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const EMPTY = new Uint8Array();
+/** The policy with every control local: what the SDK starts with when nothing was kept. */
+const EMPTY = text(policy());
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 /** 2026-10-14T12:00:00Z. */
 const NOW = 1_791_979_200_000;
 
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
-/** A remote config with no `elastic` entry at all. */
-const noElastic = () => create(AgentRemoteConfigSchema, { configHash: text("none"), config: { configMap: {} } });
+const config = (body: string) => policyConfig(body, body);
+/** A remote config with no policy at all. */
+const noPolicy = () => create(AgentRemoteConfigSchema, { configHash: text("none"), config: { configMap: {} } });
 
-const doc = (custom: unknown, rest: object = {}) => JSON.stringify({ ...rest, custom });
+/** A policy whose app_settings control sends `values`, with other controls overridden as given. */
+const doc = (values: unknown, rest: Overrides = {}) => policy({ ...rest, app_settings: { values } });
 
 interface Case {
   name: string;
@@ -46,7 +45,7 @@ interface Case {
   host?: { live?: string[] };
   refused?: string;
   custom?: Record<string, string>;
-  effective?: Record<string, string>;
+  effective?: string;
 }
 
 interface Typed {
@@ -94,8 +93,7 @@ class TestAgent extends Agent {
     };
     if (prepare) this.prepare(TestAgent.env(dir, env));
     this.client = {
-      setEffectiveConfig: (e: { configMap?: { configMap: { elastic?: { body: Uint8Array } } } }) =>
-        this.reported.push(JSON.parse(new TextDecoder().decode(e.configMap!.configMap.elastic!.body))),
+      setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),
       setHealth: () => {},
       stop: () => Promise.resolve(),
     } as never;
@@ -117,7 +115,7 @@ class TestAgent extends Agent {
     const s = super.remoteConfig(config);
     const dir = this.setup?.stateDir;
     if (s.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED && dir !== undefined) {
-      keepApplied(dir, config.config?.configMap.elastic?.body ?? new Uint8Array());
+      keepApplied(dir, config.config?.configMap[FILE]?.body);
     }
     return s;
   }
@@ -127,8 +125,9 @@ class TestAgent extends Agent {
     return t && !t.cleared ? t : undefined;
   }
 
-  get settingsInForce(): object {
-    return JSON.parse(new TextDecoder().decode(this.effective?.configMap?.configMap.elastic?.body));
+  /** The controls the effective config reports overridden. */
+  get settingsInForce(): Record<string, unknown> {
+    return overridden(this.effective);
   }
 }
 
@@ -137,9 +136,10 @@ const stateDir = () => mkdtempSync(join(tmpdir(), "opamp-app-"));
 // --- the shared vectors ---------------------------------------------------------------------------
 
 test("vectors: custom.json's cases through the layer, with each case's host", () => {
-  assert.ok(VECTORS.cases.length >= 30);
+  assert.ok(VECTORS.cases.length >= 15);
   for (const c of VECTORS.cases) {
-    const host: HostInit = c.host ?? { live: ["custom"] };
+    // Without a host, the host this package declares, which carries out every control.
+    const host: HostInit = c.host ?? hostFromEnv({});
     const d = LAYER.decide(config(c.document), EMPTY, EMPTY, host, 0n);
     if (c.refused !== undefined) {
       assert.equal(d.status?.status, FAILED, c.name);
@@ -167,13 +167,13 @@ test("vectors: custom.json's cases through the agent: what the application reads
       assert.equal(app.snapshot(), before, c.name);
       assert.equal(app.get("before", "default"), "1", c.name);
       assert.deepEqual(told, [], c.name);
-      assert.deepEqual(agent.settingsInForce, { custom: '{"before":"1"}' }, c.name);
+      assert.deepEqual(agent.settingsInForce, { app_settings: { values: { before: "1" } } }, c.name);
     } else {
       assert.equal(status.status, APPLIED, `${c.name}: ${status.errorMessage}`);
       assert.deepEqual({ ...app.snapshot() }, c.custom, c.name);
       for (const [k, v] of Object.entries(c.custom!)) assert.equal(app.get(k, "default"), v, c.name);
       assert.equal(app.get("before", "default"), c.custom!.before ?? "default", c.name);
-      assert.deepEqual(agent.settingsInForce, c.effective, c.name);
+      assert.equal(reported(agent.effective), c.effective, c.name);
       // Once, with every key added or removed.
       assert.equal(told.length, 1, c.name);
       const keys = [...new Set(["before", ...Object.keys(c.custom!)])].sort();
@@ -350,15 +350,13 @@ test("through the agent: the same map again, sent another way, or another settin
   const sends = [
     doc({ "example.feature": "on", limit: 25 }),
     doc({ limit: "25", "example.feature": "on" }), // 25 sent is "25" taken; another order
-    doc(JSON.stringify({ "example.feature": "on", limit: "25" })), // in a string
-    doc({ "example.feature": "on", limit: "25" }, { sampling_rate: "0.5" }), // another setting
-    doc({ "example.feature": "on", limit: "25", gone: null }), // a null entry is a key left out
+    doc({ "example.feature": "on", limit: "25" }, { head_sampling: { ratio: 0.5 } }), // another setting
   ];
   for (const body of sends) assert.equal(agent.remoteConfig(config(body)).status, APPLIED, body);
   assert.equal(told.length, 1);
   assert.deepEqual(told[0]!.changed, ["example.feature", "limit"]);
   assert.equal(app.getInt("limit", 0), 25);
-  assert.equal(agent.controls.sampler.samplingRate, undefined);
+  assert.equal(agent.controls.sampler.samplingRate, 0.5);
 });
 
 test("a value that starts with U+FEFF reaches the application as it was sent, and at the next start", () => {
@@ -384,12 +382,12 @@ test("a value that starts with U+FEFF reaches the application as it was sent, an
   rmSync(dir, { recursive: true });
 });
 
-test("left out, null, {} or blank, or no elastic entry: every key back to its default, told once", () => {
-  for (const out of ["{}", doc(null), doc({}), doc("  "), doc(""), "none"]) {
+test("app_settings local, or a version 1 policy: every key back to its default, told once", () => {
+  for (const out of [policy({}, 2), policy()]) {
     const { app, told } = recorded();
     const agent = new TestAgent(undefined, app);
     agent.remoteConfig(config(doc({ "example.feature": "on" })));
-    const s = agent.remoteConfig(out === "none" ? noElastic() : config(out));
+    const s = agent.remoteConfig(config(out));
     assert.equal(s.status, APPLIED, out);
     assert.equal(app.get("example.feature", "off"), "off", out);
     assert.deepEqual(told.map((t) => t.changed), [["example.feature"], ["example.feature"]], out);
@@ -400,17 +398,23 @@ test("left out, null, {} or blank, or no elastic entry: every key back to its de
 test("a FAILED config leaves the values, tells nothing, and the effective config as it was", () => {
   const { app, told } = recorded();
   const agent = new TestAgent(undefined, app);
-  agent.remoteConfig(config(doc({ "example.feature": "on" }, { sampling_rate: "0.5" })));
-  const reported = agent.settingsInForce;
+  agent.remoteConfig(config(doc({ "example.feature": "on" }, { head_sampling: { ratio: 0.5 } })));
+  const before = agent.settingsInForce;
+  const twice = doc({ a: "1", b: "2" }).replace('"b":"2"', '"a":"2"');
   for (const bad of [
     doc({ "example.feature": ["on"] }), doc({ "a b": "x" }), doc([1]), doc("[1]"), doc({ a: "x".repeat(4097) }),
-    '{"custom":{"a":"1","a":"2"}}', doc({ "example.feature": "off" }, { sampling_rate: "2" }),
+    doc(null), doc({}), doc("  "), twice, doc({ "example.feature": "off" }, { head_sampling: { ratio: 2 } }),
   ]) {
     const s = agent.remoteConfig(config(bad));
     assert.equal(s.status, FAILED, bad);
     assert.equal(app.get("example.feature", "off"), "on", bad);
-    assert.deepEqual(agent.settingsInForce, reported, bad);
+    assert.deepEqual(agent.settingsInForce, before, bad);
   }
+  // A remote config with no policy at all is refused too.
+  const none = agent.remoteConfig(noPolicy());
+  assert.equal(none.status, FAILED);
+  assert.match(none.errorMessage, /^config_map:/);
+  assert.equal(app.get("example.feature", "off"), "on");
   assert.equal(told.length, 1);
   assert.equal(agent.controls.sampler.samplingRate, 0.5);
 });
@@ -430,7 +434,7 @@ test("the timer's Refresh (debug mode's end) puts the same map in force again: n
   const { app, told } = recorded();
   const agent = new TestAgent(undefined, app);
   const until = new Date(NOW + 5000).toISOString();
-  agent.remoteConfig(config(doc({ "example.feature": "on" }, { sampling_rate: "0.1", debug_until: until })));
+  agent.remoteConfig(config(doc({ "example.feature": "on" }, { head_sampling: { ratio: 0.1 }, debug: { until } })));
   assert.equal(told.length, 1);
   assert.equal(agent.controls.sampler.samplingRate, 1); // in debug mode
   assert.equal(agent.timer?.ms, 5000);
@@ -441,7 +445,7 @@ test("the timer's Refresh (debug mode's end) puts the same map in force again: n
   assert.equal(agent.controls.sampler.samplingRate, 0.1);
   assert.equal(app.get("example.feature", "off"), "on");
   assert.equal(told.length, 1);
-  assert.deepEqual(agent.reported.at(-1), { custom: '{"example.feature":"on"}', sampling_rate: "0.1" });
+  assert.deepEqual(agent.reported.at(-1), { app_settings: { values: { "example.feature": "on" } }, head_sampling: { ratio: 0.1 } });
   // A Refresh called again (no debug mode at all): still nothing.
   agent.refresh();
   assert.equal(told.length, 1);
@@ -451,8 +455,8 @@ test("debug mode leaves the application's settings alone: they apply in it, and 
   const { app, told } = recorded();
   const agent = new TestAgent(undefined, app);
   const until = new Date(NOW + 1000).toISOString();
-  agent.remoteConfig(config(doc({ a: "1" }, { debug_until: until })));
-  agent.remoteConfig(config(doc({ a: "2" }, { debug_until: until })));
+  agent.remoteConfig(config(doc({ a: "1" }, { debug: { until } })));
+  agent.remoteConfig(config(doc({ a: "2" }, { debug: { until } })));
   assert.equal(app.get("a"), "2");
   agent.wall += 1000;
   agent.mono += 1000;
@@ -576,14 +580,14 @@ test("a restart with a state directory: the values in force at exit, from the st
   const second = new TestAgent(dir, app);
   assert.equal(app.get("example.feature", "off"), "on");
   assert.equal(app.getInt("limit", 0), 25);
-  assert.deepEqual(second.settingsInForce, { custom: '{"example.feature":"on","limit":"25"}' });
+  assert.deepEqual(second.settingsInForce, { app_settings: { values: { "example.feature": "on", limit: "25" } } });
   // Its callback was added before Load here (a test can; the register's application can't): told once, at Load.
   assert.deepEqual(told.map((t) => t.changed), [["example.feature", "limit"]]);
   // The server sends the same again: nothing to tell.
   second.remoteConfig(config(doc({ limit: "25", "example.feature": "on" })));
   assert.equal(told.length, 1);
-  // Then leaves custom out, and the start after has the defaults.
-  second.remoteConfig(config("{}"));
+  // Then leaves app_settings local, and the start after has the defaults.
+  second.remoteConfig(config(policy()));
   assert.equal(app.get("example.feature", "off"), "off");
   const third = new TestAgent(dir);
   assert.equal(third.app.get("example.feature", "off"), "off");
@@ -611,7 +615,7 @@ test("a restart without a state directory starts from the defaults", () => {
   assert.equal(second.app.get("a", "def"), "def");
 });
 
-test("a saved document with a bad custom map: the SDK's own settings, the defaults, and a warning", () => {
+test("a saved policy with a bad app_settings map: the SDK's own settings, the defaults, and a warning", () => {
   const dir = stateDir();
   new TestAgent(dir).remoteConfig(config(doc({ a: "1" })));
   // Written by hand, not by the client: a map the layer refuses.
@@ -670,7 +674,7 @@ test("a register that fails after Load: no timer left to put the saved settings 
   const dir = stateDir();
   // Saved: the flag on, in a debug window, so Load arms the timer for its end.
   const until = new Date(NOW + 5000).toISOString();
-  new TestAgent(dir).remoteConfig(config(doc({ "example.feature": "on" }, { debug_until: until })));
+  new TestAgent(dir).remoteConfig(config(doc({ "example.feature": "on" }, { debug: { until } })));
   const { app, told } = recorded();
   const agent = new TestAgent(dir, app, {}, false);
   assert.throws(() => preparing(agent, app, TestAgent.env(dir), () => {

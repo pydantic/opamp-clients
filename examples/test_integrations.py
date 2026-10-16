@@ -20,8 +20,9 @@ import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
-                          judge_truth, key_from_env, key_in_code, truth_scenario, judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
+from integrations import (APP_KEY, POLICY_FILE, POLICY_V1, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+                          judge_truth, key_from_env, key_in_code, policy, truth_scenario,
+                          judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
                           judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
                           wait_for)
@@ -114,17 +115,24 @@ class Log:
         return self
 
 
-def first(switch_at_once: bool, after_switch: float = 10) -> Log:
+REFUSED_SWITCH = "instrumentations: disabled: this SDK cannot apply the requested override"
+
+
+def first(switch_at_once: bool, after_switch: float = 10, switches: bool = True) -> Log:
     """Run 1 as it should go: spans, then none, then spans again, then the switch; the application
-    keeps making requests for `after_switch` seconds after the fifth answer."""
+    keeps making requests for `after_switch` seconds after the fifth answer. Without `switches`,
+    the agent refuses the switch and the spans go on."""
     log = Log().a2s(0, config=True)
     # Each config is offered half a second before its answer arrives.
     log.offer(0.5).a2s(1, status="APPLIED").span(2).span(3)
     log.offer(9.5).a2s(10, status="APPLIED").pings(10, 20)
-    log.offer(19.5).a2s(20, status="FAILED", error="sampling_rate: 7 is not between 0 and 1").pings(20, 30)
+    log.offer(19.5).a2s(20, status="FAILED", error="head_sampling: ratio must be a number from 0 to 1").pings(20, 30)
     log.offer(29.5).a2s(30, status="APPLIED").span(32).span(35)
-    log.offer(39.5).a2s(40, status="APPLIED").pings(40, 40 + after_switch)
-    if not switch_at_once:
+    if switches:
+        log.offer(39.5).a2s(40, status="APPLIED").pings(40, 40 + after_switch)
+    else:
+        log.offer(39.5).a2s(40, status="FAILED", error=REFUSED_SWITCH).pings(40, 40 + after_switch)
+    if not switch_at_once or not switches:
         log.span(45)
     log.a2s(40 + after_switch, disconnect=True)
     return log
@@ -140,7 +148,7 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
           info_under_floor: bool = False, info_back: bool = True, debug_spans: bool = True,
           ruled: bool = True, scoped: bool = True, scope_back: bool = True, span_name: str = "[REDACTED]",
           dropped_name: str = "GET", spans_a_second: int = 1, records_a_second: int = 1,
-          health: bool = True, set_aside: dict | None = None, set_aside_after: dict | None = None) -> Log:
+          health: bool = True, effective: dict | None = None, effective_after: dict | None = None) -> Log:
     """Run 3 as it should go: every signal; metrics and logs off; back on with `share` of the
     requests traced; a `warn` floor, under which the INFO lines (one a request) stop; rate 0 with a
     debug window of 10 s, traced until it ends, the floor left out and the INFO lines back; a rule
@@ -148,13 +156,10 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
     the URLs masked, spans named `span_name` and log lines again; the URLs dropped (spans named
     `dropped_name`) and both caps, `spans_a_second` and `records_a_second`; then every
     instrumentation off. Export health at start and at 120 s. With the third offer the agent
-    reports `set_aside` as what it set aside (by default logging_level, ignored), and with the
-    fourth `set_aside_after` (by default nothing)."""
-    named = {"ignored": ["logging_level"], "unsupported": []}
-    third_effective = {"elastic": {"sampling_rate": "0.25"}, "elastic.set_aside": set_aside or named}
-    fourth_effective: dict = {"elastic": {"sampling_rate": "0.25", "send_logs_level": "warn"}}
-    if set_aside_after:
-        fourth_effective["elastic.set_aside"] = set_aside_after
+    reports `effective` as its effective config (by default the version 1 policy in force), and
+    with the fourth `effective_after` (by default the version 2 policy in force)."""
+    third_effective = effective or in_force({"head_sampling": {"ratio": 0.25}})
+    fourth_effective = effective_after or in_force({"head_sampling": {"ratio": 0.25}, "log_levels": {"level": "warn"}})
     log = Log().a2s(0, config=True)
     if health:
         log.health(0.5, ok=0, filtered=0)
@@ -202,6 +207,11 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
     if not at_once:
         log.span(230)
     return log.a2s(235, disconnect=True)
+
+
+def in_force(overrides: dict[str, dict], version: int | None = None) -> dict:
+    """An effective config as the server's log gives it: the policy with `overrides` as its only file."""
+    return {POLICY_FILE: json.loads(policy(overrides, version))}
 
 
 def fourth(every: float = 3.0, spans: bool = False) -> Log:
@@ -342,7 +352,7 @@ class Inventory(unittest.TestCase):
 
     def test_no_gated_traces_exporter_fails(self):
         got = failed(judge_inventory(inventory_sent(gated=False).events, "urllib", False))
-        self.assertTrue(any(f.startswith("a traces exporter the send_* switch reaches") for f in got), got)
+        self.assertTrue(any(f.startswith("a traces exporter the traces export control reaches") for f in got), got)
 
     def test_an_sdk_entry_without_versions_fails(self):
         log = inventory_sent(sdk={"integration.name": "opamp-otel", "telemetry.sdk.language": "python"})
@@ -365,17 +375,17 @@ class First(unittest.TestCase):
         log = first(True, after_switch=1)
         self.assertNotEqual(failed(judge_first(log.events, "checkout", True)), [])
 
-    def test_no_spans_with_send_traces_false_and_no_requests_fails(self):
+    def test_no_spans_with_the_traces_export_off_and_no_requests_fails(self):
         log = first(False)
         log.events = [e for e in log.events if not (e["event"] == "stray_request" and 13 < e["t"] < 30)]
         self.assertNotEqual(failed(judge_first(log.events, "checkout", False)), [])
 
-    def test_a_span_that_ended_before_send_traces_went_false_may_arrive_after(self):
+    def test_a_span_that_ended_before_the_traces_export_went_off_may_arrive_after(self):
         # A batch on its way when the switch came, delivered late on a busy machine.
         log = first(False).span(15, ended=9.9)
         self.assertEqual(failed(judge_first(log.events, "checkout", False)), [])
 
-    def test_a_span_still_queued_goes_out_once_send_traces_is_switched_back(self):
+    def test_a_span_still_queued_goes_out_once_the_traces_export_is_local_again(self):
         # Ended while switched off, still in the batch when the config switching it back (offered
         # at 29.5) is put in force: exported, as it should be, before the answer (30) arrives.
         for ended in (27.0, 29.7):
@@ -383,16 +393,16 @@ class First(unittest.TestCase):
                 log = first(False).span(29.9, ended=ended)
                 self.assertEqual(failed(judge_first(log.events, "checkout", False)), [])
 
-    def test_a_span_that_arrives_before_send_traces_is_switched_back_fails(self):
+    def test_a_span_that_arrives_before_the_traces_export_is_local_again_fails(self):
         log = first(False).span(29.4, ended=27.0)
-        self.assertTrue(any(f.startswith("no span exported once send_traces is false")
+        self.assertTrue(any(f.startswith("no span exported once the traces export is off")
                             for f in failed(judge_first(log.events, "checkout", False))))
 
-    def test_a_span_that_ended_after_send_traces_went_false_fails_until_it_is_switched_back(self):
+    def test_a_span_that_ended_after_the_traces_export_went_off_fails_until_it_is_switched_back(self):
         for arrives in (12, 25, 29.4):
             with self.subTest(arrives=arrives):
                 log = first(False).span(arrives, ended=11.5)
-                self.assertTrue(any(f.startswith("no span exported once send_traces is false")
+                self.assertTrue(any(f.startswith("no span exported once the traces export is off")
                                     for f in failed(judge_first(log.events, "checkout", False))))
 
     def test_a_span_that_ended_after_an_at_once_switch_fails_whenever_it_arrives(self):
@@ -403,7 +413,27 @@ class First(unittest.TestCase):
     def test_a_log_without_end_times_counts_arrivals(self):
         log = first(False)
         log.events.append({"event": "otlp", "t": 15, "signal": "traces", "services": ["checkout"], "spans": [PING]})
-        self.assertTrue(any(f.startswith("no span exported once send_traces is false")
+        self.assertTrue(any(f.startswith("no span exported once the traces export is off")
+                            for f in failed(judge_first(log.events, "checkout", False))))
+
+    def test_where_the_switch_is_refused_the_spans_go_on(self):
+        self.assertEqual(failed(judge_first(first(False, switches=False).events, "checkout", False, switches=False)), [])
+        # Carried out where it cannot be: the fifth answer is APPLIED, not FAILED.
+        self.assertIn("five configs answered APPLIED, APPLIED, FAILED, APPLIED, FAILED",
+                      failed(judge_first(first(False).events, "checkout", False, switches=False)))
+
+    def test_a_refusal_of_the_switch_for_another_reason_fails(self):
+        log = first(False, switches=False)
+        answer = [e for e in log.events if e.get("remote_config_status")][-1]
+        answer["remote_config_status"]["error"] = "instrumentations: takes effect at the next start"
+        self.assertTrue(any(f.startswith("the switch it cannot carry out is refused")
+                            for f in failed(judge_first(log.events, "checkout", False, switches=False))))
+
+    def test_a_failure_naming_another_control_fails(self):
+        log = first(False)
+        answer = next(e for e in log.events if e.get("remote_config_status", {}).get("status", "").endswith("FAILED"))
+        answer["remote_config_status"]["error"] = "signal_exports.traces: enabled must be a boolean"
+        self.assertTrue(any(f.startswith("the FAILED names the control")
                             for f in failed(judge_first(log.events, "checkout", False))))
 
     def test_a_null_span_list_is_not_a_crash(self):
@@ -423,10 +453,10 @@ class Second(unittest.TestCase):
         self.assertIn("the instrumentation switched off at the next start: no spans",
                       failed(judge_second(self.one, two.events)))
 
-    def test_where_the_switch_is_ignored_the_spans_go_on(self):
+    def test_where_the_switch_is_refused_the_spans_go_on(self):
         # An application that instruments itself in code: nothing can switch an instrumentation off.
         self.assertEqual(failed(judge_second(self.one, second().span(3).events, switches=False)), [])
-        self.assertIn("the instrumentation switch is ignored (the application instruments itself): spans go on",
+        self.assertIn("the instrumentation switch was refused (the application instruments itself): spans go on",
                       failed(judge_second(self.one, second().events, switches=False)))
 
     def test_another_uid_fails(self):
@@ -452,24 +482,29 @@ class Second(unittest.TestCase):
         self.assertNotEqual(failed(judge_second(self.one, second(config=False).events)), [])
 
 
-def truth(aside: frozenset[str] = frozenset(), unchanged: frozenset[str] = frozenset(), switch_at_once: bool = False,
-          named_in_force: frozenset[str] = frozenset(), statuses: str = "APPLIED") -> Log:
-    """check_truth's run as it should go, a document every 10 s: the baseline (every signal), then
-    each setting of TRUTH alone, carried out. A setting in `aside` is named as set aside in the
-    effective config reported with its answer, and its window looks like the baseline; one in
-    `unchanged` is not named, and its window looks like the baseline all the same (the defect);
-    one in `named_in_force` is named as set aside and in force at once."""
-    judged = [s for s, _ in TRUTH] + ([TRUTH_SWITCH[0]] if switch_at_once else [])
+UNSUPPORTED = "this SDK cannot apply the requested override"
+
+
+def truth(refused: frozenset[str] = frozenset(), local: frozenset[str] = frozenset(),
+          unchanged: frozenset[str] = frozenset(), switch_at_once: bool = False, error: str | None = None,
+          baseline: str = "APPLIED") -> Log:
+    """check_truth's run as it should go, a policy every 10 s: the baseline (every signal), then
+    each override of TRUTH alone, carried out. A setting in `refused` is FAILED as an override the
+    SDK can't carry out (or with `error`), one in `local` is APPLIED and reported local; the
+    windows of both look like the baseline. One in `unchanged` is APPLIED and reported in force,
+    and its window looks like the baseline all the same (the defect)."""
+    judged = TRUTH + ([TRUTH_SWITCH] if switch_at_once else [])
     log = Log().a2s(0, config=True)
-    for i, setting in enumerate(judged):
+    for i, (setting, control, fields) in enumerate(judged):
         start, end = 10.0 * i + 10, 10.0 * i + 20
-        effective: dict = {"elastic": {"sampling_rate": "1"}}
-        if setting in aside or setting in named_in_force:
-            effective["elastic.set_aside"] = {"ignored": [], "unsupported": [setting]}
-        if setting in named_in_force:
-            effective["elastic"][setting] = "x"
-        log.offer(start - 0.5).a2s(start, status=statuses, effective=effective)
-        shown = setting is None or setting in aside or setting in unchanged or setting in named_in_force
+        overrides = {control: fields} if control and setting not in local | refused else {}
+        effective = {POLICY_FILE: json.loads(policy(overrides, 2))}
+        if setting in refused:
+            why = error or f"{control}: {next(iter(fields))}: {UNSUPPORTED}"
+            log.offer(start - 0.5).a2s(start, status="FAILED", error=why, effective=effective)
+        else:
+            log.offer(start - 0.5).a2s(start, status=baseline if setting is None else "APPLIED", effective=effective)
+        shown = setting is None or setting in refused | local | unchanged
         log.pings(start, end)
         t = start
         while t < end:
@@ -498,23 +533,30 @@ class Truth(unittest.TestCase):
             with self.subTest(switch_at_once=at_once):
                 self.assertEqual(failed(judge_truth(truth(switch_at_once=at_once).events, set(), at_once)), [])
 
-    def test_a_setting_named_as_set_aside_passes_where_the_setup_expects_it(self):
-        aside = frozenset({"send_traces", "mask_attributes", "send_logs_per_second"})
-        self.assertEqual(failed(judge_truth(truth(aside=aside).events, set(aside))), [])
+    def test_a_setting_refused_or_reported_local_passes_where_the_setup_expects_it_set_aside(self):
+        refused = frozenset({"send_traces", "mask_attributes"})
+        local = frozenset({"send_logs_per_second", "sampling_rate"})
+        self.assertEqual(failed(judge_truth(truth(refused, local).events, set(refused | local))), [])
 
-    def test_a_setting_applied_not_set_aside_and_not_carried_out_fails(self):
-        for setting, _ in TRUTH[1:]:
+    def test_a_refusal_of_a_signal_or_the_head_sampling_names_the_control_alone(self):
+        for setting, control in (("send_traces", "signal_exports.traces"), ("sampling_rate", "head_sampling")):
+            with self.subTest(setting=setting):
+                log = truth(frozenset({setting}), error=f"{control}: {UNSUPPORTED}")
+                self.assertEqual(failed(judge_truth(log.events, {setting})), [])
+
+    def test_a_setting_applied_in_force_and_not_carried_out_fails(self):
+        for setting, _, _ in TRUTH[1:]:
             with self.subTest(setting=setting):
                 out = failed(judge_truth(truth(unchanged=frozenset({setting})).events, set()))
                 self.assertEqual(len(out), 1)
-                self.assertTrue(out[0].startswith(f"{setting}: APPLIED, not set aside, and the telemetry didn't change"))
+                self.assertTrue(out[0].startswith(f"{setting}: APPLIED, in force, and the telemetry didn't change"))
 
     def test_spans_after_the_live_switch_fail(self):
         events = truth(unchanged=frozenset({TRUTH_SWITCH[0]}), switch_at_once=True).events
-        self.assertTrue(failed(judge_truth(events, set(), True))[0].startswith(f"{TRUTH_SWITCH[0]}: APPLIED, not"))
+        self.assertTrue(failed(judge_truth(events, set(), True))[0].startswith(f"{TRUTH_SWITCH[0]}: APPLIED, in"))
 
     def test_more_set_aside_than_the_setup_expects_fails(self):
-        out = failed(judge_truth(truth(aside=frozenset({"send_traces"})).events, set()))
+        out = failed(judge_truth(truth(local=frozenset({"send_traces"})).events, set()))
         self.assertEqual(len(out), 1)
         self.assertIn("not expected: ['send_traces']", out[0])
 
@@ -523,13 +565,14 @@ class Truth(unittest.TestCase):
         self.assertEqual(len(out), 1)
         self.assertIn("expected, carried out: ['send_logs']", out[0])
 
-    def test_a_setting_named_as_set_aside_and_in_force_fails(self):
-        out = failed(judge_truth(truth(named_in_force=frozenset({"send_logs"})).events, {"send_logs"}))
-        self.assertEqual(out, ["send_logs: set aside, and not reported in force"])
+    def test_a_policy_refused_for_another_reason_fails(self):
+        out = failed(judge_truth(truth(frozenset({"send_logs"}), error="log_levels: level: x").events, {"send_logs"}))
+        self.assertEqual(len(out), 2)
+        self.assertTrue(out[0].startswith("send_logs: refused as an override the SDK can't carry out"))
 
-    def test_a_failed_document_fails(self):
-        out = failed(judge_truth(truth(statuses="FAILED").events, set()))
-        self.assertTrue(out[0].startswith("12 configs answered APPLIED"))
+    def test_a_refused_baseline_fails(self):
+        out = failed(judge_truth(truth(baseline="FAILED").events, set()))
+        self.assertEqual(out, ["the baseline APPLIED"])
 
     def test_a_window_with_too_few_requests_shows_nothing_carried_out(self):
         log = truth()
@@ -547,11 +590,13 @@ class Truth(unittest.TestCase):
                        if e["event"] == "otlp" and e["signal"] == "traces" and 110 < e["t"] < 120]
         self.assertEqual(failed(judge_truth(log.events, set())), [])
 
-    def test_the_scenario_offers_each_document_once_in_order(self):
+    def test_the_scenario_offers_each_policy_once_in_order(self):
         for at_once in (False, True):
             faults = truth_scenario(at_once)["server"]["faults"]
-            bodies = [json.loads(f["body"]) for f in faults]
-            self.assertEqual(bodies, [b for _, b in TRUTH] + ([TRUTH_SWITCH[1]] if at_once else []))
+            judged = TRUTH + ([TRUTH_SWITCH] if at_once else [])
+            self.assertEqual([f["config_key"] for f in faults], [POLICY_FILE] * len(judged))
+            self.assertEqual([json.loads(f["body"]) for f in faults],
+                             [json.loads(policy({c: f} if c else {}, 2)) for _, c, f in judged])
             self.assertEqual(len({f["on_message"] for f in faults}), len(faults))
 
 
@@ -561,26 +606,37 @@ class Signals(unittest.TestCase):
             with self.subTest(switch_at_once=at_once):
                 self.assertEqual(failed(judge_signals(third(at_once=at_once).events, "checkout", at_once)), [])
 
-    def test_a_setting_set_aside_and_not_named_fails(self):
-        nothing = {"ignored": [], "unsupported": []}
-        self.assertTrue(any(f.startswith("set aside: the effective config names logging_level")
-                            for f in failed(judge_signals(third(set_aside=nothing).events, "checkout", False))))
+    def test_no_effective_config_fails(self):
         log = third()
         for e in log.events:
             e.pop("effective", None)
-        self.assertTrue(any(f.startswith("set aside: the effective config names logging_level")
-                            for f in failed(judge_signals(log.events, "checkout", False))))
+        got = failed(judge_signals(log.events, "checkout", False))
+        self.assertTrue(any(f.startswith("the effective config reports the version 1 policy in force") for f in got))
+        self.assertTrue(any(f.startswith("then the version 2 policy") for f in got))
 
-    def test_a_setting_still_named_once_left_out_fails(self):
-        kept = {"ignored": ["logging_level"], "unsupported": []}
-        self.assertTrue(any(f.startswith("set aside: logging_level no longer named")
-                            for f in failed(judge_signals(third(set_aside_after=kept).events, "checkout", False))))
+    def test_an_effective_config_of_another_policy_fails(self):
+        for wrong in (in_force({"head_sampling": {"ratio": 0.5}}),
+                      in_force({"head_sampling": {"ratio": 0.25}}, version=2),
+                      in_force({"head_sampling": {"ratio": 0.25}, "signal_exports.logs": {"enabled": False}}),
+                      {"settings.json": {"sampling_rate": "0.25"}},
+                      in_force({"head_sampling": {"ratio": 0.25}}) | {"other.json": {}}):
+            with self.subTest(wrong=wrong):
+                self.assertTrue(any(f.startswith("the effective config reports the version 1 policy in force")
+                                    for f in failed(judge_signals(third(effective=wrong).events, "checkout", False))))
 
-    def test_metrics_after_send_metrics_false_fail(self):
+    def test_the_policy_before_still_reported_once_the_level_is_set_fails(self):
+        kept = in_force({"head_sampling": {"ratio": 0.25}})
+        self.assertTrue(any(f.startswith("then the version 2 policy")
+                            for f in failed(judge_signals(third(effective_after=kept).events, "checkout", False))))
+
+    def test_the_effective_policy_names_its_schema(self):
+        self.assertEqual(in_force({})[POLICY_FILE]["schema"], POLICY_V1)
+
+    def test_metrics_after_the_metrics_export_is_off_fail(self):
         self.assertTrue(any(f.startswith("no metrics exported")
                             for f in failed(judge_signals(third(metrics_off=False).events, "checkout", False))))
 
-    def test_logs_after_send_logs_false_fail(self):
+    def test_logs_after_the_logs_export_is_off_fail(self):
         self.assertTrue(any(f.startswith("no logs exported")
                             for f in failed(judge_signals(third(logs_off=False).events, "checkout", False))))
 
@@ -598,17 +654,17 @@ class Signals(unittest.TestCase):
         self.assertIn("metrics arrive", failed(judge_signals(log.events, "checkout", False)))
 
     def test_info_lines_under_a_warn_floor_fail(self):
-        self.assertTrue(any(f.startswith("no INFO log lines under send_logs_level warn")
+        self.assertTrue(any(f.startswith("no INFO log lines under the log level warn")
                             for f in failed(judge_signals(third(info_under_floor=True).events, "checkout", False))))
 
     def test_info_lines_not_back_once_the_floor_is_left_out_fail(self):
-        self.assertTrue(any(f.startswith("INFO log lines again once send_logs_level is left out")
+        self.assertTrue(any(f.startswith("INFO log lines again once log_levels is local")
                             for f in failed(judge_signals(third(info_back=False).events, "checkout", False))))
 
     def test_no_info_lines_before_the_floor_fails(self):
         log = third()
         log.events = [e for e in log.events if not (e.get("signal") == "logs" and 50 < e["t"] < 75)]
-        self.assertTrue(any(f.startswith("INFO log lines arrive before send_logs_level is set")
+        self.assertTrue(any(f.startswith("INFO log lines arrive before the log level is set")
                             for f in failed(judge_signals(log.events, "checkout", False))))
 
     def test_records_queued_before_the_floor_may_arrive(self):
@@ -622,15 +678,15 @@ class Signals(unittest.TestCase):
     def test_no_requests_under_the_floor_fails(self):
         log = third()
         log.events = [e for e in log.events if not (e["event"] == "stray_request" and 75 < e["t"] < 100)]
-        self.assertTrue(any(f.startswith("no INFO log lines under send_logs_level warn")
+        self.assertTrue(any(f.startswith("no INFO log lines under the log level warn")
                             for f in failed(judge_signals(log.events, "checkout", False))))
 
     def test_every_request_traced_at_a_quarter_fails(self):
-        self.assertTrue(any(f.startswith("sampling_rate 0.25")
+        self.assertTrue(any(f.startswith("head_sampling 0.25")
                             for f in failed(judge_signals(third(share=1).events, "checkout", False))))
 
     def test_no_request_traced_at_a_quarter_fails(self):
-        self.assertTrue(any(f.startswith("sampling_rate 0.25")
+        self.assertTrue(any(f.startswith("head_sampling 0.25")
                             for f in failed(judge_signals(third(share=0).events, "checkout", False))))
 
     def test_spans_after_an_at_once_switch_fail(self):
@@ -651,26 +707,26 @@ def fails(log: Log, start: str, at_once: bool = False) -> bool:
 
 class SignalsDebug(unittest.TestCase):
     def test_no_span_in_the_window_fails(self):
-        self.assertTrue(fails(third(debug_spans=False), "debug_until: traced in the window"))
+        self.assertTrue(fails(third(debug_spans=False), "debug: traced in the window"))
 
     def test_a_span_once_the_window_is_over_fails(self):
-        self.assertTrue(fails(third().span(125, ended=124.9), "debug_until: no span once the window is over"))
+        self.assertTrue(fails(third().span(125, ended=124.9), "debug: no span once the window is over"))
 
     def test_a_span_ending_just_past_the_rounded_time_passes(self):
         # The time is rounded up to a whole second: a span may end up to a second past 109.4.
-        self.assertFalse(fails(third().span(111, ended=110.3), "debug_until"))
+        self.assertFalse(fails(third().span(111, ended=110.3), "debug:"))
 
     def test_a_span_of_the_window_arriving_after_it_passes(self):
         self.assertEqual(failed(judge_signals(third().span(115, ended=108).events, "checkout", False)), [])
 
     def test_the_server_offering_again_in_the_window_fails(self):
         # Debug mode must end on the agent's own timer, not on a word from the server.
-        self.assertTrue(fails(third().offer(112), "debug_until: no span once the window is over"))
+        self.assertTrue(fails(third().offer(112), "debug: no span once the window is over"))
 
     def test_no_requests_after_the_window_fails(self):
         log = third()
         log.events = [e for e in log.events if not (e["event"] == "stray_request" and 110 < e["t"] < 150)]
-        self.assertTrue(fails(log, "debug_until: no span once the window is over"))
+        self.assertTrue(fails(log, "debug: no span once the window is over"))
 
     def test_without_the_servers_word_the_offer_times_it(self):
         log = third()
@@ -692,53 +748,53 @@ class SignalsTelemetry(unittest.TestCase):
         self.assertTrue(fails(log, "sampling_rules"))
 
     def test_log_lines_with_the_loggers_off_fail(self):
-        self.assertTrue(fails(third(scoped=False), "send_logs_level_by_scope: no log lines"))
+        self.assertTrue(fails(third(scoped=False), "log_levels scopes: no log lines"))
 
     def test_log_lines_not_back_once_the_levels_are_left_out_fail(self):
-        self.assertTrue(fails(third(scope_back=False), "send_logs_level_by_scope: log lines again"))
+        self.assertTrue(fails(third(scope_back=False), "log_levels scopes: log lines again"))
 
     def test_a_url_shown_under_the_mask_fails(self):
-        self.assertTrue(fails(third(span_name=PING), "mask_attributes"))
+        self.assertTrue(fails(third(span_name=PING), "attribute_redaction mask"))
 
     def test_no_span_under_the_mask_fails(self):
         log = third()
         log.events = [e for e in log.events if not (e.get("spans") == ["[REDACTED]"])]
-        self.assertTrue(fails(log, "mask_attributes"))
+        self.assertTrue(fails(log, "attribute_redaction mask"))
 
     def test_a_masked_span_beside_one_without_a_url_passes(self):
-        self.assertFalse(fails(third().span(185, url="tick"), "mask_attributes"))
+        self.assertFalse(fails(third().span(185, url="tick"), "attribute_redaction mask"))
 
     def test_a_dropped_url_still_shown_fails(self):
-        self.assertTrue(fails(third(dropped_name=PING), "drop_attributes"))
+        self.assertTrue(fails(third(dropped_name=PING), "attribute_redaction drop"))
 
     def test_a_masked_url_under_the_drop_fails(self):
-        self.assertTrue(fails(third(dropped_name="[REDACTED]"), "drop_attributes"))
+        self.assertTrue(fails(third(dropped_name="[REDACTED]"), "attribute_redaction drop"))
 
     def test_a_masked_span_queued_before_the_drop_may_arrive(self):
         # Ended under the mask, exported under the drop: it counts for neither step's check.
         self.assertEqual(failed(judge_signals(third().span(202, url="GET", ended=199).events, "checkout", False)), [])
 
     def test_no_span_under_the_drop_fails(self):
-        self.assertTrue(fails(third(spans_a_second=0), "drop_attributes"))
+        self.assertTrue(fails(third(spans_a_second=0), "attribute_redaction drop"))
 
     def test_too_many_spans_under_the_trace_cap_fail(self):
-        self.assertTrue(fails(third(spans_a_second=3), "sampling_traces_per_second"))
+        self.assertTrue(fails(third(spans_a_second=3), "trace_rate_limit"))
 
     def test_no_span_under_the_trace_cap_fails(self):
-        self.assertTrue(fails(third(spans_a_second=0), "sampling_traces_per_second"))
+        self.assertTrue(fails(third(spans_a_second=0), "trace_rate_limit"))
 
     def test_too_many_records_under_the_log_cap_fail(self):
-        self.assertTrue(fails(third(records_a_second=3), "send_logs_per_second"))
+        self.assertTrue(fails(third(records_a_second=3), "log_rate_limit"))
 
     def test_no_record_under_the_log_cap_fails(self):
-        self.assertTrue(fails(third(records_a_second=0), "send_logs_per_second"))
+        self.assertTrue(fails(third(records_a_second=0), "log_rate_limit"))
 
     def test_too_few_requests_for_the_caps_to_mean_anything_fails(self):
         log = third()
         log.events = [e for e in log.events if not (e["event"] == "stray_request" and 200 < e["t"] < 225
                                                      and round(e["t"] * 5) % 4)]
-        self.assertTrue(fails(log, "sampling_traces_per_second"))
-        self.assertTrue(fails(log, "send_logs_per_second"))
+        self.assertTrue(fails(log, "trace_rate_limit"))
+        self.assertTrue(fails(log, "log_rate_limit"))
 
 
 class SignalsHealth(unittest.TestCase):
@@ -918,11 +974,11 @@ class OwnKey(unittest.TestCase):
 
 
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,
-            again: bool = True, changes: int = 3, error: str = f"custom.{APP_KEY}: values must be strings, numbers "
-            "or booleans") -> Log:
+            again: bool = True, changes: int = 3, error: str = "app_settings: values must be an object of keys to strings, "
+            "numbers or booleans") -> Log:
     """Run 7 as it should go: the defaults (no /feature) until the first offer; on (/feature each
-    round, one /changed); a FAILED config that changes nothing; custom left out (no /feature, one
-    /changed); on again (/feature, one /changed); the same map again (nothing to tell)."""
+    round, one /changed); a FAILED config that changes nothing; app_settings local (no /feature,
+    one /changed); on again (/feature, one /changed); the same values again (nothing to tell)."""
     log = Log().a2s(0, config=True).pings(0, 3, "/feature" if early else None)
     log.offer(3.5).a2s(4, status="APPLIED").request(4.1, "/changed").pings(4, 14, "/feature" if on else None)
     log.offer(13.5).a2s(14, status="FAILED", error=error).pings(14, 24, None if failed_off else "/feature")
@@ -944,13 +1000,18 @@ def eighth(feature: bool = True, changed: bool = False) -> Log:
 
 
 class AppSettings(unittest.TestCase):
-    def test_the_scenario_offers_custom_in_every_shape(self):
-        bodies = [json.loads(f["body"]) for f in app_settings_scenario()["server"]["faults"]]
-        self.assertEqual(bodies[0], {"custom": {APP_KEY: "on"}})
-        self.assertIsInstance(bodies[1]["custom"][APP_KEY], list)  # refused
-        self.assertNotIn("custom", bodies[2])
-        self.assertEqual(json.loads(bodies[3]["custom"]), {APP_KEY: "on"})  # in a string
-        self.assertEqual(bodies[4]["custom"], bodies[0]["custom"])  # the same map again
+    def test_the_scenario_offers_app_settings_as_policies(self):
+        faults = app_settings_scenario()["server"]["faults"]
+        self.assertEqual({f["config_key"] for f in faults}, {POLICY_FILE})
+        bodies = [json.loads(f["body"]) for f in faults]
+        on = {"mode": "override", "values": {APP_KEY: "on"}}
+        self.assertEqual(bodies[0]["app_settings"], on)
+        self.assertIsInstance(bodies[1]["app_settings"]["values"][APP_KEY], list)  # refused
+        self.assertEqual(bodies[2]["schema"], POLICY_V1)  # no app_settings control: local
+        self.assertNotIn("app_settings", bodies[2])
+        self.assertEqual(bodies[3]["app_settings"], on)
+        self.assertEqual(bodies[4]["app_settings"], on)  # the same values again
+        self.assertEqual(bodies[4]["head_sampling"], {"mode": "override", "ratio": 1})
 
     def test_a_good_run_passes(self):
         self.assertEqual(failed(judge_app_settings(seventh().events)), [])
@@ -964,20 +1025,20 @@ class AppSettings(unittest.TestCase):
     def test_a_refused_config_that_changes_the_flag_fails(self):
         self.assertNotEqual(failed(judge_app_settings(seventh(failed_off=True).events)), [])
 
-    def test_a_flag_left_on_once_custom_is_left_out_fails(self):
+    def test_a_flag_left_on_once_app_settings_is_local_fails(self):
         self.assertNotEqual(failed(judge_app_settings(seventh(stays_on=True).events)), [])
 
-    def test_the_flag_not_back_from_a_string_fails(self):
+    def test_the_flag_not_back_once_on_again_fails(self):
         self.assertNotEqual(failed(judge_app_settings(seventh(again=False).events)), [])
 
-    def test_told_of_the_same_map_again_fails(self):
+    def test_told_of_the_same_values_again_fails(self):
         self.assertNotEqual(failed(judge_app_settings(seventh(changes=4).events)), [])
 
     def test_not_told_of_a_change_fails(self):
         self.assertNotEqual(failed(judge_app_settings(seventh(changes=2).events)), [])
 
     def test_a_failure_naming_another_setting_fails(self):
-        self.assertNotEqual(failed(judge_app_settings(seventh(error="sampling_rate: 7").events)), [])
+        self.assertNotEqual(failed(judge_app_settings(seventh(error="head_sampling: ratio must be a number from 0 to 1").events)), [])
 
     def test_a_restart_with_the_saved_flag_passes(self):
         self.assertEqual(failed(judge_app_settings_restart(eighth().events)), [])

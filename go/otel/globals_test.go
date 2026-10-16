@@ -22,19 +22,46 @@ import (
 	tracenoop "go.opentelemetry.io/otel/trace/noop"
 )
 
-// setAside is what the agent's effective config names as set aside, sorted.
-func setAside(t *testing.T, a *agent) []string {
+// setAside is what of the policy `wanted` overrides the agent's effective config reports local,
+// sorted: a control whose override is gone ("signal_exports.traces"), or a field of one whose
+// override stays ("log_levels: scopes"). A policy in force reports what it set aside local.
+func setAside(t *testing.T, a *agent, wanted string) []string {
 	t.Helper()
-	body := setAsideBody(a)
-	if body == "null" {
-		return nil
+	controls := func(doc string) map[string]map[string]any {
+		var raw map[string]any
+		if err := json.Unmarshal([]byte(doc), &raw); err != nil {
+			t.Fatalf("policy %s: %v", doc, err)
+		}
+		out := map[string]map[string]any{}
+		for k, v := range raw {
+			if k == "signal_exports" {
+				for signal, o := range v.(map[string]any) {
+					out[k+"."+signal] = o.(map[string]any)
+				}
+			} else if o, ok := v.(map[string]any); ok {
+				out[k] = o
+			}
+		}
+		return out
 	}
-	var e struct{ Unsupported []string }
-	if err := json.Unmarshal([]byte(body), &e); err != nil {
-		t.Fatalf("elastic.set_aside %s: %v", body, err)
+	have := controls(effectiveBody(a))
+	var aside []string
+	for control, o := range controls(wanted) {
+		if o["mode"] != "override" {
+			continue
+		}
+		if have[control]["mode"] != "override" {
+			aside = append(aside, control)
+			continue
+		}
+		for field := range o {
+			if _, ok := have[control][field]; !ok {
+				aside = append(aside, control+": "+field)
+			}
+		}
 	}
-	slices.Sort(e.Unsupported)
-	return e.Unsupported
+	slices.Sort(aside)
+	return aside
 }
 
 // fakeGlobals are global providers a test sets.
@@ -50,28 +77,34 @@ func (g *fakeGlobals) set(f func(*providers)) {
 	f(&g.now)
 }
 
-// Every setting this package carries out on a signal, in one document, beside a custom value.
-const everySignal = `{"sampling_rate":"0","sampling_rules":[{"rate":1,"name":"x"}],"sampling_traces_per_second":"5",
-"send_traces":"false","send_metrics":"false","send_logs":"false","send_logs_level":"warn",
-"send_logs_level_by_scope":"noisy=off","send_logs_per_second":"5","drop_attributes":"secret",
-"mask_attributes":"token","deactivate_all_instrumentations":"true","custom":{"flag":"on"}}`
+// Every control this package carries out on a signal, in one policy, beside the application's own
+// settings.
+var everySignal = v2("head_sampling", override(`"ratio":0`),
+	"signal_exports", `{"traces":{"mode":"override","enabled":false},"metrics":{"mode":"override","enabled":false},`+
+		`"logs":{"mode":"override","enabled":false}}`,
+	"sampling_rules", override(`"rules":[{"rate":1,"name":"x"}]`),
+	"trace_rate_limit", override(`"traces_per_second":5`),
+	"log_levels", override(`"level":"warn","scopes":{"noisy":"off"}`),
+	"log_rate_limit", override(`"records_per_second":5`),
+	"attribute_redaction", override(`"drop":["secret"],"mask":["token"]`),
+	"instrumentations", override(`"all_disabled":true`),
+	"app_settings", override(`"values":{"flag":"on"}`))
 
 // A global provider the application sets in place of one of Setup's takes that signal's telemetry
-// past this package's sampler and gates: the settings that signal's telemetry needs are set aside
-// at once, put out of force, and reported so; the others stay in force. From then on a config
-// that sends them has them set aside too, and is still APPLIED.
+// past this package's sampler and gates: the overrides that signal's telemetry needs are set aside
+// at once, put out of force, and reported local; the others stay in force. From then on a policy
+// that overrides them is refused.
 func TestAGlobalProviderSetInPlaceOfSetupsSetsItsSettingsAside(t *testing.T) {
-	both := []string{"deactivate_all_instrumentations", "drop_attributes", "mask_attributes"}
 	for _, tc := range []struct {
 		signal string
 		swap   func(*providers)
 		aside  []string
 	}{
-		{"traces", func(p *providers) { p.tracer = tracenoop.NewTracerProvider() }, append([]string{
-			"sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_traces"}, both...)},
-		{"metrics", func(p *providers) { p.meter = metricnoop.NewMeterProvider() }, []string{"send_metrics"}},
-		{"logs", func(p *providers) { p.logger = lognoop.NewLoggerProvider() }, []string{"drop_attributes",
-			"mask_attributes", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second"}},
+		{"traces", func(p *providers) { p.tracer = tracenoop.NewTracerProvider() }, []string{"attribute_redaction",
+			"head_sampling", "instrumentations", "sampling_rules", "signal_exports.traces", "trace_rate_limit"}},
+		{"metrics", func(p *providers) { p.meter = metricnoop.NewMeterProvider() }, []string{"signal_exports.metrics"}},
+		{"logs", func(p *providers) { p.logger = lognoop.NewLoggerProvider() }, []string{"attribute_redaction",
+			"log_levels", "log_rate_limit", "signal_exports.logs"}},
 	} {
 		t.Run(tc.signal, func(t *testing.T) {
 			slices.Sort(tc.aside)
@@ -87,25 +120,20 @@ func TestAGlobalProviderSetInPlaceOfSetupsSetsItsSettingsAside(t *testing.T) {
 				t.Fatalf("status %v", st)
 			}
 			a.lookAtGlobals() // nothing replaced: nothing changes
-			if got := setAside(t, a); got != nil || len(r.effective) != 0 {
+			if got := setAside(t, a, everySignal); got != nil || len(r.effective) != 0 {
 				t.Fatalf("Setup's providers still global: set aside %v, %d reports", got, len(r.effective))
 			}
 
 			g.set(tc.swap)
 			a.lookAtGlobals()
-			if got := setAside(t, a); !slices.Equal(got, tc.aside) {
+			if got := setAside(t, a, everySignal); !slices.Equal(got, tc.aside) {
 				t.Fatalf("set aside %v, want %v", got, tc.aside)
 			}
 			if len(r.effective) != 1 || len(r.components) != 1 {
 				t.Fatalf("reported %d effective configs and %d inventories, want one each", len(r.effective), len(r.components))
 			}
 			effective := effectiveBody(a)
-			for _, k := range tc.aside {
-				if strings.Contains(effective, `"`+k+`"`) {
-					t.Fatalf("%s reported in force: %s", k, effective)
-				}
-			}
-			if !strings.Contains(effective, `"custom"`) || c.app.get("flag", "") != "on" {
+			if !strings.Contains(effective, `"app_settings":{"mode":"override"`) || c.app.get("flag", "") != "on" {
 				t.Fatalf("the settings still carried out stay in force: %s", effective)
 			}
 			if inForce := sentSignals(c); inForce[tc.signal] != true {
@@ -118,16 +146,21 @@ func TestAGlobalProviderSetInPlaceOfSetupsSetsItsSettingsAside(t *testing.T) {
 			}
 			// The switches stop spans: set aside with the tracer provider alone.
 			if c.Off("otelhttp") != (tc.signal != "traces") {
-				t.Fatalf("deactivate_all_instrumentations in force: %v", c.Off("otelhttp"))
+				t.Fatalf("instrumentations.all_disabled in force: %v", c.Off("otelhttp"))
 			}
 
-			// Setup's provider set again: what took the other one's meanwhile keeps it.
+			// Setup's provider set again: what took the other one's meanwhile keeps it, so the same
+			// policy offered again is refused, naming a control it set aside.
 			g.set(func(p *providers) { *p = ours })
 			a.lookAtGlobals()
-			if st := a.remoteConfig(context.Background(), remote(everySignal)); st.GetStatus() != applied {
+			again := remote(everySignal)
+			again.ConfigHash = []byte("again")
+			st := a.remoteConfig(context.Background(), again)
+			if st.GetStatus() != failed_ || !strings.HasSuffix(st.GetErrorMessage(), "this SDK cannot apply the requested override") ||
+				!slices.ContainsFunc(tc.aside, func(c string) bool { return strings.HasPrefix(st.GetErrorMessage(), c+":") }) {
 				t.Fatalf("status %v", st)
 			}
-			if got := setAside(t, a); !slices.Equal(got, tc.aside) || len(r.effective) != 1 {
+			if got := setAside(t, a, everySignal); !slices.Equal(got, tc.aside) || len(r.effective) != 1 {
 				t.Fatalf("after Setup's provider is set again: set aside %v, %d reports", got, len(r.effective))
 			}
 		})
@@ -172,19 +205,22 @@ func TestSetupSeesTheApplicationSetAGlobalProviderOfItsOwn(t *testing.T) {
 		}
 		defer sdk.Shutdown(context.Background())
 		a := sdk.agent
-		if st := a.remoteConfig(context.Background(), remote(`{"send_traces":"false","send_logs":"false"}`)); st.GetStatus() != applied {
+		off := v2("signal_exports", exports("off", "", "off"))
+		if st := a.remoteConfig(context.Background(), remote(off)); st.GetStatus() != applied {
 			t.Fatalf("status %v", st)
 		}
 		tp := sdktrace.NewTracerProvider()
 		defer tp.Shutdown(context.Background())
 		otel.SetTracerProvider(tp)
-		lookedAt := func() []string { a.mu.Lock(); defer a.mu.Unlock(); return setAside(t, a) }
-		eventually(t, "the tracer provider set in Setup's place not seen", func() bool { return slices.Contains(lookedAt(), "send_traces") })
+		lookedAt := func() []string { a.mu.Lock(); defer a.mu.Unlock(); return setAside(t, a, off) }
+		eventually(t, "the tracer provider set in Setup's place not seen", func() bool {
+			return slices.Contains(lookedAt(), "signal_exports.traces")
+		})
 		time.Sleep(50 * time.Millisecond) // more looks: nothing more to say
 		a.mu.Lock()
 		defer a.mu.Unlock()
-		if slices.Contains(setAside(t, a), "send_logs") || a.controls.gates.Load().logs || !a.controls.gates.Load().traces {
-			t.Fatalf("only the tracer provider was replaced: set aside %v", setAside(t, a))
+		if slices.Contains(setAside(t, a, off), "signal_exports.logs") || a.controls.gates.Load().logs || !a.controls.gates.Load().traces {
+			t.Fatalf("only the tracer provider was replaced: set aside %v", setAside(t, a, off))
 		}
 		var warned []string
 		for _, s := range *said {
@@ -213,16 +249,20 @@ func TestSetupSeesTheApplicationSetAGlobalProviderOfItsOwn(t *testing.T) {
 		otel.SetMeterProvider(mp)
 		global.SetLoggerProvider(lp)
 		a := sdk.agent
-		st := a.remoteConfig(context.Background(), remote(`{"send_metrics":"false","send_logs":"false","send_traces":"false"}`))
-		if st.GetStatus() != applied {
+		// Seen before the decision: a policy that overrides what they take is refused, and
+		// nothing changes.
+		st := a.remoteConfig(context.Background(), remote(v2("signal_exports", exports("off", "off", "off"))))
+		g := a.controls.gates.Load()
+		if st.GetStatus() != failed_ || st.GetErrorMessage() != "signal_exports.metrics: this SDK cannot apply the requested override" ||
+			!g.logs || !g.metrics || !g.traces {
+			t.Fatalf("status %v; sending logs %v, metrics %v, traces %v", st, g.logs, g.metrics, g.traces)
+		}
+		// One that overrides only what it still carries out is applied.
+		if st := a.remoteConfig(context.Background(), remote(v2("signal_exports", exports("off", "", "")))); st.GetStatus() != applied {
 			t.Fatalf("status %v", st)
 		}
-		got, g := setAside(t, a), a.controls.gates.Load()
-		want := []string{"send_logs", "send_metrics"}
-		if !slices.Contains(got, "send_logs") || !slices.Contains(got, "send_metrics") || slices.Contains(got, "send_traces") ||
-			!g.logs || !g.metrics || g.traces {
-			t.Fatalf("set aside %v (want %v among them, not send_traces); sending logs %v, metrics %v, traces %v",
-				got, want, g.logs, g.metrics, g.traces)
+		if g := a.controls.gates.Load(); g.traces || !g.metrics || !g.logs {
+			t.Fatalf("sending logs %v, metrics %v, traces %v", g.logs, g.metrics, g.traces)
 		}
 	})
 }

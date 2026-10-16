@@ -23,10 +23,10 @@ class SdkSettings:
              now_unix_ms: int = 0, core_state: bytes | None = None) -> settings_pb2.Loaded:
         """At start, before the SDK is built: the settings to start with, from the document saved at
         the last change (None: nothing saved). Put all of them in force, next-start ones too.
-        `host`: the settings the SDK carries out, at once or at the next start; one it leaves out
-        is set aside, never in force (None: none carried out), and one that is no setting raises
-        ValueError. `now_unix_ms`: the wall clock, which debug mode is decided by (0: none, and
-        debug mode is ignored). `core_state`: the OpAMP core's saved state (what it asked the host
+        `host`: the settings the SDK carries out, at once or at the next start. A policy that
+        overrides one it leaves out is refused (None: none carried out), and a name that is no
+        setting raises ValueError. `now_unix_ms`: the wall clock, which debug mode is decided by
+        (0: none, and the SDK cannot carry out debug mode). `core_state`: the OpAMP core's saved state (what it asked the host
         to store; None: none). The settings then come from the last config applied in it, and
         `saved` is read only when it holds none (a document kept before the core kept the config
         applied)."""
@@ -83,9 +83,15 @@ class SdkSettings:
             health.settings.CopyFrom(settings)
         return self._call(settings_pb2.Request(health=health)).health_report
 
-    def describe(self, resource: list[anyvalue_pb2.KeyValue]) -> opamp_pb2.AgentDescription:
-        """The agent description, from the SDK's resource attributes."""
-        return self._call(settings_pb2.Request(describe=settings_pb2.Describe(resource=resource))).description
+    def describe(self, resource: list[anyvalue_pb2.KeyValue], host: settings_pb2.Host | None = None,
+                 now_unix_ms: int = 0) -> opamp_pb2.AgentDescription:
+        """The agent description, from the SDK's resource attributes. It also names the policy
+        formats the SDK reads and the controls `host` carries out. `host` and `now_unix_ms` as for
+        load."""
+        describe = settings_pb2.Describe(resource=resource, now_unix_ms=now_unix_ms)
+        if host is not None:
+            describe.host.CopyFrom(host)
+        return self._call(settings_pb2.Request(describe=describe)).description
 
     def components(self, inventory: settings_pb2.Inventory, host: settings_pb2.Host | None = None,
                    now_unix_ms: int = 0) -> opamp_pb2.AvailableComponents:

@@ -13,21 +13,21 @@ reference server, with the telemetry going through a recording proxy on its way 
 sink (check_newer_settings below). Runs with the automatic instrumentation NuGet package's
 instrument.sh.
 
-Run 7, the settings in the order the server offers them, each APPLIED, while this script sends
+Run 7, the policies in the order the server offers them, each APPLIED, while this script sends
 the application's ASP.NET Core server /ping and /health requests of its own (no traceparent: each
 a new trace, which the sampler leaves to the instrumentation's Filter):
-  1. sampling_rules, a rule of rate 0 for the path /health*, and sampling_rate 1: the server's
-     /ping requests are traced, its /health requests aren't;
-  2. send_logs_level_by_scope app.noisy=off: the app logger's records are exported, app.noisy's
-     aren't;
-  3. drop_attributes server.address, mask_attributes http.request.method: spans arrive without
+  1. sampling_rules, a rule of rate 0 for the path /health*, and head_sampling 1: the server's
+     /ping requests are traced, its /health requests are not;
+  2. log_levels scopes app.noisy off: the app logger's records are exported, app.noisy's are not;
+  3. attribute_redaction drop server.address and mask http.request.method: spans arrive without
      server.address and with the method "[REDACTED]";
-  4. sampling_traces_per_second 1 and send_logs_per_second 1: about one trace and one log record
-     a second, where the application makes some seven traces and ten log lines;
-  5. sampling_rate 1 alone: the caps, the rules, the scope level and redaction are gone.
-Run 8, debug mode: sampling_rate 0 with debug_until some 40 s ahead, at the first message: spans
-until then (debug's rate, 1), none after it, and the effective config reported again at the end,
-the server sending nothing new.
+  4. trace_rate_limit 1 and log_rate_limit 1: about one trace and one log record a second, where
+     the application makes some seven traces and ten log lines;
+  5. head_sampling 1 alone, a version 1 policy: the caps, the rules, the scope level and redaction
+     are gone (local).
+Run 8, debug mode: head_sampling 0 with debug until some 40 s ahead, at the first message: spans
+until then (debug's sampling_ratio, 1), none after it, and the effective config reported again at
+the end, the server sending nothing new.
 Run 9, export health: the proxy refuses the trace exports for a minute: the agent sends its
 health again once the exports fail (at its next 30 s report), and again once they succeed.
 
@@ -45,7 +45,6 @@ from __future__ import annotations
 
 import gzip
 import http.server
-import json
 import os
 import platform
 import shutil
@@ -62,7 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, check_truth, ended, main, offered_before, pings, run,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, check_truth, ended, main, offer, offered_before, pings, run,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -73,7 +72,6 @@ TARGET = target("dotnet-otel")
 OUT = TARGET / "publish"
 LOCAL = "--local" in sys.argv
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
-SETTINGS = "application/json"
 
 
 def build() -> None:
@@ -296,11 +294,6 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
-def offer(n: int, body: dict) -> dict:
-    return {"on_message": n, "action": "offer_config", "config_key": "elastic", "body": json.dumps(body),
-            "content_type": SETTINGS}
-
-
 def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
     """Runs 7, 8 and 9 (above), and every check printed; True when all pass."""
     proxy = Proxy()
@@ -318,12 +311,14 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
     gap = 10  # messages: some 10 s at the agent's pace (one a second)
     rules = [{"rate": 0, "path": "/health*"}]
     scenario = {"server": {"faults": [
-        offer(1, {"sampling_rate": "1", "sampling_rules": rules}),
-        offer(1 + gap, {"sampling_rate": "1", "sampling_rules": rules, "send_logs_level_by_scope": "app.noisy=off"}),
-        offer(1 + 2 * gap, {"sampling_rate": "1", "drop_attributes": "server.address",
-                            "mask_attributes": "http.request.method"}),
-        offer(1 + 3 * gap, {"sampling_rate": "1", "sampling_traces_per_second": "1", "send_logs_per_second": "1"}),
-        offer(1 + 4 * gap, {"sampling_rate": "1"}),
+        offer(1, {"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": rules}}),
+        offer(1 + gap, {"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": rules},
+                        "log_levels": {"scopes": {"app.noisy": "off"}}}),
+        offer(1 + 2 * gap, {"head_sampling": {"ratio": 1},
+                            "attribute_redaction": {"drop": ["server.address"], "mask": ["http.request.method"]}}),
+        offer(1 + 3 * gap, {"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 1},
+                            "log_rate_limit": {"records_per_second": 1}}),
+        offer(1 + 4 * gap, {"head_sampling": {"ratio": 1}}),
     ]}}
     state = Path(tempfile.mkdtemp(prefix="state-newer-", dir=target_))
     state.chmod(0o777)
@@ -349,14 +344,14 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
                    f"({one.count('/health')})", "/ping" in one and "/health" not in one)
             two = proxy.items("logs", t[1] + MARGIN, t[2])
             scopes = {i["scope"] for i in two}
-            expect(f"send_logs_level_by_scope: app's records exported, app.noisy's not ({sorted(scopes)})",
+            expect(f"log_levels scopes: app's records exported, app.noisy's not ({sorted(scopes)})",
                    "app" in scopes and "app.noisy" not in scopes)
             before = proxy.items("logs", t[0] + MARGIN, t[1])
             expect("app.noisy's records were exported before", any(i["scope"] == "app.noisy" for i in before))
             three = proxy.items("traces", t[2] + MARGIN, t[3])
-            expect(f"drop_attributes: no span with server.address ({len(three)} spans)",
+            expect(f"attribute_redaction drop: no span with server.address ({len(three)} spans)",
                    bool(three) and not any("server.address" in i["attributes"] for i in three))
-            expect("mask_attributes: every span's http.request.method is [REDACTED]",
+            expect("attribute_redaction mask: every span's http.request.method is [REDACTED]",
                    bool(three) and all(i["attributes"].get("http.request.method") == "[REDACTED]" for i in three))
             expect("before them, spans had both", any("server.address" in i["attributes"]
                                                       for i in proxy.items("traces", t[0] + MARGIN, t[1])))
@@ -371,9 +366,9 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
             logs = len(proxy.items("logs", t[3] + MARGIN, end))
             # A second's burst at most beyond the rate; the application makes some seven traces and
             # ten log records a second.
-            expect(f"sampling_traces_per_second 1: {spans_} spans in {seconds:.0f} s",
+            expect(f"trace_rate_limit 1: {spans_} spans in {seconds:.0f} s",
                    seconds > 3 and 0 < spans_ <= seconds + 2)
-            expect(f"send_logs_per_second 1: {logs} log records in {seconds:.0f} s",
+            expect(f"log_rate_limit 1: {logs} log records in {seconds:.0f} s",
                    seconds > 3 and 0 < logs <= seconds + 2)
             after = proxy.items("traces", t[4] + MARGIN)
             expect(f"the caps removed: more again ({len(after)} spans)", len(after) > 2 * spans_ / max(seconds, 1))
@@ -383,7 +378,7 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
         window = 40
         until = float(int(time.time()) + window)
         stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(until))
-        scenario = {"server": {"faults": [offer(1, {"sampling_rate": "0", "debug_until": stamp})]}}
+        scenario = {"server": {"faults": [offer(1, {"head_sampling": {"ratio": 0}, "debug": {"until": stamp}})]}}
         eight = run(launch_, scenario, state, "run8", window + 60, listen, target_,
                     until=lambda events: time.time() > until + 15, settle=0)
         st = statuses(eight)
@@ -392,9 +387,9 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
         if st and eight:
             offset = next(e["wall"] - e["t"] for e in eight)
             during = ended(eight, st[0][0] + MARGIN, until - offset)
-            expect(f"in debug mode, spans at the debug rate though sampling_rate is 0 ({len(during)})", bool(during))
+            expect(f"in debug mode, spans at the debug rate though head_sampling is 0 ({len(during)})", bool(during))
             made = pings(eight, until - offset + MARGIN)
-            expect(f"after debug_until, none: the timer ended it ({len(made)} requests)",
+            expect(f"after debug's until, none: the timer ended it ({len(made)} requests)",
                    len(made) > 5 and not ended(eight, until - offset + 1))
             late = [e for e in eight if e["event"] == "a2s" and e["t"] > until - offset - 1
                     and "effective_config" in e["fields"]]
@@ -409,7 +404,7 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
             proxy.refusing = {"traces"} if refuse[0] <= now < refuse[1] else set()
             return now > refuse[1] + 40
 
-        # A state directory of its own: run 8 left sampling_rate 0 in force.
+        # A state directory of its own: run 8 left head_sampling 0 in force.
         state9 = Path(tempfile.mkdtemp(prefix="state-health-", dir=target_))
         state9.chmod(0o777)
         nine = run(launch_, {"server": {}}, state9, "run9", 200, listen, target_, until=refusing, settle=0)

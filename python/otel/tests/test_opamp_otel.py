@@ -26,6 +26,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
 import opamp_otel
+from _policy import FILE, V1, V2, config_map, off, overrides, overrides_in, policy
 from kept import keep_applied
 from opamp_otel import Agent, Controls, Setup, disabled_instrumentations, duration_ms, headers
 
@@ -49,14 +50,12 @@ def settings(doc: str):
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
-    m = opamp_pb2.AgentConfigMap()
-    if body is not None:
-        m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=body.encode(), content_type="application/json"))
-    return opamp_pb2.AgentRemoteConfig(config=m, config_hash=(body or "").encode())
+    return opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=(body or "").encode())
 
 
 def effective(agent: Agent) -> dict:
-    return json.loads(agent.effective.config_map.config_map["elastic"].body)
+    """The controls the agent's effective config reports overridden."""
+    return overrides(agent.effective)
 
 
 def prepared(tmp_path, **extra) -> tuple[Agent, dict]:
@@ -70,15 +69,15 @@ def test_the_sdks_sampler_until_a_rate_is_set_and_again_when_it_is_withdrawn():
     c = Controls()
     c.sampler.wrap(ALWAYS_OFF)
     assert c.sampler.current is ALWAYS_OFF
-    c.apply(settings('{"sampling_rate":"0.25"}'))
+    c.apply(settings(policy(head_sampling={"ratio": 0.25})))
     assert c.sampler.current.get_description() == ParentBased(TraceIdRatioBased(0.25)).get_description()
-    c.apply(settings("{}"))
+    c.apply(settings(policy()))
     assert c.sampler.current is ALWAYS_OFF
 
 
 def test_a_rate_set_before_the_sdk_builds_its_sampler_still_holds():
     c = Controls()
-    c.apply(settings('{"sampling_rate":"0"}'))
+    c.apply(settings(policy(head_sampling={"ratio": 0})))
     c.sampler.wrap(ALWAYS_ON)
     assert c.sampler.current.get_description() == ParentBased(TraceIdRatioBased(0.0)).get_description()
 
@@ -90,22 +89,22 @@ def test_spans_stop_and_start_with_send_traces_and_a_rate_of_0_samples_nothing()
     tracer.add_span_processor(SimpleSpanProcessor(c.spans(out)))
     t = tracer.get_tracer("t")
     t.start_span("one").end()
-    c.apply(settings('{"send_traces":"false"}'))
+    c.apply(settings(policy(signal_exports=off("traces"))))
     t.start_span("dropped").end()
-    c.apply(settings('{"sampling_rate":"0"}'))
+    c.apply(settings(policy(head_sampling={"ratio": 0})))
     for _ in range(50):
         t.start_span("unsampled").end()
-    c.apply(settings("{}"))
+    c.apply(settings(policy()))
     t.start_span("two").end()
     assert [s.name for s in out.get_finished_spans()] == ["one", "two"]
 
 
 def test_next_start_settings_become_the_instrumentations_switch():
-    assert disabled_instrumentations(settings('{"deactivate_instrumentations":"requests,flask"}'), "urllib, requests") \
-        == "urllib,requests,flask"
-    assert disabled_instrumentations(settings('{"deactivate_all_instrumentations":"true"}'), "x") == "*"
-    assert disabled_instrumentations(settings('{"deactivate_all_instrumentations":"false"}'), "x") is None
-    assert disabled_instrumentations(settings("{}"), "") is None
+    switch = policy(instrumentations={"disabled": ["requests", "flask"]})
+    assert disabled_instrumentations(settings(switch), "urllib, requests") == "urllib,requests,flask"
+    assert disabled_instrumentations(settings(policy(instrumentations={"all_disabled": True})), "x") == "*"
+    assert disabled_instrumentations(settings(policy(instrumentations={"all_disabled": False})), "x") is None
+    assert disabled_instrumentations(settings(policy()), "") is None
 
 
 def test_settings_read_as_the_sdk_reads_its_own():
@@ -145,33 +144,69 @@ def test_a_bad_heartbeat_interval_warns_and_is_the_default(server, caplog):
 
 def test_live_settings_are_applied_at_once_and_reported_and_the_package_saves_nothing(tmp_path):
     agent, _ = prepared(tmp_path)
-    s = agent.remote_config(config('{"sampling_rate":"0.5","send_logs":"false"}'))
-    assert s.status == APPLIED and s.last_remote_config_hash == b'{"sampling_rate":"0.5","send_logs":"false"}'
+    doc = policy(head_sampling={"ratio": 0.5}, signal_exports=off("logs"))
+    s = agent.remote_config(config(doc))
+    assert s.status == APPLIED and s.last_remote_config_hash == doc.encode()
     assert not agent.controls.send_logs
-    assert effective(agent) == {"sampling_rate": "0.5", "send_logs": "false"}
+    assert effective(agent) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("logs")}
     # The client keeps the config applied, in its own state: nothing of the package's own.
     assert not (tmp_path / "sdk-settings.json").exists()
 
 
+def described(server, configured: bool, tmp_path) -> dict:
+    """The policy attributes of the description an agent's first message carries: a string's
+    text, an array's strings."""
+    agent, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
+    agent.configured = configured
+    agent.start(Resource.create({"service.name": "checkout"}))
+    try:
+        server.wait(lambda: any(m.HasField("agent_description") and m.instance_uid == agent.uid.bytes
+                                for m in server.got))
+    finally:
+        agent.stop()
+    desc = next(m.agent_description for m in server.got
+                if m.HasField("agent_description") and m.instance_uid == agent.uid.bytes)
+    out = {}
+    for kv in desc.non_identifying_attributes:
+        if kv.key.startswith("logfire.opamp."):
+            v = kv.value
+            out[kv.key] = ([x.string_value for x in v.array_value.values] if v.WhichOneof("value") == "array_value"
+                           else v.string_value)
+    return out
+
+
+def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carries_out(server, tmp_path):
+    ours = described(server, True, tmp_path / "ours")
+    assert ours["logfire.opamp.config_format"] == V1
+    assert ours["logfire.opamp.config_formats"] == [V1, V2]
+    assert {"head_sampling", "signal_exports.traces", "sampling_rules", "debug", "app_settings",
+            "instrumentations", "polling_interval"} <= set(ours["logfire.opamp.supported_controls"])
+    # Under another configurator the sampler and the gates are not this package's.
+    other = described(server, False, tmp_path / "other")["logfire.opamp.supported_controls"]
+    assert "head_sampling" not in other and "signal_exports.traces" not in other
+    assert "app_settings" in other
+
+
 def test_a_next_start_change_is_applied_where_the_client_keeps_state_and_refused_where_none_is(tmp_path):
     agent, _ = prepared(tmp_path)
-    assert agent.remote_config(config('{"opamp_polling_interval":"1m"}')).status == APPLIED
+    minute = policy(polling_interval={"milliseconds": 60_000})
+    assert agent.remote_config(config(minute)).status == APPLIED
     agent, _ = prepared("none")
-    s = agent.remote_config(config('{"opamp_polling_interval":"1m"}'))
+    s = agent.remote_config(config(minute))
     assert s.status == FAILED and "needs somewhere to keep state" in s.error_message
 
 
 def test_the_settings_to_start_with_are_the_config_the_client_kept_applied_else_the_file_kept_before(tmp_path):
     # Kept before the client kept the config applied: the package's own file carries over.
-    (tmp_path / "sdk-settings.json").write_text('{"sampling_rate":"0.25"}')
+    (tmp_path / "sdk-settings.json").write_text(policy(head_sampling={"ratio": 0.25}))
     agent, _ = prepared(tmp_path)
     assert agent.controls.sampler._rate == 0.25
     # Once the client keeps a config applied, that is where a start begins: the old file is ignored.
-    keep_applied(tmp_path, b'{"sampling_rate":"0.5"}')
+    keep_applied(tmp_path, policy(head_sampling={"ratio": 0.5}).encode())
     agent, _ = prepared(tmp_path)
-    assert agent.controls.sampler._rate == 0.5 and effective(agent) == {"sampling_rate": "0.5"}
-    # A config applied with no settings entry: every setting the SDK's own, not the old file's.
-    keep_applied(tmp_path, b"{}")
+    assert agent.controls.sampler._rate == 0.5 and effective(agent) == {"head_sampling": {"ratio": 0.5}}
+    # A config applied with no policy: every setting the SDK's own, not the old file's.
+    keep_applied(tmp_path, None)
     agent, _ = prepared(tmp_path)
     assert agent.controls.sampler._rate is None and effective(agent) == {}
     # A client state that doesn't read: the old file again.
@@ -183,7 +218,7 @@ def test_the_settings_to_start_with_are_the_config_the_client_kept_applied_else_
 def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_path):
     # The server hears APPLIED once the client has saved the config with its state: a start after
     # that comes back to it, with no file of the package's own.
-    offer = config('{"sampling_rate":"0.5","send_logs":"false"}')
+    offer = config(policy(head_sampling={"ratio": 0.5}, signal_exports=off("logs")))
     server = _Server(reply=lambda msg: opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
                      if msg.HasField("agent_description") else None)
     applied = lambda m: m.HasField("remote_config_status") and m.remote_config_status.status == APPLIED  # noqa: E731
@@ -201,23 +236,24 @@ def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_
     again = Agent()
     again.prepare({"OTEL_OPAMP_ENDPOINT": server.endpoint, "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
     assert again.controls.sampler._rate == 0.5 and not again.controls.send_logs
-    assert effective(again) == {"sampling_rate": "0.5", "send_logs": "false"}
+    assert effective(again) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("logs")}
 
 
 def test_a_wrong_config_is_failed_and_changes_nothing(tmp_path):
     agent, _ = prepared(tmp_path)
-    agent.remote_config(config('{"send_traces":"false"}'))
-    s = agent.remote_config(config('{"send_traces":"true","sampling_rate":"2"}'))
-    assert s.status == FAILED and s.error_message.startswith("sampling_rate:")
+    agent.remote_config(config(policy(signal_exports=off("traces"))))
+    s = agent.remote_config(config(policy(head_sampling={"ratio": 2})))
+    assert s.status == FAILED and s.error_message.startswith("head_sampling:")
     assert not agent.controls.send_traces
-    assert effective(agent) == {"send_traces": "false"}
+    assert effective(agent) == {"signal_exports": off("traces")}
 
 
 def test_next_start_settings_wait_for_the_restart_then_switch_instrumentations_off(tmp_path):
     agent, _ = prepared(tmp_path)
-    assert agent.remote_config(config('{"deactivate_instrumentations":"urllib"}')).status == APPLIED
+    switch = policy(instrumentations={"disabled": ["urllib"]})
+    assert agent.remote_config(config(switch)).status == APPLIED
     assert effective(agent) == {}
-    keep_applied(tmp_path, b'{"deactivate_instrumentations":"urllib"}')  # as the client does, before APPLIED goes out
+    keep_applied(tmp_path, switch.encode())  # as the client does, before APPLIED goes out
     _, env = prepared(tmp_path, OTEL_PYTHON_DISABLED_INSTRUMENTATIONS="requests")
     assert env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] == "requests,urllib"
 
@@ -225,9 +261,11 @@ def test_next_start_settings_wait_for_the_restart_then_switch_instrumentations_o
 def test_without_a_state_directory_a_next_start_change_is_failed():
     agent = Agent()
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://server/v1/opamp"})
-    s = agent.remote_config(config('{"deactivate_all_instrumentations":"true"}'))
-    assert s.status == FAILED and "take effect at the next start" in s.error_message
-    assert agent.remote_config(config('{"sampling_rate":"0.5"}')).status == APPLIED
+    s = agent.remote_config(config(policy(instrumentations={"all_disabled": True})))
+    assert s.status == FAILED
+    assert s.error_message == ("instrumentations: takes effect at the next start, which needs somewhere to keep "
+                               "state")
+    assert agent.remote_config(config(policy(head_sampling={"ratio": 0.5}))).status == APPLIED
 
 
 def test_one_uid_names_the_instance_is_kept_and_the_metric_exporter_is_gated(tmp_path):
@@ -260,10 +298,14 @@ def test_a_state_directory_it_cant_save_in_keeps_a_given_uuid(tmp_path):
 
 def test_send_metrics_is_not_carried_out_when_no_metric_exporter_can_be_stopped(tmp_path):
     agent, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,prometheus")
-    s = agent.remote_config(config('{"send_metrics":"false","send_logs":"false"}'))
-    assert s.status == APPLIED
-    assert agent.controls.send_metrics and not agent.controls.send_logs  # ignored: nothing could stop it
-    assert effective(agent) == {"send_logs": "false"}
+    s = agent.remote_config(config(policy(signal_exports=off("metrics", "logs"))))
+    # Refused whole: nothing could stop the metrics, so nothing changes.
+    assert s.status == FAILED
+    assert s.error_message == "signal_exports.metrics: this SDK cannot apply the requested override"
+    assert agent.controls.send_metrics and agent.controls.send_logs
+    assert effective(agent) == {}
+    assert agent.remote_config(config(policy(signal_exports=off("logs")))).status == APPLIED
+    assert agent.controls.send_metrics and not agent.controls.send_logs
     # Beside another, the OTLP exporter alone would stop: carried out by half is not carried out.
     for names, carried in [(["otlp"], True), (["console", "otlp"], False), (["otlp", "prometheus"], False),
                            (["none"], True), ([""], True), (["NONE"], True), (["console"], False),
@@ -306,7 +348,7 @@ def test_logs_stop_and_start_with_send_logs():
     inner = _Recording()
     gated = c.logs(inner)
     assert gated.export(["a"]) == "exported"
-    c.apply(settings('{"send_logs":"false"}'))
+    c.apply(settings(policy(signal_exports=off("logs"))))
     assert gated.export(["b"]) == LogRecordExportResult.SUCCESS
     assert inner.batches == [["a"]]
 
@@ -325,23 +367,23 @@ def test_send_logs_level_drops_records_below_it_live():
     c = Controls()
     inner = _Recording()
     gated = c.logs(inner)
-    c.apply(settings('{"send_logs_level":"warn"}'))
+    c.apply(settings(policy(log_levels={"level": "warn"})))
     assert c.logs_min_severity == 13
     gated.export(batch)
     assert inner.batches[-1] == [warn, error, unspecified, unset]
     # A batch with nothing at or above the level doesn't reach the exporter.
     assert gated.export([debug, info]) == LogRecordExportResult.SUCCESS
     assert len(inner.batches) == 1
-    c.apply(settings('{"send_logs_level":"warn","send_logs":"false"}'))
+    c.apply(settings(policy(log_levels={"level": "warn"}, signal_exports=off("logs"))))
     assert gated.export(batch) == LogRecordExportResult.SUCCESS
     assert len(inner.batches) == 1
-    c.apply(settings("{}"))
+    c.apply(settings(policy()))
     assert c.logs_min_severity is None
     gated.export(batch)
     assert inner.batches[-1] == batch
 
 
-def test_send_logs_level_is_ignored_with_send_logs_when_another_configurator_built_the_sdk():
+def test_send_logs_level_is_not_declared_with_send_logs_when_another_configurator_built_the_sdk():
     live = list(opamp_otel.sdk_host(["otlp"], configured=False).live)
     assert "send_logs" not in live and "send_logs_level" not in live
     assert "send_logs_level" in opamp_otel.sdk_host(["otlp"]).live
@@ -356,12 +398,12 @@ def test_the_metric_exporter_is_the_otlp_one_the_protocol_picks_and_stops_with_s
     assert isinstance(gated._to, OTLPMetricExporter)
     inner = _Recording()
     gated._to = inner
-    opamp_otel.AGENT.controls.apply(settings('{"send_metrics":"false"}'))
+    opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
     try:
         assert gated.export("m") == MetricExportResult.SUCCESS
         assert inner.batches == []
     finally:
-        opamp_otel.AGENT.controls.apply(settings("{}"))
+        opamp_otel.AGENT.controls.apply(settings(policy()))
     assert gated.export("m") == "exported"
 
 
@@ -465,7 +507,7 @@ def test_a_remote_config_offered_at_once_is_answered_however_late_the_starting_t
     # The first reply offers a config. The client hands the notification over on its own loop as
     # soon as it has started; the thread that started it may not have run again by then (a loaded
     # machine). The offer must still be carried out and answered, not dropped.
-    offer = config('{"send_traces":"false"}')
+    offer = config(policy(signal_exports=off("traces")))
     server = _Server(reply=lambda msg: opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
                      if msg.HasField("agent_description") else None)
 
@@ -572,7 +614,7 @@ def test_a_forked_worker_follows_the_live_settings_its_parent_is_given(server, t
     agent.start(Resource.create({"service.name": "checkout"}))
     server.wait(lambda: len(server.got) >= 1)
     assert agent._relay is None  # nothing is made for a process that never forks
-    agent.remote_config(config('{"sampling_rate":"0.5"}'))
+    agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
     ready_r, ready_w = os.pipe()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)  # forking with threads
@@ -593,7 +635,7 @@ def test_a_forked_worker_follows_the_live_settings_its_parent_is_given(server, t
     os.read(ready_r, 1)
     relay = agent._relay
     assert relay is not None and relay.exists()
-    agent.remote_config(config('{"sampling_rate":"0.25","send_traces":"false"}'))
+    agent.remote_config(config(policy(head_sampling={"ratio": 0.25}, signal_exports=off("traces"))))
     _, status = os.waitpid(pid, 0)
     assert os.waitstatus_to_exitcode(status) == 0
     agent.stop()
@@ -627,24 +669,27 @@ def test_a_worker_keeps_its_settings_when_the_relay_is_gone(tmp_path):
     assert agent.controls.sampler._rate == 0.1
 
 
-def test_settings_another_configurator_would_not_carry_out_are_ignored_not_applied(server, tmp_path):
+def test_settings_another_configurator_would_not_carry_out_are_refused(server, tmp_path):
     agent, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
     agent.start(Resource.create({"service.name": "checkout"}))  # our Configurator never ran
     try:
-        s = agent.remote_config(config('{"sampling_rate":"0.5","send_traces":"false","send_logs":"false",'
-                                       '"send_metrics":"false"}'))
+        s = agent.remote_config(config(policy(head_sampling={"ratio": 0.5},
+                                              signal_exports=off("traces", "metrics", "logs"))))
+        metrics = agent.remote_config(config(policy(signal_exports=off("metrics"))))
     finally:
         agent.stop()
-    assert s.status == APPLIED
-    assert effective(agent) == {"send_metrics": "false"}  # the gated metric exporter is still the SDK's
+    assert s.status == FAILED
+    assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
+    # The gated metric exporter is still the SDK's.
+    assert metrics.status == APPLIED and effective(agent) == {"signal_exports": off("metrics")}
     ours, _ = prepared(tmp_path / "ours", OTEL_OPAMP_ENDPOINT=server.endpoint)
     ours.configured = True
     ours.start(Resource.create({"service.name": "checkout"}))
     try:
-        ours.remote_config(config('{"sampling_rate":"0.5","send_traces":"false"}'))
+        ours.remote_config(config(policy(head_sampling={"ratio": 0.5}, signal_exports=off("traces"))))
     finally:
         ours.stop()
-    assert effective(ours) == {"sampling_rate": "0.5", "send_traces": "false"}
+    assert effective(ours) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("traces")}
 
 
 def test_with_a_configuration_file_the_instance_is_managed_but_no_exporter_is_ours(server, tmp_path, monkeypatch):
@@ -653,11 +698,15 @@ def test_with_a_configuration_file_the_instance_is_managed_but_no_exporter_is_ou
     agent.start(Resource.create({"service.name": "checkout"}))  # what the Configurator does after the file's SDK
     agent.start(Resource.create({"service.name": "checkout"}))  # once only, should upstream's hook run too
     try:
-        s = agent.remote_config(config('{"sampling_rate":"0.5","send_traces":"false","send_logs":"false",'
-                                       '"send_metrics":"false","deactivate_instrumentations":"requests"}'))
+        s = agent.remote_config(config(policy(head_sampling={"ratio": 0.5},
+                                              signal_exports=off("traces", "metrics", "logs"),
+                                              instrumentations={"disabled": ["requests"]})))
+        switch = agent.remote_config(config(policy(instrumentations={"disabled": ["requests"]})))
     finally:
         agent.stop()
-    assert s.status == APPLIED
+    assert s.status == FAILED
+    assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
+    assert switch.status == APPLIED
     assert list(agent.host.live) == ["custom"]  # the application's own settings only
     assert list(agent.host.next_start) == ["opamp_polling_interval", "deactivate_instrumentations",
                                            "deactivate_all_instrumentations"]
@@ -740,7 +789,7 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
     gevent rules that out): one call builds the SDK the OTEL_* variables describe and puts it
     under the server, the live sampler and gated exporters included."""
     ready, answered = tmp_path / "ready", tmp_path / "answered"
-    offer = config('{"send_traces":"false","send_metrics":"false","sampling_rate":"0.5"}')
+    offer = config(policy(head_sampling={"ratio": 0.5}, signal_exports=off("traces", "metrics")))
 
     def reply(msg):
         if msg.remote_config_status.status == APPLIED:
@@ -852,25 +901,28 @@ def test_configure_without_an_endpoint_is_the_sdks_own_setup():
     assert run.returncode == 0, run.stderr
 
 
-def test_in_code_the_instrumentation_switches_are_ignored_not_applied(tmp_path):
+def test_in_code_the_instrumentation_switches_are_refused(tmp_path):
     # The application instruments itself: nothing reads OTEL_PYTHON_DISABLED_INSTRUMENTATIONS.
-    keep_applied(tmp_path, b'{"deactivate_instrumentations":"urllib"}')
+    keep_applied(tmp_path, policy(instrumentations={"disabled": ["urllib"]}).encode())
     env = {"OTEL_OPAMP_ENDPOINT": "http://server/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)}
     agent = Agent()
     agent.prepare(env, auto_instrumented=False)
     assert "OTEL_PYTHON_DISABLED_INSTRUMENTATIONS" not in env
-    s = agent.remote_config(config('{"deactivate_all_instrumentations":"true","send_logs":"false"}'))
-    assert s.status == APPLIED and effective(agent) == {"send_logs": "false"}
+    s = agent.remote_config(config(policy(instrumentations={"all_disabled": True}, signal_exports=off("logs"))))
+    assert s.status == FAILED
+    assert s.error_message == "instrumentations: all_disabled: this SDK cannot apply the requested override"
+    assert effective(agent) == {}
     host = opamp_otel.sdk_host(["otlp"], configured=False, auto_instrumented=False)
     assert (list(host.live), list(host.next_start)) == (["custom", "send_metrics"], ["opamp_polling_interval"])
 
 
 def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_settings_arent_carried_out(tmp_path):
     """configure()'s own span processor and a metric exporter named in code export past the
-    package's gates: send_traces and send_metrics are set aside (and so is redaction, which needs
-    every span), not answered as done while the spans and metrics keep going."""
+    package's gates: a policy that overrides send_traces, send_metrics or redaction (which needs
+    every span) is refused, not answered as done while the spans and metrics keep going."""
     answered = tmp_path / "answered"
-    offer = config('{"send_traces":"false","send_metrics":"false","send_logs":"false","drop_attributes":"x"}')
+    offers = [config(policy(signal_exports=off("traces", "metrics", "logs"), attribute_redaction={"drop": ["x"]})),
+              config(policy(signal_exports=off("logs")))]
     statuses: list[int] = []
 
     def reply(msg):
@@ -879,6 +931,8 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
             if msg.remote_config_status.status == APPLIED:
                 answered.touch()
             return None
+        # The refused policy first, then one the SDK carries out.
+        offer = offers[1] if FAILED in statuses else offers[0]
         return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
 
     server = _Server(reply=reply)
@@ -895,7 +949,7 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
             time.sleep(0.05)
         trace.get_tracer("t").start_span("after").end()
         assert agent.controls.send_traces and agent.controls.send_metrics and not agent.controls.send_logs
-        print("effective", agent.effective.config_map.config_map["elastic"].body.decode())
+        print("effective", agent.effective.config_map.config_map["logfire-sdk-policy.json"].body.decode())
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -905,18 +959,19 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
         server.close()
     assert run.returncode == 0, run.stderr
     assert '"name": "after"' in run.stdout  # the application's own processor still exports
-    assert json.loads(run.stdout.split("effective ")[-1]) == {"send_logs": "false"}
-    assert APPLIED in statuses and FAILED not in statuses
+    assert json.loads(run.stdout.split("effective ")[-1]) == json.loads(policy(signal_exports=off("logs")))
+    assert statuses.index(FAILED) < statuses.index(APPLIED)
     assert "send_traces" in run.stderr  # warned at start
 
 
 def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_and_says_so(tmp_path):
     """A span or log record processor the application adds to the SDK after the configurator built
-    it exports past the gates, as one passed in code does. The settings in force through those gates
-    are then set aside: the effective config names them, and is reported again, rather than leaving
-    them answered APPLIED while the new processor goes on exporting (#431)."""
+    it exports past the gates, as one passed in code does. The overrides in force through those gates
+    are then set aside: the effective config reports them local, and is reported again, rather than
+    leaving them in force while the new processor goes on exporting (#431)."""
     answered = tmp_path / "answered"
-    offer = config('{"sampling_rate":"1","send_traces":"false","send_logs":"false","drop_attributes":"x"}')
+    offer = config(policy(head_sampling={"ratio": 1}, signal_exports=off("traces", "logs"),
+                          attribute_redaction={"drop": ["x"]}))
 
     def reply(msg):
         if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
@@ -937,9 +992,7 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
         def report(when):
-            entries = agent.effective.config_map.config_map
-            aside = entries["elastic.set_aside"].body.decode() if "elastic.set_aside" in entries else "{{}}"
-            print(when, json.dumps([json.loads(entries["elastic"].body), json.loads(aside)]))
+            print(when, agent.effective.config_map.config_map[{FILE!r}].body.decode())
         report("before")
         trace.get_tracer_provider().add_span_processor(span_processor=SimpleSpanProcessor(ConsoleSpanExporter()))
         report("spans")
@@ -957,21 +1010,18 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
     finally:
         server.close()
     assert run.returncode == 0, run.stderr
-    said = {line.split(" ", 1)[0]: json.loads(line.split(" ", 1)[1]) for line in run.stdout.splitlines()
+    said = {line.split(" ", 1)[0]: overrides_in(json.loads(line.split(" ", 1)[1])) for line in run.stdout.splitlines()
             if line.split(" ", 1)[0] in ("before", "spans", "logs")}
-    assert said["before"] == [{"sampling_rate": "1", "send_traces": "false", "send_logs": "false",
-                               "drop_attributes": "x"}, {}]
-    # The span processor: send_traces, and redaction, which needs every span, set aside.
-    assert said["spans"] == [{"sampling_rate": "1", "send_logs": "false"},
-                             {"ignored": [], "unsupported": ["drop_attributes", "send_traces"]}]
-    assert said["logs"] == [{"sampling_rate": "1"},
-                            {"ignored": [], "unsupported": ["drop_attributes", "send_logs", "send_traces"]}]
+    assert said["before"] == {"head_sampling": {"ratio": 1}, "signal_exports": off("traces", "logs"),
+                              "attribute_redaction": {"drop": ["x"]}}
+    # The span processor: the traces' export, and redaction, which needs every span, set aside.
+    assert said["spans"] == {"head_sampling": {"ratio": 1}, "signal_exports": off("logs")}
+    assert said["logs"] == {"head_sampling": {"ratio": 1}}
     assert '"name": "after"' in run.stdout  # the application's own processor exports
     assert "past this package's gate: send_traces" in run.stderr
-    # The server is told: the last effective config it got names them.
+    # The server is told: the last effective config it got reports them local.
     last = [m.effective_config for m in server.got if m.HasField("effective_config")][-1]
-    assert json.loads(last.config_map.config_map["elastic.set_aside"].body)["unsupported"] == [
-        "drop_attributes", "send_logs", "send_traces"]
+    assert overrides(last) == {"head_sampling": {"ratio": 1}}
 
 
 def test_a_metric_exporter_beside_otlp_keeps_send_metrics_from_being_answered_done(tmp_path):
@@ -979,9 +1029,10 @@ def test_a_metric_exporter_beside_otlp_keeps_send_metrics_from_being_answered_do
     agent, env = prepared(tmp_path, OTEL_METRICS_EXPORTER="otlp,prometheus")
     assert env["OTEL_METRICS_EXPORTER"] == "opamp,prometheus"
     assert "send_metrics" not in agent.host.live
-    s = agent.remote_config(config('{"send_metrics":"false","send_logs":"false"}'))
-    assert s.status == APPLIED and agent.controls.send_metrics and not agent.controls.send_logs
-    assert effective(agent) == {"send_logs": "false"}
+    s = agent.remote_config(config(policy(signal_exports=off("metrics", "logs"))))
+    assert s.status == FAILED and agent.controls.send_metrics and agent.controls.send_logs
+    assert s.error_message == "signal_exports.metrics: this SDK cannot apply the requested override"
+    assert effective(agent) == {}
 
 
 def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tmp_path):
@@ -990,7 +1041,7 @@ def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tm
     # in every language.
     (tmp_path / "file").write_text("")
     agent, _ = prepared(tmp_path / "file" / "state")
-    s = agent.remote_config(config('{"sampling_rate":"0.5"}'))
+    s = agent.remote_config(config(policy(head_sampling={"ratio": 0.5})))
     assert s.status == APPLIED and agent.controls.sampler._rate == 0.5
 
 

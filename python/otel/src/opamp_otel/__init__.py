@@ -959,7 +959,7 @@ def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter
     """What the package lists of itself and the SDK it runs (docs/available-components.md): the
     global providers unless others are given. Under `host`, a signal whose send_* setting it
     can't carry out has no gated exporter: the OTLP metric exporter beside one the package can't
-    stop is gated, but send_metrics is ignored, so nothing reaches it."""
+    stop is gated, but send_metrics is not declared, so nothing reaches it."""
     from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
 
     from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
@@ -1109,9 +1109,9 @@ class Agent:
         """Once the SDK is built: join the fleet, on a thread of the client's own."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
             return
-        # What was built is known now: the settings it can't carry out are declared no more, so
-        # they are set aside rather than answered as done. The settings loaded at start are loaded
-        # again, to report that.
+        # What was built is known now: the settings it cannot carry out are declared no more, so
+        # a policy that overrides one is refused. The settings loaded at start are loaded again,
+        # under the host as built.
         config_file = bool(os.environ.get("OTEL_CONFIG_FILE"))
         built = self._built_host()
         if built != self.host:
@@ -1152,7 +1152,7 @@ class Agent:
         self.reachability.in_use = self._endpoint_in_use
         with self._lock:
             first = self._export_health()  # the first report is always sent: with the agent's first message
-        status = Status(description=self.layer.describe(attributes(resource)),
+        status = Status(description=self.layer.describe(attributes(resource), self.host, self.wall_ms()),
                         health=self._health_message(first), effective_config=self.effective,
                         available_components=self._components())
 
@@ -1408,10 +1408,6 @@ class Agent:
             d = self.layer.decide(config, self.current, self.loaded.current, self.host, now, save)
             if d.HasField("apply"):
                 self._put_in_force(d.apply)
-                if d.apply.unsupported:
-                    _log.info("OpAMP: settings this SDK doesn't carry out: %s", ", ".join(d.apply.unsupported))
-                if d.apply.ignored:
-                    _log.info("OpAMP: settings unknown to this SDK: %s", ", ".join(d.apply.ignored))
             if d.pending_restart:
                 _log.info("OpAMP: %s changed; in force when the application restarts", ", ".join(d.pending_restart))
             self.current = d.current

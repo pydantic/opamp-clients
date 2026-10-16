@@ -71,9 +71,9 @@ carries out and builds the one shape every language sends:
 | Component | What it holds |
 |---|---|
 | `sdk` | metadata `integration.name` and `integration.version` (our package), `telemetry.sdk.language` and `telemetry.sdk.version` (the OpenTelemetry SDK's) |
-| `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name `deactivate_instrumentations` takes, with metadata `version` when known |
-| `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter, named as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or by its type, with the boolean metadata `gated`: whether the integration's `send_*` switch, levels, caps and redaction reach what it exports |
-| `settings` | one sub-component per remote setting it carries out, with metadata `applies`: `at once` or `next start`. A setting it can't carry out in this process is left out |
+| `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known |
+| `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter, named as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or by its type, with the boolean metadata `gated`: whether the integration's signal export control, levels, caps and redaction reach what it exports |
+| `settings` | one sub-component per setting it carries out, by the setting's name behind the policy's controls ([sdk-settings.md](sdk-settings.md#the-controls)), with metadata `applies`: `at once` or `next start`. A setting it cannot carry out in this process is left out |
 
 For example, a Python service with Flask and a Prometheus reader:
 

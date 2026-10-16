@@ -19,6 +19,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
 import opamp_otel
+from _policy import FILE, config_map, off, overrides, policy
 from kept import keep_applied
 from opamp_otel import Agent, Controls
 
@@ -61,19 +62,28 @@ def ids(cases: list[dict]) -> list[str]:
 
 
 def document(settings) -> bytes:
-    return settings if isinstance(settings, bytes) else json.dumps(settings).encode()
+    """A policy: given whole (bytes, text or a parsed policy), or as the overrides of a policy
+    with every other control local (policy's keyword arguments)."""
+    if isinstance(settings, bytes):
+        return settings
+    if isinstance(settings, str):
+        return settings.encode()
+    if "schema" in settings:
+        return json.dumps(settings).encode()
+    return policy(**settings).encode()
 
 
 def config(body) -> opamp_pb2.AgentRemoteConfig:
     body = document(body)
-    m = opamp_pb2.AgentConfigMap()
-    m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=body, content_type="application/json"))
-    return opamp_pb2.AgentRemoteConfig(config=m, config_hash=body)
+    return opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body)
+
+
+LOCAL = policy().encode()
 
 
 def typed(settings, now: int = NOW, host: settings_pb2.Host = HOST) -> settings_pb2.Settings:
-    """The settings as the layer hands them to this package, for a server's document."""
-    d = LAYER.decide(config(settings), b"{}", b"{}", host, now)
+    """The settings as the layer hands them to this package, for a server's policy."""
+    d = LAYER.decide(config(settings), LOCAL, LOCAL, host, now)
     assert d.status.status == APPLIED, d.status.error_message
     return d.apply
 
@@ -135,7 +145,7 @@ def test_a_scope_is_the_python_logger_a_record_is_exported_under():
     from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
     from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
 
-    c = controlled({"send_logs_level": "warn", "send_logs_level_by_scope": "app.db*=debug,urllib3=off"})
+    c = controlled({"log_levels": {"level": "warn", "scopes": {"app.db*": "debug", "urllib3": "off"}}})
     inner = Recording()
     provider = LoggerProvider()
     provider.add_log_record_processor(SimpleLogRecordProcessor(c.logs(inner)))
@@ -158,9 +168,9 @@ def test_scope_levels_change_live_and_revert_when_withdrawn():
     c = Controls()
     db, web = record("app.db", 5), record("app.web", 5)
     assert exported(c, [db, web]) == [db, web]
-    c.apply(typed({"send_logs_level": "warn", "send_logs_level_by_scope": "app.db=debug"}))
+    c.apply(typed({"log_levels": {"level": "warn", "scopes": {"app.db": "debug"}}}))
     assert exported(c, [db, web]) == [db]
-    c.apply(typed({"send_logs_level_by_scope": "app.db=off"}))
+    c.apply(typed({"log_levels": {"scopes": {"app.db": "off"}}}))
     assert exported(c, [db, web]) == [web]
     c.apply(typed({}))
     assert c.logs_scope_levels == ()
@@ -168,7 +178,7 @@ def test_scope_levels_change_live_and_revert_when_withdrawn():
 
 
 def test_a_batch_every_scope_level_drops_doesnt_reach_the_exporter():
-    c = controlled({"send_logs_level_by_scope": "*=off"})
+    c = controlled({"log_levels": {"scopes": {"*": "off"}}})
     inner = Recording()
     c.logs(inner).export([record("a"), record(None, 0)])
     assert inner.batches == []
@@ -176,37 +186,37 @@ def test_a_batch_every_scope_level_drops_doesnt_reach_the_exporter():
 
 def test_a_record_with_no_scope_is_the_empty_scope_which_only_star_matches():
     unnamed = record(None, 5)
-    assert exported(controlled({"send_logs_level_by_scope": "*=error"}), [unnamed]) == []
-    assert exported(controlled({"send_logs_level_by_scope": "a*=error"}), [unnamed]) == [unnamed]
+    assert exported(controlled({"log_levels": {"scopes": {"*": "error"}}}), [unnamed]) == []
+    assert exported(controlled({"log_levels": {"scopes": {"a*": "error"}}}), [unnamed]) == [unnamed]
     # Severity unset is 0: kept under a level, dropped under off.
     unset = record("x", None)
-    assert exported(controlled({"send_logs_level_by_scope": "x=fatal"}), [unset]) == [unset]
-    assert exported(controlled({"send_logs_level_by_scope": "x=off"}), [unset]) == []
+    assert exported(controlled({"log_levels": {"scopes": {"x": "fatal"}}}), [unset]) == [unset]
+    assert exported(controlled({"log_levels": {"scopes": {"x": "off"}}}), [unset]) == []
 
 
 def test_scope_levels_are_declared_only_where_the_package_built_the_sdk(tmp_path):
-    doc = '{"send_logs_level_by_scope":"app=off"}'
+    doc = {"log_levels": {"scopes": {"app": "off"}}}
     agent = Agent()
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
     assert "send_logs_level_by_scope" in agent.host.live
-    s = agent.remote_config(config(doc.encode()))
+    s = agent.remote_config(config(doc))
     assert s.status == APPLIED and agent.controls.logs_scope_levels == (("app", 0xFFFF),)
-    assert json.loads(agent.effective.config_map.config_map["elastic"].body) == {"send_logs_level_by_scope": "app=off"}
-    # Another configurator's SDK: not this package's gates, so ignored, never reported in force.
+    assert overrides(agent.effective) == doc
+    # Another configurator's SDK: not this package's gates, so refused, never in force.
     other = opamp_otel.sdk_host(["otlp"], configured=False)
     assert "send_logs_level_by_scope" not in other.live
-    d = LAYER.decide(config(doc.encode()), b"{}", b"{}", other, NOW)
-    assert d.status.status == APPLIED and not d.apply.send_logs_scope_levels
-    assert "send_logs_level_by_scope" in d.apply.unsupported
+    d = LAYER.decide(config(doc), LOCAL, LOCAL, other, NOW)
+    assert d.status.status == FAILED and not d.HasField("apply")
+    assert d.status.error_message == "log_levels: scopes: this SDK cannot apply the requested override"
 
 
 def test_a_bad_scope_level_is_failed_and_changes_nothing(tmp_path):
     agent = Agent()
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
-    agent.remote_config(config(b'{"send_logs_level_by_scope":"app=error"}'))
-    for bad in ("app=loud", "a=debug,a=info", "a b=info"):
-        s = agent.remote_config(config(json.dumps({"send_logs_level_by_scope": bad}).encode()))
-        assert s.status == FAILED and s.error_message.startswith("send_logs_level_by_scope:"), bad
+    agent.remote_config(config({"log_levels": {"scopes": {"app": "error"}}}))
+    for bad in ({"app": "loud"}, {"a b": "info"}, {}):
+        s = agent.remote_config(config({"log_levels": {"scopes": bad}}))
+        assert s.status == FAILED and s.error_message.startswith("log_levels: scopes"), bad
         assert agent.controls.logs_scope_levels == (("app", 17),)
 
 
@@ -245,16 +255,16 @@ def test_the_log_cap_passes_what_the_shared_vectors_pass(case):
 
 def test_records_the_levels_drop_take_no_tokens_and_a_change_of_cap_starts_full():
     clock = Clock()
-    c = controlled({"send_logs_level": "warn", "send_logs_per_second": "2"}, clock=clock)
+    c = controlled({"log_levels": {"level": "warn"}, "log_rate_limit": {"records_per_second": 2}}, clock=clock)
     debug, warn = record("app", 5), record("app", 13)
     assert exported(c, [debug, debug, debug, warn]) == [warn]  # one token taken, not four
     assert exported(c, [warn, warn]) == [warn]
     assert exported(c, [warn]) == []
     # The same cap again (a refresh, a repeated config) keeps its bucket: still empty.
-    c.apply(typed({"send_logs_level": "warn", "send_logs_per_second": "2"}))
+    c.apply(typed({"log_levels": {"level": "warn"}, "log_rate_limit": {"records_per_second": 2}}))
     assert exported(c, [warn]) == []
     # A new cap starts full.
-    c.apply(typed({"send_logs_per_second": "3"}))
+    c.apply(typed({"log_rate_limit": {"records_per_second": 3}}))
     assert exported(c, [warn] * 5) == [warn] * 3
     # Removing it: unlimited at once.
     c.apply(typed({}))
@@ -264,7 +274,7 @@ def test_records_the_levels_drop_take_no_tokens_and_a_change_of_cap_starts_full(
 
 def test_the_log_cap_refills_on_the_monotonic_clock():
     clock = Clock(10**12)
-    c = controlled({"send_logs_per_second": "4"}, clock=clock)
+    c = controlled({"log_rate_limit": {"records_per_second": 4}}, clock=clock)
     r = record()
     assert len(exported(c, [r] * 10)) == 4
     clock.ns += 250_000_000
@@ -275,16 +285,18 @@ def test_the_log_cap_refills_on_the_monotonic_clock():
 
 def test_send_logs_false_drops_before_the_cap_takes_anything():
     clock = Clock()
-    c = controlled({"send_logs": "false", "send_logs_per_second": "1"}, clock=clock)
+    c = controlled({"signal_exports": off("logs"), "log_rate_limit": {"records_per_second": 1}}, clock=clock)
     assert exported(c, [record()]) == []
-    c.apply(typed({"send_logs_per_second": "1"}))  # the same cap: its bucket was never touched
+    c.apply(typed({"log_rate_limit": {"records_per_second": 1}}))  # the same cap: its bucket was never touched
     assert len(exported(c, [record(), record()])) == 1
 
 
 def test_a_bad_cap_is_failed():
-    for bad, why in (("0", "0 is refused"), ("-1", "not more than 0"), ("1000001", "not more than 0"), ("x", "not a number")):
-        d = LAYER.decide(config({"send_logs_per_second": bad}), b"{}", b"{}", HOST, NOW)
-        assert d.status.status == FAILED and why in d.status.error_message, bad
+    for bad in (0, -1, 1000001, "x"):
+        d = LAYER.decide(config({"log_rate_limit": {"records_per_second": bad}}), LOCAL, LOCAL, HOST, NOW)
+        assert d.status.status == FAILED, bad
+        assert d.status.error_message == ("log_rate_limit: records_per_second must be a number more than 0, "
+                                          "at most 1000000"), bad
 
 
 # --- drop_attributes and mask_attributes -------------------------------------------------------
@@ -368,7 +380,7 @@ def test_redaction_keeps_the_rest_of_the_span_and_what_the_sdks_limits_dropped()
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import SpanKind, Status, StatusCode
 
-    c = controlled({"drop_attributes": "secret", "mask_attributes": "user.email"})
+    c = controlled({"attribute_redaction": {"drop": ["secret"], "mask": ["user.email"]}})
     out = InMemorySpanExporter()
     provider = TracerProvider(span_limits=SpanLimits(max_span_attributes=3))
     provider.add_span_processor(SimpleSpanProcessor(c.spans(out)))
@@ -394,7 +406,7 @@ def test_redaction_keeps_the_rest_of_the_span_and_what_the_sdks_limits_dropped()
 
 
 def test_a_span_or_record_redaction_doesnt_touch_is_passed_on_as_it_is():
-    c = controlled({"drop_attributes": "secret"})
+    c = controlled({"attribute_redaction": {"drop": ["secret"]}})
     r = record("app", 9, {"ok": 1})
     assert exported(c, [r])[0] is r
 
@@ -403,9 +415,9 @@ def test_redaction_changes_live_and_reverts_when_withdrawn():
     r = record("app", 9, {"user.email": "a@b.c", "token": "t"})
     c = Controls()
     assert pairs(exported(c, [r])[0].log_record.attributes) == [("user.email", "a@b.c"), ("token", "t")]
-    c.apply(typed({"mask_attributes": "USER.*", "drop_attributes": "token"}))
+    c.apply(typed({"attribute_redaction": {"mask": ["USER.*"], "drop": ["token"]}}))
     assert pairs(exported(c, [r])[0].log_record.attributes) == [("user.email", "[REDACTED]")]
-    c.apply(typed({"drop_attributes": "*"}))
+    c.apply(typed({"attribute_redaction": {"drop": ["*"]}}))
     assert pairs(exported(c, [r])[0].log_record.attributes) == []
     c.apply(typed({}))
     assert not c.redactor
@@ -440,13 +452,12 @@ def exports_at_every_line_of_apply(c: Controls, settings: settings_pb2.Settings,
 
 @pytest.mark.parametrize("signal", ["traces", "logs"])
 def test_a_signal_turned_back_on_with_redaction_never_exports_the_key_while_the_document_is_applied(signal):
-    """From {send_X: false} to {send_X: true, drop_attributes: *password*}, an export in the middle
+    """From the signal off to the signal on and *password* dropped, an export in the middle
     of apply is held to one document or the other, never to B's send and A's redaction: the
     password is exported under neither."""
     from opentelemetry.sdk.trace import ReadableSpan  # noqa: PLC0415
 
-    key = "send_traces" if signal == "traces" else "send_logs"
-    c = controlled({key: "false"})
+    c = controlled({"signal_exports": off(signal)})
     inner = Recording()
     if signal == "traces":
         gate = c.spans(inner)
@@ -456,7 +467,7 @@ def test_a_signal_turned_back_on_with_redaction_never_exports_the_key_while_the_
         gate = c.logs(inner)
         def item(): return record(attributes={"user.password": "hunter2", "ok": 1})
         def attributes(x): return dict(x.log_record.attributes)
-    ran = exports_at_every_line_of_apply(c, typed({key: "true", "drop_attributes": "*password*"}),
+    ran = exports_at_every_line_of_apply(c, typed({"attribute_redaction": {"drop": ["*password*"]}}),
                                          lambda: gate.export([item()]))
     assert ran >= 5  # an export between each of apply's steps
     sent = [attributes(x) for b in inner.batches for x in b]
@@ -466,7 +477,7 @@ def test_a_signal_turned_back_on_with_redaction_never_exports_the_key_while_the_
 
 
 def test_log_bodies_resource_and_scope_attributes_are_out_of_scope():
-    c = controlled({"mask_attributes": "*"})
+    c = controlled({"attribute_redaction": {"mask": ["*"]}})
     r = ReadableLogRecord(LogRecord(body={"password": "p"}, severity_number=SeverityNumber.INFO,
                                     attributes={"password": "p"}),
                           Resource.create({"password": "p"}), InstrumentationScope("app", attributes={"password": "p"}))
@@ -479,7 +490,8 @@ def test_log_bodies_resource_and_scope_attributes_are_out_of_scope():
 
 def test_redaction_after_the_levels_and_the_cap():
     clock = Clock()
-    c = controlled({"send_logs_level": "warn", "send_logs_per_second": "1", "mask_attributes": "k"}, clock=clock)
+    c = controlled({"log_levels": {"level": "warn"}, "log_rate_limit": {"records_per_second": 1},
+                    "attribute_redaction": {"mask": ["k"]}}, clock=clock)
     low, high = record("app", 5, {"k": "v"}), record("app", 13, {"k": "v"})
     out = exported(c, [low, high, high])
     assert len(out) == 1 and dict(out[0].log_record.attributes) == {"k": "[REDACTED]"}
@@ -592,7 +604,7 @@ def test_a_rate_of_a_half_samples_half_of_10k_trace_ids():
 
     from opentelemetry.trace import SpanKind
 
-    c = controlled({"sampling_rules": [{"rate": 0.5, "kind": "server"}], "sampling_rate": "0"})
+    c = controlled({"sampling_rules": {"rules": [{"rate": 0.5, "kind": "server"}]}, "head_sampling": {"ratio": 0}})
     rng = random.Random(7)
     root = parent_context("none")
     sampled = sum(c.sampler.should_sample(root, rng.getrandbits(128), "GET", SpanKind.SERVER).decision.is_sampled()
@@ -600,7 +612,7 @@ def test_a_rate_of_a_half_samples_half_of_10k_trace_ids():
     assert 4_700 <= sampled <= 5_300
     # Rates 0 and 1 are exact.
     for rate, want in ((0, 0), (1, 1000)):
-        c.apply(typed({"sampling_rules": [{"rate": rate}]}))
+        c.apply(typed({"sampling_rules": {"rules": [{"rate": rate}]}}))
         assert sum(c.sampler.should_sample(root, rng.getrandbits(128), "x").decision.is_sampled()
                    for _ in range(1000)) == want
 
@@ -611,7 +623,8 @@ def test_on_a_real_sdk_a_rule_drops_health_checks_and_their_children_follow():
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
     from opentelemetry.trace import SpanKind
 
-    c = controlled({"sampling_rate": "1", "sampling_rules": [{"rate": 0, "kind": "server", "path": "/health*"}]})
+    c = controlled({"head_sampling": {"ratio": 1},
+                    "sampling_rules": {"rules": [{"rate": 0, "kind": "server", "path": "/health*"}]}})
     out = InMemorySpanExporter()
     provider = TracerProvider(sampler=c.sampler.wrap(None))
     provider.add_span_processor(SimpleSpanProcessor(c.spans(out)))
@@ -633,7 +646,7 @@ def test_removing_the_rules_restores_the_apps_own_sampler():
     c.sampler.wrap(app)
     root = parent_context("none")
     assert c.sampler.should_sample(root, 1, "GET").decision == Decision.RECORD_ONLY
-    c.apply(typed({"sampling_rules": [{"rate": 0}]}))
+    c.apply(typed({"sampling_rules": {"rules": [{"rate": 0}]}}))
     assert c.sampler.should_sample(root, 1, "GET").decision == Decision.DROP
     c.apply(typed({}))
     assert c.sampler.should_sample(root, 1, "GET").decision == Decision.RECORD_ONLY
@@ -641,18 +654,19 @@ def test_removing_the_rules_restores_the_apps_own_sampler():
 
 
 def test_a_rule_of_rate_0_beside_sampling_rate_1_and_a_rule_with_no_matchers():
-    c = controlled({"sampling_rate": "1", "sampling_rules": [{"rate": 0, "name": "noisy*"}, {"rate": 1}]})
+    c = controlled({"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [{"rate": 0, "name": "noisy*"}, {"rate": 1}]}})
     root = parent_context("none")
     assert not c.sampler.should_sample(root, 5, "noisy job").decision.is_sampled()
     assert c.sampler.should_sample(root, 5, "other").decision.is_sampled()
-    c.apply(typed({"sampling_rate": "1", "sampling_rules": [{"rate": 0}]}))  # matches every span, before the rate
+    # A rule that matches every span, before the rate.
+    c.apply(typed({"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [{"rate": 0}]}}))
     assert not c.sampler.should_sample(root, 5, "other").decision.is_sampled()
 
 
 def test_a_sampled_remote_parent_with_rule_0_is_sampled_and_an_unsampled_one_with_rule_1_is_not():
-    c = controlled({"sampling_rules": [{"rate": 0}]})
+    c = controlled({"sampling_rules": {"rules": [{"rate": 0}]}})
     assert c.sampler.should_sample(parent_context("remote_sampled"), 5, "GET").decision.is_sampled()
-    c.apply(typed({"sampling_rules": [{"rate": 1}]}))
+    c.apply(typed({"sampling_rules": {"rules": [{"rate": 1}]}}))
     assert not c.sampler.should_sample(parent_context("remote_unsampled"), 5, "GET").decision.is_sampled()
 
 
@@ -662,7 +676,7 @@ def test_the_cap_holds_on_a_real_sdk_children_of_a_sampled_root_take_no_token():
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
     clock = Clock()
-    c = controlled({"sampling_rate": "1", "sampling_traces_per_second": "2"}, clock=clock)
+    c = controlled({"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 2}}, clock=clock)
     out = InMemorySpanExporter()
     provider = TracerProvider(sampler=c.sampler.wrap(None))
     provider.add_span_processor(SimpleSpanProcessor(out))
@@ -678,16 +692,16 @@ def test_the_cap_holds_on_a_real_sdk_children_of_a_sampled_root_take_no_token():
         t.start_span(f"root{i}").end()
     assert sum(s.name.startswith("root") for s in out.get_finished_spans()) == 3
     # A new cap starts full; removing it is unlimited at once.
-    c.apply(typed({"sampling_rate": "1", "sampling_traces_per_second": "3"}))
+    c.apply(typed({"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 3}}))
     assert sum(c.sampler.should_sample(parent_context("none"), 1, "r").decision.is_sampled() for _ in range(5)) == 3
-    c.apply(typed({"sampling_rate": "1"}))
+    c.apply(typed({"head_sampling": {"ratio": 1}}))
     assert sum(c.sampler.should_sample(parent_context("none"), 1, "r").decision.is_sampled() for _ in range(50)) == 50
 
 
 def test_the_cap_counts_only_the_traces_the_rules_or_rate_sampled():
     clock = Clock()
-    c = controlled({"sampling_rules": [{"rate": 0, "name": "drop*"}], "sampling_rate": "1",
-                    "sampling_traces_per_second": "1"}, clock=clock)
+    c = controlled({"sampling_rules": {"rules": [{"rate": 0, "name": "drop*"}]}, "head_sampling": {"ratio": 1},
+                    "trace_rate_limit": {"traces_per_second": 1}}, clock=clock)
     root = parent_context("none")
     for _ in range(10):
         assert not c.sampler.should_sample(root, 1, "drop me").decision.is_sampled()
@@ -696,22 +710,22 @@ def test_the_cap_counts_only_the_traces_the_rules_or_rate_sampled():
 
 
 def test_bad_rules_are_failed_naming_the_rule():
-    for rules, why in (([{"rate": 7}], "sampling_rules[0].rate: 7 is not between 0 and 1"),
-                       ([{"rate": 1}, {"rate": 1, "route": "/x"}], "sampling_rules[1]"),
-                       ([{"rate": 1, "kind": "sideways"}], "sampling_rules[0].kind"),
-                       ([{"name": "x"}], "sampling_rules[0]")):
-        d = LAYER.decide(config({"sampling_rules": rules}), b"{}", b"{}", HOST, NOW)
+    for rules, why in (([{"rate": 7}], "sampling_rules: rules[0].rate: 7 is not between 0 and 1"),
+                       ([{"rate": 1}, {"rate": 1, "route": "/x"}], "sampling_rules: rules[1].route"),
+                       ([{"rate": 1, "kind": "sideways"}], "sampling_rules: rules[0].kind"),
+                       ([{"name": "x"}], "sampling_rules: rules[0].rate: missing")):
+        d = LAYER.decide(config({"sampling_rules": {"rules": rules}}), LOCAL, LOCAL, HOST, NOW)
         assert d.status.status == FAILED and why in d.status.error_message, (rules, d.status.error_message)
 
 
 def test_rules_and_the_cap_are_reported_in_force_and_in_the_samplers_description(tmp_path):
     agent = Agent()
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
-    s = agent.remote_config(config(b'{"sampling_rules":"[{\\"rate\\": 0, \\"kind\\": \\"server\\", \\"path\\": \\"/health*\\"}]",'
-                                   b'"sampling_traces_per_second":"50"}'))
+    s = agent.remote_config(config({"sampling_rules": {"rules": [{"rate": 0, "kind": "server", "path": "/health*"}]},
+                                    "trace_rate_limit": {"traces_per_second": 50}}))
     assert s.status == APPLIED
-    eff = json.loads(agent.effective.config_map.config_map["elastic"].body)
-    assert eff == {"sampling_rules": '[{"kind":"server","path":"/health*","rate":0}]', "sampling_traces_per_second": "50"}
+    assert overrides(agent.effective) == {"sampling_rules": {"rules": [{"kind": "server", "path": "/health*", "rate": 0}]},
+                                          "trace_rate_limit": {"traces_per_second": 50}}
     assert agent.controls.sampler.get_description() == "OpampLiveSampler{ParentBased{root:AlwaysOnSampler,remoteParentSampled:AlwaysOnSampler,remoteParentNotSampled:AlwaysOffSampler,localParentSampled:AlwaysOnSampler,localParentNotSampled:AlwaysOffSampler},rules=1,traces_per_second=50.0}"
 
 
@@ -740,13 +754,15 @@ def agent_at(clocks: Clocks, state, **env) -> Agent:
 
 
 def eff(agent: Agent) -> dict:
-    return json.loads(agent.effective.config_map.config_map["elastic"].body or b"{}")
+    """The controls the agent's effective config reports overridden."""
+    return overrides(agent.effective)
 
 
-def set_aside(agent: Agent) -> dict | None:
-    """What the agent's effective config names as set aside (its elastic.set_aside entry)."""
+def reported_text(agent: Agent) -> str:
+    """The policy the agent's effective config reports, exactly as the layer writes it."""
     files = agent.effective.config_map.config_map
-    return json.loads(files["elastic.set_aside"].body) if "elastic.set_aside" in files else None
+    assert list(files) == [FILE], list(files)
+    return files[FILE].body.decode()
 
 
 # saving.json's cases whose save fails are the layer's: here the client keeps the config applied,
@@ -779,9 +795,7 @@ def test_debug_mode_and_saving_over_time_are_what_the_shared_vectors_say_through
         if "refresh_at_unix_ms" in want:
             assert agent._refresh_at == want["refresh_at_unix_ms"]
         if "effective" in want:
-            assert eff(agent) == want["effective"]
-        if "set_aside" in want:
-            assert set_aside(agent) == want["set_aside"]
+            assert reported_text(agent) == want["effective"]
 
 
 def test_the_timer_ends_debug_mode_at_its_deadline_and_reports_it(tmp_path):
@@ -789,9 +803,9 @@ def test_the_timer_ends_debug_mode_at_its_deadline_and_reports_it(tmp_path):
     agent = agent_at(clocks, tmp_path)
     reported = []
     agent.client = type("Client", (), {"set_effective_config": lambda self, e: reported.append(e)})()
-    agent.remote_config(config({"sampling_rate": "0.1", "send_logs_level": "error",
-                                "send_logs_level_by_scope": "noisy=off", "sampling_rules": [{"rate": 0}],
-                                "debug_until": "2026-10-14T12:10:00Z", "debug_send_logs_level": "info"}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "log_levels": {"level": "error", "scopes": {"noisy": "off"}},
+                                "sampling_rules": {"rules": [{"rate": 0}]},
+                                "debug": {"until": "2026-10-14T12:10:00Z", "log_level": "info"}}))
     c = agent.controls
     assert (c.sampler._rate, c.logs_min_severity, c.logs_scope_levels, c.sampler._rules) == (1, 9, (), ())
     assert agent._tick() == pytest.approx(600)
@@ -801,15 +815,15 @@ def test_the_timer_ends_debug_mode_at_its_deadline_and_reports_it(tmp_path):
     assert agent._tick() is None  # due: refreshed, nothing more to wait for
     assert (c.sampler._rate, c.logs_min_severity, c.logs_scope_levels) == (0.1, 17, (("noisy", 0xFFFF),))
     assert len(c.sampler._rules) == 1
-    assert eff(agent) == {"sampling_rate": "0.1", "send_logs_level": "error", "send_logs_level_by_scope": "noisy=off",
-                          "sampling_rules": '[{"rate":0}]'}
+    assert eff(agent) == {"head_sampling": {"ratio": 0.1}, "log_levels": {"level": "error", "scopes": {"noisy": "off"}},
+                          "sampling_rules": {"rules": [{"rate": 0}]}}
     assert reported and reported[-1] is agent.effective
 
 
 def test_a_wall_clock_set_back_doesnt_hold_debug_mode_open(tmp_path):
     clocks = Clocks()
     agent = agent_at(clocks, tmp_path)
-    agent.remote_config(config({"sampling_rate": "0.1", "debug_until": "2026-10-14T12:10:00Z"}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "debug": {"until": "2026-10-14T12:10:00Z"}}))
     clocks.mono += 600  # ten minutes pass...
     clocks.wall -= 3_600_000  # ...while the wall clock is set back an hour
     agent._tick()
@@ -819,28 +833,28 @@ def test_a_wall_clock_set_back_doesnt_hold_debug_mode_open(tmp_path):
 def test_a_failed_config_after_the_wall_clock_passed_debug_until_ends_debug_mode(tmp_path):
     clocks = Clocks()
     agent = agent_at(clocks, tmp_path)
-    agent.remote_config(config({"sampling_rate": "0.1", "debug_until": "2026-10-14T12:10:00Z"}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "debug": {"until": "2026-10-14T12:10:00Z"}}))
     assert agent.controls.sampler._rate == 1
     # The machine sleeps: the wall clock passes debug_until, the monotonic one doesn't move, so
     # the timer hasn't gone off. Then a bad document comes.
     clocks.wall += 15 * 60_000
-    s = agent.remote_config(config({"sampling_rate": "7"}))
+    s = agent.remote_config(config({"head_sampling": {"ratio": 7}}))
     assert s.status == FAILED
     # What is in force is what is reported: debug mode is over.
-    assert eff(agent) == {"sampling_rate": "0.1"}
+    assert eff(agent) == {"head_sampling": {"ratio": 0.1}}
     assert agent.controls.sampler._rate == 0.1 and agent._refresh_at == 0
 
 
 def test_a_newer_decision_replaces_the_timer_so_the_old_one_does_nothing(tmp_path):
     clocks = Clocks()
     agent = agent_at(clocks, tmp_path)
-    agent.remote_config(config({"sampling_rate": "0.1", "debug_until": "2026-10-14T12:10:00Z"}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "debug": {"until": "2026-10-14T12:10:00Z"}}))
     clocks.advance(60_000)
-    agent.remote_config(config({"sampling_rate": "0.2", "debug_until": "2026-10-14T12:30:00Z"}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.2}, "debug": {"until": "2026-10-14T12:30:00Z"}}))
     clocks.advance(540_000)  # the first window's end: nothing happens
     agent._tick()
     assert agent.controls.sampler._rate == 1 and agent._refresh_at == NOW + 30 * 60_000
-    agent.remote_config(config({"sampling_rate": "0.2"}))  # no debug_until: debug ends at once
+    agent.remote_config(config({"head_sampling": {"ratio": 0.2}}))  # debug local: debug ends at once
     assert agent._refresh_deadline is None and agent._tick() is None
     assert agent.controls.sampler._rate == 0.2
 
@@ -848,21 +862,23 @@ def test_a_newer_decision_replaces_the_timer_so_the_old_one_does_nothing(tmp_pat
 def test_caps_redaction_and_send_switches_stay_in_debug_mode(tmp_path):
     clocks = Clocks()
     agent = agent_at(clocks, tmp_path)
-    agent.remote_config(config({"send_logs": "false", "mask_attributes": "k", "send_logs_per_second": "5",
-                                "sampling_traces_per_second": "7", "debug_until": "2026-10-14T12:10:00Z"}))
+    agent.remote_config(config({"signal_exports": off("logs"), "attribute_redaction": {"mask": ["k"]},
+                                "log_rate_limit": {"records_per_second": 5}, "trace_rate_limit": {"traces_per_second": 7},
+                                "debug": {"until": "2026-10-14T12:10:00Z"}}))
     c = agent.controls
     assert (c.send_logs, c.redactor.mask, c.logs_cap.per_second, c.sampler._cap.per_second) == (False, ("k",), 5, 7)
 
 
-def test_debug_mode_is_ignored_where_the_package_didnt_build_the_sdk():
+def test_debug_mode_is_refused_where_the_package_didnt_build_the_sdk():
     other = opamp_otel.sdk_host(["otlp"], configured=False)
-    d = LAYER.decide(config({"debug_until": "2026-10-14T12:10:00Z"}), b"{}", b"{}", other, NOW)
-    assert d.status.status == APPLIED and "debug_until" in d.apply.unsupported and not d.refresh_at_unix_ms
+    d = LAYER.decide(config({"debug": {"until": "2026-10-14T12:10:00Z"}}), LOCAL, LOCAL, other, NOW)
+    assert d.status.status == FAILED and not d.HasField("apply") and not d.refresh_at_unix_ms
+    assert d.status.error_message == "debug: until: this SDK cannot apply the requested override"
 
 
 def test_a_debug_window_too_far_ahead_is_failed(tmp_path):
     agent = agent_at(Clocks(), tmp_path)
-    s = agent.remote_config(config({"debug_until": "2026-10-16T12:00:01Z"}))
+    s = agent.remote_config(config({"debug": {"until": "2026-10-16T12:00:01Z"}}))
     assert s.status == FAILED and "more than 24h ahead" in s.error_message
 
 
@@ -875,7 +891,7 @@ def test_the_timer_thread_ends_debug_mode_on_its_own():
     agent = Agent()
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": "none"})
     end = datetime.datetime.fromtimestamp(time.time() + 0.2, datetime.UTC).isoformat(timespec="milliseconds")
-    agent.remote_config(config({"sampling_rate": "0.1", "debug_until": end.replace("+00:00", "Z")}))
+    agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "debug": {"until": end.replace("+00:00", "Z")}}))
     assert agent.controls.sampler._rate == 1
     agent._ticking = True
     timer = threading.Thread(target=agent._timer, daemon=True)
@@ -898,7 +914,7 @@ def test_a_saved_debug_window_ends_when_the_client_cant_start(tmp_path, caplog):
     import time
 
     end = datetime.datetime.fromtimestamp(time.time() + 0.3, datetime.UTC).isoformat(timespec="milliseconds")
-    keep_applied(tmp_path, json.dumps({"sampling_rate": "0.1", "debug_until": end.replace("+00:00", "Z")}).encode())
+    keep_applied(tmp_path, policy(head_sampling={"ratio": 0.1}, debug={"until": end.replace("+00:00", "Z")}).encode())
     agent = Agent()
     # The core refuses the scheme: the client doesn't start.
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "ftp://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
@@ -975,7 +991,7 @@ def test_the_gates_count_exports_failures_and_what_they_drop_on_purpose():
     from opentelemetry.sdk._logs.export import LogRecordExportResult
     from opentelemetry.sdk.trace.export import SpanExportResult
 
-    c = controlled({"send_logs_level": "warn"})
+    c = controlled({"log_levels": {"level": "warn"}})
     logs = c.logs(Recording(LogRecordExportResult.SUCCESS))
     logs.export([record("a", 5), record("a", 13), record("a", 17)])
     failing = c.logs(Recording(LogRecordExportResult.FAILURE))
@@ -994,7 +1010,7 @@ def test_the_gates_count_exports_failures_and_what_they_drop_on_purpose():
     c.spans(Recording(SpanExportResult.SUCCESS)).export(["s"])
     assert (c.traces.proto().exports_ok, c.traces.proto().last_failed) == (1, False)
     # send_* false: filtered, not failed.
-    c.apply(typed({"send_traces": "false", "send_logs": "false"}))
+    c.apply(typed({"signal_exports": off("traces", "logs")}))
     spans.export(["a", "b", "c"])
     logs.export([record()])
     assert (c.traces.proto().items_filtered, c.logs_counts.proto().items_filtered) == (3, 2)
@@ -1017,7 +1033,7 @@ def test_metrics_are_counted_by_data_point_at_the_gated_metric_exporter(monkeypa
     gated.export(data)
     after = opamp_otel.AGENT.controls.metrics.proto()
     assert (after.exports_failed - before.exports_failed, after.items_failed - before.items_failed) == (1, 2)
-    opamp_otel.AGENT.controls.apply(typed({"send_metrics": "false"}))
+    opamp_otel.AGENT.controls.apply(typed({"signal_exports": off("metrics")}))
     try:
         gated.export(data)
         assert opamp_otel.AGENT.controls.metrics.proto().items_filtered - before.items_filtered == 2
@@ -1086,14 +1102,14 @@ def test_the_package_declares_every_setting_it_carries_out():
     assert list(opamp_otel.sdk_host(["otlp"], configured=False).live) == ["custom", "send_metrics"]
     assert list(opamp_otel.sdk_host(["otlp"], configured=False, config_file=True).live) == ["custom"]
     # Every declared name is a setting: the layer refuses a host naming one that isn't.
-    LAYER.load(b"{}", every)
+    LAYER.load(LOCAL, every)
 
 
 # --- the native matchers against the layer's reference ones (Evaluate), on generated inputs --------
 
 
 def evaluate(settings: dict, **input_) -> settings_pb2.Evaluated:
-    e = settings_pb2.Evaluate(settings=json.dumps(settings).encode(), host=HOST, now_unix_ms=NOW, **input_)
+    e = settings_pb2.Evaluate(settings=document(settings), host=HOST, now_unix_ms=NOW, **input_)
     return LAYER._call(settings_pb2.Request(evaluate=e)).evaluated
 
 
@@ -1133,7 +1149,7 @@ def test_the_sampler_agrees_with_the_layers_reference_on_generated_spans():
                                      {"key": "k", "bool": rng.random() < 0.5}, {"key": "n", "double": 0.5}]))
         span = {"name": word(rng, star=False), "kind": rng.choice(kinds), "attributes": attrs,
                 "parent": rng.choice(["none", "none", "remote_sampled", "local_unsampled"])}
-        settings = {"sampling_rules": rules}
+        settings = {"sampling_rules": {"rules": rules}}
         ref = evaluate(settings, span=settings_pb2.SpanStart(
             name=span["name"], kind=KINDS[span["kind"]] + 1,
             attributes=[anyvalue_pb2.KeyValue(key=a["key"], value=anyvalue(a)) for a in attrs],
@@ -1173,9 +1189,10 @@ def test_the_log_levels_agree_with_the_layers_reference_on_generated_scopes():
             entries[name + rng.choice(["", "*"])] = rng.choice(levels)
         if rng.random() < 0.2:
             entries["*"] = rng.choice(levels)
-        settings = {"send_logs_level_by_scope": ",".join(f"{p}={lv}" for p, lv in entries.items())}
+        log_levels = {"scopes": entries}
         if rng.random() < 0.5:
-            settings["send_logs_level"] = rng.choice(levels[:-1])
+            log_levels["level"] = rng.choice(levels[:-1])
+        settings = {"log_levels": log_levels}
         scope = "".join(rng.choice("ab.é") for _ in range(rng.randrange(0, 5)))
         severity = rng.choice([0, 1, 5, 9, 12, 13, 17, 21, 24])
         ref = evaluate(settings, log=settings_pb2.LogRecord(scope=scope, severity=severity))
@@ -1189,8 +1206,9 @@ def test_redaction_agrees_with_the_layers_reference_on_generated_keys():
     rng = random.Random(231)
     changed = 0
     for _ in range(300):
-        settings = {k: ",".join(word(rng) or "x" for _ in range(rng.randrange(1, 3)))
-                    for k in ("drop_attributes", "mask_attributes") if rng.random() < 0.7}
+        redaction = {k: [word(rng) or "x" for _ in range(rng.randrange(1, 3))]
+                     for k in ("drop", "mask") if rng.random() < 0.7}
+        settings = {"attribute_redaction": redaction} if redaction else {}
         keys = list(dict.fromkeys(word(rng, 5, star=False) or "k" for _ in range(4)))
         ref = evaluate(settings, attributes=settings_pb2.Attributes(attributes=[
             anyvalue_pb2.KeyValue(key=k, value=anyvalue({"int": i})) for i, k in enumerate(keys)]))

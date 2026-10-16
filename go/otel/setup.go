@@ -179,7 +179,7 @@ func (s *SDK) metrics(ctx context.Context, getenv func(string) string) error {
 	opts := []sdkmetric.Option{sdkmetric.WithResource(s.Resource)}
 	if reader != nil {
 		opts = append(opts, sdkmetric.WithReader(reader))
-		// Gated as the host says: an exporter metricsGated says isn't makes send_metrics unsupported.
+		// Gated as the host says: an exporter that metricsGated says is not gated leaves send_metrics undeclared.
 		s.built("metrics", metricsExporter(getenv), s.Controls != nil && metricsGated(getenv))
 	}
 	mp := sdkmetric.NewMeterProvider(opts...)

@@ -16,18 +16,19 @@ check_settings is Go's own, for the settings that match telemetry (docs/go-otel.
 application in EXAMPLE_SETTINGS mode (a request to /health beside each to /ping, and three debug
 lines a tick from a second bridge logger, "noisy"). What the reference server's sink shows of
 telemetry is each span's url.full (else its name) and end, and how many log records arrive, so
-each setting is checked by what it does to those:
-Run 7, the settings, in the order the server offers them:
-  1. sampling_rate 1: spans of both /ping and /health; four log records a tick;
-  2. a sampling rule of rate 0 on client spans named "* /health" (main.go names its client spans
-     by method and path; otelhttp's transport adds url.full only after the span starts, too late
-     for a rule), and noisy=off by scope: spans of /ping, none of /health; one log record a tick;
-  3. drop_attributes url.full: spans arrive, none named by its URL (the sink names a span by its
-     url.full, else its name);
-  4. mask_attributes URL.FULL (any case): every span named [REDACTED];
-  5. sampling_traces_per_second 1 and send_logs_per_second 2: about a trace and two log records a
-     second, of ten requests and twenty log lines.
-Run 8, debug mode: sampling_rate 0 with debug_until 20 s ahead, offered once: spans while it
+each control is checked by what it does to those:
+Run 7, the policies, in the order the server offers them:
+  1. head_sampling 1: spans of both /ping and /health; four log records a tick;
+  2. sampling_rules, a rule of rate 0 on client spans named "* /health" (main.go names its client
+     spans by method and path; otelhttp's transport adds url.full only after the span starts, too
+     late for a rule), and log_levels scopes noisy off: spans of /ping, none of /health; one log
+     record a tick;
+  3. attribute_redaction drop url.full: spans arrive, none named by its URL (the sink names a span
+     by its url.full, else its name);
+  4. attribute_redaction mask URL.FULL (any case): every span named [REDACTED];
+  5. trace_rate_limit 1 and log_rate_limit 2: about a trace and two log records a second, of ten
+     requests and twenty log lines.
+Run 8, debug mode: head_sampling 0 with debug until 20 s ahead, offered once: spans while it
 lasts, none after, though the server sends nothing more; the agent reports its effective config
 again when it ends.
 Run 9, export health: the traces exporter sent to a path the sink refuses: the agent sends its
@@ -51,7 +52,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, key_in_code,  # noqa: E402
-                          check_signals, check_truth, ended, main, pings, run, signal, spans, statuses, stop_group, target, opamp_url)
+                          check_signals, check_truth, ended, main, offer, pings, run, signal, spans, statuses, stop_group, target, opamp_url)
 import json  # noqa: E402
 import shutil  # noqa: E402
 import tempfile  # noqa: E402
@@ -89,14 +90,8 @@ def launcher(in_code: bool, target_: Path):
     return launch
 
 
-SETTINGS = "application/json"
 # check_settings's environment: every signal exported, and the application's extra telemetry.
 EXTRA = SIGNALS | {"OTEL_METRICS_EXPORTER": "none", "EXAMPLE_SETTINGS": "1"}
-
-
-def offer(n: int, body: dict) -> dict:
-    return {"on_message": n, "action": "offer_config", "config_key": "elastic", "body": json.dumps(body),
-            "content_type": SETTINGS}
 
 
 def names(events: list[dict], after: float, before: float = 1e9) -> list[str]:
@@ -124,7 +119,7 @@ def judge_settings(seven: list[dict]) -> list[tuple[str, bool]]:
     t1, t2, t3, t4, t5 = (t for t, _, _ in st)
     end = max(e["t"] for e in seven)
     one = names(seven, t1 + MARGIN, t2)
-    out.append((f"sampling_rate 1: spans of /ping and of /health ({len(one)})",
+    out.append((f"head_sampling 1: spans of /ping and of /health ({len(one)})",
                 any(n.endswith("/ping") for n in one) and any(n.endswith("/health") for n in one)))
     ticks = len(pings(seven, t1 + MARGIN, t2 - MARGIN))
     per = logs(seven, t1 + MARGIN, t2 - MARGIN) / ticks if ticks else 0
@@ -134,26 +129,26 @@ def judge_settings(seven: list[dict]) -> list[tuple[str, bool]]:
                 any(n.endswith("/ping") for n in two) and not any(n.endswith("/health") for n in two)))
     ticks = len(pings(seven, t2 + MARGIN, t3 - MARGIN))
     per = logs(seven, t2 + MARGIN, t3 - MARGIN) / ticks if ticks else 0
-    out.append((f"send_logs_level_by_scope noisy=off: one log record a tick ({per:.1f})", ticks > 5 and 0.5 <= per <= 1.5))
+    out.append((f"log_levels scopes noisy off: one log record a tick ({per:.1f})", ticks > 5 and 0.5 <= per <= 1.5))
     three = arrived(seven, t3 + MARGIN, t4)
-    out.append((f"drop_attributes url.full: spans, none named by a URL ({sorted(set(three))[:3]})",
+    out.append((f"attribute_redaction drop url.full: spans, none named by a URL ({sorted(set(three))[:3]})",
                 bool(three) and not any(n.startswith("http") for n in three)))
     four = arrived(seven, t4 + MARGIN, t5)
-    out.append((f"mask_attributes URL.FULL: every span [REDACTED] ({sorted(set(four))[:3]})",
+    out.append((f"attribute_redaction mask URL.FULL: every span [REDACTED] ({sorted(set(four))[:3]})",
                 bool(four) and all(n == "[REDACTED]" for n in four)))
     lasted = end - (t5 + MARGIN)
     five = ended(seven, t5 + MARGIN)
-    out.append((f"sampling_traces_per_second 1: {len(five)} spans in {lasted:.0f} s, of "
+    out.append((f"trace_rate_limit 1: {len(five)} spans in {lasted:.0f} s, of "
                 f"{2 * len(pings(seven, t5 + MARGIN))} requests",
                 lasted > 8 and 0 < len(five) <= lasted + 3 < len(pings(seven, t5 + MARGIN))))
     capped = logs(seven, t5 + MARGIN)
-    out.append((f"send_logs_per_second 2: {capped} log records in {lasted:.0f} s, of some "
+    out.append((f"log_rate_limit 2: {capped} log records in {lasted:.0f} s, of some "
                 f"{4 * len(pings(seven, t5 + MARGIN))}", 0 < capped <= 2 * lasted + 4))
     return out
 
 
 def judge_debug(eight: list[dict], until: float) -> list[tuple[str, bool]]:
-    """`until`: debug_until, on the log's clock."""
+    """`until`: debug's until, on the log's clock."""
     st = statuses(eight)
     offers = [e for e in eight if e["event"] == "s2a" and e.get("offer_config")]
     during = [n for n in names(eight, (st[0][0] if st else until) + DRIFT, until - DRIFT) if n.endswith("/ping")]
@@ -162,8 +157,8 @@ def judge_debug(eight: list[dict], until: float) -> list[tuple[str, bool]]:
     reported = [e for e in eight if e["event"] == "a2s" and "effective_config" in e["fields"] and e["t"] > until - DRIFT]
     return [
         ("the config answered APPLIED, and offered once", [s for _, s, _ in st] == ["APPLIED"] and len(offers) == 1),
-        (f"debug mode: spans at sampling_rate 0 ({len(during)})", len(during) > 5),
-        (f"after debug_until, none, the server sending nothing ({len(requests)} requests)",
+        (f"debug mode: spans at head_sampling 0 ({len(during)})", len(during) > 5),
+        (f"after debug's until, none, the server sending nothing ({len(requests)} requests)",
          len(requests) > 5 and not after),
         ("the effective config reported again at the end", bool(reported)),
     ]
@@ -194,12 +189,13 @@ def check_settings(launch, target_: Path) -> bool:
     try:
         gap = 12
         seven = run(launch, {"server": {"faults": [
-            offer(1, {"sampling_rate": "1"}),
-            offer(1 + gap, {"sampling_rate": "1", "send_logs_level_by_scope": "noisy=off",
-                            "sampling_rules": [{"rate": 0, "kind": "client", "name": "* /health"}]}),
-            offer(1 + 2 * gap, {"sampling_rate": "1", "drop_attributes": "url.full"}),
-            offer(1 + 3 * gap, {"sampling_rate": "1", "mask_attributes": "URL.FULL"}),
-            offer(1 + 4 * gap, {"sampling_rate": "1", "sampling_traces_per_second": "1", "send_logs_per_second": "2"}),
+            offer(1, {"head_sampling": {"ratio": 1}}),
+            offer(1 + gap, {"head_sampling": {"ratio": 1}, "log_levels": {"scopes": {"noisy": "off"}},
+                            "sampling_rules": {"rules": [{"rate": 0, "kind": "client", "name": "* /health"}]}}),
+            offer(1 + 2 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"drop": ["url.full"]}}),
+            offer(1 + 3 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["URL.FULL"]}}),
+            offer(1 + 4 * gap, {"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 1},
+                                "log_rate_limit": {"records_per_second": 2}}),
         ]}}, states[0], "run7", 150, "127.0.0.1:0", target_,
             until=lambda events: len(statuses(events)) >= 5, settle=15, env=EXTRA)
         print(f"run 7: remote config statuses {[s for _, s, _ in statuses(seven)]}, {len(spans(seven))} span exports")
@@ -208,11 +204,12 @@ def check_settings(launch, target_: Path) -> bool:
         window = 20
         until = datetime.now(timezone.utc) + timedelta(seconds=window + 5)
         eight = run(launch, {"server": {"faults": [
-            offer(1, {"sampling_rate": "0", "debug_until": until.isoformat(timespec="milliseconds").replace("+00:00", "Z")}),
+            offer(1, {"head_sampling": {"ratio": 0},
+                      "debug": {"until": until.isoformat(timespec="milliseconds").replace("+00:00", "Z")}}),
         ]}}, states[1], "run8", window + 25, "127.0.0.1:0", target_, env=EXTRA)
-        # debug_until on the log's clock: each event has its wall time beside it.
+        # debug's until on the log's clock: each event has its wall time beside it.
         on_log = until.timestamp() - eight[0]["wall"] + eight[0]["t"] if eight else 0
-        print(f"run 8: debug_until {until:%H:%M:%S.%f}, {len(spans(eight))} span exports")
+        print(f"run 8: debug until {until:%H:%M:%S.%f}, {len(spans(eight))} span exports")
         expect(judge_debug(eight, on_log))
 
         def failed_twice(events: list[dict]) -> bool:

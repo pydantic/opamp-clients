@@ -1,203 +1,409 @@
 # Remote settings, by example
 
-Each file here is a whole settings document, ready to send as the remote config's `elastic`
-entry (`application/json`) to any of the six SDK integrations. [docs/sdk-settings.md](../../docs/sdk-settings.md)
-defines every setting; [where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)
-has the limits per language. The settings layer's own tests check that every file here is
-applied as written, and that between them they use every setting, and that the one with keys that
-are no setting here shows what an instance reports of them.
+Each file here is a whole Logfire SDK policy. Send it as the remote config's only file,
+`logfire-sdk-policy.json` (`application/json`), to any of the six SDK integrations.
+[docs/sdk-settings.md](../../docs/sdk-settings.md#the-policy) describes version 1 and the version 2
+draft, and what each control does.
+[Where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies) has the limits
+per language. `examples/test_settings_cookbook.py` checks three things. Every file here is a whole
+policy, version 1 where only version 1 controls are overridden. This README shows each file as it
+is. Between them, the files override every control.
 
-A document is the whole of what the server wants: a setting left out goes back to the SDK's own
-value, as configured locally. So each document says everything that should differ from the
-SDK's own, not only what changes.
+A policy is the whole of what the server wants. Every control is in it, as `local` or as
+`override`. A `local` control is the SDK's own value, as configured locally. Thus each policy
+states everything that should differ from the SDK's own, not only what changes. A field that the
+policy version does not name is refused, and so is an override that the SDK cannot carry out. A
+refused policy changes nothing.
+
+Version 1 has two controls, `head_sampling` and `signal_exports`. Version 2 adds the rest. A
+server sends version 2 only to an SDK that lists `logfire-sdk-policy/v2-draft` in its
+`logfire.opamp.config_formats` attribute. The examples use version 1 where it is enough.
 
 ## Cut trace volume: `sample-a-quarter.json`
 
 ```json
-{"sampling_rate": "0.25"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "override", "ratio": 0.25},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  }
+}
 ```
 
 A quarter of new traces are sampled, at once. A request that arrives already sampled (a
-`traceparent` from a sampled caller) stays sampled, so a service behind a traced caller is cut
+`traceparent` from a sampled caller) stays sampled. Thus a service behind a traced caller is cut
 far less than this.
 
 ## Trace everything while you debug: `sample-everything.json`
 
 ```json
-{"sampling_rate": "1"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "override", "ratio": 1},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  }
+}
 ```
 
 Every new trace is sampled, at once, whatever the SDK's own sampler says. Send
-`back-to-defaults.json` when you're done.
+`back-to-defaults.json` when you are done.
 
 ## Keep traces, stop metrics and logs: `traces-only.json`
 
 ```json
-{"send_metrics": "false", "send_logs": "false"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "override", "enabled": false},
+    "logs": {"mode": "override", "enabled": false}
+  }
+}
 ```
 
-Metrics and log records stop being exported, at once (a batch already on its way still arrives).
+Metrics and log records stop being exported, at once. A batch already on its way still arrives.
 Traces carry on.
 
 ## Quiet the application's logs to warnings and errors: `quiet-logs.json`
 
 ```json
-{"send_logs_level": "warn"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "override", "level": "warn"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
 Only the application's log records at `warn` or above (SeverityNumber 13 and up) are exported, at
-once: the records below are still made, just not sent, and a record with no severity is exported
-whatever the level. The levels are `trace`, `debug`, `info`, `warn`, `error` and `fatal`. It
-filters what is exported; it doesn't change the SDK's own log level. It reaches the log exporters
-the integration builds, as `send_logs` does ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
+once. The records below are still made, but they are not sent. A record with no severity is
+exported whatever the level. The levels are `trace`, `debug`, `info`, `warn`, `error` and
+`fatal`. The level filters what is exported. It does not change the SDK's own log level. It
+reaches the log exporters that the integration builds, as `signal_exports.logs` does
+([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
 
 ## Stop a service exporting anything: `stop-exporting.json`
 
 ```json
-{"send_traces": "false", "send_metrics": "false", "send_logs": "false"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "override", "enabled": false},
+    "metrics": {"mode": "override", "enabled": false},
+    "logs": {"mode": "override", "enabled": false}
+  }
+}
 ```
 
 Nothing more is exported, at once. The application runs as before, and the agent stays
-connected, so the next document can turn it all back on.
+connected. Thus the next policy can turn it all back on.
 
 ## Switch off noisy instrumentations: `drop-noisy-instrumentations.json`
 
 ```json
-{"deactivate_instrumentations": "jdbc,kafka-clients"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "override", "disabled": ["jdbc", "kafka-clients"]},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-The named instrumentations are off from the next start (in Go, Node.js and Rust, at once). Names
-are each language's own:
+The named instrumentations are off from the next start. In Go, Node.js and Rust, they are off at
+once. Names are each language's own:
 
 | Language | Names | The example app's HTTP client |
 |---|---|---|
 | Python | entry points: `flask`, `requests`, `urllib` | `urllib` |
-| Node.js | upstream's short ones: `http`, `express`, `pg` | `http,net,dns` |
+| Node.js | upstream's short ones: `http`, `express`, `pg` | `http`, `net`, `dns` |
 | Go | the instrumentation's: `otelhttp` | `otelhttp` |
 | Rust | the `tracing` target: `reqwest_tracing` | `reqwest_tracing` |
 | Java | the agent's: `jdbc`, `spring-webmvc`, `java-http-client` | `java-http-client` |
 | .NET | upstream's, lowercase: `httpclient`, `aspnetcore`, `sqlclient` | `httpclient` |
 
-The same document goes to every language: a name a language doesn't have switches nothing off
-there. A next-start setting needs a state directory to be kept in; without one, the document is
-answered FAILED and nothing changes.
+The same policy goes to every language. A name that a language does not have switches nothing
+off there. A next-start control needs a state directory to be kept in. Without one, the SDK
+answers the policy FAILED and nothing changes.
 
 ## Switch every instrumentation off: `no-instrumentation.json`
 
 ```json
-{"deactivate_all_instrumentations": "true"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "override", "all_disabled": true},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-No instrumentation runs from the next start (in Go, Node.js and Rust, at once).
+No instrumentation runs from the next start. In Go, Node.js and Rust, none runs from now.
 
 ## Check in less often: `poll-less-often.json`
 
 ```json
-{"opamp_polling_interval": "5m"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "override", "milliseconds": 300000}
+}
 ```
 
 The agent checks in every 5 minutes from the next start, whatever `OTEL_OPAMP_HEARTBEAT_INTERVAL`
-says. From 1 s to 24 h.
+says. The interval is from 1000 ms to 86400000 ms (24 h).
 
 ## Skip health checks, keep every checkout: `skip-health-checks.json`
 
 ```json
-{"sampling_rate": "0.25", "sampling_rules": [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 1, "name": "POST /checkout*"}]}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "override", "ratio": 0.25},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "override", "rules": [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 1, "name": "POST /checkout*"}]},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-For a new trace, the first rule its root span matches sets the rate, at once: no health-check
-traces, every checkout, and a quarter of the rest (`sampling_rate`). A rule's `name` and `path`
-are globs (`*` is any run of characters); `kind` is `server`, `client`, `internal`, `producer` or
-`consumer`. A span with a sampled parent is still sampled, rules or not. A rule matches what a
-span has when it starts, which differs by instrumentation: an HTTP client span starts without its
-URL in Go and on .NET 8, for one ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
+For a new trace, the first rule that its root span matches sets the rate, at once. Thus there are
+no health-check traces, every checkout is sampled, and a quarter of the rest are sampled
+(`head_sampling`). The `name` and `path` of a rule are globs, where `*` is any run of characters.
+The `kind` is `server`, `client`, `internal`, `producer` or `consumer`. A span with a sampled
+parent is still sampled, rules or not. A rule matches what a span has when it starts, and that
+differs by instrumentation. For example, an HTTP client span starts without its URL in Go and on
+.NET 8 ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
 
 ## Quiet the noisy loggers, hear more from one: `quiet-noisy-loggers.json`
 
 ```json
-{"send_logs_level": "warn", "send_logs_level_by_scope": "com.acme.payments*=debug,urllib3=error,noisy.lib=off"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "override", "level": "warn", "scopes": {"com.acme.payments*": "debug", "urllib3": "error", "noisy.lib": "off"}},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-Log records are exported from `warn` up, at once, but from `debug` up for the scopes (loggers)
-whose name starts with `com.acme.payments`, from `error` up for `urllib3`, and none for
-`noisy.lib`. An exact name wins over a prefix, and a longer prefix over a shorter one. A scope
-is each language's logger: Python's and Java's logger name, .NET's `ILogger` category, Rust's
-`tracing` target, the `otelslog` logger's name in Go, the logs API logger (or the bridge's
-package) in Node.js. Like `send_logs_level`, it reaches the log exporters the integration builds;
-where it can't be carried out, it is ignored rather than answered as done ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
+Log records are exported from `warn` up, at once. But they are exported from `debug` up for the
+scopes (loggers) whose name starts with `com.acme.payments`, from `error` up for `urllib3`, and
+not at all for `noisy.lib`. An exact name wins over a prefix, and a longer prefix wins over a
+shorter one. A scope is the logger of each language. It is the logger name in Python and Java,
+the `ILogger` category in .NET, the `tracing` target in Rust, the name of the `otelslog` logger in
+Go, and the logs API logger (or the package of the bridge) in Node.js. Like the level, the scopes
+reach the log exporters that the integration builds. An SDK that cannot carry them out refuses
+the policy ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
 
 ## Keep secrets out of the backend: `redact-secrets.json`
 
 ```json
-{"drop_attributes": "*password*,*token*,http.request.header.authorization", "mask_attributes": "user.email,enduser.id"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "override", "mask": ["user.email", "enduser.id"], "drop": ["*password*", "*token*", "http.request.header.authorization"]},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-At export, the span and log attributes whose keys match (globs, ignoring case) are removed, or
-have their value replaced by `[REDACTED]`, at once. Resource attributes, span names, log
-bodies and metrics are left alone. Only where every span and log record goes through the
-integration's own exporters is it carried out; elsewhere it is ignored rather than half done
+At export, the SDK removes the span and log attributes whose keys match `drop`. It replaces the
+value with `[REDACTED]` for the keys that match `mask`. The globs ignore case. This applies at
+once. Resource attributes, span names, log bodies and metrics stay as they are. Only an
+integration whose own exporters see every span and log record carries this out. Elsewhere the SDK
+refuses the policy
 ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
 
 ## Cap the volume: `cap-volume.json`
 
 ```json
-{"sampling_rate": "1", "sampling_traces_per_second": "50", "send_logs_per_second": "200"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "override", "ratio": 1},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "override", "traces_per_second": 50},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "override", "records_per_second": 200},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
 Every trace is sampled, but no more than 50 new traces and 200 log records a second leave each
-instance, at once: a safety valve for a traffic spike or a logging loop. The log cap is at the
-log exporters the integration builds, as `send_logs_level` is; each process has its own buckets.
+instance, at once. This is a safety valve for a traffic spike or a logging loop. The log cap is at
+the log exporters that the integration builds, as the log level is. Each process has its own
+buckets.
 
 ## Debug for half an hour: `debug-for-half-an-hour.json`
 
 ```json
-{"sampling_rate": "0.05", "send_logs_level": "warn", "debug_until": "2026-10-14T12:30:00Z", "debug_sampling_rate": "1", "debug_send_logs_level": "debug"}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "override", "ratio": 0.05},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "override", "level": "warn"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "override", "until": "2026-10-14T12:30:00Z", "sampling_ratio": 1, "log_level": "debug"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-Until 12:30 UTC every trace is sampled and every log record from `debug` up is exported, rules
-and levels per scope set aside; then each instance goes back to 5 % and `warn` on its own, even
-if the server can't reach it. Send it with your own time: at most 24 h ahead, as an RFC 3339
-time. Sending it again (as a server does on every reconnect) doesn't extend it; a later time does.
-Every integration ends it on a timer of its own, server or no server.
+Until 12:30 UTC, every trace is sampled and every log record from `debug` up is exported. Rules
+and levels per scope do not apply for that time. Then each instance goes back to 5 % and `warn`
+on its own, even if the server cannot reach it. Send it with your own time, as an RFC 3339 time
+at most 24 h ahead. Sending it again (as a server does on every reconnect) does not extend it,
+but a later time does. Every integration ends it on a timer of its own, server or no server.
 
 ## Flip a feature flag of the application's own: `flip-a-feature-flag.json`
 
 ```json
-{"custom": {"checkout.new_flow": "on", "example.log_level": "debug"}}
+{
+  "schema": "logfire-sdk-policy/v2-draft",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "override", "values": {"checkout.new_flow": "on", "example.log_level": "debug"}},
+  "instrumentations": {"mode": "local"},
+  "polling_interval": {"mode": "local"}
+}
 ```
 
-Not a setting of the SDK's but of the application's: the SDK hands `custom` to the application,
-which reads a key with a default (`opamp_otel.app_settings.get("checkout.new_flow", "off")` in
-Python) and can be told when the map changes. The values are in force at once, and left out
-again each key is back to the application's default
-([docs/app-settings.md](../../docs/app-settings.md)). Only an integration that lets the
-application read them takes them; elsewhere `custom` is ignored.
-
-## One document for EDOT and these SDKs alike, and what each set aside: `edot-and-upstream-alike.json`
-
-```json
-{"sampling_rate": "0.25", "logging_level": "warn", "infer_spans": "false"}
-```
-
-`logging_level` and `infer_spans` are EDOT's settings, not these SDKs': they are ignored, not
-refused, and the document is answered APPLIED with a quarter of new traces sampled. So the server
-can see what didn't take, each instance names what it set aside in its effective config, as an
-entry of its own beside the `elastic` entry of the settings in force. Here its
-`elastic.set_aside` entry is:
-
-```json
-{"ignored":["infer_spans","logging_level"],"unsupported":[]}
-```
-
-`ignored` names keys that are no setting here (another SDK's, or misspelt); `unsupported` names
-settings this integration doesn't carry out where it runs, such as `send_metrics` beside an
-exporter it doesn't gate ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
-With nothing set aside, the entry is left out.
+These values are not settings of the SDK but of the application. The SDK hands `app_settings` to
+the application. The application reads a key with a default, for example
+`opamp_otel.app_settings.get("checkout.new_flow", "off")` in Python, and it can be told when the
+values change. The values are in force at once. When the control is `local` again, each key is
+back to the default of the application ([docs/app-settings.md](../../docs/app-settings.md)). Only
+an integration that lets the application read them takes them. Elsewhere the SDK refuses the
+policy.
 
 ## Back to the SDK's own settings: `back-to-defaults.json`
 
 ```json
-{}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  }
+}
 ```
 
-Every setting is the SDK's own again: live ones at once, next-start ones at the next start.
+Every control is `local`, so every setting is the SDK's own again. Live settings change at once,
+and next-start settings change at the next start. This version 1 policy is also the one that the
+effective config reports before any policy is applied. An SDK that has taken a version 2 policy
+also takes this one, and the version 2 controls go back to local.

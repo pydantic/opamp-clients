@@ -331,8 +331,8 @@ internal sealed class Agent
         }
 
         // Debug mode: the layer folds it into the settings it hands over, and SdkAgent's timer
-        // ends it. Its rate and level are set aside, as sampling_rate and send_logs_level are, where
-        // those aren't declared.
+        // ends it. Where sampling_rate or send_logs_level is not declared, the layer refuses a
+        // policy that overrides the debug rate or level, as it refuses one that overrides those.
         h.Live.Add("debug_until");
         h.Live.Add("debug_sampling_rate");
         h.Live.Add("debug_send_logs_level");

@@ -151,7 +151,7 @@ func TestTheRedactionVectors(t *testing.T) {
 // were: the gate changes a view and a copy.
 func TestRedactionLeavesTheSDKsTelemetryAlone(t *testing.T) {
 	c := NewControls()
-	c.Apply(settingsOf(t, []byte(`{"drop_attributes":"secret","mask_attributes":"user.email"}`), 0))
+	c.Apply(settingsOf(t, []byte(redactionPolicy([]string{"user.email"}, []string{"secret"})), 0))
 	gated, plain := tracetest.NewInMemoryExporter(), tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(c.Spans(gated)), sdktrace.WithSyncer(plain))
 	_, other := sdktrace.NewTracerProvider().Tracer("o").Start(context.Background(), "other")
@@ -197,7 +197,7 @@ func TestRedactionLeavesTheSDKsTelemetryAlone(t *testing.T) {
 // A drop doesn't change the count of attributes the SDK's limits dropped from a span.
 func TestRedactionKeepsASpansDroppedCount(t *testing.T) {
 	c := NewControls()
-	c.Apply(settingsOf(t, []byte(`{"drop_attributes":"a"}`), 0))
+	c.Apply(settingsOf(t, []byte(redactionPolicy(nil, []string{"a"})), 0))
 	mem := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(c.Spans(mem)),
 		sdktrace.WithSpanLimits(sdktrace.SpanLimits{AttributeCountLimit: 2, EventCountLimit: -1, LinkCountLimit: -1,
@@ -227,18 +227,37 @@ func TestRedactionChangesLiveAndReverts(t *testing.T) {
 	if got := span(); got != asIs {
 		t.Fatalf("nothing set: %s", got)
 	}
-	c.Apply(settingsOf(t, []byte(`{"drop_attributes":"authorization"}`), 0))
+	c.Apply(settingsOf(t, []byte(redactionPolicy(nil, []string{"authorization"})), 0))
 	if got := span(); got != "user=STRING:u" {
 		t.Fatalf("drop: %s", got)
 	}
-	c.Apply(settingsOf(t, []byte(`{"mask_attributes":"AUTHORIZATION,user"}`), 0))
+	c.Apply(settingsOf(t, []byte(redactionPolicy([]string{"AUTHORIZATION", "user"}, nil)), 0))
 	if got := span(); got != "Authorization=STRING:[REDACTED] user=STRING:[REDACTED]" {
 		t.Fatalf("mask: %s", got)
 	}
-	c.Apply(settingsOf(t, []byte(`{}`), 0))
+	c.Apply(settingsOf(t, []byte(v2()), 0))
 	if got := span(); got != asIs {
-		t.Fatalf("left out: %s", got)
+		t.Fatalf("local: %s", got)
 	}
+}
+
+// redactionPolicy is a policy whose attribute_redaction control masks and drops the given globs; with
+// neither, the control is local.
+func redactionPolicy(mask, drop []string) string {
+	if len(mask) == 0 && len(drop) == 0 {
+		return v2()
+	}
+	var fields []string
+	for _, f := range []struct {
+		name  string
+		globs []string
+	}{{"mask", mask}, {"drop", drop}} {
+		if len(f.globs) > 0 {
+			b, _ := json.Marshal(f.globs)
+			fields = append(fields, `"`+f.name+`":`+string(b))
+		}
+	}
+	return v2("attribute_redaction", override(strings.Join(fields, ",")))
 }
 
 // The gates' redaction against the layer's (Evaluate), on generated keys and patterns.
@@ -254,12 +273,16 @@ func TestRedactionMatchesTheLayers(t *testing.T) {
 	for i := 0; i < 300; i++ {
 		var drop, mask []string
 		for range r.IntN(3) {
-			drop = append(drop, word("aB.*é"))
+			if w := word("aB.*é"); w != "" {
+				drop = append(drop, w)
+			}
 		}
 		for range r.IntN(3) {
-			mask = append(mask, word("Ab.*É"))
+			if w := word("Ab.*É"); w != "" {
+				mask = append(mask, w)
+			}
 		}
-		doc, _ := json.Marshal(map[string]string{"drop_attributes": strings.Join(drop, ","), "mask_attributes": strings.Join(mask, ",")})
+		doc := []byte(redactionPolicy(mask, drop))
 		var in []attribute.KeyValue
 		var wire []*protobufs.KeyValue
 		for range r.IntN(5) {

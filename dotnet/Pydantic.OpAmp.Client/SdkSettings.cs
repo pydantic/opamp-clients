@@ -7,7 +7,7 @@ using OpAmp.Proto.V1;
 namespace Pydantic.OpAmp.Client.Sdk;
 
 /// <summary>
-/// Decides what an OpenTelemetry SDK does with the settings an OpAMP server sends it, the same way
+/// Decides what an OpenTelemetry SDK does with the Logfire SDK policy an OpAMP server sends it, the same way
 /// in every language: the SDK settings layer, run natively (the native
 /// library the core is in). It keeps nothing between calls; the caller keeps
 /// the settings documents it is handed (<c>Current</c>, and the one it saves) and passes them back.
@@ -21,10 +21,11 @@ public sealed class SdkSettings : IDisposable
     /// <summary>
     /// At start, before the SDK is built: the settings to start with, from the document saved at the
     /// last change (null: nothing saved). Put all of them in force, next-start ones too.
-    /// <paramref name="host"/>: the settings the SDK carries out, at once or at the next start; one it
-    /// leaves out is set aside, never in force (null: none carried out), and one that is no setting
-    /// throws. <paramref name="nowUnixMs"/>: the wall clock in milliseconds since the Unix epoch, which debug
-    /// mode is decided by (0: none, and debug mode is ignored). <paramref name="coreState"/>: the OpAMP
+    /// <paramref name="host"/>: the settings the SDK carries out, at once or at the next start. A policy
+    /// that overrides one it leaves out is refused (null: none carried out), and a name that is no
+    /// setting throws. <paramref name="nowUnixMs"/>: the wall clock in milliseconds since the Unix epoch,
+    /// which debug mode is decided by (0: none, and the SDK cannot carry out debug mode).
+    /// <paramref name="coreState"/>: the OpAMP
     /// core's saved state (what it asked the host to store; null: none). The settings then come from
     /// the last config applied in it, and <paramref name="saved"/> is read only when it holds none (a
     /// document kept before the core kept the config applied).
@@ -102,10 +103,16 @@ public sealed class SdkSettings : IDisposable
             Health = new Health { Counts = counts, Previous = previous, NowUnixMs = nowUnixMs, Settings = settings },
         }).HealthReport;
 
-    /// <summary>The agent description, from the SDK's resource attributes.</summary>
-    public AgentDescription Describe(IEnumerable<KeyValue> resource)
+    /// <summary>
+    /// The agent description, from the SDK's resource attributes. It also names the policy formats the
+    /// SDK reads and the controls that <paramref name="host"/> carries out
+    /// (<c>logfire.opamp.config_format</c>, <c>logfire.opamp.config_formats</c> and
+    /// <c>logfire.opamp.supported_controls</c>). The host and the time as for Load: with no host it
+    /// lists no control, and with no clock it does not list <c>debug</c>.
+    /// </summary>
+    public AgentDescription Describe(IEnumerable<KeyValue> resource, Host? host = null, ulong nowUnixMs = 0)
     {
-        var describe = new Describe();
+        var describe = new Describe { Host = host, NowUnixMs = nowUnixMs };
         describe.Resource.AddRange(resource);
         return Do(new Request { Describe = describe }).Description;
     }

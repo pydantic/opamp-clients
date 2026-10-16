@@ -9,28 +9,10 @@ import pytest
 from opamp_client import anyvalue_pb2, opamp_pb2
 from opamp_client.sdk import SdkSettings
 
+from _policy import FILE, V1, V2, config, effective, policy
+
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
-
-
-def config(body: bytes) -> opamp_pb2.AgentRemoteConfig:
-    return opamp_pb2.AgentRemoteConfig(config_hash=b"h", config=opamp_pb2.AgentConfigMap(
-        config_map={"elastic": opamp_pb2.AgentConfigObject(body=body, content_type="application/json")}))
-
-
-def effective(e: opamp_pb2.EffectiveConfig) -> bytes:
-    return e.config_map.config_map["elastic"].body
-
-
-def set_aside(e: opamp_pb2.EffectiveConfig) -> dict | None:
-    """What the effective config names as set aside (its elastic.set_aside entry), if anything."""
-    files = e.config_map.config_map
-    assert set(files) <= {"elastic", "elastic.set_aside"}, set(files)
-    if "elastic.set_aside" not in files:
-        return None
-    assert files["elastic.set_aside"].content_type == "application/json"
-    return json.loads(files["elastic.set_aside"].body)
-
 
 # Every setting: what a host declares when it carries out each one (each live one at once, each
 # next-start one at the next start).
@@ -49,106 +31,157 @@ def declaring():
 
 def test_loads_decides_and_describes() -> None:
     layer = SdkSettings()
-    loaded = layer.load(b'{"send_logs":"false"}', declaring())
+    logs_off = policy(signal_exports={"logs": {"enabled": False}})
+    loaded = layer.load(logs_off, declaring())
     assert loaded.settings.HasField("send_logs") and not loaded.settings.send_logs
-    assert effective(loaded.effective) == b'{"send_logs":"false"}'
+    assert effective(loaded.effective) == json.loads(logs_off)
 
     kept: list[bytes] = []
-    d = layer.decide(config(b'{"sampling_rate":"0.25"}'), loaded.current, loaded.current, declaring(),
-                     save=kept.append)
+    quarter = policy(head_sampling={"ratio": 0.25})
+    d = layer.decide(config(quarter), loaded.current, loaded.current, declaring(), save=kept.append)
     assert d.status.status == APPLIED and d.status.last_remote_config_hash == b"h"
-    assert d.apply.sampling_rate == 0.25 and kept == [b'{"sampling_rate":"0.25"}']
-    assert effective(d.effective) == b'{"sampling_rate":"0.25"}'
-    assert set_aside(d.effective) is None  # nothing set aside, no entry
+    assert d.apply.sampling_rate == 0.25 and kept == [quarter]
+    assert effective(d.effective) == json.loads(quarter)
 
-    bad = layer.decide(config(b'{"sampling_rate":"x"}'), d.current, loaded.current, declaring(), save=kept.append)
-    assert bad.status.status == FAILED and bad.status.error_message.startswith("sampling_rate:")
+    bad = layer.decide(config(policy(head_sampling={"ratio": "x"})), d.current, loaded.current, declaring(),
+                       save=kept.append)
+    assert bad.status.status == FAILED and bad.status.error_message.startswith("head_sampling:")
     assert not bad.HasField("apply") and bad.current == d.current
     assert len(kept) == 1  # refused: nothing to keep
 
     desc = layer.describe([
         anyvalue_pb2.KeyValue(key="service.name", value=anyvalue_pb2.AnyValue(string_value="checkout")),
         anyvalue_pb2.KeyValue(key="host.name", value=anyvalue_pb2.AnyValue(string_value="h")),
-    ])
+    ], declaring(), NOW)
     assert [kv.key for kv in desc.identifying_attributes] == ["service.name"]
-    assert [kv.key for kv in desc.non_identifying_attributes] == ["host.name"]
+    assert [kv.key for kv in desc.non_identifying_attributes][0] == "host.name"
+
+
+def described(desc: opamp_pb2.AgentDescription) -> dict:
+    """The description's policy attributes: a string's text, an array's strings."""
+    out = {}
+    for kv in desc.non_identifying_attributes:
+        if kv.key.startswith("logfire.opamp."):
+            v = kv.value
+            out[kv.key] = ([x.string_value for x in v.array_value.values] if v.WhichOneof("value") == "array_value"
+                           else v.string_value)
+    return out
+
+
+def test_the_description_names_the_policy_formats_and_the_controls_the_host_carries_out() -> None:
+    from opamp_client.sdk import settings_pb2
+
+    layer = SdkSettings()
+    host = settings_pb2.Host(live=["sampling_rate", "send_logs", "custom"], next_start=["opamp_polling_interval"])
+    got = described(layer.describe([], host, NOW))
+    assert got == {
+        "logfire.opamp.config_format": V1,
+        "logfire.opamp.config_formats": [V1, V2],
+        "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings",
+                                             "polling_interval"],
+    }
+    # Every setting declared: every control. No host: none.
+    every = described(layer.describe([], declaring(), NOW))["logfire.opamp.supported_controls"]
+    assert {"head_sampling", "sampling_rules", "debug", "app_settings", "instrumentations"} <= set(every)
+    assert described(layer.describe([]))["logfire.opamp.supported_controls"] == []
 
 
 def test_a_host_says_what_it_carries_out() -> None:
     from opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
-    # The instrumentation switch at once, and no signal's sending: send_traces isn't declared.
+    # The instrumentation switch at once, and no signal's sending: send_traces is not declared.
     host = settings_pb2.Host(live=["deactivate_instrumentations", "sampling_rate"])
-    d = layer.decide(config(b'{"send_traces":"false","deactivate_instrumentations":"urllib","send_trace":"x"}'),
-                     b"", b"", host)
+    switch = policy(instrumentations={"disabled": ["urllib"]})
+    d = layer.decide(config(switch), b"", b"", host)
     assert d.status.status == APPLIED
-    assert list(d.apply.unsupported) == ["send_traces"]
-    assert list(d.apply.ignored) == ["send_trace"]  # unknown, told apart
     assert list(d.apply.deactivate_instrumentations.names) == ["urllib"]  # live: in force now, no state needed
-    assert effective(d.effective) == b'{"deactivate_instrumentations":"urllib"}'
-    # Named for the server beside what is in force (#215), by Decide, Load and Refresh alike, and
-    # still after a FAILED, which leaves the document in force.
-    names = {"ignored": ["send_trace"], "unsupported": ["send_traces"]}
-    assert set_aside(d.effective) == names and d.status.error_message == ""
-    assert set_aside(layer.load(d.current, host).effective) == names
-    assert set_aside(layer.refresh(d.current, b"", NOW, host).effective) == names
-    failed = layer.decide(config(b'{"sampling_rate":"7"}'), d.current, b"", host)
-    assert failed.status.status == FAILED and set_aside(failed.effective) == names
-    assert not layer.load(b'{"send_traces":"false"}', host).settings.HasField("send_traces")
-    # Declared nothing, nothing is carried out.
-    nothing = layer.decide(config(b'{"sampling_rate":"0.5"}'), b"", b"", save=lambda doc: None)
-    assert not nothing.apply.HasField("sampling_rate") and effective(nothing.effective) == b"{}"
+    assert effective(d.effective) == json.loads(switch)
+    # An override the host does not carry out refuses the whole policy, and what was in force stays.
+    traces_off = policy(signal_exports={"traces": {"enabled": False}})
+    off = layer.decide(config(traces_off), d.current, b"", host)
+    assert off.status.status == FAILED and not off.HasField("apply")
+    assert off.status.error_message == "signal_exports.traces: this SDK cannot apply the requested override"
+    assert off.current == d.current and effective(off.effective) == json.loads(switch)
+    # Version 2 names the field too.
+    rules = policy(sampling_rules={"rules": [{"rate": 0}]})
+    assert (layer.decide(config(rules), d.current, b"", host).status.error_message
+            == "sampling_rules: rules: this SDK cannot apply the requested override")
+    # A field nothing here knows refuses it too.
+    unknown = json.loads(switch) | {"send_trace": "x"}
+    assert (layer.decide(config(json.dumps(unknown).encode()), d.current, b"", host).status.error_message
+            == 'policy: unknown field "send_trace"')
+    # Saved under another host, a setting this one does not carry out is not in force.
+    assert not layer.load(traces_off, host).settings.HasField("send_traces")
+    # Declared nothing, nothing is carried out: every override is refused.
+    nothing = layer.decide(config(policy(head_sampling={"ratio": 0.5})), b"", b"", save=lambda doc: None)
+    assert nothing.status.status == FAILED
+    assert nothing.status.error_message == "head_sampling: this SDK cannot apply the requested override"
     # A name that is no setting is the host's bug: refused, saying why.
     with pytest.raises(ValueError, match="send_metric"):
-        layer.load(b"{}", settings_pb2.Host(live=["send_metric"]))
+        layer.load(policy(), settings_pb2.Host(live=["send_metric"]))
+
+
+def test_a_policy_is_the_configs_only_file() -> None:
+    layer = SdkSettings()
+    beside = config(policy())
+    beside.config.config_map["other.json"].CopyFrom(opamp_pb2.AgentConfigObject(body=b"{}",
+                                                                               content_type="application/json"))
+    d = layer.decide(beside, b"", b"", declaring())
+    assert d.status.status == FAILED and d.status.error_message.startswith("config_map:")
+    none = opamp_pb2.AgentRemoteConfig(config_hash=b"h", config=opamp_pb2.AgentConfigMap())
+    d = layer.decide(none, b"", b"", declaring())
+    assert d.status.status == FAILED and d.status.error_message.startswith("config_map:")
 
 
 def test_the_save_the_layer_asks_for_decides_the_answer() -> None:
     """Decide, then commit (#215): the integration saves what the layer asks it to keep, and the
     layer answers from how that went, the same in every language."""
     layer = SdkSettings()
-    current = b'{"sampling_rate":"0.5"}'
+    current = policy(head_sampling={"ratio": 0.5})
+    quarter = policy(head_sampling={"ratio": 0.25})
 
     def full(doc: bytes) -> None:
         raise OSError(28, "No space left on device")
 
-    d = layer.decide(config(b'{"sampling_rate":"0.25"}'), current, current, declaring(), save=full)
+    d = layer.decide(config(quarter), current, current, declaring(), save=full)
     assert d.status.status == FAILED
     assert d.status.error_message == "can't save the settings: [Errno 28] No space left on device"
     assert not d.HasField("apply") and d.current == current
-    assert effective(d.effective) == b'{"sampling_rate":"0.5"}'
+    assert effective(d.effective) == json.loads(current)
     # Whatever stops the save refuses the config.
-    d = layer.decide(config(b'{"sampling_rate":"0.25"}'), current, current, declaring(), save=lambda doc: 1 / 0)
+    d = layer.decide(config(quarter), current, current, declaring(), save=lambda doc: 1 / 0)
     assert (d.status.status, d.status.error_message) == (FAILED, "can't save the settings: division by zero")
     # Nowhere to keep state: a live change is applied, a next-start one refused.
-    live = layer.decide(config(b'{"sampling_rate":"0.25"}'), current, current, declaring())
+    live = layer.decide(config(quarter), current, current, declaring())
     assert live.status.status == APPLIED
-    later = layer.decide(config(b'{"opamp_polling_interval":"1m"}'), current, current, declaring())
-    assert later.status.error_message == ("opamp_polling_interval take effect at the next start, which needs "
+    minute = policy(polling_interval={"milliseconds": 60_000})
+    later = layer.decide(config(minute), current, current, declaring())
+    assert later.status.error_message == ("polling_interval: takes effect at the next start, which needs "
                                           "somewhere to keep state")
     kept: list[bytes] = []
-    saved = layer.decide(config(b'{"opamp_polling_interval":"1m"}'), current, current, declaring(), save=kept.append)
+    saved = layer.decide(config(minute), current, current, declaring(), save=kept.append)
     assert saved.status.status == APPLIED and list(saved.pending_restart) == ["opamp_polling_interval"]
-    assert kept == [b'{"opamp_polling_interval":"1m"}']
+    assert kept == [minute]
 
 
 def test_a_log_level_arrives_as_the_lowest_severity_number_to_export() -> None:
     layer = SdkSettings()
-    d = layer.decide(config(b'{"send_logs_level":"Warning"}'), b"", b"", declaring())
+    d = layer.decide(config(policy(log_levels={"level": "Warning"})), b"", b"", declaring())
     assert d.status.status == APPLIED
     assert d.apply.HasField("send_logs_min_severity") and d.apply.send_logs_min_severity == 13
-    assert effective(d.effective) == b'{"send_logs_level":"warn"}'
-    assert not layer.load(b"{}", declaring()).settings.HasField("send_logs_min_severity")  # unset: every severity
+    assert effective(d.effective)["log_levels"] == {"mode": "override", "level": "warn"}
+    assert not layer.load(policy(), declaring()).settings.HasField("send_logs_min_severity")  # unset: every severity
 
 
 def test_the_settings_that_match_telemetry_arrive_typed_where_the_host_declares_them() -> None:
     from opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
-    doc = (b'{"sampling_rules":[{"rate":0,"kind":"server","path":"/health*"}],'
-           b'"send_logs_level_by_scope":"com.acme.db*=debug","drop_attributes":"*token*",'
-           b'"mask_attributes":"User.Email","sampling_traces_per_second":"50","send_logs_per_second":"0.5"}')
+    doc = policy(sampling_rules={"rules": [{"rate": 0, "kind": "server", "path": "/health*"}]},
+                 log_levels={"scopes": {"com.acme.db*": "debug"}},
+                 attribute_redaction={"drop": ["*token*"], "mask": ["User.Email"]},
+                 trace_rate_limit={"traces_per_second": 50}, log_rate_limit={"records_per_second": 0.5})
     d = layer.decide(config(doc), b"", b"", declaring(), NOW)
     assert d.status.status == APPLIED
     s = d.apply
@@ -157,53 +190,78 @@ def test_the_settings_that_match_telemetry_arrive_typed_where_the_host_declares_
     assert [(lv.pattern, lv.min_severity) for lv in s.send_logs_scope_levels] == [("com.acme.db*", 5)]
     assert (list(s.drop_attributes), list(s.mask_attributes)) == (["*token*"], ["user.email"])
     assert (s.sampling_traces_per_second, s.send_logs_per_second) == (50, 0.5)
-    # Undeclared: ignored, never in force.
+    # Undeclared: refused, never in force.
     plain = layer.decide(config(doc), b"", b"")
-    assert not plain.apply.sampling_rules and len(plain.apply.unsupported) == 6
-    assert effective(plain.effective) == b"{}"
+    assert plain.status.status == FAILED and not plain.HasField("apply")
+    assert plain.status.error_message == "sampling_rules: rules: this SDK cannot apply the requested override"
+
+
+VECTORS = Path(__file__).resolve().parents[2] / "testdata" / "sdk-settings"
+
+
+def host_of(case: dict):
+    """A case's host, as Host's fields; without one, a host that declares every setting."""
+    from opamp_client.sdk import settings_pb2
+
+    host = case.get("host")
+    if host is None:
+        return declaring()
+    return settings_pb2.Host(live=host.get("live", []), next_start=host.get("next_start", []))
 
 
 def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them() -> None:
     """custom (docs/app-settings.md), and the shared vectors (testdata/sdk-settings/custom.json) through the module."""
-    import json
-    from pathlib import Path
-
     from opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
-    d = layer.decide(config(b'{"custom":{"checkout.new_flow":"on","limit":25,"gone":null}}'), b"", b"", 
-                     declaring(), NOW)
+    doc = policy(app_settings={"values": {"checkout.new_flow": "on", "limit": 25}})
+    d = layer.decide(config(doc), b"", b"", declaring(), NOW)
     assert d.status.status == APPLIED
     assert dict(d.apply.custom) == {"checkout.new_flow": "on", "limit": "25"}
-    assert effective(d.effective) == b'{"custom":"{\\"checkout.new_flow\\":\\"on\\",\\"limit\\":\\"25\\"}"}'
-    # Undeclared: set aside, unchecked, never in force.
-    plain = layer.decide(config(b'{"custom":[1]}'), b"", b"", settings_pb2.Host(live=["sampling_rate"]))
-    assert plain.status.status == APPLIED and list(plain.apply.unsupported) == ["custom"] and not plain.apply.custom
-    vectors = json.loads((Path(__file__).resolve().parents[2] / "testdata/sdk-settings/custom.json")
-                         .read_text())["cases"]
-    for case in vectors:
-        h = case.get("host")
-        host = (settings_pb2.Host(live=h.get("live", []), next_start=h.get("next_start", [])) if h is not None
-                else declaring())
-        d = layer.decide(config(case["document"].encode()), b"", b"", host, NOW, save=lambda doc: None)
+    assert effective(d.effective)["app_settings"] == {"mode": "override",
+                                                      "values": {"checkout.new_flow": "on", "limit": "25"}}
+    # Undeclared: refused, never in force.
+    plain = layer.decide(config(doc), b"", b"", settings_pb2.Host(live=["sampling_rate"]))
+    assert plain.status.status == FAILED and not plain.HasField("apply")
+    assert plain.status.error_message == "app_settings: values: this SDK cannot apply the requested override"
+    for case in json.loads((VECTORS / "custom.json").read_text())["cases"]:
+        d = layer.decide(config(case["document"].encode()), b"", b"", host_of(case), NOW, save=lambda doc: None)
         if "refused" in case:
             assert d.status.error_message == case["refused"], case["name"]
             continue
+        assert d.status.status == APPLIED, case["name"]
         assert dict(d.apply.custom) == case["custom"], case["name"]
-        assert json.loads(effective(d.effective)) == case["effective"], case["name"]
-        assert set_aside(d.effective) == case.get("set_aside"), case["name"]
+        assert d.effective.config_map.config_map[FILE].body.decode() == case["effective"], case["name"]
+
+
+SETTINGS = json.loads((VECTORS / "settings.json").read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", SETTINGS, ids=[c["name"] for c in SETTINGS])
+def test_the_settings_vectors(case: dict) -> None:
+    """testdata/sdk-settings/settings.json: how the layer reads a policy, through the module. The
+    policy is also the one in force at start, so a next-start setting is in force at once."""
+    doc = case["document"].encode()
+    d = SdkSettings().decide(config(doc), b"", doc, host_of(case), case.get("now_unix_ms", 0), save=lambda doc: None)
+    if "refused" in case:
+        assert (d.status.status, d.status.error_message) == (FAILED, case["refused"])
+        return
+    assert d.status.status == APPLIED, d.status.error_message
+    assert d.effective.config_map.config_map[FILE].body.decode() == case["effective"]
+    if "refresh_at_unix_ms" in case:
+        assert d.refresh_at_unix_ms == case["refresh_at_unix_ms"]
 
 
 def test_debug_mode_arrives_folded_in_and_a_refresh_at_its_end_ends_it() -> None:
     layer = SdkSettings()
-    doc = b'{"sampling_rate":"0.1","debug_until":"2026-10-14T12:30:00Z","debug_send_logs_level":"info"}'
+    doc = policy(head_sampling={"ratio": 0.1}, debug={"until": "2026-10-14T12:30:00Z", "log_level": "info"})
     d = layer.decide(config(doc), b"", b"", declaring(), NOW, save=lambda doc: None)
     assert (d.apply.sampling_rate, d.apply.send_logs_min_severity) == (1, 9)
     end = NOW + 30 * 60_000
     assert d.refresh_at_unix_ms == end
     r = layer.refresh(d.current, b"", end, declaring())
     assert (r.settings.sampling_rate, r.refresh_at_unix_ms) == (0.1, 0)
-    assert effective(r.effective) == b'{"sampling_rate":"0.1"}'
+    assert effective(r.effective) == json.loads(policy(head_sampling={"ratio": 0.1}, version=2))
     assert layer.load(d.current, declaring(), NOW).refresh_at_unix_ms == end
 
 
@@ -224,7 +282,6 @@ def test_export_health_is_sent_at_the_first_call_and_on_a_failure_and_held_while
     assert failed.exporters.component_health_map["logs"].status == "off"
 
 
-VECTORS = Path(__file__).resolve().parents[2] / "testdata" / "sdk-settings"
 COMPONENTS = json.loads((VECTORS / "components.json").read_text())["cases"]
 
 
@@ -240,16 +297,6 @@ def inventory_of(case: dict):
                           for i in inv.get("instrumentations", [])],
         exporters=[settings_pb2.Exporter(signal=e.get("signal", ""), name=e.get("name", ""),
                                          gated=e.get("gated", False)) for e in inv.get("exporters", [])])
-
-
-def host_of(case: dict):
-    """A case's host, as Host's fields; without one, a host that declares every setting."""
-    from opamp_client.sdk import settings_pb2
-
-    host = case.get("host")
-    if host is None:
-        return declaring()
-    return settings_pb2.Host(live=host.get("live", []), next_start=host.get("next_start", []))
 
 
 def components_json(c: opamp_pb2.AvailableComponents) -> dict:
@@ -303,5 +350,6 @@ def test_the_start_vectors(case: dict) -> None:
     applied in the core's saved state, else from the document kept before."""
     core_state = bytes.fromhex(case["core_state"]) if "core_state" in case else None
     saved = case["saved"].encode() if "saved" in case else None
-    loaded = SdkSettings().load(saved, None, 0, core_state=core_state)
-    assert loaded.current == (case["want"] or "{}").encode()
+    loaded = SdkSettings().load(saved, declaring(), 0, core_state=core_state)
+    assert loaded.current == case["want"].encode()
+    assert bool(loaded.warning) == case["warns"], loaded.warning

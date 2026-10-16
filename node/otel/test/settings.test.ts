@@ -25,31 +25,36 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type AgentRemoteConfig, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings, type Settings } from "@pydantic/opamp-client/sdk";
 
 import { keepApplied } from "./kept.js";
+import { config as policyConfig, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
 import { Agent, Controls, glob, HEALTH_EVERY_MS, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const EMPTY = new Uint8Array();
+/** The policy with every control local: what the SDK starts with when nothing was kept. */
+const EMPTY = text(policy());
 /** 2026-10-14T12:00:00Z, the vectors' clock. */
 const NOW = 1_791_979_200_000;
 
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
+/**
+ * A policy: given whole (text, or a parsed policy with its schema), or as the overrides of a
+ * policy with every other control local.
+ */
+const document = (doc: string | object) =>
+  typeof doc === "string" ? doc : "schema" in doc ? JSON.stringify(doc) : policy(doc as Overrides);
+
+/** A remote config whose only file is the policy, its hash the policy's text. */
+const config = (doc: string | object) => policyConfig(document(doc), document(doc));
 
 /**
- * The settings this package puts in force for a document, as a remote config, declared as the
+ * The settings this package puts in force for a policy, as a remote config, declared as the
  * package declares them with every exporter its own (hostFromEnv), at `now` (0: no clock).
  */
 function settings(doc: string | object, now = 0): Settings {
-  const body = typeof doc === "string" ? doc : JSON.stringify(doc);
-  const d = LAYER.decide(config(body), EMPTY, EMPTY, hostFromEnv({}), BigInt(now));
+  const d = LAYER.decide(config(doc), EMPTY, EMPTY, hostFromEnv({}), BigInt(now));
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
   return d.apply!;
 }
@@ -121,17 +126,17 @@ test("a scope's level, live: lower or higher than send_logs_level, then left out
   ];
   const sent = () => out.got.at(-1)!.map((r) => `${r.instrumentationScope.name}:${r.severityNumber ?? 0}`);
   const done = () => {};
-  c.apply(settings({ send_logs_level: "warn", send_logs_level_by_scope: "com.acme.db*=debug, urllib3*=error, noisy.lib=off" }));
+  c.apply(settings({ log_levels: { level: "warn", scopes: { "com.acme.db*": "debug", "urllib3*": "error", "noisy.lib": "off" } } }));
   assert.deepEqual(c.sendLogsScopeLevels.map((l) => [l.pattern, l.minSeverity]),
     [["com.acme.db*", 5], ["noisy.lib", SEVERITY_OFF], ["urllib3*", 17]]);
   logs.export(batch, done);
   assert.deepEqual(sent(), ["com.acme.db:5", "com.acme.dbpool:5", "app:13"]);
   // The empty scope name: only * matches it.
-  c.apply(settings({ send_logs_level_by_scope: "*=error, app*=info" }));
+  c.apply(settings({ log_levels: { scopes: { "*": "error", "app*": "info" } } }));
   logs.export(batch, done);
   assert.deepEqual(sent(), ["noisy.lib:21", "noisy.lib:0", "app:9", "app:13"]);
-  // Left out again: send_logs_level alone, then every record.
-  c.apply(settings({ send_logs_level: "warn" }));
+  // Left out again: the level alone, then every record.
+  c.apply(settings({ log_levels: { level: "warn" } }));
   assert.deepEqual(c.sendLogsScopeLevels, []);
   logs.export(batch, done);
   assert.deepEqual(sent(), ["urllib3:13", "noisy.lib:21", "noisy.lib:0", "app:13"]);
@@ -144,22 +149,24 @@ test("a scope's level: a switched-off scope sends nothing, and the export still 
   const c = new Controls();
   const out = sink();
   const results: number[] = [];
-  c.apply(settings({ send_logs_level_by_scope: "noisy=off" }));
+  c.apply(settings({ log_levels: { scopes: { noisy: "off" } } }));
   c.logs(out as never).export([record("noisy", 21), record("noisy")], (r) => results.push(r.code));
   assert.deepEqual([out.got.length, results], [0, [0]]);
 });
 
-test("send_logs false overrides every scope's level; a scope level on a host that can't filter logs is ignored", () => {
+test("send_logs false overrides every scope's level; a scope level on a host that cannot filter logs is refused", () => {
   const c = new Controls();
   const out = sink();
-  c.apply(settings({ send_logs: "false", send_logs_level_by_scope: "*=trace" }));
+  c.apply(settings({ signal_exports: off("logs"), log_levels: { scopes: { "*": "trace" } } }));
   c.logs(out as never).export([record("app", 21)], () => {});
   assert.equal(out.got.length, 0);
   // Logs NodeSDK exports, ungated: neither send_logs_level nor the scope levels are carried out.
   const host = hostFromEnv({ OTEL_LOGS_EXPORTER: "custom" });
   assert.ok(!host.live!.includes("send_logs_level_by_scope"));
-  const d = LAYER.decide(config('{"send_logs_level_by_scope":"a=off"}'), EMPTY, EMPTY, host, BigInt(NOW));
-  assert.deepEqual([d.apply?.sendLogsScopeLevels, d.apply?.unsupported], [[], ["send_logs_level_by_scope"]]);
+  const d = LAYER.decide(config({ log_levels: { scopes: { a: "off" } } }), EMPTY, EMPTY, host, BigInt(NOW));
+  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
+  assert.equal(d.status?.errorMessage, "log_levels: scopes: this SDK cannot apply the requested override");
+  assert.equal(d.apply, undefined);
 });
 
 // --- send_logs_per_second (and, below, sampling_traces_per_second) -----------------------------
@@ -200,7 +207,7 @@ test("vectors: caps.json's log batches, through the log gate on the test's clock
 });
 
 test("the log cap: the first records of a batch go on, in order, and the export succeeds", () => {
-  const { c } = clocked({ send_logs_per_second: "3" });
+  const { c } = clocked({ log_rate_limit: { records_per_second: 3 } });
   const out = sink<{ attributes: { i: number } }>();
   const results: number[] = [];
   c.logs(out as never).export(Array.from({ length: 5 }, (_, i) => record("app", 9, { i })), (r) => results.push(r.code));
@@ -210,7 +217,7 @@ test("the log cap: the first records of a batch go on, in order, and the export 
 });
 
 test("the log cap comes after the levels: a record they drop takes no token", () => {
-  const { c } = clocked({ send_logs_level: "warn", send_logs_per_second: "2" });
+  const { c } = clocked({ log_levels: { level: "warn" }, log_rate_limit: { records_per_second: 2 } });
   const out = sink<{ severityNumber: number }>();
   const logs = c.logs(out as never);
   logs.export([record("app", 9), record("app", 9), record("app", 13), record("app", 9), record("app", 17), record("app", 21)],
@@ -219,7 +226,7 @@ test("the log cap comes after the levels: a record they drop takes no token", ()
 });
 
 test("the log cap, live: a new n starts a full bucket, the same n keeps it, left out is no cap at once", () => {
-  const { c, at } = clocked({ send_logs_per_second: "2" });
+  const { c, at } = clocked({ log_rate_limit: { records_per_second: 2 } });
   const out = sink();
   const logs = c.logs(out as never);
   const send = (n: number) => {
@@ -229,20 +236,20 @@ test("the log cap, live: a new n starts a full bucket, the same n keeps it, left
   };
   assert.equal(send(5), 2);
   // The same cap sent again (a reconnect): the same bucket, still empty.
-  c.apply(settings({ send_logs_per_second: "2" }));
+  c.apply(settings({ log_rate_limit: { records_per_second: 2 } }));
   assert.equal(send(5), 0);
   // Another n: a full bucket of it.
-  c.apply(settings({ send_logs_per_second: "4" }));
+  c.apply(settings({ log_rate_limit: { records_per_second: 4 } }));
   assert.equal(send(5), 4);
   at(250_000_000); // a quarter of a second: one token back
   assert.equal(send(5), 1);
   c.apply(settings({}));
   assert.equal(c.logsCap, undefined);
   assert.equal(send(5000), 5000);
-  // A cap the layer refuses changes nothing: 0 is "use send_logs false".
-  const d = LAYER.decide(config('{"send_logs_per_second":"0"}'), EMPTY, EMPTY, hostFromEnv({}), 0n);
+  // A cap the layer refuses changes nothing: 0 is "turn the logs off".
+  const d = LAYER.decide(config({ log_rate_limit: { records_per_second: 0 } }), EMPTY, EMPTY, hostFromEnv({}), 0n);
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.match(d.status!.errorMessage, /send_logs_per_second: 0 is refused/);
+  assert.equal(d.status!.errorMessage, "log_rate_limit: records_per_second must be a number more than 0, at most 1000000");
 });
 
 test("the log cap is declared only where the package builds the log exporters", () => {
@@ -325,7 +332,7 @@ test("vectors: redact.json, on a span's, its event's and link's, and a log recor
 
 test("a redacted span is the span's own otherwise, as the OTLP exporter writes it", () => {
   const c = new Controls();
-  c.apply(settings({ drop_attributes: "http.request.header.authorization", mask_attributes: "*password*, user.email" }));
+  c.apply(settings({ attribute_redaction: { drop: ["http.request.header.authorization"], mask: ["*password*", "user.email"] } }));
   const { gated, plain, tracer } = tracing(c);
   const parent = tracer.startSpan("parent");
   const ctx = trace.setSpan(ROOT_CONTEXT, parent);
@@ -367,7 +374,7 @@ test("a redacted span is the span's own otherwise, as the OTLP exporter writes i
 
 test("a redacted log record keeps its body, severity and context, as the OTLP exporter writes it", () => {
   const c = new Controls();
-  c.apply(settings({ mask_attributes: "user.*", drop_attributes: "secret" }));
+  c.apply(settings({ attribute_redaction: { mask: ["user.*"], drop: ["secret"] } }));
   const { gated, plain, logger } = logging(c);
   const span = trace.wrapSpanContext({ traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 });
   logger.emit({ severityNumber: 13, severityText: "WARN", body: { "user.email": "in the body" },
@@ -394,7 +401,7 @@ test("redaction, live: nothing copied while it is off, on at once, off again whe
   const span = { attributes: { token: "t" }, events: [], links: [] } as never;
   spans.export([span], () => {});
   assert.equal(out.got[0]![0], span);
-  c.apply(settings({ drop_attributes: "token" }));
+  c.apply(settings({ attribute_redaction: { drop: ["token"] } }));
   spans.export([span], () => {});
   assert.deepEqual((out.got[1]![0] as { attributes: object }).attributes, {});
   c.apply(settings({}));
@@ -402,7 +409,7 @@ test("redaction, live: nothing copied while it is off, on at once, off again whe
   spans.export([span], () => {});
   assert.equal(out.got[2]![0], span);
   // Nothing matched: the span itself, not a copy.
-  c.apply(settings({ mask_attributes: "password" }));
+  c.apply(settings({ attribute_redaction: { mask: ["password"] } }));
   spans.export([span], () => {});
   assert.equal(out.got[3]![0], span);
 });
@@ -411,7 +418,7 @@ test("redaction: a key both lists match is dropped; drop doesn't change dropped_
   const r = new Redaction(["token"], ["token", "user"]);
   assert.deepEqual(r.attributes({ token: "t", user: "u", other: 1 }), { user: MASK, other: 1 });
   const c = new Controls();
-  c.apply(settings({ drop_attributes: "*" }));
+  c.apply(settings({ attribute_redaction: { drop: ["*"] } }));
   const { gated, tracer } = tracing(c);
   tracer.startSpan("s", { attributes: { a: 1, b: 2 } }).end();
   assert.deepEqual([gated.getFinishedSpans()[0]!.attributes, gated.getFinishedSpans()[0]!.droppedAttributesCount], [{}, 0]);
@@ -425,8 +432,9 @@ test("redaction is declared only where both the span and the log exporters are t
   for (const env of [{ OTEL_LOGS_EXPORTER: "custom" }, { OTEL_TRACES_EXPORTER: "zipkin" }]) {
     const host = hostFromEnv(env);
     assert.ok(!host.live!.includes("drop_attributes") && !host.live!.includes("mask_attributes"), JSON.stringify(env));
-    const d = LAYER.decide(config('{"mask_attributes":"user.email"}'), EMPTY, EMPTY, host, 0n);
-    assert.deepEqual([d.apply?.maskAttributes, d.apply?.unsupported], [[], ["mask_attributes"]]);
+    const d = LAYER.decide(config({ attribute_redaction: { mask: ["user.email"] } }), EMPTY, EMPTY, host, 0n);
+    assert.equal(d.status?.errorMessage, "attribute_redaction: mask: this SDK cannot apply the requested override");
+    assert.equal(d.apply, undefined);
   }
 });
 
@@ -518,7 +526,7 @@ test("vectors: sampling.json, each span through the sampler", () => {
 test("a rule's rate of 0.5 samples half of 10,000 new traces, within 3%", () => {
   const c = new Controls();
   c.sampler.wrap(APP);
-  c.apply(settings({ sampling_rate: "1", sampling_rules: [{ rate: 0.5, kind: "server", path: "/api/*" }] }));
+  c.apply(settings({ head_sampling: { ratio: 1 }, sampling_rules: { rules: [{ rate: 0.5, kind: "server", path: "/api/*" }] } }));
   let sampled = 0;
   for (let i = 0; i < 10_000; i++) {
     const id = randomBytes(16).toString("hex");
@@ -547,13 +555,13 @@ test("sampling rules on a real SDK: by path, kind and name; children follow; lef
     return names;
   };
   // A rule of rate 0 beside sampling_rate 1: health checks go, everything else is traced.
-  c.apply(settings({ sampling_rate: "1", sampling_rules: [{ rate: 0, kind: "server", path: "/health*" }] }));
+  c.apply(settings({ head_sampling: { ratio: 1 }, sampling_rules: { rules: [{ rate: 0, kind: "server", path: "/health*" }] } }));
   request("/healthz");
   request("/checkout");
   request("/healthz", "GET", SpanKind.CLIENT); // not a server span: the rule doesn't match
   assert.deepEqual(exported(), ["child:", "GET:/checkout?q=1", "child:", "GET:/healthz?q=1"]);
   // The first rule that matches wins over a later, more specific one.
-  c.apply(settings({ sampling_rules: [{ rate: 1, name: "checkout*" }, { rate: 0, name: "checkout cart" }] }));
+  c.apply(settings({ sampling_rules: { rules: [{ rate: 1, name: "checkout*" }, { rate: 0, name: "checkout cart" }] } }));
   request("/x", "checkout cart", SpanKind.INTERNAL);
   request("/x", "other", SpanKind.INTERNAL); // no rule, no rate: the SDK's own (always off)
   assert.deepEqual(exported(), ["child:", "checkout cart:/x?q=1"]);
@@ -566,28 +574,28 @@ test("sampling rules on a real SDK: by path, kind and name; children follow; lef
 test("a caller's decision is followed whatever the rules: sampled under rate 0, unsampled under rate 1", () => {
   const c = new Controls();
   c.sampler.wrap(APP);
-  c.apply(settings({ sampling_rules: [{ rate: 0 }] }));
+  c.apply(settings({ sampling_rules: { rules: [{ rate: 0 }] } }));
   const id = "0af7651916cd43dd8448eb211c80319c";
   const decide = (parent: string) => c.sampler.shouldSample(parented(parent), id, "GET", SpanKind.SERVER, {}, []).decision;
   assert.equal(decide("remote_sampled"), SamplingDecision.RECORD_AND_SAMPLED);
   assert.equal(decide("none"), SamplingDecision.NOT_RECORD);
-  c.apply(settings({ sampling_rules: [{ rate: 1 }] }));
+  c.apply(settings({ sampling_rules: { rules: [{ rate: 1 }] } }));
   assert.equal(decide("remote_unsampled"), SamplingDecision.NOT_RECORD);
   assert.equal(decide("local_unsampled"), SamplingDecision.NOT_RECORD);
   assert.equal(decide("none"), SamplingDecision.RECORD_AND_SAMPLED);
 });
 
-test("rules sent in a string are the same rules, and report the same effective config", () => {
+test("rules written another way are the same rules, and report the same effective config", () => {
   const host = hostFromEnv({});
-  const a = LAYER.decide(config('{"sampling_rules":[{"rate":0,"path":"/health*"}]}'), EMPTY, EMPTY, host, 0n);
-  const b = LAYER.decide(config('{"sampling_rules":"[{\\"path\\":\\"/health*\\",\\"rate\\":0.0}]"}'), EMPTY, EMPTY, host, 0n);
+  const a = LAYER.decide(config({ sampling_rules: { rules: [{ rate: 0, path: "/health*" }] } }), EMPTY, EMPTY, host, 0n);
+  const other = policy({ sampling_rules: { rules: [{ path: "/health*", rate: 0 }] } }).replace('"rate":0}', '"rate":0.0}');
+  const b = LAYER.decide(config(other), EMPTY, EMPTY, host, 0n);
   assert.deepEqual(a.apply?.samplingRules.map((r) => [r.rate, r.path]), [[0, "/health*"]]);
   assert.deepEqual(b.apply?.samplingRules.map((r) => [r.rate, r.path]), [[0, "/health*"]]);
-  const body = (d: typeof a) => new TextDecoder().decode(d.effective?.configMap?.configMap.elastic?.body);
-  assert.equal(body(a), body(b));
+  assert.equal(reported(a.effective), reported(b.effective));
   // A bad rule: FAILED, naming it, and the rules in force stay.
-  const bad = LAYER.decide(config('{"sampling_rules":[{"rate":0},{"rate":7}]}'), EMPTY, EMPTY, host, 0n);
-  assert.equal(bad.status?.errorMessage, "sampling_rules[1].rate: 7 is not between 0 and 1");
+  const bad = LAYER.decide(config({ sampling_rules: { rules: [{ rate: 0 }, { rate: 7 }] } }), EMPTY, EMPTY, host, 0n);
+  assert.equal(bad.status?.errorMessage, "sampling_rules: rules[1].rate: 7 is not between 0 and 1");
 });
 
 test("vectors: caps.json's spans, through the sampler on the test's clock", () => {
@@ -624,7 +632,7 @@ test("the trace cap on a real SDK: whole traces, a local child never refused; re
     for (let i = 0; i < 3; i++) t.startSpan(`child${n}`, {}, trace.setSpan(ROOT_CONTEXT, root)).end();
     root.end();
   };
-  c.apply(settings({ sampling_rate: "1", sampling_traces_per_second: "2" }));
+  c.apply(settings({ head_sampling: { ratio: 1 }, trace_rate_limit: { traces_per_second: 2 } }));
   for (let n = 0; n < 5; n++) traceOf(n);
   assert.deepEqual(out.getFinishedSpans().map((s) => s.name), [
     "child0", "child0", "child0", "root0", "child1", "child1", "child1", "root1",
@@ -632,11 +640,12 @@ test("the trace cap on a real SDK: whole traces, a local child never refused; re
   out.reset();
   // Counted only for spans the rules or rate sampled: a rule of rate 0 takes no token.
   now = 1e9;
-  c.apply(settings({ sampling_rate: "1", sampling_traces_per_second: "2", sampling_rules: [{ rate: 0, name: "root0" }] }));
+  c.apply(settings({ head_sampling: { ratio: 1 }, trace_rate_limit: { traces_per_second: 2 },
+    sampling_rules: { rules: [{ rate: 0, name: "root0" }] } }));
   for (let n = 0; n < 4; n++) traceOf(n);
   assert.deepEqual(out.getFinishedSpans().filter((s) => s.name.startsWith("root")).map((s) => s.name), ["root1", "root2"]);
   out.reset();
-  c.apply(settings({ sampling_rate: "1" }));
+  c.apply(settings({ head_sampling: { ratio: 1 } }));
   assert.equal(c.sampler.cap, undefined);
   for (let n = 0; n < 50; n++) traceOf(n);
   assert.equal(out.getFinishedSpans().length, 200);
@@ -668,8 +677,7 @@ class TestAgent extends Agent {
     this.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: dir ?? "none", ...env });
     // A client that keeps what it is handed: the effective config, and (below) health.
     this.client = {
-      setEffectiveConfig: (e: { configMap?: { configMap: { elastic?: { body: Uint8Array } } } }) =>
-        this.reported.push(JSON.parse(new TextDecoder().decode(e.configMap!.configMap.elastic!.body))),
+      setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),
       setHealth: () => {},
     } as never;
   }
@@ -682,7 +690,7 @@ class TestAgent extends Agent {
     const s = super.remoteConfig(config);
     const dir = this.setup?.stateDir;
     if (s.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED && dir !== undefined) {
-      keepApplied(dir, config.config?.configMap.elastic?.body ?? new Uint8Array());
+      keepApplied(dir, config.config?.configMap[FILE]?.body);
     }
     return s;
   }
@@ -699,14 +707,9 @@ class TestAgent extends Agent {
     this.mono += ms;
   }
 
-  get settingsInForce(): object {
-    return JSON.parse(new TextDecoder().decode(this.effective?.configMap?.configMap.elastic?.body));
-  }
-
-  /** What the effective config names as set aside (its elastic.set_aside entry); null without one. */
-  get setAside(): object | null {
-    const f = this.effective?.configMap?.configMap["elastic.set_aside"];
-    return f === undefined ? null : JSON.parse(new TextDecoder().decode(f.body));
+  /** The controls the effective config reports overridden. */
+  get settingsInForce(): Record<string, unknown> {
+    return overridden(this.effective);
   }
 }
 
@@ -722,8 +725,7 @@ interface DebugCase {
       error?: string;
       sampling_rate?: number | null;
       refresh_at_unix_ms?: number;
-      effective?: object;
-      set_aside?: object | null;
+      effective?: string;
     };
   }[];
 }
@@ -733,7 +735,7 @@ interface DebugCase {
 test("vectors: debug.json and saving.json, step by step through the agent: decide, a restart, the timer's refresh", () => {
   const cases = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")]
     .filter((k) => !k.steps.some((s) => s.save === "failed"));
-  assert.ok(cases.length >= 14);
+  assert.ok(cases.length >= 13);
   for (const k of cases) {
     const nowhere = k.steps.some((s) => s.save === "nowhere");
     const dir = nowhere ? undefined : mkdtempSync(join(tmpdir(), "opamp-debug-"));
@@ -766,8 +768,7 @@ test("vectors: debug.json and saving.json, step by step through the agent: decid
         if (w.refresh_at_unix_ms === 0) assert.equal(timer, undefined, what);
         else assert.equal(timer?.ms, w.refresh_at_unix_ms - step.now_unix_ms, what);
       }
-      if (w.effective !== undefined) assert.deepEqual(agent.settingsInForce, w.effective, what);
-      if (w.set_aside !== undefined) assert.deepEqual(agent.setAside, w.set_aside, what);
+      if (w.effective !== undefined) assert.equal(reported(agent.effective), w.effective, what);
     }
   }
 });
@@ -779,10 +780,10 @@ test("debug mode: the timer ends it with no server, puts the earlier settings ba
   const logs = agent.controls.logs(out as never);
   const batch = [record("noisy", 5), record("app", 5), record("app", 9), record("app", 13)];
   const until = new Date(NOW + 5000).toISOString();
-  agent.remoteConfig(config(JSON.stringify({
-    sampling_rate: "0.1", sampling_rules: [{ rate: 0, name: "GET" }], send_logs_level: "warn",
-    send_logs_level_by_scope: "noisy=off", debug_until: until, debug_send_logs_level: "info",
-  })));
+  agent.remoteConfig(config({
+    head_sampling: { ratio: 0.1 }, sampling_rules: { rules: [{ rate: 0, name: "GET" }] },
+    log_levels: { level: "warn", scopes: { noisy: "off" } }, debug: { until, log_level: "info" },
+  }));
   // In debug mode: the debug rate in place of the rate and rules, the debug level in place of the levels.
   assert.equal(agent.controls.sampler.samplingRate, 1);
   assert.equal(agent.controls.sampler.explain(ROOT_CONTEXT, "GET", SpanKind.SERVER, {})?.how, "rate");
@@ -795,19 +796,19 @@ test("debug mode: the timer ends it with no server, puts the earlier settings ba
   assert.equal(agent.timer?.ms, 1);
   agent.pass(1);
   agent.timer!.fn();
-  // Exactly at debug_until it is over: the rate, the rules and the levels sent before it.
+  // Exactly at its end it is over: the rate, the rules and the levels sent before it.
   assert.equal(agent.controls.sampler.samplingRate, 0.1);
   assert.deepEqual(agent.controls.sampler.explain(ROOT_CONTEXT, "GET", SpanKind.SERVER, {}), { how: "rate", rate: 0, rule: 0 });
   logs.export(batch, () => {});
   assert.deepEqual(out.got.at(-1)!.map((r) => `${r.instrumentationScope.name}:${r.severityNumber}`), ["app:13"]);
   assert.equal(agent.timer, undefined);
   assert.equal(agent.refreshAt, 0);
-  assert.ok(!("debug_until" in agent.settingsInForce));
+  assert.ok(!("debug" in agent.settingsInForce));
 });
 
 test("debug mode: the end reported to the server; the same document again doesn't extend it", () => {
   const agent = new TestAgent(undefined);
-  const doc = JSON.stringify({ sampling_rate: "0.25", debug_until: new Date(NOW + 60_000).toISOString() });
+  const doc = policy({ head_sampling: { ratio: 0.25 }, debug: { until: new Date(NOW + 60_000).toISOString() } });
   agent.remoteConfig(config(doc));
   assert.equal(agent.timer?.ms, 60_000);
   agent.pass(30_000);
@@ -815,29 +816,29 @@ test("debug mode: the end reported to the server; the same document again doesn'
   assert.equal(agent.timer?.ms, 30_000);
   agent.pass(30_000);
   agent.timer!.fn();
-  assert.deepEqual(agent.reported.at(-1), { sampling_rate: "0.25" });
+  assert.deepEqual(agent.reported.at(-1), { head_sampling: { ratio: 0.25 } });
   assert.equal(agent.controls.sampler.samplingRate, 0.25);
 });
 
-test("debug mode: a timer armed before a newer decision does nothing; a new debug_until replaces the old", () => {
+test("debug mode: a timer armed before a newer decision does nothing; a new end replaces the old", () => {
   const agent = new TestAgent(undefined);
-  agent.remoteConfig(config(JSON.stringify({ debug_until: new Date(NOW + 10_000).toISOString() })));
+  agent.remoteConfig(config({ debug: { until: new Date(NOW + 10_000).toISOString() } }));
   const stale = agent.timer!;
-  agent.remoteConfig(config(JSON.stringify({ debug_until: new Date(NOW + 20_000).toISOString() })));
+  agent.remoteConfig(config({ debug: { until: new Date(NOW + 20_000).toISOString() } }));
   assert.ok(stale.cleared);
   agent.pass(15_000);
   stale.fn(); // fired anyway (it was on its way): a no-op
   assert.equal(agent.controls.sampler.samplingRate, 1);
   assert.equal(agent.timer?.ms, 20_000);
-  // A config without debug_until ends debug mode at once, and the timer with it.
-  agent.remoteConfig(config('{"send_logs":"true"}'));
+  // A config with debug local ends debug mode at once, and the timer with it.
+  agent.remoteConfig(config({ signal_exports: { logs: { enabled: true } } }));
   assert.equal(agent.controls.sampler.samplingRate, undefined);
   assert.equal(agent.timer, undefined);
 });
 
 test("debug mode ends on the monotonic clock: the wall clock moving back doesn't extend it", () => {
   const agent = new TestAgent(undefined);
-  agent.remoteConfig(config(JSON.stringify({ sampling_rate: "0", debug_until: new Date(NOW + 10_000).toISOString() })));
+  agent.remoteConfig(config({ head_sampling: { ratio: 0 }, debug: { until: new Date(NOW + 10_000).toISOString() } }));
   agent.mono += 10_000;
   agent.wall -= 3_600_000; // the wall clock set back an hour meanwhile
   agent.timer!.fn();
@@ -845,49 +846,54 @@ test("debug mode ends on the monotonic clock: the wall clock moving back doesn't
   assert.equal(agent.timer, undefined);
 });
 
-test("debug mode: a refused config after the wall clock passed debug_until ends it, as reported", () => {
+test("debug mode: a refused config after the wall clock passed its end ends it, as reported", () => {
   const agent = new TestAgent(undefined);
-  agent.remoteConfig(config(JSON.stringify({ sampling_rate: "0.1", debug_until: new Date(NOW + 10 * 60_000).toISOString() })));
+  agent.remoteConfig(config({ head_sampling: { ratio: 0.1 }, debug: { until: new Date(NOW + 10 * 60_000).toISOString() } }));
   assert.equal(agent.controls.sampler.samplingRate, 1);
   // The machine sleeps: the wall clock passes the end, the monotonic one doesn't, so the timer
   // hasn't gone off. Then a bad document comes.
   agent.wall += 15 * 60_000;
-  const s = agent.remoteConfig(config('{"sampling_rate":"7"}'));
+  const s = agent.remoteConfig(config({ head_sampling: { ratio: 7 } }));
   assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.deepEqual(agent.settingsInForce, { sampling_rate: "0.1" });
+  assert.deepEqual(agent.settingsInForce, { head_sampling: { ratio: 0.1 } });
   assert.equal(agent.controls.sampler.samplingRate, 0.1);
   assert.equal(agent.refreshAt, 0);
   assert.equal(agent.timer, undefined);
-  assert.deepEqual(agent.reported.at(-1), { sampling_rate: "0.1" });
+  assert.deepEqual(agent.reported.at(-1), { head_sampling: { ratio: 0.1 } });
 });
 
 test("debug mode: refused more than 24 h ahead, and an end already past is applied but over", () => {
   const agent = new TestAgent(undefined);
-  const far = agent.remoteConfig(config(JSON.stringify({ debug_until: new Date(NOW + 25 * 3_600_000).toISOString() })));
+  const far = agent.remoteConfig(config({ debug: { until: new Date(NOW + 25 * 3_600_000).toISOString() } }));
   assert.equal(far.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.match(far.errorMessage, /more than 24h ahead/);
-  const past = agent.remoteConfig(config(JSON.stringify({ sampling_rate: "0.5", debug_until: new Date(NOW - 1000).toISOString() })));
+  const past = agent.remoteConfig(config({ head_sampling: { ratio: 0.5 }, debug: { until: new Date(NOW - 1000).toISOString() } }));
   assert.equal(past.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.sampler.samplingRate, 0.5);
   assert.equal(agent.timer, undefined);
-  assert.deepEqual(agent.settingsInForce, { sampling_rate: "0.5" });
+  assert.deepEqual(agent.settingsInForce, { head_sampling: { ratio: 0.5 } });
 });
 
-test("debug mode: the caps stay, and the debug level is ignored where the logs aren't this package's", () => {
+test("debug mode: the caps stay, and the debug level is refused where the logs are not this package's", () => {
   const agent = new TestAgent(undefined);
-  agent.remoteConfig(config(JSON.stringify({ send_logs_per_second: "2", debug_until: new Date(NOW + 1000).toISOString() })));
+  const until = new Date(NOW + 1000).toISOString();
+  agent.remoteConfig(config({ log_rate_limit: { records_per_second: 2 }, debug: { until } }));
   assert.equal(agent.controls.logsCap?.perSecond, 2);
   const ungated = new TestAgent(undefined, { OTEL_LOGS_EXPORTER: "custom" });
-  ungated.remoteConfig(config(JSON.stringify({ debug_until: new Date(NOW + 1000).toISOString(), debug_send_logs_level: "info" })));
+  const s = ungated.remoteConfig(config({ debug: { until, log_level: "info" } }));
+  assert.equal(s.errorMessage, "debug: log_level: this SDK cannot apply the requested override");
+  assert.equal(ungated.controls.sampler.samplingRate, undefined);
+  // The debug rate alone is this package's to carry out.
+  ungated.remoteConfig(config({ debug: { until } }));
   assert.equal(ungated.controls.sendLogsMinSeverity, undefined);
   assert.equal(ungated.controls.sampler.samplingRate, 1);
-  assert.deepEqual(ungated.settingsInForce, { debug_until: new Date(NOW + 1000).toISOString() });
+  assert.deepEqual(ungated.settingsInForce, { debug: { until } });
 });
 
 test("a stopped agent arms no timer", async () => {
   const agent = new TestAgent(undefined);
   agent.client = undefined;
-  agent.remoteConfig(config(JSON.stringify({ debug_until: new Date(NOW + 1000).toISOString() })));
+  agent.remoteConfig(config({ debug: { until: new Date(NOW + 1000).toISOString() } }));
   const t = agent.timer!;
   await agent.stop();
   assert.ok(t.cleared);
@@ -940,7 +946,7 @@ test("vectors: health.json, call after call through the agent: its gates' counts
     for (const [i, step] of k.steps.entries()) {
       const what = `${k.name}, step ${i + 1}`;
       agent.wall = step.now_unix_ms;
-      agent.remoteConfig(config(JSON.stringify(step.settings ?? {})));
+      agent.remoteConfig(config(step.settings ?? {}));
       for (const signal of ["traces", "metrics", "logs"] as const) {
         const n = step.counts?.[signal] ?? {};
         Object.assign(agent.controls.counts[signal], {
@@ -994,11 +1000,12 @@ test("the gates count each export's result, and what they drop on purpose", () =
   });
   spans.export([span], done); // a success clears the failure
   assert.equal(c.counts.traces.lastFailed, false);
-  c.apply(settings({ send_traces: "false" }));
+  c.apply(settings({ signal_exports: off("traces") }));
   spans.export([span, span], done);
   assert.deepEqual([c.counts.traces.exportsOk, c.counts.traces.itemsFiltered], [2, 2]);
   // Logs: a level, the cap and send_logs false drop on purpose; redaction drops no record.
-  const { c: l } = clocked({ send_logs_level: "warn", send_logs_per_second: "1", mask_attributes: "x" });
+  const { c: l } = clocked({ log_levels: { level: "warn" }, log_rate_limit: { records_per_second: 1 },
+    attribute_redaction: { mask: ["x"] } });
   const logs = l.logs(answering() as never);
   logs.export([record("app", 9), record("app", 13), record("app", 17)], done);
   assert.deepEqual([l.counts.logs.exportsOk, l.counts.logs.itemsFiltered], [1, 2]);
@@ -1009,7 +1016,7 @@ test("the gates count each export's result, and what they drop on purpose", () =
   const metrics = m.metrics({ ...answering(1), selectAggregationTemporality: undefined } as never);
   metrics.export({ resource: {}, scopeMetrics: [{ scope: { name: "a" }, metrics: [{ dataPoints: [1, 2] }, { dataPoints: [3] }] }] } as never, done);
   assert.deepEqual([m.counts.metrics.exportsFailed, m.counts.metrics.itemsFailed], [1, 3]);
-  m.apply(settings({ send_metrics: "false" }));
+  m.apply(settings({ signal_exports: off("metrics") }));
   metrics.export({ resource: {}, scopeMetrics: [{ scope: { name: "a" }, metrics: [{ dataPoints: [1] }] }] } as never, done);
   assert.equal(m.counts.metrics.itemsFiltered, 1);
 });
@@ -1041,12 +1048,12 @@ test("export health on the agent's timer: at start, a failure at once, a recover
   tick();
   assert.equal(exporters().status, "ok");
   // send_traces false: off, not failing, sent at once at the next look.
-  agent.remoteConfig(config('{"send_traces":"false"}'));
+  agent.remoteConfig(config({ signal_exports: off("traces") }));
   tick();
   const traces = (exporters() as unknown as { componentHealthMap: Record<string, { status: string }> }).componentHealthMap.traces;
   assert.equal(traces!.status, "off");
   // Debug mode's end and health share the one timer: the earlier is what it waits for.
-  agent.remoteConfig(config(JSON.stringify({ debug_until: new Date(agent.wall + 5000).toISOString() })));
+  agent.remoteConfig(config({ debug: { until: new Date(agent.wall + 5000).toISOString() } }));
   assert.equal(agent.timer?.ms, 5000);
   agent.pass(5000);
   agent.timer!.fn();
