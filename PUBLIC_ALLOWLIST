@@ -2,6 +2,7 @@
 # `dir/` allows all under it, anything else is a glob over the whole path. Adding a line is a
 # reviewed change: it widens what can be published.
 .github/workflows/*.yml
+.github/actions/*/action.yml
 .gitignore
 AGENTS.md
 LICENSE
