@@ -1,0 +1,9 @@
+{
+  "description": "The server moves the agent to its second endpoint with a new token; the agent restarts halfway and must go straight back to the second endpoint.",
+  "transports": ["http", "ws"],
+  "duration_s": 16,
+  "needs": ["connection_settings"],
+  "driver": {"poll_s": 1, "token": "bootstrap", "accept_connection_settings": true, "runs": [9, 7]},
+  "server": {"credentials": {"bootstrap": "bootstrap", "offer": "agent-moved", "offer_on": 2, "move": true}},
+  "checks": ["connection_settings_applied", "connection_settings_moved", "never_locked_out", "driver_survives"]
+}

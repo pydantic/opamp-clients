@@ -153,6 +153,20 @@ type Credentials struct {
 	OfferOn int    `json:"offer_on"`
 	// Broken: the server never accepts the token it offers.
 	Broken bool `json:"broken"`
+	// Then, when set, is a second key: offered the same way once the agent has answered Offer.
+	// Once the agent uses it, the server accepts only that (a rotation).
+	Then string `json:"then"`
+	// Move: Offer names this server's second listener (another port) instead of the one the
+	// agent uses (a move). The second listener serves the same as the first.
+	Move bool `json:"move"`
+}
+
+// offers is what the server offers, in order.
+func (c *Credentials) offers() []string {
+	if c.Then != "" {
+		return []string{c.Offer, c.Then}
+	}
+	return []string{c.Offer}
 }
 
 // Fault is something the server does to the client. Exactly one trigger is set. Times (at_s,
