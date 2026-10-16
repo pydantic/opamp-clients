@@ -61,7 +61,8 @@ use, being tried or already answered, changes nothing.
 7. **Revert**, if disproven: reconnect with the valid settings, and drop the candidate (a `Store`)
    only once they have **worked again**; then FAILED with the reason. If the valid settings are
    refused instead, the server has already switched to the candidate, so the candidate is tried
-   again.
+   again. A candidate that may have connected without the client hearing the server's answer is
+   dropped only once the server has refused it ([below](#a-candidate-that-may-have-connected)).
 
    This departs from the spec's step 9 ("if step 6 fails the Client deletes the new settings"),
    and must. A candidate can connect, which lets the server drop the old settings (step 7). The
@@ -73,7 +74,7 @@ agent that died mid-switch neither keeps unproven settings nor loses proven ones
 
 ### An offer while busy
 
-FAILED says an offer can never be taken; "not now" is not FAILED (issue #213). An answered offer
+FAILED says an offer can never be taken; "not now" is not FAILED. An answered offer
 is not taken again, so a FAILED for "busy" or for a failed save would leave a server that offers
 the same settings again no way to move the client on. Instead, as the remote-config lifecycle
 keeps the newest config:
@@ -171,6 +172,10 @@ HTTP, as before. The interval is taken from any offer, including one otherwise F
   once the candidate is dropped.
 - **Every candidate is resolved.** With a finite number of faults and refusals the client can see,
   a saved candidate is promoted or dropped, and the client ends up connected.
+- **A key the agent can never reach is given up on.** The server can offer a key at an endpoint
+  the agent can't reach: `-public-url` is wrong, or the server is behind a proxy whose Host the
+  agent can't reach again. Then every attempt fails before it reaches the server. Each FAILED the
+  agent reports counts, and the server gives the key up after `MAX_SETTINGS_FAILURES` attempts.
 
 ## Without persistent storage
 
@@ -278,12 +283,21 @@ In .NET, what an application most likely logs is a notification: a `ConnectionSe
 the offer with every header's value and every private key shown as `<redacted>`, and every
 endpoint, proxy and download URL without its password, as the options records do.
 
-## After a restart: a candidate that may have connected
+## A candidate that may have connected
 
 The spec lets a server drop the old credentials once the agent has connected with the new ones
-(step 7), at any time after. So a candidate back from disk after a crash may already have
-connected, its promotion not yet saved, and the server may drop the old credentials whenever it
-likes. The core treats such a candidate as possibly proven:
+(step 7), at any time after. The client can't always tell whether it has:
+
+- a candidate back from disk after a crash may already have connected, its promotion not yet
+  saved;
+- over WebSocket, a candidate whose upgrade worked, the connection then lost (or closed) before
+  the server's first message on it, may have been taken by the server: the credentials come with
+  the upgrade, and a server may count the agent connected then. The upgrade proves nothing (it may
+  come from something on the way), so the candidate is not promoted; but the client can't rule
+  out that the server took it.
+
+Either way the server may drop the old credentials whenever it likes. The core treats such a
+candidate as possibly proven:
 
 - it is tried first, as any saved candidate is;
 - if its time runs out or its connections fail, the client connects with the valid settings
@@ -292,20 +306,23 @@ likes. The core treats such a candidate as possibly proven:
   work; otherwise it is tried again a verification timeout later, until it connects (APPLIED) or
   is refused.
 
-A candidate that is new in this run is dropped as before: the client knows it never connected.
+Any other candidate (new in this run, and never upgraded) is dropped as before: the server never
+took a connection with it.
 
 This holds against a server that switches when the new credentials connect and one that
 switches at any time after, and against refusals the client can't see (a client certificate
 refused in the TLS handshake looks like a failed connection): never locked out in every case. With
 invisible refusals, a candidate back from disk that the server refuses is kept and tried again for
 ever, so a client should report such a refusal as one. Without this, a candidate that had
-connected was dropped after a restart, and a server that switched later locked the agent out.
+connected was dropped after a restart, and so was one whose upgrade had worked, lost before the
+answer: a server that switched later locked the agent out.
 
 ## How it is checked
 
 - The core is checked on its own before it is released: against a model of the design, with and
   without storage, crashes anywhere, an attempt on its way when the verification time runs out, a
-  server that switches late, refusals the client can't see, and saves that land but are reported
+  server that switches late (and one that takes a WebSocket upgrade lost before its answer as the
+  agent connecting), refusals the client can't see, and saves that land but are reported
   failed, over either transport; against a simulated server, disk and crashes, checking the rules
   above after every step; and against a hostile server (malformed endpoints, headers, telemetry
   settings and download URLs, heartbeat intervals up to 2^64 - 1 seconds): no request or
