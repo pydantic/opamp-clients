@@ -327,17 +327,17 @@ reaches the telemetry that goes through them, and nothing else.
 
 | Setting | Python | Node.js | Go | .NET plugin | .NET `WithOpAmp` | Java agent |
 |---|---|---|---|---|---|---|
-| `sampling_rate` | at once | at once | at once | at once | at once | at once |
-| `send_traces`, `send_logs` | at once ¹ | at once ¹ | at once | at once ¹ | at once ¹ | at once ¹ |
-| `send_logs_level` | at once ¹ | at once ¹ | at once | at once ¹ | at once ¹ | at once ¹ |
-| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁵ |
-| `send_logs_level_by_scope` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
-| `drop_attributes`, `mask_attributes` | at once ¹ ⁴ | at once ¹ ⁴ | at once | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
-| `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ⁴ | at once | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
-| `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` | at once, until then ⁴ | at once, until then ⁴ | at once, until then | at once, until then ⁴ | at once, until then ⁴ | at once, until then |
+| `sampling_rate` | at once | at once | at once ⁴ | at once | at once | at once |
+| `send_traces`, `send_logs` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
+| `send_logs_level` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
+| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁵ |
+| `send_logs_level_by_scope` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once ¹ ⁴, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
+| `drop_attributes`, `mask_attributes` | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
+| `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
+| `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then |
 | [export health](#export-health) (no setting) | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ |
 | `send_metrics` | at once, `otlp` only ¹ | at once ¹ | at once, push only ¹ | at once ¹ | at once ¹ | at once, Prometheus too |
-| `deactivate_instrumentations`, `deactivate_all_instrumentations` | next start | at once ² | at once | next start | not carried out | next start |
+| `deactivate_instrumentations`, `deactivate_all_instrumentations` | next start | at once ² | at once ⁴ | next start | not carried out | next start |
 | `opamp_polling_interval` | next start | next start | next start | next start | next start | next start |
 | `logging_level`, `infer_spans` | ignored | ignored | ignored | ignored | ignored | ignored |
 | `custom` ([app-settings.md](app-settings.md)) | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application |
@@ -347,12 +347,17 @@ Another exporter, a span or log processor passed in or added later, or another a
 processor goes on exporting. Where the integration sees such an exporter when it builds the SDK,
 it doesn't declare that signal's settings, so they are set aside, named as not carried out:
 Python for exporters it doesn't build, span or log processors or metric exporters passed to
-`configure()`, and, from then on, a span or log processor added to its providers later; Node.js for exporters it doesn't build; the .NET plugin and `WithOpAmp` whenever
+`configure()`, and, from then on, a span or log processor added to its providers later; Node.js for
+exporters it doesn't build; Go for a metrics exporter it doesn't gate, and for a global provider the
+application sets in place of `Setup`'s, from when it is set (the package looks before each decision
+and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
 one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
 `WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent under a
 configuration file for a span or log processor that is neither batch nor simple, or a metric
 reader neither periodic nor pull. Elsewhere a processor added after the SDK is built isn't seen:
-the setting is still answered APPLIED.
+the setting is still answered APPLIED. Go's `Setup` hands out no SDK provider, so nothing can be added
+to one. A Go application that builds an SDK of its own and never sets it as a global provider
+isn't seen either.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -370,8 +375,11 @@ redaction only where it builds both the span and the log exporters. The .NET plu
 every span and log record exported goes through a gate (traces and logs each gated, or not
 exported), `sampling_rules` and `sampling_traces_per_second` where `sampling_rate` is carried
 out, and debug mode always (its rate and level set aside where `sampling_rate` and
-`send_logs_level` are). Go declares every one, always; the Java agent every one but where
-footnote ¹ says.
+`send_logs_level` are). Go declares every one until the application sets a global provider of its
+own in place of `Setup`'s. Then it sets aside what that signal needs: for the tracer provider the
+sampler's settings, `send_traces`, redaction and the instrumentation switches; for the meter
+provider `send_metrics`; for the logger provider the log settings and redaction. The Java agent
+declares every one but where footnote ¹ says.
 
 ⁵ A rule sees what a span has when it starts, which differs by instrumentation
 ([sampling rules](#sampling-rules)). HTTP server spans start with their path in every language
@@ -403,6 +411,9 @@ What else to know:
 - **An SDK the application builds on its own isn't reached.** Python (`opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
+  In Go a global provider the application sets after `Setup` is seen, and that signal's settings
+  are set aside. A provider it builds and never sets as global can't be seen: the server may hear
+  APPLIED for a setting its telemetry doesn't follow.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are
