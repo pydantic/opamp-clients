@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 import json
+import re
 import subprocess
 import tempfile
 import textwrap
@@ -920,11 +921,14 @@ class Main(unittest.TestCase):
         self.assertEqual((self.out / "prepared").read_text(), "x")
 
     def test_with_jobs_checks_run_side_by_side_after_one_build(self):
-        r, took = self.run_try("--local", "--jobs", "2", "a", "b", "c")
+        r, took = self.run_try("--local", "--jobs", "3", "a", "b", "c")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        # Each check's output whole, in the order given; the build once, in the first process.
-        self.assertRegex(r.stdout, r"(?s)^=== a\n  a line of a\n=== a: passed in \d+ s\n=== b\n  a line of b\n"
-                                   r"=== b: passed in \d+ s\n=== c\n  a line of c\n=== c: passed in \d+ s\n$")
+        # Each check's output whole, as it ends (c, the short one, before a and b); the build once,
+        # in the first process.
+        blocks = re.findall(r"=== (\w+)\n  a line of \1\n=== \1: passed in \d+ s\n", r.stdout)
+        self.assertEqual("".join(re.findall(r"=== \w+\n  a line of \w+\n=== \w+: passed in \d+ s\n", r.stdout)), r.stdout)
+        self.assertEqual(sorted(blocks), ["a", "b", "c"])
+        self.assertEqual(blocks[0], "c")
         self.assertEqual((self.out / "prepared").read_text(), "x")
         # a and b at once: in less than the 3 s they take one after the other (the interpreter
         # starts aside).

@@ -1052,8 +1052,10 @@ def main(checks: dict[str, Callable[[], bool]], prepare: Callable[[], object] = 
             return r.stdout, r.returncode
 
         ok = True
+        # Each check's output as soon as it ends: a job cut short keeps what had finished.
         with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
-            for output, code in pool.map(one, names):
+            for done in concurrent.futures.as_completed([pool.submit(one, name) for name in names]):
+                output, code = done.result()
                 print(output, end="", flush=True)
                 ok &= code == 0
         return 0 if ok else 1
