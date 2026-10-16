@@ -60,6 +60,14 @@ jobs:
         with:
           # Built from the tag, also when run by hand.
           ref: go/opampsupervisor/v${{ needs.version.outputs.version }}
+      # archive.sh from this workflow's commit, so a tag cut before it existed (v0.1.0) still builds.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: .release
+          sparse-checkout: go/opampsupervisor/packaging/archive.sh
+          sparse-checkout-cone-mode: false
+      - name: The archive script, from this workflow's commit
+        run: cp .release/go/opampsupervisor/packaging/archive.sh go/opampsupervisor/packaging/archive.sh
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
