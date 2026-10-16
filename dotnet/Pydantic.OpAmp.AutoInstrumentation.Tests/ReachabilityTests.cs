@@ -45,6 +45,27 @@ public class ReachabilityTests
         Assert.DoesNotContain(said.Lines, l => l.Contains("secret", StringComparison.Ordinal) || l.Contains("token=x", StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// After the server moved the agent to another endpoint, what it says names the one the client
+    /// uses now (logged without credentials), not the one configured.
+    /// </summary>
+    [Fact]
+    public void WhatIsSaidNamesTheEndpointInUse()
+    {
+        var said = new Said();
+        string? inUse = null; // none yet: the configured one
+        var r = new Reachability(new Uri("https://a.example.com/v1/opamp"), SettingNames.Env, string.Empty, Uid, said.Log) { InUse = () => inUse };
+        r.Notified(new OpAmpNotification.Connected());
+        inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+        r.Notified(new OpAmpNotification.ConnectFailed(null, "connection refused"));
+        r.Notified(new OpAmpNotification.Connected());
+        Assert.Equal(3, said.Lines.Count);
+        Assert.StartsWith("Info: connected to https://a.example.com/v1/opamp;", said.Lines[0], StringComparison.Ordinal);
+        Assert.StartsWith("Warn: can't reach https://b.example.com/v1/opamp (connection refused)", said.Lines[1], StringComparison.Ordinal);
+        Assert.Equal("Info: connected to https://b.example.com/v1/opamp again", said.Lines[2]);
+        Assert.DoesNotContain(said.Lines, l => l.Contains("secret", StringComparison.Ordinal) || l.Contains("token=x", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void WithoutAServiceNameTheInstanceIsNamedAlone()
     {

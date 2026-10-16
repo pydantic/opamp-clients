@@ -727,6 +727,17 @@ public final class OpampClient {
     return instanceUid.clone();
   }
 
+  /**
+   * The endpoint the client uses now: where its latest OpAMP request or WebSocket connection went,
+   * which after the server moved the agent (an offer of connection settings) is the offered one, or
+   * the configured one again once an offer failed. Null before any outcome, and in Rust mode, where
+   * the core makes the requests itself (the configured one is all there is to name then). The URL
+   * is as the core gave it: redact it before logging.
+   */
+  public String endpoint() {
+    return streams == null ? executor.used : null;
+  }
+
   /** Tests only: the core tap's file, or null. */
   String tapPath() {
     return core.tapPath();

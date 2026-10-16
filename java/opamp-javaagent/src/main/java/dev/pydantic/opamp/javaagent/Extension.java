@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opamp.proto.v1.Anyvalue;
@@ -411,7 +412,13 @@ final class Extension {
    * when it's back: setup that works or doesn't is never silent. On the client's thread.
    */
   static final class Reachability {
+    /** The configured endpoint, as {@link #where} gives it. */
     private final String endpoint;
+    /**
+     * The endpoint the client uses now, as the client gives it (null, or null from it: the
+     * configured one): after the server moved the agent, the one it moved it to.
+     */
+    volatile Supplier<String> inUse;
     private final String service;
     private final UUID uid;
     private boolean ever;
@@ -423,7 +430,15 @@ final class Extension {
       this.uid = uid;
     }
 
+    /** The endpoint the client uses now, as it is safe to log. */
+    String at() {
+      Supplier<String> f = inUse;
+      String e = f == null ? null : f.get();
+      return e == null || e.isEmpty() ? endpoint : where(e);
+    }
+
     synchronized void notified(Notification n) {
+      String endpoint = at();
       if (n instanceof Notification.Connected) {
         if (!ever) {
           String who = service == null || service.isEmpty() ? "" : " as " + service;
@@ -714,6 +729,10 @@ final class Extension {
     // through the JDK's HTTP client, one of the agent's own that isn't traced.
     b.mode(OpampClient.Mode.JAVA).httpClient(untracedHttpClient());
     reachability = new Reachability(s.endpoint(), resource.getAttribute(SERVICE_NAME), uid);
+    reachability.inUse = () -> {
+      OpampClient c = client.getNow(null);
+      return c == null ? null : c.endpoint();
+    };
     // Export health from the first message: the layer always sends its first report.
     health(controls.counts(), inForce, wallClock.getAsLong());
     // The inventory, once: the agent builds its SDK and instrumentations once, and the settings it
@@ -1048,6 +1067,11 @@ final class Extension {
   /** For tests: where the server is, and the state directory. */
   synchronized Setup setupForTest() {
     return setup;
+  }
+
+  /** For tests: the endpoint what the agent says of reaching its server names now. */
+  String endpointSaidForTest() {
+    return reachability.at();
   }
 
   /** For tests: stop the client, as the shutdown hook does (the server hears the agent go). */

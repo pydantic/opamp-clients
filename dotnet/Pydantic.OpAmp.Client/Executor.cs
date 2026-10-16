@@ -39,6 +39,8 @@ internal sealed class Executor
     // Connections open or closing, for the sends and the close asked of them.
     private readonly ConcurrentDictionary<ulong, Conn> conns = new();
 
+    private string? used;
+
     /// <summary>
     /// Carry out effects over <paramref name="transport"/>: one handler for requests, WebSocket
     /// upgrades and downloads, so the application's TLS and proxy settings apply to all of them.
@@ -58,6 +60,12 @@ internal sealed class Executor
 
     /// <summary>The effects in flight.</summary>
     public InFlight InFlight { get; }
+
+    /// <summary>
+    /// The URL of the OpAMP request or connection whose outcome came last (null: none yet). Set
+    /// before the outcome reaches the core: a notification of it finds it in place.
+    /// </summary>
+    internal string? Used => Volatile.Read(ref this.used);
 
     /// <summary>The file operations saves and downloads go through (journaled with the core tap on).</summary>
     internal IFileOps Files => this.files;
@@ -438,6 +446,7 @@ internal sealed class Executor
             result = Failed(Detail(e));
         }
 
+        Volatile.Write(ref this.used, r.Url);
         this.Report(r.Id, result);
     }
 
@@ -476,6 +485,7 @@ internal sealed class Executor
                 }
             }
 
+            Volatile.Write(ref this.used, o.Url);
             this.Report(o.Id, new Input { WsFailed = failed });
             return;
         }
@@ -489,6 +499,7 @@ internal sealed class Executor
         }
 
         this.conns[o.Id] = conn;
+        Volatile.Write(ref this.used, o.Url);
         this.Report(o.Id, new Input { WsOpened = new Id { Id_ = o.Id } }, final: false);
         await conn.ReadAsync().ConfigureAwait(false);
         await conn.Ended.ConfigureAwait(false);
