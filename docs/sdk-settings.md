@@ -351,14 +351,17 @@ Python for exporters it doesn't build, span or log processors or metric exporter
 exporters it doesn't build; Go for a metrics exporter it doesn't gate, and for a global provider the
 application sets in place of `Setup`'s, from when it is set (the package looks before each decision
 and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
-one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
-`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent for a span or log
-record processor or a metric reader another agent extension adds through the autoconfigure
+one of a signal's exporters can't be stopped (not OTLP, beside another exporter, another
+plugin's, or, in `WithOpAmp`, with a path or an `HttpClientFactory` of its own), and the .NET
+plugin for traces and metrics under `OTEL_DOTNET_AUTO_SETUP_SDK=false`; the Java agent for a span
+or log record processor or a metric reader another agent extension adds through the autoconfigure
 customizers, and under a configuration file for a span or log processor that is neither batch nor
-simple, or a metric reader neither periodic nor pull. Elsewhere a processor added after the SDK is
-built isn't seen: the setting is still answered APPLIED. Go's `Setup` hands out no SDK provider, so
-nothing can be added to one. A Go application that builds an SDK of its own and never sets it as a
-global provider isn't seen either.
+simple, or a metric reader neither periodic nor pull. .NET reads the built providers again, before
+each decision and every 30 s, and the plugin reads each logger provider on its first log record: a
+processor added later sets its signal's settings aside from then on, and the effective config is
+reported again. Elsewhere a processor added after the SDK is built isn't seen: the setting is still
+answered APPLIED. Go's `Setup` hands out no SDK provider, so nothing can be added to one. A Go
+application that builds an SDK of its own and never sets it as a global provider isn't seen either.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -418,7 +421,9 @@ What else to know:
   are set aside. A provider it builds and never sets as global can't be seen: the server may hear
   APPLIED for a setting its telemetry doesn't follow. The Java agent extension can't see an
   `OpenTelemetrySdk` the application builds and uses itself: that SDK's telemetry escapes every
-  setting, and the extension still answers for the agent's SDK.
+  setting, and the extension still answers for the agent's SDK. In .NET, a tracer or meter
+  provider the application builds beside the managed one listens to the same instrumentations. The
+  integration can't see it, so the settings stay answered APPLIED while its telemetry goes on.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are
