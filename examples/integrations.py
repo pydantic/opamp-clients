@@ -894,6 +894,148 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
     return ok
 
 
+#: check_truth's documents, `TRUTH_GAP` messages apart: each sets one setting beside
+#: sampling_rate 1 (the first, the baseline, nothing else), and the next leaves it out again, so
+#: each window shows that setting alone. (The setting judged, the document.)
+TRUTH: list[tuple[str | None, dict]] = [
+    (None, {"sampling_rate": "1"}),
+    ("send_traces", {"sampling_rate": "1", "send_traces": "false"}),
+    ("send_metrics", {"sampling_rate": "1", "send_metrics": "false"}),
+    ("send_logs", {"sampling_rate": "1", "send_logs": "false"}),
+    ("sampling_rate", {"sampling_rate": "0"}),
+    ("send_logs_level", {"sampling_rate": "1", "send_logs_level": "warn"}),
+    ("send_logs_level_by_scope", {"sampling_rate": "1",
+                                  "send_logs_level_by_scope": "app*=off, rust_otel_example*=off"}),
+    ("sampling_rules", {"sampling_rate": "1", "sampling_rules": [{"rate": 0, "kind": "client"}]}),
+    ("mask_attributes", {"sampling_rate": "1", "mask_attributes": "url.full, http.url"}),
+    ("drop_attributes", {"sampling_rate": "1", "drop_attributes": "url.full, http.url"}),
+    ("sampling_traces_per_second", {"sampling_rate": "1", "sampling_traces_per_second": "1"}),
+    ("send_logs_per_second", {"sampling_rate": "1", "send_logs_per_second": "1"}),
+]
+#: Where the instrumentation switches are live (switch_at_once), last: nothing traced after it.
+TRUTH_SWITCH = ("deactivate_all_instrumentations", {"sampling_rate": "1", "deactivate_all_instrumentations": "true"})
+#: Messages between check_truth's documents: at one a second, a window of some eight seconds past
+#: MARGIN, long enough for a rate cap of one a second to show.
+TRUTH_GAP = 12
+
+
+def truth_scenario(switch_at_once: bool = False, gap: int = TRUTH_GAP) -> dict:
+    """check_truth's offers (TRUTH), `gap` messages apart."""
+    documents = [body for _, body in TRUTH] + ([TRUTH_SWITCH[1]] if switch_at_once else [])
+    return {"server": {"faults": [
+        {"on_message": 1 + i * gap, "action": "offer_config", "config_key": "elastic", "body": json.dumps(body),
+         "content_type": SETTINGS} for i, body in enumerate(documents)]}}
+
+
+def set_aside(events: list[dict], after: float, before: float) -> tuple[set[str], set[str]]:
+    """What the effective configs the agent reported between `after` and `before` name: (the
+    settings set aside, `unsupported` in elastic.set_aside; the settings in force, in elastic)."""
+    aside: set[str] = set()
+    in_force: set[str] = set()
+    for e in effective_configs(events, after, before):
+        aside |= set((e.get("elastic.set_aside") or {}).get("unsupported") or [])
+        in_force |= set(e.get("elastic") or {})
+    return aside, in_force
+
+
+def carried_out(events: list[dict], setting: str, applied: float, end: float) -> tuple[bool, str]:
+    """Whether the telemetry the sink received shows `setting` carried out, in the window from
+    when its document was APPLIED (`applied`) until the next was offered (`end`): (whether it
+    does, what was seen). A window with too few of the application's requests to tell shows
+    nothing carried out."""
+    made = len(pings(events, applied + MARGIN, end - DRIFT))
+    window = end - DRIFT - (applied + MARGIN)
+    if made <= REQUESTS:
+        return False, f"{made} requests, too few to tell"
+    if setting in ("send_traces", TRUTH_SWITCH[0]):
+        late = ended(events, applied + DRIFT, arrived_before=end)
+        return not late, f"{len(late)} spans, {made} requests"
+    if setting in ("send_metrics", "send_logs"):
+        late = signal(events, setting.removeprefix("send_"), applied + MARGIN, end)
+        return not late, f"{len(late)} exports, {made} requests"
+    if setting in ("sampling_rate", "sampling_rules"):
+        # A rate of 0 for new traces, or a rule of rate 0 for client spans: every example's
+        # requests are its HTTP client's root spans.
+        n = traced(events, applied + DRIFT, end - DRIFT)
+        return not n, f"{n} of {made} requests traced"
+    if setting in ("send_logs_level", "send_logs_level_by_scope"):
+        per, made = per_request(events, applied + MARGIN, end)
+        return per <= 0.1, f"{per:.2f} log records a request, {made} requests"
+    if setting in ("mask_attributes", "drop_attributes"):
+        names = ending(events, applied + DRIFT, 1e9, arrived_before=end)
+        shown = [n for n in names if "://" in n or (setting == "drop_attributes" and n == "[REDACTED]")]
+        return bool(names) and not shown, f"{len(names)} spans, {shown[:2]}"
+    if setting == "sampling_traces_per_second":
+        # Spans, not exports: a span two exporters send is still one span the cap let through. (The
+        # sink gives each export's end times on the log's clock, which can differ by a millisecond.)
+        n = len({(name, round(at, 2)) for e in spans(events)
+                 for name, at in zip(e.get("spans") or [], e.get("ends") or []) if applied + MARGIN < at < end - DRIFT})
+        return window > 3 and 0 < n <= window + 3, f"{n} spans in {window:.1f} s of {made} requests"
+    if setting == "send_logs_per_second":
+        n = records(events, applied + MARGIN, end)
+        return window > 3 and 0 < n <= window + 3, f"{n} log records in {window:.1f} s of {made} requests"
+    raise ValueError(f"no measure of {setting}")
+
+
+def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bool = False,
+                service: str = "checkout") -> list[tuple[str, bool]]:
+    """check_truth's checks (what, whether it holds): every document APPLIED; the baseline's spans,
+    metrics and log records arrive; and each setting either shows in the telemetry or is named as
+    set aside in the effective config, never neither (an APPLIED answer for a setting the SDK
+    didn't carry out). The settings named as set aside must be `expected_aside`: no more (a setting
+    this setup could carry out, given up), and no fewer (the integration's table out of date)."""
+    judged = [s for s, _ in TRUTH] + ([TRUTH_SWITCH[0]] if switch_at_once else [])
+    st = statuses(events)
+    out = [(f"{len(judged)} configs answered APPLIED ({[s for _, s, _ in st]})",
+            [s for _, s, _ in st] == ["APPLIED"] * len(judged))]
+    if len(st) != len(judged):
+        return out
+    times = [t for t, _, _ in st]
+    nexts = [offered_before(events, t) for t in times[1:]] + [max(e["t"] for e in events)]
+    for name in ("traces", "metrics", "logs"):
+        got = spans(events, times[0], nexts[0]) if name == "traces" else signal(events, name, times[0], nexts[0])
+        out.append((f"baseline: {name} arrive", any(e.get("services") in (None, [service]) for e in got)))
+    aside_seen: set[str] = set()
+    for setting, applied, end in zip(judged[1:], times[1:], nexts[1:]):
+        aside, in_force = set_aside(events, offered_before(events, applied), end)
+        if setting in aside:
+            aside_seen.add(setting)
+            out.append((f"{setting}: set aside, and not reported in force", setting not in in_force))
+            continue
+        done, seen = carried_out(events, setting, applied, end)
+        out.append((f"{setting}: APPLIED and carried out ({seen})" if done else
+                    f"{setting}: APPLIED, not set aside, and the telemetry didn't change ({seen})", done))
+    extra = sorted(aside_seen - expected_aside)
+    missing = sorted(expected_aside & set(judged) - aside_seen)
+    out.append((f"set aside as this setup expects ({sorted(aside_seen)}; not expected: {extra}; "
+                f"expected, carried out: {missing})", not extra and not missing))
+    return out
+
+
+def check_truth(launch: Launch, target_: Path, setup: str, expected_aside: set[str], env: dict[str, str] | None = None,
+                switch_at_once: bool = False, service: str = "checkout", listen: str = "127.0.0.1:0",
+                seconds: float = 360) -> bool:
+    """One run of TRUTH's documents under `setup`, the application's setup the matrix in
+    docs/sdk-settings.md names as one where a setting may not reach the telemetry (EXAMPLE_SETUP in
+    its environment, beside `env`); every check printed; True when all pass."""
+    state = Path(tempfile.mkdtemp(prefix=f"state-truth-{setup}-", dir=target_))
+    state.chmod(0o777)
+    ok = True
+    try:
+        judged = len(TRUTH) + switch_at_once
+        events = run(launch, truth_scenario(switch_at_once), state, f"truth-{setup}", seconds, listen, target_,
+                     # The last window as long as the others: some eight seconds of requests.
+                     until=lambda ev: len(statuses(ev)) >= judged and len(pings(ev, statuses(ev)[-1][0])) > 8 * REQUESTS,
+                     settle=2, env={**SIGNALS, **(env or {}), "EXAMPLE_SETUP": setup})
+        print(f"truth ({setup}): remote config statuses {[s for _, s, _ in statuses(events)]}")
+        for what, cond in judge_truth(events, expected_aside, switch_at_once, service):
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
 def key_from_env(token: str) -> dict[str, str]:
     """The environment that gives the agent `token`: OTEL_OPAMP_HEADERS."""
     return {HEADERS: f"Authorization=Bearer%20{token}"}

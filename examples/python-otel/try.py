@@ -38,7 +38,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (DRIFT, MARGIN, ROOT, SETTINGS, check, check_app_settings, check_setup,  # noqa: E402
                           key_in_code,
-                          check_signals, main, pings, run, signal as exports, spans, statuses, stop_group, target)
+                          check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("python-otel")
@@ -182,6 +182,12 @@ def check_next(launch, target_: Path, seconds: float = 200) -> bool:
     return ok
 
 
+#: What a span and a log record processor the application adds once the SDK is built (setups.py)
+#: take from the package's control: their gates' settings, set aside. The sampler stays its own.
+LATE_PROCESSOR = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
+                  "mask_attributes", "drop_attributes"}
+
+
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
     """A check of `app` (APPS), in a directory of its own: run_check(directory)."""
     def run_() -> bool:
@@ -204,6 +210,7 @@ CHECKS = {
     "setup": of("app.py", lambda d: check_setup(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
     "next": of("app.py", lambda d: check_next(launch, d)),
     "app": of("app.py", lambda d: check_app_settings(launch, d)),
+    "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", LATE_PROCESSOR)),
     "first-in-code": of("in_code.py", lambda d: check(launch, "urllib", d, switches=False)),
     "setup-in-code": of("in_code.py", lambda d: check_setup(
         launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"},
