@@ -576,6 +576,21 @@ class Truth(unittest.TestCase):
         self.assertEqual(len(out), 2)
         self.assertTrue(out[0].startswith("send_logs: refused as an override the SDK can't carry out"))
 
+    def test_an_answer_neither_applied_nor_failed_fails(self):
+        log = truth()
+        for e in log.events:
+            if e.get("remote_config_status") and e["t"] == 20:
+                e["remote_config_status"]["status"] = "RemoteConfigStatuses_UNSET"
+        self.assertIn("send_traces: answered APPLIED or FAILED, not UNSET", failed(judge_truth(log.events, set())))
+
+    def test_an_override_reported_with_other_values_fails(self):
+        log = truth()
+        for e in log.events:
+            if e.get("remote_config_status") and e["t"] == 50:  # head_sampling, ratio 0 sent
+                e["effective"] = {POLICY_FILE: json.loads(policy({"head_sampling": {"ratio": 1}}, 2))}
+        self.assertEqual(failed(judge_truth(log.events, set())),
+                         ["sampling_rate: APPLIED, and reported in force with other values than sent"])
+
     def test_a_refused_baseline_fails(self):
         out = failed(judge_truth(truth(baseline="FAILED").events, set()))
         self.assertEqual(out, ["the baseline APPLIED"])

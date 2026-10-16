@@ -1038,11 +1038,15 @@ def refused_as_unsupported(error: str, control: str, fields: dict) -> bool:
     return any(error in (f"{control}: {unsupported}", f"{control}: {field}: {unsupported}") for field in fields)
 
 
-def in_force(events: list[dict], control: str, fields: dict, after: float, before: float) -> bool:
-    """Whether an effective config the agent reported between `after` and `before` has the override
-    of `control` in force with every one of `fields` (a policy in force reports what it set aside
-    local, the rest as sent)."""
-    return any(set(fields) <= set(overridden(e, control) or {}) for e in effective_configs(events, after, before))
+def in_force(events: list[dict], control: str, fields: dict, after: float, before: float) -> bool | None:
+    """How the effective configs the agent reported between `after` and `before` have the override
+    of `control`: True when one has every one of `fields` with its value, False when none has any
+    of them (set aside: a policy in force reports what it set aside local), None otherwise (in force
+    with other values, which no SDK may report)."""
+    reported = [overridden(e, control) or {} for e in effective_configs(events, after, before)]
+    if any(all(r.get(k) == v for k, v in fields.items()) for r in reported):
+        return True
+    return False if all(not set(fields) & set(r) for r in reported) else None
 
 
 def carried_out(events: list[dict], setting: str, applied: float, end: float) -> tuple[bool, str]:
@@ -1112,7 +1116,14 @@ def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bo
             out.append((f"{setting}: refused as an override the SDK can't carry out ({error!r})", refused))
             aside_seen |= {setting} if refused else set()
             continue
-        if not in_force(events, control, fields, offered, end):
+        if status != "APPLIED":
+            out.append((f"{setting}: answered APPLIED or FAILED, not {status}", False))
+            continue
+        reported = in_force(events, control, fields, offered, end)
+        if reported is None:
+            out.append((f"{setting}: APPLIED, and reported in force with other values than sent", False))
+            continue
+        if not reported:
             aside_seen.add(setting)
             out.append((f"{setting}: APPLIED, set aside and reported local", True))
             continue
