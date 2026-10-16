@@ -55,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (ROOT, check, check_app_settings, check_setup, check_signals, key_in_code, main,  # noqa: E402
-                          read_log, server_binary, statuses, stop_group, target)
+                          read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("node-otel")
@@ -78,11 +78,10 @@ APP = "app.cjs"
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-    base = f"http://127.0.0.1:{port}"
     telemetry = f"http://127.0.0.1:{telemetry_port}"
     env = dict(os.environ,
                OTEL_SERVICE_NAME="checkout",
-               OTEL_OPAMP_ENDPOINT=f"{base}/v1/opamp",
+               OTEL_OPAMP_ENDPOINT=opamp_url(port),
                OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
                OTEL_OPAMP_STATE_DIR=str(state),
                OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
@@ -96,7 +95,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         # The server in the application's own settings, given to register() in code; none in
         # OTEL_OPAMP_*, here or inherited (a run may set one, to show the code wins).
         env = {k: v for k, v in env.items() if not k.startswith("OTEL_OPAMP_")}
-        env.update(APP_OPAMP_URL=f"{base}/v1/opamp", APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
+        env.update(APP_OPAMP_URL=opamp_url(port), APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
         command = ["node", str(HERE / APP)]
     else:
         command = ["node", "--import", str(OTEL / "dist/src/register.js"), str(HERE / APP)]
@@ -240,7 +239,7 @@ def answered(server: Server, n: int, seconds: float = 60) -> list[float]:
 def settings_app(sink: Sink, opamp_port: str, state: Path, name: str):
     env = dict(os.environ,
                OTEL_SERVICE_NAME="checkout",
-               OTEL_OPAMP_ENDPOINT=f"http://127.0.0.1:{opamp_port}/v1/opamp",
+               OTEL_OPAMP_ENDPOINT=opamp_url(opamp_port),
                OTEL_OPAMP_STATE_DIR=str(state),
                OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
                OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{sink.port}",

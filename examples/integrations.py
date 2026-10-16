@@ -133,6 +133,31 @@ DEBUG = 10
 TAKES_KEYS = 0x100 | 0x8000
 
 
+def websocket() -> bool:
+    """Whether the applications talk to the server over a WebSocket (OPAMP_EXAMPLES_TRANSPORT
+    `websocket`) or plain HTTP (`http`, the default)."""
+    transport = os.environ.get("OPAMP_EXAMPLES_TRANSPORT", "http")
+    if transport not in ("http", "websocket"):
+        sys.exit(f"OPAMP_EXAMPLES_TRANSPORT={transport}: http or websocket")
+    return transport == "websocket"
+
+
+def opamp_url(port: str, host: str = "127.0.0.1") -> str:
+    """The OpAMP endpoint an application is given for the server on `port`: plain HTTP, or a
+    WebSocket (websocket()). The checks are the same over either, and judge_transport() holds the
+    run to the one asked for."""
+    return f"{'ws' if websocket() else 'http'}://{host}:{port}/v1/opamp"
+
+
+def judge_transport(events: list[dict]) -> list[tuple[str, bool]]:
+    """Every message the server took came over the transport asked for (opamp_url())."""
+    want = "ws" if websocket() else "http"
+    a2s = [e for e in events if e["event"] == "a2s"]
+    came = sorted({e.get("transport") for e in a2s}, key=str)
+    return [(f"every message came over {'a WebSocket' if want == 'ws' else 'plain HTTP'} ({len(a2s)}, {came})",
+             bool(a2s) and came == [want])]
+
+
 def target(name: str) -> Path:
     """A runner's own directory, for its builds, the server's logs and the state: two runners, at
     once or one after the other, share nothing. Under the checkout, not /tmp, as a Docker daemon
@@ -845,6 +870,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
                   until=lambda events: len(statuses(events)) >= 5, settle=10)
         print(f"run 1: remote config statuses {[s for _, s, _ in statuses(one)]}")
         expect(judge_first(one, service, switch_at_once))
+        expect(judge_transport(one))
         expect(judge_inventory(one, instrumentation, switch_at_once, switches, versioned))
 
         # Until the application has made its requests with the agent connected, then long enough
@@ -880,6 +906,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
         print(f"run 3: remote config statuses {[s for _, s, _ in statuses(three)]}, "
               f"{len(signal(three, 'metrics'))} metrics and {len(signal(three, 'logs'))} log exports")
         expect(judge_signals(three, service, switch_at_once))
+        expect(judge_transport(three))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]
@@ -952,6 +979,7 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
               f"key {'confirmed' if promoted(six) else 'not confirmed'}; the next start: "
               f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
         expect(judge_right_key(six))
+        expect(judge_transport(six))
         expect(judge_own_key(again))
     finally:
         shutil.rmtree(state, ignore_errors=True)
@@ -984,6 +1012,7 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
         print(f"run 7: remote config statuses {[s for _, s, _ in statuses(seven)]}, "
               f"{len(requests(seven, '/feature'))} /feature and {len(requests(seven, '/changed'))} /changed requests")
         expect(judge_app_settings(seven))
+        expect(judge_transport(seven))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]

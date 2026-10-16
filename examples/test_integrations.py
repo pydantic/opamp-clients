@@ -7,6 +7,7 @@ check passes a good run and fails a bad one, and none passes for want of anythin
 """
 from __future__ import annotations
 
+import os
 import sys
 import json
 import tempfile
@@ -17,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from integrations import (APP_KEY, TAKES_KEYS, app_settings_scenario, key_from_env, key_in_code,  # noqa: E402
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
-                          judge_wrong_key, read_log, wait_for)
+                          judge_transport, judge_wrong_key, opamp_url, read_log, wait_for)
 
 UID = "01928f3a7c3e7a1b8c2d3e4f5a6b7c8d"
 PING = "http://127.0.0.1:1/ping"
@@ -231,6 +232,43 @@ def inventory_sent(instrumentations: tuple[str, ...] = ("urllib", "requests"), g
 
 def failed(results: list[tuple[str, bool]]) -> list[str]:
     return [what for what, ok in results if not ok]
+
+
+class Transport(unittest.TestCase):
+    def setUp(self) -> None:
+        self.was = os.environ.pop("OPAMP_EXAMPLES_TRANSPORT", None)
+
+    def tearDown(self) -> None:
+        os.environ.pop("OPAMP_EXAMPLES_TRANSPORT", None)
+        if self.was is not None:
+            os.environ["OPAMP_EXAMPLES_TRANSPORT"] = self.was
+
+    @staticmethod
+    def over(*transports: str) -> list[dict]:
+        return [{"event": "a2s", "t": i, "transport": t} for i, t in enumerate(transports)]
+
+    def test_plain_http_by_default(self):
+        self.assertEqual(opamp_url("4320"), "http://127.0.0.1:4320/v1/opamp")
+        self.assertEqual(judge_transport(self.over("http", "http"))[0][1], True)
+
+    def test_a_websocket_when_asked(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "websocket"
+        self.assertEqual(opamp_url("4320", "host.docker.internal"), "ws://host.docker.internal:4320/v1/opamp")
+        self.assertEqual(judge_transport(self.over("ws", "ws"))[0][1], True)
+
+    def test_a_message_over_the_other_transport_fails(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "websocket"
+        self.assertEqual(judge_transport(self.over("ws", "http"))[0][1], False)
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "http"
+        self.assertEqual(judge_transport(self.over("ws"))[0][1], False)
+
+    def test_no_message_fails(self):
+        self.assertEqual(judge_transport([])[0][1], False)
+
+    def test_an_unknown_transport_is_refused(self):
+        os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "grpc"
+        with self.assertRaises(SystemExit):
+            opamp_url("4320")
 
 
 class Wait(unittest.TestCase):
