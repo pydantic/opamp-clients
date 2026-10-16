@@ -62,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, check_truth, ended, main, offered_before, pings, run,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offered_before, pings, run,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -447,6 +447,7 @@ CHECKS = {
     "first": lambda: check(launch, "httpclient", TARGET, listen=LISTEN),
     "signals": lambda: check_signals(launch, TARGET, listen=LISTEN),
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
+    "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
     "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", PLUGIN_EXPORTERS, listen=LISTEN,

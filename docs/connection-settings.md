@@ -324,7 +324,10 @@ offer like the first one, and every SDK integration follows it the same way:
   SDK names the configured endpoint then.
 
 Each integration's unit tests check a move to a second server, a second key at the same
-endpoint, and a move to an endpoint nobody listens on, each across a restart where it applies.
+endpoint, and a move to an endpoint nobody listens on, each across a restart where it applies. End to end, `check_rotation` (`examples/integrations.py`, the check `rotation` of each
+integration's `try.py`) has the reference server's operator rotate an agent's key and then move it
+to the server's second listener: the agent takes both, and its next start goes straight to the
+new endpoint.
 
 ## How it is checked
 

@@ -75,6 +75,15 @@ For an application that gives the token in code (key_in_code()), the same runs w
 given in code and OTEL_OPAMP_HEADERS set to the other one, which the code wins over: run 5's
 warning names the option given in code, not OTEL_OPAMP_HEADERS, and run 6 is accepted.
 
+check_rotation runs one more (and its next start) against the same kind of server, whose operator
+then rotates and moves the agent (docs/connection-settings.md, "Moves and rotations"): once the
+agent's own key is confirmed, the operator gives it a second key at the same endpoint; once that
+one is confirmed, a third at the server's second listener, the same server on another port. The
+agent takes each (three keys confirmed) without a refused request, and once it has reached the
+second listener it opens no connection to the first. The next start, with the same state
+directory and the first endpoint still configured, goes straight to the second listener on the
+key it was given there: no connection to the first, nothing refused, no new key.
+
 check_truth runs one more, under a setup (EXAMPLE_SETUP) where a setting may not reach the
 telemetry: the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each
 is either carried out (the sink shows it) or named as set aside in the effective config, never
@@ -1136,6 +1145,89 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
         expect(judge_right_key(six))
         expect(judge_transport(six))
         expect(judge_own_key(again))
+        expect(judge_transport(again))
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+def connections(events: list[dict], listener: str) -> list[dict]:
+    """The connections the fixture accepted on `listener` ("first" or "second"; with a move)."""
+    return [e for e in events if e["event"] == "connection" and e.get("listener") == listener]
+
+
+def judge_rotation(nine: list[dict]) -> list[tuple[str, bool]]:
+    """The rotation run's checks: (what, whether it holds)."""
+    keys = [e for e in nine if e["event"] == "key_promoted"]
+    done = [(e.get("action"), e.get("agents", 0)) for e in nine if e["event"] == "operator"]
+    second = connections(nine, "second")
+    reached = second[0]["t"] if second else None
+    back = [e for e in connections(nine, "first") if reached is not None and e["t"] > reached]
+    after = [e for e in nine if e["event"] == "a2s" and reached is not None and e["t"] > reached]
+    return [
+        (f"the operator rotated the agent's key and then moved it ({done})",
+         [a for a, _ in done] == ["rotate", "move"] and all(n >= 1 for _, n in done)),
+        (f"the agent took its own key, the second and the moved one: three confirmed ({len(keys)})", len(keys) == 3),
+        (f"no request refused ({len(rejected(nine))})", not rejected(nine)),
+        ("it reached the second listener", reached is not None),
+        (f"and opened no connection to the first after that ({len(back)})", reached is not None and not back),
+        (f"the server heard from it there ({len(after)} messages)", len(after) > 1),
+        ("the application's requests are traced after the move",
+         reached is not None and any("/ping" in u for e in spans(nine, after=reached) for u in e.get("spans") or [])),
+    ]
+
+
+def judge_moved_start(again: list[dict]) -> list[tuple[str, bool]]:
+    """The checks of the rotation run's next start: (what, whether it holds)."""
+    a2s = [e for e in again if e["event"] == "a2s" and not e["disconnect"]]
+    return [
+        (f"the next start goes straight to the second listener ({len(connections(again, 'second'))} connections), "
+         f"none to the first ({len(connections(again, 'first'))})",
+         bool(connections(again, "second")) and not connections(again, "first")),
+        (f"on the key it was given there: the server accepted it ({len(a2s)} messages), refusing none",
+         len(a2s) > 1 and not rejected(again)),
+        ("with no new key to take", not promoted(again)),
+        ("the application's requests are traced",
+         any("/ping" in u for e in spans(again) for u in e.get("spans") or [])),
+    ]
+
+
+def check_rotation(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
+                   env: dict[str, str] | None = None, key: Callable[[str], dict[str, str]] = key_from_env,
+                   host: str = "127.0.0.1") -> bool:
+    """The rotation run and its next start, and every check printed; True when all pass. `env` and
+    `key` as check_setup's; `host`: what the application reaches the server by (opamp_url()), which
+    the move names too."""
+    target_.mkdir(parents=True, exist_ok=True)
+    state = Path(tempfile.mkdtemp(prefix="state-rotation-", dir=target_))
+    state.chmod(0o777)
+    scenario_ = {"server": {"enrollment_key": "example", "after_promotion": ["rotate", "move"], "move_host": host}}
+    env = env or {}
+    ok = True
+
+    def expect(results: list[tuple[str, bool]]) -> None:
+        nonlocal ok
+        for what, cond in results:
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+
+    try:
+        def moved(events: list[dict]) -> bool:
+            second = connections(events, "second")
+            return (sum(e["event"] == "key_promoted" for e in events) >= 3 and bool(second)
+                    and bool(spans(events, after=second[0]["t"])))
+
+        def accepted(events: list[dict]) -> bool:
+            return sum(e["event"] == "a2s" for e in events) > 5 and bool(spans(events))
+
+        nine, again = run_and_restart(launch, scenario_, state, "rotation", seconds, listen, target_, until=moved,
+                                      again=accepted, settle=MARGIN, env=env | key("example"))
+        print(f"the rotation run: {sum(e['event'] == 'key_promoted' for e in nine)} keys confirmed, "
+              f"{len(connections(nine, 'second'))} connections to the second listener; the next start: "
+              f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
+        expect(judge_rotation(nine))
+        expect(judge_transport(nine))
+        expect(judge_moved_start(again))
         expect(judge_transport(again))
     finally:
         shutil.rmtree(state, ignore_errors=True)

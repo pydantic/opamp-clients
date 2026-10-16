@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from integrations import (APP_KEY, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
                           judge_truth, key_from_env, key_in_code, truth_scenario, judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
-                          judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
+                          judge_moved_start, judge_own_key, judge_right_key, judge_rotation, judge_second, judge_signals, judge_signals_restart,
                           judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
                           wait_for)
 import integrations  # noqa: E402
@@ -915,6 +915,75 @@ class OwnKey(unittest.TestCase):
 
     def test_the_default_interval_fails(self):
         self.assertNotEqual(failed(judge_own_key(again(every=30).events)), [])
+
+
+def rotated(back: bool = False, moved: bool = True, refused: bool = False) -> Log:
+    """The rotation run as it should go: the agent's own key confirmed, the operator rotates it,
+    the second confirmed, the operator moves it, the third confirmed at the second listener.
+    moved=False: the agent never takes the move."""
+    log = Log().pings(0, 20).a2s(0.5).a2s(1)
+    log.events += [{"event": "connection", "t": 0.4, "listener": "first"},
+                   {"event": "key_promoted", "t": 2, "uid": UID},
+                   {"event": "operator", "t": 2.1, "action": "rotate", "agents": 1},
+                   {"event": "key_promoted", "t": 4, "uid": UID},
+                   {"event": "operator", "t": 4.1, "action": "move", "agents": 1}]
+    if moved:
+        log.events += [{"event": "connection", "t": 5, "listener": "second"},
+                       {"event": "key_promoted", "t": 6, "uid": UID}]
+    if back:
+        log.events.append({"event": "connection", "t": 8, "listener": "first"})
+    if refused:
+        log.events.append({"event": "request_rejected", "t": 7, "status": 401})
+    return log.a2s(5.5).a2s(6.5).a2s(7.5).span(9)
+
+
+def moved_start(first: bool = False) -> Log:
+    """The rotation run's next start: straight to the second listener."""
+    log = Log().pings(0, 10).a2s(0.5).a2s(1).a2s(2).span(3)
+    log.events.append({"event": "connection", "t": 0.4, "listener": "second"})
+    if first:
+        log.events.append({"event": "connection", "t": 0.3, "listener": "first"})
+    return log
+
+
+class Rotation(unittest.TestCase):
+    def test_a_good_run_passes(self):
+        self.assertEqual(failed(judge_rotation(rotated().events)), [])
+
+    def test_a_connection_back_to_the_first_listener_fails(self):
+        self.assertEqual(failed(judge_rotation(rotated(back=True).events)),
+                         ["and opened no connection to the first after that (1)"])
+
+    def test_a_move_never_taken_fails(self):
+        self.assertIn("it reached the second listener", failed(judge_rotation(rotated(moved=False).events)))
+
+    def test_a_refused_request_fails(self):
+        self.assertEqual(failed(judge_rotation(rotated(refused=True).events)), ["no request refused (1)"])
+
+    def test_a_move_before_the_rotation_fails(self):
+        log = rotated()
+        ops = [e for e in log.events if e["event"] == "operator"]
+        ops[0]["action"], ops[1]["action"] = "move", "rotate"
+        self.assertIn("the operator rotated the agent's key and then moved it "
+                      "([('move', 1), ('rotate', 1)])", failed(judge_rotation(log.events)))
+
+    def test_an_operator_that_changed_no_agent_fails(self):
+        log = rotated()
+        next(e for e in log.events if e["event"] == "operator")["agents"] = 0
+        self.assertNotEqual(failed(judge_rotation(log.events)), [])
+
+
+class MovedStart(unittest.TestCase):
+    def test_a_good_start_passes(self):
+        self.assertEqual(failed(judge_moved_start(moved_start().events)), [])
+
+    def test_a_start_at_the_configured_endpoint_fails(self):
+        self.assertNotEqual(failed(judge_moved_start(moved_start(first=True).events)), [])
+
+    def test_a_new_key_fails(self):
+        log = moved_start()
+        log.events.append({"event": "key_promoted", "t": 1, "uid": UID})
+        self.assertEqual(failed(judge_moved_start(log.events)), ["with no new key to take"])
 
 
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,
