@@ -83,6 +83,21 @@ checked by `check_app_settings` (the check `app`): its example application reads
 |---|---|
 | `custom` | none of `/feature` before the first config (the default); `/feature` once the flag is `on`, still after a bad map is FAILED naming `custom.example.feature`, none once `custom` is left out, again from a map in a string; `/changed` three times (on, off, on), not for the FAILED config or the same map sent again; after a restart with no offer, `/feature` from the start |
 
+`check_truth` (the checks `truth-<setup>`) runs an integration under a setup where a setting may
+not reach the telemetry: something the application does to the SDK beside the integration, named
+in `EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
+out again by the next: `send_traces`, `send_metrics`, `send_logs`, `sampling_rate` 0,
+`send_logs_level`, `send_logs_level_by_scope`, `sampling_rules`, `mask_attributes`,
+`drop_attributes` and both rate caps (and `deactivate_all_instrumentations` where it is live). Each
+must either show at the sink, measured as `check_signals` measures it, or be named as set aside in
+the effective config the agent reports. An APPLIED setting that is neither fails. So does a setup
+whose settings set aside differ from the ones its try.py expects: more is control given up, fewer
+is a table out of date.
+
+| Integration | Setup | What the application does | Set aside |
+|---|---|---|---|
+| Python | `late-processor` | adds a span and a log record processor of its own, exporting over OTLP, once the SDK is built | the trace and log gates' settings and redaction; the sampler's stay |
+
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.
 The examples currently use the `elastic` settings format. The Logfire policy adapter is

@@ -110,8 +110,10 @@ default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, 
 30 s. An endpoint whose scheme the client doesn't speak (not `http(s)://` or `ws(s)://`) is warned
 about at start, as one without a scheme is. None of it raises. Its other keyword arguments are
 upstream's configurator's (`sampler`, which a remote rate replaces while one is set,
-`resource_attributes`, `span_processors`, and so on). Span processors given here, or added to the
-provider later, aren't the package's: `send_traces` doesn't stop them. Call it once, before the application's instrumentors.
+`resource_attributes`, `span_processors`, and so on). Span or log record processors given here,
+or added to the providers later, aren't the package's: they export past its gates. So the gates'
+settings are set aside from then on, and the effective config names them
+([the host](sdk-settings.md#the-host)). Call it once, before the application's instrumentors.
 
 [examples/python-otel/in_code.py](../examples/python-otel/in_code.py) is a whole application set
 up this way, the server taken from its own variables; `examples/python-otel/try.py` runs it
@@ -149,7 +151,7 @@ process can't carry out.
   | Setting | How |
   |---|---|
   | `sampling_rate` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`); a span whose parent was sampled, here or by the caller, is sampled at any rate, 0 included. Left out: the configured sampler. |
-  | `send_traces`, `send_logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors: `false` drops what would be exported. Processors passed to `configure()` or added later aren't stopped. |
+  | `send_traces`, `send_logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors: `false` drops what would be exported. Processors passed to `configure()` or added later aren't stopped, so then the setting is set aside, not answered as done. |
   | `send_logs_level` | live, at the same gated log exporters: a record below the level's SeverityNumber is dropped at its next export, one with no severity (0) is kept, and left out every record goes. |
   | `sampling_rules`, `send_logs_level_by_scope`, `drop_attributes`, `mask_attributes`, `sampling_traces_per_second`, `send_logs_per_second`, `debug_until` (with `debug_sampling_rate`, `debug_send_logs_level`) | live, in the same sampler and gates: see [the newer settings](#the-newer-settings). |
   | `send_metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook): `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, stoppable. Only the name `otlp` is: with no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them and the setting is ignored rather than answered as done ([the host](sdk-settings.md#the-host)). Nor with `otlp` beside another (`otlp,prometheus`): only the OTLP one could stop, so the setting is ignored too. |
@@ -330,12 +332,13 @@ components, in the shape every language sends
   whether the package's gate wraps it (the trace and log exporters its configurator built, and the
   OTLP metric exporter) and the host declares its signal's `send_*` setting. An exporter another
   configurator or `OTEL_CONFIG_FILE` built, every trace exporter when a span processor given to
-  `configure()` exports past the gate (and every log exporter, likewise for a log record
-  processor), and every metric exporter when one beside `otlp` makes `send_metrics` ignored: each
+  `configure()` or added to the provider later exports past the gate (and every log exporter,
+  likewise for a log record processor), and every metric exporter when one beside `otlp` makes `send_metrics` ignored: each
   is `gated: false`, as the settings left undeclared say. An exporter set to `none` isn't listed.
 - `settings`: the settings this process carries out, from the same host its decisions use.
 
-It is sent once: nothing it lists changes while the process runs.
+It is sent once, and again only if a processor added to a provider later makes a signal's
+settings set aside.
 
 ## How it is checked
 

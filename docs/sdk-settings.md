@@ -346,13 +346,13 @@ reaches the telemetry that goes through them, and nothing else.
 Another exporter, a span or log processor passed in or added later, or another agent extension's
 processor goes on exporting. Where the integration sees such an exporter when it builds the SDK,
 it doesn't declare that signal's settings, so they are set aside, named as not carried out:
-Python for exporters it doesn't build and span or log processors or metric exporters passed to
-`configure()`; Node.js for exporters it doesn't build; the .NET plugin and `WithOpAmp` whenever
+Python for exporters it doesn't build, span or log processors or metric exporters passed to
+`configure()`, and, from then on, a span or log processor added to its providers later; Node.js for exporters it doesn't build; the .NET plugin and `WithOpAmp` whenever
 one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
 `WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent under a
 configuration file for a span or log processor that is neither batch nor simple, or a metric
-reader neither periodic nor pull. A processor added after the SDK is built isn't seen: the
-setting is still answered APPLIED.
+reader neither periodic nor pull. Elsewhere a processor added after the SDK is built isn't seen:
+the setting is still answered APPLIED.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -596,4 +596,8 @@ exporters and a gated pull metric reader), a mapping from the next-start setting
   checks what arrives at the sink: a debug window that ends on the agent's timer, a sampling rule,
   the application's loggers off by scope, a masked and a dropped URL, both rate caps, and export
   health; and that an EDOT setting sent beside them is named as set aside in the effective config
-  the agent reports ([examples/README.md](../examples/README.md)).
+  the agent reports ([examples/README.md](../examples/README.md)). Its `check_truth` runs the
+  integration under the setups where a setting may not reach the telemetry (a processor added
+  once the SDK is built, say), one setting a document: each is carried out at the sink or named
+  as set aside, never answered APPLIED and neither, and the settings set aside are the ones that
+  setup is known to take out of the integration's hands.

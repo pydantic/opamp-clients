@@ -75,6 +75,11 @@ For an application that gives the token in code (key_in_code()), the same runs w
 given in code and OTEL_OPAMP_HEADERS set to the other one, which the code wins over: run 5's
 warning names the option given in code, not OTEL_OPAMP_HEADERS, and run 6 is accepted.
 
+check_truth runs one more, under a setup (EXAMPLE_SETUP) where a setting may not reach the
+telemetry: the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each
+is either carried out (the sink shows it) or named as set aside in the effective config, never
+APPLIED and neither. The settings set aside must be the ones the setup expects.
+
 check_app_settings runs two more, for an integration that lets the application read its own
 settings (docs/app-settings.md). Its example application reads the custom key `example.feature`
 with the default `off` each round, and while it is `on` also requests /feature; it asks to be told
