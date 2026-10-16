@@ -272,8 +272,12 @@ const EMPTY = create(EmptySchema);
 
 /** The longest delay a Node timer takes (setTimeout takes a longer one as 1 ms). */
 const MAX_DELAY_MS = 2 ** 31 - 1;
-/** Once the core has stopped, at least this for what it gave up on to unwind. */
-const STOP_GRACE_MS = 250;
+/** Once the core has stopped, at least this for what it gave up on to unwind (a download's file
+ * deleted once the write in flight is over), however much of the stop timeout the core took: stop
+ * returns within the stop timeout and this. 250 ms was too little on a loaded machine: a core that
+ * took all of its stop timeout and then stopped with a file being written left the file to be
+ * deleted after stop had returned (measured: up to 1.1 s on one CPU shared with 28 processes). */
+const STOP_GRACE_MS = 1000;
 
 /** Effects that open something new: a connection, a download, a stream. */
 const STARTS = new Set(["wsOpen", "download", "streamOpen"]);
@@ -641,7 +645,9 @@ export class Client {
     const core = this.#core;
     // All of stop takes one stop timeout from stop() (RULE-SHELL-07).
     const begun = this.#stopAt ?? this.#now();
-    const left = () => Math.max(STOP_GRACE_MS, begun + this.#stopMs - this.#now());
+    // One deadline for all of it: the grace is given once, not to each part.
+    const releasedBy = Math.max(begun + this.#stopMs, this.#now() + STOP_GRACE_MS);
+    const left = () => Math.max(0, releasedBy - this.#now());
     void (async () => {
       // Whatever is still under way (the client stopped on its own) is given up on; downloads
       // given up on have deleted what they wrote (S3), or the bound has passed.

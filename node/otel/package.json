@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api-logs": "0.222.0",
     "@opentelemetry/auto-instrumentations-node": "0.80.0",
     "@opentelemetry/core": "2.11.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "0.222.0",

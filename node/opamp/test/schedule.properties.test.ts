@@ -2035,9 +2035,10 @@ test("stop is bounded though a file write hangs", async () => {
           mock.timers.tick(250);
           waited += 250;
         }
-        // The core's stop_timeout (5 s) and a margin, whatever the disk does.
+        // The core's stop_timeout (5 s) and the shell's grace once the core has stopped (1 s,
+        // STOP_GRACE_MS in src/index.ts), whatever the disk does.
         if (process.env.OPAMP_SCHED_DEBUG) console.error(`stall run: ${mode} ${ws} steps=${steps} waited=${waited} settled=${w.stopSettled}`);
-        assert.ok(w.stopSettled && waited <= 5_500, `stop returned within 5.5 s of stop() (waited ${waited} ms, a write in flight: ${writing})`);
+        assert.ok(w.stopSettled && waited <= 6_000, `stop returned within 6 s of stop() (waited ${waited} ms, a write in flight: ${writing})`);
       } finally {
         current = undefined;
         mock.timers.reset();

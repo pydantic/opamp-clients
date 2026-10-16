@@ -670,22 +670,28 @@ class Executor:
             await f.finish()
             return resp.status, digest.digest(), where
 
-    async def close(self, timeout: float | None = None) -> None:
-        """Release everything within `timeout` seconds: whatever is still under way is dropped,
-        reported to no one, and a save already writing lands."""
+    async def close(self, timeout: float | None = None, *, release: float | None = None) -> None:
+        """Release everything: whatever is still under way is dropped, reported to no one, and a
+        save already writing lands. What was given up on (requests, connections, downloads and
+        the deletion of their files, once the file operation in flight is over) is waited for
+        `release` seconds at most (None: `timeout`); a save still writing, `timeout` seconds at
+        most (None: for ever)."""
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + timeout if timeout is not None else None
-        await self._inflight.close(timeout)
+        if release is None:
+            release = timeout
+        saves_by = loop.time() + timeout if timeout is not None else None
+        released_by = loop.time() + release if release is not None else None
+        await self._inflight.close(release)
         for session in (self._session, self._fetcher):
             if session is not None:
                 await session.close()
         if self._file_work:
             # Download files cancelled: deleted once their operation in flight is over.
-            left = None if deadline is None else max(0.0, deadline - loop.time())
+            left = None if released_by is None else max(0.0, released_by - loop.time())
             await asyncio.wait(list(self._file_work), timeout=left)
         if self._state_file is not None:
             settled = loop.run_in_executor(_saver(self._state_file), lambda: None)
-            left = None if deadline is None else max(0.0, deadline - loop.time())
+            left = None if saves_by is None else max(0.0, saves_by - loop.time())
             try:
                 await asyncio.wait_for(settled, left)
             except asyncio.TimeoutError:

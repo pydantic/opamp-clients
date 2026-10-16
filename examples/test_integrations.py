@@ -20,8 +20,8 @@ import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, TAKES_KEYS, app_settings_scenario, key_from_env, key_in_code,  # noqa: E402
-                          judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
+from integrations import (APP_KEY, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+                          judge_truth, key_from_env, key_in_code, truth_scenario, judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_moved_start, judge_own_key, judge_right_key, judge_rotation, judge_second, judge_signals, judge_signals_restart,
                           judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
                           wait_for)
@@ -450,6 +450,109 @@ class Second(unittest.TestCase):
 
     def test_no_effective_config_fails(self):
         self.assertNotEqual(failed(judge_second(self.one, second(config=False).events)), [])
+
+
+def truth(aside: frozenset[str] = frozenset(), unchanged: frozenset[str] = frozenset(), switch_at_once: bool = False,
+          named_in_force: frozenset[str] = frozenset(), statuses: str = "APPLIED") -> Log:
+    """check_truth's run as it should go, a document every 10 s: the baseline (every signal), then
+    each setting of TRUTH alone, carried out. A setting in `aside` is named as set aside in the
+    effective config reported with its answer, and its window looks like the baseline; one in
+    `unchanged` is not named, and its window looks like the baseline all the same (the defect);
+    one in `named_in_force` is named as set aside and in force at once."""
+    judged = [s for s, _ in TRUTH] + ([TRUTH_SWITCH[0]] if switch_at_once else [])
+    log = Log().a2s(0, config=True)
+    for i, setting in enumerate(judged):
+        start, end = 10.0 * i + 10, 10.0 * i + 20
+        effective: dict = {"elastic": {"sampling_rate": "1"}}
+        if setting in aside or setting in named_in_force:
+            effective["elastic.set_aside"] = {"ignored": [], "unsupported": [setting]}
+        if setting in named_in_force:
+            effective["elastic"][setting] = "x"
+        log.offer(start - 0.5).a2s(start, status=statuses, effective=effective)
+        shown = setting is None or setting in aside or setting in unchanged or setting in named_in_force
+        log.pings(start, end)
+        t = start
+        while t < end:
+            for signal in ("metrics", "logs"):
+                if shown or setting not in (f"send_{signal}", "send_logs_level", "send_logs_level_by_scope",
+                                            "send_logs_per_second"):
+                    log.export(t + 0.3, signal)
+            t += 0.5
+        if not shown and setting == "send_logs_per_second":
+            for second in range(int(start), int(end)):
+                log.export(second + 0.3, "logs", count=1)
+        name = {"mask_attributes": "[REDACTED]", "drop_attributes": "GET"}.get(setting, PING) if not shown else PING
+        silent = ("send_traces", "sampling_rate", "sampling_rules", TRUTH_SWITCH[0])
+        t = start
+        while t < end:
+            capped = setting == "sampling_traces_per_second" and not shown and round(t * 5) % 5
+            if (shown or setting not in silent) and not capped:
+                log.span(t + 0.5, url=name, ended=t + 0.05)
+            t += 0.2
+    return log.a2s(10.0 * len(judged) + 10, disconnect=True)
+
+
+class Truth(unittest.TestCase):
+    def test_every_setting_carried_out_passes(self):
+        for at_once in (False, True):
+            with self.subTest(switch_at_once=at_once):
+                self.assertEqual(failed(judge_truth(truth(switch_at_once=at_once).events, set(), at_once)), [])
+
+    def test_a_setting_named_as_set_aside_passes_where_the_setup_expects_it(self):
+        aside = frozenset({"send_traces", "mask_attributes", "send_logs_per_second"})
+        self.assertEqual(failed(judge_truth(truth(aside=aside).events, set(aside))), [])
+
+    def test_a_setting_applied_not_set_aside_and_not_carried_out_fails(self):
+        for setting, _ in TRUTH[1:]:
+            with self.subTest(setting=setting):
+                out = failed(judge_truth(truth(unchanged=frozenset({setting})).events, set()))
+                self.assertEqual(len(out), 1)
+                self.assertTrue(out[0].startswith(f"{setting}: APPLIED, not set aside, and the telemetry didn't change"))
+
+    def test_spans_after_the_live_switch_fail(self):
+        events = truth(unchanged=frozenset({TRUTH_SWITCH[0]}), switch_at_once=True).events
+        self.assertTrue(failed(judge_truth(events, set(), True))[0].startswith(f"{TRUTH_SWITCH[0]}: APPLIED, not"))
+
+    def test_more_set_aside_than_the_setup_expects_fails(self):
+        out = failed(judge_truth(truth(aside=frozenset({"send_traces"})).events, set()))
+        self.assertEqual(len(out), 1)
+        self.assertIn("not expected: ['send_traces']", out[0])
+
+    def test_fewer_set_aside_than_the_setup_expects_fails(self):
+        out = failed(judge_truth(truth().events, {"send_logs"}))
+        self.assertEqual(len(out), 1)
+        self.assertIn("expected, carried out: ['send_logs']", out[0])
+
+    def test_a_setting_named_as_set_aside_and_in_force_fails(self):
+        out = failed(judge_truth(truth(named_in_force=frozenset({"send_logs"})).events, {"send_logs"}))
+        self.assertEqual(out, ["send_logs: set aside, and not reported in force"])
+
+    def test_a_failed_document_fails(self):
+        out = failed(judge_truth(truth(statuses="FAILED").events, set()))
+        self.assertTrue(out[0].startswith("12 configs answered APPLIED"))
+
+    def test_a_window_with_too_few_requests_shows_nothing_carried_out(self):
+        log = truth()
+        log.events = [e for e in log.events if not (e["event"] == "stray_request" and 20 < e["t"] < 30)]
+        self.assertTrue(any("too few to tell" in f for f in failed(judge_truth(log.events, set()))))
+
+    def test_no_baseline_telemetry_fails(self):
+        log = truth()
+        log.events = [e for e in log.events if not (e["event"] == "otlp" and e["signal"] == "metrics" and e["t"] < 20)]
+        self.assertEqual(failed(judge_truth(log.events, set())), ["baseline: metrics arrive"])
+
+    def test_a_span_two_exporters_send_counts_once_against_the_cap(self):
+        log = truth()
+        log.events += [{**e, "t": e["t"] + 0.1, "ends": [e["ends"][0] + 0.001]} for e in list(log.events)
+                       if e["event"] == "otlp" and e["signal"] == "traces" and 110 < e["t"] < 120]
+        self.assertEqual(failed(judge_truth(log.events, set())), [])
+
+    def test_the_scenario_offers_each_document_once_in_order(self):
+        for at_once in (False, True):
+            faults = truth_scenario(at_once)["server"]["faults"]
+            bodies = [json.loads(f["body"]) for f in faults]
+            self.assertEqual(bodies, [b for _, b in TRUTH] + ([TRUTH_SWITCH[1]] if at_once else []))
+            self.assertEqual(len({f["on_message"] for f in faults}), len(faults))
 
 
 class Signals(unittest.TestCase):

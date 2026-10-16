@@ -34,6 +34,12 @@ health again once the exports fail (at its next 30 s report), and again once the
 Then check_app_settings (examples/integrations.py, its own runs 7 and 8): Program.cs reads the
 feature flag example.feature (OpAmpAppSettings.Get), which the server turns on and off, and is
 told of each change (OpAmpAppSettings.OnChange) (docs/app-settings.md).
+
+Last, check_truth (examples/integrations.py) under the setups Setups.cs carries out, named in
+EXAMPLE_SETUP: plugin-exporters, a plugin of the application's own adding a span exporter and a
+log record processor; own-sdk, the application's own tracer and meter providers under
+OTEL_DOTNET_AUTO_SETUP_SDK=false. Each setting shows in the telemetry or is named as set aside,
+and the settings set aside are exactly those the setup takes from the plugin.
 """
 from __future__ import annotations
 
@@ -56,7 +62,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, ended, main, offered_before, pings, run,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offered_before, pings, run,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -424,6 +430,18 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
     return ok
 
 
+#: The plugin first, then the application's own (Setups.cs), which automatic instrumentation calls after it.
+PLUGINS = ("Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation:"
+           "Example.ExtraExporters, App")
+#: What a span exporter and a log record processor of the application's own plugin take from the
+#: plugin's control: their gates' settings, set aside. The sampler stays the plugin's.
+PLUGIN_EXPORTERS = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
+                    "mask_attributes", "drop_attributes"}
+#: What the application's own tracer and meter providers take (OTEL_DOTNET_AUTO_SETUP_SDK=false):
+#: the sampler and the traces and metrics gates. The logs stay automatic instrumentation's.
+OWN_SDK = {"send_traces", "send_metrics", "sampling_rate", "sampling_rules", "sampling_traces_per_second",
+           "mask_attributes", "drop_attributes"}
+
 LISTEN = "127.0.0.1:0" if LOCAL else "0.0.0.0:0"
 CHECKS = {
     "first": lambda: check(launch, "httpclient", TARGET, listen=LISTEN),
@@ -432,6 +450,10 @@ CHECKS = {
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
+    "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", PLUGIN_EXPORTERS, listen=LISTEN,
+                                                  env={"OTEL_DOTNET_AUTO_PLUGINS": PLUGINS}),
+    "truth-own-sdk": lambda: check_truth(launch, TARGET, "own-sdk", OWN_SDK, listen=LISTEN,
+                                         env={"OTEL_DOTNET_AUTO_SETUP_SDK": "false"}),
 }
 
 if __name__ == "__main__":

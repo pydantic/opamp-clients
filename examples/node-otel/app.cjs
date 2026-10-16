@@ -17,6 +17,10 @@ const { logs } = require("@opentelemetry/api-logs");
 // The application's settings alone, without the rest of the package: what the register filled in.
 const { appSettings } = require("@pydantic/opamp-otel/app-settings");
 
+// check_truth's setups (setups.cjs), before the application gets its loggers and tracers: none
+// otherwise, and nothing to call for each request.
+const setup = process.env.EXAMPLE_SETUP ? require("./setups.cjs").apply(process.env.EXAMPLE_SETUP) : () => {};
+
 const log = logs.getLogger("app");
 
 // With EXAMPLE_SETTINGS=1 (try.py's settings runs) it does more, for the settings that match
@@ -46,6 +50,7 @@ const timer = setInterval(() => {
   }
   if (!demo) {
     get(process.argv[2]);
+    setup(process.argv[2]);
     log.emit({ severityText: "INFO", severityNumber: 9, body: `requested ${process.argv[2]}` });
     return;
   }

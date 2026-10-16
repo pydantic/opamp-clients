@@ -181,6 +181,9 @@ internal sealed class Controls
 /// <param name="signal">The exporter's signal; null: each request's, by its path (one whose path names none goes as it is).</param>
 internal sealed class GateHandler(Controls controls, Signal? signal = null) : DelegatingHandler
 {
+    /// <summary>The signal it was given; null: each request's, by its path.</summary>
+    public Signal? Signal => signal;
+
     // http/protobuf sends synchronously; gRPC asynchronously.
     protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
     {

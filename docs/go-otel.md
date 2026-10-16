@@ -114,8 +114,9 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   `service.instance.id` identify it; the rest describes it. Attributes keep their types, arrays
   as arrays.
 - **Takes settings** from the remote config's `elastic` entry, **every one but the polling
-  interval at once**, for the SDK `Setup` builds (an application that keeps its own SDK setup, or
-  sets other global providers after `Setup`, isn't managed):
+  interval at once**, for the SDK `Setup` builds. An application that keeps its own SDK setup
+  isn't managed. One that sets a global provider of its own after `Setup` has that signal's
+  settings set aside ([below](#where-the-server-cant-reach)):
 
   | Setting | How |
   |---|---|
@@ -176,8 +177,30 @@ the application's own too. To keep the application's own spans, list the instrum
   or any metrics exporter while `OTEL_METRICS_PRODUCERS` is set, is autoexport's own: an SDK
   reader can't be wrapped outside the SDK. `send_metrics` can't stop it: the package warns, and
   the setting is ignored rather than answered as done ([the host](sdk-settings.md#the-host)).
-- An SDK the application builds itself, or global providers it sets after `Setup`: none of the
-  settings reach them.
+- A global provider the application sets after `Setup` (`otel.SetTracerProvider`,
+  `otel.SetMeterProvider`, `global.SetLoggerProvider`) has no sampler or gate of this package's.
+  Go instrumentation takes its tracer, meter or logger from the global provider, often at each
+  call (otelhttp's transport does at each request), so that signal's telemetry goes there. The
+  agent sees it, warns, and sets aside the settings it can't carry out from then on. It reports
+  the new effective config and inventory at once, and each later config is decided without
+  them:
+
+  | Provider set | Set aside |
+  |---|---|
+  | tracer | `sampling_rate`, `sampling_rules`, `sampling_traces_per_second`, `send_traces`, `drop_attributes`, `mask_attributes`, `deactivate_instrumentations`, `deactivate_all_instrumentations` (and `debug_sampling_rate`) |
+  | meter | `send_metrics` |
+  | logger | `send_logs`, `send_logs_level`, `send_logs_level_by_scope`, `send_logs_per_second`, `drop_attributes`, `mask_attributes` (and `debug_send_logs_level`) |
+
+  The rest stay in force. With the meter or the logger provider set, the instrumentation switches
+  still stop spans and the metrics and log records that go through `Setup`'s providers, but not
+  what goes through the application's. The settings stay set aside if `Setup`'s provider is set
+  again: what took a tracer, meter or logger from the other one keeps it. The otel packages say
+  nothing when a global provider is set, so the agent looks: at each config, before it decides,
+  and once a second. A provider that wraps `Setup`'s and is set in its place counts as one of the
+  application's own.
+- An SDK the application builds itself and never sets as the global providers: none of the
+  settings reach it, and the package can't see it. Nothing is set aside for it, so the server
+  may hear APPLIED for a setting that telemetry doesn't follow. Use `Setup`'s providers instead.
 - A tracer taken from a provider other than the global one (`sdk.TracerProvider` is the global
   one) or a span it started isn't switched.
 
@@ -212,6 +235,7 @@ settings it carries out. For example, with otelhttp, a log bridge and a Promethe
   logs, and for metrics exactly when `send_metrics` is carried out, so a Prometheus reader, or any
   reader while `OTEL_METRICS_PRODUCERS` is set, is `gated: false` ([above](#where-the-server-cant-reach)).
 - **Settings** are those of the host the layer is given at `Load` and `Decide`, with the same clock.
+  When a global provider set in place of `Setup`'s narrows the host, the inventory is sent again.
 
 ## The settings that match telemetry
 
@@ -413,6 +437,10 @@ told of.
     later is sent again, once; no instrumentation, every exporter `none`, and duplicates;
   - each setting's edge cases from [sdk-settings.md](sdk-settings.md), live changes and
     reverting, and a second, ungated exporter seeing the application's own telemetry;
+  - a global provider set in place of `Setup`'s (`globals_test.go`): each signal's settings set
+    aside at once, put out of force and reported, the others kept; still set aside when `Setup`'s
+    provider is set again; seen through the otel packages' globals by the agent's own look,
+    warned once, and by a decision before it answers;
   - the application's own settings (`appsettings_test.go`): reads before any config, without a
     server and once a key is left out; the typed reads against `custom.json`'s `typed` vectors and
     their edges; every `custom.json` case through the layer and `Controls`; a function told once
@@ -436,3 +464,9 @@ told of.
   `check_app_settings` ([app-settings.md](app-settings.md#how-it-is-checked)): the server turns
   `example.feature` on and off, a bad map is FAILED and changes nothing, the same map again tells
   nothing, and the next start has the saved value from the start.
+  The `truth-global-tracer`, `truth-global-meter` and `truth-global-logger` checks run
+  `check_truth` (`examples/integrations.py`) with the example in each `EXAMPLE_SETUP` of
+  [setups.go](../examples/go-otel/setups.go): once `Setup` has returned, the application sets a
+  provider of its own as the global one, exporting to the same sink. Each setting must change the
+  telemetry the sink receives or be named as set aside, and the settings set aside must be
+  exactly those in the table [above](#where-the-server-cant-reach).

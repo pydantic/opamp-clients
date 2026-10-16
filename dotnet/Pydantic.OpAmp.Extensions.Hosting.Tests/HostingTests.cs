@@ -632,6 +632,50 @@ public class HostingTests
                 .WithOpAmp();
         });
 
+    // A processor added to a built provider once the host has started exports past the gate. The
+    // next config is decided without that signal's send_* (here, traces), which is set aside; and a
+    // check between configs (here, logs; the health timer's, or Recheck) reports the effective
+    // config again. The inventory no longer says those signals are gated.
+    [Fact]
+    public async Task AProcessorAddedToABuiltProviderSetsItsSignalAside()
+    {
+        const string first = "{\"send_traces\":\"false\",\"send_logs\":\"false\"}";
+        const string next = "{\"send_traces\":\"false\",\"send_logs\":\"false\",\"sampling_rate\":\"1\"}";
+        await using var server = new OpAmpServer(Kit.Config(first));
+        await using var collector = new Collector();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
+        b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector.Endpoint + "/v1/logs")));
+        b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector.Endpoint + "/v1/traces"))).WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        var agent = host.Services.GetRequiredService<OpAmpAgent>();
+        await Kit.Until(() => Applied(server, first), "the first config answered APPLIED");
+        Assert.False(agent.Controls.Sends(Signal.Traces));
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+
+        host.Services.GetRequiredService<TracerProvider>().AddProcessor(new SimpleActivityExportProcessor(new Kept<Activity>()));
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent!.RemoteConfig(Kit.Config(next)).Status);
+        Assert.True(agent.Controls.Sends(Signal.Traces));
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+        Assert.Contains("send_traces", agent.Agent.Effective.ConfigMap.ConfigMap["elastic.set_aside"].Body.ToStringUtf8());
+
+        host.Services.GetRequiredService<LoggerProvider>().AddProcessor(new SimpleLogRecordExportProcessor(new Kept<LogRecord>()));
+        agent.Agent.Recheck();
+        Assert.True(agent.Controls.Sends(Signal.Logs));
+        await Kit.Until(() => server.Messages.Any(m => m.EffectiveConfig?.ConfigMap?.ConfigMap.TryGetValue("elastic.set_aside", out var a) == true &&
+                                                       a.Body.ToStringUtf8().Contains("send_logs", StringComparison.Ordinal)), "the effective config reported again");
+        var exporters = agent.Agent.Components!.Components["exporters"].SubComponentMap;
+        foreach (var signal in new[] { "traces", "logs" })
+        {
+            Assert.All(exporters[signal].SubComponentMap.Values, e => Assert.False(e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
+        }
+
+        await host.StopAsync(Cancel);
+    }
+
+    private static bool Applied(OpAmpServer server, string body) =>
+        server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s && s.LastRemoteConfigHash.ToStringUtf8() == body);
+
     // An exporter given a client certificate or a CA builds them into its own HTTP client: the
     // gate's carries the same, and every signal can still be stopped.
     [Fact]
