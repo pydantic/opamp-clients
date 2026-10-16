@@ -284,6 +284,23 @@ public class SdkSettingsTests
             layer.Components(reversed, Declaring(), Now).ToByteArray());
     }
 
+    // Every case of testdata/start.json through the wrapper: the settings to start with come from the
+    // last config applied in the core's saved state, else from the document kept before.
+    [Fact]
+    public void TheStartVectors()
+    {
+        using var layer = new SdkSettings();
+        foreach (var c in Cases("start.json"))
+        {
+            var name = c.GetProperty("name").GetString();
+            var coreState = c.TryGetProperty("core_state", out var h) ? Convert.FromHexString(h.GetString()!) : null;
+            var saved = c.TryGetProperty("saved", out var s) ? System.Text.Encoding.UTF8.GetBytes(s.GetString()!) : null;
+            var loaded = layer.Load(saved, null, 0, coreState);
+            var want = c.GetProperty("want").ValueKind == JsonValueKind.Null ? "{}" : c.GetProperty("want").GetString();
+            Assert.True(want == loaded.Current.ToStringUtf8(), $"{name}: started from {loaded.Current.ToStringUtf8()}");
+        }
+    }
+
     private static List<JsonElement> Cases(string file)
     {
         var dir = AppContext.BaseDirectory;

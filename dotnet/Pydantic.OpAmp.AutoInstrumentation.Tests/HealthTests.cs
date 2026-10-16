@@ -7,6 +7,7 @@ using System.Text.Json;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 using static Pydantic.OpAmp.AutoInstrumentation.Tests.Otlp;
 
@@ -170,8 +171,10 @@ public class HealthTests
             this.nanos = 0;
             var steps = c.GetProperty("steps").EnumerateArray().ToList();
             this.wall = steps[0].GetProperty("now_unix_ms").GetUInt64();
-            // A state directory: the first step's settings, decided before the start, are what it loads.
-            var agent = this.Prepared(Path.Combine(Path.GetTempPath(), "opamp-health-" + Guid.NewGuid()));
+            // A state directory: the first step's settings, decided before the start (and kept applied
+            // as the client keeps them), are what it loads.
+            var dir = Path.Combine(Path.GetTempPath(), "opamp-health-" + Guid.NewGuid());
+            var agent = this.Prepared(dir);
             try
             {
                 var had = new Dictionary<Signal, SignalCounts>();
@@ -187,6 +190,7 @@ public class HealthTests
 
                     var settings = step.TryGetProperty("settings", out var doc) ? doc.GetRawText() : "{}";
                     Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(settings)).Status);
+                    Kept.KeepApplied(dir, settings);
                     foreach (var signal in Enum.GetValues<Signal>())
                     {
                         var want = step.TryGetProperty("counts", out var counts) && counts.TryGetProperty(signal.ToString().ToLowerInvariant(), out var sc)

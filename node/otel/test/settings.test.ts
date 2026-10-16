@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -25,9 +25,10 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings, type Settings } from "@pydantic/opamp-client/sdk";
 
+import { keepApplied } from "./kept.js";
 import { Agent, Controls, glob, HEALTH_EVERY_MS, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
 
 const LAYER = new SdkSettings();
@@ -673,6 +674,19 @@ class TestAgent extends Agent {
     } as never;
   }
 
+  /**
+   * The remote config answered, and, APPLIED with a state directory, kept as the client keeps it
+   * (in its state, before APPLIED goes out): this agent has no client, so a restart finds it there.
+   */
+  override remoteConfig(config: AgentRemoteConfig): RemoteConfigStatus {
+    const s = super.remoteConfig(config);
+    const dir = this.setup?.stateDir;
+    if (s.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED && dir !== undefined) {
+      keepApplied(dir, config.config?.configMap.elastic?.body ?? new Uint8Array());
+    }
+    return s;
+  }
+
   /** The timer armed now: the latest, not cleared. */
   get timer() {
     const t = this.armed.at(-1);
@@ -714,27 +728,12 @@ interface DebugCase {
   }[];
 }
 
-/**
- * Run `f` with the settings file in `dir` made unsavable when `fail`: a directory, not empty,
- * stands where it goes. What was saved before is put back after.
- */
-function failingSave<T>(dir: string | undefined, fail: boolean, f: () => T): T {
-  if (!fail || dir === undefined) return f();
-  const path = join(dir, "sdk-settings.json");
-  const kept = join(dir, "sdk-settings.kept");
-  if (existsSync(path)) renameSync(path, kept);
-  mkdirSync(join(path, "in-the-way"), { recursive: true });
-  try {
-    return f();
-  } finally {
-    rmSync(path, { recursive: true });
-    if (existsSync(kept)) renameSync(kept, path);
-  }
-}
-
+// saving.json's cases whose save fails are the layer's: here the client keeps the config applied,
+// and its save failing holds APPLIED back rather than refusing the config (the client's tests).
 test("vectors: debug.json and saving.json, step by step through the agent: decide, a restart, the timer's refresh", () => {
-  const cases = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")];
-  assert.ok(cases.length >= 17);
+  const cases = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")]
+    .filter((k) => !k.steps.some((s) => s.save === "failed"));
+  assert.ok(cases.length >= 14);
   for (const k of cases) {
     const nowhere = k.steps.some((s) => s.save === "nowhere");
     const dir = nowhere ? undefined : mkdtempSync(join(tmpdir(), "opamp-debug-"));
@@ -748,7 +747,7 @@ test("vectors: debug.json and saving.json, step by step through the agent: decid
       } else {
         agent.wall = step.now_unix_ms;
         if (step.call === "decide") {
-          const s = failingSave(dir, step.save === "failed", () => agent.remoteConfig(config(step.document!)));
+          const s = agent.remoteConfig(config(step.document!));
           status = s.status;
           error = s.errorMessage;
         } else agent.refresh();

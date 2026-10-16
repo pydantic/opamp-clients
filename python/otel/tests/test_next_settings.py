@@ -6,10 +6,8 @@ setting's edge cases from docs/sdk-settings.md."""
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
-import shutil
 from pathlib import Path
 
 import pytest
@@ -21,6 +19,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
 import opamp_otel
+from kept import keep_applied
 from opamp_otel import Agent, Controls
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
@@ -750,26 +749,9 @@ def set_aside(agent: Agent) -> dict | None:
     return json.loads(files["elastic.set_aside"].body) if "elastic.set_aside" in files else None
 
 
-DEBUG = vectors("debug") + vectors("saving")
-
-
-@contextlib.contextmanager
-def failing_save(state: Path, fail: bool):
-    """While it lasts, if `fail`, the settings file can't be saved: a directory, not empty, stands
-    where it goes. What was saved before is put back after."""
-    if not fail:
-        yield
-        return
-    path, kept = state / "sdk-settings.json", state / "sdk-settings.kept"
-    if path.exists():
-        path.rename(kept)
-    (path / "in-the-way").mkdir(parents=True)
-    try:
-        yield
-    finally:
-        shutil.rmtree(path)
-        if kept.exists():
-            kept.rename(path)
+# saving.json's cases whose save fails are the layer's: here the client keeps the config applied,
+# and its save failing holds APPLIED back rather than refusing the config (the client's tests).
+DEBUG = vectors("debug") + [c for c in vectors("saving") if all(s.get("save") != "failed" for s in c["steps"])]
 
 
 @pytest.mark.parametrize("case", DEBUG, ids=ids(DEBUG))
@@ -781,11 +763,12 @@ def test_debug_mode_and_saving_over_time_are_what_the_shared_vectors_say_through
     for step in case["steps"]:
         clocks.wall = step["now_unix_ms"]
         if step["call"] == "decide":
-            with failing_save(tmp_path, step.get("save") == "failed"):
-                status = agent.remote_config(config(step["document"].encode()))
+            status = agent.remote_config(config(step["document"].encode()))
             want_status = {"applied": APPLIED, "failed": FAILED}[step["want"].get("status", "applied")]
             assert status.status == want_status, status.error_message
             assert status.error_message.startswith(step["want"].get("error", "")), status.error_message
+            if status.status == APPLIED and not nowhere:
+                keep_applied(tmp_path, step["document"].encode())  # as the client does, before APPLIED goes out
         elif step["call"] == "load":
             agent = agent_at(clocks, state)  # a restart
         else:
@@ -915,8 +898,7 @@ def test_a_saved_debug_window_ends_when_the_client_cant_start(tmp_path, caplog):
     import time
 
     end = datetime.datetime.fromtimestamp(time.time() + 0.3, datetime.UTC).isoformat(timespec="milliseconds")
-    (tmp_path / "sdk-settings.json").write_text(json.dumps({"sampling_rate": "0.1",
-                                                            "debug_until": end.replace("+00:00", "Z")}))
+    keep_applied(tmp_path, json.dumps({"sampling_rate": "0.1", "debug_until": end.replace("+00:00", "Z")}).encode())
     agent = Agent()
     # The core refuses the scheme: the client doesn't start.
     agent.prepare({"OTEL_OPAMP_ENDPOINT": "ftp://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})

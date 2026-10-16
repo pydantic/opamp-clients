@@ -624,8 +624,8 @@ func TestAWrongCustomEntryFailsTheConfigAndNothingChanges(t *testing.T) {
 		t.Fatalf("effective %s", got)
 	}
 	tld.want(t, change{m{"a": "1"}, []string{"a"}})
-	if saved, _ := os.ReadFile(filepath.Join(dir, "sdk-settings.json")); string(saved) != `{"custom":{"a":"1"},"sampling_rate":"0.5"}` {
-		t.Fatalf("saved %s", saved)
+	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); err == nil {
+		t.Fatal("sdk-settings.json written: the client keeps the config applied")
 	}
 }
 
@@ -696,8 +696,11 @@ func TestARefreshWithTheSameMapTellsNothing(t *testing.T) {
 
 func TestValuesSurviveARestartWithAStateDirectory(t *testing.T) {
 	dir := t.TempDir()
-	newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"checkout.new_flow":"on"}}`))
-	again := newTestAgent(t, dir) // the next start: before any config arrives
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"checkout.new_flow":"on"}}`)); st.GetStatus() != applied {
+		t.Fatalf("%v", st)
+	}
+	keepApplied(t, dir, `{"custom":{"checkout.new_flow":"on"}}`) // as the client does, before APPLIED goes out
+	again := newTestAgent(t, dir)                                // the next start: before any config arrives
 	if again.controls.app.get("checkout.new_flow", "off") != "on" {
 		t.Fatal("the saved values aren't in force at the next start")
 	}
@@ -724,7 +727,10 @@ func TestWithoutAStateDirectoryARestartStartsFromTheDefaults(t *testing.T) {
 func TestSetupPutsTheSavedValuesInForceBeforeItReturns(t *testing.T) {
 	ownAppSettings(t)
 	dir := t.TempDir()
-	newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on","limit":"9"}}`))
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on","limit":"9"}}`)); st.GetStatus() != applied {
+		t.Fatalf("%v", st)
+	}
+	keepApplied(t, dir, `{"custom":{"example.feature":"on","limit":"9"}}`) // as the client does, before APPLIED goes out
 	var tld told
 	defer OnAppSettingsChange(tld.f)()
 	os.Setenv("OTEL_TRACES_EXPORTER", "none")
@@ -755,7 +761,10 @@ func TestSetupPutsTheSavedValuesInForceBeforeItReturns(t *testing.T) {
 func TestAFailedSetupTakesTheSavedValuesBack(t *testing.T) {
 	ownAppSettings(t)
 	dir := t.TempDir()
-	newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on"}}`))
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on"}}`)); st.GetStatus() != applied {
+		t.Fatalf("%v", st)
+	}
+	keepApplied(t, dir, `{"custom":{"example.feature":"on"}}`) // as the client does, before APPLIED goes out
 	var tld told
 	defer OnAppSettingsChange(tld.f)()
 	os.Setenv("OTEL_TRACES_EXPORTER", "none")

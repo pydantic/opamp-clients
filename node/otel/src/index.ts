@@ -1505,17 +1505,23 @@ export class Agent {
     this.layer = new SdkSettings();
     this.host = hostFromEnv(env);
     let saved: Uint8Array | undefined;
+    let coreState: Uint8Array | undefined;
     const dir = this.setup.stateDir;
     if (dir) {
       try {
         mkdirSync(dir, { recursive: true });
+        // The settings to start with are the last config applied, which the client keeps in its
+        // state (opamp-state); sdk-settings.json is what this package kept itself before, read
+        // only while the client's state holds no config applied.
+        const state = join(dir, "opamp-state");
+        if (existsSync(state)) coreState = readFileSync(state);
         const path = join(dir, "sdk-settings.json");
         if (existsSync(path)) saved = readFileSync(path);
       } catch (e) {
         say.warn(`OpAMP: saved SDK settings unreadable, using the SDK's own: ${String(e)}`);
       }
     }
-    this.loaded = this.layer.load(saved, this.host, BigInt(this.now()));
+    this.loaded = this.layer.load(saved, this.host, BigInt(this.now()), coreState);
     if (this.loaded.warning) say.warn(`OpAMP: ${this.loaded.warning}`);
     this.current = this.loaded.current;
     this.effective = this.loaded.effective;
@@ -1749,10 +1755,15 @@ export class Agent {
     this.#timer = undefined;
     const lock = this.setup?.stateLock;
     const run = this.#run;
+    const client = this.client;
     // Called from the application's context (a signal handler): the goodbye is the agent's too.
     this.#stopping ??= context
-      .with(suppressTracing(context.active()), () => this.client?.stop() ?? Promise.resolve())
+      .with(suppressTracing(context.active()), () => client?.stop() ?? Promise.resolve())
       .catch(() => {})
+      // A save the client left writing (a config applied just before) lands first: a register
+      // after this one, in the same process, reads the settings to start with from that state,
+      // before its client starts. (The write keeps Node.js running until it is done anyway.)
+      .then(() => client?.settled())
       .then(() => {
         // Unless a later prepare (after abandon gave it up at once) holds the same slot again.
         if (lock && (this.#run === run || this.setup?.stateLock !== lock)) release(lock);
@@ -1801,7 +1812,10 @@ export class Agent {
       this.loaded?.current ?? new Uint8Array(),
       this.host,
       BigInt(now),
-      s.stateDir === undefined ? undefined : (doc) => write(join(s.stateDir!, "sdk-settings.json"), doc),
+      // With a state directory the client keeps the config this applies, in its own state, and
+      // tells the server APPLIED once that is saved: nothing for this package to save. Without
+      // one, nothing is kept, and a next-start change is refused.
+      s.stateDir === undefined ? undefined : () => {},
     );
     if (d.apply) {
       this.controls.apply(d.apply);

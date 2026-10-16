@@ -24,14 +24,22 @@ public sealed class SdkSettings : IDisposable
     /// <paramref name="host"/>: the settings the SDK carries out, at once or at the next start; one it
     /// leaves out is set aside, never in force (null: none carried out), and one that is no setting
     /// throws. <paramref name="nowUnixMs"/>: the wall clock in milliseconds since the Unix epoch, which debug
-    /// mode is decided by (0: none, and debug mode is ignored).
+    /// mode is decided by (0: none, and debug mode is ignored). <paramref name="coreState"/>: the OpAMP
+    /// core's saved state (what it asked the host to store; null: none). The settings then come from
+    /// the last config applied in it, and <paramref name="saved"/> is read only when it holds none (a
+    /// document kept before the core kept the config applied).
     /// </summary>
-    public Loaded Load(byte[]? saved, Host? host = null, ulong nowUnixMs = 0)
+    public Loaded Load(byte[]? saved, Host? host = null, ulong nowUnixMs = 0, byte[]? coreState = null)
     {
         var load = new Load { Host = host, NowUnixMs = nowUnixMs };
         if (saved != null)
         {
             load.Saved = ByteString.CopyFrom(saved);
+        }
+
+        if (coreState != null)
+        {
+            load.CoreState = ByteString.CopyFrom(coreState);
         }
 
         return Do(new Request { Load = load }).Loaded;

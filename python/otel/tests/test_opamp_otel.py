@@ -26,6 +26,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
 import opamp_otel
+from kept import keep_applied
 from opamp_otel import Agent, Controls, Setup, disabled_instrumentations, duration_ms, headers
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
@@ -142,14 +143,65 @@ def test_a_bad_heartbeat_interval_warns_and_is_the_default(server, caplog):
         agent.stop()
 
 
-def test_live_settings_are_applied_at_once_saved_and_reported(tmp_path):
+def test_live_settings_are_applied_at_once_and_reported_and_the_package_saves_nothing(tmp_path):
     agent, _ = prepared(tmp_path)
     s = agent.remote_config(config('{"sampling_rate":"0.5","send_logs":"false"}'))
     assert s.status == APPLIED and s.last_remote_config_hash == b'{"sampling_rate":"0.5","send_logs":"false"}'
     assert not agent.controls.send_logs
     assert effective(agent) == {"sampling_rate": "0.5", "send_logs": "false"}
-    assert (tmp_path / "sdk-settings.json").read_text() == '{"sampling_rate":"0.5","send_logs":"false"}'
-    assert (tmp_path / "sdk-settings.json").stat().st_mode & 0o777 == 0o600
+    # The client keeps the config applied, in its own state: nothing of the package's own.
+    assert not (tmp_path / "sdk-settings.json").exists()
+
+
+def test_a_next_start_change_is_applied_where_the_client_keeps_state_and_refused_where_none_is(tmp_path):
+    agent, _ = prepared(tmp_path)
+    assert agent.remote_config(config('{"opamp_polling_interval":"1m"}')).status == APPLIED
+    agent, _ = prepared("none")
+    s = agent.remote_config(config('{"opamp_polling_interval":"1m"}'))
+    assert s.status == FAILED and "needs somewhere to keep state" in s.error_message
+
+
+def test_the_settings_to_start_with_are_the_config_the_client_kept_applied_else_the_file_kept_before(tmp_path):
+    # Kept before the client kept the config applied: the package's own file carries over.
+    (tmp_path / "sdk-settings.json").write_text('{"sampling_rate":"0.25"}')
+    agent, _ = prepared(tmp_path)
+    assert agent.controls.sampler._rate == 0.25
+    # Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+    keep_applied(tmp_path, b'{"sampling_rate":"0.5"}')
+    agent, _ = prepared(tmp_path)
+    assert agent.controls.sampler._rate == 0.5 and effective(agent) == {"sampling_rate": "0.5"}
+    # A config applied with no settings entry: every setting the SDK's own, not the old file's.
+    keep_applied(tmp_path, b"{}")
+    agent, _ = prepared(tmp_path)
+    assert agent.controls.sampler._rate is None and effective(agent) == {}
+    # A client state that doesn't read: the old file again.
+    (tmp_path / "opamp-state").write_bytes(b"\xff\xff")
+    agent, _ = prepared(tmp_path)
+    assert agent.controls.sampler._rate == 0.25
+
+
+def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_path):
+    # The server hears APPLIED once the client has saved the config with its state: a start after
+    # that comes back to it, with no file of the package's own.
+    offer = config('{"sampling_rate":"0.5","send_logs":"false"}')
+    server = _Server(reply=lambda msg: opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
+                     if msg.HasField("agent_description") else None)
+    applied = lambda m: m.HasField("remote_config_status") and m.remote_config_status.status == APPLIED  # noqa: E731
+    agent = Agent()
+    agent.configured = True
+    try:
+        agent.prepare({"OTEL_OPAMP_ENDPOINT": server.endpoint, "OTEL_OPAMP_STATE_DIR": str(tmp_path),
+                       "OTEL_OPAMP_HEARTBEAT_INTERVAL": "1s"})
+        agent.start(Resource.create({"service.name": "checkout"}))
+        server.wait(lambda: any(applied(m) for m in server.got))
+    finally:
+        agent.stop()
+        server.close()
+    assert not (tmp_path / "sdk-settings.json").exists()
+    again = Agent()
+    again.prepare({"OTEL_OPAMP_ENDPOINT": server.endpoint, "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
+    assert again.controls.sampler._rate == 0.5 and not again.controls.send_logs
+    assert effective(again) == {"sampling_rate": "0.5", "send_logs": "false"}
 
 
 def test_a_wrong_config_is_failed_and_changes_nothing(tmp_path):
@@ -165,6 +217,7 @@ def test_next_start_settings_wait_for_the_restart_then_switch_instrumentations_o
     agent, _ = prepared(tmp_path)
     assert agent.remote_config(config('{"deactivate_instrumentations":"urllib"}')).status == APPLIED
     assert effective(agent) == {}
+    keep_applied(tmp_path, b'{"deactivate_instrumentations":"urllib"}')  # as the client does, before APPLIED goes out
     _, env = prepared(tmp_path, OTEL_PYTHON_DISABLED_INSTRUMENTATIONS="requests")
     assert env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] == "requests,urllib"
 
@@ -801,7 +854,7 @@ def test_configure_without_an_endpoint_is_the_sdks_own_setup():
 
 def test_in_code_the_instrumentation_switches_are_ignored_not_applied(tmp_path):
     # The application instruments itself: nothing reads OTEL_PYTHON_DISABLED_INSTRUMENTATIONS.
-    (tmp_path / "sdk-settings.json").write_text('{"deactivate_instrumentations":"urllib"}')
+    keep_applied(tmp_path, b'{"deactivate_instrumentations":"urllib"}')
     env = {"OTEL_OPAMP_ENDPOINT": "http://server/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)}
     agent = Agent()
     agent.prepare(env, auto_instrumented=False)
@@ -867,14 +920,14 @@ def test_a_metric_exporter_beside_otlp_keeps_send_metrics_from_being_answered_do
     assert effective(agent) == {"send_logs": "false"}
 
 
-def test_a_state_directory_that_cant_be_written_fails_a_live_change_as_every_language_does(tmp_path):
-    # The same answer in every language: the settings can't be kept, so nothing is
-    # applied, live ones included.
+def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tmp_path):
+    # The package saves nothing: the client keeps the config applied with its state, and until
+    # that save lands the server hears APPLYING, not APPLIED (the client's own tests). The same
+    # in every language.
     (tmp_path / "file").write_text("")
     agent, _ = prepared(tmp_path / "file" / "state")
     s = agent.remote_config(config('{"sampling_rate":"0.5"}'))
-    assert s.status == FAILED and s.error_message.startswith("can't save the settings")
-    assert agent.controls.sampler._rate is None
+    assert s.status == APPLIED and agent.controls.sampler._rate == 0.5
 
 
 def _released(setup: Setup | None) -> None:

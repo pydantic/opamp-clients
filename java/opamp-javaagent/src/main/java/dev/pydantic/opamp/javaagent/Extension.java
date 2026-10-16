@@ -123,8 +123,8 @@ final class Extension {
   private boolean hooked;
   /**
    * Whether the state directory can be written: without that, the instance UID is made afresh each
-   * start. Settings are saved wherever there is a state directory, and a change that can't be
-   * saved fails, as in every language.
+   * start. The client keeps the config applied wherever there is a state directory, and tells the
+   * server APPLIED once that is saved, as in every language.
    */
   private boolean canSave;
   /** What the agent carries out ({@link #HOST}, narrowed by {@link #notGated}); {@link #host} adds {@code custom}. */
@@ -495,9 +495,17 @@ final class Extension {
       return Map.of();
     }
     byte[] saved = null;
+    byte[] coreState = null;
     canSave = writable(setup.stateDir());
     if (setup.stateDir() != null) {
       try {
+        // The settings to start with are the last config applied, which the client keeps in its
+        // state (opamp-state); sdk-settings.json is what this agent kept itself before, read only
+        // while the client's state holds no config applied.
+        Path state = setup.stateDir().resolve("opamp-state");
+        if (Files.exists(state)) {
+          coreState = Files.readAllBytes(state);
+        }
         Path file = setup.stateDir().resolve("sdk-settings.json");
         if (Files.exists(file)) {
           saved = Files.readAllBytes(file);
@@ -510,7 +518,7 @@ final class Extension {
       controls.app = appSettings.get();
     }
     appBefore = controls.app == null ? null : controls.app.current();
-    start(saved);
+    start(coreState, saved);
     return Controls.startProperties(loaded.getSettings());
   }
 
@@ -528,11 +536,11 @@ final class Extension {
     LOG.warning("OpAMP: the configuration file's " + String.join(", ", new java.util.TreeSet<>(signals))
         + " pass a processor or reader other than batch, simple, periodic or pull, which the agent can't"
         + " gate; the server's settings for them aren't carried out");
-    start(loaded.getCurrent().toByteArray());
+    start(null, loaded.getCurrent().toByteArray());
   }
 
-  private void start(byte[] saved) {
-    loaded = layer().load(saved, host(), wallClock.getAsLong());
+  private void start(byte[] coreState, byte[] saved) {
+    loaded = layer().loadFrom(coreState, saved, host(), wallClock.getAsLong());
     if (!loaded.getWarning().isEmpty()) {
       LOG.warning("OpAMP: " + loaded.getWarning());
     }
@@ -597,7 +605,7 @@ final class Extension {
       return true;
     } catch (IOException | RuntimeException e) {
       LOG.log(Level.WARNING, "OpAMP: can't write the state directory " + dir
-          + "; the instance UID isn't kept, and a settings change fails as it can't be saved", e);
+          + "; the instance UID isn't kept, and the client can't keep the settings applied", e);
       return false;
     }
   }
@@ -809,12 +817,12 @@ final class Extension {
 
   /** Carry out the layer's decision on a remote config; the answer for the server. */
   synchronized Opamp.RemoteConfigStatus remoteConfig(Opamp.AgentRemoteConfig config) {
-    // Saved wherever there is a state directory: the layer fails a change whose save fails, rather
-    // than taking a live one that a restart would lose.
+    // With a state directory the client keeps the config this applies, in its own state, and tells
+    // the server APPLIED once that is saved: nothing for the agent to save. Without one, nothing is
+    // kept, and a next-start change is refused.
     long now = wallClock.getAsLong();
-    Path dir = setup.stateDir();
     SettingsProto.Decision d = layer().decide(config, current, loaded.getCurrent(), host(), now,
-        dir == null ? null : doc -> write(dir.resolve("sdk-settings.json"), doc));
+        setup.stateDir() == null ? null : doc -> { });
     if (d.hasApply()) {
       controls.apply(d.getApply());
       inForce = d.getApply();

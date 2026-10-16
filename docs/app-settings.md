@@ -78,10 +78,11 @@ took (`25` sent is `"25"` taken):
 The same map sent another way (in a string, keys in another order, `25` for `"25"`) is the same
 text, so it is no change.
 
-**Restarts.** The integrations already save the document in force for the next start (in the
-state directory, `sdk-settings.json` in Python) and `Load` it before the application's code runs.
-`custom` is in it, so with a state directory the values in force at exit are in force again from
-the start, before any config arrives and whether the server can be reached or not. Without one,
+**Restarts.** With a state directory the client keeps the last config applied in its saved
+state, and the integrations `Load` the settings from it before the application's code runs
+([sdk-settings.md](sdk-settings.md#at-start)). `custom` is in it, so the values in force at exit
+are in force again from the start, before any config arrives and whether the server can be
+reached or not. Without one,
 each start begins from the defaults until the server sends a config (it is live, so it needs no
 state to be applied).
 

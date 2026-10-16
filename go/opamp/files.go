@@ -6,10 +6,26 @@ package opamp
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 )
+
+// ReadState is what is saved at stateFile (nil if there is no file yet), once the work a client
+// stopped before on it left under way has ended: what a client started next on the file starts
+// from. Stop doesn't wait for a save already writing (it lands by itself), so a read straight
+// after Stop can find the state before it. stateFile is named as it was in Config.StateFile. A
+// state sealed with Config.StateSealer comes back sealed.
+func ReadState(stateFile string) ([]byte, error) {
+	workOn(stateFile).settle()
+	b, err := os.ReadFile(stateFile)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	return b, err
+}
 
 // fileSystem is every file operation a save and a download's file carry out: the disk itself
 // (osFS), journaled into the core tap when it is on (journal), and replaced by tests that inject

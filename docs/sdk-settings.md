@@ -417,16 +417,18 @@ quotes at most 64 characters of a value or key, then `… (N bytes)`, so a huge 
 doesn't come back as a huge reason. It then
 reports its **effective config**: the `elastic` entry again, with the settings in force.
 
-**What the save comes to decides the answer.** A config is answered in two steps, the same in
-every language. The layer first decides what to keep (`Decide` returns a `Plan`: the document to
-save, or nothing when the config is refused). The integration saves it, to `sdk-settings.json` in
-its state directory, and hands back how that went (`Commit`: saved, failed with the error, or
-nowhere to save: no state directory). The layer then gives the answer. A save that fails refuses
-the config (`can't save the settings: …`) and changes nothing: no live setting is taken that a
-restart would lose. With nowhere to save, a config that changes a next-start setting is refused
-(`… take effect at the next start, which needs somewhere to keep state`); one that changes only
-live settings is APPLIED. The integration never rewrites the answer: each language's binding runs
-the two steps around the integration's save, so the integration makes one call.
+**The client keeps the config applied.** A config is answered in two steps, the same in every
+language. The layer first decides what to keep (`Decide` returns a `Plan`: the document to keep,
+or nothing when the config is refused), and then gives the answer (`Commit`). With a state
+directory the integrations save nothing themselves: the client keeps the config the application
+answered APPLIED in its own saved state, and tells the server APPLIED only once that save has
+landed. Until then, and while a save fails (the client tries again), the server hears APPLYING.
+So the integration commits it as saved. With no state directory there is nowhere to keep it: a
+config that changes a next-start setting is refused (`… take effect at the next start, which needs
+somewhere to keep state`), and one that changes only live settings is APPLIED. A save that fails,
+for a host that makes one itself, refuses the config (`can't save the settings: …`) and changes
+nothing. The integration never rewrites the answer: each language's binding runs the two steps,
+so the integration makes one call.
 
 - Live settings show as applied: as sent, but `send_logs_level` by its lowercase name (`warn` for
   `WARNING`), `sampling_rules` as canonical JSON, `send_logs_level_by_scope` sorted, and the
@@ -481,7 +483,7 @@ integration keeps the settings documents it is handed and passes them back.
 
 | Call | When | Returns |
 |---|---|---|
-| `Load{core_state, saved, host, now_unix_ms}` | at start, before the SDK is built, with the core's saved state and the document saved at the last change ([at start](#at-start)) | the settings to start with (next-start ones included), the document in force, the effective config, and a warning if the saved document was unreadable (the SDK then starts with its own); when to ask again (`refresh_at_unix_ms`) |
+| `Load{core_state, saved, host, now_unix_ms}` | at start, before the SDK is built, with the client's saved state and the document kept before ([at start](#at-start)) | the settings to start with (next-start ones included), the document in force, the effective config, and a warning if the saved document was unreadable (the SDK then starts with its own); when to ask again (`refresh_at_unix_ms`) |
 | `Decide{config, current, at_start, host, now_unix_ms}` | a remote config arrived | a `Plan`: the document to save before answering (none when the config is refused) |
 | `Commit{decide, saved, error}` | once the plan's document is saved, or its save failed, or there is nowhere to save it ([the answer](#the-answer)) | the `RemoteConfigStatus` to send, the settings to put in force (only when APPLIED), the document now in force, the effective config, the next-start settings pending a restart, and when to ask again |
 | `Refresh{current, at_start, host, now_unix_ms}` | at the time a `Load`, `Commit` or `Refresh` said to ask again (`refresh_at_unix_ms`, 0 for never): the end of debug mode | the settings to put in force now, the effective config, when to ask again, and a warning if the document in force no longer reads on this clock (one moved back a day, say: the SDK's own settings are then in force) |
@@ -492,22 +494,23 @@ integration keeps the settings documents it is handed and passes them back.
 
 ### At start
 
-The settings to start with are those of the last config applied. The client core keeps that
-config in its saved state (beside the last config received, which it hands over again at start):
-it saves it when the application answers APPLIED, and reports APPLIED only once that save has
-landed. `Load` takes the state as the core asked the host to store it (`core_state`) and reads the
-config's `elastic` entry from it with the core's own decoding, so there is one copy of the format.
-A config applied without an `elastic` entry is every setting the SDK's own. So a config the
-application refused, received after the one applied, is never what a restart starts from.
+The settings to start with are those of the last config applied. The client keeps that config in
+its saved state (the state file in the state directory, beside the last config received, which it
+hands over again at start): it saves it when the application answers APPLIED, and reports APPLIED
+only once that save has landed. `Load` takes the state as the client saved it (`core_state`) and
+reads the config's `elastic` entry from it. A config applied without an `elastic` entry is every
+setting the SDK's own. So a config the application refused, received after the one applied, is
+never what a restart starts from.
 
-With no config applied in that state (none saved, a state saved before the core kept one, or one
-that doesn't read), `Load` reads `saved`, the document the integration kept itself before
-(`sdk-settings.json`): the settings carry over until a config is applied.
+With no config applied in that state (none saved, a state saved by an earlier client that didn't
+keep one, or one that doesn't read), `Load` reads `saved`: the document the integration kept
+itself before (`sdk-settings.json` in the state directory). So the settings carry over from an
+earlier release until a config is applied. The integrations no longer write that file.
 
-The config applied survives an endpoint change. The core drops the config received from the old
-server (the new server's config wins) but keeps the applied one, as it keeps packages installed:
-its settings are in force on the agent, and stay so until the new server's config is applied. A
-new server then sees in the effective config what the agent actually runs.
+The config applied survives an endpoint change. The client drops the config received from the
+old server (the new server's config wins) but keeps the applied one, as it keeps packages
+installed: its settings are in force on the agent, and stay so until the new server's config is
+applied. A new server then sees in the effective config what the agent actually runs.
 
 ### The host
 
@@ -570,13 +573,14 @@ exporters and a gated pull metric reader), a mapping from the next-start setting
   redaction leaves of a list of attributes), `caps.json` (what a rate cap lets through, event by
   event), `debug.json` (debug mode over time: `Load`, `Decide` and `Refresh` in turn, and what the
   effective config names as set aside through them), `saving.json` (the answer from what became
-  of the save: saved, failed, nowhere to save),
+  of the save: saved, failed, nowhere to save; the integrations, whose saves are the client's, run
+  its saved and nowhere cases), `start.json` (the document `Load` starts from: the config applied
+  in the client's saved state, or the one kept before),
   `components.json` (what the inventory lists,
   [available-components.md](available-components.md#what-the-sdk-integrations-report)),
   `health.json` (export health call after call: what is reported, and when it is sent),
   `custom.json` (the application's own settings: the maps taken and refused, and the typed
-  reads), `start.json` (the document `Load` starts from: the config applied in the core's saved
-  state, or the one kept before). The layer runs every one, and through `Evaluate`; each language's wrapper and
+  reads). The layer runs every one, and through `Evaluate`; each language's wrapper and
   integration tests run them too.
 - Random vectors: cases in the formats of `sampling.json`, `logs.json`, `redact.json` and
   `caps.json`, answered by the layer, drawn where languages part ways (case outside ASCII, the

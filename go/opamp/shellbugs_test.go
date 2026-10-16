@@ -224,6 +224,55 @@ func TestASlowSaveHoldsUpNothing(t *testing.T) {
 	}
 }
 
+// ReadState right after Stop: a save the client left writing lands first, and what it saved is
+// what is read, as the next client on the file would start from it.
+func TestReadStateWaitsForTheSaveAStoppedClientLeftWriting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state")
+	started, release := holdSaves(t, path)
+	ts := httptest.NewServer(&server{})
+	defer ts.Close()
+	// No UID chosen: the core makes one and saves it at once.
+	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StopTimeout: 300 * time.Millisecond, StateFile: path}
+	a, err := Start(context.Background(), cfg, Status{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no save")
+	}
+	_ = a.Stop(context.Background())
+	if before, err := os.ReadFile(path); err == nil || len(before) > 0 {
+		t.Fatalf("the save landed before it was let go: %x (%v)", before, err)
+	}
+	type read struct {
+		b   []byte
+		err error
+	}
+	got := make(chan read, 1)
+	go func() {
+		b, err := ReadState(path)
+		got <- read{b, err}
+	}()
+	select {
+	case r := <-got:
+		t.Fatalf("read %x (%v) while the save was still writing", r.b, r.err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	release()
+	r := <-got
+	if r.err != nil || len(r.b) == 0 {
+		t.Fatalf("read %x (%v), want the state saved", r.b, r.err)
+	}
+	if on, _ := os.ReadFile(path); !bytes.Equal(r.b, on) {
+		t.Fatalf("read %x, the file holds %x", r.b, on)
+	}
+	if b, err := ReadState(filepath.Join(t.TempDir(), "none")); b != nil || err != nil {
+		t.Fatalf("no file: %x, %v", b, err)
+	}
+}
+
 // S5: a notification on the first step (a remote config saved before a restart) comes with the
 // client's handle, after Start has returned, and can be answered through it.
 func TestTheCallbackGetsTheClient(t *testing.T) {

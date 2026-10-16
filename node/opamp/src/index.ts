@@ -518,6 +518,14 @@ export class Client {
     return this.#done;
   }
 
+  /** Once the file work under way on the state file has ended: a save still writing when stop()
+   * resolved (stop doesn't wait for it; a client started next on the file does) has landed, and
+   * what is saved there is what a client started next would start from. At once without a state
+   * file. Never rejects. */
+  async settled(): Promise<void> {
+    if (this.#stateFile !== undefined) await settled(this.#stateFile);
+  }
+
   #now(): number {
     return this.#clock() - this.#start;
   }

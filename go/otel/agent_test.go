@@ -5,7 +5,9 @@ package opampotel
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -80,10 +82,11 @@ func TestInstrumentationSwitchesTakeEffectAtOnceAndAtTheNextStart(t *testing.T) 
 	if got := effectiveBody(a); !strings.Contains(got, `"deactivate_instrumentations":"otelhttp"`) {
 		t.Fatalf("effective config %s", got)
 	}
-	saved, err := os.ReadFile(filepath.Join(dir, "sdk-settings.json"))
-	if err != nil || string(saved) != string(a.current) {
-		t.Fatalf("saved %q (%v), want the document in force %q", saved, err, a.current)
+	// The client keeps the config applied, in its own state: nothing of the package's own.
+	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("sdk-settings.json written (%v)", err)
 	}
+	keepApplied(t, dir, body) // as the client does, before APPLIED goes out
 
 	next := newTestAgent(t, dir)
 	if !next.controls.Off(otelhttp) || next.uid != a.uid {
@@ -315,6 +318,74 @@ func offeringServer(t *testing.T, remote *protobufs.AgentRemoteConfig) (*httptes
 // the client it comes with: callbacks wait for Start to return, so no queue holds them until the
 // client is there (with -race, a callback reading a.client, which start sets after Start
 // returns, races).
+// The server hears APPLIED once the client has saved the config with its state: a start after
+// that comes back to it, with no file of the package's own.
+func TestAConfigAppliedThroughTheServerIsWhereTheNextStartBegins(t *testing.T) {
+	body := `{"deactivate_instrumentations":"otelhttp","sampling_rate":"0.25"}`
+	srv, statuses := offeringServer(t, remote(body))
+	dir := t.TempDir()
+	a, err := newAgent(context.Background(), &server{endpoint: srv.URL + "/v1/opamp", stateDir: dir,
+		heartbeat: 100 * time.Millisecond}, NewControls(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.start(context.Background(), resource.Empty())
+	deadline := time.After(10 * time.Second)
+	for done := false; !done; {
+		select {
+		case s := <-statuses:
+			done = s.GetStatus() == applied && string(s.GetLastRemoteConfigHash()) == body
+		case <-deadline:
+			t.Fatal("never answered APPLIED")
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := a.stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("sdk-settings.json written (%v)", err)
+	}
+	next := newTestAgent(t, dir)
+	if !next.controls.Off(otelhttp) || *next.controls.Sampler.rate != 0.25 {
+		t.Fatal("the next start: the config applied should be in force")
+	}
+}
+
+// The settings to start with are the config the client kept applied, else the file this package
+// kept before (an earlier release's), which carries over until a config is applied.
+func TestTheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sdk-settings.json"), []byte(`{"sampling_rate":"0.25"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rate := func() any {
+		a := newTestAgent(t, dir)
+		if r := a.controls.Sampler.rate; r != nil {
+			return *r
+		}
+		return nil
+	}
+	if r := rate(); r != 0.25 {
+		t.Fatalf("kept before: rate %v", r)
+	}
+	keepApplied(t, dir, `{"sampling_rate":"0.5"}`)
+	if r := rate(); r != 0.5 {
+		t.Fatalf("kept applied by the client: rate %v", r)
+	}
+	keepApplied(t, dir, `{}`) // a config applied with no settings: the SDK's own, not the old file's
+	if r := rate(); r != nil {
+		t.Fatalf("an empty config applied: rate %v", r)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "opamp-state"), []byte{0xff, 0xff}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if r := rate(); r != 0.25 {
+		t.Fatalf("a client state that doesn't read: rate %v", r)
+	}
+}
+
 func TestTheFirstNotificationIsAnsweredThroughItsClient(t *testing.T) {
 	body := `{"deactivate_instrumentations":"otelhttp"}`
 	srv, statuses := offeringServer(t, remote(body))

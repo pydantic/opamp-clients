@@ -180,6 +180,59 @@ public class StopTests
         }
     }
 
+    // ReadState right after StopAsync: a save the client left writing lands first, and what it
+    // saved is what is read, as the next client on the state file would start from it.
+    [Fact]
+    public async Task ReadStateWaitsForTheSaveAStoppedClientLeftWriting()
+    {
+        using var server = new TestServer();
+        var dir = Directory.CreateTempSubdirectory();
+        var state = Path.Combine(dir.FullName, "state");
+        var full = Path.GetFullPath(state);
+        using var held = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        var first = 0;
+        void Hold(string path)
+        {
+            if (Path.GetFullPath(path) == full && Interlocked.Exchange(ref first, 1) == 0)
+            {
+                held.Set();
+                release.Wait(TimeSpan.FromSeconds(30));
+            }
+        }
+
+        StateFile.Saving += Hold;
+        try
+        {
+            var options = new OpAmpClientOptions
+            {
+                Mode = OpAmpMode.DotNet,
+                Endpoint = new Uri(server.Endpoint("http")),
+                HeartbeatInterval = TimeSpan.FromHours(1),
+                StateFile = state,
+                StopTimeout = TimeSpan.FromMilliseconds(300),
+            };
+            var a = OpAmpClient.Start(options, new OpAmpStatus());
+            Assert.True(held.Wait(TimeSpan.FromSeconds(10)), "no save");
+            await a.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(File.Exists(state), "the save landed before it was let go");
+
+            var read = Task.Run(() => OpAmpClient.ReadState(state));
+            await Task.Delay(300);
+            Assert.False(read.IsCompleted, "read while the save was still writing");
+            release.Set();
+            var got = await read.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotEmpty(got);
+            Assert.Equal(File.ReadAllBytes(state), got);
+            Assert.Empty(OpAmpClient.ReadState(Path.Combine(dir.FullName, "none")));
+        }
+        finally
+        {
+            release.Set();
+            StateFile.Saving -= Hold;
+        }
+    }
+
     // S5: a remote config saved before a restart is handed over as the client starts; the
     // callback answers through the client it is given, before Start has even returned to a caller
     // that is slow to take it.

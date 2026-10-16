@@ -65,9 +65,8 @@ class ExtensionTest {
     assertEquals(c.getConfigHash(), s.getLastRemoteConfigHash());
     assertFalse(e.controls.gates.sendLogs());
     assertEquals("{\"sampling_rate\":\"0.5\",\"send_logs\":\"false\"}", effective(e));
-    // Saved, for the next start.
-    assertEquals("{\"sampling_rate\":\"0.5\",\"send_logs\":\"false\"}",
-        Files.readString(dir.resolve("sdk-settings.json")));
+    // The client keeps the config applied, in its own state: nothing of the agent's own.
+    assertFalse(Files.exists(dir.resolve("sdk-settings.json")));
   }
 
   @Test
@@ -148,39 +147,24 @@ class ExtensionTest {
   }
 
   /**
-   * Runs {@code f} with the settings file in {@code dir} made unsavable when {@code fail}: a
-   * directory, not empty, stands where it goes. What was saved before is put back after.
-   */
-  static <T> T failingSave(Path dir, boolean fail, java.util.concurrent.Callable<T> f) throws Exception {
-    if (!fail) {
-      return f.call();
-    }
-    Path path = dir.resolve("sdk-settings.json");
-    Path kept = dir.resolve("sdk-settings.kept");
-    if (Files.exists(path)) {
-      Files.move(path, kept);
-    }
-    Files.createDirectories(path.resolve("in-the-way"));
-    try {
-      return f.call();
-    } finally {
-      Files.delete(path.resolve("in-the-way"));
-      Files.delete(path);
-      if (Files.exists(kept)) {
-        Files.move(kept, path);
-      }
-    }
-  }
-
-  /**
-   * debug.json and saving.json, through the extension: each decide a remote config (its save
-   * failing where the step says), each load a restart (what was saved read back from the state
-   * directory), each refresh what the timer does, at the step's clock.
+   * debug.json and saving.json, through the extension: each decide a remote config (kept applied
+   * as the client keeps it, where there is a state directory), each load a restart (what the client
+   * kept read back from the state directory), each refresh what the timer does, at the step's clock.
+   * saving.json's cases whose save fails are the layer's: here the client keeps the config applied,
+   * and its save failing holds APPLIED back rather than refusing the config (the client's tests).
    */
   @org.junit.jupiter.api.TestFactory
   java.util.stream.Stream<org.junit.jupiter.api.DynamicTest> debugModeAndSavingOverTime(@TempDir Path root) {
     var cases = new java.util.ArrayList<>(Vectors.cases("debug"));
-    cases.addAll(Vectors.cases("saving"));
+    for (var c : Vectors.cases("saving")) {
+      boolean fails = false;
+      for (var step : c.get("steps")) {
+        fails |= "failed".equals(step.path("save").asText());
+      }
+      if (!fails) {
+        cases.add(c);
+      }
+    }
     return cases.stream().map(c -> org.junit.jupiter.api.DynamicTest.dynamicTest(
         c.get("name").asText(), () -> {
           Path dir = Files.createTempDirectory(root, "state");
@@ -199,9 +183,10 @@ class ExtensionTest {
                   e = Extension.forTest(setup(canSave ? dir : null));
                   e.wallClock = () -> now[0];
                 }
-                Extension at = e;
-                Opamp.RemoteConfigStatus st = failingSave(dir, "failed".equals(step.path("save").asText()),
-                    () -> at.remoteConfig(config("elastic", step.get("document").asText())));
+                Opamp.RemoteConfigStatus st = e.remoteConfig(config("elastic", step.get("document").asText()));
+                if (st.getStatus() == APPLIED && canSave) {
+                  Kept.keepApplied(dir, step.get("document").asText()); // as the client does, before APPLIED goes out
+                }
                 assertEquals(want.get("status").asText(), st.getStatus() == APPLIED ? "applied" : "failed");
                 assertTrue(st.getErrorMessage().startsWith(want.path("error").asText()), st.getErrorMessage());
               }
@@ -474,6 +459,7 @@ class ExtensionTest {
     assertEquals(APPLIED, s.getStatus());
     // Not in force yet: the effective config still has the agent's own.
     assertEquals("{}", effective(e));
+    Kept.keepApplied(dir, "{\"deactivate_instrumentations\":\"jdbc\"}"); // as the client does, before APPLIED goes out
 
     // The next start reads them, as agent properties, and they are in force.
     Extension next = Extension.forTest(null);
@@ -496,8 +482,31 @@ class ExtensionTest {
   }
 
   @Test
+  void theSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore(@TempDir Path dir) throws Exception {
+    // Kept before the client kept the config applied (an earlier release): it carries over.
+    Files.writeString(dir.resolve("sdk-settings.json"), "{\"sampling_rate\":\"0.25\"}");
+    assertEquals(0.25, startedIn(dir).inForce().getSamplingRate());
+    // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+    Kept.keepApplied(dir, "{\"sampling_rate\":\"0.5\"}");
+    assertEquals(0.5, startedIn(dir).inForce().getSamplingRate());
+    // A config applied with no settings entry: every setting the SDK's own, not the old file's.
+    Kept.keepApplied(dir, "{}");
+    assertFalse(startedIn(dir).inForce().hasSamplingRate());
+    // A client state that doesn't read: the old file again.
+    Files.write(dir.resolve("opamp-state"), new byte[] {(byte) 0xff, (byte) 0xff});
+    assertEquals(0.25, startedIn(dir).inForce().getSamplingRate());
+  }
+
+  static Extension startedIn(Path dir) {
+    Extension e = Extension.forTest(null);
+    e.properties(DefaultConfigProperties.createFromMap(
+        Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
+    return e;
+  }
+
+  @Test
   void savedSettingsAreInForceFromTheStart(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"), "{\"send_metrics\":\"false\",\"sampling_rate\":\"0\"}");
+    Kept.keepApplied(dir, "{\"send_metrics\":\"false\",\"sampling_rate\":\"0\"}");
     Extension e = Extension.forTest(null);
     e.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
@@ -573,31 +582,18 @@ class ExtensionTest {
   }
 
   @Test
-  void aStateDirectoryThatCantBeWrittenFailsALiveChangeAsEveryLanguageDoes(@TempDir Path tmp) throws Exception {
+  void aStateDirectoryThatCantBeWrittenIsTheClientsToKeepTrying(@TempDir Path tmp) throws Exception {
     // A directory that can't be made, whoever runs the test (root writes anywhere else).
     Path dir = Files.writeString(tmp.resolve("a-file"), "").resolve("state");
     Extension e = Extension.forTest(null);
     e.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
-    // Not applied and lost at the restart: failed, as it can't be saved, and nothing changes.
+    // The agent saves nothing: the client keeps the config applied with its state, and until that
+    // save lands the server hears APPLYING, not APPLIED (the client's own tests). The same in
+    // every language.
     Opamp.RemoteConfigStatus live = e.remoteConfig(config("elastic", "{\"send_logs\":\"false\"}"));
-    assertEquals(FAILED, live.getStatus());
-    assertTrue(live.getErrorMessage().startsWith("can't save the settings"), live.getErrorMessage());
-    assertTrue(e.controls.gates.sendLogs());
-    assertEquals("{}", effective(e));
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config("elastic", "{\"deactivate_instrumentations\":\"jdbc\"}"));
-    assertEquals(FAILED, s.getStatus());
-  }
-
-  @Test
-  void savedFilesAreTheAgentUsersOnly(@TempDir Path dir) throws Exception {
-    Extension e = Extension.forTest(setup(dir));
-    e.remoteConfig(config("elastic", "{\"send_logs\":\"false\"}"));
-    if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
-      assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
-          Files.getPosixFilePermissions(dir.resolve("sdk-settings.json"))));
-    }
-    assertFalse(Files.exists(dir.resolve("sdk-settings.json.tmp")));
+    assertEquals(APPLIED, live.getStatus());
+    assertFalse(e.controls.gates.sendLogs());
   }
 
   @Test

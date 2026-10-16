@@ -14,6 +14,7 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
     <Compile Include="../Pydantic.OpAmp.AutoInstrumentation.Tests/WebApp.cs" Link="WebApp.cs" />
     <Compile Include="../Pydantic.OpAmp.AutoInstrumentation.Tests/Undeclared.cs" Link="Undeclared.cs" />
+    <Compile Include="../Pydantic.OpAmp.AutoInstrumentation.Tests/Kept.cs" Link="Kept.cs" />
   </ItemGroup>
 
   <ItemGroup>

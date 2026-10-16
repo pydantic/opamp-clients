@@ -13,9 +13,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.Stream;
 import opamp.proto.v1.Anyvalue;
@@ -251,6 +253,25 @@ class SdkSettingsTest {
   }
 
   /** The layer's test vectors, from the repository this client is in. */
+  /**
+   * testdata/start.json: the settings to start with come from the last config applied in the core's
+   * saved state, else from the document kept before.
+   */
+  @TestFactory
+  Stream<DynamicTest> theStartVectors() throws IOException {
+    List<DynamicTest> tests = new ArrayList<>();
+    for (JsonNode c : JSON.readTree(testdata().resolve("start.json").toFile()).get("cases")) {
+      tests.add(DynamicTest.dynamicTest(c.get("name").asText(), () -> {
+        byte[] coreState = c.has("core_state") ? HexFormat.of().parseHex(c.get("core_state").asText()) : null;
+        byte[] saved = c.has("saved") ? c.get("saved").asText().getBytes(StandardCharsets.UTF_8) : null;
+        SettingsProto.Loaded loaded = layer.loadFrom(coreState, saved, null, 0);
+        String want = c.get("want").isNull() ? "{}" : c.get("want").asText();
+        assertEquals(want, loaded.getCurrent().toStringUtf8());
+      }));
+    }
+    return tests.stream();
+  }
+
   static Path testdata() {
     for (Path d = Path.of("").toAbsolutePath(); d != null; d = d.getParent()) {
       Path t = d.resolve("testdata/sdk-settings");

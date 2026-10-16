@@ -344,3 +344,17 @@ test("vectors: components.json, each inventory through Components", () => {
     for (const [part, want] of Object.entries(c.want)) assert.deepEqual(parts[part], want, `${c.name}: ${part}`);
   }
 });
+
+type StartCase = { name: string; core_state?: string; saved?: string; want: string | null };
+
+test("vectors: start.json, the settings to start with from the core's saved state", () => {
+  const url = new URL("../../../../testdata/sdk-settings/start.json", import.meta.url);
+  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: StartCase[] }).cases;
+  const layer = new SdkSettings();
+  for (const c of cases) {
+    const coreState = c.core_state === undefined ? undefined : new Uint8Array(Buffer.from(c.core_state, "hex"));
+    const saved = c.saved === undefined ? undefined : new TextEncoder().encode(c.saved);
+    const loaded = layer.load(saved, undefined, 0n, coreState);
+    assert.equal(new TextDecoder().decode(loaded.current), c.want ?? "{}", c.name);
+  }
+});
