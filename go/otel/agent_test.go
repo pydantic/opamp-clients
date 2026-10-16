@@ -638,3 +638,20 @@ func TestSendMetricsIsIgnoredWhenTheMetricsReaderIsAutoexportsOwn(t *testing.T) 
 		_ = a.layer.Close(context.Background())
 	}
 }
+
+// After the server moved the agent to another endpoint, what it says names the one it uses now
+// (as the client gives it, logged without credentials), not the one configured.
+func TestWhatIsSaidNamesTheEndpointInUse(t *testing.T) {
+	said := records(t)
+	inUse := "" // none yet: the configured one
+	r := &reachability{endpoint: where("https://a.example.com/v1/opamp"), inUse: func() string { return inUse }}
+	r.notified(opamp.Notification{Kind: opamp.Connected})
+	inUse = "https://user:secret@b.example.com/v1/opamp?token=x"
+	r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})
+	r.notified(opamp.Notification{Kind: opamp.Connected})
+	if len(*said) != 3 || !strings.HasPrefix((*said)[0], "INFO opamp: connected to https://a.example.com/v1/opamp;") ||
+		!strings.HasPrefix((*said)[1], "WARN opamp: can't reach https://b.example.com/v1/opamp (connection refused)") ||
+		(*said)[2] != "INFO opamp: connected to https://b.example.com/v1/opamp again" {
+		t.Fatalf("said: %q", *said)
+	}
+}

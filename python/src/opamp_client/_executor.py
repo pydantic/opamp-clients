@@ -453,6 +453,8 @@ class Executor:
         self._inflight = InFlight(deliver)
         # This client's name for its download files (Rust mode's Streams names them so too).
         self.client = secrets.token_hex(6)
+        #: The URL of the OpAMP request or connection whose outcome came last (None: none yet).
+        self.used: str | None = None
 
     def download_path(self, id_: int) -> str:
         """The file of download `id_`."""
@@ -523,6 +525,14 @@ class Executor:
         else:
             self._inflight.finish(s.id, corepb.Input(stored=corepb.Id(id=s.id)))
 
+    def _outcome(self, url: str, id_: int, input_: corepb.Input) -> None:
+        """Hand the core the outcome of a request or a connection to url, having noted url as the
+        latest one tried: a notification of the outcome finds it in place. An outcome the core no
+        longer waits for (its effect was cancelled) leaves the URL noted before."""
+        before, self.used = self.used, url
+        if not self._inflight.finish(id_, input_):
+            self.used = before
+
     async def _post(self, r: corepb.HttpRequest) -> None:
         def failed(detail: str) -> corepb.Input:
             return corepb.Input(http_failed=corepb.Failed(id=r.id, detail=lossy(detail)))
@@ -538,16 +548,16 @@ class Executor:
                 while len(body) <= limit and (piece := await resp.content.read(limit + 1 - len(body))):
                     body += piece
                 if len(body) > limit:
-                    self._inflight.finish(r.id, failed(f"response over {limit} bytes"))
+                    self._outcome(r.url, r.id, failed(f"response over {limit} bytes"))
                     return
-                self._inflight.finish(r.id, corepb.Input(http_response=corepb.HttpResponse(
+                self._outcome(r.url, r.id, corepb.Input(http_response=corepb.HttpResponse(
                     id=r.id, status=resp.status, headers=_from_headers(resp.headers), body=bytes(body),
                     unix_ms=_unix_ms())))
         # Whatever aiohttp raises (a socket error, a header it refuses, a request it can't make at
         # all, as at interpreter exit), the core hears the request failed, rather than waiting on
         # it. (A cancel is a CancelledError: not an Exception.)
         except Exception as e:  # noqa: BLE001
-            self._inflight.finish(r.id, failed(str(e) or type(e).__name__))
+            self._outcome(r.url, r.id, failed(str(e) or type(e).__name__))
 
     async def _open(self, o: corepb.WsOpen) -> None:
         try:
@@ -558,16 +568,17 @@ class Executor:
             ws = await self._http().ws_connect(_url(o.url), headers=_headers(o.headers), max_msg_size=size,
                                                autoclose=False, autoping=True, timeout=aiohttp.ClientWSTimeout())
         except aiohttp.WSServerHandshakeError as e:
-            self._inflight.finish(o.id, corepb.Input(ws_failed=corepb.WsFailed(
+            self._outcome(o.url, o.id, corepb.Input(ws_failed=corepb.WsFailed(
                 id=o.id, status=e.status, headers=_from_headers(e.headers or {}), detail=lossy(str(e)),
                 unix_ms=_unix_ms())))
             return
         except Exception as e:  # noqa: BLE001 - whatever it is, the open has failed
-            self._inflight.finish(o.id, corepb.Input(ws_failed=corepb.WsFailed(
+            self._outcome(o.url, o.id, corepb.Input(ws_failed=corepb.WsFailed(
                 id=o.id, detail=lossy(str(e) or type(e).__name__), unix_ms=_unix_ms())))
             return
         conn = _Conn(ws, o.max_message_bytes)
         if self._inflight.adopt(o.id, conn, self._read(o.id, conn), self._write(o.id, conn)):
+            self.used = o.url
             self._inflight.report(o.id, corepb.Input(ws_opened=corepb.Id(id=o.id)))
 
     async def _read(self, id_: int, c: _Conn) -> None:

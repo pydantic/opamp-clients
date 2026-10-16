@@ -366,26 +366,39 @@ test("a config applied through the server is where the next start begins, with n
   }
 });
 
-async function keyServer() {
+/** An OpAMP server that takes an enrollment key and, as the reference server does, hands an agent
+ * that says it takes connection settings a key of its own; once the agent uses it, the enrollment
+ * key speaks for it no more (401). Once the agent has said APPLIED of its own key, it offers
+ * `next` (if set) in answer to each message with it: another key, here or at another server's
+ * endpoint. `keys` are the keys it takes besides the enrollment key (taken only with `enroll`);
+ * once a request comes with `retires`, "own" is taken no more. */
+async function keyServer(keys = ["own"], enroll = true) {
   const takesKeys = BigInt(AgentCapabilities.AgentCapabilities_AcceptsOpAMPConnectionSettings)
     | BigInt(AgentCapabilities.AgentCapabilities_ReportsConnectionSettingsStatus);
   const seen = {
     polls: 0, authorization: [] as (string | undefined)[], capabilities: [] as bigint[], applied: false, ownUsed: false,
+    statuses: [] as [ConnectionSettingsStatuses, string][], ownGone: false,
   };
+  const plan = { keys, next: undefined as ReturnType<typeof offer> | undefined, retires: undefined as string | undefined };
   let endpoint = "";
   const s = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     const auth = req.headers.authorization;
     seen.authorization.push(auth);
-    if ((auth !== "Bearer enroll" && auth !== "Bearer own") || (auth === "Bearer enroll" && seen.ownUsed)) {
+    const key = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length) : "";
+    const taken = (auth === "Bearer enroll" && enroll && !seen.ownUsed)
+      || (plan.keys.includes(key) && !(key === "own" && seen.ownGone));
+    if (!taken) {
       res.statusCode = 401;
       res.end();
       return;
     }
     seen.polls++;
-    seen.ownUsed ||= auth === "Bearer own";
+    seen.ownUsed ||= key === "own";
+    seen.ownGone ||= plan.retires !== undefined && key === plan.retires;
     seen.capabilities.push(msg.capabilities);
     const status = msg.connectionSettingsStatus;
+    if (status) seen.statuses.push([status.status, Buffer.from(status.lastConnectionSettingsHash).toString()]);
     if (status?.status === ConnectionSettingsStatuses.ConnectionSettingsStatuses_APPLIED
       && Buffer.from(status.lastConnectionSettingsHash).toString() === "own-key-offer" && auth === "Bearer own") {
       seen.applied = true;
@@ -400,14 +413,39 @@ async function keyServer() {
           heartbeatIntervalSeconds: 1n,
         },
       });
+    } else if (key === "own" && plan.next && seen.applied) {
+      reply.connectionSettings = plan.next;
     }
     res.setHeader("Content-Type", "application/x-protobuf");
     res.end(toBinary(ServerToAgentSchema, reply));
   });
   await new Promise<void>((r) => s.listen(0, "127.0.0.1", r));
   endpoint = `http://127.0.0.1:${(s.address() as AddressInfo).port}/v1/opamp`;
-  return { seen, endpoint, takesKeys, close: () => s.close() };
+  /** Whether the agent reported `status` of the offer `hash` here. */
+  const said = (status: ConnectionSettingsStatuses, hash: string) =>
+    seen.statuses.some(([st, h]) => st === status && h === hash);
+  return { seen, plan, said, endpoint, takesKeys, close: () => s.close() };
 }
+
+/** An offer, by hash, of `key` at `endpoint`. */
+function offer(hash: string, endpoint: string, key: string) {
+  return create(ConnectionSettingsOffersSchema, {
+    hash: new TextEncoder().encode(hash),
+    opamp: { destinationEndpoint: endpoint, headers: { headers: [{ key: "Authorization", value: `Bearer ${key}` }] } },
+  });
+}
+
+/** Run a program that keeps running until `done` holds (or 12 s, before run's own 15 s). */
+function runUntil(endpoint: string, seen: { polls: number }, env: Record<string, string>, done: () => boolean) {
+  return run("setInterval(() => {}, 1000);", endpoint, (kill) => void (async () => {
+    const deadline = Date.now() + 12_000;
+    while (!done() && Date.now() < deadline) await new Promise((w) => setTimeout(w, 20));
+    kill("SIGTERM");
+  })(), seen, env);
+}
+
+const APPLIED = ConnectionSettingsStatuses.ConnectionSettingsStatuses_APPLIED;
+const FAILED = ConnectionSettingsStatuses.ConnectionSettingsStatuses_FAILED;
 
 test("with a state directory the agent takes a key of its own, says APPLIED on it, and the next start keeps it", async () => {
   const s = await keyServer();
@@ -438,6 +476,72 @@ test("without a state directory the agent doesn't say it takes connection settin
     assert.ok(s.seen.polls > 0, r.out);
     assert.ok(s.seen.capabilities.every((c) => (c & s.takesKeys) === 0n));
     assert.ok(s.seen.authorization.every((a) => a === "Bearer enroll"));
+  } finally {
+    s.close();
+  }
+});
+
+
+test("the agent follows a move to another server, says APPLIED there, and the next start goes there first", async () => {
+  const a = await keyServer();
+  const b = await keyServer(["moved"], false);
+  a.plan.next = offer("move-to-b", b.endpoint, "moved");
+  const env = { OTEL_OPAMP_HEADERS: "Authorization=Bearer%20enroll", OTEL_OPAMP_STATE_DIR: mkdtempSync(join(tmpdir(), "opamp-otel-state-")) };
+  try {
+    const r = await runUntil(a.endpoint, a.seen, env, () => b.said(APPLIED, "move-to-b"));
+    assert.ok(b.said(APPLIED, "move-to-b"), `the move was never APPLIED at B: ${r.out}`);
+    assert.ok(b.seen.authorization.every((x) => x === "Bearer moved"), "B hears only the key the agent was moved with");
+    const [atA, atB] = [a.seen.authorization.length, b.seen.authorization.length];
+    const again = await run("setTimeout(() => {}, 1000);", a.endpoint, undefined, undefined, env);
+    assert.ok(b.seen.authorization.length > atB, again.out);
+    assert.equal(a.seen.authorization.length, atA, "the next start went to A, not to B");
+    assert.equal(b.seen.authorization[atB], "Bearer moved", "the next start comes to B with the key it was moved with");
+  } finally {
+    a.close();
+    b.close();
+  }
+});
+
+test("the agent takes a second key at the same endpoint, keeps it, and never sends the old one again", async () => {
+  const s = await keyServer(["own", "own2"]);
+  s.plan.retires = "own2";
+  s.plan.next = offer("second-key", s.endpoint, "own2");
+  const env = { OTEL_OPAMP_HEADERS: "Authorization=Bearer%20enroll", OTEL_OPAMP_STATE_DIR: mkdtempSync(join(tmpdir(), "opamp-otel-state-")) };
+  try {
+    let since = -1;
+    const r = await runUntil(s.endpoint, s.seen, env, () => {
+      if (since < 0 && s.said(APPLIED, "second-key")) since = s.seen.authorization.length;
+      return since >= 0 && s.seen.authorization.length > since + 2;
+    });
+    assert.ok(since >= 0, `the second key was never APPLIED: ${r.out}`);
+    const before = s.seen.authorization.length;
+    const again = await run("setTimeout(() => {}, 1000);", s.endpoint, undefined, undefined, env);
+    assert.ok(s.seen.authorization.length > before, again.out);
+    assert.deepEqual(s.seen.authorization.slice(since).filter((x) => x !== "Bearer own2"), [],
+      "after the second key was APPLIED only it is sent");
+  } finally {
+    s.close();
+  }
+});
+
+test("a move nobody answers is FAILED, and the agent carries on where it was with the key it had", async () => {
+  const closed = createServer();
+  await new Promise<void>((r) => closed.listen(0, "127.0.0.1", r));
+  const nowhere = `http://127.0.0.1:${(closed.address() as AddressInfo).port}/v1/opamp`;
+  await new Promise((r) => closed.close(r));
+  const s = await keyServer();
+  s.plan.next = offer("move-nowhere", nowhere, "moved");
+  const env = { OTEL_OPAMP_HEADERS: "Authorization=Bearer%20enroll", OTEL_OPAMP_STATE_DIR: mkdtempSync(join(tmpdir(), "opamp-otel-state-")) };
+  try {
+    let since = -1;
+    const r = await runUntil(s.endpoint, s.seen, env, () => {
+      if (since < 0 && s.said(FAILED, "move-nowhere")) since = s.seen.authorization.length;
+      return since >= 0 && s.seen.authorization.length > since + 2;
+    });
+    assert.ok(since >= 0, `the move was never FAILED: ${r.out}`);
+    assert.ok(s.seen.authorization.length > since + 2, `the agent did not carry on with A: ${r.out}`);
+    assert.deepEqual(s.seen.authorization.slice(since).filter((x) => x !== "Bearer own"), []);
+    assert.ok(!s.said(APPLIED, "move-nowhere"));
   } finally {
     s.close();
   }

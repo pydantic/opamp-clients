@@ -301,7 +301,10 @@ internal sealed class SdkAgent
         };
         var service = resource.FirstOrDefault(a => a.Key == "service.name").Value;
         this.reachability = new Reachability(this.server.Endpoint, this.server.Named,
-            Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log);
+            Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log)
+        {
+            InUse = () => Volatile.Read(ref this.client)?.Endpoint,
+        };
         using (SuppressInstrumentationScope.Begin())
         {
             // Notifications come one at a time on the client's loop, never before Start returns,
@@ -589,6 +592,9 @@ internal sealed class SdkAgent
             this.log.Error($"the settings' timer failed: {e.Message}");
         }
     }
+
+    /// <summary>For tests: the endpoint what the agent says of reaching its server names now.</summary>
+    internal string? EndpointSaid => this.reachability?.At();
 
     /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
     public void Notified(OpAmpClient client, OpAmpNotification n)

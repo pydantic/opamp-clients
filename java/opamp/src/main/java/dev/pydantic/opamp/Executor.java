@@ -52,6 +52,11 @@ final class Executor {
   /** Headers of the transport's own (the proxy's credentials) for every request. */
   private final List<Map.Entry<String, String>> extra;
   private final Consumer<CoreProto.Input> deliver;
+  /**
+   * The URL of the OpAMP request or connection whose outcome came last (null: none yet). Set before
+   * the outcome reaches the core: a notification of it finds it in place.
+   */
+  volatile String used;
   private final Path stateFile;
   /** This client's prefix for download files: another client's download never touches them. */
   private final String files;
@@ -414,7 +419,10 @@ final class Executor {
           }
         }, bodies)
         .exceptionally(e -> failedHttp(r.getId(), message(e)))
-        .thenAccept(deliver);
+        .thenAccept(in -> {
+          used = r.getUrl();
+          deliver.accept(in);
+        });
     inFlight.add(r.getId(), () -> {
       body.cancel();
       request.cancel(true);
@@ -466,6 +474,7 @@ final class Executor {
   private void open(CoreProto.WsOpen o) {
     long id = o.getId();
     Conn conn = new Conn(id, limit(o.getMaxMessageBytes()));
+    conn.url = o.getUrl();
     // In flight before it starts: it may open before buildAsync returns.
     if (!inFlight.add(id, conn, null)) {
       return;
@@ -492,6 +501,7 @@ final class Executor {
       if (cause instanceof WebSocketHandshakeException h) {
         f.setStatus(h.getResponse().statusCode()).addAllHeaders(fromHeaders(h.getResponse().headers()));
       }
+      used = o.getUrl();
       deliver.accept(CoreProto.Input.newBuilder().setWsFailed(f).build());
     });
   }
@@ -507,6 +517,8 @@ final class Executor {
   private final class Conn implements WebSocket.Listener, InFlight.Work {
     private final long id;
     private final long maxMessageBytes;
+    /** Where it goes. */
+    private volatile String url;
     private final ByteArrayOutputStream partial = new ByteArrayOutputStream();
     private volatile CompletableFuture<WebSocket> opening;
     private volatile WebSocket ws;
@@ -540,6 +552,7 @@ final class Executor {
       if (!inFlight.attach(id, webSocket::abort)) {
         return;
       }
+      used = url;
       deliver.accept(CoreProto.Input.newBuilder().setWsOpened(CoreProto.Id.newBuilder().setId(id)).build());
       webSocket.request(1);
     }

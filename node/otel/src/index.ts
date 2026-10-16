@@ -295,7 +295,11 @@ export function hint(status: number | undefined, endpointFrom = "OTEL_OPAMP_ENDP
  * when it's back: setup that works or doesn't is never silent.
  */
 export class Reachability {
+  /** The configured endpoint, as it is safe to log. */
   readonly endpoint: string;
+  /** The endpoint the client uses now, as the client gives it (unset, or undefined from it: the
+   * configured one): after the server moved the agent, the one it moved it to. */
+  inUse: (() => string | undefined) | undefined;
   #ever = false;
   #failing = false;
 
@@ -304,23 +308,30 @@ export class Reachability {
     this.endpoint = where(endpoint);
   }
 
+  /** The endpoint the client uses now, as it is safe to log. */
+  at(): string {
+    const e = this.inUse?.();
+    return e ? where(e) : this.endpoint;
+  }
+
   notified(n: Notification): void {
+    const endpoint = this.at();
     if (n.kind === "connected") {
       if (!this.#ever) {
         const who = this.service ? ` as ${this.service}` : "";
-        diag.info(`OpAMP: connected to ${this.endpoint}; this SDK is managed${who}, instance ${this.uid}`);
+        diag.info(`OpAMP: connected to ${endpoint}; this SDK is managed${who}, instance ${this.uid}`);
       } else if (this.#failing) {
-        diag.info(`OpAMP: connected to ${this.endpoint} again`);
+        diag.info(`OpAMP: connected to ${endpoint} again`);
       }
       this.#ever = true;
       this.#failing = false;
     } else if (n.kind === "connectFailed") {
       if (!this.#failing) {
         const why = n.detail || `HTTP ${n.status}`;
-        say.warn(`OpAMP: can't reach ${this.endpoint} (${why}): ${hint(n.status, this.endpointFrom, this.headersFrom)}. Retrying in the background; `
+        say.warn(`OpAMP: can't reach ${endpoint} (${why}): ${hint(n.status, this.endpointFrom, this.headersFrom)}. Retrying in the background; `
           + "the SDK keeps its current settings meanwhile");
       } else {
-        diag.debug(`OpAMP: still can't reach ${this.endpoint}: ${n.detail}`);
+        diag.debug(`OpAMP: still can't reach ${endpoint}: ${n.detail}`);
       }
       this.#failing = true;
     }
@@ -1701,6 +1712,7 @@ export class Agent {
     const heartbeat = atStart?.opampPollingIntervalMs !== undefined ? Number(atStart.opampPollingIntervalMs) : s.heartbeatMs;
     this.reachability = new Reachability(s.endpoint, String(resource.attributes["service.name"] ?? ""), uid,
       s.endpointFrom, s.headersFrom);
+    this.reachability.inUse = () => this.client?.endpoint;
     try {
       const availableComponents = this.components();
       // The client's own requests aren't the application's: everything it starts (its timers,

@@ -42,7 +42,7 @@ import tempfile
 import threading
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
@@ -244,29 +244,38 @@ class Reachability:
 
     def __init__(self, endpoint: str, service: str = "", uid: uuid.UUID | None = None,
                  endpoint_from: str = "OTEL_OPAMP_ENDPOINT", headers_from: str = "OTEL_OPAMP_HEADERS") -> None:
-        self.endpoint = where(endpoint)
+        self.endpoint = where(endpoint)  # the configured one
+        #: The endpoint the client uses now, as the client gives it (None, or None from it: the
+        #: configured one): after the server moved the agent, the one it moved it to.
+        self.in_use: Callable[[], str | None] | None = None
         self.endpoint_from, self.headers_from = endpoint_from, headers_from
         self.service = service
         self.uid = uid
         self.ever = False
         self.failing = False
 
+    def at(self) -> str:
+        """The endpoint the client uses now, as it is safe to log."""
+        e = self.in_use() if self.in_use is not None else None
+        return where(e) if e else self.endpoint
+
     def notified(self, n: Notification) -> None:
+        endpoint = self.at()
         if n.kind == "connected":
             if not self.ever:
                 who = f" as {self.service}" if self.service else ""
-                _log.info("OpAMP: connected to %s; this SDK is managed%s, instance %s", self.endpoint, who, self.uid)
+                _log.info("OpAMP: connected to %s; this SDK is managed%s, instance %s", endpoint, who, self.uid)
             elif self.failing:
-                _log.info("OpAMP: connected to %s again", self.endpoint)
+                _log.info("OpAMP: connected to %s again", endpoint)
             self.ever, self.failing = True, False
         elif n.kind == "connect_failed":
             if not self.failing:
                 why = n.detail or f"HTTP {n.status}"
                 _log.warning("OpAMP: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its "
-                             "current settings meanwhile", self.endpoint, why,
+                             "current settings meanwhile", endpoint, why,
                              hint(n.status, self.endpoint_from, self.headers_from))
             else:
-                _log.debug("OpAMP: still can't reach %s: %s", self.endpoint, n.detail)
+                _log.debug("OpAMP: still can't reach %s: %s", endpoint, n.detail)
             self.failing = True
 
 
@@ -1090,6 +1099,12 @@ class Agent:
         chosen = chosen_uid(env)
         return chosen if chosen is not None else uuid7()
 
+    def _endpoint_in_use(self) -> str | None:
+        """The endpoint the client uses now, if a client runs. (The client is read once: a stop
+        that clears it meanwhile leaves this call with the one it read.)"""
+        client = self.client
+        return client.endpoint if client is not None else None
+
     def start(self, resource: Resource) -> None:
         """Once the SDK is built: join the fleet, on a thread of the client's own."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
@@ -1136,6 +1151,7 @@ class Agent:
                         mode="python")
         self.reachability = Reachability(s.endpoint, str(resource.attributes.get("service.name", "")), self.uid,
                                          s.endpoint_from, s.headers_from)
+        self.reachability.in_use = self._endpoint_in_use
         with self._lock:
             first = self._export_health()  # the first report is always sent: with the agent's first message
         status = Status(description=self.layer.describe(attributes(resource)),

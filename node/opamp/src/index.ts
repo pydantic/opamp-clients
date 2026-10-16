@@ -502,6 +502,15 @@ export class Client {
     return uid && uid.length === 16 ? uid.slice() : undefined;
   }
 
+  /** The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
+   * went, which after the server moved the agent (an offer of connection settings) is the offered
+   * one, or the configured one again once an offer failed. Undefined before any outcome, and in
+   * Rust mode, where the core makes the requests itself (the configured one is all there is to
+   * name then). The URL is as the core gave it: redact it before logging. */
+  get endpoint(): string | undefined {
+    return this.#streams === undefined ? this.#x?.used : undefined;
+  }
+
   /** Send agent_disconnect if a message can still be sent, then stop. Stop is the application's
    * work: from here until the client has stopped (within the stop timeout) it does keep Node.js
    * running, so a program that ends by awaiting stop() says its goodbye first. (The client's own

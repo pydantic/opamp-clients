@@ -699,6 +699,28 @@ class ExtensionTest {
     }
   }
 
+  /**
+   * After the server moved the agent to another endpoint, what it says names the one the client uses
+   * now (logged without credentials), not the one configured.
+   */
+  @Test
+  void whatIsSaidNamesTheEndpointInUse() {
+    String[] inUse = {null}; // none yet: the configured one
+    Extension.Reachability r = new Extension.Reachability("https://a.example.com/v1/opamp", null, new UUID(0, 1));
+    r.inUse = () -> inUse[0];
+    List<String> said = logged(Level.INFO, () -> {
+      r.notified(new Notification.Connected());
+      inUse[0] = "https://user:secret@b.example.com/v1/opamp?token=x";
+      r.notified(new Notification.ConnectFailed(null, "connection refused"));
+      r.notified(new Notification.Connected());
+    });
+    assertEquals(3, said.size(), said.toString());
+    assertTrue(said.get(0).startsWith("INFO OpAMP: connected to https://a.example.com/v1/opamp;"), said.get(0));
+    assertTrue(said.get(1).startsWith("WARNING OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)"),
+        said.get(1));
+    assertEquals("INFO OpAMP: connected to https://b.example.com/v1/opamp again", said.get(2));
+  }
+
   @Test
   void theHintFollowsTheStatusAndTheServiceIsLeftOutWithoutOne() {
     assertTrue(Extension.hint(403).startsWith("the server refused this agent's credentials"));
