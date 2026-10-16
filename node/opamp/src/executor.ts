@@ -251,6 +251,9 @@ export class Executor {
   #lastSave: Promise<void> = Promise.resolve();
   /** Saves, downloads and deletions under way. */
   readonly #work = new Set<Promise<void>>();
+  /** The URL of the OpAMP request or connection whose outcome came last (undefined: none yet).
+   * Set before the outcome reaches the core: a notification of it finds it in place. */
+  used: string | undefined;
 
   constructor(
     deliver: Deliver,
@@ -273,7 +276,11 @@ export class Executor {
         const abort = new AbortController();
         if (!this.#f.start(k.value.id, () => abort.abort())) break;
         const id = k.value.id;
-        void this.#post(k.value, abort.signal).then((i) => this.#f.finish(id, i));
+        const url = k.value.url;
+        void this.#post(k.value, abort.signal).then((i) => {
+          this.used = url;
+          this.#f.finish(id, i);
+        });
         break;
       }
       case "wsOpen":
@@ -479,8 +486,10 @@ export class Executor {
     let ws: WebSocket | undefined;
     // Cancelled while it opens: the handshake is aborted (and says nothing).
     if (!this.#f.start(id, () => ws?.terminate())) return;
-    const failed = (detail: string, status?: number, hs: Header[] = []): Input =>
-      input({ case: "wsFailed", value: { $typeName: "opamp.core.v1.WsFailed", id, status, headers: hs, detail, unixMs: unixMs() } });
+    const failed = (detail: string, status?: number, hs: Header[] = []): Input => {
+      this.used = o.url;
+      return input({ case: "wsFailed", value: { $typeName: "opamp.core.v1.WsFailed", id, status, headers: hs, detail, unixMs: unixMs() } });
+    };
     const lost = (detail: string): Input => input({ case: "wsLost", value: { $typeName: "opamp.core.v1.Failed", id, detail } });
     // ws takes a maxPayload of 0 as no limit: the core's limit is kept below, on every message.
     const limit = o.maxMessageBytes;
@@ -511,6 +520,7 @@ export class Executor {
       // Opened after its cancel (or shutdown): closed at once, and nothing said of it (S1).
       if (e === undefined) return void socket.terminate();
       e.ws = socket;
+      this.used = o.url;
       this.#f.report(id, input({ case: "wsOpened", value: { $typeName: "opamp.core.v1.Id", id } }));
     });
     socket.on("message", (data: Buffer, isBinary: boolean) => {

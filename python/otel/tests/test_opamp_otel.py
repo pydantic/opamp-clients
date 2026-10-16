@@ -1156,6 +1156,24 @@ def test_connecting_failing_and_recovering_are_each_said_once(caplog):
     assert "secret" not in caplog.text and "token=x" not in caplog.text
 
 
+def test_what_is_said_names_the_endpoint_in_use(caplog):
+    """After the server moved the agent to another endpoint, what it says names the one the client
+    uses now (logged without credentials), not the one configured."""
+    caplog.set_level(logging.INFO, logger="opamp_otel")
+    in_use: list[str | None] = [None]  # none yet: the configured one
+    r = opamp_otel.Reachability("https://a.example.com/v1/opamp")
+    r.in_use = lambda: in_use[0]
+    r.notified(Notification("connected"))
+    in_use[0] = "https://user:secret@b.example.com/v1/opamp?token=x"
+    r.notified(Notification("connect_failed", detail="connection refused"))
+    r.notified(Notification("connected"))
+    said = [rec.getMessage() for rec in caplog.records if rec.levelno >= logging.INFO]
+    assert said[0].startswith("OpAMP: connected to https://a.example.com/v1/opamp;")
+    assert said[1].startswith("OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)")
+    assert said[2:] == ["OpAMP: connected to https://b.example.com/v1/opamp again"]
+    assert "secret" not in caplog.text and "token=x" not in caplog.text
+
+
 @pytest.mark.parametrize("given, endpoint_from, headers_from", [
     ({}, "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS"),
     # Given in code, each wins over its variable, and the warning names the argument.

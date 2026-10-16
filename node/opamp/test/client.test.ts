@@ -87,6 +87,30 @@ test("HTTP: reports, then says goodbye after the request in flight", async () =>
   assert.equal(notes.at(-1)?.kind, "stopped");
 });
 
+test("endpoint: where the latest request went, once one has an outcome; undefined in Rust mode", async () => {
+  const server = createServer(async (req, res) => {
+    const msg = fromBinary(AgentToServerSchema, await body(req));
+    res.setHeader("Content-Type", "application/x-protobuf");
+    res.end(toBinary(ServerToAgentSchema, create(ServerToAgentSchema, { instanceUid: msg.instanceUid })));
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/opamp`;
+  try {
+    for (const mode of ["node", "rust"] as const) {
+      const seen: (string | undefined)[] = [];
+      const client: Client = Client.start({ endpoint, instanceUid: UID, heartbeatIntervalMs: 50, mode }, { description },
+        (n) => void (n.kind === "connected" && seen.push(client.endpoint)));
+      assert.equal(client.endpoint, undefined, "no outcome yet");
+      const deadline = Date.now() + 10_000;
+      while (seen.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+      await client.stop();
+      assert.deepEqual(seen, [mode === "node" ? endpoint : undefined], mode);
+    }
+  } finally {
+    server.close();
+  }
+});
+
 test("WebSocket: reports, answers a Close frame, reconnects, says goodbye", async () => {
   const wss = new WebSocketServer({ port: 0, host: "127.0.0.1" });
   await new Promise<void>((r) => wss.on("listening", r));

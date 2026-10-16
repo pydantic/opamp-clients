@@ -356,6 +356,15 @@ class Client:
         made, or one the server assigned (``instance_uid_changed`` tells of a new one)."""
         return self._core.instance_uid
 
+    @property
+    def endpoint(self) -> str | None:
+        """The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
+        went, which after the server moved the agent (an offer of connection settings) is the
+        offered one, or the configured one again once an offer failed. None before any outcome,
+        and in Rust mode, where the core makes the requests itself (the configured one is all
+        there is to name then). The URL is as the core gave it: redact it before logging."""
+        return None if self._streams is not None else self._x.used
+
     def _release(self) -> None:
         """Deliver what came while starting, now that the caller has the client."""
         held, self._held = self._held or [], None
