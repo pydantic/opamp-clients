@@ -600,6 +600,15 @@ class Truth(unittest.TestCase):
                 e["effective"] = {POLICY_FILE: json.loads(policy({"attribute_redaction": {"mask": ["http.url", "url.full"]}}, 2))}
         self.assertEqual(failed(judge_truth(log.events, set())), [])
 
+    def test_rules_reported_with_their_keys_in_another_order_are_the_rules_sent(self):
+        log = truth()
+        i = [s for s, _, _ in TRUTH].index("sampling_rules")
+        rules = [{k: v for k, v in reversed(list(r.items()))} for r in TRUTH[i][2]["rules"]]
+        for e in log.events:
+            if e.get("remote_config_status") and e["t"] == 10.0 * i + 10:
+                e["effective"] = {POLICY_FILE: json.loads(policy({"sampling_rules": {"rules": rules}}, 2))}
+        self.assertEqual(failed(judge_truth(log.events, set())), [])
+
     def test_a_refused_baseline_fails(self):
         out = failed(judge_truth(truth(baseline="FAILED").events, set()))
         self.assertEqual(out, ["the baseline APPLIED"])

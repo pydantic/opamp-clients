@@ -1042,7 +1042,8 @@ def same(reported: object, sent: object) -> bool:
     """Whether a field reported in force has the value sent. A list is a set of names (attribute
     redaction's), which the core reports sorted and without repeats."""
     if isinstance(reported, list) and isinstance(sent, list):
-        return sorted(set(map(str, reported))) == sorted(set(map(str, sent)))
+        key = lambda v: json.dumps(v, sort_keys=True)  # noqa: E731
+        return sorted(set(map(key, reported))) == sorted(set(map(key, sent)))
     return reported == sent
 
 
