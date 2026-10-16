@@ -327,10 +327,10 @@ reaches the telemetry that goes through them, and nothing else.
 
 | Setting | Python | Node.js | Go | .NET plugin | .NET `WithOpAmp` | Java agent |
 |---|---|---|---|---|---|---|
-| `sampling_rate` | at once | at once | at once ⁴ | at once | at once | at once |
+| `sampling_rate` | at once | at once | at once ⁴ | at once | at once | at once ⁴ |
 | `send_traces`, `send_logs` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
 | `send_logs_level` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
-| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁵ |
+| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ |
 | `send_logs_level_by_scope` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once ¹ ⁴, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
 | `drop_attributes`, `mask_attributes` | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
 | `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
@@ -352,12 +352,13 @@ exporters it doesn't build; Go for a metrics exporter it doesn't gate, and for a
 application sets in place of `Setup`'s, from when it is set (the package looks before each decision
 and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
 one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
-`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent under a
-configuration file for a span or log processor that is neither batch nor simple, or a metric
-reader neither periodic nor pull. Elsewhere a processor added after the SDK is built isn't seen:
-the setting is still answered APPLIED. Go's `Setup` hands out no SDK provider, so nothing can be added
-to one. A Go application that builds an SDK of its own and never sets it as a global provider
-isn't seen either.
+`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent for a span or log
+record processor or a metric reader another agent extension adds through the autoconfigure
+customizers, and under a configuration file for a span or log processor that is neither batch nor
+simple, or a metric reader neither periodic nor pull. Elsewhere a processor added after the SDK is
+built isn't seen: the setting is still answered APPLIED. Go's `Setup` hands out no SDK provider, so
+nothing can be added to one. A Go application that builds an SDK of its own and never sets it as a
+global provider isn't seen either.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -379,7 +380,9 @@ out, and debug mode always (its rate and level set aside where `sampling_rate` a
 own in place of `Setup`'s. Then it sets aside what that signal needs: for the tracer provider the
 sampler's settings, `send_traces`, redaction and the instrumentation switches; for the meter
 provider `send_metrics`; for the logger provider the log settings and redaction. The Java agent
-declares every one but where footnote ¹ says.
+declares every one but where footnote ¹ says. It also sets aside `sampling_rate`, `sampling_rules`,
+`sampling_traces_per_second` and `debug_sampling_rate` where another agent extension sets a
+sampler of its own in place of the extension's.
 
 ⁵ A rule sees what a span has when it starts, which differs by instrumentation
 ([sampling rules](#sampling-rules)). HTTP server spans start with their path in every language
@@ -413,7 +416,9 @@ What else to know:
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
   In Go a global provider the application sets after `Setup` is seen, and that signal's settings
   are set aside. A provider it builds and never sets as global can't be seen: the server may hear
-  APPLIED for a setting its telemetry doesn't follow.
+  APPLIED for a setting its telemetry doesn't follow. The Java agent extension can't see an
+  `OpenTelemetrySdk` the application builds and uses itself: that SDK's telemetry escapes every
+  setting, and the extension still answers for the agent's SDK.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are
