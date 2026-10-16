@@ -341,4 +341,7 @@ endpoint, and a move to an endpoint nobody listens on, each across a restart whe
   (and `hostile-heartbeat`: intervals of 0 and huge ones).
 - The conformance scenarios `credential-offer` (the server offers each agent its own token,
   then accepts only that, and the agent restarts halfway) and `credential-offer-broken` (the
-  offered token never works), for every client over both transports.
+  offered token never works), `credential-rotation` (a second token once the first works, and
+  the agent never sends an older one again) and `endpoint-move` (a new token at the server's
+  second endpoint: the new token goes only there, the old one never does, and after a restart
+  the agent goes straight there), for every client over both transports.
