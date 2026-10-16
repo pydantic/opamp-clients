@@ -27,7 +27,6 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { test } from "node:test";
 
 import fc from "fast-check";
 import { type WebSocket, WebSocketServer } from "ws";
@@ -47,6 +46,7 @@ import {
   ServerToAgentSchema,
   toBinary,
 } from "../src/index.js";
+import { annotatedTest } from "./annotate.js";
 
 const UID = new Uint8Array(16).fill(0x87);
 const CAPABILITY = "io.example.model";
@@ -571,6 +571,9 @@ const commands = [
   fc.constant(new StopOutside()),
   fc.integer({ min: 5, max: 80 }).map((ms) => new Wait(ms)),
 ];
+
+/** Every test here prints, when it fails, an annotation with how to replay it (annotate.ts). */
+const test = annotatedTest("callback.properties.test.js", () => ({ OPAMP_MODEL_SEED: SEED }));
 
 /** The seed both modes' runs are drawn from: the same plans in each. */
 const SEED = process.env.OPAMP_MODEL_SEED ? Number(process.env.OPAMP_MODEL_SEED) : (Date.now() ^ (Math.random() * 2 ** 31)) | 0;
