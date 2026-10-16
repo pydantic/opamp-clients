@@ -255,7 +255,12 @@ def server_binary(target_: Path) -> Path:
     """The server, built if this process hasn't yet, in `target_` (run() starts it from there)."""
     target_.mkdir(parents=True, exist_ok=True)
     binary = target_ / "server"
-    shutil.copy2(built_server(), binary)
+    # Copied aside, then renamed over it: a check running at once (main()'s --jobs) may be running
+    # the server there, and Linux refuses to write a file being run (ETXTBSY). The rename leaves
+    # that one running the file it started.
+    aside = target_ / f".server-{os.getpid()}"
+    shutil.copy2(built_server(), aside)
+    os.replace(aside, binary)
     return binary
 
 

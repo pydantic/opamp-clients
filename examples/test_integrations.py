@@ -14,13 +14,15 @@ import tempfile
 import textwrap
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from integrations import (APP_KEY, TAKES_KEYS, app_settings_scenario, key_from_env, key_in_code,  # noqa: E402
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
-                          judge_wrong_key, read_log, wait_for)
+                          judge_wrong_key, read_log, server_binary, wait_for)
+import integrations  # noqa: E402
 
 UID = "01928f3a7c3e7a1b8c2d3e4f5a6b7c8d"
 PING = "http://127.0.0.1:1/ping"
@@ -850,6 +852,27 @@ class RustLog(unittest.TestCase):
             path = Path(directory) / "server.jsonl"
             path.write_text(json.dumps({"event": "otlp", "t": 20, "wall": 100, "ends_wall": [95, 99]}) + "\n")
             self.assertEqual(read_log(path)[0]["ends"], [15, 19])
+
+
+class ServerBinary(unittest.TestCase):
+    def test_the_server_is_put_in_place_while_another_check_runs_it(self):
+        # Checks side by side (main()'s --jobs) each put the server in the integration's directory
+        # and run it from there; writing over a file being run fails with ETXTBSY.
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(root, ignore_errors=True))
+        # (A program, not a script: the kernel refuses writes only to a file it is executing.)
+        built = root / "built"
+        __import__("shutil").copy2(__import__("shutil").which("sleep"), built)
+        with unittest.mock.patch.dict("os.environ", {"OPAMP_EXAMPLES_SERVER": str(built)}):
+            integrations.built_server.cache_clear()
+            self.addCleanup(integrations.built_server.cache_clear)
+            running = subprocess.Popen([str(server_binary(root / "t")), "5"])
+            try:
+                self.assertEqual(server_binary(root / "t"), root / "t" / "server")
+                self.assertEqual(sorted(p.name for p in (root / "t").iterdir()), ["server"])
+            finally:
+                running.kill()
+                running.wait()
 
 
 class Main(unittest.TestCase):
