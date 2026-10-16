@@ -1599,9 +1599,9 @@ def _watch_processors() -> None:
     def watched(provider, method: str, signal: str) -> None:
         add = getattr(provider, method)
 
-        def added(processor, *args, **kwargs):
+        def added(*args, **kwargs):
             AGENT.processor_added(signal)
-            return add(processor, *args, **kwargs)
+            return add(*args, **kwargs)
 
         setattr(provider, method, added)
 

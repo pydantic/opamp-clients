@@ -941,9 +941,9 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
             aside = entries["elastic.set_aside"].body.decode() if "elastic.set_aside" in entries else "{{}}"
             print(when, json.dumps([json.loads(entries["elastic"].body), json.loads(aside)]))
         report("before")
-        trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+        trace.get_tracer_provider().add_span_processor(span_processor=SimpleSpanProcessor(ConsoleSpanExporter()))
         report("spans")
-        _logs.get_logger_provider().add_log_record_processor(BatchLogRecordProcessor(ConsoleLogExporter()))
+        _logs.get_logger_provider().add_log_record_processor(log_record_processor=BatchLogRecordProcessor(ConsoleLogExporter()))
         report("logs")
         trace.get_tracer("t").start_span("after").end()
         assert agent.controls.send_traces and agent.controls.send_logs
