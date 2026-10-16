@@ -33,4 +33,6 @@ scripts/test_sdk_release.py
 scripts/redact_mutants.py
 scripts/redact-mutants.toml
 scripts/test_redact_mutants.py
+scripts/collector_release.py
+scripts/test_collector_release.py
 scripts/*_fuzz.sh
