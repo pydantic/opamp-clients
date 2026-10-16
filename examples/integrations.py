@@ -1012,14 +1012,14 @@ def connections(events: list[dict], listener: str) -> list[dict]:
 def judge_rotation(nine: list[dict]) -> list[tuple[str, bool]]:
     """The rotation run's checks: (what, whether it holds)."""
     keys = [e for e in nine if e["event"] == "key_promoted"]
-    done = {e.get("action"): e.get("agents", 0) for e in nine if e["event"] == "operator"}
+    done = [(e.get("action"), e.get("agents", 0)) for e in nine if e["event"] == "operator"]
     second = connections(nine, "second")
     reached = second[0]["t"] if second else None
     back = [e for e in connections(nine, "first") if reached is not None and e["t"] > reached]
     after = [e for e in nine if e["event"] == "a2s" and reached is not None and e["t"] > reached]
     return [
         (f"the operator rotated the agent's key and then moved it ({done})",
-         done.get("rotate", 0) >= 1 and done.get("move", 0) >= 1),
+         [a for a, _ in done] == ["rotate", "move"] and all(n >= 1 for _, n in done)),
         (f"the agent took its own key, the second and the moved one: three confirmed ({len(keys)})", len(keys) == 3),
         (f"no request refused ({len(rejected(nine))})", not rejected(nine)),
         ("it reached the second listener", reached is not None),

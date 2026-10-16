@@ -857,6 +857,18 @@ class Rotation(unittest.TestCase):
     def test_a_refused_request_fails(self):
         self.assertEqual(failed(judge_rotation(rotated(refused=True).events)), ["no request refused (1)"])
 
+    def test_a_move_before_the_rotation_fails(self):
+        log = rotated()
+        ops = [e for e in log.events if e["event"] == "operator"]
+        ops[0]["action"], ops[1]["action"] = "move", "rotate"
+        self.assertIn("the operator rotated the agent's key and then moved it "
+                      "([('move', 1), ('rotate', 1)])", failed(judge_rotation(log.events)))
+
+    def test_an_operator_that_changed_no_agent_fails(self):
+        log = rotated()
+        next(e for e in log.events if e["event"] == "operator")["agents"] = 0
+        self.assertNotEqual(failed(judge_rotation(log.events)), [])
+
 
 class MovedStart(unittest.TestCase):
     def test_a_good_start_passes(self):
