@@ -591,6 +591,15 @@ class Truth(unittest.TestCase):
         self.assertEqual(failed(judge_truth(log.events, set())),
                          ["sampling_rate: APPLIED, and reported in force with other values than sent"])
 
+    def test_names_reported_sorted_are_the_names_sent(self):
+        # The core reports attribute redaction's names sorted: ["http.url", "url.full"].
+        log = truth()
+        start = 10.0 * [s for s, _, _ in TRUTH].index("mask_attributes") + 10
+        for e in log.events:
+            if e.get("remote_config_status") and e["t"] == start:
+                e["effective"] = {POLICY_FILE: json.loads(policy({"attribute_redaction": {"mask": ["http.url", "url.full"]}}, 2))}
+        self.assertEqual(failed(judge_truth(log.events, set())), [])
+
     def test_a_refused_baseline_fails(self):
         out = failed(judge_truth(truth(baseline="FAILED").events, set()))
         self.assertEqual(out, ["the baseline APPLIED"])

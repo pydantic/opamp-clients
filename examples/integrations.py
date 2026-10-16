@@ -1038,13 +1038,21 @@ def refused_as_unsupported(error: str, control: str, fields: dict) -> bool:
     return any(error in (f"{control}: {unsupported}", f"{control}: {field}: {unsupported}") for field in fields)
 
 
+def same(reported: object, sent: object) -> bool:
+    """Whether a field reported in force has the value sent. A list is a set of names (attribute
+    redaction's), which the core reports sorted and without repeats."""
+    if isinstance(reported, list) and isinstance(sent, list):
+        return sorted(set(map(str, reported))) == sorted(set(map(str, sent)))
+    return reported == sent
+
+
 def in_force(events: list[dict], control: str, fields: dict, after: float, before: float) -> bool | None:
     """How the effective configs the agent reported between `after` and `before` have the override
     of `control`: True when one has every one of `fields` with its value, False when none has any
     of them (set aside: a policy in force reports what it set aside local), None otherwise (in force
     with other values, which no SDK may report)."""
     reported = [overridden(e, control) or {} for e in effective_configs(events, after, before)]
-    if any(all(r.get(k) == v for k, v in fields.items()) for r in reported):
+    if any(all(same(r.get(k), v) for k, v in fields.items()) for r in reported):
         return True
     return False if all(not set(fields) & set(r) for r in reported) else None
 
