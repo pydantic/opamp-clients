@@ -197,7 +197,13 @@ the Supervisor's auth extensions use, hands the core a token it renews. The core
 over the header of the same name on each later request and connection, and never saves it. A list
 the rule refuses fails that attempt, and nothing is sent.
 
-## The upstream OpAMP clients
+## Each client
 
-This page is about our clients. For the upstream ones (opamp-go, and the Java, .NET and Python
-contrib clients), see [java.md](java.md), [dotnet.md](dotnet.md) and [python.md](python.md).
+Each client has a page of its own: how to install it, start and stop it, its options, and its
+threads: [Python](python.md), [Go](go.md), [Node.js](node.md), [Java](java.md) and
+[.NET](dotnet.md). The OpenTelemetry Collector's extension and Supervisor are in
+[collector.md](collector.md).
+
+The conformance suite also runs the upstream OpAMP clients (opamp-go, and the Java, .NET and
+Python contrib clients); their known results are in
+[conformance/baseline.toml](../conformance/baseline.toml).
