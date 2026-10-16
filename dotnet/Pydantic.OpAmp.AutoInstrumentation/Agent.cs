@@ -76,7 +76,7 @@ internal sealed class Agent
             return null;
         }
 
-        if (!StateDirs.Claim(ref server, getenv, Log.Sink, out var stateLock))
+        if (!StateDirs.Claim(ref server, Log.Sink, out var stateLock))
         {
             return null;
         }

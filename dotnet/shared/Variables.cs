@@ -11,23 +11,10 @@ namespace Pydantic.OpAmp.Otel;
 /// <summary>What the OpAMP and SDK variables say, the same for the plugin and the hosting package.</summary>
 internal static partial class Variables
 {
-    /// <summary>`name=value,...`, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS.</summary>
-    public static IReadOnlyDictionary<string, string> Headers(string spec)
-    {
-        var headers = new Dictionary<string, string>();
-        foreach (var pair in spec.Split(','))
-        {
-            var eq = pair.IndexOf('=');
-            if (eq > 0)
-            {
-                headers[pair[..eq].Trim()] = Uri.UnescapeDataString(pair[(eq + 1)..].Trim());
-            }
-        }
-
-        return headers;
-    }
-
-    /// <summary>`1500` (milliseconds, as the SDK's variables), or `500ms`, `30s`, `2m`.</summary>
+    /// <summary>
+    /// `1500` (milliseconds, as the SDK's variables), or `500ms`, `30s`, `2m`: the hosting package's
+    /// <c>OpAmp:HeartbeatInterval</c>. (The variables themselves are the core's Setup call's to read.)
+    /// </summary>
     public static TimeSpan Duration(string value)
     {
         var m = DurationPattern().Match(value);

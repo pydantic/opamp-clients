@@ -53,6 +53,16 @@ internal static partial class Native
         }
     }
 
+    /// <summary>Run one encoded Setup call; throws <see cref="CoreException"/> if the core panicked.</summary>
+    internal static unsafe byte[] SetupCall(byte[] call)
+    {
+        Check();
+        fixed (byte* p = call)
+        {
+            return Take(opamp_core_setup(p, (nuint)call.Length, out var outPtr, out var outLen), outPtr, outLen);
+        }
+    }
+
     /// <summary>What a call handed back, copied out and freed: the reply, or a panic as <see cref="CoreException"/>.</summary>
     internal static unsafe byte[] Take(int code, byte* ptr, nuint len)
     {
@@ -78,6 +88,9 @@ internal static partial class Native
 
     [LibraryImport(Lib)]
     internal static unsafe partial int opamp_sdk_settings_call(byte* ptr, nuint len, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib)]
+    internal static unsafe partial int opamp_core_setup(byte* ptr, nuint len, out byte* outPtr, out nuint outLen);
 
     [LibraryImport(Lib)]
     internal static unsafe partial void opamp_bytes_free(byte* ptr, nuint len);
