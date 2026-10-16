@@ -94,11 +94,21 @@ jobs:
         run: python3 scripts/fetch_core.py check
       # The type generation of gen_core.py and gen_sdk_settings.py. The modules themselves are the
       # fetched ones, which the step above checked.
+      # On a core candidate the types are generated, not checked: they are checked in for the locked
+      # release, and the lock bump that takes the release in regenerates them. What matters before
+      # the release is that they still generate, and that the clients as they are pass on it.
       - name: Every client's types match the fetched protos
         if: ${{ !cancelled() }}
         run: |
-          python3 scripts/gen_core.py --check
-          python3 scripts/gen_sdk_settings.py --check
+          if [ -n "$CORE_ARTIFACT" ]; then
+            python3 scripts/gen_core.py
+            python3 scripts/gen_sdk_settings.py
+            echo "The types the lock bump will change:"
+            git status --short
+          else
+            python3 scripts/gen_core.py --check
+            python3 scripts/gen_sdk_settings.py --check
+          fi
       - name: The scripts' own tests (conformance checks, the SDK integrations' checks, packaging)
         if: ${{ !cancelled() }}
         run: >-
