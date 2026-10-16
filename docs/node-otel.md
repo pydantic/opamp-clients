@@ -5,7 +5,9 @@ server. It sets up what `@opentelemetry/auto-instrumentations-node/register` set
 every auto-instrumentation, configured by the `OTEL_*` variables. The SDK then joins the server's
 fleet and takes its settings from it: sampling, what to send and which instrumentations are on,
 while it runs ([sdk-settings.md](sdk-settings.md)). It reaches the SDK this
-package sets up: an application that builds its own tracer provider isn't managed. The application needs no code. It works for CommonJS and ES modules alike:
+package sets up. A provider the application builds on its own isn't managed: where the application
+registers it as the global one, the package sets aside the settings it can no longer carry out
+([below](#a-provider-of-the-applications-own)). The application needs no code. It works for CommonJS and ES modules alike:
 the register installs the instrumentations' loader hook for `import`, which upstream leaves to a
 separate `--experimental-loader` flag.
 
@@ -163,6 +165,38 @@ effect at once, and the saved settings switch the same instrumentations off from
   their scope, the instrumentation's name. Only the exporters this package builds leave them out:
   a `prometheus` reader still serves them.
 
+### A provider of the application's own
+
+The package's sampler and gates are inside the SDK's providers. What the application sends through
+a tracer, logger or meter provider it builds itself goes past them.
+
+- **Registered as the global one.** The API holds one global provider per signal, and refuses
+  another until the first is disabled (`trace.disable()`, `logs.disable()`, `metrics.disable()`).
+  When the application then registers its own (`trace.setGlobalTracerProvider`,
+  `provider.register()`, `logs.setGlobalLoggerProvider`, `metrics.setGlobalMeterProvider`), the
+  package sees it at once. It warns, and sets aside the settings that provider takes past it. It
+  decides the config in force again, and reports the new effective config to the server at once,
+  with the inventory's settings. The rest of the config stays in force. A provider the
+  application registered before `register()` is seen the same way, as the SDK's is refused.
+
+  | The application's own | Set aside from then on |
+  |---|---|
+  | tracer provider | `sampling_rate`, `sampling_rules`, `sampling_traces_per_second`, `debug_sampling_rate`, `send_traces`, `drop_attributes`, `mask_attributes` |
+  | logger provider | `send_logs`, `send_logs_level`, `send_logs_level_by_scope`, `send_logs_per_second`, `debug_send_logs_level`, `drop_attributes`, `mask_attributes` |
+  | meter provider | `send_metrics` |
+
+- **The instrumentations keep the SDK's providers.** Each got its providers when NodeSDK started.
+  So their spans are still sampled and gated, and the server still switches them. But a setting
+  that no longer reaches all of the application's telemetry isn't answered as carried out. The
+  settings stay set aside until the next start.
+- **Not registered, not seen.** A provider the application builds and uses directly
+  (`provider.getTracer("app")`) goes past the package unseen, and its settings are still
+  answered APPLIED. So does one registered through another copy of `@opentelemetry/api` or
+  `@opentelemetry/api-logs`: every copy shares the one global, but the package watches its own
+  copy's setters. npm installs one copy where the versions agree.
+- **No processor added later.** The SDK's providers take no span or log record processor once
+  they are built, so nothing joins them past the gates.
+
 ### Is it working?
 
 The package says so on the logger `OTEL_LOG_LEVEL` sets up; without it, its warnings go to stderr
@@ -226,7 +260,9 @@ rate have said to sample:
   Nor does a span sampled under a remote parent that wasn't (the application's own sampler may sample
   one when only a cap is set).
 - The same bucket as `send_logs_per_second` ([rate caps](#rate-caps)), on its own.
-- Both are declared whatever the exporters: the sampler is always this package's.
+- Both are declared whatever the exporters: the sampler is always this package's. But it samples
+  only the SDK's spans: once the application registers a tracer provider of its own, the
+  sampler's settings are set aside ([above](#a-provider-of-the-applications-own)).
 
 ### Log levels per scope
 
@@ -263,6 +299,7 @@ rate have said to sample:
   are left alone.
 - Declared only when both the span and the log exporters are this package's (OTLP, `console` or
   `none`): with either left to NodeSDK, both settings are ignored rather than half carried out.
+  The same holds once the application registers a tracer or logger provider of its own.
 
 ### Rate caps
 
@@ -303,7 +340,7 @@ server reachable or not:
   sent again (a reconnect) keeps its end; a restart before the end is still in debug mode (with a
   state directory), after it, not.
 - `debug_send_logs_level` is declared only where the package builds the log exporters;
-  `debug_until` and `debug_sampling_rate` everywhere.
+  `debug_until` everywhere, and `debug_sampling_rate` where `sampling_rate` is.
 
 ### Export health
 
@@ -413,7 +450,8 @@ sends the hash at start, and the components in full when the server asks.
   NodeSDK doesn't know builds nothing, and isn't listed.
 - `settings`: those the package carries out, as it declares them to the layer: the instrumentations
   switched `at once`, the log settings only where it builds the log exporters.
-- Worked out once, as the client starts: nothing it lists changes while the application runs.
+- Worked out once, as the client starts. Only `settings` can change while the application runs:
+  a provider of the application's own takes its settings out, and the components are sent again.
 
 ## How it is checked
 
@@ -457,6 +495,10 @@ sends the hash at start, and the components in full when the server asks.
     debug mode telling nothing; callbacks in order, ones that throw or reject, unsubscribing and
     subscribing from inside a callback; restarts with and without a state directory; one map for
     the register and the application, by `import` or `require`;
+  - a provider of the application's own (`test/providers.test.ts`): a tracer, logger or meter
+    provider registered once NodeSDK has started sets exactly its settings aside, reported at
+    once with the inventory's settings, and the configs decided after; one the API refuses
+    changes nothing; one registered before NodeSDK starts is seen as the SDK's is refused;
   - the inventory (`test/inventory.test.ts`): a typical setup's components; every instrumentation
     `getNodeAutoInstrumentations` loads listed with its version, and switched off by the name
     listed; no instrumentations, exporters set to `none`, repeated and unknown ones; an exporter
@@ -477,4 +519,7 @@ sends the hash at start, and the components in full when the server asks.
   `check_app_settings` (the checks `app-cjs` and `app-mjs`): the programs read the flag
   `example.feature` (`appSettings`), which the server turns on, sends a bad map for (FAILED, still
   on), leaves out (off), sends in a string (on) and sends again (nothing to tell); after a restart
-  with no offer it is on from the start.
+  with no offer it is on from the start. Last, `check_truth` (the checks `truth-own-*`): app.cjs
+  registers a tracer, logger or meter provider of its own (`EXAMPLE_SETUP`, setups.cjs), exporting
+  to the same sink. Each setting sent must then show in the telemetry, or be named as set aside;
+  and the settings set aside must be exactly those that provider takes past the package.

@@ -327,13 +327,13 @@ reaches the telemetry that goes through them, and nothing else.
 
 | Setting | Python | Node.js | Go | .NET plugin | .NET `WithOpAmp` | Java agent |
 |---|---|---|---|---|---|---|
-| `sampling_rate` | at once | at once | at once ⁴ | at once | at once | at once ⁴ |
+| `sampling_rate` | at once | at once ³ | at once ⁴ | at once | at once | at once ⁴ |
 | `send_traces`, `send_logs` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
 | `send_logs_level` | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ | at once ¹ |
-| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ |
+| `sampling_rules` | at once ⁴ ⁵ | at once ³ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ |
 | `send_logs_level_by_scope` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once ¹ ⁴, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
 | `drop_attributes`, `mask_attributes` | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
-| `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
+| `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ³ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
 | `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then |
 | [export health](#export-health) (no setting) | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ |
 | `send_metrics` | at once, `otlp` only ¹ | at once ¹ | at once, push only ¹ | at once ¹ | at once ¹ | at once, Prometheus too |
@@ -348,9 +348,10 @@ processor goes on exporting. Where the integration sees such an exporter when it
 it doesn't declare that signal's settings, so they are set aside, named as not carried out:
 Python for exporters it doesn't build, span or log processors or metric exporters passed to
 `configure()`, and, from then on, a span or log processor added to its providers later; Node.js for
-exporters it doesn't build; Go for a metrics exporter it doesn't gate, and for a global provider the
-application sets in place of `Setup`'s, from when it is set (the package looks before each decision
-and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
+exporters it doesn't build, and from the moment the application registers a global tracer, logger
+or meter provider of its own in place of the SDK's; Go for a metrics exporter it doesn't gate, and
+for a global provider the application sets in place of `Setup`'s, from when it is set (the package
+looks before each decision and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
 one of a signal's exporters can't be stopped (not OTLP, beside another exporter, another
 plugin's, or, in `WithOpAmp`, with a path or an `HttpClientFactory` of its own), and the .NET
 plugin for traces and metrics under `OTEL_DOTNET_AUTO_SETUP_SDK=false`; the Java agent for a span
@@ -360,19 +361,25 @@ simple, or a metric reader neither periodic nor pull. .NET reads the built provi
 each decision and every 30 s, and the plugin reads each logger provider on its first log record: a
 processor added later sets its signal's settings aside from then on, and the effective config is
 reported again. Elsewhere a processor added after the SDK is built isn't seen: the setting is still
-answered APPLIED. Go's `Setup` hands out no SDK provider, so nothing can be added to one. A Go
-application that builds an SDK of its own and never sets it as a global provider isn't seen either.
+answered APPLIED. In Node.js the SDK's providers take no processor once built, and Go's `Setup`
+hands out no SDK provider, so nothing can be added to one. A provider a Node.js or Go application
+builds and never registers or sets as global isn't seen either.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
 a switched-off one stays loaded, recording nothing ([node-otel.md](node-otel.md#switching-instrumentations-off)).
 
+³ In Node.js the sampler samples the spans of the SDK's tracer provider only. Once the
+application registers a global tracer provider of its own, its spans go past the sampler, so
+`sampling_rate`, `sampling_rules`, `sampling_traces_per_second` and `debug_sampling_rate` are set
+aside from then on ([node-otel.md](node-otel.md#a-provider-of-the-applications-own)).
+
 ⁴ Declared to the layer (see [the host](#the-host)) only where the integration carries it out,
 as every setting is; elsewhere it is set aside: named as not carried out, never reported in force,
 and the rest of the config still APPLIED. Python declares every one only where its configurator
 built the SDK (not under another configurator or `OTEL_CONFIG_FILE`). Node.js declares
-`sampling_rules`, `sampling_traces_per_second`, `debug_until` and `debug_sampling_rate` always
-(the sampler is always its own), the log ones (`send_logs_level_by_scope`,
+`debug_until` always, and `sampling_rules`, `sampling_traces_per_second` and
+`debug_sampling_rate` unless the application registers a tracer provider of its own (footnote ³), the log ones (`send_logs_level_by_scope`,
 `send_logs_per_second`, `debug_send_logs_level`) only where it builds the log exporters, and
 redaction only where it builds both the span and the log exporters. The .NET plugin and
 `WithOpAmp` declare the log ones where every logs exporter is the gated OTLP one, redaction where
@@ -417,13 +424,14 @@ What else to know:
 - **An SDK the application builds on its own isn't reached.** Python (`opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
-  In Go a global provider the application sets after `Setup` is seen, and that signal's settings
-  are set aside. A provider it builds and never sets as global can't be seen: the server may hear
-  APPLIED for a setting its telemetry doesn't follow. The Java agent extension can't see an
-  `OpenTelemetrySdk` the application builds and uses itself: that SDK's telemetry escapes every
-  setting, and the extension still answers for the agent's SDK. In .NET, a tracer or meter
-  provider the application builds beside the managed one listens to the same instrumentations. The
-  integration can't see it, so the settings stay answered APPLIED while its telemetry goes on.
+  Node.js and Go set aside what a provider the application registers or sets as the global one
+  takes past them. A provider it builds and never registers or sets as global can't be seen: the
+  server may hear APPLIED for a setting its telemetry doesn't follow. The Java agent extension
+  can't see an `OpenTelemetrySdk` the application builds and uses itself: that SDK's telemetry
+  escapes every setting, and the extension still answers for the agent's SDK. In .NET, a tracer or
+  meter provider the application builds beside the managed one listens to the same
+  instrumentations. The integration can't see it, so the settings stay answered APPLIED while its
+  telemetry goes on.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are

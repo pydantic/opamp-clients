@@ -107,6 +107,9 @@ is a table out of date.
 | Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | the sampler's settings, `send_traces`, redaction and the instrumentation switches |
 | Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | `send_metrics` |
 | Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | the log settings and redaction |
+| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own | the sampler's settings, `send_traces` and redaction |
+| Node.js | `own-logger-provider` | the same for the logger provider | the log settings and redaction |
+| Node.js | `own-meter-provider` | the same for the meter provider | `send_metrics` |
 | Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | the trace, metric and log gates' settings and redaction; the sampler's stay |
 | Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | the sampler's settings |
 | .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | the trace and log gates' settings and redaction; the sampler's stay |
