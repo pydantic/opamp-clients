@@ -428,6 +428,11 @@ func location(requested *url.URL, given string) (string, *corepb.Origin) {
 		return lossy(given), nil
 	}
 	u := requested.ResolveReference(ref)
+	// A URL with no host (`a:/.//` resolves to `a://`) is no place to go, and it reads back as
+	// another (`a:`).
+	if u.Host == "" {
+		return lossy(given), nil
+	}
 	var port uint64
 	if p := u.Port(); p != "" {
 		// Port 0 is no port to go to, and an origin's 0 means the scheme's default.
