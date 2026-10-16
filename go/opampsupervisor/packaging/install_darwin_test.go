@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +48,11 @@ func startService(t *testing.T) func() {
 	return func() {
 		out, err := exec.Command("launchctl", "bootout", "system/"+label).CombinedOutput()
 		require.NoError(t, err, "launchctl bootout: %s", out)
+		// bootout can return while launchd is still taking the service down, and a bootstrap
+		// then fails with "5: Input/output error": unloaded once launchctl no longer knows it.
+		require.Eventually(t, func() bool {
+			return exec.Command("launchctl", "print", "system/"+label).Run() != nil
+		}, 30*time.Second, 100*time.Millisecond, "launchd still has %s after bootout", label)
 		log, _ := os.ReadFile(storage + "/log/supervisor.log")
 		t.Logf("Supervisor output:\n%s", log)
 	}

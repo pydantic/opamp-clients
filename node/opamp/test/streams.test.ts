@@ -115,8 +115,12 @@ test("a discard or a cancel while a write is pending: no file, and nothing more 
         const { s, got, state } = streams();
         for (let i = 0; i < 5; i++) s.do(effect({ case: "downloadData", value: { id: 9n, data: randomBytes(50_000) } }));
         if (done) s.do(effect({ case: "downloadDone", value: { id: 9n } }));
-        await sleep(20); // the first write is in flight
+        // The file is made, and its first write (100 ms) is in flight: waited for, not timed.
+        await until("the file made", () => existsSync(downloadPath(state, 9n)));
         s.do(effect({ case: how, value: { id: 9n } }));
+        // Deleted once that write is over: waited for, so a busy machine's late timers don't
+        // count against it; then nothing more comes.
+        await until(`${how} (done ${done}) deleting the file`, () => !existsSync(downloadPath(state, 9n)));
         await sleep(150);
         assert.deepEqual(got, [], `${how} (done ${done})`);
         assert.equal(existsSync(downloadPath(state, 9n)), false, `${how} (done ${done}) left a file`);
