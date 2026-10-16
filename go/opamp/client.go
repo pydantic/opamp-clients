@@ -96,8 +96,9 @@
 // downloads alike; Proxy.Direct tells the client to go direct instead, ignoring the environment.
 // The two modes read the environment by different rules:
 //
-//   - Rust mode, by the one rule every SDK's Rust mode shares (tests/shell-tables/README.md,
-//     "Rust mode's proxy rule"): REQUEST_METHOD set (CGI) means none; each variable's upper-case
+//   - Rust mode, read once when the client starts, by the one rule every SDK's Rust mode shares
+//     (tests/shell-tables/README.md, "Rust mode's proxy rule"), which the core applies:
+//     REQUEST_METHOD set (CGI) means none; each variable's upper-case
 //     name if it is set at all, else its lower-case one, a value empty or only spaces being
 //     unset; HTTP_PROXY for http:// and ws://, HTTPS_PROXY for https:// and wss://, either
 //     falling back to ALL_PROXY (a SOCKS5 proxy too), its value trimmed; NO_PROXY's
@@ -304,12 +305,16 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		return nil, err
 	}
 	var tlsCfg *tls.Config
+	var proxies *rustProxies
 	if rust {
 		// The core speaks HTTP and WebSocket itself, over the streams this gives it.
 		if tlsCfg, err = cfg.TLS.tlsConfig(); err != nil {
 			return nil, fmt.Errorf("opamp: TLS: %w", err)
 		}
 		cc.Streams, cc.SpliceDownloads = true, !cfg.NoRustSplice
+		// The core picks each connection's proxy from these.
+		proxies = newRustProxies(cfg.Proxy, cfg.environ)
+		cc.Proxy = proxies.choice
 	}
 	if cfg.StateFile != "" {
 		// A save or a download a client stopped before on this file left finishing ends first.
@@ -358,15 +363,13 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	if rust {
 		// What the core hands over that isn't a stream's (store, discard, a save's cancel; and
 		// platform effects, should a core emit them) goes to x as in Go mode.
-		x.streams = newStreams(x, tlsCfg, newRustProxies(cfg.Proxy, cfg.environ), cfg.streamNet)
+		x.streams = newStreams(x, tlsCfg, proxies, cfg.streamNet)
 	}
 	if notify == nil {
 		notify = func(*Client, Notification) {}
 	}
-	stopBound := cfg.StopTimeout
-	if stopBound <= 0 {
-		stopBound = 5 * time.Second // the core's default
-	}
+	// Stop is bounded by the core's own stop timeout, as given or its default: init reports it.
+	stopBound := time.Duration(out.GetLimits().GetStopTimeoutMs()) * time.Millisecond
 	l := &loop{core: c, x: x, notify: func(n Notification) { notify(cl, n) }, cmds: cl.cmds, start: time.Now(),
 		queue: first, uid: cl.setUID, stopBound: stopBound}
 	started := make(chan struct{})
@@ -586,7 +589,8 @@ func (cfg Config) connection() (*connection, error) {
 
 // coreConfig is the core's settings. The core takes the transport from the endpoint, keeps every
 // effect's time (the client carries out its cancels), judges a download's status, and with no
-// instance UID makes one from entropy.
+// instance UID makes one from entropy. It makes the backoff's jitter seed from the same entropy
+// (Seed left 0): two clients started in the same tick don't retry in step.
 func coreConfig(cfg Config) (*corepb.Config, error) {
 	var uid []byte
 	if cfg.InstanceUID != ([16]byte{}) {
@@ -602,7 +606,6 @@ func coreConfig(cfg Config) (*corepb.Config, error) {
 		UnixMs:                   unixMs(),
 		Capabilities:             cfg.Capabilities,
 		HeartbeatIntervalMs:      millis(cfg.HeartbeatInterval),
-		Seed:                     uint64(time.Now().UnixNano()),
 		Endpoint:                 cfg.Endpoint,
 		Headers:                  fromHTTP(cfg.Header),
 		RequestTimeoutMs:         millis(cfg.RequestTimeout),
@@ -621,7 +624,9 @@ func coreConfig(cfg Config) (*corepb.Config, error) {
 
 // millis is d in whole milliseconds for the core; a negative d is none, the core's default, as 0
 // is (as the Node.js client takes it).
-func millis(d time.Duration) uint64 { return uint64(max(d, 0) / time.Millisecond) }
+// millis is d in milliseconds for the core. A negative one reaches it as its two's complement,
+// which the core refuses at init, naming the field and the number meant.
+func millis(d time.Duration) uint64 { return uint64(d / time.Millisecond) }
 
 func statusInputs(s Status) []*corepb.Input {
 	var in []*corepb.Input

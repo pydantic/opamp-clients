@@ -69,6 +69,30 @@ test("a bad config is an error", () => {
   assert.throws(() => new Core(create(ConfigSchema, { instanceUid: new Uint8Array(2) })), CoreError);
 });
 
+// A negative time or size is refused at start by the core, naming the field and the number meant,
+// as in every SDK (it was clamped to the default here, while others threw). Less than a
+// millisecond is 0: the default.
+test("a negative time or size is an error at start", () => {
+  const endpoint = "http://127.0.0.1:1/v1/opamp";
+  for (const [field, config] of [
+    ["stop_timeout_ms is -5000", { stopTimeoutMs: -5000 }],
+    ["heartbeat_interval_ms is -1", { heartbeatIntervalMs: -1 }],
+    ["request_timeout_ms is -2", { requestTimeoutMs: -2.5 }],
+    ["max_send_bytes is -1", { maxSendBytes: -1 }],
+  ] as const) {
+    assert.throws(() => Client.start({ endpoint, ...config }, {}), (e: Error) => e.message.includes(`${field}: negative`));
+  }
+  void Client.start({ endpoint, requestTimeoutMs: -0.5 }, {}).stop();
+});
+
+// Stop is bounded by the stop timeout the core goes by: its start reports it, the default too.
+test("the core reports the limits it goes by", () => {
+  const config = (stopTimeoutMs: bigint) =>
+    create(ConfigSchema, { instanceUid: new Uint8Array(16).fill(1), endpoint: "http://server/v1/opamp", stopTimeoutMs });
+  assert.equal(new Core(config(0n)).limits?.stopTimeoutMs, 5000n);
+  assert.equal(new Core(config(1500n)).limits?.stopTimeoutMs, 1500n);
+});
+
 test("cores are independent", () => {
   const a = new Core(create(ConfigSchema, { instanceUid: new Uint8Array(16).fill(1), endpoint: "http://server/v1/opamp" }));
   const b = new Core(create(ConfigSchema, { instanceUid: new Uint8Array(16).fill(2), endpoint: "http://server/v1/opamp" }));

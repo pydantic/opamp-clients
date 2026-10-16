@@ -68,6 +68,8 @@ class Core:
         #: The instance UID in use, as the core last said (the application's, a saved one, or
         #: one the core made).
         self.instance_uid = b""
+        # The limits the core goes by, as given or by default: its start reports them.
+        self.limits: corepb.Limits | None = None
         self._tap = _open_tap()
         self._tap_lock = threading.Lock()  # records come from worker threads too (file records)
         try:
@@ -125,4 +127,6 @@ class Core:
             raise CoreError(reply.error)
         if reply.output.instance_uid:
             self.instance_uid = bytes(reply.output.instance_uid)
+        if reply.output.HasField("limits"):
+            self.limits = reply.output.limits
         return reply.output

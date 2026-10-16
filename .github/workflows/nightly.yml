@@ -325,9 +325,11 @@ jobs:
       - name: Node.js
         if: ${{ !cancelled() && matrix.part == 'Go and Node.js' }}
         working-directory: node/opamp
+        # The spec reporter passes a failing test's annotation (test/annotate.ts: the test, its seed,
+        # the line that replays it) through as a line of its own, which GitHub shows in the summary.
         run: >-
           npm ci --no-audit --no-fund && npm exec -- tsc -p . &&
-          node --test dist/test/callback.properties.test.js dist/test/adversary.properties.test.js dist/test/schedule.properties.test.js
+          node --test --test-reporter=spec dist/test/callback.properties.test.js dist/test/adversary.properties.test.js dist/test/schedule.properties.test.js
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         if: matrix.part == 'Python'
       - name: Python
@@ -423,7 +425,7 @@ jobs:
           cache-dependency-path: node/opamp/package-lock.json
       - if: matrix.sdk == 'node'
         working-directory: node/opamp
-        run: npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/callback.properties.test.js
+        run: npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test --test-reporter=spec dist/test/callback.properties.test.js
       - if: matrix.sdk == 'python'
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - if: matrix.sdk == 'python'

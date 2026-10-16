@@ -25,7 +25,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -189,88 +188,6 @@ func FuzzHeaderConversion(f *testing.F) {
 			}
 		}
 	})
-}
-
-// Rust mode's proxy rule, against what it promises: under CGI no proxy; otherwise one of the
-// variables' values, trimmed; NO_PROXY's entries only ever send hosts direct (an entry added to
-// the list never brings a proxy back), a host its own entry and * (for names) are direct, case
-// doesn't matter, and the answer can be handed to the core.
-func FuzzRustProxyRule(f *testing.F) {
-	f.Add("localhost,.example.com,10.0.0.0/8, 2001:db8::/32 ,*", "api.example.com", "HTTP_PROXY=http://p:3128\nNO_PROXY=x", "http")
-	f.Add("example.com", "EXAMPLE.COM", "https_proxy= socks5://u:p@p:1080 \nALL_PROXY=http://all", "wss")
-	f.Add("::1,127.0.0.1/32,fe80::1%eth0", "::1", "ALL_PROXY=p\nREQUEST_METHOD=", "ws")
-	f.Add(".", "a.", "HTTPS_PROXY=\xe9", "https")
-	f.Fuzz(func(t *testing.T, list, host, envBlob, scheme string) {
-		if strings.ContainsAny(host, "/?#@[]") || strings.Contains(host, ",") {
-			t.Skip()
-		}
-		env := map[string]string{}
-		for _, line := range strings.Split(envBlob, "\n") {
-			if k, v, ok := strings.Cut(line, "="); ok {
-				env[k] = v
-			}
-		}
-		if list != "" {
-			env["NO_PROXY"] = list
-		}
-		lookup := func(k string) (string, bool) { v, ok := env[k]; return v, ok }
-
-		direct := rustNoProxy(list, host)
-		if !direct && (rustNoProxy(list+","+host, host) != true || rustNoProxy(host+","+list, host) != true) && strings.TrimSpace(host) == host && host != "" {
-			t.Fatalf("NO_PROXY %q plus the host %q itself doesn't send it direct", list, host)
-		}
-		if direct {
-			for _, more := range []string{"x.invalid", "10.1.2.3", "::/0", "", "*"} {
-				if !rustNoProxy(list+","+more, host) || !rustNoProxy(more+","+list, host) {
-					t.Fatalf("adding %q to %q brought a proxy back for %q", more, list, host)
-				}
-			}
-		}
-		if rustNoProxy(list, swapASCIICase(host)) != direct || rustNoProxy(swapASCIICase(list), host) != direct {
-			t.Fatalf("NO_PROXY %q for %q depends on case", list, host)
-		}
-		if ip, err := netip.ParseAddr(host); (err != nil || ip.Zone() != "") && !rustNoProxy("*", host) {
-			t.Fatalf("* doesn't send the name %q direct", host)
-		}
-
-		raw := scheme + "://" + host + "/v1/opamp"
-		got := rustEnvProxy(lookup, raw)
-		if _, cgi := env["REQUEST_METHOD"]; cgi && got != "" {
-			t.Fatalf("under CGI the proxy is %q", got)
-		}
-		if got != "" {
-			ok := false
-			for _, k := range []string{"HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"} {
-				ok = ok || (env[k] != "" && strings.TrimSpace(env[k]) == got)
-			}
-			if !ok || strings.TrimSpace(got) != got {
-				t.Fatalf("proxy %q is none of the environment's (%v)", got, env)
-			}
-			if u, err := url.Parse(raw); err == nil && rustNoProxy(list, u.Hostname()) {
-				t.Fatalf("NO_PROXY %q names %q, but the proxy is %q", list, u.Hostname(), got)
-			}
-		}
-		in := newRustProxies(Proxy{}, lookup).answer(9, raw)
-		if _, err := proto.Marshal(in); err != nil {
-			t.Fatalf("the answer can't reach the core: %v", err)
-		}
-		if in.GetProxyAnswer().GetId() != 9 || in.GetProxyAnswer().GetProxy() != lossy(got) {
-			t.Fatalf("answer %v for proxy %q", in, got)
-		}
-	})
-}
-
-func swapASCIICase(s string) string {
-	b := []byte(s)
-	for i, c := range b {
-		switch {
-		case 'a' <= c && c <= 'z':
-			b[i] = c - 32
-		case 'A' <= c && c <= 'Z':
-			b[i] = c + 32
-		}
-	}
-	return string(b)
 }
 
 // toCore is the core's notification that n was made from, as far as n says (the inverse of

@@ -43,7 +43,7 @@ import { EventEmitter } from "node:events";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mock, test } from "node:test";
+import { mock } from "node:test";
 
 import fc from "fast-check";
 
@@ -70,6 +70,7 @@ import {
 } from "../src/index.js";
 import type { StreamsPlatform } from "../src/streams.js";
 import { Transport } from "../src/transport.js";
+import { annotatedTest } from "./annotate.js";
 
 const UID = new Uint8Array(16).fill(0x92);
 const CAPABILITY = "io.example.sched";
@@ -1801,9 +1802,14 @@ const commands = [
 
 // ---------------------------------------------------------------------------------------------
 
+/** The main test's seed: OPAMP_SCHED_SEED, or one of its own (printed). */
+const SCHED_SEED = process.env.OPAMP_SCHED_SEED ? Number(process.env.OPAMP_SCHED_SEED) : (Date.now() ^ (Math.random() * 2 ** 31)) | 0;
+/** Every test here prints, when it fails, an annotation with how to replay it (annotate.ts). */
+const test = annotatedTest("schedule.properties.test.js", () => ({ OPAMP_SCHED_SEED: SCHED_SEED }));
+
 // covers: RULE-SHELL-01, RULE-SHELL-02, RULE-SHELL-03, RULE-SHELL-04, RULE-SHELL-05, RULE-SHELL-06, RULE-SHELL-07, RULE-SHELL-08, RULE-SHELL-09
 test("the shell contract holds whatever the order of its I/O (fast-check's scheduler)", async (t) => {
-  const seed = process.env.OPAMP_SCHED_SEED ? Number(process.env.OPAMP_SCHED_SEED) : (Date.now() ^ (Math.random() * 2 ** 31)) | 0;
+  const seed = SCHED_SEED;
   const numRuns = Number(process.env.OPAMP_SCHED_RUNS ?? 500);
   const path = process.env.OPAMP_SCHED_PATH;
   const replayPath = process.env.OPAMP_SCHED_REPLAY;

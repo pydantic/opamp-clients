@@ -446,24 +446,16 @@ public class StreamsTests
         Directory.Delete(dir, recursive: true);
     }
 
-    // The proxy question is answered from the options: configured, direct, or by the shared rule.
-    // covers: RULE-PROXY-02
+    // The proxy question (which the core asks only when it wasn't told which proxy to use) is
+    // answered from the options: the configured proxy, or none; the environment's is the core's.
     [Fact]
     public void TheProxyQuestionIsAnsweredFromTheOptions()
     {
-        static ProxyAnswer Ask(OpAmpClientOptions o, Dictionary<string, string> env, string url = "https://server.test/v1/opamp") =>
-            OpAmpClient.ProxyAnswerFor(o, n => env.GetValueOrDefault(n), url);
         var endpoint = new Uri("https://server.test/v1/opamp");
-        var env = new Dictionary<string, string> { ["HTTPS_PROXY"] = "socks5h://u:p@env-proxy:1080" };
-
-        var configured = Ask(new() { Endpoint = endpoint, Proxy = new Uri("socks5://user:pa%40ss@proxy.test:1080"), ProxyUseLocalResolver = true }, env);
+        var configured = OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint, Proxy = new Uri("socks5://user:pa%40ss@proxy.test:1080"), ProxyUseLocalResolver = true });
         Assert.Equal(("socks5://user:pa%40ss@proxy.test:1080", true), (configured.Proxy, configured.ResolveLocally));
-        Assert.Equal(string.Empty, Ask(new() { Endpoint = endpoint, DirectConnection = true }, env).Proxy);
-        var fromEnv = Ask(new() { Endpoint = endpoint }, env);
-        Assert.Equal(("socks5h://u:p@env-proxy:1080", false), (fromEnv.Proxy, fromEnv.ResolveLocally));
-        Assert.True(Ask(new() { Endpoint = endpoint, ProxyUseLocalResolver = true }, env).ResolveLocally);
-        Assert.False(Ask(new() { Endpoint = endpoint, ProxyUseLocalResolver = true }, new() { ["HTTPS_PROXY"] = "http://h:3128" }).ResolveLocally);
-        Assert.Equal(string.Empty, Ask(new() { Endpoint = endpoint }, env, "http://server.test/").Proxy);
+        Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint, DirectConnection = true }).Proxy);
+        Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint }).Proxy);
 
         // Through the effect, naming its stream.
         using var r = new StreamsRig(proxy: _ => new ProxyAnswer { Proxy = "http://p:1" });
