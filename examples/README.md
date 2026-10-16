@@ -83,6 +83,17 @@ checked by `check_app_settings` (the check `app`): its example application reads
 |---|---|
 | `custom` | none of `/feature` before the first config (the default); `/feature` once the flag is `on`, still after a bad map is FAILED naming `custom.example.feature`, none once `custom` is left out, again from a map in a string; `/changed` three times (on, off, on), not for the FAILED config or the same map sent again; after a restart with no offer, `/feature` from the start |
 
+Some setups take telemetry out of an integration's control. `check_truth` runs the application
+under one, named in `EXAMPLE_SETUP`, as the check `truth-<setup>`. The server offers one setting a
+document. Each setting must show in the telemetry the sink receives, or be named as set aside in
+the effective config. The settings set aside must be exactly the ones the setup can't carry out.
+
+| Setup | Integration | What it does |
+|---|---|---|
+| `late-processor` | Python | the application adds a span and a log record processor once the SDK is built |
+| `extension-processor` | Java agent | a second extension (`Setups.java`) adds a span processor, a log record processor and a metric reader |
+| `extension-sampler` | Java agent | a second extension sets a sampler of its own in place of the extension's |
+
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.
 The examples currently use the `elastic` settings format. The Logfire policy adapter is

@@ -305,6 +305,10 @@ class DeclarativeTest {
       assertTrue(sdk.getSdkTracerProvider().toString().contains("OpampLiveSampler"));
       assertTrue(sdk.getSdkTracerProvider().toString().contains("OpampGated{LoggingSpanExporter"));
       assertNull(e.notHooked(config(dir)));
+      // The SDK as built samples with the extension's sampler, around the file's: nothing set aside.
+      var declared = e.host();
+      e.built(sdk);
+      assertEquals(declared, e.host());
     } finally {
       System.clearProperty("otel.opamp.endpoint");
       System.clearProperty("otel.opamp.state.dir");

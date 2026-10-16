@@ -327,10 +327,10 @@ reaches the telemetry that goes through them, and nothing else.
 
 | Setting | Python | Node.js | Go | .NET plugin | .NET `WithOpAmp` | Java agent |
 |---|---|---|---|---|---|---|
-| `sampling_rate` | at once | at once | at once | at once | at once | at once |
+| `sampling_rate` | at once | at once | at once | at once | at once | at once ⁴ |
 | `send_traces`, `send_logs` | at once ¹ | at once ¹ | at once | at once ¹ | at once ¹ | at once ¹ |
 | `send_logs_level` | at once ¹ | at once ¹ | at once | at once ¹ | at once ¹ | at once ¹ |
-| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁵ |
+| `sampling_rules` | at once ⁴ ⁵ | at once ⁵ | at once ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ |
 | `send_logs_level_by_scope` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
 | `drop_attributes`, `mask_attributes` | at once ¹ ⁴ | at once ¹ ⁴ | at once | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
 | `sampling_traces_per_second`, `send_logs_per_second` | at once ¹ ⁴, per process | at once ¹ ⁴ | at once | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
@@ -349,10 +349,11 @@ it doesn't declare that signal's settings, so they are set aside, named as not c
 Python for exporters it doesn't build and span or log processors or metric exporters passed to
 `configure()`; Node.js for exporters it doesn't build; the .NET plugin and `WithOpAmp` whenever
 one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
-`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent under a
-configuration file for a span or log processor that is neither batch nor simple, or a metric
-reader neither periodic nor pull. A processor added after the SDK is built isn't seen: the
-setting is still answered APPLIED.
+`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent for a span or log
+record processor or a metric reader another agent extension adds through the autoconfigure
+customizers, and under a configuration file for a span or log processor that is neither batch nor
+simple, or a metric reader neither periodic nor pull. A processor added after the SDK is built
+isn't seen: the setting is still answered APPLIED.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -370,8 +371,10 @@ redaction only where it builds both the span and the log exporters. The .NET plu
 every span and log record exported goes through a gate (traces and logs each gated, or not
 exported), `sampling_rules` and `sampling_traces_per_second` where `sampling_rate` is carried
 out, and debug mode always (its rate and level set aside where `sampling_rate` and
-`send_logs_level` are). Go declares every one, always; the Java agent every one but where
-footnote ¹ says.
+`send_logs_level` are). Go declares every one, always. The Java agent declares every one but where
+footnote ¹ says. It also sets aside `sampling_rate`, `sampling_rules`,
+`sampling_traces_per_second` and `debug_sampling_rate` where another agent extension sets a
+sampler of its own in place of the extension's.
 
 ⁵ A rule sees what a span has when it starts, which differs by instrumentation
 ([sampling rules](#sampling-rules)). HTTP server spans start with their path in every language
@@ -403,6 +406,8 @@ What else to know:
 - **An SDK the application builds on its own isn't reached.** Python (`opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
+  The Java agent extension can't see an `OpenTelemetrySdk` the application builds and uses itself:
+  that SDK's telemetry escapes every setting, and the extension still answers for the agent's SDK.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are
