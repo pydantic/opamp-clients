@@ -33,7 +33,7 @@ import (
 // exporter it builds goes through a gate), send_metrics only where the metrics reader is built
 // around a gated exporter, the instrumentation switches at once too (a switched-off
 // instrumentation's tracer starts no span from then on), and the polling interval at the next
-// start.
+// start. A global provider the application sets in place of Setup's narrows it (agent.host).
 func (s *server) host() *settingspb.Host {
 	live := append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations"}, carried...)
 	if !s.metricsUngated {
@@ -101,6 +101,16 @@ type agent struct {
 	// last listed (under mu).
 	exporters []*settingspb.Exporter
 	listed    uint64
+	// relist: the host narrowed before there was a client to tell; start sends the inventory.
+	relist bool
+
+	// The global providers Setup set (set before start), which of them the application has
+	// replaced since (under mu), the global providers now (a test's own in tests), and what
+	// stops watching them.
+	ours      providers
+	replaced  replaced
+	globals   func() providers
+	watchStop chan struct{}
 }
 
 // stopper is a timer that can be stopped (*time.Timer).
@@ -136,7 +146,8 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	if err != nil {
 		return nil, err
 	}
-	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second}
+	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second,
+		globals: globalProviders}
 	changed := func() { go a.scopesChanged() }
 	controls.scopes.changed.Store(&changed)
 	var saved, coreState []byte
@@ -294,14 +305,23 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 	if a.effective != effective { // a timer changed it since
 		client.SetEffectiveConfig(a.effective)
 	}
-	if a.controls.scopes.gen.Load() != a.listed { // an instrumentation came since
+	if a.controls.scopes.gen.Load() != a.listed || a.relist { // an instrumentation came since, or the host narrowed
 		if c := a.components(ctx); c != nil {
 			a.reporter.SetAvailableComponents(c)
+			a.relist = false
 		}
 	}
 	a.nextHealth = a.now().Add(a.healthEvery)
 	a.arm()
+	if a.ours != (providers{}) && !a.stopped {
+		a.watchStop = make(chan struct{})
+		go a.watch(a.watchStop, watchEvery)
+	}
 }
+
+// host is what this package carries out now: the server's host (server.host), less what a global
+// provider the application set in place of Setup's takes from it. Under a.mu.
+func (a *agent) host() *settingspb.Host { return a.replaced.without(a.server.host()) }
 
 // healthReport is the agent's health: the application's (healthy, as it runs), with export
 // health under component_health_map["exporters"] as the layer builds it from the gates' counts,
@@ -340,6 +360,10 @@ func (a *agent) stop(ctx context.Context) error {
 	a.stopped = true
 	if a.timer != nil {
 		a.timer.Stop()
+	}
+	if a.watchStop != nil {
+		close(a.watchStop)
+		a.watchStop = nil
 	}
 	a.mu.Unlock()
 	var errs []error
@@ -479,7 +503,12 @@ func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteC
 	if a.server.stateDir != "" {
 		save = func([]byte) error { return nil }
 	}
-	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.server.host(), unixMs(now), save)
+	// A provider replaced since the last look is seen before the decision, so the answer is for
+	// what this package carries out now.
+	if a.noticeReplaced() {
+		a.narrowed(now)
+	}
+	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.host(), unixMs(now), save)
 	if err != nil {
 		return failed(config, err.Error())
 	}
@@ -570,8 +599,13 @@ func (a *agent) fired(gen uint64) {
 // decides that it has come: the layer is told at least refreshAt, should the wall clock have
 // moved back since. Under a.mu.
 func (a *agent) refresh(now time.Time) {
-	ms := max(unixMs(now), a.refreshAt)
-	r, err := a.layer.Refresh(context.Background(), a.current, a.atStart.GetCurrent(), a.server.host(), ms)
+	a.decideAgain(now, max(unixMs(now), a.refreshAt))
+}
+
+// decideAgain asks the layer what is in force at ms under the host as it is now, puts it in
+// force, and reports the effective config. Under a.mu.
+func (a *agent) decideAgain(now time.Time, ms uint64) {
+	r, err := a.layer.Refresh(context.Background(), a.current, a.atStart.GetCurrent(), a.host(), ms)
 	if err != nil {
 		slog.Warn("opamp: the settings in force could not be refreshed; asking again in a minute", "error", err)
 		a.refreshAfter(ms+60_000, now)
