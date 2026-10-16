@@ -5,8 +5,8 @@ OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 | Language | Client | OpenTelemetry integration |
 |---|---|---|
 | Python | [`python/`](python/), [docs](docs/python.md) | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) |
-| Go | [`go/opamp/`](go/opamp/) | [`go/otel/`](go/otel/), [docs](docs/go-otel.md); also a Collector extension and Supervisor ([`go/opampextension/`](go/opampextension/), [`go/opampsupervisor/`](go/opampsupervisor/)) |
-| Node.js | [`node/opamp/`](node/opamp/) | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) |
+| Go | [`go/opamp/`](go/opamp/), [docs](docs/go.md) | [`go/otel/`](go/otel/), [docs](docs/go-otel.md); also a Collector extension and Supervisor ([`go/opampextension/`](go/opampextension/), [`go/opampsupervisor/`](go/opampsupervisor/), [docs](docs/collector.md)) |
+| Node.js | [`node/opamp/`](node/opamp/), [docs](docs/node.md) | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) |
 | Java | [`java/opamp/`](java/opamp/), [docs](docs/java.md) | [`java/opamp-javaagent/`](java/opamp-javaagent/), [docs](docs/javaagent.md) |
 | .NET | [`dotnet/`](dotnet/), [docs](docs/dotnet.md) | [docs](docs/dotnet-otel.md) |
 
