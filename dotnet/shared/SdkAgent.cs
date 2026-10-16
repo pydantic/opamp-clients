@@ -624,11 +624,13 @@ internal sealed class SdkAgent
 
     /// <summary>
     /// The client's saved state (opamp-state), raw: the settings to start with are the last config
-    /// applied, which the client keeps there.
+    /// applied, which the client keeps there. Read as the client reads it at start: after a save a
+    /// client stopped in this process left writing (a config applied just before a stop) has
+    /// landed, or this start would begin from the config before.
     /// </summary>
-    private byte[]? ReadCoreState() => this.ReadStateFile("opamp-state");
+    private byte[]? ReadCoreState() => this.ReadStateFile("opamp-state", OpAmpClient.ReadState);
 
-    private byte[]? ReadStateFile(string name)
+    private byte[]? ReadStateFile(string name, Func<string, byte[]>? read = null)
     {
         if (this.server.StateDir is not { } dir)
         {
@@ -639,6 +641,11 @@ internal sealed class SdkAgent
         {
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, name);
+            if (read is not null)
+            {
+                return read(path) is { Length: > 0 } kept ? kept : null;
+            }
+
             return File.Exists(path) ? File.ReadAllBytes(path) : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)

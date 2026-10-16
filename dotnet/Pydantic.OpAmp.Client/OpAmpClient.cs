@@ -563,6 +563,19 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
+    /// What is saved at <paramref name="stateFile"/> (empty if there is no file yet), once the work
+    /// a client stopped before on it left under way has ended: what a client started next on the
+    /// file starts from. <see cref="StopAsync"/> doesn't wait for a save already writing (it lands
+    /// by itself), so a read straight after it can find the state before.
+    /// </summary>
+    public static byte[] ReadState(string stateFile)
+    {
+        ArgumentNullException.ThrowIfNull(stateFile);
+        Client.StateFile.Settled(stateFile);
+        return Client.StateFile.Load(stateFile);
+    }
+
+    /// <summary>
     /// The instance UID in use (16 bytes): the application's, one saved before a restart, one the
     /// core made, or one the server assigned since (<see cref="OpAmpNotification.InstanceUidChanged"/>).
     /// </summary>

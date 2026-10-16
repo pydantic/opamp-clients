@@ -700,7 +700,7 @@ func TestValuesSurviveARestartWithAStateDirectory(t *testing.T) {
 		t.Fatalf("%v", st)
 	}
 	keepApplied(t, dir, `{"custom":{"checkout.new_flow":"on"}}`) // as the client does, before APPLIED goes out
-	again := newTestAgent(t, dir) // the next start: before any config arrives
+	again := newTestAgent(t, dir)                                // the next start: before any config arrives
 	if again.controls.app.get("checkout.new_flow", "off") != "on" {
 		t.Fatal("the saved values aren't in force at the next start")
 	}

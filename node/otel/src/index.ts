@@ -1755,10 +1755,15 @@ export class Agent {
     this.#timer = undefined;
     const lock = this.setup?.stateLock;
     const run = this.#run;
+    const client = this.client;
     // Called from the application's context (a signal handler): the goodbye is the agent's too.
     this.#stopping ??= context
-      .with(suppressTracing(context.active()), () => this.client?.stop() ?? Promise.resolve())
+      .with(suppressTracing(context.active()), () => client?.stop() ?? Promise.resolve())
       .catch(() => {})
+      // A save the client left writing (a config applied just before) lands first: a register
+      // after this one, in the same process, reads the settings to start with from that state,
+      // before its client starts. (The write keeps Node.js running until it is done anyway.)
+      .then(() => client?.settled())
       .then(() => {
         // Unless a later prepare (after abandon gave it up at once) holds the same slot again.
         if (lock && (this.#run === run || this.setup?.stateLock !== lock)) release(lock);

@@ -6,7 +6,7 @@
 // file left by another client or a crashed run (S3, a download's file made new).
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -259,6 +259,52 @@ for (const mode of MODES) {
     }
   });
 }
+
+// stop() doesn't wait for a save already writing; settled() does, and then the state file holds
+// what was saved: what an application reads there next is what a client started next starts from.
+test("settled: once the save stop left writing has landed, and the state file holds it", async () => {
+  const server = await opampServer({});
+  const state = join(dir("settled"), "state.bin");
+  let gate: () => void = () => {};
+  const released = new Promise<void>((r) => (gate = r));
+  const disk = faulty(() => undefined, {
+    ...REAL,
+    async rename(from, to) {
+      await released;
+      return REAL.rename(from, to);
+    },
+  });
+  // No instance UID: the core makes one up and saves it at once.
+  const config = { endpoint: server.url, stateFile: state, heartbeatIntervalMs: 50, stopTimeoutMs: 200, mode: "node",
+    proxy: false } as Config;
+  const a = Client.start({ ...config, [TEST_FILE_OPS]: disk.ops } as Config, {});
+  try {
+    await until("a save", () => disk.calls.some((c) => c.op === "rename"));
+    await a.stop();
+    assert.equal(existsSync(state), false, "the save landed before it was let go");
+    let done = false;
+    const settled = a.settled().then(() => void (done = true));
+    await sleep(300);
+    assert.equal(done, false, "settled while the save was still writing");
+    gate();
+    await settled;
+    assert.ok(readFileSync(state).length > 0, "settled before the save landed");
+    // The next client starts from it: the same instance UID.
+    const before = server.msgs.length;
+    const b = Client.start(config, {});
+    await until("the next client's first message", () => server.msgs.length > before);
+    await b.stop();
+    await b.settled();
+    assert.equal(hex(server.msgs[before]!.msg.instanceUid), hex(server.msgs[0]!.msg.instanceUid));
+  } finally {
+    gate();
+    server.close();
+  }
+  // Without a state file there is nothing to wait for.
+  const c = Client.start({ endpoint: "http://127.0.0.1:1/", mode: "node", proxy: false } as Config, {});
+  await c.settled();
+  await c.stop();
+});
 
 test("no state file: nothing journaled, a store fails", async () => {
   const got: Input[] = [];

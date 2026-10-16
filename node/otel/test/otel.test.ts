@@ -21,7 +21,7 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { AgentRemoteConfigSchema, type Client, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings } from "@pydantic/opamp-client/sdk";
 import { keepApplied } from "./kept.js";
 
@@ -499,6 +499,30 @@ test("register after its shutdown, in one process: the same slot, the same UID, 
   next.prepare({ ...env });
   assert.equal(next.setup?.stateDir, first.dir);
   released(next.setup);
+});
+
+test("a register right after its shutdown starts from a config applied just before: the shutdown waits for its save", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
+  keepApplied(dir, '{"sampling_rate":"0.25"}');
+  const { agent, env } = prepared(dir);
+  assert.equal(agent.controls.sampler.samplingRate, 0.25);
+  // A config applied just before the shutdown: the client's save of it is still writing when its
+  // stop resolves (stop doesn't wait for it), and lands a little later.
+  let land: () => void = () => {};
+  const landed = new Promise<void>((r) => (land = r));
+  agent.client = {
+    stop: async () => {
+      setTimeout(() => {
+        keepApplied(dir, '{"sampling_rate":"0.5"}');
+        land();
+      }, 50);
+    },
+    settled: () => landed,
+  } as unknown as Client;
+  await agent.stop(); // register's shutdown
+  agent.prepare(env);
+  assert.equal(agent.controls.sampler.samplingRate, 0.5, "the next register started from the config before");
+  await agent.stop();
 });
 
 test("a register that failed, then another at once: the second keeps the slot the first gave back", async () => {

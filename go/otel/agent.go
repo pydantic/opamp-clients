@@ -146,9 +146,11 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 		}
 		// The settings to start with are the last config applied, which the client keeps in its
 		// state (opamp-state); sdk-settings.json is what this package kept itself before, read
-		// only while the client's state holds no config applied.
-		coreState, err = os.ReadFile(filepath.Join(s.stateDir, "opamp-state"))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		// only while the client's state holds no config applied. Read as the client reads it at
+		// start: after a save a client stopped in this process left writing (a config applied
+		// just before a Shutdown) has landed, or this start would begin from the config before.
+		coreState, err = opamp.ReadState(filepath.Join(s.stateDir, "opamp-state"))
+		if err != nil {
 			slog.Warn("opamp: the client's saved state unreadable, using the SDK's own settings", "error", err)
 		}
 		saved, err = os.ReadFile(filepath.Join(s.stateDir, "sdk-settings.json"))
