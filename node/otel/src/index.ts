@@ -41,6 +41,7 @@ import {
   isSpanContextValid,
   DiagConsoleLogger,
   type Link,
+  metrics,
   ProxyTracerProvider,
   type Span,
   SpanKind,
@@ -51,6 +52,7 @@ import {
   TraceFlags,
   type TracerProvider,
 } from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations, getResourceDetectors } from "@opentelemetry/auto-instrumentations-node";
 import { diagLogLevelFromString, type ExportResult, SDK_INFO, suppressTracing } from "@opentelemetry/core";
 import { OTLPLogExporter as GrpcLogs } from "@opentelemetry/exporter-logs-otlp-grpc";
@@ -1287,25 +1289,81 @@ export function builds(signal: Signal, env: NodeJS.ProcessEnv = process.env): bo
  * host"), which sets aside any setting not named: the sampler's settings and the instrumentation
  * switches always, at once (instrumentations are switched while the application runs); a
  * signal's sending, and what its gate holds, only where this package builds every one of its
- * exporters (`builds`); the polling interval at the next start.
+ * exporters (`builds`); the polling interval at the next start. `own`: the signals the
+ * application registered a global provider of its own for (watchProviders). Their telemetry
+ * goes past the gate, and for traces past the sampler, so those settings aren't declared.
  */
-export function hostFromEnv(env: NodeJS.ProcessEnv = process.env): HostInit {
-  // The sampler is this package's whatever the exporters. Debug mode is the layer's: the package
-  // only runs the timer for its end (Agent.refresh).
-  const live = ["sampling_rate", "sampling_rules", "sampling_traces_per_second", "debug_until", "debug_sampling_rate",
-    "deactivate_instrumentations", "deactivate_all_instrumentations"];
+export function hostFromEnv(env: NodeJS.ProcessEnv = process.env, own: ReadonlySet<ApiSignal> = new Set()): HostInit {
+  // The sampler is this package's whatever the exporters, but it samples only the spans of the
+  // SDK's tracer provider. Debug mode is the layer's: the package only runs the timer for its end
+  // (Agent.refresh).
+  const sampled = !own.has("traces");
+  const live = [...(sampled ? ["sampling_rate", "sampling_rules", "sampling_traces_per_second"] : []), "debug_until",
+    ...(sampled ? ["debug_sampling_rate"] : []), "deactivate_instrumentations", "deactivate_all_instrumentations"];
   // custom, the application's own settings (docs/app-settings.md): it reads them through
   // appSettings, whatever the exporters.
   live.push("custom");
-  if (builds("TRACES", env)) live.push("send_traces");
-  if (builds("METRICS", env)) live.push("send_metrics");
+  const spansGated = builds("TRACES", env) && !own.has("traces");
+  const logsGated = builds("LOGS", env) && !own.has("logs");
+  if (spansGated) live.push("send_traces");
+  if (builds("METRICS", env) && !own.has("metrics")) live.push("send_metrics");
   // The levels, the cap and debug mode's level are held at the same gate as send_logs.
-  if (builds("LOGS", env)) {
+  if (logsGated) {
     live.push("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "debug_send_logs_level");
   }
   // Redaction is of spans and log records alike: only where both pass through this package.
-  if (builds("TRACES", env) && builds("LOGS", env)) live.push("drop_attributes", "mask_attributes");
+  if (spansGated && logsGated) live.push("drop_attributes", "mask_attributes");
   return { live, nextStart: ["opamp_polling_interval"] };
+}
+
+/** A signal the OpenTelemetry API holds one global provider for. */
+export type ApiSignal = "traces" | "metrics" | "logs";
+
+const PROVIDER: Record<ApiSignal, string> = { traces: "tracer", metrics: "meter", logs: "logger" };
+
+/**
+ * The global providers the API holds, as `watchProviders` sees them registered: the SDK's, and
+ * whom to tell of another.
+ */
+const registry: { agent: Agent | undefined; starting: boolean; sdk: Partial<Record<ApiSignal, unknown>>; watching: boolean } = {
+  agent: undefined, starting: false, sdk: {}, watching: false,
+};
+
+/**
+ * Run `start` (which starts the SDK) and from then on tell `agent` of each global provider the
+ * application registers through the API in place of the SDK's (Agent.providerOfItsOwn). What the
+ * application sends through the API then goes to that provider: past this package's sampler and
+ * gates. The API's setters are wrapped, once, so the agent hears of it as it happens. While
+ * `start` runs a registration is the SDK's own; one the API refuses then means the application
+ * registered its own first. A provider the application builds and uses without registering it
+ * isn't seen. Nor is one registered through another copy of the API: the API keeps one global
+ * per signal, but each copy has its own setters.
+ */
+export function watchProviders(agent: Agent, start: () => void): void {
+  registry.agent = agent;
+  registry.sdk = {};
+  if (!registry.watching) {
+    registry.watching = true;
+    const watch = <P, R>(signal: ApiSignal, set: (provider: P) => R, took: (result: R, provider: P) => boolean) =>
+      (provider: P): R => {
+        const result = set(provider);
+        if (registry.starting && took(result, provider)) registry.sdk[signal] = provider;
+        else if (registry.starting || (took(result, provider) && provider !== registry.sdk[signal])) {
+          registry.agent?.providerOfItsOwn(signal);
+        }
+        return result;
+      };
+    trace.setGlobalTracerProvider = watch("traces", trace.setGlobalTracerProvider.bind(trace), (r) => r === true);
+    metrics.setGlobalMeterProvider = watch("metrics", metrics.setGlobalMeterProvider.bind(metrics), (r) => r === true);
+    // The logs API answers with the provider it holds: the one given, or the one it kept.
+    logs.setGlobalLoggerProvider = watch("logs", logs.setGlobalLoggerProvider.bind(logs), (r, p) => r === p);
+  }
+  registry.starting = true;
+  try {
+    start();
+  } finally {
+    registry.starting = false;
+  }
 }
 
 /**
@@ -1500,6 +1558,10 @@ export class Agent {
   health: HealthReport | undefined;
   /** What the instance runs, once the SDK is built (`instrument`): reported as its available components. */
   inventory: InventoryInit | undefined;
+  /** The signals the application registered a global provider of its own for (watchProviders). */
+  readonly ownProviders = new Set<ApiSignal>();
+  /** The environment the host is read from. */
+  #env: NodeJS.ProcessEnv = {};
 
   get on(): boolean {
     return this.setup !== undefined;
@@ -1514,6 +1576,8 @@ export class Agent {
     this.setup = setupFromEnv(env, options);
     if (!this.setup) return;
     this.layer = new SdkSettings();
+    this.#env = env;
+    this.ownProviders.clear();
     this.host = hostFromEnv(env);
     let saved: Uint8Array | undefined;
     let coreState: Uint8Array | undefined;
@@ -1641,6 +1705,30 @@ export class Agent {
     if (this.effective) this.client?.setEffectiveConfig(this.effective);
     this.#refreshAfter(r.refreshAtUnixMs);
     if (before && !this.#refreshAt) diag.info("OpAMP: debug mode is over: the settings sent before it are in force");
+  }
+
+  /**
+   * The application registered a global provider of its own for `signal`, in place of the SDK's:
+   * what it sends through the API goes past this package's sampler (traces) and gates. The
+   * settings held there are declared no more. What is in force is decided again through the
+   * layer, put in force and reported at once, so those settings are named as set aside from now
+   * on rather than left answered APPLIED.
+   */
+  providerOfItsOwn(signal: ApiSignal): void {
+    if (!this.layer || this.ownProviders.has(signal)) return;
+    this.ownProviders.add(signal);
+    const was = new Set(this.host.live ?? []);
+    this.host = hostFromEnv(this.#env, this.ownProviders);
+    const lost = [...was].filter((k) => !this.host.live?.includes(k));
+    if (lost.length === 0) return;
+    say.warn(`OpAMP: the application registered a ${PROVIDER[signal]} provider of its own, which exports past `
+      + `this package: ${lost.join(", ")} can't be carried out`);
+    // Called from the application's code: what the client sends isn't the application's to trace.
+    context.with(suppressTracing(context.active()), () => {
+      this.refresh();
+      const components = this.components();
+      if (components) this.client?.setAvailableComponents(components);
+    });
   }
 
   /**
@@ -1949,7 +2037,7 @@ function registered(env: NodeJS.ProcessEnv, logLevel: string | undefined): { sdk
     ...(metricReaders ? { metricReaders } : {}),
     ...(logRecordProcessors ? { logRecordProcessors } : {}),
   });
-  sdk.start();
+  watchProviders(AGENT, () => sdk.start());
   AGENT.instrument(instrumentations, env);
   const ready = resource.waitForAsyncAttributes?.() ?? Promise.resolve();
   void ready

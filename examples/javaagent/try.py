@@ -26,6 +26,13 @@ the server sending nothing new.
 Run 9, export health: the proxy refuses the trace exports for a while: the agent sends its
 health again once the exports fail (after the exporter's retries), and again once they succeed.
 
+Then check_truth (examples/integrations.py), once for each setup Setups.java makes, a second
+agent extension built here and given to the agent only when EXAMPLE_SETUP names a setup:
+extension-processor (a span processor, a log record processor and a metric reader of its own,
+exporting to the same sink) and extension-sampler (a sampler of its own). Each setting the server
+offers must show in the telemetry or be named as set aside, and the set-aside settings must be
+exactly what the setup takes from the extension's control.
+
 Then check_app_settings (examples/integrations.py, its own runs 7 and 8): App.java reads the
 feature flag example.feature (AppSettings.get), which the server turns on and off, and is told of
 each change (AppSettings.onChange) (docs/app-settings.md). App.java is compiled against, and run
@@ -44,11 +51,12 @@ import tempfile
 import threading
 import time
 import urllib.request
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, ended, main, pings, run, statuses,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, check_truth, ended, main, pings, run, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -73,6 +81,13 @@ def build() -> None:
         copy_jars()
         subprocess.run(["javac", "-cp", str(TARGET / APP_SETTINGS), "-d", str(TARGET / "app"), str(HERE / "App.java")],
                        check=True)
+        for name in SETUPS_CLASSPATH:
+            subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy",
+                            f"-Dartifact=io.opentelemetry:{name}:{SDK_VERSION}", f"-DoutputDirectory={TARGET / 'setups-lib'}",
+                            "-Dmdep.stripVersion=true", "-f", str(ROOT / "java/opamp-javaagent/pom.xml")], check=True,
+                           stdout=subprocess.DEVNULL)
+        classpath = ":".join(str(TARGET / "setups-lib" / f"{n}.jar") for n in SETUPS_CLASSPATH)
+        subprocess.run(["javac", "-cp", classpath, "-d", str(TARGET / "setups"), str(HERE / "Setups.java")], check=True)
     else:
         for module, goal in [("java/opamp", "install"), ("java/opamp-javaagent", "package")]:
             subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT / module}:/src", *M2, "-w",
@@ -87,6 +102,33 @@ def build() -> None:
         subprocess.run(["docker", "run", "--rm", "-v", f"{HERE}:/app:ro", "-v", f"{TARGET}:/out",
                         "eclipse-temurin:21-jdk", "javac", "-cp", f"/out/{APP_SETTINGS}", "-d", "/out/app",
                         "/app/App.java"], check=True)
+        for name in SETUPS_CLASSPATH:
+            subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
+                            "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
+                            f"-Dartifact=io.opentelemetry:{name}:{SDK_VERSION}", "-DoutputDirectory=/out/setups-lib",
+                            "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
+        classpath = ":".join(f"/out/setups-lib/{n}.jar" for n in SETUPS_CLASSPATH)
+        subprocess.run(["docker", "run", "--rm", "-v", f"{HERE}:/app:ro", "-v", f"{TARGET}:/out",
+                        "eclipse-temurin:21-jdk", "javac", "-cp", classpath, "-d", "/out/setups", "/app/Setups.java"],
+                       check=True)
+    package_setups()
+
+
+#: The SDK the agent bundles, and what Setups.java (check_truth's second extension) compiles against.
+SDK_VERSION = "1.66.0"
+SETUPS_CLASSPATH = ["opentelemetry-api", "opentelemetry-context", "opentelemetry-common", "opentelemetry-sdk-common",
+                    "opentelemetry-sdk-trace", "opentelemetry-sdk-logs", "opentelemetry-sdk-metrics",
+                    "opentelemetry-sdk-extension-autoconfigure-spi", "opentelemetry-exporter-otlp"]
+SETUPS = "example-setups.jar"
+
+
+def package_setups() -> None:
+    """Setups.java's classes as an agent extension of their own: a jar with its service file."""
+    with zipfile.ZipFile(TARGET / SETUPS, "w") as jar:
+        for f in sorted((TARGET / "setups").glob("*.class")):
+            jar.write(f, f.name)
+        jar.writestr("META-INF/services/io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvider",
+                     "Setups\n")
 
 
 APP_SETTINGS = "opamp-app-settings.jar"
@@ -118,8 +160,10 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         "OTEL_BSP_SCHEDULE_DELAY": "500",
     } | extra
     agent = TARGET if LOCAL else Path("/agent")
-    java = ["java", f"-javaagent:{agent}/opentelemetry-javaagent.jar",
-            f"-Dotel.javaagent.extensions={agent}/opamp-javaagent-extension.jar",
+    extensions = f"{agent}/opamp-javaagent-extension.jar"
+    if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
+        extensions += f",{agent}/{SETUPS}"
+    java = ["java", f"-javaagent:{agent}/opentelemetry-javaagent.jar", f"-Dotel.javaagent.extensions={extensions}",
             "-cp", f"{agent}/app:{agent}/{APP_SETTINGS}", "App", f"{telemetry}/ping"]
     stderr = open(TARGET / f"{name}.stderr", "w")
     if LOCAL:
@@ -393,6 +437,13 @@ def check_matching_settings(launch_, target_: Path, listen: str) -> bool:
     return ok
 
 
+#: What another extension's span processor, log record processor and metric reader (Setups.java)
+#: take from the extension's control: their signals' gates, set aside. The sampler stays its own.
+EXTENSION_PROCESSOR = {"send_traces", "send_metrics", "send_logs", "send_logs_level", "send_logs_level_by_scope",
+                       "send_logs_per_second", "mask_attributes", "drop_attributes"}
+#: What another extension's sampler (Setups.java) takes: the settings the extension's sampler holds.
+EXTENSION_SAMPLER = {"sampling_rate", "sampling_rules", "sampling_traces_per_second"}
+
 LISTEN = "127.0.0.1:0" if LOCAL else "0.0.0.0:0"
 CHECKS = {
     "first": lambda: check(launch, "java-http-client", TARGET, listen=LISTEN),
@@ -400,6 +451,10 @@ CHECKS = {
     "setup": lambda: check_setup(launch, TARGET, listen=LISTEN),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
+    "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", EXTENSION_PROCESSOR,
+                                                     listen=LISTEN),
+    "truth-extension-sampler": lambda: check_truth(launch, TARGET, "extension-sampler", EXTENSION_SAMPLER,
+                                                   listen=LISTEN),
 }
 
 if __name__ == "__main__":

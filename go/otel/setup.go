@@ -130,6 +130,7 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 	global.SetLoggerProvider(s.LoggerProvider)
 	if s.agent != nil {
 		s.agent.exporters = s.exporters
+		s.agent.ours = providers{tracer: s.TracerProvider, meter: s.MeterProvider, logger: s.LoggerProvider}
 		s.agent.start(ctx, s.Resource)
 	}
 	return s, nil

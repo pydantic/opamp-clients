@@ -42,9 +42,10 @@ java -javaagent:opentelemetry-javaagent.jar \
 
 Everything else is the agent's usual configuration. The settings the server sends override the
 agent's own for as long as they are sent: withdraw a setting and the agent's own value comes
-back. They reach the sampler and exporters the agent builds from its `otel.*` configuration: a
-sampler, processor or exporter another extension sets up isn't covered, though the setting is
-still answered APPLIED.
+back. They reach the sampler and exporters the agent builds from its `otel.*` configuration, and
+nothing else. Where the agent's SDK sends telemetry another way, the extension sets aside the
+settings it can't carry out, so they are never answered as done
+([what another extension adds](#what-another-extension-adds)).
 
 With declarative configuration (`OTEL_CONFIG_FILE`, `otel.config.file`) the agent builds its SDK
 from the file and runs none of the autoconfigure hooks, so the extension takes the file's model
@@ -60,6 +61,41 @@ component of its own isn't covered, as an extension's isn't. The model's classes
 one SDK release to the next, so the extension is built against the agent's own (1.65.0-alpha for
 agent 2.31.1). If an endpoint is set but the agent built its SDK without calling either hook, the
 extension logs a WARNING saying it won't connect, rather than nothing.
+
+### What another extension adds
+
+Another agent extension can change the SDK through the same autoconfigure customizers. The
+extension's customizers run last, and it reads what the SDK is built with:
+
+- **A processor or reader of its own.** A tracer, logger or meter provider customizer can add a
+  span processor, a log record processor or a metric reader. What it exports doesn't go through
+  the extension's gate, so that signal's gate settings are set aside, as under a configuration
+  file. For traces these are `send_traces`, `drop_attributes` and `mask_attributes`. For logs they
+  are `send_logs`, `send_logs_level`, `send_logs_level_by_scope`, `send_logs_per_second`,
+  `debug_send_logs_level` and the two redaction settings. For metrics it is `send_metrics`. The
+  agent logs a WARNING that names what was added and what is set aside. The inventory lists it,
+  ungated. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
+  counted: the agent adds such processors itself, and one that exported would send spans before
+  they end.
+- **What is left alone.** A processor or reader the agent built from `otel.*.exporter` stays
+  gated, also when another extension's processor customizer wrapped it. A span processor that
+  isn't told when a span ends can't export, so it changes nothing: the agent's thread details and
+  baggage processors are two. The agent's baggage log record processor only adds attributes. Any
+  other log record processor counts as one that exports, as the extension can't tell what it does.
+  So does the span processor the agent adds for `otel.javaagent.debug`, which logs every span.
+- **A sampler of its own.** A tracer provider customizer can set a sampler in place of the
+  extension's. Once the SDK is built, the extension checks its sampler. If it isn't the
+  extension's, `sampling_rate`, `sampling_rules`, `sampling_traces_per_second` and
+  `debug_sampling_rate` are set aside, with a WARNING. A sampler set through
+  `otel.traces.sampler` or a sampler customizer is still the one the extension wraps.
+
+All of this is decided before the client starts, so the first effective config already names
+these settings as set aside. The SDK's builders don't expose their processors and readers, so the
+extension reads them reflectively. If it can't, it logs a WARNING and sees nothing added.
+
+The extension can't see an SDK the application builds itself. An application that makes its own
+`OpenTelemetrySdk` and uses it directly sends that SDK's telemetry past every setting, and the
+extension still answers for the agent's SDK.
 
 ### Is it working?
 
@@ -156,7 +192,9 @@ it out, and what it sees. Each example is a whole `elastic` document, as the ser
   spans start with `url.full`, `server.address` and `server.port`, so match those under
   `attributes`. Spans the application starts itself have their own name.
 - The sampler `otel.traces.sampler` names (the agent's, or another extension's) is what the
-  rules and the rate fall back to, and what decides every span while neither is set.
+  rules and the rate fall back to, and what decides every span while neither is set. A sampler
+  another extension sets in place of the extension's sets the rules aside
+  ([what another extension adds](#what-another-extension-adds)).
 
 ### Log levels per scope
 
@@ -297,7 +335,9 @@ built by the SDK settings layer as in every language:
   `gated`: it is inside the extension's gate. Under declarative configuration the file's exporters
   are listed the same way (`otlp_http` and `otlp_grpc` as `otlp`, `prometheus/development` as
   `prometheus`), and a processor of a kind of its own, which the controls don't reach, by its name
-  with `gated` false. An exporter another extension sets up isn't seen, so isn't listed.
+  with `gated` false. A processor or metric reader another extension adds is listed with `gated`
+  false too: a batch or simple processor by its exporter's class (`OtlpHttpSpanExporter`), any
+  other processor or reader by its own class.
 - `settings`: every setting above, `at once` or `next start`.
 
 The agent builds its SDK once and declares the same settings while it runs, so the inventory is
@@ -324,6 +364,12 @@ sent once, at start: the hash in the first message, the components in full when 
   going in whole; a FAILED config changing nothing; restarts with and without a state directory;
   a failed setup putting back what was in force; several class loaders on one bridge, one that is
   gone no longer held; and the bridge's jar loaded by a class loader that sees the JDK alone.
+- What another extension adds (`OutsideTest`), on an SDK built through another extension's
+  customizers and then the extension's: a span processor, a log record processor and a metric
+  reader of its own each set aside their signal's settings, named as unsupported, and are listed
+  ungated; a span processor that only starts spans, and another extension's wrapper around the
+  agent's own processors, set nothing aside; a sampler set in place of the extension's sets the
+  sampler's settings aside, while one set through the sampler customizer is still wrapped.
 - The inventory (`InventoryTest`) of an SDK built through the extension's hooks: the
   names `deactivate_instrumentations` takes, versions where embedded, each exporter as configured
   (`none`, another library's, a processor of a file's own kind ungated), and the client sending
@@ -354,6 +400,14 @@ sent once, at start: the hash in the first message, the components in full when 
      config reported at the end, the server sending nothing.
   9. The proxy refuses trace exports for a minute: the agent sends its health once they fail, and
      again once they succeed.
+
+  Then `check_truth`, once for each setup a second extension (`examples/javaagent/Setups.java`)
+  makes, named in `EXAMPLE_SETUP`. The server offers one setting a document, and each must show in
+  the telemetry or be named as set aside, never neither. `extension-processor` adds a span
+  processor, a log record processor and a metric reader exporting to the same sink: their
+  signals' gate settings are set aside, and the sampler's are carried out. `extension-sampler`
+  sets a sampler that samples every trace: `sampling_rate`, `sampling_rules` and
+  `sampling_traces_per_second` are set aside, and the gates' settings are carried out.
 
   Then `check_app_settings` ([app-settings.md](app-settings.md#how-it-is-checked)): the program
   reads `example.feature` with `AppSettings`, which the server turns on and off; a bad map is

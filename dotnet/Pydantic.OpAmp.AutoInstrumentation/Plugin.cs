@@ -6,6 +6,7 @@ using OpenTelemetry.AutoInstrumentation.PluginApi;
 using OpenTelemetry.AutoInstrumentation.PluginApi.Telemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Instrumentation.AspNetCore;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -24,7 +25,7 @@ namespace Pydantic.OpAmp.AutoInstrumentation;
 /// </summary>
 public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<OtlpExporterOptions>,
     IConfigureMetricsOptions<OtlpExporterOptions>, IConfigureLogsOptions<OtlpExporterOptions>,
-    IConfigureTracesOptions<AspNetCoreTraceInstrumentationOptions>
+    IConfigureTracesOptions<AspNetCoreTraceInstrumentationOptions>, IConfigureLogsOptions<OpenTelemetryLoggerOptions>
 {
     private Agent? agent;
     private Resource? resource;
@@ -63,7 +64,11 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
         }
     }
 
-    /// <summary>Once the SDK is built: join the fleet.</summary>
+    /// <summary>
+    /// Once the SDK is built: join the fleet. Every plugin has had the providers by now, another
+    /// plugin's processors and exporters among them: what they export through is read as the agent
+    /// starts.
+    /// </summary>
     public void Initialized()
     {
         if (this.agent is not { } a)
@@ -97,7 +102,11 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
     }
 
     /// <inheritdoc/>
-    public void TracerProviderInitialized(TracerProvider tracerProvider) => this.resource ??= tracerProvider.GetResource();
+    public void TracerProviderInitialized(TracerProvider tracerProvider)
+    {
+        this.resource ??= tracerProvider.GetResource();
+        this.agent?.Built(tracerProvider);
+    }
 
     /// <inheritdoc/>
     public MeterProviderBuilder BeforeConfigureMeterProvider(MeterProviderBuilder builder) => builder;
@@ -106,7 +115,11 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
     public MeterProviderBuilder AfterConfigureMeterProvider(MeterProviderBuilder builder) => builder;
 
     /// <inheritdoc/>
-    public void MeterProviderInitialized(MeterProvider meterProvider) => this.resource ??= meterProvider.GetResource();
+    public void MeterProviderInitialized(MeterProvider meterProvider)
+    {
+        this.resource ??= meterProvider.GetResource();
+        this.agent?.Built(meterProvider);
+    }
 
     /// <inheritdoc/>
     public void ConfigureTracesOptions(OtlpExporterOptions options) => this.agent?.Gate(options, Signal.Traces);
@@ -119,4 +132,7 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
 
     /// <inheritdoc/>
     public void ConfigureLogsOptions(OtlpExporterOptions options) => this.agent?.Gate(options, Signal.Logs);
+
+    /// <summary>Each logger provider's options: what it exports through is read once it is built (<see cref="Agent.Watch"/>).</summary>
+    public void ConfigureLogsOptions(OpenTelemetryLoggerOptions options) => this.agent?.Watch(options);
 }

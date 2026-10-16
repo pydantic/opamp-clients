@@ -76,6 +76,10 @@ func main() {
 			log.Print(err)
 		}
 	}()
+	if names := os.Getenv("EXAMPLE_SETUP"); names != "" { // try.py's truth checks (setups.go): none otherwise
+		stop := applySetups(ctx, names)
+		defer func() { _ = stop(context.Background()) }()
+	}
 
 	logger, noisy := otelslog.NewLogger("app"), otelslog.NewLogger("noisy")
 	settings := os.Getenv("EXAMPLE_SETTINGS") == "1"

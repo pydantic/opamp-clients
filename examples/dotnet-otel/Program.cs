@@ -29,6 +29,9 @@ using var term = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
     stop.Cancel();
 });
 
+// check_truth's setups (Setups.cs, EXAMPLE_SETUP): none otherwise.
+var ownSdk = Example.Setup.Has("own-sdk") ? Example.OwnSdk.Build() : [];
+
 using var loggers = LoggerFactory.Create(_ => { });
 var log = loggers.CreateLogger("app");
 var noisy = loggers.CreateLogger("app.noisy");
@@ -82,4 +85,9 @@ while (!stop.IsCancellationRequested)
 if (server is not null)
 {
     await server.StopAsync();
+}
+
+foreach (var provider in ownSdk)
+{
+    provider.Dispose();
 }

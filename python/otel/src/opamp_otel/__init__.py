@@ -1113,9 +1113,7 @@ class Agent:
         # they are set aside rather than answered as done. The settings loaded at start are loaded
         # again, to report that.
         config_file = bool(os.environ.get("OTEL_CONFIG_FILE"))
-        built = sdk_host(self._metric_exporters + self.extra_metric_exporters, configured=self.configured,
-                         auto_instrumented=self._auto_instrumented, config_file=config_file,
-                         span_processors=self.span_processors, log_processors=self.log_processors)
+        built = self._built_host()
         if built != self.host:
             self.host = built
             lost = ", ".join(_undeclared(built))
@@ -1181,6 +1179,42 @@ class Agent:
             _at_exit(self.stop)
             if hasattr(os, "register_at_fork"):
                 os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
+
+    def _built_host(self) -> settings_pb2.Host:
+        """What the package carries out of the SDK as built (sdk_host), as it knows it now."""
+        return sdk_host(self._metric_exporters + self.extra_metric_exporters, configured=self.configured,
+                        auto_instrumented=self._auto_instrumented,
+                        config_file=bool(os.environ.get("OTEL_CONFIG_FILE")),
+                        span_processors=self.span_processors, log_processors=self.log_processors)
+
+    def processor_added(self, signal: str) -> None:
+        """The application added a span (`signal` "traces") or log record ("logs") processor to
+        the SDK once it was built: it exports past the gate, as one passed to the configurator
+        does. The gate's settings are declared no more, and what is in force is decided again and
+        reported, so the settings it can't carry out are named as set aside from now on rather
+        than left answered as done."""
+        with self._lock:
+            if signal == "traces":
+                if self.span_processors:
+                    return
+                self.span_processors = True
+            else:
+                if self.log_processors:
+                    return
+                self.log_processors = True
+            built = self._built_host()
+            if built == self.host or self.layer is None:
+                return
+            lost = [k for k in _undeclared(built) if k not in _undeclared(self.host)]
+            self.host = built
+            _log.warning("OpAMP: a %s processor added to the SDK once it was built exports past this package's "
+                         "gate: %s can't be carried out", "span" if signal == "traces" else "log record",
+                         ", ".join(lost))
+            self._refresh()
+            if self.client is not None and self.components is not None:
+                components = self._components()
+                if components is not None:
+                    self.client.set_available_components(components)
 
     def _components(self) -> opamp_pb2.AvailableComponents | None:
         """The inventory, once the SDK is built, as the available components: under the same host
@@ -1560,6 +1594,8 @@ class Configurator(_OTelSDKConfigurator):
             # With a declarative configuration file (newer SDKs) the SDK ignores all of the above.
             AGENT.configured = not os.environ.get("OTEL_CONFIG_FILE")
         super()._configure(**kwargs)
+        if AGENT.on and AGENT.configured:
+            _watch_processors()
         if AGENT.on and not AGENT.configured:
             # The file's SDK skips upstream's OpAMP hook (start): join the fleet from here, with
             # what the file built, so the instance is still managed (its next-start settings, its
@@ -1567,6 +1603,30 @@ class Configurator(_OTelSDKConfigurator):
             from opentelemetry import trace  # noqa: PLC0415
 
             AGENT.start(getattr(trace.get_tracer_provider(), "resource", None) or Resource.create({}))
+
+
+def _watch_processors() -> None:
+    """Once the configurator has built the SDK: a span or log record processor the application
+    adds to its providers from then on is told to the agent (Agent.processor_added), then added."""
+    from opentelemetry import _logs, trace  # noqa: PLC0415
+    from opentelemetry.sdk._logs import LoggerProvider  # noqa: PLC0415
+    from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
+
+    def watched(provider, method: str, signal: str) -> None:
+        add = getattr(provider, method)
+
+        def added(*args, **kwargs):
+            AGENT.processor_added(signal)
+            return add(*args, **kwargs)
+
+        setattr(provider, method, added)
+
+    tracer_provider = trace.get_tracer_provider()
+    if isinstance(tracer_provider, TracerProvider):
+        watched(tracer_provider, "add_span_processor", "traces")
+    logger_provider = _logs.get_logger_provider()
+    if isinstance(logger_provider, LoggerProvider):
+        watched(logger_provider, "add_log_record_processor", "logs")
 
 
 class GatedOtlpMetricExporter(MetricExporter):
