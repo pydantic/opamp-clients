@@ -176,7 +176,14 @@ public class ConnectionSettingsTests
     [Fact]
     public async Task AMoveNobodyAnswersFailsAndTheAgentStaysWhereItWas()
     {
-        var nowhere = $"http://127.0.0.1:{Kit.FreePort()}/v1/opamp";
+        // A port bound and never listened on: a connection to it is refused, and no other test's
+        // server can take it meanwhile (a port found free and let go can be).
+        using var closed = new System.Net.Sockets.Socket(
+            System.Net.Sockets.AddressFamily.InterNetwork,
+            System.Net.Sockets.SocketType.Stream,
+            System.Net.Sockets.ProtocolType.Tcp);
+        closed.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 0));
+        var nowhere = $"http://127.0.0.1:{((System.Net.IPEndPoint)closed.LocalEndPoint!).Port}/v1/opamp";
         await using var server = new KeyServer();
         lock (server)
         {
