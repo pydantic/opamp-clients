@@ -1099,6 +1099,12 @@ class Agent:
         chosen = chosen_uid(env)
         return chosen if chosen is not None else uuid7()
 
+    def _endpoint_in_use(self) -> str | None:
+        """The endpoint the client uses now, if a client runs. (The client is read once: a stop
+        that clears it meanwhile leaves this call with the one it read.)"""
+        client = self.client
+        return client.endpoint if client is not None else None
+
     def start(self, resource: Resource) -> None:
         """Once the SDK is built: join the fleet, on a thread of the client's own."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
@@ -1145,7 +1151,7 @@ class Agent:
                         mode="python")
         self.reachability = Reachability(s.endpoint, str(resource.attributes.get("service.name", "")), self.uid,
                                          s.endpoint_from, s.headers_from)
-        self.reachability.in_use = lambda: self.client.endpoint if self.client is not None else None
+        self.reachability.in_use = self._endpoint_in_use
         with self._lock:
             first = self._export_health()  # the first report is always sent: with the agent's first message
         status = Status(description=self.layer.describe(attributes(resource)),

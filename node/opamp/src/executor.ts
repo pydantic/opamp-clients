@@ -277,10 +277,7 @@ export class Executor {
         if (!this.#f.start(k.value.id, () => abort.abort())) break;
         const id = k.value.id;
         const url = k.value.url;
-        void this.#post(k.value, abort.signal).then((i) => {
-          this.used = url;
-          this.#f.finish(id, i);
-        });
+        void this.#post(k.value, abort.signal).then((i) => this.#outcome(url, id, i));
         break;
       }
       case "wsOpen":
@@ -481,15 +478,22 @@ export class Executor {
     }
   }
 
+  /** Hand the core the outcome of a request or a connection to url, having noted url as the latest
+   * one tried: a notification of the outcome finds it in place. An outcome the core no longer waits
+   * for (its effect was cancelled) leaves the URL noted before. */
+  #outcome(url: string, id: bigint, i: Input): void {
+    const before = this.used;
+    this.used = url;
+    if (!this.#f.finish(id, i)) this.used = before;
+  }
+
   #open(o: WsOpen): void {
     const id = o.id;
     let ws: WebSocket | undefined;
     // Cancelled while it opens: the handshake is aborted (and says nothing).
     if (!this.#f.start(id, () => ws?.terminate())) return;
-    const failed = (detail: string, status?: number, hs: Header[] = []): Input => {
-      this.used = o.url;
-      return input({ case: "wsFailed", value: { $typeName: "opamp.core.v1.WsFailed", id, status, headers: hs, detail, unixMs: unixMs() } });
-    };
+    const failed = (detail: string, status?: number, hs: Header[] = []): Input =>
+      input({ case: "wsFailed", value: { $typeName: "opamp.core.v1.WsFailed", id, status, headers: hs, detail, unixMs: unixMs() } });
     const lost = (detail: string): Input => input({ case: "wsLost", value: { $typeName: "opamp.core.v1.Failed", id, detail } });
     // ws takes a maxPayload of 0 as no limit: the core's limit is kept below, on every message.
     const limit = o.maxMessageBytes;
@@ -511,7 +515,7 @@ export class Executor {
     // An open connection doesn't keep Node.js running (see Config).
     socket.on("upgrade", (res) => res.socket.unref());
     socket.on("unexpected-response", (_req, res) => {
-      this.#f.finish(id, failed(`upgrade refused: ${res.statusCode}`, res.statusCode, fromHeaders(Object.entries(res.headers))));
+      this.#outcome(o.url, id, failed(`upgrade refused: ${res.statusCode}`, res.statusCode, fromHeaders(Object.entries(res.headers))));
       res.resume();
       socket.terminate();
     });
@@ -538,13 +542,14 @@ export class Executor {
     socket.on("error", (err: Error) => {
       const e = this.#f.get(id);
       if (e === undefined) return;
-      this.#f.finish(id, e.ws ? lost(err.message) : failed(err.message));
+      if (e.ws) this.#f.finish(id, lost(err.message));
+      else this.#outcome(o.url, id, failed(err.message));
     });
     socket.on("close", (code: number) => {
       const e = this.#f.get(id);
       if (e === undefined) return;
       if (!e.ws) {
-        this.#f.finish(id, failed("closed before it opened"));
+        this.#outcome(o.url, id, failed("closed before it opened"));
       } else if (code === 1006) {
         // No Close frame at all: the connection dropped.
         this.#f.finish(id, lost(e.closing ? "connection dropped while closing" : "connection dropped"));

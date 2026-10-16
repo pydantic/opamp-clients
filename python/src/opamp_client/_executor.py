@@ -527,9 +527,11 @@ class Executor:
 
     def _outcome(self, url: str, id_: int, input_: corepb.Input) -> None:
         """Hand the core the outcome of a request or a connection to url, having noted url as the
-        latest one tried: a notification of the outcome finds it in place."""
-        self.used = url
-        self._inflight.finish(id_, input_)
+        latest one tried: a notification of the outcome finds it in place. An outcome the core no
+        longer waits for (its effect was cancelled) leaves the URL noted before."""
+        before, self.used = self.used, url
+        if not self._inflight.finish(id_, input_):
+            self.used = before
 
     async def _post(self, r: corepb.HttpRequest) -> None:
         def failed(detail: str) -> corepb.Input:
