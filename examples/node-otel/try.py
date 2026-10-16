@@ -54,7 +54,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_signals, key_in_code, main,  # noqa: E402
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, key_in_code, main,  # noqa: E402
                           read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
@@ -402,6 +402,7 @@ CHECKS = {
     "first-in-code": of("in-code.mjs", lambda d: check(launch, "http,net,dns", d, switch_at_once=True)),
     "setup-in-code": of("in-code.mjs", lambda d: check_setup(launch, d, key=key_in_code("APP_OPAMP_TOKEN"),
                                                              named="the headers given to register()")),
+    "rotation": of("app.cjs", lambda d: check_rotation(launch, d)),
     "settings": check_settings,
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))
