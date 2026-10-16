@@ -356,7 +356,7 @@ def test_app_settings_left_local_put_every_key_back_to_its_default(tmp_path):
     told = Told()
     agent.controls.app.on_change(told)
     agent.remote_config(config(values({"a": "1"})))
-    agent.remote_config(config(policy(head_sampling={"ratio": 1}, version=2)))
+    agent.remote_config(config(policy(head_sampling={"ratio": 1}, every=True)))
     assert agent.controls.app.get("a", "default") == "default"
     assert told.calls[-1] == ({}, frozenset({"a"}))
     agent.remote_config(config(values({"a": "1"})))

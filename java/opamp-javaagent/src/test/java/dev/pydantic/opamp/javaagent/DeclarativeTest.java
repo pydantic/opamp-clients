@@ -3,10 +3,11 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.every;
 import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.full;
 import static dev.pydantic.opamp.javaagent.Vectors.override;
 import static dev.pydantic.opamp.javaagent.Vectors.v1;
-import static dev.pydantic.opamp.javaagent.Vectors.v2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -192,7 +193,7 @@ class DeclarativeTest {
   @Test
   void savedSettingsAreInForceFromTheStartTheNextStartOnesWhereTheAgentReadsThem(@TempDir Path dir) throws Exception {
     Files.writeString(dir.resolve("sdk-settings.json"),
-        v2("signal_exports", exports("", "", "off"), "instrumentations", override("\"disabled\":[\"java-http-client\",\"jdbc\"],\"all_disabled\":true")));
+        every("signal_exports", exports("", "", "off"), "instrumentations", override("\"disabled\":[\"java-http-client\",\"jdbc\"],\"all_disabled\":true")));
     Extension e = Extension.forTest(null);
     OpenTelemetryConfigurationModel m = Declarative.setUp(e, config(dir), model(FILE + """
         distribution:
@@ -277,12 +278,12 @@ class DeclarativeTest {
       assertTrue(e.on());
       assertTrue(e.controls.gates.sendTraces());
       assertFalse(e.controls.gates.sendMetrics()); // the reader is the agent's: gated
-      assertEquals(saved, ExtensionTest.effective(e));
+      assertEquals(full(saved), ExtensionTest.effective(e));
       Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(v1("signal_exports", exports("off", "", ""))));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
       assertEquals("signal_exports.traces: this SDK cannot apply the requested override", s.getErrorMessage());
       assertTrue(e.controls.gates.sendTraces());
-      assertEquals(saved, ExtensionTest.effective(e));
+      assertEquals(full(saved), ExtensionTest.effective(e));
     } finally {
       System.clearProperty("otel.opamp.endpoint");
       System.clearProperty("otel.opamp.state.dir");

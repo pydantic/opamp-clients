@@ -551,9 +551,9 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 }
 
 // appValues is a policy whose app_settings control overrides the values with the given JSON, and
-// whose other controls are local unless set gives them, as v2 takes them.
+// whose other controls are local unless set gives them, as every takes them.
 func appValues(values string, set ...string) string {
-	return v2(append([]string{"app_settings", override(`"values":` + values)}, set...)...)
+	return every(append([]string{"app_settings", override(`"values":` + values)}, set...)...)
 }
 
 func TestThePackageDeclaresCustom(t *testing.T) {
@@ -572,7 +572,7 @@ func TestAConfigPutsTheValuesInForceAndTheEffectiveConfigReportsThem(t *testing.
 		}
 		tld.f(settings, changed)
 	})
-	doc := v2("head_sampling", override(`"ratio":0.5`), "app_settings", override(`"values":{"checkout.new_flow":"on","limit":25}`))
+	doc := every("head_sampling", override(`"ratio":0.5`), "app_settings", override(`"values":{"checkout.new_flow":"on","limit":25}`))
 	st := a.remoteConfig(context.Background(), remote(doc))
 	if st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
@@ -648,7 +648,7 @@ func TestAConfigWithoutCustomPutsEveryKeyBackToItsDefault(t *testing.T) {
 	if st.GetStatus() != failed_ || !strings.HasPrefix(st.GetErrorMessage(), "config_map:") || a.controls.app.get("a", "default") != "1" {
 		t.Fatalf("no policy: %v", st)
 	}
-	a.remoteConfig(context.Background(), remote(v2()))
+	a.remoteConfig(context.Background(), remote(every()))
 	if a.controls.app.get("a", "default") != "default" {
 		t.Fatal("app_settings local: the default")
 	}

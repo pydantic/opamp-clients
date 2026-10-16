@@ -9,7 +9,7 @@ import pytest
 from opamp_client import anyvalue_pb2, opamp_pb2
 from opamp_client.sdk import SdkSettings
 
-from _policy import FILE, V1, V2, config, effective, policy
+from _policy import FILE, V1, config, effective, full, policy
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -34,14 +34,14 @@ def test_loads_decides_and_describes() -> None:
     logs_off = policy(signal_exports={"logs": {"enabled": False}})
     loaded = layer.load(logs_off, declaring())
     assert loaded.settings.HasField("send_logs") and not loaded.settings.send_logs
-    assert effective(loaded.effective) == json.loads(logs_off)
+    assert effective(loaded.effective) == full(logs_off)
 
     kept: list[bytes] = []
     quarter = policy(head_sampling={"ratio": 0.25})
     d = layer.decide(config(quarter), loaded.current, loaded.current, declaring(), save=kept.append)
     assert d.status.status == APPLIED and d.status.last_remote_config_hash == b"h"
     assert d.apply.sampling_rate == 0.25 and kept == [quarter]
-    assert effective(d.effective) == json.loads(quarter)
+    assert effective(d.effective) == full(quarter)
 
     bad = layer.decide(config(policy(head_sampling={"ratio": "x"})), d.current, loaded.current, declaring(),
                        save=kept.append)
@@ -76,7 +76,6 @@ def test_the_description_names_the_policy_formats_and_the_controls_the_host_carr
     got = described(layer.describe([], host, NOW))
     assert got == {
         "logfire.opamp.config_format": V1,
-        "logfire.opamp.config_formats": [V1, V2],
         "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings",
                                              "polling_interval"],
     }
@@ -96,13 +95,13 @@ def test_a_host_says_what_it_carries_out() -> None:
     d = layer.decide(config(switch), b"", b"", host)
     assert d.status.status == APPLIED
     assert list(d.apply.deactivate_instrumentations.names) == ["urllib"]  # live: in force now, no state needed
-    assert effective(d.effective) == json.loads(switch)
+    assert effective(d.effective) == full(switch)
     # An override the host does not carry out refuses the whole policy, and what was in force stays.
     traces_off = policy(signal_exports={"traces": {"enabled": False}})
     off = layer.decide(config(traces_off), d.current, b"", host)
     assert off.status.status == FAILED and not off.HasField("apply")
     assert off.status.error_message == "signal_exports.traces: this SDK cannot apply the requested override"
-    assert off.current == d.current and effective(off.effective) == json.loads(switch)
+    assert off.current == d.current and effective(off.effective) == full(switch)
     # Version 2 names the field too.
     rules = policy(sampling_rules={"rules": [{"rate": 0}]})
     assert (layer.decide(config(rules), d.current, b"", host).status.error_message
@@ -141,14 +140,14 @@ def test_the_save_the_layer_asks_for_decides_the_answer() -> None:
     current = policy(head_sampling={"ratio": 0.5})
     quarter = policy(head_sampling={"ratio": 0.25})
 
-    def full(doc: bytes) -> None:
+    def disk_full(doc: bytes) -> None:
         raise OSError(28, "No space left on device")
 
-    d = layer.decide(config(quarter), current, current, declaring(), save=full)
+    d = layer.decide(config(quarter), current, current, declaring(), save=disk_full)
     assert d.status.status == FAILED
     assert d.status.error_message == "can't save the settings: [Errno 28] No space left on device"
     assert not d.HasField("apply") and d.current == current
-    assert effective(d.effective) == json.loads(current)
+    assert effective(d.effective) == full(current)
     # Whatever stops the save refuses the config.
     d = layer.decide(config(quarter), current, current, declaring(), save=lambda doc: 1 / 0)
     assert (d.status.status, d.status.error_message) == (FAILED, "can't save the settings: division by zero")
@@ -261,7 +260,7 @@ def test_debug_mode_arrives_folded_in_and_a_refresh_at_its_end_ends_it() -> None
     assert d.refresh_at_unix_ms == end
     r = layer.refresh(d.current, b"", end, declaring())
     assert (r.settings.sampling_rate, r.refresh_at_unix_ms) == (0.1, 0)
-    assert effective(r.effective) == json.loads(policy(head_sampling={"ratio": 0.1}, version=2))
+    assert effective(r.effective) == full(policy(head_sampling={"ratio": 0.1}, every=True))
     assert layer.load(d.current, declaring(), NOW).refresh_at_unix_ms == end
 
 

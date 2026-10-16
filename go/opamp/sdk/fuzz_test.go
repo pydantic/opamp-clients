@@ -32,11 +32,11 @@ var (
 func FuzzSettingsLayer(f *testing.F) {
 	f.Add([]byte(v1("signal_exports", logsOff)), []byte(v1("head_sampling", override(`"ratio":0.25`))), "application/json", byte(1))
 	f.Add([]byte(`not json`), []byte(v1("head_sampling", override(`"ratio":"x"`))), "application/json", byte(0))
-	f.Add([]byte{}, []byte(v2("instrumentations", override(`"disabled":["otelhttp","grpc"]`),
+	f.Add([]byte{}, []byte(every("instrumentations", override(`"disabled":["otelhttp","grpc"]`),
 		"polling_interval", override(`"milliseconds":30000`))), "", byte(3))
-	f.Add([]byte(v2("instrumentations", override(`"all_disabled":true`))), []byte(`{}`), "text/yaml", byte(7))
+	f.Add([]byte(every("instrumentations", override(`"all_disabled":true`))), []byte(`{}`), "text/yaml", byte(7))
 	f.Add([]byte(`{"schema":"logfire-sdk-policy/v1","head_sampling":{"mode":"override","ratio":1e309}}`),
-		[]byte(v2("signal_exports", `{"traces":{"mode":"override","enabled":true},"metrics":{"mode":"override","enabled":"maybe"},"logs":{"mode":"local"}}`)),
+		[]byte(every("signal_exports", `{"traces":{"mode":"override","enabled":true},"metrics":{"mode":"override","enabled":"maybe"},"logs":{"mode":"local"}}`)),
 		"application/json", byte(2))
 	f.Fuzz(func(t *testing.T, saved, body []byte, contentType string, flags byte) {
 		fuzzLayerOnce.Do(func() { fuzzLayer, fuzzLayerErr = New(context.Background()) })

@@ -157,7 +157,7 @@ func (d tortureDoc) json() []byte {
 	if e := exports(signal("send_traces"), signal("send_metrics"), signal("send_logs")); exportsSet {
 		pairs = append(pairs, "signal_exports", e)
 	}
-	return []byte(v2(pairs...))
+	return []byte(every(pairs...))
 }
 
 // pick is one of the choices, at random.

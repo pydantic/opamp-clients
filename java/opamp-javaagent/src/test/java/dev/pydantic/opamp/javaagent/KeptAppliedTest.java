@@ -117,13 +117,13 @@ class KeptAppliedTest {
     try (ConfigServer second = new ConfigServer(null)) {
       runAgent(second, dir, "the next start never reached the server", () -> !second.firstEffective.isEmpty());
       synchronized (second) {
-        assertEquals(half, second.firstEffective.get(0));
+        assertEquals(Vectors.full(half), second.firstEffective.get(0));
       }
     }
   }
 
   /**
-   * The description the agent sends at start names the policy formats the layer reads and the
+   * The description the agent sends at start names the policy format the layer reads and the
    * controls the agent carries out.
    */
   @Test
@@ -140,7 +140,6 @@ class KeptAppliedTest {
         }
       }
       assertEquals("logfire-sdk-policy/v1", attrs.get("logfire.opamp.config_format"));
-      assertEquals("logfire-sdk-policy/v1,logfire-sdk-policy/v2-draft", attrs.get("logfire.opamp.config_formats"));
       assertEquals("head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
           + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,instrumentations,polling_interval",
           attrs.get("logfire.opamp.supported_controls"));

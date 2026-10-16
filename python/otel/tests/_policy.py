@@ -10,34 +10,40 @@ from opamp_client import opamp_pb2
 
 FILE = "logfire-sdk-policy.json"
 V1 = "logfire-sdk-policy/v1"
-V2 = "logfire-sdk-policy/v2-draft"
 SIGNALS = ("traces", "metrics", "logs")
-V2_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
+# The controls a policy may leave out (as local).
+MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
                "app_settings", "instrumentations", "polling_interval")
 
 
-def policy(version: int | None = None, **overrides: dict) -> str:
+def policy(every: bool | None = None, **overrides: dict) -> str:
     """A policy with every control local but the ones given. Each one given is its override's
-    fields, and signal_exports is each signal's. The policy is version 1 when it overrides only
-    head_sampling and signal_exports, else version 2, unless `version` says."""
-    unknown = set(overrides) - {"head_sampling", "signal_exports", *V2_CONTROLS}
+    fields, and signal_exports is each signal's. The policy is the first four controls alone when it
+    overrides only head_sampling and signal_exports, else every control, unless `every` says."""
+    unknown = set(overrides) - {"head_sampling", "signal_exports", *MORE_CONTROLS}
     assert not unknown, unknown
-    if version is None:
-        version = 1 if set(overrides) <= {"head_sampling", "signal_exports"} else 2
+    if every is None:
+        every = not set(overrides) <= {"head_sampling", "signal_exports"}
 
     def control(fields: dict | None) -> dict:
         return {"mode": "local"} if fields is None else {"mode": "override", **fields}
 
     signals = overrides.get("signal_exports", {})
     doc = {
-        "schema": V1 if version == 1 else V2,
+        "schema": V1,
         "head_sampling": control(overrides.get("head_sampling")),
         "signal_exports": {s: control(signals.get(s)) for s in SIGNALS},
     }
-    if version == 2:
-        doc.update({name: control(overrides.get(name)) for name in V2_CONTROLS})
+    if every:
+        doc.update({name: control(overrides.get(name)) for name in MORE_CONTROLS})
     return json.dumps(doc, separators=(",", ":"))
 
+
+
+def full(body: str | bytes) -> dict:
+    """A policy, parsed as the effective config reports it: every control, those left out local."""
+    doc = json.loads(body)
+    return doc | {name: doc.get(name, {"mode": "local"}) for name in MORE_CONTROLS}
 
 def config_map(body: str | bytes | None) -> opamp_pb2.AgentConfigMap:
     """A remote config's files: the policy `body` alone, or none."""

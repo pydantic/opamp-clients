@@ -382,8 +382,8 @@ test("a value that starts with U+FEFF reaches the application as it was sent, an
   rmSync(dir, { recursive: true });
 });
 
-test("app_settings local, or a version 1 policy: every key back to its default, told once", () => {
-  for (const out of [policy({}, 2), policy()]) {
+test("app_settings local, or left out: every key back to its default, told once", () => {
+  for (const out of [policy({}, true), policy()]) {
     const { app, told } = recorded();
     const agent = new TestAgent(undefined, app);
     agent.remoteConfig(config(doc({ "example.feature": "on" })));

@@ -175,7 +175,7 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		off = append(off, name)
 	}
 	if st := sdk.agent.remoteConfig(context.Background(),
-		remote(v2("instrumentations", override(`"disabled":["`+strings.Join(off, `","`)+`"]`)))); st.GetStatus() != applied {
+		remote(every("instrumentations", override(`"disabled":["`+strings.Join(off, `","`)+`"]`)))); st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
 	}
 	for _, scope := range []string{otelhttp, autoexportScope, "checkout.db"} {

@@ -104,11 +104,10 @@ public sealed class SdkSettings : IDisposable
         }).HealthReport;
 
     /// <summary>
-    /// The agent description, from the SDK's resource attributes. It also names the policy formats the
+    /// The agent description, from the SDK's resource attributes. It also names the policy format the
     /// SDK reads and the controls that <paramref name="host"/> carries out
-    /// (<c>logfire.opamp.config_format</c>, <c>logfire.opamp.config_formats</c> and
-    /// <c>logfire.opamp.supported_controls</c>). The host and the time as for Load: with no host it
-    /// lists no control, and with no clock it does not list <c>debug</c>.
+    /// (<c>logfire.opamp.config_format</c> and <c>logfire.opamp.supported_controls</c>). The host and
+    /// the time as for Load: with no host it lists no control, and with no clock it does not list <c>debug</c>.
     /// </summary>
     public AgentDescription Describe(IEnumerable<KeyValue> resource, Host? host = null, ulong nowUnixMs = 0)
     {

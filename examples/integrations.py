@@ -7,8 +7,8 @@ its sources where they are (a Cargo.toml at the root), else the binary OPAMP_EXA
 The SDK traces its HTTP requests. Two runs share one state directory.
 
 Each offer is a remote config whose only file is a Logfire SDK policy, `logfire-sdk-policy.json`
-(docs/sdk-settings.md): version 1 where only head_sampling and signal_exports are overridden, else
-version 2. A control the step does not name is local, the SDK's own value.
+(docs/sdk-settings.md): the first four controls alone where only head_sampling and signal_exports
+are overridden, else every control. A control the step does not name is local, the SDK's own value.
 
 Run 1, the policies, in the order the server offers them:
   1. head_sampling 0.5, signal_exports.traces enabled: APPLIED, spans arrive;
@@ -35,10 +35,10 @@ Run 3, the policies, in the order the server offers them:
      it, while spans go on;
   3. head_sampling 0.25: APPLIED; metrics and log records come again (local, so the SDK's own
      value), and some of the application's requests are traced but not all; the effective config
-     the agent reports is this version 1 policy, as the only file;
+     the agent reports is this policy (every control listed), as the only file;
   4. head_sampling 0.25, log_levels warn: APPLIED; the application's INFO log lines stop (the sink
      counts records, not severities: about none per request, against about one before), and the
-     effective config is now this version 2 policy;
+     effective config is now this policy;
   5. head_sampling 0 with debug until 10 s after the offer (the server fills the time in as it
      sends it): APPLIED; the application's requests are traced until then (the debug
      sampling_ratio left out, so 1), and none made after it, with no word from the server; the
@@ -103,7 +103,7 @@ Run 7, the policies, in the order the server offers them:
   1. app_settings {example.feature: on}: APPLIED; /feature requests start (none before: the
      default);
   2. app_settings {example.feature: [on]}: FAILED, naming app_settings, and /feature goes on;
-  3. head_sampling 1, as a version 1 policy (app_settings local): APPLIED; /feature stops (back to
+  3. head_sampling 1, the first four controls alone (app_settings left out, so local): APPLIED; /feature stops (back to
      the default) while the application goes on making requests;
   4. app_settings {example.feature: on} again: APPLIED; /feature again;
   5. the same values again beside head_sampling 1: APPLIED, and no change to tell;
@@ -221,39 +221,39 @@ def stop_container(app: subprocess.Popen, container: str) -> None:
 #: The remote config's only file: the Logfire SDK policy (docs/sdk-settings.md).
 POLICY_FILE = "logfire-sdk-policy.json"
 POLICY_V1 = "logfire-sdk-policy/v1"
-POLICY_V2 = "logfire-sdk-policy/v2-draft"
 _SIGNALS = ("traces", "metrics", "logs")
-_V2_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
+# The controls a policy may leave out (as local).
+_MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
                 "app_settings", "instrumentations", "polling_interval")
 
 
-def policy(overrides: dict[str, dict], version: int | None = None) -> str:
+def policy(overrides: dict[str, dict], every: bool | None = None) -> str:
     """A Logfire SDK policy, as its JSON text. `overrides` maps each control the policy overrides (a
     signal's export as `signal_exports.logs`) to the fields of its override. Every other control is
-    local. The policy is version 1 when it overrides only version 1 controls, unless `version` says
-    2."""
-    v1 = all(c == "head_sampling" or c.startswith("signal_exports.") for c in overrides)
-    version = version or (1 if v1 else 2)
-    unknown = set(overrides) - {"head_sampling", *(f"signal_exports.{s}" for s in _SIGNALS), *_V2_CONTROLS}
-    if unknown or (version == 1 and not v1):
-        raise ValueError(f"no control of policy version {version}: {sorted(unknown) or sorted(overrides)}")
+    local. The policy is the first four controls alone when it overrides only those, else every
+    control, unless `every` says."""
+    short = all(c == "head_sampling" or c.startswith("signal_exports.") for c in overrides)
+    every = (not short) if every is None else every
+    unknown = set(overrides) - {"head_sampling", *(f"signal_exports.{s}" for s in _SIGNALS), *_MORE_CONTROLS}
+    if unknown or not (every or short):
+        raise ValueError(f"no such control, or one left out: {sorted(unknown) or sorted(overrides)}")
 
     def control(name: str) -> dict:
         fields = overrides.get(name)
         return {"mode": "local"} if fields is None else {"mode": "override", **fields}
 
-    doc: dict = {"schema": POLICY_V1 if version == 1 else POLICY_V2, "head_sampling": control("head_sampling"),
+    doc: dict = {"schema": POLICY_V1, "head_sampling": control("head_sampling"),
                  "signal_exports": {s: control(f"signal_exports.{s}") for s in _SIGNALS}}
-    if version == 2:
-        doc.update({c: control(c) for c in _V2_CONTROLS})
+    if every:
+        doc.update({c: control(c) for c in _MORE_CONTROLS})
     return json.dumps(doc, separators=(",", ":"))
 
 
-def offer(n: int, overrides: dict[str, dict], version: int | None = None) -> dict:
+def offer(n: int, overrides: dict[str, dict], every: bool | None = None) -> dict:
     """A scenario's offer, on message `n`, of a remote config whose only file is the policy with
     `overrides` (policy())."""
     return {"on_message": n, "action": "offer_config", "config_key": POLICY_FILE,
-            "body": policy(overrides, version), "content_type": SETTINGS}
+            "body": policy(overrides, every), "content_type": SETTINGS}
 
 
 def policy_in_force(effective: dict) -> dict:
@@ -541,25 +541,24 @@ def effective_configs(events: list[dict], after: float = -1, before: float = 1e9
 
 def judge_effective(three: list[dict], t3: float, t4: float, end: float) -> list[tuple[str, bool]]:
     """Steps 3 and 4: the effective config reports the policy in force, as the only file. Step 3's
-    is version 1, with head_sampling 0.25 and the signals local (APPLIED at t3, until the next,
-    APPLIED at t4). Step 4's is version 2, with the log level beside it. `end`: when the offer
-    after that was sent."""
+    has head_sampling 0.25 and every other control local (APPLIED at t3, until the next, APPLIED
+    at t4). Step 4's has the log level beside it. `end`: when the offer after that was sent."""
     during = effective_configs(three, offered_before(three, t3), offered_before(three, t4))
     after = effective_configs(three, t4 - DRIFT, end)
 
     def three_in_force(e: dict) -> bool:
         return (list(e) == [POLICY_FILE] and policy_in_force(e).get("schema") == POLICY_V1
                 and overridden(e, "head_sampling") == {"ratio": 0.25}
-                and all(overridden(e, f"signal_exports.{s}") is None for s in _SIGNALS))
+                and all(overridden(e, c) is None for c in (*(f"signal_exports.{s}" for s in _SIGNALS), *_MORE_CONTROLS)))
 
     def four_in_force(e: dict) -> bool:
-        return (list(e) == [POLICY_FILE] and policy_in_force(e).get("schema") == POLICY_V2
+        return (list(e) == [POLICY_FILE] and policy_in_force(e).get("schema") == POLICY_V1
                 and overridden(e, "head_sampling") == {"ratio": 0.25} and overridden(e, "log_levels") == {"level": "warn"})
 
     return [
-        (f"the effective config reports the version 1 policy in force, head_sampling 0.25 and the signals local "
+        (f"the effective config reports the policy in force, head_sampling 0.25 and every other control local "
          f"({during[-1] if during else 'none reported'})", any(three_in_force(e) for e in during)),
-        (f"then the version 2 policy, with the log level warn beside it ({after[-1] if after else 'none reported'})",
+        (f"then the next policy, with the log level warn beside it ({after[-1] if after else 'none reported'})",
          bool(after) and four_in_force(after[-1])),
     ]
 
@@ -1032,10 +1031,10 @@ TRUTH_GAP = 12
 
 
 def truth_scenario(switch_at_once: bool = False, gap: int = TRUTH_GAP) -> dict:
-    """check_truth's offers (TRUTH), `gap` messages apart, each a version 2 policy."""
+    """check_truth's offers (TRUTH), `gap` messages apart, each a policy of every control."""
     judged = TRUTH + ([TRUTH_SWITCH] if switch_at_once else [])
     return {"server": {"faults": [
-        offer(1 + i * gap, {control: fields} if control else {}, version=2)
+        offer(1 + i * gap, {control: fields} if control else {}, every=True)
         for i, (_, control, fields) in enumerate(judged)]}}
 
 

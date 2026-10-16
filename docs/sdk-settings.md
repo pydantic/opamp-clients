@@ -22,11 +22,10 @@ To wire a client to an SDK by hand instead, see [sdks.md](sdks.md).
 
 The policy is a Logfire SDK policy: the remote config's only file, `logfire-sdk-policy.json`
 (`AgentConfigMap.config_map["logfire-sdk-policy.json"]`, content type `application/json`). It is
-one JSON object. Its `schema` names its version, and every control of that version is in it. A
-control is `{"mode": "local"}`, which is the SDK's own value as configured locally, or
-`{"mode": "override", ...}` with the fields of the override.
-
-Version 1, `logfire-sdk-policy/v1`, has two controls, `head_sampling` and `signal_exports`:
+one JSON object. Its `schema` is `logfire-sdk-policy/v1`. A control is `{"mode": "local"}`, which
+is the SDK's own value as configured locally, or `{"mode": "override", ...}` with the fields of the
+override. Every policy sends `head_sampling` and `signal_exports`, and the shortest policy is those
+two alone:
 
 ```json
 {
@@ -40,12 +39,12 @@ Version 1, `logfire-sdk-policy/v1`, has two controls, `head_sampling` and `signa
 }
 ```
 
-The version 2 draft, `logfire-sdk-policy/v2-draft`, keeps every rule of version 1 and adds a
-control for each other setting that the SDKs carry out:
+Every other control ([the controls](#the-controls)) may be sent too, and a control left out is
+`local`:
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 0.25},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -53,34 +52,27 @@ control for each other setting that the SDKs carry out:
     "logs": {"mode": "local"}
   },
   "sampling_rules": {"mode": "override", "rules": [{"path": "/health*", "rate": 0}]},
-  "trace_rate_limit": {"mode": "local"},
   "log_levels": {"mode": "override", "level": "warn", "scopes": {"sqlalchemy.engine": "error"}},
-  "log_rate_limit": {"mode": "local"},
   "attribute_redaction": {"mode": "override", "mask": ["*token*"], "drop": ["http.request.header.cookie"]},
-  "debug": {"mode": "local"},
-  "app_settings": {"mode": "override", "values": {"checkout.new_flow": true}},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "app_settings": {"mode": "override", "values": {"checkout.new_flow": true}}
 }
 ```
 
-A server sends version 2 only to an SDK that lists `logfire-sdk-policy/v2-draft` in its
-`logfire.opamp.config_formats` attribute ([the description](#the-description)).
-[examples/settings](../examples/settings/README.md) has a policy for each common use (cut trace
-volume, trace everything while debugging, stop metrics and logs, quiet the logs, switch
-instrumentations off). Version 1 is used where it is enough.
+[examples/settings](../examples/settings/README.md) has a policy for each common
+use (cut trace volume, trace everything while debugging, stop metrics and logs, quiet the logs,
+switch instrumentations off).
 
 - The policy is the whole of what the server wants. A control left `local` is the SDK's own
   value, so a policy states everything that should differ from the SDK's own, not only what
   changes.
-- Every control of the version is required. A missing control, a field that the version does not
-  name, a control of version 2 in a version 1 policy, a bad value, or a field sent twice (JSON
+- `head_sampling` and `signal_exports` (with all three signals) are required. A missing one, a
+  field or control that the policy does not name, a bad value, or a field sent twice (JSON
   parsers disagree on which one wins) refuses the policy. The answer is FAILED, the reason starts
   with the control (`head_sampling: ratio must be a number from 0 to 1`), and nothing changes.
 - The whole policy is applied, or none of it. This includes an override that this SDK does not
   carry out where it runs ([the host](#the-host)): the SDK refuses the policy with
-  `signal_exports.metrics: this SDK cannot apply the requested override` in version 1, or with
-  the field as well in version 2 (`log_levels: scopes: this SDK cannot apply the requested
+  `signal_exports.metrics: this SDK cannot apply the requested override`, naming the field as
+  well where a control has several (`log_levels: scopes: this SDK cannot apply the requested
   override`). Thus a server never hears APPLIED for an override that is not in force.
 - The policy must be the only file of the config. A config without it is refused
   (`config_map: the config has no logfire-sdk-policy.json file`), and so is a config with another
@@ -161,7 +153,7 @@ in `testdata/sdk-settings` and the layer's `Evaluate` call hold each matcher to 
 ### Sampling rules
 
 `sampling_rules` sets the rate per kind of trace, first match wins. These are the two controls
-of a version 2 policy that it is about:
+of a policy that it is about:
 
 ```json
 {
@@ -513,10 +505,8 @@ APPLIED. A save that fails, for a host that makes one itself, refuses the config
 (`can't save the settings: …`) and changes nothing. The integration never rewrites the answer.
 Each language's binding runs the two steps, so the integration makes one call.
 
-- The effective config uses the schema of the policy in force. Before any policy is applied, it
-  is the version 1 policy with every control local.
-- A version 1 policy is written compact, its keys in the order of the schema. A version 2 policy
-  is written compact, its keys sorted.
+- The effective config lists every control, those the policy in force left out as `local`.
+  Before any policy is applied, every control is local. It is written compact, its keys sorted.
 - Live controls show as applied: a level by its lowercase name (`warn` for `WARNING`), the rules,
   the scopes and the redaction patterns in their canonical form, and the values of `app_settings`
   as strings (`"25"` for `25`).
@@ -534,11 +524,9 @@ Each language's binding runs the two steps, so the integration makes one call.
 
 `Describe` builds the agent description. `service.name`, `service.namespace` and
 `service.instance.id` identify the instance, and the rest of the resource describes it. Beside
-them, the layer adds three attributes for the server:
+them, the layer adds two attributes for the server:
 
-- `logfire.opamp.config_format`: `logfire-sdk-policy/v1`, the exact format of version 1.
-- `logfire.opamp.config_formats`: the schemas that the SDK reads, `logfire-sdk-policy/v1` and
-  `logfire-sdk-policy/v2-draft`.
+- `logfire.opamp.config_format`: `logfire-sdk-policy/v1`, the policy that the SDK reads.
 - `logfire.opamp.supported_controls`: the controls that this host carries out, in the order
   `head_sampling`, `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs`,
   `sampling_rules`, `trace_rate_limit`, `log_levels`, `log_rate_limit`, `attribute_redaction`,
@@ -609,9 +597,9 @@ own.
   (`deactivate_instrumentations`, `deactivate_all_instrumentations`, `opamp_polling_interval`).
   A live setting cannot be listed here.
 - A setting in neither is not carried out. A policy that overrides its control is refused with
-  `<control>: this SDK cannot apply the requested override` (version 1), or
-  `<control>: <field>: this SDK cannot apply the requested override` (version 2), and nothing
-  changes. Each integration declares a signal's sending and what its gate holds only where every
+  `<control>: this SDK cannot apply the requested override`, or
+  `<control>: <field>: this SDK cannot apply the requested override` where the control has
+  several fields, and nothing changes. Each integration declares a signal's sending and what its gate holds only where every
   exporter of the signal is gated, and the sampler's settings only where its sampler is in force
   ([where each setting applies](#where-each-setting-applies), footnotes ¹ and ⁴).
   `send_logs_level_by_scope` and `debug_send_logs_level` count as not declared without
@@ -686,9 +674,9 @@ under declarative configuration, to the configuration model), and the agent's ex
   checks what arrives at the sink: a debug window that ends on the agent's timer, a sampling rule,
   the application's loggers off by scope, a masked and a dropped URL, both rate caps, and export
   health. It also checks that the effective config that the agent reports is the policy in force,
-  version 1 and then version 2 ([examples/README.md](../examples/README.md)). Its `check_truth`
+  the first four controls alone and then every control ([examples/README.md](../examples/README.md)). Its `check_truth`
   runs the integration under the setups where a control may not reach the telemetry (a processor
-  added once the SDK is built, say), and offers one version 2 policy per control. A control counts
+  added once the SDK is built, say), and offers one policy per control. A control counts
   as set aside when the policy is FAILED as an override the SDK can't carry out, or APPLIED with
   that override reported `local` in the effective config. Every other override must show in the
   telemetry, and the controls set aside must be the ones that setup is known to take out of the

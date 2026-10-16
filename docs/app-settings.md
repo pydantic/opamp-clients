@@ -9,13 +9,13 @@ that each language gives the application.
 ## On the wire
 
 They are the `app_settings` control of the Logfire SDK policy, the remote config's only file
-([sdk-settings.md](sdk-settings.md#the-policy)). The control is in the version 2 draft
-(`logfire-sdk-policy/v2-draft`). Its override has one field, `values`: a JSON object of keys to
+([sdk-settings.md](sdk-settings.md#the-policy)), `logfire-sdk-policy/v1`. Its override has one
+field, `values`: a JSON object of keys to
 values.
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 0.25},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -41,8 +41,8 @@ values.
   A number or a boolean is kept as its JSON text (`25` is `"25"`, `true` is `"true"`, `1e21` is
   `"1e+21"`). Send strings to keep the text you mean. Each value is at most 4096 bytes (UTF-8).
 - At most **128 entries**, and at least one.
-- `app_settings` local puts **every key back to the application's default**. So does a version 1
-  policy, which has no `app_settings` control.
+- `app_settings` local puts **every key back to the application's default**. So does a policy
+  that leaves `app_settings` out.
 
 What is wrong is refused as every other wrong control is
 ([sdk-settings.md](sdk-settings.md#the-policy)). The whole config is answered **FAILED**, the
@@ -80,8 +80,7 @@ no new call and no new WebAssembly or C export: an integration reads one more fi
 already gets. Debug mode leaves it alone.
 
 The **effective config** reports the values as the SDK took them, each as a string, so the server
-sees exactly what the SDK took (`25` sent is `"25"` taken). The policy is version 2, so its keys
-are sorted. This is its `app_settings` control:
+sees exactly what the SDK took (`25` sent is `"25"` taken). Its keys are sorted. This is its `app_settings` control:
 
 ```json
 {"mode":"override","values":{"checkout.new_flow":"on","example.log_level":"debug"}}
@@ -195,8 +194,8 @@ callback the application adds is told of the server's changes from then on, not 
 - End to end, `check_app_settings` in [examples/integrations.py](../examples/integrations.py):
   the example application reads the flag `example.feature` and, while it is `on`, requests
   `/feature` each round; it requests `/changed` once per change it is told of. The server turns
-  the flag on, sends a bad value (FAILED, the flag stays on), sends a version 1 policy, which
-  leaves `app_settings` local (the flag back to `off`), turns it on again, and sends the same
+  the flag on, sends a bad value (FAILED, the flag stays on), sends a policy that
+  leaves `app_settings` out (the flag back to `off`), turns it on again, and sends the same
   values again (nothing to tell): three `/changed`. After a restart with no offer the flag is on from the start. An integration opts in
   by giving its example application that behaviour and calling `check_app_settings(launch,
   target)` from its `try.py`, as every integration's `examples/*/try.py` does (its check `app`).

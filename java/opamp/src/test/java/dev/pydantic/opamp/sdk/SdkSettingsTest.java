@@ -3,10 +3,10 @@
 
 package dev.pydantic.opamp.sdk;
 
+import static dev.pydantic.opamp.sdk.Policy.every;
 import static dev.pydantic.opamp.sdk.Policy.exports;
 import static dev.pydantic.opamp.sdk.Policy.override;
 import static dev.pydantic.opamp.sdk.Policy.v1;
-import static dev.pydantic.opamp.sdk.Policy.v2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,7 +54,7 @@ class SdkSettingsTest {
     SettingsProto.Loaded l = layer.load(saved.getBytes(StandardCharsets.UTF_8), DECLARING, 0);
     assertTrue(l.getSettings().hasSendLogs());
     assertFalse(l.getSettings().getSendLogs());
-    assertEquals(saved, effective(l.getEffective()));
+    assertEquals(Policy.full(saved), effective(l.getEffective()));
 
     List<String> kept = new ArrayList<>();
     String quarter = v1("head_sampling", override("\"ratio\":0.25"));
@@ -64,7 +64,7 @@ class SdkSettingsTest {
     assertEquals(ByteString.copyFromUtf8("h"), d.getStatus().getLastRemoteConfigHash());
     assertEquals(0.25, d.getApply().getSamplingRate());
     assertEquals(List.of(quarter), kept);
-    assertEquals(quarter, effective(d.getEffective()));
+    assertEquals(Policy.full(quarter), effective(d.getEffective()));
 
     SettingsProto.Decision bad = layer.decide(config(v1("head_sampling", override("\"ratio\":\"x\""))), d.getCurrent(),
         l.getCurrent(), DECLARING, 0, doc -> kept.add("again"));
@@ -108,7 +108,7 @@ class SdkSettingsTest {
     assertEquals("can't save the settings: No space left on device", failed.getStatus().getErrorMessage());
     assertFalse(failed.hasApply());
     assertEquals(current, failed.getCurrent());
-    assertEquals(half, effective(failed.getEffective()));
+    assertEquals(Policy.full(half), effective(failed.getEffective()));
     // Whatever stops the save refuses the config.
     SettingsProto.Decision odd = layer.decide(config(quarter), current, current, DECLARING, 0,
         doc -> {
@@ -118,7 +118,7 @@ class SdkSettingsTest {
     // Nowhere to keep state: a live change is applied, a next-start one refused.
     SettingsProto.Decision live = layer.decide(config(quarter), current, current, DECLARING, 0, null);
     assertEquals(APPLIED, live.getStatus().getStatus());
-    String minute = v2("polling_interval", override("\"milliseconds\":60000"));
+    String minute = every("polling_interval", override("\"milliseconds\":60000"));
     SettingsProto.Decision later = layer.decide(config(minute), current, current, DECLARING, 0, null);
     assertEquals("polling_interval: takes effect at the next start, which needs somewhere to keep state",
         later.getStatus().getErrorMessage());
@@ -142,11 +142,11 @@ class SdkSettingsTest {
   }
 
   /**
-   * The description carries the resource, and tells a server the policy formats the layer reads and
+   * The description carries the resource, and tells a server the policy format the layer reads and
    * the controls the host carries out: debug only with a clock, and none for no host.
    */
   @Test
-  void theDescriptionNamesTheFormatsAndTheControls() {
+  void theDescriptionNamesTheFormatAndTheControls() {
     Opamp.AgentDescription desc = layer.describe(List.of(
         Anyvalue.KeyValue.newBuilder().setKey("service.name")
             .setValue(Anyvalue.AnyValue.newBuilder().setStringValue("checkout")).build(),
@@ -167,21 +167,20 @@ class SdkSettingsTest {
         new Case(null, NOW, ""))) {
       Opamp.AgentDescription d = layer.describe(List.of(), c.host(), c.now());
       assertEquals("logfire-sdk-policy/v1", attribute(d, "logfire.opamp.config_format"));
-      assertEquals("logfire-sdk-policy/v1,logfire-sdk-policy/v2-draft", attribute(d, "logfire.opamp.config_formats"));
       assertEquals(c.controls(), attribute(d, "logfire.opamp.supported_controls"), String.valueOf(c));
     }
   }
 
   @Test
   void aLogLevelArrivesAsTheLowestSeverityNumberToExport() {
-    String doc = v2("log_levels", override("\"level\":\"warn\""));
+    String doc = every("log_levels", override("\"level\":\"warn\""));
     SettingsProto.Decision d = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY, DECLARING, 0, null);
     assertEquals(APPLIED, d.getStatus().getStatus());
     assertTrue(d.getApply().hasSendLogsMinSeverity());
     assertEquals(13, d.getApply().getSendLogsMinSeverity());
     assertEquals(Policy.sorted(doc), effective(d.getEffective()));
     // Local: every severity.
-    assertFalse(layer.load(v2().getBytes(StandardCharsets.UTF_8), DECLARING, 0).getSettings()
+    assertFalse(layer.load(every().getBytes(StandardCharsets.UTF_8), DECLARING, 0).getSettings()
         .hasSendLogsMinSeverity());
   }
 
@@ -198,7 +197,7 @@ class SdkSettingsTest {
 
   @Test
   void theSettingsThatMatchTelemetryArriveTypedWhereTheHostDeclaresThem() {
-    String doc = v2("sampling_rules", override("\"rules\":[{\"rate\":0,\"kind\":\"server\",\"path\":\"/health*\"}]"),
+    String doc = every("sampling_rules", override("\"rules\":[{\"rate\":0,\"kind\":\"server\",\"path\":\"/health*\"}]"),
         "log_levels", override("\"scopes\":{\"com.acme.db*\":\"debug\"}"),
         "attribute_redaction", override("\"mask\":[\"User.Email\"],\"drop\":[\"*token*\"]"),
         "trace_rate_limit", override("\"traces_per_second\":50"),
@@ -232,24 +231,24 @@ class SdkSettingsTest {
     String in = v1("head_sampling", override("\"ratio\":0.5"));
     SettingsProto.Decision d = layer.decide(config(in), ByteString.EMPTY, ByteString.EMPTY, host, NOW, null);
     assertEquals(APPLIED, d.getStatus().getStatus());
-    // Version 1 names the control, version 2 the control and its field.
+    // A refusal names the control, or the control and its field.
     SettingsProto.Decision v1 = layer.decide(config(v1("head_sampling", override("\"ratio\":0.5"),
         "signal_exports", exports("", "", "off"))), d.getCurrent(), ByteString.EMPTY, host, NOW, null);
     assertEquals(FAILED, v1.getStatus().getStatus());
     assertEquals("signal_exports.logs: this SDK cannot apply the requested override", v1.getStatus().getErrorMessage());
     assertFalse(v1.hasApply());
     assertEquals(d.getCurrent(), v1.getCurrent());
-    assertEquals(in, effective(v1.getEffective()));
-    SettingsProto.Decision v2 = layer.decide(config(v2("instrumentations", override("\"disabled\":[\"otelhttp\"]"))),
+    assertEquals(Policy.full(in), effective(v1.getEffective()));
+    SettingsProto.Decision field = layer.decide(config(every("instrumentations", override("\"disabled\":[\"otelhttp\"]"))),
         d.getCurrent(), ByteString.EMPTY, host, NOW, KEEP);
-    assertEquals(FAILED, v2.getStatus().getStatus());
+    assertEquals(FAILED, field.getStatus().getStatus());
     assertEquals("instrumentations: disabled: this SDK cannot apply the requested override",
-        v2.getStatus().getErrorMessage());
+        field.getStatus().getErrorMessage());
   }
 
   @Test
   void debugModeArrivesFoldedInAndARefreshAtItsEndEndsIt() {
-    String doc = v2("head_sampling", override("\"ratio\":0.1"),
+    String doc = every("head_sampling", override("\"ratio\":0.1"),
         "debug", override("\"until\":\"2026-10-14T12:30:00Z\",\"log_level\":\"info\""));
     SettingsProto.Decision d = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY, DECLARING, NOW, KEEP);
     assertEquals(1.0, d.getApply().getSamplingRate());
@@ -260,7 +259,7 @@ class SdkSettingsTest {
     assertEquals(0.1, r.getSettings().getSamplingRate());
     assertFalse(r.getSettings().hasSendLogsMinSeverity());
     assertEquals(0, r.getRefreshAtUnixMs());
-    assertEquals(Policy.sorted(v2("head_sampling", override("\"ratio\":0.1"))), effective(r.getEffective()));
+    assertEquals(Policy.sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(r.getEffective()));
     assertEquals(end, layer.load(d.getCurrent().toByteArray(), DECLARING, NOW).getRefreshAtUnixMs());
   }
 

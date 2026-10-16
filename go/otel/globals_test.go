@@ -79,7 +79,7 @@ func (g *fakeGlobals) set(f func(*providers)) {
 
 // Every control this package carries out on a signal, in one policy, beside the application's own
 // settings.
-var everySignal = v2("head_sampling", override(`"ratio":0`),
+var everySignal = every("head_sampling", override(`"ratio":0`),
 	"signal_exports", `{"traces":{"mode":"override","enabled":false},"metrics":{"mode":"override","enabled":false},`+
 		`"logs":{"mode":"override","enabled":false}}`,
 	"sampling_rules", override(`"rules":[{"rate":1,"name":"x"}]`),
@@ -205,7 +205,7 @@ func TestSetupSeesTheApplicationSetAGlobalProviderOfItsOwn(t *testing.T) {
 		}
 		defer sdk.Shutdown(context.Background())
 		a := sdk.agent
-		off := v2("signal_exports", exports("off", "", "off"))
+		off := every("signal_exports", exports("off", "", "off"))
 		if st := a.remoteConfig(context.Background(), remote(off)); st.GetStatus() != applied {
 			t.Fatalf("status %v", st)
 		}
@@ -251,14 +251,14 @@ func TestSetupSeesTheApplicationSetAGlobalProviderOfItsOwn(t *testing.T) {
 		a := sdk.agent
 		// Seen before the decision: a policy that overrides what they take is refused, and
 		// nothing changes.
-		st := a.remoteConfig(context.Background(), remote(v2("signal_exports", exports("off", "off", "off"))))
+		st := a.remoteConfig(context.Background(), remote(every("signal_exports", exports("off", "off", "off"))))
 		g := a.controls.gates.Load()
 		if st.GetStatus() != failed_ || st.GetErrorMessage() != "signal_exports.metrics: this SDK cannot apply the requested override" ||
 			!g.logs || !g.metrics || !g.traces {
 			t.Fatalf("status %v; sending logs %v, metrics %v, traces %v", st, g.logs, g.metrics, g.traces)
 		}
 		// One that overrides only what it still carries out is applied.
-		if st := a.remoteConfig(context.Background(), remote(v2("signal_exports", exports("off", "", "")))); st.GetStatus() != applied {
+		if st := a.remoteConfig(context.Background(), remote(every("signal_exports", exports("off", "", "")))); st.GetStatus() != applied {
 			t.Fatalf("status %v", st)
 		}
 		if g := a.controls.gates.Load(); g.traces || !g.metrics || !g.logs {

@@ -21,7 +21,7 @@ public class SdkSettingsTests
         using var layer = new SdkSettings();
         var loaded = layer.Load(System.Text.Encoding.UTF8.GetBytes(Policy.Stop("logs")), Declaring());
         Assert.False(loaded.Settings.SendLogs);
-        Assert.Equal(Policy.Stop("logs"), Policy.Text(loaded.Effective));
+        Assert.Equal(Policy.Full(Policy.Stop("logs")), Policy.Text(loaded.Effective));
 
         var kept = new List<string>();
         var d = layer.Decide(Config(Policy.HeadSampling(0.25)), loaded.Current, loaded.Current, Declaring(), save: doc => kept.Add(System.Text.Encoding.UTF8.GetString(doc)));
@@ -50,7 +50,7 @@ public class SdkSettingsTests
         Assert.Contains(description.NonIdentifyingAttributes, a => a.Key == "host.name");
     }
 
-    // The description says which policy formats the SDK reads and which controls its host carries out,
+    // The description says which policy format the SDK reads and which controls its host carries out,
     // so that a server sends an override only to an SDK that lists its control.
     [Fact]
     public void TheDescriptionNamesThePolicyFormatsAndTheControlsTheHostCarriesOut()
@@ -60,7 +60,6 @@ public class SdkSettingsTests
 
         var all = Attributes(layer.Describe(resource, DeclaringAll(), Now));
         Assert.Equal(Policy.V1, all["logfire.opamp.config_format"].StringValue);
-        Assert.Equal(new[] { Policy.V1, Policy.V2 }, Strings(all["logfire.opamp.config_formats"]));
         Assert.Equal(
             new[]
             {
@@ -150,22 +149,23 @@ public class SdkSettingsTests
         var host = new Host { Live = { "sampling_rate" } };
         var current = ByteString.CopyFromUtf8(Policy.HeadSampling(0.5));
 
-        var v1 = layer.Decide(Config(Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""))), current, current, host, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Failed, v1.Status.Status);
-        Assert.Equal("signal_exports.logs: this SDK cannot apply the requested override", v1.Status.ErrorMessage);
-        Assert.Null(v1.Apply);
-        Assert.Equal(current, v1.Current);
-        Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", Policy.Overrides(v1.Effective));
+        var logs = layer.Decide(Config(Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""))), current, current, host, save: Keep);
+        Assert.Equal(RemoteConfigStatuses.Failed, logs.Status.Status);
+        Assert.Equal("signal_exports.logs: this SDK cannot apply the requested override", logs.Status.ErrorMessage);
+        Assert.Null(logs.Apply);
+        Assert.Equal(current, logs.Current);
+        Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", Policy.Overrides(logs.Effective));
 
-        var v2 = layer.Decide(Config(Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""))), current, current, host, save: Keep);
-        Assert.Equal(RemoteConfigStatuses.Failed, v2.Status.Status);
-        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", v2.Status.ErrorMessage);
-        Assert.Null(v2.Apply);
+        var instrumentations = layer.Decide(Config(Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""))), current, current, host, save: Keep);
+        Assert.Equal(RemoteConfigStatuses.Failed, instrumentations.Status.Status);
+        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", instrumentations.Status.ErrorMessage);
+        Assert.Null(instrumentations.Apply);
 
         // The same controls local need nothing of the host.
-        var local = layer.Decide(Config(Policy.OfV2(("head_sampling", """{"ratio":0.25}"""))), current, current, host, save: Keep);
+        var every = Policy.OfEvery(("head_sampling", """{"ratio":0.25}"""));
+        var local = layer.Decide(Config(every), current, current, host, save: Keep);
         Assert.Equal(RemoteConfigStatuses.Applied, local.Status.Status);
-        Assert.Equal(Policy.V2, Policy.Schema(Policy.Text(local.Effective)));
+        Assert.Equal(Policy.Full(every), Policy.Text(local.Effective));
 
         // A host naming what is no setting has a bug: an error, saying which.
         var e = Assert.ThrowsAny<Exception>(() => layer.Load(null, new Host { Live = { "send_metric" } }));

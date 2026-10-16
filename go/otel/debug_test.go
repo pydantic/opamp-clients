@@ -236,7 +236,7 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 
 // debugWindow is a policy with the head sampling ratio and debug mode until the given time.
 func debugWindow(ratio, until string) string {
-	return v2("head_sampling", override(`"ratio":`+ratio), "debug", override(`"until":"`+until+`"`))
+	return every("head_sampling", override(`"ratio":`+ratio), "debug", override(`"until":"`+until+`"`))
 }
 
 // A timer armed before a newer decision is nothing when it goes off: that decision armed its own.
@@ -256,7 +256,7 @@ func TestAStaleTimerIsNothing(t *testing.T) {
 		t.Fatal("the stale timer ended the newer window")
 	}
 	ft.set(vectorNow + 20*60_000)
-	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != 1 || effectiveBody(a) != sorted(t, v2("head_sampling", override(`"ratio":0.1`))) {
+	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != 1 || effectiveBody(a) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
 		t.Fatalf("the newer window's end: rate %v, %d reports", *a.controls.Sampler.rate, len(rep.effective))
 	}
 }
@@ -280,7 +280,7 @@ func TestTheEndIsOnTheTimersDeadline(t *testing.T) {
 func TestStopStopsTheTimer(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, _ := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(v2("debug", override(`"until":"2026-10-14T12:10:00Z"`))))
+	a.remoteConfig(context.Background(), remote(every("debug", override(`"until":"2026-10-14T12:10:00Z"`))))
 	if ft.pending() != 1 {
 		t.Fatalf("%d timers", ft.pending())
 	}
@@ -313,7 +313,7 @@ func TestADebugWindowEndsOnItsOwn(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if got := func() string { a.mu.Lock(); defer a.mu.Unlock(); return effectiveBody(a) }(); got != sorted(t, v2("head_sampling", override(`"ratio":0.5`))) {
+	if got := func() string { a.mu.Lock(); defer a.mu.Unlock(); return effectiveBody(a) }(); got != sorted(t, every("head_sampling", override(`"ratio":0.5`))) {
 		t.Fatalf("effective %s", got)
 	}
 }
@@ -335,7 +335,7 @@ func TestAFailedConfigAfterDebugUntilEndsDebugMode(t *testing.T) {
 	a.mu.Lock()
 	rate, refreshAt, eff := *a.controls.Sampler.rate, a.refreshAt, effectiveBody(a)
 	a.mu.Unlock()
-	if rate != 0.1 || refreshAt != 0 || eff != sorted(t, v2("head_sampling", override(`"ratio":0.1`))) || len(rep.effective) != 1 {
+	if rate != 0.1 || refreshAt != 0 || eff != sorted(t, every("head_sampling", override(`"ratio":0.1`))) || len(rep.effective) != 1 {
 		t.Fatalf("debug mode is still in force: rate %v, refresh at %d, effective %s, %d reports", rate, refreshAt, eff,
 			len(rep.effective))
 	}

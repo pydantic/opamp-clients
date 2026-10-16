@@ -3,10 +3,11 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.every;
 import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.full;
 import static dev.pydantic.opamp.javaagent.Vectors.override;
 import static dev.pydantic.opamp.javaagent.Vectors.v1;
-import static dev.pydantic.opamp.javaagent.Vectors.v2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -82,12 +83,12 @@ class AppSettingsExtensionTest {
     // is FAILED, saying so, and nothing of it is in force.
     Extension without = Extension.forTest(ExtensionTest.setup(dir));
     assertEquals(Extension.HOST, without.host());
-    Opamp.RemoteConfigStatus s = without.remoteConfig(config(v2("signal_exports", exports("off", "", ""),
+    Opamp.RemoteConfigStatus s = without.remoteConfig(config(every("signal_exports", exports("off", "", ""),
         "app_settings", override("\"values\":{\"a\":\"1\"}"))));
     assertEquals(FAILED, s.getStatus());
     assertEquals("app_settings: values: this SDK cannot apply the requested override", s.getErrorMessage());
     assertTrue(without.controls.gates.sendTraces());
-    assertEquals(v1(), ExtensionTest.effective(without));
+    assertEquals(full(v1()), ExtensionTest.effective(without));
   }
 
   /** custom.json's cases, through the extension's own Decide: the map handed over, or FAILED with nothing changed. */
@@ -115,7 +116,7 @@ class AppSettingsExtensionTest {
         return;
       }
       // Something in force first, so a FAILED case can show it changed nothing.
-      assertEquals(APPLIED, e.remoteConfig(config(v2("app_settings", override("\"values\":{\"before\":\"1\"}")))).getStatus());
+      assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"before\":\"1\"}")))).getStatus());
       app.told.clear();
       Opamp.RemoteConfigStatus s = e.remoteConfig(config(c.get("document").asText()));
       if (c.has("refused")) {
@@ -147,22 +148,22 @@ class AppSettingsExtensionTest {
   void aChangeIsToldOnceAndTheSameMapNeverAgain(@TempDir Path dir) throws Exception {
     App app = new App();
     Extension e = extension(dir, app);
-    assertEquals(APPLIED, e.remoteConfig(config(v2("app_settings", override("\"values\":{\"example.feature\":\"on\",\"limit\":\"25\"}")))).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"on\",\"limit\":\"25\"}")))).getStatus());
     assertEquals(List.of(new Told(Map.of("example.feature", "on", "limit", "25"), Set.of("example.feature", "limit"))),
         app.told);
     // The same map again, another way each time: keys in another order, 25 for "25", another
     // control beside it.
-    for (String same : List.of(v2("app_settings", override("\"values\":{\"example.feature\":\"on\",\"limit\":\"25\"}")),
-        v2("app_settings", override("\"values\":{\"limit\":\"25\",\"example.feature\":\"on\"}")),
-        v2("app_settings", override("\"values\":{\"limit\":25,\"example.feature\":\"on\"}")),
-        v2("head_sampling", override("\"ratio\":0.5"), "app_settings", override("\"values\":{\"limit\":\"25\",\"example.feature\":\"on\"}")))) {
+    for (String same : List.of(every("app_settings", override("\"values\":{\"example.feature\":\"on\",\"limit\":\"25\"}")),
+        every("app_settings", override("\"values\":{\"limit\":\"25\",\"example.feature\":\"on\"}")),
+        every("app_settings", override("\"values\":{\"limit\":25,\"example.feature\":\"on\"}")),
+        every("head_sampling", override("\"ratio\":0.5"), "app_settings", override("\"values\":{\"limit\":\"25\",\"example.feature\":\"on\"}")))) {
       assertEquals(APPLIED, e.remoteConfig(config(same)).getStatus(), same);
     }
     assertEquals(1, app.told.size());
     // A value changed: that key alone.
-    e.remoteConfig(config(v2("app_settings", override("\"values\":{\"example.feature\":\"off\",\"limit\":\"25\"}"))));
+    e.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"off\",\"limit\":\"25\"}"))));
     assertEquals(new Told(Map.of("example.feature", "off", "limit", "25"), Set.of("example.feature")), app.told.get(1));
-    // A version 1 policy, which has no app_settings: every key back to the application's default.
+    // A policy that leaves app_settings out (local): every key back to the application's default.
     e.remoteConfig(config(v1("head_sampling", override("\"ratio\":0.5"))));
     assertEquals(new Told(Map.of(), Set.of("example.feature", "limit")), app.told.get(2));
     // A config without a policy: FAILED, so nothing to tell.
@@ -174,11 +175,11 @@ class AppSettingsExtensionTest {
   void aFailedConfigChangesNothingTheApplicationReads(@TempDir Path dir) throws Exception {
     App app = new App();
     Extension e = extension(dir, app);
-    e.remoteConfig(config(v2("signal_exports", exports("off", "", ""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}"))));
+    e.remoteConfig(config(every("signal_exports", exports("off", "", ""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}"))));
     app.told.clear();
-    for (String bad : List.of(v2("app_settings", override("\"values\":{\"example.feature\":[\"on\"]}")),
-        v2("head_sampling", override("\"ratio\":7"), "app_settings", override("\"values\":{\"example.feature\":\"off\"}")),
-        v2("signal_exports", exports("on", "", ""), "app_settings", override("\"values\":{\"a b\":\"x\"}")))) {
+    for (String bad : List.of(every("app_settings", override("\"values\":{\"example.feature\":[\"on\"]}")),
+        every("head_sampling", override("\"ratio\":7"), "app_settings", override("\"values\":{\"example.feature\":\"off\"}")),
+        every("signal_exports", exports("on", "", ""), "app_settings", override("\"values\":{\"a b\":\"x\"}")))) {
       assertEquals(FAILED, e.remoteConfig(config(bad)).getStatus(), bad);
     }
     assertEquals(Map.of("example.feature", "on"), app.bridge.current());
@@ -196,8 +197,8 @@ class AppSettingsExtensionTest {
     java.util.function.BiConsumer<Map<String, String>, Set<String>> listener =
         (settings, changed) -> seen.add(settings.get("traces") + "/" + e.controls.gates.sendTraces());
     app.bridge.subscribe(listener);
-    e.remoteConfig(config(v2("signal_exports", exports("off", "", ""), "app_settings", override("\"values\":{\"traces\":\"false\"}"))));
-    e.remoteConfig(config(v2("signal_exports", exports("on", "", ""), "app_settings", override("\"values\":{\"traces\":\"true\"}"))));
+    e.remoteConfig(config(every("signal_exports", exports("off", "", ""), "app_settings", override("\"values\":{\"traces\":\"false\"}"))));
+    e.remoteConfig(config(every("signal_exports", exports("on", "", ""), "app_settings", override("\"values\":{\"traces\":\"true\"}"))));
     java.lang.ref.Reference.reachabilityFence(listener);
     assertEquals(List.of("false/false", "true/true"), seen);
   }
@@ -225,7 +226,7 @@ class AppSettingsExtensionTest {
       Thread th = new Thread(() -> {
         for (int i = 0; i < 100; i++) {
           boolean logs = (i + id) % 2 == 0;
-          e.controls.apply(settings(v2("signal_exports", exports("", "", logs ? "on" : "off"),
+          e.controls.apply(settings(every("signal_exports", exports("", "", logs ? "on" : "off"),
               "app_settings", override("\"values\":{\"logs\":\"" + logs + "\",\"n\":\"" + id + ":" + i + "\"}"))));
         }
       });
@@ -246,7 +247,7 @@ class AppSettingsExtensionTest {
     App app = new App();
     Extension e = extension(dir, app);
     e.wallClock = () -> Vectors.NOW;
-    assertEquals(APPLIED, e.remoteConfig(config(v2("head_sampling", override("\"ratio\":0.1"), "debug", override("\"until\":\"2026-10-14T12:30:00Z\""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.1"), "debug", override("\"until\":\"2026-10-14T12:30:00Z\""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     assertEquals(1, app.told.size());
     long[] armed = e.armedForTest();
     e.fire(armed[0], armed[1]);
@@ -261,8 +262,8 @@ class AppSettingsExtensionTest {
     Extension e = Extension.forTest(null, first.sink);
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
     assertEquals(Map.of(), first.bridge.current());
-    assertEquals(APPLIED, e.remoteConfig(config(v2("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
-    Kept.keepApplied(dir, v2("app_settings", override("\"values\":{\"example.feature\":\"on\"}"))); // as the client does, before APPLIED goes out
+    assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
+    Kept.keepApplied(dir, every("app_settings", override("\"values\":{\"example.feature\":\"on\"}"))); // as the client does, before APPLIED goes out
 
     // The next start: in force at Load, before any config arrives, and told to whoever listened.
     App second = new App();
@@ -274,13 +275,13 @@ class AppSettingsExtensionTest {
         "\"app_settings\":{\"mode\":\"override\",\"values\":{\"example.feature\":\"on\"}}"),
         ExtensionTest.effective(next));
     // And the same map from the server again tells nothing.
-    assertEquals(APPLIED, next.remoteConfig(config(v2("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
+    assertEquals(APPLIED, next.remoteConfig(config(every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     assertEquals(1, second.told.size());
   }
 
   @Test
   void savedValuesTheServerLaterLeavesOutGoBackToTheDefaults(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"), v2("app_settings", override("\"values\":{\"a\":\"1\"}")));
+    Files.writeString(dir.resolve("sdk-settings.json"), every("app_settings", override("\"values\":{\"a\":\"1\"}")));
     App app = new App();
     Extension e = Extension.forTest(null, app.sink);
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
@@ -288,7 +289,7 @@ class AppSettingsExtensionTest {
     e.remoteConfig(config(v1()));
     assertEquals(Map.of(), app.bridge.current());
     // The file kept before is left as it was: the client keeps the config applied now.
-    assertEquals(v2("app_settings", override("\"values\":{\"a\":\"1\"}")), Files.readString(dir.resolve("sdk-settings.json"), StandardCharsets.UTF_8));
+    assertEquals(every("app_settings", override("\"values\":{\"a\":\"1\"}")), Files.readString(dir.resolve("sdk-settings.json"), StandardCharsets.UTF_8));
   }
 
   @Test
@@ -297,7 +298,7 @@ class AppSettingsExtensionTest {
     Extension e = Extension.forTest(null, app.sink);
     e.properties(DefaultConfigProperties.createFromMap(props(null)));
     // Live, so applied without a state directory too.
-    assertEquals(APPLIED, e.remoteConfig(config(v2("app_settings", override("\"values\":{\"a\":\"1\"}")))).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(every("app_settings", override("\"values\":{\"a\":\"1\"}")))).getStatus());
     assertEquals(Map.of("a", "1"), app.bridge.current());
     App again = new App();
     Extension next = Extension.forTest(null, again.sink);
@@ -308,7 +309,7 @@ class AppSettingsExtensionTest {
 
   @Test
   void aFailedSetupPutsBackWhatWasInForceBefore(@TempDir Path dir) throws Exception {
-    Files.writeString(dir.resolve("sdk-settings.json"), v2("app_settings", override("\"values\":{\"a\":\"saved\"}")));
+    Files.writeString(dir.resolve("sdk-settings.json"), every("app_settings", override("\"values\":{\"a\":\"saved\"}")));
     App app = new App();
     app.bridge.put(Map.of("a", "before"));
     app.told.clear();
@@ -388,16 +389,16 @@ class AppSettingsExtensionTest {
     App app = new App();
     Extension e = extension(dir, app);
     List<String> statuses = new ArrayList<>();
-    for (String doc : List.of(v2("app_settings", override("\"values\":{\"example.feature\":\"on\"}")), v2("app_settings", override("\"values\":{\"example.feature\":[\"on\"]}")),
-        v1("head_sampling", override("\"ratio\":1")), v2("app_settings", override("\"values\":{\"example.feature\":\"on\"}")),
-        v2("head_sampling", override("\"ratio\":1"), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))) {
+    for (String doc : List.of(every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")), every("app_settings", override("\"values\":{\"example.feature\":[\"on\"]}")),
+        v1("head_sampling", override("\"ratio\":1")), every("app_settings", override("\"values\":{\"example.feature\":\"on\"}")),
+        every("head_sampling", override("\"ratio\":1"), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))) {
       statuses.add(e.remoteConfig(config(doc)).getStatus().name().replace("RemoteConfigStatuses_", ""));
     }
     assertEquals(List.of("APPLIED", "FAILED", "APPLIED", "APPLIED", "APPLIED"), statuses);
     assertEquals(3, app.told.size());
     assertEquals(Map.of("example.feature", "on"), app.bridge.current());
     // The restart, from the config the client kept applied (the last one): on from the start.
-    Kept.keepApplied(dir, v2("head_sampling", override("\"ratio\":1"), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")));
+    Kept.keepApplied(dir, every("head_sampling", override("\"ratio\":1"), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")));
     App next = new App();
     Extension again = Extension.forTest(null, next.sink);
     again.properties(DefaultConfigProperties.createFromMap(props(dir)));

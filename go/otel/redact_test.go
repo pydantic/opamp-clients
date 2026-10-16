@@ -235,7 +235,7 @@ func TestRedactionChangesLiveAndReverts(t *testing.T) {
 	if got := span(); got != "Authorization=STRING:[REDACTED] user=STRING:[REDACTED]" {
 		t.Fatalf("mask: %s", got)
 	}
-	c.Apply(settingsOf(t, []byte(v2()), 0))
+	c.Apply(settingsOf(t, []byte(every()), 0))
 	if got := span(); got != asIs {
 		t.Fatalf("local: %s", got)
 	}
@@ -245,7 +245,7 @@ func TestRedactionChangesLiveAndReverts(t *testing.T) {
 // neither, the control is local.
 func redactionPolicy(mask, drop []string) string {
 	if len(mask) == 0 && len(drop) == 0 {
-		return v2()
+		return every()
 	}
 	var fields []string
 	for _, f := range []struct {
@@ -257,7 +257,7 @@ func redactionPolicy(mask, drop []string) string {
 			fields = append(fields, `"`+f.name+`":`+string(b))
 		}
 	}
-	return v2("attribute_redaction", override(strings.Join(fields, ",")))
+	return every("attribute_redaction", override(strings.Join(fields, ",")))
 }
 
 // The gates' redaction against the layer's (Evaluate), on generated keys and patterns.

@@ -226,7 +226,7 @@ class ControlsTortureTest {
         }
         set.addAll(List.of("debug", Vectors.override(String.join(",", d))));
       }
-      return Vectors.v2(set.toArray(String[]::new));
+      return Vectors.every(set.toArray(String[]::new));
     }
 
     private static String strings(List<String> values) {

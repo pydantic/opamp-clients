@@ -26,7 +26,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
 import opamp_otel
-from _policy import FILE, V1, V2, config_map, off, overrides, overrides_in, policy
+from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
 from kept import keep_applied
 from opamp_otel import Agent, Controls, Setup, disabled_instrumentations, duration_ms, headers
 
@@ -178,7 +178,6 @@ def described(server, configured: bool, tmp_path) -> dict:
 def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carries_out(server, tmp_path):
     ours = described(server, True, tmp_path / "ours")
     assert ours["logfire.opamp.config_format"] == V1
-    assert ours["logfire.opamp.config_formats"] == [V1, V2]
     assert {"head_sampling", "signal_exports.traces", "sampling_rules", "debug", "app_settings",
             "instrumentations", "polling_interval"} <= set(ours["logfire.opamp.supported_controls"])
     # Under another configurator the sampler and the gates are not this package's.
@@ -959,7 +958,7 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
         server.close()
     assert run.returncode == 0, run.stderr
     assert '"name": "after"' in run.stdout  # the application's own processor still exports
-    assert json.loads(run.stdout.split("effective ")[-1]) == json.loads(policy(signal_exports=off("logs")))
+    assert json.loads(run.stdout.split("effective ")[-1]) == full(policy(signal_exports=off("logs")))
     assert statuses.index(FAILED) < statuses.index(APPLIED)
     assert "send_traces" in run.stderr  # warned at start
 

@@ -151,7 +151,7 @@ func TestTheLogCapLive(t *testing.T) {
 	if n := exportBatch(t, c, 30); n != 20 {
 		t.Fatalf("a new cap of 20: %d of 30", n)
 	}
-	apply(v2()) // local: no cap, at once
+	apply(every()) // local: no cap, at once
 	if n := exportBatch(t, c, 30); n != 30 {
 		t.Fatalf("cap removed: %d of 30", n)
 	}
@@ -161,7 +161,7 @@ func TestTheLogCapLive(t *testing.T) {
 func TestRecordsDroppedByLevelTakeNoToken(t *testing.T) {
 	c := NewControls()
 	withClock(c)
-	c.Apply(settingsOf(t, []byte(v2("log_levels", override(`"level":"warn"`), "log_rate_limit", override(`"records_per_second":2`))), 0))
+	c.Apply(settingsOf(t, []byte(every("log_levels", override(`"level":"warn"`), "log_rate_limit", override(`"records_per_second":2`))), 0))
 	sink := &recordSink{}
 	batch := make([]sdklog.Record, 6)
 	for i := range batch {
@@ -180,7 +180,7 @@ func TestRecordsDroppedByLevelTakeNoToken(t *testing.T) {
 
 // logCap is a policy whose log_rate_limit control overrides the records a second.
 func logCap(perSecond string) string {
-	return v2("log_rate_limit", override(`"records_per_second":`+perSecond))
+	return every("log_rate_limit", override(`"records_per_second":`+perSecond))
 }
 
 // The gate's bucket against the layer's (Evaluate), on generated runs.

@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Bill Easton. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 """The policies in examples/settings against their README and the controls' table: each file is a
-whole Logfire SDK policy (version 1 where it overrides only version 1 controls), the README names
+whole Logfire SDK policy (the first four controls alone where it overrides only those), the README names
 each and shows it as it is, and between them the files override every control.
 
 The controls, and which take effect at the next start, are docs/sdk-settings.md's table.
@@ -23,12 +23,12 @@ TABLE = ROOT / "docs" / "sdk-settings.md"
 ROW = re.compile(r"^\| `([a-z_.]+)` \| .* \| ([^|]+) \|$")
 
 V1 = "logfire-sdk-policy/v1"
-V2 = "logfire-sdk-policy/v2-draft"
 SIGNALS = ("traces", "metrics", "logs")
+# The controls every policy sends, then every control.
 V1_CONTROLS = ("head_sampling", "signal_exports")
-V2_CONTROLS = V1_CONTROLS + ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
+ALL_CONTROLS = V1_CONTROLS + ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
                              "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval")
-# The controls a version 1 policy can override, a signal's export as `signal_exports.logs`.
+# The controls every policy sends, a signal's export as `signal_exports.logs`.
 V1_OVERRIDES = {"head_sampling", *(f"signal_exports.{s}" for s in SIGNALS)}
 
 
@@ -66,7 +66,7 @@ class SettingsCookbook(unittest.TestCase):
 
     def test_the_table_reads(self) -> None:
         self.assertEqual(self.next_start, {"instrumentations", "polling_interval"})
-        self.assertEqual(self.live | self.next_start, V1_OVERRIDES | set(V2_CONTROLS[2:]))
+        self.assertEqual(self.live | self.next_start, V1_OVERRIDES | set(ALL_CONTROLS[2:]))
 
     def test_each_file_is_a_whole_policy(self) -> None:
         docs = examples()
@@ -75,17 +75,17 @@ class SettingsCookbook(unittest.TestCase):
             with self.subTest(name):
                 policy = json.loads(text)
                 self.assertIsInstance(policy, dict, f"{name} is no JSON object")
-                self.assertIn(policy.get("schema"), (V1, V2), name)
-                self.assertEqual(list(policy), ["schema", *(V1_CONTROLS if policy["schema"] == V1 else V2_CONTROLS)],
-                                 f"{name} does not have every control of its version, in order")
+                self.assertEqual(policy.get("schema"), V1, name)
+                short = overrides(policy) <= V1_OVERRIDES
+                self.assertEqual(list(policy), ["schema", *(V1_CONTROLS if short else ALL_CONTROLS)],
+                                 f"{name}: the first four controls alone where only those are overridden, else every "
+                                 "control, in order")
                 self.assertEqual(list(policy["signal_exports"]), list(SIGNALS), name)
                 each = [c for k, c in policy.items() if k not in ("schema", "signal_exports")]
                 for control in each + list(policy["signal_exports"].values()):
                     self.assertIn(control.get("mode"), ("local", "override"), name)
                     if control["mode"] == "local":
                         self.assertEqual(control, {"mode": "local"}, f"{name}: a local control has no fields")
-                self.assertEqual(policy["schema"], V1 if overrides(policy) <= V1_OVERRIDES else V2,
-                                 f"{name}: version 1 where only version 1 controls are overridden, else version 2")
 
     def test_the_readme_names_and_shows_each_file(self) -> None:
         for name, text in examples():

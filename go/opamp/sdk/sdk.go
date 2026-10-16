@@ -178,7 +178,7 @@ func (l *Layer) Evaluate(ctx context.Context, e *settingspb.Evaluate) (*settings
 }
 
 // Describe gives the agent description from the SDK's resource attributes. It adds the policy
-// formats the layer reads and the controls host carries out at nowUnixMs (as LoadAt), so that a
+// format the layer reads and the controls host carries out at nowUnixMs (as LoadAt), so that a
 // server knows which overrides this SDK can apply.
 func (l *Layer) Describe(ctx context.Context, resource []*protobufs.KeyValue, host *settingspb.Host,
 	nowUnixMs uint64) (*protobufs.AgentDescription, error) {

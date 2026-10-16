@@ -64,7 +64,7 @@ func settingsOf(t testing.TB, doc []byte, now uint64) *settingspb.Settings {
 
 const policyFile = "logfire-sdk-policy.json"
 
-// The controls of a policy in order: version 1 has the first two.
+// The controls of a policy in order: it must send the first two, and may leave out the others.
 var policyControls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
 	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval"}
 
@@ -109,23 +109,42 @@ func policy(schema string, n int, set ...string) string {
 	return b + "}"
 }
 
-// v1 is a version 1 policy, every control local unless set gives it.
+// v1 is a policy of the two controls it must send, each local unless set gives it.
 func v1(set ...string) string { return policy("logfire-sdk-policy/v1", 2, set...) }
 
-// v2 is a version 2 draft policy, every control local unless set gives it.
-func v2(set ...string) string {
-	return policy("logfire-sdk-policy/v2-draft", len(policyControls), set...)
-}
+// every is a policy that sends every control, each local unless set gives it.
+func every(set ...string) string { return policy("logfire-sdk-policy/v1", len(policyControls), set...) }
 
 // override is a control's override with the given fields.
 func override(fields string) string { return `{"mode":"override",` + fields + `}` }
 
-// sorted is a policy as the layer writes a version 2 effective config: compact, keys sorted.
+// sorted is a policy that sends every control as the layer writes the effective config: compact,
+// keys sorted.
 func sorted(t testing.TB, doc string) string {
 	t.Helper()
 	var v any
 	if err := json.Unmarshal([]byte(doc), &v); err != nil {
 		t.Fatal(err)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// full is a policy as the layer writes the effective config: every control, those left out local,
+// compact, keys sorted.
+func full(t testing.TB, doc string) string {
+	t.Helper()
+	var v map[string]any
+	if err := json.Unmarshal([]byte(doc), &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range policyControls {
+		if _, ok := v[c]; !ok {
+			v[c] = map[string]any{"mode": "local"}
+		}
 	}
 	b, err := json.Marshal(v)
 	if err != nil {

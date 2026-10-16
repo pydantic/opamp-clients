@@ -155,7 +155,7 @@ public final class SdkSettings {
   }
 
   /**
-   * The agent description, from the SDK's resource attributes. It adds the policy formats the layer
+   * The agent description, from the SDK's resource attributes. It adds the policy format the layer
    * reads and the controls {@code host} carries out at {@code nowUnixMs} (as for load), so that a
    * server knows which overrides this SDK can apply.
    */

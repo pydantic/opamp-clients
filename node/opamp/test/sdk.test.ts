@@ -19,7 +19,7 @@ import {
   RemoteConfigStatuses,
 } from "../src/index.js";
 import { type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
-import { config, off, overridden, policy, reported, V1, V2 } from "./policy.js";
+import { config, full, off, overridden, policy, reported, V1 } from "./policy.js";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
@@ -54,7 +54,7 @@ test("loads, decides and describes", () => {
   const logsOff = policy({ signal_exports: off("logs") });
   const loaded = layer.load(text(logsOff), declaring);
   assert.equal(loaded.settings?.sendLogs, false);
-  assert.equal(reported(loaded.effective), logsOff);
+  assert.equal(reported(loaded.effective), full(logsOff));
 
   const kept: Uint8Array[] = [];
   const quarter = policy({ head_sampling: { ratio: 0.25 } });
@@ -65,7 +65,7 @@ test("loads, decides and describes", () => {
   assert.deepEqual(d.status?.lastRemoteConfigHash, text("h"));
   assert.equal(d.apply?.samplingRate, 0.25);
   assert.deepEqual(kept, [text(quarter)]);
-  assert.equal(reported(d.effective), quarter);
+  assert.equal(reported(d.effective), full(quarter));
 
   const bad = layer.decide(config(policy({ head_sampling: { ratio: "x" } })), d.current, loaded.current, declaring, 0n, () => {});
   assert.equal(bad.status?.status, FAILED);
@@ -95,12 +95,11 @@ function described(desc: AgentDescription): Record<string, unknown> {
   return out;
 }
 
-test("the description names the policy formats and the controls the host carries out", () => {
+test("the description names the policy format and the controls the host carries out", () => {
   const layer = new SdkSettings();
   const host = { live: ["sampling_rate", "send_logs", "custom"], nextStart: ["opamp_polling_interval"] };
   assert.deepEqual(described(layer.describe([], host, now)), {
     "logfire.opamp.config_format": V1,
-    "logfire.opamp.config_formats": [V1, V2],
     "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings", "polling_interval"],
   });
   // Every setting declared: every control. No host: none.
@@ -125,7 +124,7 @@ test("a host says what it carries out", () => {
   assert.equal(refused.apply, undefined);
   assert.deepEqual(refused.current, d.current);
   assert.deepEqual(overridden(refused.effective), { instrumentations: { disabled: ["http"] } });
-  // Version 2 names the field too.
+  // A control past the first two names the field too.
   const rules = layer.decide(config(policy({ sampling_rules: { rules: [{ rate: 0 }] } })), d.current, none, host);
   assert.equal(rules.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
   // A field nothing here knows refuses it too.

@@ -85,19 +85,19 @@ final class Vectors {
     return settings(c.get("settings").toString(), c.has("now_unix_ms") ? c.get("now_unix_ms").asLong() : NOW);
   }
 
-  /** The controls of a policy in order: version 1 has the first two. */
+  /** The controls of a policy in order: it must send the first two, and may leave out the rest (as local). */
   static final List<String> CONTROLS = List.of("head_sampling", "signal_exports", "sampling_rules",
       "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
       "instrumentations", "polling_interval");
 
-  /** A version 1 policy: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
+  /** A policy of the first two controls: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
   static String v1(String... set) {
     return policy("logfire-sdk-policy/v1", 2, set);
   }
 
-  /** A version 2 draft policy: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
-  static String v2(String... set) {
-    return policy("logfire-sdk-policy/v2-draft", CONTROLS.size(), set);
+  /** A policy that sends every control: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
+  static String every(String... set) {
+    return policy("logfire-sdk-policy/v1", CONTROLS.size(), set);
   }
 
   /** A control's override with the given fields. */
@@ -122,7 +122,7 @@ final class Vectors {
     java.util.Map<String, String> given = new java.util.HashMap<>();
     for (int i = 0; i + 1 < set.length; i += 2) {
       if (!CONTROLS.subList(0, n).contains(set[i])) {
-        throw new IllegalArgumentException("no control " + set[i] + " in " + schema);
+        throw new IllegalArgumentException("no control " + set[i] + " in the first " + n);
       }
       given.put(set[i], set[i + 1]);
     }
@@ -137,10 +137,24 @@ final class Vectors {
   private static final ObjectMapper SORTED = new ObjectMapper()
       .configure(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
 
-  /** A policy as the layer writes a version 2 effective config: compact, keys sorted. */
+  /** A policy as the layer writes an effective config: compact, keys sorted. */
   static String sorted(String doc) {
     try {
       return SORTED.writeValueAsString(SORTED.readValue(doc, Object.class));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /** A policy as the layer reports it in force: every control, those it leaves out local, keys sorted. */
+  static String full(String doc) {
+    try {
+      @SuppressWarnings("unchecked")
+      java.util.Map<String, Object> m = SORTED.readValue(doc, java.util.Map.class);
+      for (String c : CONTROLS) {
+        m.putIfAbsent(c, java.util.Map.of("mode", "local"));
+      }
+      return SORTED.writeValueAsString(m);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

@@ -1,5 +1,5 @@
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 1},
   "signal_exports": {
     "traces": {"mode": "local"},

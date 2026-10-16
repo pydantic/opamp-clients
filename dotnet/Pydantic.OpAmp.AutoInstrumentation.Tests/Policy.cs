@@ -19,36 +19,52 @@ internal static class Policy
 {
     public const string File = "logfire-sdk-policy.json";
     public const string V1 = "logfire-sdk-policy/v1";
-    public const string V2 = "logfire-sdk-policy/v2-draft";
 
     private static readonly string[] Signals = ["traces", "metrics", "logs"];
 
-    private static readonly string[] V1Controls = ["head_sampling", "signal_exports"];
+    // The controls a policy must send. It may leave out each other one (as local).
+    private static readonly string[] ShortControls = ["head_sampling", "signal_exports"];
 
-    private static readonly string[] V2Controls =
+    private static readonly string[] Controls =
     [
         "head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
         "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval",
     ];
 
-    /// <summary>The version 1 policy with every control local: the SDK's own settings.</summary>
+    /// <summary>The short policy with every control local: the SDK's own settings.</summary>
     public static string Local => Of();
 
     /// <summary>
     /// A policy with these overrides and every other control local. Each override names a control
     /// (a signal's export as <c>signal_exports.logs</c>) and the fields of its override, as a JSON
-    /// object. The policy is version 1 when every override is a version 1 control, else version 2.
+    /// object. The policy sends only the controls it must when every override is one of them, else
+    /// every control.
     /// </summary>
     public static string Of(params (string Control, string Fields)[] overrides) =>
-        Write(overrides.All(o => o.Control == "head_sampling" || o.Control.StartsWith("signal_exports.", StringComparison.Ordinal)) ? 1 : 2, overrides);
+        Write(!overrides.All(o => o.Control == "head_sampling" || o.Control.StartsWith("signal_exports.", StringComparison.Ordinal)), overrides);
 
-    /// <summary>As <see cref="Of"/>, but always version 2.</summary>
-    public static string OfV2(params (string Control, string Fields)[] overrides) => Write(2, overrides);
+    /// <summary>As <see cref="Of"/>, but always sending every control.</summary>
+    public static string OfEvery(params (string Control, string Fields)[] overrides) => Write(true, overrides);
 
-    /// <summary>A version 1 policy that samples <paramref name="ratio"/> of new traces.</summary>
+    /// <summary>
+    /// <paramref name="policy"/> as an effective config reports it: every control, those left out
+    /// local, keys sorted, compact.
+    /// </summary>
+    public static string Full(string policy)
+    {
+        var root = JsonNode.Parse(policy)!.AsObject();
+        foreach (var name in Controls.Where(n => !root.ContainsKey(n)))
+        {
+            root[name] = new JsonObject { ["mode"] = "local" };
+        }
+
+        return Sorted(root)!.ToJsonString();
+    }
+
+    /// <summary>A short policy that samples <paramref name="ratio"/> of new traces.</summary>
     public static string HeadSampling(double ratio) => Of(("head_sampling", $"{{\"ratio\":{Number(ratio)}}}"));
 
-    /// <summary>A version 1 policy that stops the export of each signal named.</summary>
+    /// <summary>A short policy that stops the export of each signal named.</summary>
     public static string Stop(params string[] signals) =>
         Of([.. signals.Select(s => ($"signal_exports.{s}", "{\"enabled\":false}"))]);
 
@@ -129,9 +145,6 @@ internal static class Policy
         }
     }
 
-    /// <summary>The schema of <paramref name="policy"/>.</summary>
-    public static string Schema(string policy) => JsonNode.Parse(policy)!["schema"]!.GetValue<string>();
-
     private static JsonNode? Sorted(JsonNode? node) => node switch
     {
         JsonObject o => new JsonObject(o.OrderBy(kv => kv.Key, StringComparer.Ordinal)
@@ -141,16 +154,16 @@ internal static class Policy
         _ => JsonNode.Parse(node.ToJsonString()),
     };
 
-    private static string Write(int version, (string Control, string Fields)[] overrides)
+    private static string Write(bool every, (string Control, string Fields)[] overrides)
     {
         var given = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var (control, fields) in overrides)
         {
             var known = control.StartsWith("signal_exports.", StringComparison.Ordinal)
                 ? Signals.Contains(control["signal_exports.".Length..])
-                : V2Controls.Contains(control) && control != "signal_exports";
+                : Controls.Contains(control) && control != "signal_exports";
             Assert.True(known, $"{control} is no control of the policy");
-            Assert.True(version == 2 || control == "head_sampling" || control.StartsWith("signal_exports.", StringComparison.Ordinal), $"{control} is no version 1 control");
+            Assert.True(every || control == "head_sampling" || control.StartsWith("signal_exports.", StringComparison.Ordinal), $"{control} is not sent by a short policy");
             using var parsed = JsonDocument.Parse(fields); // the fields are one JSON object
             Assert.Equal(JsonValueKind.Object, parsed.RootElement.ValueKind);
             var inner = fields.Trim()[1..^1].Trim();
@@ -159,8 +172,8 @@ internal static class Policy
 
         const string local = "{\"mode\":\"local\"}";
         string Control(string name) => given.GetValueOrDefault(name, local);
-        var b = new StringBuilder("{\"schema\":\"").Append(version == 1 ? V1 : V2).Append('"');
-        foreach (var name in version == 1 ? V1Controls : V2Controls)
+        var b = new StringBuilder("{\"schema\":\"").Append(V1).Append('"');
+        foreach (var name in every ? Controls : ShortControls)
         {
             b.Append(",\"").Append(name).Append("\":");
             if (name == "signal_exports")

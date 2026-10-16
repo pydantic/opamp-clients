@@ -190,11 +190,11 @@ Warning and Debug, naming `OpAmp:Endpoint` and `OpAmp:Headers` instead.
 
 ## The newer settings
 
-Each is a control of the version 2 draft. Each is carried out at once, in the plugin and in
+Each is a control of the policy. Each is carried out at once, in the plugin and in
 `WithOpAmp()` alike (the same code), and declared to the layer
 ([the host](sdk-settings.md#the-host)) only where it is carried out. Elsewhere the agent refuses
 a policy that overrides it. What each means is [sdk-settings.md](sdk-settings.md)'s. Here is where
-.NET holds it. Each fragment below shows the controls of a version 2 policy that it is about.
+.NET holds it. Each fragment below shows the controls of a policy that it is about.
 Every other control of the policy is local.
 
 ### `sampling_rules`
@@ -493,7 +493,7 @@ told of.
   `example.feature` on and off, a bad value is FAILED and changes nothing, the same values again tell
   nothing, and the next start has the saved value from the start. Then `check_truth`
   (`examples/integrations.py`) under two setups (`examples/dotnet-otel/Setups.cs`). The server
-  offers one version 2 policy per control. A control is set aside when the policy is FAILED as an
+  offers one policy per control. A control is set aside when the policy is FAILED as an
   override the plugin can't carry out, or APPLIED with that override reported `local` in the
   effective config. Every other override must show in the telemetry, and the controls set aside
   must be exactly those the setup takes from the plugin. `truth-plugin-exporters`: a plugin of the

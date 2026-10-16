@@ -3,11 +3,12 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.every;
 import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.full;
 import static dev.pydantic.opamp.javaagent.Vectors.override;
 import static dev.pydantic.opamp.javaagent.Vectors.sorted;
 import static dev.pydantic.opamp.javaagent.Vectors.v1;
-import static dev.pydantic.opamp.javaagent.Vectors.v2;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,7 +71,7 @@ class ExtensionTest {
     assertEquals(APPLIED, s.getStatus());
     assertEquals(c.getConfigHash(), s.getLastRemoteConfigHash());
     assertFalse(e.controls.gates.sendLogs());
-    assertEquals(doc, effective(e));
+    assertEquals(full(doc), effective(e));
     // The client keeps the config applied, in its own state: nothing of the agent's own.
     assertFalse(Files.exists(dir.resolve("sdk-settings.json")));
   }
@@ -78,11 +79,11 @@ class ExtensionTest {
   @Test
   void aLogLevelIsAppliedAtOnceAndReported(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    String doc = v2("log_levels", override("\"level\":\"warn\""));
+    String doc = every("log_levels", override("\"level\":\"warn\""));
     assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(13, e.controls.gates.logLevels().min());
     assertEquals(sorted(doc), effective(e));
-    e.remoteConfig(config(v2()));
+    e.remoteConfig(config(every()));
     assertEquals(0, e.controls.gates.logLevels().min());
   }
 
@@ -90,7 +91,7 @@ class ExtensionTest {
   void levelsPerScopeAreDeclaredAppliedAtOnceAndReportedSorted(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().contains("send_logs_level_by_scope"));
     Extension e = Extension.forTest(setup(dir));
-    String doc = v2("log_levels",
+    String doc = every("log_levels",
         override("\"scopes\":{\"noisy.lib\":\"off\",\"com.acme.db*\":\"debug\",\"com.acme.db\":\"warn\"}"));
     assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     // As the layer sorts them for matching: the longest name first, an exact name before its prefix.
@@ -98,12 +99,12 @@ class ExtensionTest {
         e.controls.gates.logLevels().byScope().stream().map(l -> l.getPattern()).toList());
     assertEquals(sorted(doc), effective(e));
     // A level that is not one: FAILED, naming the control, and the levels stay.
-    Opamp.RemoteConfigStatus bad = e.remoteConfig(config(v2("log_levels", override("\"scopes\":{\"a\":\"loud\"}"))));
+    Opamp.RemoteConfigStatus bad = e.remoteConfig(config(every("log_levels", override("\"scopes\":{\"a\":\"loud\"}"))));
     assertEquals(FAILED, bad.getStatus());
     assertTrue(bad.getErrorMessage().startsWith("log_levels:"), bad.getErrorMessage());
     assertEquals(3, e.controls.gates.logLevels().byScope().size());
     // Local: none.
-    e.remoteConfig(config(v2()));
+    e.remoteConfig(config(every()));
     assertFalse(e.controls.gates.logLevels().any());
   }
 
@@ -111,15 +112,15 @@ class ExtensionTest {
   void theLogCapIsDeclaredAppliedAtOnceAndZeroIsRefused(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().contains("send_logs_per_second"));
     Extension e = Extension.forTest(setup(dir));
-    String doc = v2("log_rate_limit", override("\"records_per_second\":0.5"));
+    String doc = every("log_rate_limit", override("\"records_per_second\":0.5"));
     assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(0.5, e.controls.gates.logCap().perSecond);
     assertEquals(sorted(doc), effective(e));
-    Opamp.RemoteConfigStatus zero = e.remoteConfig(config(v2("log_rate_limit", override("\"records_per_second\":0"))));
+    Opamp.RemoteConfigStatus zero = e.remoteConfig(config(every("log_rate_limit", override("\"records_per_second\":0"))));
     assertEquals(FAILED, zero.getStatus());
     assertTrue(zero.getErrorMessage().startsWith("log_rate_limit:"), zero.getErrorMessage());
     assertEquals(0.5, e.controls.gates.logCap().perSecond);
-    e.remoteConfig(config(v2()));
+    e.remoteConfig(config(every()));
     assertEquals(null, e.controls.gates.logCap());
   }
 
@@ -127,12 +128,12 @@ class ExtensionTest {
   void redactionIsDeclaredAppliedAtOnceAndReportedLowercaseAndSorted(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().containsAll(List.of("drop_attributes", "mask_attributes")));
     Extension e = Extension.forTest(setup(dir));
-    assertEquals(APPLIED, e.remoteConfig(config(v2("attribute_redaction",
+    assertEquals(APPLIED, e.remoteConfig(config(every("attribute_redaction",
         override("\"drop\":[\"Cookie\",\"Authorization\",\"cookie\"],\"mask\":[\"*Token*\"]")))).getStatus());
     assertTrue(e.controls.gates.redaction().any());
-    assertEquals(sorted(v2("attribute_redaction",
+    assertEquals(sorted(every("attribute_redaction",
         override("\"drop\":[\"authorization\",\"cookie\"],\"mask\":[\"*token*\"]"))), effective(e));
-    e.remoteConfig(config(v2()));
+    e.remoteConfig(config(every()));
     assertFalse(e.controls.gates.redaction().any());
   }
 
@@ -140,20 +141,20 @@ class ExtensionTest {
   void samplingRulesAndTheTraceCapAreDeclaredAppliedAtOnceAndReportedCanonically(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().containsAll(List.of("sampling_rules", "sampling_traces_per_second")));
     Extension e = Extension.forTest(setup(dir));
-    String doc = v2("sampling_rules", override("\"rules\":[{\"path\":\"/health*\",\"rate\":0.0,\"kind\":\"server\"}]"),
+    String doc = every("sampling_rules", override("\"rules\":[{\"path\":\"/health*\",\"rate\":0.0,\"kind\":\"server\"}]"),
         "trace_rate_limit", override("\"traces_per_second\":50"));
     assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(50.0, e.controls.sampler.cap().perSecond);
-    assertEquals(sorted(v2("sampling_rules", override("\"rules\":[{\"kind\":\"server\",\"path\":\"/health*\",\"rate\":0}]"),
+    assertEquals(sorted(every("sampling_rules", override("\"rules\":[{\"kind\":\"server\",\"path\":\"/health*\",\"rate\":0}]"),
         "trace_rate_limit", override("\"traces_per_second\":50"))), effective(e));
     // route is not a matcher: FAILED, naming the rule, and nothing changes.
-    Opamp.RemoteConfigStatus route = e.remoteConfig(config(v2("sampling_rules",
+    Opamp.RemoteConfigStatus route = e.remoteConfig(config(every("sampling_rules",
         override("\"rules\":[{\"rate\":1},{\"rate\":0,\"route\":\"/users/:id\"}]"))));
     assertEquals(FAILED, route.getStatus());
     assertTrue(route.getErrorMessage().startsWith("sampling_rules:") && route.getErrorMessage().contains("route"),
         route.getErrorMessage());
     assertEquals(50.0, e.controls.sampler.cap().perSecond);
-    e.remoteConfig(config(v2()));
+    e.remoteConfig(config(every()));
     assertEquals(null, e.controls.sampler.cap());
   }
 
@@ -232,7 +233,7 @@ class ExtensionTest {
         "debug_send_logs_level")));
     Extension e = Extension.forTest(setup(dir));
     e.wallClock = () -> Vectors.NOW;
-    assertEquals(APPLIED, e.remoteConfig(config(v2("head_sampling", override("\"ratio\":0.01"),
+    assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.01"),
         "sampling_rules", override("\"rules\":[{\"rate\":0,\"name\":\"GET\"}]"),
         "log_levels", override("\"level\":\"error\",\"scopes\":{\"noisy\":\"off\"}"),
         "log_rate_limit", override("\"records_per_second\":100"), "trace_rate_limit", override("\"traces_per_second\":10"),
@@ -268,7 +269,7 @@ class ExtensionTest {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
     e.wallClock = () -> now[0];
-    e.remoteConfig(config(v2("debug", override("\"until\":\"2026-10-14T12:10:00Z\""))));
+    e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-14T12:10:00Z\""))));
     long[] stale = e.armedForTest();
     // A newer window, sent before the first ends.
     e.remoteConfig(config(debugWindow("0.1", "2026-10-14T12:20:00Z")));
@@ -281,12 +282,12 @@ class ExtensionTest {
     long[] armed = e.armedForTest();
     e.fire(armed[0], armed[1]);
     assertEquals(0.1, e.inForce().getSamplingRate());
-    assertEquals(sorted(v2("head_sampling", override("\"ratio\":0.1"))), effective(e));
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(e));
   }
 
   /** A policy with the head sampling ratio and debug mode until the given time. */
   static String debugWindow(String ratio, String until) {
-    return v2("head_sampling", override("\"ratio\":" + ratio), "debug", override("\"until\":\"" + until + "\""));
+    return every("head_sampling", override("\"ratio\":" + ratio), "debug", override("\"until\":\"" + until + "\""));
   }
 
   /**
@@ -303,7 +304,7 @@ class ExtensionTest {
     assertEquals(1.0, e.inForce().getSamplingRate());
     now[0] = Vectors.NOW + 25 * 60_000;
     assertEquals(FAILED, e.remoteConfig(config(v1("head_sampling", override("\"ratio\":7")))).getStatus());
-    assertEquals(sorted(v2("head_sampling", override("\"ratio\":0.1"))), effective(e));
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(e));
     assertEquals(0.1, e.inForce().getSamplingRate());
     assertEquals(0, e.armedForTest()[1]);
   }
@@ -312,7 +313,7 @@ class ExtensionTest {
   void aWindowMoreThanADayAheadIsRefused(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     e.wallClock = () -> Vectors.NOW;
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config(v2("debug", override("\"until\":\"2026-10-17T00:00:00Z\""))));
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-17T00:00:00Z\""))));
     assertEquals(FAILED, s.getStatus());
     assertTrue(s.getErrorMessage().contains("24h"), s.getErrorMessage());
     assertEquals(0, e.armedForTest()[1]);
@@ -329,7 +330,7 @@ class ExtensionTest {
       Thread.sleep(50);
     }
     assertEquals(0.2, e.inForce().getSamplingRate());
-    assertEquals(sorted(v2("head_sampling", override("\"ratio\":0.2"))), effective(e));
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.2"))), effective(e));
   }
 
   /** health.json, through the extension's health step: what it sends, and the agent health it sends it in. */
@@ -456,7 +457,7 @@ class ExtensionTest {
     assertEquals(FAILED, s.getStatus());
     assertTrue(s.getErrorMessage().startsWith("head_sampling:"), s.getErrorMessage());
     assertFalse(e.controls.gates.sendTraces());
-    assertEquals(off, effective(e));
+    assertEquals(full(off), effective(e));
   }
 
   @Test
@@ -468,10 +469,10 @@ class ExtensionTest {
     assertEquals(FAILED, none.getStatus());
     assertTrue(none.getErrorMessage().startsWith("config_map:"), none.getErrorMessage());
     assertFalse(e.controls.gates.sendTraces());
-    assertEquals(off, effective(e));
+    assertEquals(full(off), effective(e));
     assertEquals(APPLIED, e.remoteConfig(config(v1())).getStatus());
     assertTrue(e.controls.gates.sendTraces());
-    assertEquals(v1(), effective(e));
+    assertEquals(full(v1()), effective(e));
   }
 
   /** An override the agent does not carry out is refused, saying which, and changes nothing. */
@@ -479,7 +480,7 @@ class ExtensionTest {
   void anOverrideTheAgentDoesNotCarryOutIsFailed(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     // Without the bridge to the application's settings, the agent does not declare custom.
-    String values = v2("app_settings", override("\"values\":{\"a\":\"1\"}"));
+    String values = every("app_settings", override("\"values\":{\"a\":\"1\"}"));
     if (!e.host().getLiveList().contains("custom")) {
       Opamp.RemoteConfigStatus s = e.remoteConfig(config(values));
       assertEquals(FAILED, s.getStatus());
@@ -492,17 +493,17 @@ class ExtensionTest {
     assertEquals(FAILED, s.getStatus());
     assertEquals("signal_exports.metrics: this SDK cannot apply the requested override", s.getErrorMessage());
     assertTrue(ungated.controls.gates.sendMetrics());
-    assertEquals(v1(), effective(ungated));
+    assertEquals(full(v1()), effective(ungated));
   }
 
   @Test
   void nextStartSettingsWaitForTheRestartAndShowAsPendingUntilThen(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    String doc = v2("instrumentations", override("\"disabled\":[\"jdbc\"]"));
+    String doc = every("instrumentations", override("\"disabled\":[\"jdbc\"]"));
     Opamp.RemoteConfigStatus s = e.remoteConfig(config(doc));
     assertEquals(APPLIED, s.getStatus());
     // Not in force yet: the effective config still has the agent's own.
-    assertEquals(sorted(v2()), effective(e));
+    assertEquals(sorted(every()), effective(e));
     Kept.keepApplied(dir, doc); // as the client does, before APPLIED goes out
 
     // The next start reads them, as agent properties, and they are in force.
@@ -516,13 +517,13 @@ class ExtensionTest {
   @Test
   void withoutAStateDirectoryNextStartSettingsAreFailed() {
     Extension e = Extension.forTest(setup(null));
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config(v2("head_sampling", override("\"ratio\":0.5"),
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.5"),
         "instrumentations", override("\"all_disabled\":true"))));
     assertEquals(FAILED, s.getStatus());
     assertEquals("instrumentations: takes effect at the next start, which needs somewhere to keep state",
         s.getErrorMessage());
     // Nothing of it applied, the live setting included.
-    assertEquals(v1(), effective(e));
+    assertEquals(full(v1()), effective(e));
     // Live settings alone are fine.
     assertEquals(APPLIED, e.remoteConfig(config(v1("head_sampling", override("\"ratio\":0.5")))).getStatus());
   }
@@ -558,7 +559,7 @@ class ExtensionTest {
     e.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
     assertFalse(e.controls.gates.sendMetrics());
-    assertEquals(doc, effective(e));
+    assertEquals(full(doc), effective(e));
   }
 
   @Test

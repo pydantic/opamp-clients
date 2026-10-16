@@ -137,8 +137,8 @@ query string or a fragment. An endpoint without a scheme gets a warning at start
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the agent's resource: `service.name`, `service.namespace` and
   `service.instance.id` identify it. Host, process, runtime and `telemetry.distro.*` describe it.
-  The description also names the policy formats the extension reads (`logfire.opamp.config_format`,
-  `logfire.opamp.config_formats`) and the controls this agent carries out
+  The description also names the policy format the extension reads
+  (`logfire.opamp.config_format`) and the controls this agent carries out
   (`logfire.opamp.supported_controls`).
 - **Takes settings** from the Logfire SDK policy, the remote config's only file
   (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the agent's own value, or an
@@ -177,9 +177,9 @@ neither periodic nor pull, is a component the extension can't gate: that signal'
 its gate holds, are not declared. The agent logs a warning, and a policy that overrides them is
 refused. What each means is in
 [sdk-settings.md](sdk-settings.md#settings-that-match-telemetry). Here is where the agent carries
-it out, and what it sees. Each example below shows the controls a version 2 policy
-(`logfire-sdk-policy/v2-draft`) overrides. Every control left out of an example is
-`{"mode": "local"}` in the policy a server sends.
+it out, and what it sees. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 
 ### Sampling rules
 
@@ -421,7 +421,7 @@ sent once, at start: the hash in the first message, the components in full when 
      again once they succeed.
 
   Then `check_truth`, once for each setup a second extension (`examples/javaagent/Setups.java`)
-  makes, named in `EXAMPLE_SETUP`. The server offers one version 2 policy per control. A control
+  makes, named in `EXAMPLE_SETUP`. The server offers one policy per control. A control
   is set aside when the policy is FAILED as an override the extension can't carry out, or APPLIED
   with that override reported `local` in the effective config. Every other override must show in
   the telemetry. `extension-processor` adds a span processor, a log record processor and a metric

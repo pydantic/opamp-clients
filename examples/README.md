@@ -32,9 +32,9 @@ To see an application's inventory yourself, run it against the reference server 
 `target/integrations/python-otel/run1.jsonl` (each language's directory is its example's name).
 
 Each offer is a remote config whose only file is a Logfire SDK policy, `logfire-sdk-policy.json`
-([docs/sdk-settings.md](../docs/sdk-settings.md)): version 1 where only `head_sampling` and
-`signal_exports` are overridden, else the version 2 draft. Every control a step does not name is
-local, the SDK's own value.
+([docs/sdk-settings.md](../docs/sdk-settings.md)): the first four controls alone where only
+`head_sampling` and `signal_exports` are overridden, else every control. Every control a step does
+not name is local, the SDK's own value.
 
 Each integration then runs `check_signals`: two more runs with metrics and logs exported too
 (every application writes a log line per request), which prove every control of the policy end
@@ -51,7 +51,7 @@ to end:
 | `attribute_redaction` `mask` | on `url.full` and `http.url`: spans come again, each URL `[REDACTED]` in the sink, none shown |
 | `attribute_redaction` `drop` | on the same keys, in another case: spans arrive, none with a URL |
 | `trace_rate_limit`, `log_rate_limit` | at 1: no more than about a span and a log record a second, of some five requests a second |
-| the effective config | after `head_sampling` 0.25, the agent reports that version 1 policy as the only file; after the log level is added, the version 2 policy |
+| the effective config | after `head_sampling` 0.25, the agent reports that policy, every control listed, as the only file; after the log level is added, that policy |
 | export health (no control) | the agent's health carries `exporters`, a child per signal, the application's own `healthy` kept; it counts trace exports that succeeded and log records dropped on purpose |
 | `polling_interval` | at the next start the agent checks in at the offered interval, not its environment's |
 | `instrumentations` `all_disabled` | at the next start, no spans while the application makes requests |

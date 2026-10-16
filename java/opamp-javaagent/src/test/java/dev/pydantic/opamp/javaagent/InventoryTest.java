@@ -172,7 +172,7 @@ class InventoryTest {
     List<String> names = new ArrayList<>(instrumentations(c).keySet());
     // Loaded at start, as a saved document: next-start settings are in force there.
     String disabled = names.stream().map(n -> "\"" + n + "\"").collect(java.util.stream.Collectors.joining(","));
-    SettingsProto.Settings s = Vectors.LAYER.load(Vectors.v2("instrumentations",
+    SettingsProto.Settings s = Vectors.LAYER.load(Vectors.every("instrumentations",
         Vectors.override("\"disabled\":[" + disabled + "]")).getBytes(StandardCharsets.UTF_8), Extension.HOST,
         Vectors.NOW).getSettings();
     // Each name switches off exactly that instrumentation, as the agent reads its property.

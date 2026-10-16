@@ -112,8 +112,8 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the SDK's resource: `service.name`, `service.namespace` and
   `service.instance.id` identify it, and the rest describes it. Attributes keep their types, and
-  arrays stay arrays. The description also names the policy formats the package reads
-  (`logfire.opamp.config_format`, `logfire.opamp.config_formats`) and the controls this process
+  arrays stay arrays. The description also names the policy format the package reads
+  (`logfire.opamp.config_format`) and the controls this process
   carries out (`logfire.opamp.supported_controls`).
 - **Takes settings** from the Logfire SDK policy, the remote config's only file
   (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
@@ -250,9 +250,9 @@ What each setting means is [sdk-settings.md](sdk-settings.md#settings-that-match
 the same in every language. This is where the package carries each out on the Go SDK, and what
 to send. Each one is declared to the layer ([the host](sdk-settings.md#the-host)), in every configuration `Setup` builds,
 so the layer puts it in force and reports it. Each takes effect at once, and goes back at once
-when the control is local again. Each example below shows the controls a version 2 policy
-(`logfire-sdk-policy/v2-draft`) overrides. Every control left out of an example is
-`{"mode": "local"}` in the policy a server sends.
+when the control is local again. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 
 ### Sampling rules
 
@@ -482,7 +482,7 @@ told of.
   `check_truth` (`examples/integrations.py`) with the example in each `EXAMPLE_SETUP` of
   [setups.go](../examples/go-otel/setups.go): once `Setup` has returned, the application sets a
   provider of its own as the global one, exporting to the same sink. The server offers one
-  version 2 policy per control. A control is set aside when the policy is FAILED as an override
+  policy per control. A control is set aside when the policy is FAILED as an override
   the package can't carry out, or APPLIED with that override reported `local` in the effective
   config. Every other override must change the telemetry the sink receives, and the controls set
   aside must be exactly those in the table [above](#where-the-server-cant-reach).

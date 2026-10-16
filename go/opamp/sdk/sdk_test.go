@@ -44,7 +44,7 @@ func effective(t *testing.T, e *protobufs.EffectiveConfig) string {
 	return string(f.GetBody())
 }
 
-// The controls of a policy in order: version 1 has the first two.
+// The controls of a policy in order: it must send the first two, and may leave out the others.
 var controls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
 	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval"}
 
@@ -77,21 +77,42 @@ func policy(schema string, n int, set ...string) string {
 	return b + "}"
 }
 
-// v1 is a version 1 policy, every control local unless set gives it.
+// v1 is a policy of the two controls it must send, each local unless set gives it.
 func v1(set ...string) string { return policy("logfire-sdk-policy/v1", 2, set...) }
 
-// v2 is a version 2 draft policy, every control local unless set gives it.
-func v2(set ...string) string { return policy("logfire-sdk-policy/v2-draft", len(controls), set...) }
+// every is a policy that sends every control, each local unless set gives it.
+func every(set ...string) string { return policy("logfire-sdk-policy/v1", len(controls), set...) }
 
 // override is a control's override with the given fields.
 func override(fields string) string { return `{"mode":"override",` + fields + `}` }
 
-// sorted is a policy as the layer writes a version 2 effective config: compact, keys sorted.
+// sorted is a policy that sends every control as the layer writes the effective config: compact,
+// keys sorted.
 func sorted(t *testing.T, doc string) string {
 	t.Helper()
 	var v any
 	if err := json.Unmarshal([]byte(doc), &v); err != nil {
 		t.Fatal(err)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// full is a policy as the layer writes the effective config: every control, those left out local,
+// compact, keys sorted.
+func full(t *testing.T, doc string) string {
+	t.Helper()
+	var v map[string]any
+	if err := json.Unmarshal([]byte(doc), &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range controls {
+		if _, ok := v[c]; !ok {
+			v[c] = map[string]any{"mode": "local"}
+		}
 	}
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -117,17 +138,17 @@ func TestLoadDecideDescribe(t *testing.T) {
 	defer l.Close(ctx)
 	saved := v1("signal_exports", logsOff)
 	loaded, err := l.Load(ctx, []byte(saved), declaring)
-	if err != nil || loaded.GetSettings().SendLogs == nil || loaded.GetSettings().GetSendLogs() || effective(t, loaded.GetEffective()) != saved {
+	if err != nil || loaded.GetSettings().SendLogs == nil || loaded.GetSettings().GetSendLogs() || effective(t, loaded.GetEffective()) != full(t, saved) {
 		t.Fatalf("load: %v %v", loaded, err)
 	}
 	doc := v1("head_sampling", override(`"ratio":0.25`))
 	d, err := l.Decide(ctx, config(doc), loaded.GetCurrent(), loaded.GetCurrent(), declaring, keep)
-	if err != nil || status(d) != applied || d.GetApply().GetSamplingRate() != 0.25 || effective(t, d.GetEffective()) != doc {
+	if err != nil || status(d) != applied || d.GetApply().GetSamplingRate() != 0.25 || effective(t, d.GetEffective()) != full(t, doc) {
 		t.Fatalf("decide: %v %v", d, err)
 	}
 	bad, err := l.Decide(ctx, config(v1("head_sampling", override(`"ratio":"x"`))), d.GetCurrent(), loaded.GetCurrent(), declaring, keep)
 	if err != nil || status(bad) != failed || !strings.HasPrefix(bad.GetStatus().GetErrorMessage(), "head_sampling:") ||
-		bad.GetApply() != nil || effective(t, bad.GetEffective()) != doc {
+		bad.GetApply() != nil || effective(t, bad.GetEffective()) != full(t, doc) {
 		t.Fatalf("bad: %v %v", bad, err)
 	}
 	// The policy is the remote config's only file: none, or another beside it, is refused.
@@ -149,17 +170,17 @@ func TestLoadDecideDescribe(t *testing.T) {
 		string(d2.GetCurrent()) != string(d.GetCurrent()) {
 		t.Fatalf("v1, not carried out: %v %v", d2, err)
 	}
-	d2, err = l.Decide(ctx, config(v2("instrumentations", override(`"disabled":["otelhttp"]`))), nil, nil, host, keep)
+	d2, err = l.Decide(ctx, config(every("instrumentations", override(`"disabled":["otelhttp"]`))), nil, nil, host, keep)
 	if err != nil || status(d2) != failed ||
 		d2.GetStatus().GetErrorMessage() != "instrumentations: disabled: this SDK cannot apply the requested override" {
-		t.Fatalf("v2, not carried out: %v %v", d2, err)
+		t.Fatalf("every, not carried out: %v %v", d2, err)
 	}
 	// A host naming what is no setting has a bug: an error, saying which.
 	if _, err := l.Load(ctx, nil, &settingspb.Host{Live: []string{"send_metric"}}); err == nil || !strings.Contains(err.Error(), "send_metric") {
 		t.Fatalf("a host declaring send_metric: %v", err)
 	}
 	// A log level: the lowest severity number to export, reported by its name; unset, every severity.
-	doc = v2("log_levels", override(`"level":"warn"`))
+	doc = every("log_levels", override(`"level":"warn"`))
 	d, err = l.Decide(ctx, config(doc), nil, nil, declaring, nil)
 	if err != nil || status(d) != applied || d.GetApply().SendLogsMinSeverity == nil || d.GetApply().GetSendLogsMinSeverity() != 13 ||
 		effective(t, d.GetEffective()) != sorted(t, doc) || loaded.GetSettings().SendLogsMinSeverity != nil {
@@ -193,16 +214,16 @@ func attribute(d *protobufs.AgentDescription, key string) string {
 	return "<none>"
 }
 
-// The description tells a server the policy formats the layer reads and the controls the host
+// The description tells a server the policy format the layer reads and the controls the host
 // carries out: debug only with a clock, and none for a host that declares nothing.
-func TestTheDescriptionNamesTheFormatsAndTheControls(t *testing.T) {
+func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 	ctx := context.Background()
 	l, err := New(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	every := "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,trace_rate_limit," +
+	all := "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,trace_rate_limit," +
 		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,polling_interval"
 	for _, c := range []struct {
 		name     string
@@ -210,9 +231,9 @@ func TestTheDescriptionNamesTheFormatsAndTheControls(t *testing.T) {
 		now      uint64
 		controls string
 	}{
-		{"every setting, with a clock", everySetting, now, every},
-		{"every setting, no clock", everySetting, 0, strings.Replace(every, ",debug", "", 1)},
-		{"every setting but the application's own", declaring, now, strings.Replace(every, ",app_settings", "", 1)},
+		{"every setting, with a clock", everySetting, now, all},
+		{"every setting, no clock", everySetting, 0, strings.Replace(all, ",debug", "", 1)},
+		{"every setting but the application's own", declaring, now, strings.Replace(all, ",app_settings", "", 1)},
 		{"the head sampling and the export switches", &settingspb.Host{Live: []string{"sampling_rate", "send_traces", "send_logs"}}, now,
 			"head_sampling,signal_exports.traces,signal_exports.logs"},
 		{"no host", nil, now, ""},
@@ -223,9 +244,6 @@ func TestTheDescriptionNamesTheFormatsAndTheControls(t *testing.T) {
 		}
 		if got := attribute(d, "logfire.opamp.config_format"); got != "logfire-sdk-policy/v1" {
 			t.Errorf("%s: config_format %q", c.name, got)
-		}
-		if got := attribute(d, "logfire.opamp.config_formats"); got != "logfire-sdk-policy/v1,logfire-sdk-policy/v2-draft" {
-			t.Errorf("%s: config_formats %q", c.name, got)
 		}
 		if got := attribute(d, "logfire.opamp.supported_controls"); got != c.controls {
 			t.Errorf("%s: supported_controls %q, want %q", c.name, got, c.controls)
@@ -257,12 +275,12 @@ func TestTheSaveTheLayerAsksForDecidesTheAnswer(t *testing.T) {
 	}
 	defer l.Close(ctx)
 	current := []byte(v1("head_sampling", override(`"ratio":0.5`)))
-	full := func([]byte) error { return errors.New("no space left on device") }
+	noSpace := func([]byte) error { return errors.New("no space left on device") }
 	quarter := v1("head_sampling", override(`"ratio":0.25`))
-	d, err := l.Decide(ctx, config(quarter), current, current, declaring, full)
+	d, err := l.Decide(ctx, config(quarter), current, current, declaring, noSpace)
 	if err != nil || status(d) != failed ||
 		d.GetStatus().GetErrorMessage() != "can't save the settings: no space left on device" || d.GetApply() != nil ||
-		string(d.GetCurrent()) != string(current) || effective(t, d.GetEffective()) != string(current) {
+		string(d.GetCurrent()) != string(current) || effective(t, d.GetEffective()) != full(t, string(current)) {
 		t.Fatalf("a failed save: %v %v", d, err)
 	}
 	// Nowhere to keep state: a live change is applied, a next-start one refused.
@@ -270,7 +288,7 @@ func TestTheSaveTheLayerAsksForDecidesTheAnswer(t *testing.T) {
 	if err != nil || status(d) != applied {
 		t.Fatalf("live, nowhere: %v %v", d, err)
 	}
-	minute := v2("polling_interval", override(`"milliseconds":60000`))
+	minute := every("polling_interval", override(`"milliseconds":60000`))
 	d, err = l.Decide(ctx, config(minute), current, current, declaring, nil)
 	if err != nil || d.GetStatus().GetErrorMessage() !=
 		"polling_interval: takes effect at the next start, which needs somewhere to keep state" {
@@ -287,7 +305,7 @@ func TestTheSaveTheLayerAsksForDecidesTheAnswer(t *testing.T) {
 		t.Fatalf("next start, saved: %v %v %q", d, err, kept)
 	}
 	// A refused config asks for no save.
-	d, err = l.Decide(ctx, config(v1("head_sampling", override(`"ratio":2`))), current, current, declaring, full)
+	d, err = l.Decide(ctx, config(v1("head_sampling", override(`"ratio":2`))), current, current, declaring, noSpace)
 	if err != nil || d.GetStatus().GetErrorMessage() != "head_sampling: ratio must be a number from 0 to 1" {
 		t.Fatalf("refused: %v %v", d, err)
 	}
@@ -302,7 +320,7 @@ func TestTheNewSettingsArrive(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	doc := v2("sampling_rules", override(`"rules":[{"rate":0,"kind":"server","path":"/health*"}]`),
+	doc := every("sampling_rules", override(`"rules":[{"rate":0,"kind":"server","path":"/health*"}]`),
 		"log_levels", override(`"scopes":{"com.acme.db*":"debug"}`),
 		"attribute_redaction", override(`"mask":["User.Email"],"drop":["*token*"]`),
 		"trace_rate_limit", override(`"traces_per_second":50`),
@@ -341,7 +359,7 @@ func TestDebugModeAndRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	doc := v2("head_sampling", override(`"ratio":0.1`), "debug", override(`"until":"2026-10-14T12:30:00Z","log_level":"info"`))
+	doc := every("head_sampling", override(`"ratio":0.1`), "debug", override(`"until":"2026-10-14T12:30:00Z","log_level":"info"`))
 	d, err := l.DecideAt(ctx, config(doc), nil, nil, declaring, now, keep)
 	end := now + 30*60_000
 	if err != nil || d.GetApply().GetSamplingRate() != 1 || d.GetApply().GetSendLogsMinSeverity() != 9 || d.GetRefreshAtUnixMs() != end {
@@ -349,7 +367,7 @@ func TestDebugModeAndRefresh(t *testing.T) {
 	}
 	r, err := l.Refresh(ctx, d.GetCurrent(), nil, declaring, end)
 	if err != nil || r.GetSettings().GetSamplingRate() != 0.1 || r.GetSettings().SendLogsMinSeverity != nil || r.GetRefreshAtUnixMs() != 0 ||
-		effective(t, r.GetEffective()) != sorted(t, v2("head_sampling", override(`"ratio":0.1`))) {
+		effective(t, r.GetEffective()) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
 		t.Fatalf("refresh: %v %v", r, err)
 	}
 	loaded, err := l.LoadAt(ctx, d.GetCurrent(), declaring, now)
@@ -392,7 +410,7 @@ func TestEvaluate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	doc := []byte(v2("sampling_rules", override(`"rules":[{"rate":0,"kind":"server","path":"/health*"}]`),
+	doc := []byte(every("sampling_rules", override(`"rules":[{"rate":0,"kind":"server","path":"/health*"}]`),
 		"log_levels", override(`"scopes":{"noisy":"off"}`),
 		"attribute_redaction", override(`"mask":["*token*"]`),
 		"log_rate_limit", override(`"records_per_second":2`)))

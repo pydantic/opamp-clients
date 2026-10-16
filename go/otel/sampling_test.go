@@ -207,12 +207,12 @@ func rules(list, ratio string) string {
 	if ratio != "" {
 		set = append(set, "head_sampling", override(`"ratio":`+ratio))
 	}
-	return v2(set...)
+	return every(set...)
 }
 
 // traceCap is a policy whose trace_rate_limit control overrides the traces a second.
 func traceCap(perSecond string) string {
-	return v2("trace_rate_limit", override(`"traces_per_second":`+perSecond))
+	return every("trace_rate_limit", override(`"traces_per_second":`+perSecond))
 }
 
 // The spec's edge cases, on the real SDK: the first rule wins, a rule of rate 0 over
@@ -265,12 +265,12 @@ func TestSamplingRulesChangeLiveAndRevert(t *testing.T) {
 		doc  string
 		want samplingWant
 	}{
-		{v2(), samplingWant{How: "app_sampler"}},
+		{every(), samplingWant{How: "app_sampler"}},
 		{rules(`[{"rate":0,"path":"/health"}]`, ""), samplingWant{How: "rate", Rate: 0}},
 		{rules(`[{"rate":0.25,"path":"/health"}]`, "1"), samplingWant{How: "rate", Rate: 0.25}},
 		{rules("", "1"), samplingWant{How: "rate", Rate: 1}},
 		{rules(`[{"rate":0.5}]`, ""), samplingWant{How: "rate", Rate: 0.5}},
-		{v2(), samplingWant{How: "app_sampler"}},
+		{every(), samplingWant{How: "app_sampler"}},
 	}
 	for _, s := range steps {
 		apply(s.doc)
@@ -348,7 +348,7 @@ func TestTheTraceCapOnTheSDK(t *testing.T) {
 	if _, again := root(context.Background()); again {
 		t.Fatal("the same cap applied again refilled the bucket")
 	}
-	c.Apply(settingsOf(t, []byte(v2()), 0))
+	c.Apply(settingsOf(t, []byte(every()), 0))
 	for range 5 {
 		if _, s := root(context.Background()); !s {
 			t.Fatal("the cap made local still capped")

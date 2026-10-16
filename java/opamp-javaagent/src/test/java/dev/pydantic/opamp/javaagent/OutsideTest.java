@@ -167,7 +167,7 @@ class OutsideTest {
           "debug_until", "debug_sampling_rate")), declared.toString());
 
       // A policy that overrides a gate's control is refused, naming it, and changes nothing.
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.v2(
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.every(
           "head_sampling", Vectors.override("\"ratio\":0.5"), "signal_exports", Vectors.exports("off", "off", ""),
           "log_levels", Vectors.override("\"level\":\"warn\""))));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
@@ -177,7 +177,7 @@ class OutsideTest {
       String sampled = Vectors.v1("head_sampling", Vectors.override("\"ratio\":0.5"));
       s = e.remoteConfig(ExtensionTest.config(sampled));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
-      assertEquals(Vectors.JSON.readTree(sampled), Vectors.JSON.readTree(ExtensionTest.effective(e)));
+      assertEquals(Vectors.full(sampled), ExtensionTest.effective(e));
       assertTrue(e.controls.gates.sendTraces());
 
       // The inventory lists what the other extension added, ungated, beside the configured ones.
@@ -224,7 +224,7 @@ class OutsideTest {
       assertTrue(declared.containsAll(List.of("send_traces", "mask_attributes", "debug_until", "send_logs_level")),
           declared.toString());
 
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.v2(
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.every(
           "head_sampling", Vectors.override("\"ratio\":0"), "trace_rate_limit", Vectors.override("\"traces_per_second\":1"),
           "signal_exports", Vectors.exports("off", "", ""))));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
@@ -233,7 +233,7 @@ class OutsideTest {
       String tracesOff = Vectors.v1("signal_exports", Vectors.exports("off", "", ""));
       s = e.remoteConfig(ExtensionTest.config(tracesOff));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
-      assertEquals(Vectors.JSON.readTree(tracesOff), Vectors.JSON.readTree(ExtensionTest.effective(e)));
+      assertEquals(Vectors.full(tracesOff), ExtensionTest.effective(e));
       assertFalse(e.controls.gates.sendTraces());
     }
   }

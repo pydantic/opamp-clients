@@ -59,7 +59,7 @@ class AgreesWithLayerTest {
   }
 
   /**
-   * The version 2 policy for the generated settings. The generators fill a flat object of the
+   * The policy, every control sent, for the generated settings. The generators fill a flat object of the
    * fields they vary, and this puts each field under its control.
    */
   static String policy(ObjectNode settings) {
@@ -91,7 +91,7 @@ class AgreesWithLayerTest {
     if (!redaction.isEmpty()) {
       set.addAll(List.of("attribute_redaction", Vectors.override(String.join(",", redaction))));
     }
-    return Vectors.v2(set.toArray(String[]::new));
+    return Vectors.every(set.toArray(String[]::new));
   }
 
   static String text(Random r, int max) {

@@ -68,7 +68,7 @@ const (
 func TestInstrumentationSwitchesTakeEffectAtOnceAndAtTheNextStart(t *testing.T) {
 	dir := t.TempDir()
 	a := newTestAgent(t, dir)
-	body := v2("instrumentations", override(`"disabled":["otelhttp"]`), "head_sampling", override(`"ratio":0.25`))
+	body := every("instrumentations", override(`"disabled":["otelhttp"]`), "head_sampling", override(`"ratio":0.25`))
 	st := a.remoteConfig(context.Background(), remote(body))
 	if st.GetStatus() != applied || string(st.GetLastRemoteConfigHash()) != body {
 		t.Fatalf("status %v", st)
@@ -96,7 +96,7 @@ func TestAnUnusableConfigChangesNothing(t *testing.T) {
 	a := newTestAgent(t, t.TempDir())
 	a.remoteConfig(context.Background(), remote(v1("signal_exports", exports("off", "", ""))))
 	before := string(a.current)
-	st := a.remoteConfig(context.Background(), remote(v2("head_sampling", override(`"ratio":7`),
+	st := a.remoteConfig(context.Background(), remote(every("head_sampling", override(`"ratio":7`),
 		"instrumentations", override(`"disabled":["otelhttp"]`))))
 	if st.GetStatus() != failed_ || !strings.HasPrefix(st.GetErrorMessage(), "head_sampling:") {
 		t.Fatalf("status %v", st)
@@ -108,10 +108,10 @@ func TestAnUnusableConfigChangesNothing(t *testing.T) {
 
 func TestWithoutAStateDirectoryOnlyTheNextStartSettingsAreRefused(t *testing.T) {
 	a := newTestAgent(t, "")
-	if st := a.remoteConfig(context.Background(), remote(v2("instrumentations", override(`"disabled":["otelhttp"]`)))); st.GetStatus() != applied {
+	if st := a.remoteConfig(context.Background(), remote(every("instrumentations", override(`"disabled":["otelhttp"]`)))); st.GetStatus() != applied {
 		t.Fatalf("a live switch needs no saving: %v", st)
 	}
-	st := a.remoteConfig(context.Background(), remote(v2("instrumentations", override(`"disabled":["otelhttp"]`),
+	st := a.remoteConfig(context.Background(), remote(every("instrumentations", override(`"disabled":["otelhttp"]`),
 		"polling_interval", override(`"milliseconds":10000`))))
 	if st.GetStatus() != failed_ || !a.controls.Off(otelhttp) ||
 		st.GetErrorMessage() != "polling_interval: takes effect at the next start, which needs somewhere to keep state" {
@@ -322,7 +322,7 @@ func offeringServer(t *testing.T, remote *protobufs.AgentRemoteConfig) (*httptes
 // The server hears APPLIED once the client has saved the config with its state: a start after
 // that comes back to it, with no file of the package's own.
 func TestAConfigAppliedThroughTheServerIsWhereTheNextStartBegins(t *testing.T) {
-	body := v2("instrumentations", override(`"disabled":["otelhttp"]`), "head_sampling", override(`"ratio":0.25`))
+	body := every("instrumentations", override(`"disabled":["otelhttp"]`), "head_sampling", override(`"ratio":0.25`))
 	srv, statuses := offeringServer(t, remote(body))
 	dir := t.TempDir()
 	a, err := newAgent(context.Background(), &server{endpoint: srv.URL + "/v1/opamp", stateDir: dir,
@@ -388,7 +388,7 @@ func TestTheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBe
 }
 
 func TestTheFirstNotificationIsAnsweredThroughItsClient(t *testing.T) {
-	body := v2("instrumentations", override(`"disabled":["otelhttp"]`))
+	body := every("instrumentations", override(`"disabled":["otelhttp"]`))
 	srv, statuses := offeringServer(t, remote(body))
 	a, err := newAgent(context.Background(), &server{endpoint: srv.URL + "/v1/opamp", stateDir: t.TempDir(),
 		heartbeat: 100 * time.Millisecond}, NewControls(), "")
@@ -430,7 +430,7 @@ func TestAUIDTheServerAssignsIsTheNextStarts(t *testing.T) {
 	}
 }
 
-// The description the agent sends at start names the policy formats the layer reads and the
+// The description the agent sends at start names the policy format the layer reads and the
 // controls this package carries out, beside the resource's attributes.
 func TestTheDescriptionNamesThePolicyAndTheControls(t *testing.T) {
 	descriptions := make(chan *protobufs.AgentDescription, 8)
@@ -479,8 +479,7 @@ func TestTheDescriptionNamesThePolicyAndTheControls(t *testing.T) {
 		}
 	}
 	want := map[string]string{
-		"logfire.opamp.config_format":  "logfire-sdk-policy/v1",
-		"logfire.opamp.config_formats": "logfire-sdk-policy/v1,logfire-sdk-policy/v2-draft",
+		"logfire.opamp.config_format": "logfire-sdk-policy/v1",
 		"logfire.opamp.supported_controls": "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs," +
 			"sampling_rules,trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,polling_interval",
 	}
@@ -699,7 +698,7 @@ func TestSendMetricsIsRefusedWhenTheMetricsReaderIsAutoexportsOwn(t *testing.T) 
 				t.Fatalf("%v: refused with %q", tc.env, st.GetErrorMessage())
 			}
 		}
-		if st.GetStatus() != want || effectiveBody(a) != eff || a.controls.gates.Load().metrics == tc.gated ||
+		if st.GetStatus() != want || effectiveBody(a) != full(t, eff) || a.controls.gates.Load().metrics == tc.gated ||
 			a.controls.gates.Load().traces != !tc.gated {
 			t.Fatalf("%v: status %v, effective %s, sending metrics %v", tc.env, st, effectiveBody(a), a.controls.gates.Load().metrics)
 		}

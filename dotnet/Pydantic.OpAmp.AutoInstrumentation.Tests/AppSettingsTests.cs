@@ -651,7 +651,7 @@ public class AppSettingsTests
             var told = new Told();
             using var sub = app.OnChange(told.Handler);
             agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}""")));
-            // A version 1 policy has no app_settings control: it is local.
+            // A short policy leaves app_settings out: it is local.
             agent.RemoteConfig(Vectors.Config(Policy.HeadSampling(1)));
             Assert.Equal("default", app.Get("a", "default"));
             agent.RemoteConfig(Vectors.Config(Values("""{"a":"1"}""")));
@@ -660,8 +660,8 @@ public class AppSettingsTests
             Assert.Equal(RemoteConfigStatuses.Failed, none.Status);
             Assert.StartsWith("config_map:", none.ErrorMessage, StringComparison.Ordinal);
             Assert.Equal("1", app.Get("a", "default"));
-            // A version 2 policy with every control local.
-            agent.RemoteConfig(Vectors.Config(Policy.OfV2()));
+            // A policy sending every control, each local.
+            agent.RemoteConfig(Vectors.Config(Policy.OfEvery()));
             Assert.Equal("default", app.Get("a", "default"));
             told.Want((M(("a", "1")), new[] { "a" }), (M(), new[] { "a" }), (M(("a", "1")), new[] { "a" }), (M(), new[] { "a" }));
         }

@@ -100,7 +100,7 @@ process running.
 - **Describes itself** from the SDK's resource, detected once (the same detectors as upstream's
   `register`) and handed to NodeSDK. `service.name`, `service.namespace` and
   `service.instance.id` identify it, and the rest describes it. The description also names the
-  policy formats the package reads (`logfire.opamp.config_format`, `logfire.opamp.config_formats`)
+  policy format the package reads (`logfire.opamp.config_format`)
   and the controls this process carries out (`logfire.opamp.supported_controls`).
 - **Reports its inventory**: this package's and the SDK's versions, the instrumentations it loaded
   and the exporters it built, as its available components ([below](#inventory)).
@@ -228,9 +228,9 @@ These controls act on what the sampler and the exporters this package builds see
 `console`). [sdk-settings.md](sdk-settings.md#settings-that-match-telemetry) has their contract.
 The package declares each to the layer ([the host](sdk-settings.md#the-host)) only where it
 carries it out. Thus a policy that overrides a control the package cannot carry out is FAILED,
-never APPLIED. Each example below shows the controls a version 2 policy
-(`logfire-sdk-policy/v2-draft`) overrides. Every control left out of an example is
-`{"mode": "local"}` in the policy a server sends.
+never APPLIED. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 
 ### Sampling rules
 
@@ -543,7 +543,7 @@ sends the hash at start, and the components in full when the server asks.
   on), leaves out (off), sends in a string (on) and sends again (nothing to tell); after a restart
   with no offer it is on from the start. Last, `check_truth` (the checks `truth-own-*`): app.cjs
   registers a tracer, logger or meter provider of its own (`EXAMPLE_SETUP`, setups.cjs), exporting
-  to the same sink. The server offers one version 2 policy per control. A control is set aside
+  to the same sink. The server offers one policy per control. A control is set aside
   when the policy is FAILED as an override the package can't carry out, or APPLIED with that
   override reported `local` in the effective config. Every other override must show in the
   telemetry, and the controls set aside must be exactly those that provider takes past the

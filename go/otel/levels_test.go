@@ -53,8 +53,8 @@ func TestScopeLevelsChangeLiveAndRevert(t *testing.T) {
 		}
 		return exported(sink)
 	}
-	every := "com.acme.db:5 com.acme.db:13 com.acme.dbpool:5 com.acme.dbpool:13 noisy.lib:5 noisy.lib:13 app:5 app:13"
-	if got := all(); got != every {
+	everyRecord := "com.acme.db:5 com.acme.db:13 com.acme.dbpool:5 com.acme.dbpool:13 noisy.lib:5 noisy.lib:13 app:5 app:13"
+	if got := all(); got != everyRecord {
 		t.Fatalf("nothing set: %s", got)
 	}
 	c.Apply(settingsOf(t, []byte(levelsPolicy("warn", "com.acme.db*=debug", "noisy.lib=off")), 0))
@@ -69,8 +69,8 @@ func TestScopeLevelsChangeLiveAndRevert(t *testing.T) {
 	if got, want := all(), "com.acme.db:13 com.acme.dbpool:13 noisy.lib:13 app:13"; got != want {
 		t.Fatalf("levels per scope left out: %s, want the global level's %s", got, want)
 	}
-	c.Apply(settingsOf(t, []byte(v2()), 0))
-	if got := all(); got != every {
+	c.Apply(settingsOf(t, []byte(every()), 0))
+	if got := all(); got != everyRecord {
 		t.Fatalf("everything left out: %s, want every record", got)
 	}
 }
@@ -78,12 +78,12 @@ func TestScopeLevelsChangeLiveAndRevert(t *testing.T) {
 // levelsPolicy is a policy whose log_levels control is the given level and scope entries, each
 // "pattern=level"; with neither, the control is local.
 func levelsPolicy(level string, entries ...string) string {
-	return v2("log_levels", logLevelsControl(level, entries...))
+	return every("log_levels", logLevelsControl(level, entries...))
 }
 
 // levelsPolicyOff is levelsPolicy with no level, the given scope entries and the log export off.
 func levelsPolicyOff(entries ...string) string {
-	return v2("signal_exports", exports("", "", "off"), "log_levels", logLevelsControl("", entries...))
+	return every("signal_exports", exports("", "", "off"), "log_levels", logLevelsControl("", entries...))
 }
 
 func logLevelsControl(level string, entries ...string) string {

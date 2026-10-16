@@ -2,22 +2,23 @@
 
 Each file here is a whole Logfire SDK policy. Send it as the remote config's only file,
 `logfire-sdk-policy.json` (`application/json`), to any of the six SDK integrations.
-[docs/sdk-settings.md](../../docs/sdk-settings.md#the-policy) describes version 1 and the version 2
-draft, and what each control does.
+[docs/sdk-settings.md](../../docs/sdk-settings.md#the-policy) describes the policy and what each
+control does.
 [Where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies) has the limits
 per language. `examples/test_settings_cookbook.py` checks three things. Every file here is a whole
-policy, version 1 where only version 1 controls are overridden. This README shows each file as it
+policy: the first four controls alone where only those are overridden, else every control. This README shows each file as it
 is. Between them, the files override every control.
 
-A policy is the whole of what the server wants. Every control is in it, as `local` or as
-`override`. A `local` control is the SDK's own value, as configured locally. Thus each policy
+A policy is the whole of what the server wants. Each control is in it as `local` or as
+`override`, or is left out, which is `local`. A `local` control is the SDK's own value, as
+configured locally. Thus each policy
 states everything that should differ from the SDK's own, not only what changes. A field that the
 policy version does not name is refused, and so is an override that the SDK cannot carry out. A
 refused policy changes nothing.
 
-Version 1 has two controls, `head_sampling` and `signal_exports`. Version 2 adds the rest. A
-server sends version 2 only to an SDK that lists `logfire-sdk-policy/v2-draft` in its
-`logfire.opamp.config_formats` attribute. The examples use version 1 where it is enough.
+Every policy sends `head_sampling` and `signal_exports`. The other controls may be left out. A
+server sends an override only to an SDK that lists its control in its
+`logfire.opamp.supported_controls` attribute.
 
 ## Cut trace volume: `sample-a-quarter.json`
 
@@ -75,7 +76,7 @@ Traces carry on.
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -122,7 +123,7 @@ connected. Thus the next policy can turn it all back on.
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -161,7 +162,7 @@ answers the policy FAILED and nothing changes.
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -186,7 +187,7 @@ No instrumentation runs from the next start. In Go, Node.js and Rust, none runs 
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -212,7 +213,7 @@ says. The interval is from 1000 ms to 86400000 ms (24 h).
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 0.25},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -243,7 +244,7 @@ differs by instrumentation. For example, an HTTP client span starts without its 
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -275,7 +276,7 @@ the policy ([where each setting applies](../../docs/sdk-settings.md#where-each-s
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -305,7 +306,7 @@ refuses the policy
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 1},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -333,7 +334,7 @@ buckets.
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "override", "ratio": 0.05},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -362,7 +363,7 @@ but a later time does. Every integration ends it on a timer of its own, server o
 
 ```json
 {
-  "schema": "logfire-sdk-policy/v2-draft",
+  "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
   "signal_exports": {
     "traces": {"mode": "local"},
@@ -403,7 +404,6 @@ policy.
 }
 ```
 
-Every control is `local`, so every setting is the SDK's own again. Live settings change at once,
-and next-start settings change at the next start. This version 1 policy is also the one that the
-effective config reports before any policy is applied. An SDK that has taken a version 2 policy
-also takes this one, and the version 2 controls go back to local.
+Every control is `local`, those left out included, so every setting is the SDK's own again. Live
+settings change at once, and next-start settings change at the next start. Before any policy is
+applied, the effective config reports this policy with every control listed.

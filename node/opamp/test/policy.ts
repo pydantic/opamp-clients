@@ -9,9 +9,9 @@ import { AgentRemoteConfigSchema, type AgentRemoteConfig, type EffectiveConfig }
 
 export const FILE = "logfire-sdk-policy.json";
 export const V1 = "logfire-sdk-policy/v1";
-export const V2 = "logfire-sdk-policy/v2-draft";
 const SIGNALS = ["traces", "metrics", "logs"] as const;
-const V2_CONTROLS = [
+// The controls a policy may leave out (as local).
+const MORE_CONTROLS = [
   "sampling_rules",
   "trace_rate_limit",
   "log_levels",
@@ -41,19 +41,32 @@ export interface Overrides {
 }
 
 /**
- * A policy with every control local but the ones given. The policy is version 1 when it overrides
- * only head_sampling and signal_exports, else version 2, unless `version` says.
+ * A policy with every control local but the ones given. The policy is the first four controls
+ * alone when it overrides only head_sampling and signal_exports, else every control, unless `every`
+ * says.
  */
-export function policy(overrides: Overrides = {}, version?: 1 | 2): string {
-  const v = version ?? (Object.keys(overrides).every((k) => k === "head_sampling" || k === "signal_exports") ? 1 : 2);
+export function policy(overrides: Overrides = {}, every?: boolean): string {
+  const all = every ?? !Object.keys(overrides).every((k) => k === "head_sampling" || k === "signal_exports");
   const control = (fields: Fields | undefined) => (fields === undefined ? { mode: "local" } : { mode: "override", ...fields });
   const doc: Record<string, unknown> = {
-    schema: v === 1 ? V1 : V2,
+    schema: V1,
     head_sampling: control(overrides.head_sampling),
     signal_exports: Object.fromEntries(SIGNALS.map((s) => [s, control(overrides.signal_exports?.[s])])),
   };
-  if (v === 2) for (const name of V2_CONTROLS) doc[name] = control(overrides[name]);
+  if (all) for (const name of MORE_CONTROLS) doc[name] = control(overrides[name]);
   return JSON.stringify(doc);
+}
+
+/** A policy as the effective config reports it: every control, those left out local, keys sorted. */
+export function full(body: string): string {
+  const doc = JSON.parse(body) as Record<string, unknown>;
+  for (const name of MORE_CONTROLS) doc[name] ??= { mode: "local" };
+  const sort = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sort)
+    : v !== null && typeof v === "object"
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, x]) => [k, sort(x)]))
+    : v;
+  return JSON.stringify(sort(doc));
 }
 
 /** signal_exports's overrides that stop each signal named. */

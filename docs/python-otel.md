@@ -148,7 +148,7 @@ other override above that a process cannot carry out.
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the SDK's resource: `service.name`, `service.namespace` and
   `service.instance.id` identify it, and the rest describes it. The description also names the
-  policy formats the package reads (`logfire.opamp.config_format`, `logfire.opamp.config_formats`)
+  policy format the package reads (`logfire.opamp.config_format`)
   and the controls this process carries out (`logfire.opamp.supported_controls`).
 - **Takes settings** from the Logfire SDK policy, the remote config's only file
   (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
@@ -202,9 +202,9 @@ configurator built the SDK: there the package declares them to the layer ([the
 host](sdk-settings.md#the-host)). Under another configurator, or `OTEL_CONFIG_FILE`, it does not,
 and a policy that overrides one is refused. The rules for each are
 [sdk-settings.md](sdk-settings.md#settings-that-match-telemetry)'s. What follows is where they
-apply in Python. Each example below shows the controls a version 2 policy
-(`logfire-sdk-policy/v2-draft`) overrides. Every control left out of an example is
-`{"mode": "local"}` in the policy a server sends.
+apply in Python. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 `examples/python-otel/try.py` checks each one against the reference server and its sink.
 
 ### Sampling rules

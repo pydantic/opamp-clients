@@ -156,8 +156,8 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
     the URLs masked, spans named `span_name` and log lines again; the URLs dropped (spans named
     `dropped_name`) and both caps, `spans_a_second` and `records_a_second`; then every
     instrumentation off. Export health at start and at 120 s. With the third offer the agent
-    reports `effective` as its effective config (by default the version 1 policy in force), and
-    with the fourth `effective_after` (by default the version 2 policy in force)."""
+    reports `effective` as its effective config (by default the policy in force), and with the
+    fourth `effective_after` (by default the next policy in force)."""
     third_effective = effective or in_force({"head_sampling": {"ratio": 0.25}})
     fourth_effective = effective_after or in_force({"head_sampling": {"ratio": 0.25}, "log_levels": {"level": "warn"}})
     log = Log().a2s(0, config=True)
@@ -209,9 +209,10 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
     return log.a2s(235, disconnect=True)
 
 
-def in_force(overrides: dict[str, dict], version: int | None = None) -> dict:
-    """An effective config as the server's log gives it: the policy with `overrides` as its only file."""
-    return {POLICY_FILE: json.loads(policy(overrides, version))}
+def in_force(overrides: dict[str, dict]) -> dict:
+    """An effective config as the server's log gives it: the policy with `overrides`, every control
+    listed, as its only file."""
+    return {POLICY_FILE: json.loads(policy(overrides, every=True))}
 
 
 def fourth(every: float = 3.0, spans: bool = False) -> Log:
@@ -650,22 +651,22 @@ class Signals(unittest.TestCase):
         for e in log.events:
             e.pop("effective", None)
         got = failed(judge_signals(log.events, "checkout", False))
-        self.assertTrue(any(f.startswith("the effective config reports the version 1 policy in force") for f in got))
-        self.assertTrue(any(f.startswith("then the version 2 policy") for f in got))
+        self.assertTrue(any(f.startswith("the effective config reports the policy in force") for f in got))
+        self.assertTrue(any(f.startswith("then the next policy") for f in got))
 
     def test_an_effective_config_of_another_policy_fails(self):
         for wrong in (in_force({"head_sampling": {"ratio": 0.5}}),
-                      in_force({"head_sampling": {"ratio": 0.25}}, version=2),
+                      in_force({"head_sampling": {"ratio": 0.25}, "debug": {"until": "2026-10-14T12:10:00Z"}}),
                       in_force({"head_sampling": {"ratio": 0.25}, "signal_exports.logs": {"enabled": False}}),
                       {"settings.json": {"sampling_rate": "0.25"}},
                       in_force({"head_sampling": {"ratio": 0.25}}) | {"other.json": {}}):
             with self.subTest(wrong=wrong):
-                self.assertTrue(any(f.startswith("the effective config reports the version 1 policy in force")
+                self.assertTrue(any(f.startswith("the effective config reports the policy in force")
                                     for f in failed(judge_signals(third(effective=wrong).events, "checkout", False))))
 
     def test_the_policy_before_still_reported_once_the_level_is_set_fails(self):
         kept = in_force({"head_sampling": {"ratio": 0.25}})
-        self.assertTrue(any(f.startswith("then the version 2 policy")
+        self.assertTrue(any(f.startswith("then the next policy")
                             for f in failed(judge_signals(third(effective_after=kept).events, "checkout", False))))
 
     def test_the_effective_policy_names_its_schema(self):
