@@ -7,7 +7,8 @@
 // so all three go the same way.
 //
 // Without a proxy in the options, the environment's apply. In Rust mode (the client's default)
-// by the rule every SDK's Rust mode shares (rustProxy below). In Node mode by Node's own default:
+// by the rule every SDK's Rust mode shares, which the core applies to the variables it is handed
+// (rustProxyChoice below). In Node mode by Node's own default:
 // the proxies in the environment (HTTP_PROXY, HTTPS_PROXY, NO_PROXY) when Node is told to use
 // them (NODE_USE_ENV_PROXY=1 or --use-env-proxy), read the way Node reads them; otherwise none.
 // `proxy: false` goes direct.
@@ -205,99 +206,28 @@ function envProxies(env: NodeJS.ProcessEnv, resolveLocally: boolean): EnvProxies
   };
 }
 
-/** Rust mode's proxy rule (tests/shell-tables/README.md, "Rust mode's proxy rule"; the
- * reference's, the Rust client's): the proxy the environment `env` names for `url`,
- * trimmed, as given; undefined: directly. The same in every SDK's Rust mode. */
-export function rustProxy(env: NodeJS.ProcessEnv, url: string): string | undefined {
-  // Under CGI, HTTP_PROXY may be a request's Proxy header (httpoxy): no variable is taken.
-  if (env.REQUEST_METHOD !== undefined) return undefined;
-  // The upper-case name if it is set at all (even empty), else the lower-case one.
-  const read = (upper: string): string | undefined => env[upper] ?? env[upper.toLowerCase()];
-  // Empty (or spaces) is unset.
-  const proxy = (upper: string): string | undefined => read(upper)?.trim() || undefined;
-  const u = new URL(url);
-  const secure = u.protocol === "https:" || u.protocol === "wss:";
-  const named = proxy(secure ? "HTTPS_PROXY" : "HTTP_PROXY") ?? proxy("ALL_PROXY");
-  if (named === undefined) return undefined;
-  const host = u.hostname.replace(/^\[(.*)\]$/, "$1");
-  return rustNoProxy(read("NO_PROXY") ?? "", host) ? undefined : named;
-}
+/** The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+ * rule"). The core applies the rule; the client only reads them, once. */
+const RUST_PROXY_VARIABLES = [
+  "REQUEST_METHOD",
+  "HTTP_PROXY",
+  "http_proxy",
+  "HTTPS_PROXY",
+  "https_proxy",
+  "ALL_PROXY",
+  "all_proxy",
+  "NO_PROXY",
+  "no_proxy",
+] as const;
 
-/** An IP address as its family and value, or undefined for anything else (a name: nothing is
- * resolved). IPv4: four decimal parts, 0 to 255, without leading zeros; IPv6: its text forms
- * (an IPv4 tail too), without a zone. */
-function ipValue(text: string): { v6: boolean; value: bigint } | undefined {
-  const v4 = (t: string): bigint | undefined => {
-    const parts = t.split(".");
-    if (parts.length !== 4) return undefined;
-    let n = 0n;
-    for (const part of parts) {
-      if (!/^(0|[1-9][0-9]{0,2})$/.test(part) || Number(part) > 255) return undefined;
-      n = (n << 8n) | BigInt(part);
-    }
-    return n;
-  };
-  const four = v4(text);
-  if (four !== undefined) return { v6: false, value: four };
-  if (!text.includes(":") || !/^[0-9a-fA-F:.]+$/.test(text)) return undefined;
-  // An IPv4 tail is two groups.
-  let groups = text;
-  const lastColon = text.lastIndexOf(":");
-  if (text.slice(lastColon + 1).includes(".")) {
-    const tail = v4(text.slice(lastColon + 1));
-    if (tail === undefined) return undefined;
-    groups = `${text.slice(0, lastColon + 1)}${(tail >> 16n).toString(16)}:${(tail & 0xffffn).toString(16)}`;
-  }
-  const halves = groups.split("::");
-  if (halves.length > 2) return undefined;
-  const side = (h: string): string[] | undefined => {
-    if (h === "") return [];
-    const g = h.split(":");
-    return g.every((x) => /^[0-9a-fA-F]{1,4}$/.test(x)) ? g : undefined;
-  };
-  const head = side(halves[0] ?? "");
-  const tail = halves.length === 2 ? side(halves[1] ?? "") : [];
-  if (head === undefined || tail === undefined) return undefined;
-  const missing = 8 - head.length - tail.length;
-  if (halves.length === 2 ? missing < 1 : missing !== 0) return undefined;
-  let n = 0n;
-  for (const g of [...head, ...Array<string>(missing).fill("0"), ...tail]) n = (n << 16n) | BigInt(`0x${g}`);
-  return { v6: true, value: n };
+/** What Rust mode tells the core about proxies, once (Config.proxy). */
+export interface RustProxyChoice {
+  direct: boolean;
+  url: string;
+  headers: { name: string; value: string }[];
+  resolveLocally: boolean;
+  environment: { name: string; value: string }[];
 }
-
-/** Whether NO_PROXY `list` sends `host` (a name, or an address without brackets) direct, by Rust
- * mode's rule: an address by the address and network entries, a name by the name entries. */
-export function rustNoProxy(list: string, host: string): boolean {
-  const ip = ipValue(host);
-  const name = host.toLowerCase();
-  for (const raw of list.split(",")) {
-    const entry = raw.trim();
-    if (entry === "") continue;
-    // An address entry: a network (address/prefix) or an address.
-    const slash = entry.indexOf("/");
-    const net = ipValue(slash < 0 ? entry : entry.slice(0, slash));
-    const bits = net === undefined ? 0 : net.v6 ? 128 : 32;
-    const prefix = slash < 0 ? bits : /^(0|[1-9][0-9]{0,2})$/.test(entry.slice(slash + 1)) ? Number(entry.slice(slash + 1)) : -1;
-    if (net !== undefined && prefix >= 0 && prefix <= bits) {
-      if (ip !== undefined && ip.v6 === net.v6) {
-        const shift = BigInt(bits - prefix);
-        if (ip.value >> shift === net.value >> shift) return true;
-      }
-      continue;
-    }
-    // A name entry: never an address's.
-    if (ip !== undefined) continue;
-    const d = entry.toLowerCase();
-    if (d === name || (d.startsWith(".") && d.slice(1) === name)) return true;
-    if (name.endsWith(d)) {
-      if (d.startsWith(".") || name[name.length - d.length - 1] === ".") return true;
-    } else if (d === "*") {
-      return true;
-    }
-  }
-  return false;
-}
-
 const ipv4 = (ip: string): number => ip.split(".").reduce((n, b) => n * 256 + Number(b), 0);
 
 /** Whether NO_PROXY (split, trimmed, lower case) sends `host:port` direct, as Node decides it:
@@ -365,14 +295,16 @@ export class Transport {
   /** For fetch: the plain HTTP requests and downloads. */
   readonly dispatcher: Dispatcher;
 
-  /** Rust mode: the environment Rust mode's proxy rule reads, when no proxy is named (and not
-   * `false`); undefined otherwise. */
-  readonly #rustEnv: NodeJS.ProcessEnv | undefined;
+  /** Rust mode: the variables Rust mode's proxy rule reads, as set at the start, when no proxy
+   * is named (and not `false`); undefined otherwise. */
+  readonly #rustEnv: { name: string; value: string }[] | undefined;
+  /** `proxy: false`. */
+  readonly #direct: boolean;
   /** `proxy.resolveLocally` without a `url`: for a SOCKS5 proxy the environment names. */
   readonly #resolveLocally: boolean;
 
-  /** `rust`: Rust mode, whose answers to the core's proxy questions (proxyFor) follow the shared
-   * rule (tests/shell-tables/README.md) rather than Node's convention. */
+  /** `rust`: Rust mode, where the core picks the proxy (rustProxyChoice) by the shared rule
+   * (tests/shell-tables/README.md) rather than Node's convention. */
   constructor(options: ConnectionOptions = {}, platform: Platform = process, rust = false) {
     this.#context = secureContext(options.tls ?? {});
     const p = options.proxy;
@@ -380,7 +312,14 @@ export class Transport {
     // No proxy named (and not `false`): the environment's, when Node is told to use it.
     const env = p === undefined || (p !== false && p.url === undefined);
     this.#resolveLocally = (p && p.resolveLocally) ?? false;
-    this.#rustEnv = rust && env ? platform.env : undefined;
+    this.#direct = p === false;
+    this.#rustEnv =
+      rust && env
+        ? RUST_PROXY_VARIABLES.flatMap((name) => {
+            const value = platform.env[name];
+            return value === undefined ? [] : [{ name, value }];
+          })
+        : undefined;
     // Under CGI, HTTP_PROXY may be a request's Proxy header (httpoxy): none of them is taken.
     // Set at all, even empty: the conservative reading (tests/shell-tables/proxy.json).
     const cgi = platform.env.REQUEST_METHOD !== undefined;
@@ -418,17 +357,26 @@ export class Transport {
     return this.#context;
   }
 
-  /** Rust mode: the proxy for `url` (http or https), if any: its URL, CONNECT headers, and
-   * whether the core is to have the server's name resolved here. */
+  /** Rust mode: what the core is told about proxies, once (Config.proxy): the configured proxy
+   * (its URL, CONNECT headers, and whether the core is to have the server's name resolved here),
+   * none with `proxy: false`, or else the environment's variables, which the core reads by the
+   * shared rule (it refuses a proxy it can't use: the connection fails, never goes direct). */
+  rustProxyChoice(): RustProxyChoice {
+    const p = this.#proxy;
+    return {
+      direct: this.#direct,
+      url: p?.url ?? "",
+      headers: Object.entries(p?.headers ?? {}).map(([name, value]) => ({ name, value })),
+      resolveLocally: p ? p.resolveLocally : this.#resolveLocally,
+      environment: this.#rustEnv ?? [],
+    };
+  }
+
+  /** The proxy for `url` (http or https), if any: its URL, CONNECT headers, and whether the
+   * server's name is resolved here. In Node mode, the options' or Node's convention's. In Rust
+   * mode, the answer to a proxy question, which the core asks only when it wasn't told
+   * (rustProxyChoice): the configured proxy, or none (the environment's rule is the core's). */
   proxyFor(url: string): { url: string; headers: Record<string, string>; resolveLocally: boolean } | undefined {
-    if (this.#rustEnv !== undefined) {
-      // The shared rule: the value as the environment gives it (the core reads it, and refuses
-      // a scheme it can't use: the connection fails, never goes direct).
-      const named = rustProxy(this.#rustEnv, url);
-      if (named === undefined) return undefined;
-      const socks = /^socks5h?:\/\//i.test(named);
-      return { url: named, headers: {}, resolveLocally: this.#resolveLocally && socks };
-    }
     const u = new URL(url);
     const secure = u.protocol === "https:" || u.protocol === "wss:";
     const host = u.hostname.replace(/^\[(.*)\]$/, "$1");

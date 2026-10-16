@@ -15,6 +15,7 @@ import {
   type Config,
   ConfigSchema,
   type Input,
+  type Limits,
   type Output,
   OutputSchema,
   ReplySchema,
@@ -109,6 +110,7 @@ export class Core {
   readonly #tap: Tap | undefined;
   /** The instance UID in use, as the last output said (16 bytes). */
   #uid: Uint8Array = new Uint8Array();
+  #limits: Limits | undefined;
 
   /** `wasm`: another module than the embedded core (tests only); `tap`: the file to tap it to
    * (tests only; otherwise OPAMP_CORE_TAP says). */
@@ -166,7 +168,13 @@ export class Core {
     }
     const out = reply.output ?? create(OutputSchema);
     if (out.instanceUid.length === 16) this.#uid = out.instanceUid;
+    if (out.limits !== undefined) this.#limits = out.limits;
     return out;
+  }
+
+  /** The limits the core goes by, as given or by default: its start reports them. */
+  get limits(): Limits | undefined {
+    return this.#limits;
   }
 
   /** The instance UID in use (the core's, if the application gave none). */

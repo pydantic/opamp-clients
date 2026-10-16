@@ -20,8 +20,14 @@ from ._executor import Executor, clear_downloads, read_state
 from ._files import REAL, AfterClear, Files, Journal
 from ._proto.opamp.core.v1 import core_pb2 as corepb
 from ._proto.opamp.v1 import opamp_pb2 as pb
-from ._streams import Streams
+from ._streams import Streams, proxy_choice
 from ._transport import TLS, Proxy, Transport, redacted_headers, redacted_url
+
+
+def _u64(n: int) -> int:
+    """A time or size for the core: a negative one reaches it as its two's complement, which the core
+    refuses at start, naming the field and the number meant (as in every SDK)."""
+    return n & 0xFFFF_FFFF_FFFF_FFFF
 
 
 @dataclass
@@ -267,33 +273,35 @@ class Client:
         transport = Transport(config.tls, config.proxy, rust=rust)
         # The core takes the transport from the endpoint's scheme, keeps every effect's time (and
         # cancels what it gives up on), decides what a download's status means, and makes the
-        # instance UID if the application chose none.
+        # instance UID if the application chose none, and the backoff's jitter seed from the
+        # entropy (seed left 0: two clients started in the same tick don't retry in step).
         self._core = Core(corepb.Config(
             instance_uid=config.instance_uid or b"",
             entropy=os.urandom(32),
             unix_ms=time.time_ns() // 1_000_000,
-            stop_timeout_ms=config.stop_timeout_ms,
-            connect_timeout_ms=config.connect_timeout_ms,
+            stop_timeout_ms=_u64(config.stop_timeout_ms),
+            connect_timeout_ms=_u64(config.connect_timeout_ms),
             capabilities=config.capabilities,
-            heartbeat_interval_ms=config.heartbeat_interval_ms,
-            seed=time.time_ns() & 0xFFFFFFFFFFFFFFFF,
+            heartbeat_interval_ms=_u64(config.heartbeat_interval_ms),
             endpoint=config.endpoint,
             headers=[corepb.Header(name=k, value=v) for k, v in config.headers.items()],
-            request_timeout_ms=config.request_timeout_ms,
-            max_send_bytes=config.max_send_bytes,
-            max_receive_bytes=config.max_receive_bytes,
+            request_timeout_ms=_u64(config.request_timeout_ms),
+            max_send_bytes=_u64(config.max_send_bytes),
+            max_receive_bytes=_u64(config.max_receive_bytes),
             persistence=config.state_file is not None,
             saved_state=read_state(config.state_file),
             accept_connection_settings=config.accept_connection_settings,
-            verify_timeout_ms=config.verify_timeout_ms,
+            verify_timeout_ms=_u64(config.verify_timeout_ms),
             accept_packages=config.accept_packages,
             request_instance_uid=config.request_instance_uid,
-            max_package_bytes=config.max_package_bytes,
-            download_timeout_ms=config.download_timeout_ms,
+            max_package_bytes=_u64(config.max_package_bytes),
+            download_timeout_ms=_u64(config.download_timeout_ms),
             streams=rust,
             splice_downloads=rust and config.rust_splice,
+            proxy=proxy_choice(transport) if rust else None,
         ), _module=_core_module)
-        self._stop_timeout = (config.stop_timeout_ms or 5000) / 1000
+        # All of stop takes the core's stop timeout, as given or by default: its start reports it.
+        self._stop_timeout = (self._core.limits.stop_timeout_ms if self._core.limits else 0) / 1000
         self._stop_called: float | None = None  # when stop() was first called (the loop's clock)
         # The file system saves and download files go through; with the tap on, each operation
         # is recorded there too, the state file named first.

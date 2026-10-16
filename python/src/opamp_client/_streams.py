@@ -52,6 +52,22 @@ from ._transport import Transport
 
 Deliver = Callable[[corepb.Input], None]
 
+
+def proxy_choice(transport: Transport) -> corepb.ProxyChoice:
+    """What Rust mode tells the core about proxies, once (Config.proxy): the configured proxy (its
+    URL as given, credentials and all, its CONNECT headers, resolve_locally), none with
+    Proxy.DIRECT, or else the environment's variables, from which the core picks each
+    connection's proxy by the rule every SDK's Rust mode shares. (The environment's bytes that
+    aren't UTF-8 are lone surrogates here: lossy.)"""
+    r = transport.fixed
+    if r is not None:
+        return corepb.ProxyChoice(url=lossy(r.url), resolve_locally=r.resolve_locally,
+                                  headers=[corepb.Header(name=lossy(k), value=lossy(v)) for k, v in r.headers.items()])
+    if transport.configured:
+        return corepb.ProxyChoice(direct=True)
+    return corepb.ProxyChoice(environment=[corepb.Header(name=k, value=lossy(v))
+                                           for k, v in transport.rust_environment.items()])
+
 #: How long a closed stream has to flush what was written before it is aborted.
 LINGER_S = 2.0
 #: The most buffers one file write takes.
@@ -353,7 +369,6 @@ class Streams:
         if kind == "proxy_query":
             q = e.proxy_query
             r = self._transport.proxy_for(q.url)
-            # (The environment's bytes that aren't UTF-8 are lone surrogates here: lossy.)
             self._deliver(corepb.Input(proxy_answer=corepb.ProxyAnswer(
                 id=q.id, proxy=lossy(r.url) if r else "",
                 headers=[corepb.Header(name=lossy(k), value=lossy(v))

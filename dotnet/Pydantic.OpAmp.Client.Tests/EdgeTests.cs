@@ -102,7 +102,8 @@ public class EdgeTests
 
     // Each was cast to the unsigned value the core takes: -1 ms (Timeout.InfiniteTimeSpan) became
     // 2^64 - 1, a negative heartbeat interval none for half a billion years, a negative
-    // MaxReceiveBytes no limit at all. Python's client refuses them (protobuf's range check).
+    // MaxReceiveBytes no limit at all. The core refuses them now, naming the field and the number
+    // meant, as in every SDK.
     public static TheoryData<OpAmpMode, string> Negatives()
     {
         var data = new TheoryData<OpAmpMode, string>();
@@ -127,15 +128,26 @@ public class EdgeTests
         {
             "HeartbeatInterval" => o with { HeartbeatInterval = TimeSpan.FromSeconds(-1) },
             "RequestTimeout" => o with { RequestTimeout = Timeout.InfiniteTimeSpan },
-            "ConnectTimeout" => o with { ConnectTimeout = TimeSpan.FromTicks(-1) },
+            "ConnectTimeout" => o with { ConnectTimeout = TimeSpan.FromMilliseconds(-1) },
             "StopTimeout" => o with { StopTimeout = Timeout.InfiniteTimeSpan },
             "VerifyTimeout" => o with { VerifyTimeout = TimeSpan.FromSeconds(-5) },
             "DownloadTimeout" => o with { DownloadTimeout = TimeSpan.MinValue },
             "MaxSendBytes" => o with { MaxSendBytes = -1 },
             _ => o with { MaxReceiveBytes = long.MinValue },
         };
-        var e = Assert.Throws<ArgumentOutOfRangeException>(() => OpAmpClient.Start(o, new OpAmpStatus()));
-        Assert.Equal(name, e.ParamName);
+        var e = Assert.Throws<CoreException>(() => OpAmpClient.Start(o, new OpAmpStatus()));
+        var (field, meant) = name switch
+        {
+            "HeartbeatInterval" => ("heartbeat_interval_ms", "-1000"),
+            "RequestTimeout" => ("request_timeout_ms", "-1"),
+            "ConnectTimeout" => ("connect_timeout_ms", "-1"),
+            "StopTimeout" => ("stop_timeout_ms", "-1"),
+            "VerifyTimeout" => ("verify_timeout_ms", "-5000"),
+            "DownloadTimeout" => ("download_timeout_ms", "-922337203685477"),
+            "MaxSendBytes" => ("max_send_bytes", "-1"),
+            _ => ("max_receive_bytes", "-9223372036854775808"),
+        };
+        Assert.Contains($"{field} is {meant}: negative", e.Message);
         await Task.Delay(100);
         Assert.Equal(0, server.Connections); // nothing started
     }

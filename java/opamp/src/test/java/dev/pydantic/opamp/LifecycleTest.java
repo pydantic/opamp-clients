@@ -87,19 +87,37 @@ class LifecycleTest {
     }
   }
 
-  // A negative duration is none: the default, as the Go and Node.js clients take it. It reached
-  // the core as an unsigned number, some 584 million years: a negative stop timeout (or request
-  // timeout) with a server that doesn't answer, and stop never returned. A duration past a long's
-  // milliseconds is the longest there is, not an ArithmeticException from start.
+  // A negative duration is refused at start by the core, naming the field and the number meant, as
+  // in every SDK. (It reached the core as an unsigned number once, some 584 million years: a stop
+  // that never returned; then it was taken as the default here, while other SDKs threw.) Less
+  // than a millisecond is 0, the default. A duration past a long's milliseconds is the longest
+  // there is, not an ArithmeticException from start.
   @Test
-  void aNegativeDurationIsTheDefault() throws Exception {
-    assertEquals(0, OpampClient.ms(Duration.ofMillis(-1)));
-    assertEquals(0, OpampClient.ms(Duration.ofSeconds(-30)));
+  void aNegativeDurationIsRefused() throws Exception {
+    assertEquals(0, OpampClient.ms(Duration.ofNanos(-500_000)));
+    assertEquals(-30_000, OpampClient.ms(Duration.ofSeconds(-30)));
     assertEquals(1500, OpampClient.ms(Duration.ofMillis(1500)));
     assertEquals(Long.MAX_VALUE, OpampClient.ms(Duration.ofSeconds(Long.MAX_VALUE)));
+    assertEquals(Long.MIN_VALUE, OpampClient.ms(Duration.ofSeconds(Long.MIN_VALUE)));
+    String url = "http://127.0.0.1:9/v1/opamp";
+    for (var c : java.util.Map.of(
+        "stop_timeout_ms is -5000: negative", OpampClient.Config.builder(url).stopTimeout(Duration.ofSeconds(-5)),
+        "request_timeout_ms is -1: negative", OpampClient.Config.builder(url).requestTimeout(Duration.ofMillis(-1)),
+        "heartbeat_interval_ms is -30000: negative",
+        OpampClient.Config.builder(url).heartbeatInterval(Duration.ofSeconds(-30))).entrySet()) {
+      RuntimeException e = assertThrows(RuntimeException.class,
+          () -> OpampClient.start(c.getValue().build(), OpampClient.Status.of(null), n -> {}));
+      assertTrue(e.getMessage().contains(c.getKey()), e.getMessage());
+    }
+  }
+
+  // All of stop takes the stop timeout the core goes by: its start reports it, the default (5 s)
+  // too. A server that never answers holds the request until then.
+  @Test
+  void stopTakesTheCoresDefaultStopTimeout() throws Exception {
     try (Raw server = new Raw(Raw::hold)) {
       OpampClient client = OpampClient.start(
-          OpampClient.Config.builder(server.url("http") + "/v1/opamp").stopTimeout(Duration.ofMillis(-1)).build(),
+          OpampClient.Config.builder(server.url("http") + "/v1/opamp").build(),
           OpampClient.Status.of(null), n -> {});
       server.held();
       long t0 = System.nanoTime();

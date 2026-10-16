@@ -16,16 +16,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/pydantic/opamp-clients/go/opamp/internal/core"
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
 
 // mustCross fails unless in can be handed to the core (proto.Marshal checks every string is UTF-8).
-func mustCross(t *testing.T, what string, in *corepb.Input) {
+func mustCross(t *testing.T, what string, in proto.Message) {
 	t.Helper()
 	if _, err := proto.Marshal(in); err != nil {
 		t.Errorf("%s can't reach the core: %v (%v)", what, err, in)
@@ -95,9 +97,10 @@ func TestWhatTheClientHandsTheCoreIsUTF8(t *testing.T) {
 		}
 		return "", false
 	}
-	mustCross(t, "the environment's proxy", newRustProxies(Proxy{}, env).answer(1, "https://server/"))
-	mustCross(t, "the configured proxy", newRustProxies(Proxy{URL: "http://u:p\xe9@proxy:3128",
-		ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil).answer(1, "https://server/"))
+	mustCross(t, "the environment's proxy", newRustProxies(Proxy{}, env).choice)
+	configured := newRustProxies(Proxy{URL: "http://u:p\xe9@proxy:3128", ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil)
+	mustCross(t, "the configured proxy", configured.choice)
+	mustCross(t, "the configured proxy, asked", configured.answer(1))
 
 	// A download's file that can't be written, under a directory whose name isn't UTF-8 (Rust mode).
 	r := newStreamRig(t, nil, &slowFS{})
@@ -133,18 +136,52 @@ func TestNotificationValuesSaturate(t *testing.T) {
 	}
 }
 
-// A negative duration in Config is no duration: the core's default, as 0 is (the Node.js client
-// clamps the same way). It used to reach the core as some 584 million years.
-func TestANegativeDurationIsTheDefault(t *testing.T) {
-	cc, err := coreConfig(Config{HeartbeatInterval: -time.Second, RequestTimeout: -1, ConnectTimeout: -time.Hour,
-		StopTimeout: -time.Minute, VerifyTimeout: -time.Second, DownloadTimeout: math.MinInt64})
-	if err != nil {
-		t.Fatal(err)
+// A negative duration in Config is refused by the core at Start, with the field and the number
+// meant, as in every SDK. (It once reached the core as some 584 million years; then it was
+// clamped to the default here, while other SDKs threw.) Less than a millisecond is 0: the default.
+func TestANegativeDurationIsRefused(t *testing.T) {
+	for _, c := range []struct {
+		cfg   Config
+		field string
+	}{
+		{Config{HeartbeatInterval: -time.Second}, "heartbeat_interval_ms is -1000: negative"},
+		{Config{RequestTimeout: -time.Second}, "request_timeout_ms is -1000: negative"},
+		{Config{ConnectTimeout: -time.Hour}, "connect_timeout_ms is -3600000: negative"},
+		{Config{StopTimeout: -time.Minute}, "stop_timeout_ms is -60000: negative"},
+		{Config{VerifyTimeout: -time.Second}, "verify_timeout_ms is -1000: negative"},
+		{Config{DownloadTimeout: math.MinInt64}, "download_timeout_ms is -9223372036854: negative"},
+	} {
+		c.cfg.Endpoint = "http://127.0.0.1:1/v1/opamp"
+		cl, err := Start(context.Background(), c.cfg, Status{}, nil)
+		if err == nil {
+			_ = cl.Stop(context.Background())
+			t.Fatalf("%s: started", c.field)
+		}
+		if !strings.Contains(err.Error(), c.field) {
+			t.Errorf("got %v, want %q", err, c.field)
+		}
 	}
-	for name, ms := range map[string]uint64{"heartbeat": cc.HeartbeatIntervalMs, "request": cc.RequestTimeoutMs,
-		"connect": cc.ConnectTimeoutMs, "stop": cc.StopTimeoutMs, "verify": cc.VerifyTimeoutMs, "download": cc.DownloadTimeoutMs} {
-		if ms != 0 {
-			t.Errorf("%s: %d ms", name, ms)
+	cc, err := coreConfig(Config{RequestTimeout: -1})
+	if err != nil || cc.RequestTimeoutMs != 0 {
+		t.Fatalf("%v, %d ms", err, cc.RequestTimeoutMs)
+	}
+}
+
+// Stop is bounded by the stop timeout the core goes by (Start reads it from init's limits), its
+// default included: no copy of the default here.
+func TestInitReportsTheStopTimeoutStopIsBoundedBy(t *testing.T) {
+	for given, want := range map[time.Duration]uint64{0: 5000, 1500 * time.Millisecond: 1500} {
+		cc, err := coreConfig(Config{Endpoint: "http://x", StopTimeout: given})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, out, err := core.New(context.Background(), cc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Close(context.Background())
+		if got := out.GetLimits().GetStopTimeoutMs(); got != want {
+			t.Errorf("stop timeout %v: init says %d ms, want %d", given, got, want)
 		}
 	}
 }

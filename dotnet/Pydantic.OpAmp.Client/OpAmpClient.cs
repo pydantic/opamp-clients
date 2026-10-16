@@ -405,7 +405,6 @@ public sealed class OpAmpClient
 
     private OpAmpClient(OpAmpClientOptions options, Action<OpAmpNotification>? notify, Seams? seams)
     {
-        CheckRanges(options);
         this.time = options.TimeProvider ?? TimeProvider.System;
         this.started0 = this.time.GetTimestamp();
         this.stepped = seams?.Stepped;
@@ -439,25 +438,28 @@ public sealed class OpAmpClient
             Entropy = ByteString.CopyFrom(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
             UnixMs = (ulong)this.time.GetUtcNow().ToUnixTimeMilliseconds(),
             Capabilities = options.Capabilities,
-            HeartbeatIntervalMs = (ulong)options.HeartbeatInterval.TotalMilliseconds,
-            Seed = (ulong)this.time.GetUtcNow().UtcTicks,
+            HeartbeatIntervalMs = Ms(options.HeartbeatInterval),
+            // No Seed: the core makes the backoff's jitter seed from the entropy, so two clients
+            // started in the same tick don't retry in step.
             // As the application wrote it: Uri.ToString() would unescape it (%41 sent as A, %20 as
             // a space the core refuses), so the server would get another target than from every
             // other client (tests/shell-tables/urls.json).
             Endpoint = options.Endpoint.OriginalString,
-            RequestTimeoutMs = (ulong)options.RequestTimeout.TotalMilliseconds,
-            ConnectTimeoutMs = (ulong)options.ConnectTimeout.TotalMilliseconds,
-            StopTimeoutMs = (ulong)options.StopTimeout.TotalMilliseconds,
-            MaxSendBytes = (ulong)options.MaxSendBytes,
-            MaxReceiveBytes = (ulong)options.MaxReceiveBytes,
+            RequestTimeoutMs = Ms(options.RequestTimeout),
+            ConnectTimeoutMs = Ms(options.ConnectTimeout),
+            StopTimeoutMs = Ms(options.StopTimeout),
+            MaxSendBytes = Bytes(options.MaxSendBytes),
+            MaxReceiveBytes = Bytes(options.MaxReceiveBytes),
             AcceptConnectionSettings = options.AcceptConnectionSettings,
-            VerifyTimeoutMs = (ulong)options.VerifyTimeout.TotalMilliseconds,
+            VerifyTimeoutMs = Ms(options.VerifyTimeout),
             AcceptPackages = options.AcceptPackages,
             RequestInstanceUid = options.RequestInstanceUid,
             MaxPackageBytes = options.MaxPackageBytes,
-            DownloadTimeoutMs = (ulong)options.DownloadTimeout.TotalMilliseconds,
+            DownloadTimeoutMs = Ms(options.DownloadTimeout),
             Streams = rust,
             SpliceDownloads = rust && options.RustSplice,
+            // Rust mode: the core picks each connection's proxy from this.
+            Proxy = rust ? RustProxyChoice(options, seams?.Environment ?? Environment.GetEnvironmentVariable) : null,
         };
         if (options.StateFile is { } stateFile)
         {
@@ -465,13 +467,18 @@ public sealed class OpAmpClient
             // A client stopped before on the same file may have left a save writing.
             Client.StateFile.Settled(stateFile);
             config.SavedState = ByteString.CopyFrom(Client.StateFile.Load(stateFile));
-            // Files downloaded before a restart: the core downloads again what it still needs.
-            Executor.DeleteDownloads(stateFile, files);
         }
 
         config.Headers.AddRange(options.Headers.Select(h => new Header { Name = h.Key, Value = h.Value }));
         Func<string, string?>? getenv = seams?.Tap is { } tap ? name => name == CoreTap.Variable ? tap : null : null;
         this.core = new CoreInstance(config, getenv, seams?.Core);
+        if (options.StateFile is { } downloadsOf)
+        {
+            // Files downloaded before a restart: the core downloads again what it still needs.
+            // (Once the core has taken the config: not for one it refuses.)
+            Executor.DeleteDownloads(downloadsOf, files);
+        }
+
         if (this.core.Tap is { } t && options.StateFile is { } state)
         {
             // Tapped: the file operations of its saves and downloads are recorded too.
@@ -483,12 +490,12 @@ public sealed class OpAmpClient
         this.executor = new Executor(this.transport, this.Enqueue, options.StateFile, this.time, files);
         if (rust)
         {
-            var env = seams?.Environment ?? Environment.GetEnvironmentVariable;
             this.streams = new Streams(
-                this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), url => ProxyAnswerFor(options, env, url), seams?.Net, this.time);
+                this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), _ => ProxyAnswerFor(options), seams?.Net, this.time);
         }
 
-        this.stopTimeout = options.StopTimeout > TimeSpan.Zero ? options.StopTimeout : TimeSpan.FromSeconds(5);
+        // All of stop takes the core's stop timeout, as given or by default: its start reports it.
+        this.stopTimeout = TimeSpan.FromMilliseconds(this.core.Initial.Limits?.StopTimeoutMs ?? 0);
     }
 
     /// <summary>
@@ -641,38 +648,14 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
-    /// Times and sizes the core takes as unsigned: a negative one is an error, at start. Cast as it
-    /// was, it became one of the largest values there are (-1 ms, as
-    /// <see cref="Timeout.InfiniteTimeSpan"/> is, 2^64 - 1): a negative heartbeat interval was none
-    /// for half a billion years, and a negative MaxReceiveBytes took a response of any size.
+    /// A time for the core, in whole milliseconds (toward zero). A negative one reaches it as its
+    /// two's complement, which the core refuses at start, naming the field and the number meant, as
+    /// in every SDK (-1 ms, as <see cref="Timeout.InfiniteTimeSpan"/> is, included).
     /// </summary>
-    private static void CheckRanges(OpAmpClientOptions o)
-    {
-        static void Span(TimeSpan value, string name)
-        {
-            if (value < TimeSpan.Zero)
-            {
-                throw new ArgumentOutOfRangeException(name, value, $"{name} can't be negative (zero is the default)");
-            }
-        }
+    private static ulong Ms(TimeSpan t) => unchecked((ulong)(long)t.TotalMilliseconds);
 
-        static void Size(long value, string name)
-        {
-            if (value < 0)
-            {
-                throw new ArgumentOutOfRangeException(name, value, $"{name} can't be negative (zero is the default)");
-            }
-        }
-
-        Span(o.HeartbeatInterval, nameof(o.HeartbeatInterval));
-        Span(o.RequestTimeout, nameof(o.RequestTimeout));
-        Span(o.ConnectTimeout, nameof(o.ConnectTimeout));
-        Span(o.StopTimeout, nameof(o.StopTimeout));
-        Span(o.VerifyTimeout, nameof(o.VerifyTimeout));
-        Span(o.DownloadTimeout, nameof(o.DownloadTimeout));
-        Size(o.MaxSendBytes, nameof(o.MaxSendBytes));
-        Size(o.MaxReceiveBytes, nameof(o.MaxReceiveBytes));
-    }
+    /// <summary>A size for the core: a negative one is refused at start, as a negative time is.</summary>
+    private static ulong Bytes(long n) => unchecked((ulong)n);
 
     /// <summary>Rust mode: what can't apply there is an error, at start.</summary>
     private static OpAmpClientOptions CheckRust(OpAmpClientOptions o)
@@ -705,26 +688,52 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
-    /// Rust mode's answer to the core's proxy question for <paramref name="url"/>: none if
-    /// DirectConnection; the configured proxy (with its credentials), if any; else the one the
-    /// environment names by the shared rule (<see cref="RustProxy"/>).
+    /// The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+    /// rule"). The core applies the rule; the client only reads them, once.
     /// </summary>
-    internal static ProxyAnswer ProxyAnswerFor(OpAmpClientOptions o, Func<string, string?> env, string url)
+    internal static readonly string[] RustProxyVariables =
+    [
+        "REQUEST_METHOD", "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy",
+    ];
+
+    /// <summary>
+    /// What Rust mode tells the core about proxies, once (Config.proxy): none if DirectConnection;
+    /// the configured proxy (with its credentials), if any; else the environment's variables, from
+    /// which the core picks each connection's proxy by the shared rule.
+    /// </summary>
+    internal static ProxyChoice RustProxyChoice(OpAmpClientOptions o, Func<string, string?> env)
     {
         if (o.DirectConnection)
         {
-            return new ProxyAnswer();
+            return new ProxyChoice { Direct = true };
         }
 
         if (o.Proxy is { } p)
         {
-            return new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver };
+            return new ProxyChoice { Url = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver };
         }
 
-        return RustProxy.For(env, url) is { } named
-            ? new ProxyAnswer { Proxy = named, ResolveLocally = o.ProxyUseLocalResolver && RustProxy.IsSocks5(named) }
-            : new ProxyAnswer();
+        var choice = new ProxyChoice { ResolveLocally = o.ProxyUseLocalResolver };
+        foreach (var name in RustProxyVariables)
+        {
+            if (env(name) is { } value)
+            {
+                choice.Environment.Add(new Header { Name = name, Value = value });
+            }
+        }
+
+        return choice;
     }
+
+    /// <summary>
+    /// Rust mode's answer to the core's proxy question, which the core asks only when it wasn't
+    /// told (<see cref="RustProxyChoice"/>): the configured proxy (with its credentials), or none.
+    /// The environment's rule is the core's.
+    /// </summary>
+    internal static ProxyAnswer ProxyAnswerFor(OpAmpClientOptions o) =>
+        !o.DirectConnection && o.Proxy is { } p
+            ? new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver }
+            : new ProxyAnswer();
 
     private OpAmpNotification? FromCore(Notification n) => n.KindCase switch
     {

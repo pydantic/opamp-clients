@@ -248,8 +248,9 @@ class ShellTablesTest {
   // Proxies (Rust mode: platform mode takes none from the environment).
 
   /**
-   * Rust mode's proxy from the environment, as the client answers the core's proxy_query: exactly
-   * proxy.json, no known differences.
+   * Rust mode's proxy from the environment: the client hands the core the variables
+   * ({@code Config.proxy}) and the core picks by the shared rule. Each case through this client's
+   * reading of the environment and the core it ships: exactly proxy.json, no known differences.
    */
   // covers: RULE-PROXY-02
   @Test
@@ -263,8 +264,7 @@ class ShellTablesTest {
       map(c.get("env")).forEach((k, v) -> env.put(k, (String) v));
       String url = (String) c.get("url");
       OpampClient.Config config = OpampClient.Config.builder(url).mode(OpampClient.Mode.RUST).environment(env).build();
-      String answer = OpampClient.proxies(config).apply(url).getProxy();
-      String got = answer.isEmpty() ? null : route(answer);
+      String got = coreRoute(OpampClient.proxyChoice(config), url);
       if (!java.util.Objects.equals(got, c.get("proxy"))) {
         wrong.put((String) c.get("id"), got + ", the table says " + c.get("proxy") + " (" + c.get("why") + ")");
       }
@@ -272,12 +272,75 @@ class ShellTablesTest {
     assertEquals(Map.of(), wrong, "Rust mode's proxy otherwise than proxy.json");
   }
 
-  /** A proxy URL as a route: scheme://host:port, credentials left out (no scheme: http). */
-  private static String route(String proxy) {
-    URI u = URI.create(proxy.contains("://") ? proxy : "http://" + proxy);
-    String scheme = u.getScheme().toLowerCase(Locale.ROOT);
-    int port = u.getPort() >= 0 ? u.getPort() : scheme.equals("https") ? 443 : scheme.startsWith("socks") ? 1080 : 80;
-    return scheme + "://" + u.getHost() + ":" + port;
+  /**
+   * What Rust mode tells the core: the configured proxy and no variables; none for a direct
+   * connection; otherwise each variable the rule reads that is set, even empty, by its own name. A
+   * proxy_query (only a core that wasn't told asks) hears the configured proxy or none.
+   */
+  // covers: RULE-PROXY-02
+  @Test
+  void rustModeTellsTheCoreItsProxy() throws Exception {
+    Map<String, String> env = Map.of("HTTP_PROXY", "http://env:1", "no_proxy", "", "REQUEST_METHOD", "GET", "OTHER", "x");
+    OpampClient.Config configured = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env)
+        .proxy("socks5://u:p%40ss@configured:1080").proxyResolveLocally(true).build();
+    assertEquals(CoreProto.ProxyChoice.newBuilder().setUrl("socks5://u:p%40ss@configured:1080").setResolveLocally(true).build(),
+        OpampClient.proxyChoice(configured));
+    assertEquals("socks5://u:p%40ss@configured:1080", OpampClient.proxies(configured).apply("http://x/").getProxy());
+    OpampClient.Config direct = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env)
+        .directConnection().build();
+    assertEquals(CoreProto.ProxyChoice.newBuilder().setDirect(true).build(), OpampClient.proxyChoice(direct));
+    OpampClient.Config fromEnv = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env).build();
+    CoreProto.ProxyChoice choice = OpampClient.proxyChoice(fromEnv);
+    List<String> got = new ArrayList<>();
+    choice.getEnvironmentList().forEach(h -> got.add(h.getName() + "=" + h.getValue()));
+    assertEquals(List.of("REQUEST_METHOD=GET", "HTTP_PROXY=http://env:1", "no_proxy="), got);
+    assertEquals("", OpampClient.proxies(fromEnv).apply("http://x/").getProxy());
+    // The core reads them by the rule: CGI, so none.
+    assertEquals(null, coreRoute(choice, "http://example.com/"));
+  }
+
+  /**
+   * Where Rust mode's core connects first for {@code url} when told {@code choice}: the proxy as
+   * the table writes a route (scheme://host:port, credentials left out), or null for directly. The
+   * core picks it itself: it asks no proxy_query.
+   */
+  private static String coreRoute(CoreProto.ProxyChoice choice, String url) {
+    Core core = new Core(CoreProto.Config.newBuilder().setInstanceUid(ByteString.copyFrom(new byte[16])).setEndpoint(url)
+        .setStreams(true).setEntropy(ByteString.copyFrom(new byte[32])).setProxy(choice).build());
+    try {
+      CoreProto.Output out = core.step(1, 1, CoreProto.Input.newBuilder().setStart(CoreProto.Empty.getDefaultInstance()).build());
+      CoreProto.StreamOpen open = null;
+      for (CoreProto.Effect e : out.getEffectsList()) {
+        assertTrue(!e.hasProxyQuery(), url + ": the core asked which proxy");
+        if (e.hasStreamOpen()) {
+          open = e.getStreamOpen();
+        }
+      }
+      assertTrue(open != null, url + ": no stream opened");
+      URI u = URI.create(url);
+      String scheme = u.getScheme().toLowerCase(Locale.ROOT);
+      int port = u.getPort() >= 0 ? u.getPort() : scheme.equals("https") || scheme.equals("wss") ? 443 : 80;
+      String host = u.getHost().startsWith("[") ? u.getHost().substring(1, u.getHost().length() - 1) : u.getHost();
+      if (open.getHost().equalsIgnoreCase(host) && open.getPort() == port) {
+        return null;
+      }
+      // Which kind of proxy: SOCKS5 greets with version 5, an https:// one is TLS first.
+      CoreProto.Output next = core.step(2, 2, CoreProto.Input.newBuilder()
+          .setStreamOpened(CoreProto.Id.newBuilder().setId(open.getId())).build());
+      String kind = "http";
+      for (CoreProto.Effect e : next.getEffectsList()) {
+        if (e.hasStreamWrite() && !e.getStreamWrite().getData().isEmpty() && e.getStreamWrite().getData().byteAt(0) == 5) {
+          kind = "socks5";
+        }
+        if (e.hasStreamStartTls()) {
+          kind = "https";
+        }
+      }
+      String at = open.getHost().contains(":") ? "[" + open.getHost() + "]" : open.getHost();
+      return kind + "://" + at + ":" + open.getPort();
+    } finally {
+      core.close();
+    }
   }
 
   // ---------------------------------------------------------------------------------------------

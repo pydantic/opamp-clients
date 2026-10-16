@@ -532,14 +532,14 @@ public final class OpampClient {
     }
     java.util.function.Function<String, javax.net.ssl.SSLEngine> engines = rust ? Streams.engines(config.tls) : null;
     // The transport is the endpoint's, as the core reads it: this client carries out whichever
-    // effects come. The core keeps every effect's time (this client carries out its cancels) and
-    // decides what a download's status means.
+    // effects come. The core keeps every effect's time (this client carries out its cancels),
+    // decides what a download's status means, and makes the backoff's jitter seed from the
+    // entropy (seed left 0: two clients started in the same tick don't retry in step).
     CoreProto.Config.Builder c = CoreProto.Config.newBuilder()
         .setEntropy(ByteString.copyFrom(entropy()))
         .setUnixMs(System.currentTimeMillis())
         .setCapabilities(config.capabilities)
         .setHeartbeatIntervalMs(ms(config.heartbeatInterval))
-        .setSeed(System.nanoTime())
         .setEndpoint(config.endpoint)
         .setRequestTimeoutMs(ms(config.requestTimeout))
         .setMaxSendBytes(config.maxSendBytes)
@@ -555,6 +555,10 @@ public final class OpampClient {
         // Rust mode: the core speaks HTTP and WebSocket over the streams this client opens.
         .setStreams(rust)
         .setSpliceDownloads(rust && config.rustSplice);
+    if (rust) {
+      // The core picks each connection's proxy from this.
+      c.setProxy(proxyChoice(config));
+    }
     if (config.stateFile != null) {
       // A save or a download's file work of a client stopped before on this file may still be
       // finishing: it lands before this client reads the file, not after.
@@ -564,10 +568,11 @@ public final class OpampClient {
     if (config.instanceUid != null) {
       c.setInstanceUid(ByteString.copyFrom(config.instanceUid));
     }
-    this.stopTimeoutMs = ms(config.stopTimeout) == 0 ? 5000 : ms(config.stopTimeout);
     config.headers.forEach((k, v) -> c.addHeaders(CoreProto.Header.newBuilder().setName(k).setValue(v)));
     this.core = Core.of(coreModule, c.build(), tapPath);
     this.instanceUid = core.initOutput().getInstanceUid().toByteArray();
+    // All of stop takes the core's stop timeout, as given or by default: its start reports it.
+    this.stopTimeoutMs = core.initOutput().getLimits().getStopTimeoutMs();
     // The file operations of saves and downloads, journaled into the core tap if there is one.
     Disk files = disk.apply(Disk.REAL);
     if (config.stateFile != null) {
@@ -657,39 +662,53 @@ public final class OpampClient {
   }
 
   /**
-   * Rust mode's answer to the core's proxy_query: the proxy configured, as given; none for a
-   * direct connection; otherwise the environment's, by Rust mode's rule ({@link RustProxy}).
+   * What Rust mode tells the core about proxies, once ({@code Config.proxy}): the proxy
+   * configured, as given; none for a direct connection; otherwise the environment's variables,
+   * from which the core picks by Rust mode's rule ({@link RustProxy}).
+   */
+  static CoreProto.ProxyChoice proxyChoice(Config config) {
+    CoreProto.ProxyChoice.Builder c = CoreProto.ProxyChoice.newBuilder();
+    if (config.rustProxy != null) {
+      return c.setUrl(config.rustProxy).setResolveLocally(config.proxyResolveLocally).build();
+    }
+    if (config.direct) {
+      return c.setDirect(true).build();
+    }
+    Map<String, String> env = config.environment != null ? config.environment : System.getenv();
+    for (String name : RustProxy.VARIABLES) {
+      String v = env.get(name);
+      if (v != null) {
+        c.addEnvironment(CoreProto.Header.newBuilder().setName(name).setValue(v));
+      }
+    }
+    return c.build();
+  }
+
+  /**
+   * Rust mode's answer to the core's proxy_query, which the core asks only when it wasn't told
+   * ({@link #proxyChoice}): the proxy configured, or none (the environment's rule is the core's).
    */
   static java.util.function.Function<String, CoreProto.ProxyAnswer.Builder> proxies(Config config) {
-    Map<String, String> env = config.environment != null ? config.environment : System.getenv();
     return url -> {
       CoreProto.ProxyAnswer.Builder a = CoreProto.ProxyAnswer.newBuilder();
       if (config.rustProxy != null) {
         a.setProxy(config.rustProxy).setResolveLocally(config.proxyResolveLocally);
-      } else if (!config.direct) {
-        String p = RustProxy.fromEnvironment(env, url);
-        if (p != null) {
-          a.setProxy(p);
-        }
       }
       return a;
     };
   }
 
   /**
-   * {@code d} in whole milliseconds for the core, where 0 is its default: a negative duration is
-   * none, the default, as the Go and Node.js clients take it (as an unsigned number the core would
-   * read it as some 584 million years: a stop that never ends), and one past a {@code long}'s
-   * milliseconds the longest there is.
+   * {@code d} in whole milliseconds for the core (toward zero), where 0 is its default. A negative
+   * one reaches the core as its two's complement, which the core refuses at start, naming the field
+   * and the number meant, as in every SDK. One past a {@code long}'s milliseconds is the longest
+   * there is (or, negative, the most negative).
    */
   static long ms(Duration d) {
-    if (d.isNegative()) {
-      return 0;
-    }
     try {
-      return d.toMillis();
+      return d.isNegative() ? -d.negated().toMillis() : d.toMillis();
     } catch (ArithmeticException tooLong) {
-      return Long.MAX_VALUE;
+      return d.isNegative() ? Long.MIN_VALUE : Long.MAX_VALUE;
     }
   }
 

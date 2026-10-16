@@ -12,7 +12,7 @@ import threading
 import pytest
 from _servers import MODES, UID, OpampServer, wait_for
 
-from opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from opamp_client import Client, Config, CoreError, Notification, Status, opamp_pb2 as pb
 
 # Headers the core refuses in every mode, and why: it checks every header list it sends by the
 # rule an offered header meets (issue #218). aiohttp sent each as given: a name that isn't a token
@@ -261,3 +261,28 @@ def _run(coro) -> object:
         return asyncio.run(asyncio.wait_for(coro, 10))
     except BaseException as e:  # noqa: BLE001
         return e
+
+
+# A negative time or size is refused at start by the core, naming the field and the number meant,
+# as in every SDK (protobuf's range check refused it here before, in its own words).
+@pytest.mark.parametrize(("field", "value"), [("stop_timeout_ms", -5000), ("heartbeat_interval_ms", -1),
+                                              ("max_send_bytes", -1), ("download_timeout_ms", -(2 ** 63))])
+def test_a_negative_time_or_size_is_refused_at_start(field: str, value: int) -> None:
+    async def main() -> None:
+        config = Config(endpoint="http://127.0.0.1:9/v1/opamp", instance_uid=UID, **{field: value})
+        with pytest.raises(CoreError, match=f"{field} is {value}: negative"):
+            Client.start(config, Status())
+
+    asyncio.run(main())
+
+
+# All of stop takes the stop timeout the core goes by: its start reports it, the default too.
+@pytest.mark.parametrize(("given", "want"), [(0, 5.0), (1500, 1.5)])
+def test_stop_takes_the_cores_stop_timeout(given: int, want: float) -> None:
+    async def main() -> None:
+        client = Client.start(Config(endpoint="http://127.0.0.1:9/v1/opamp", instance_uid=UID,
+                                     stop_timeout_ms=given), Status())
+        assert client._stop_timeout == want
+        await asyncio.wait_for(client.stop(), 10)
+
+    asyncio.run(main())
