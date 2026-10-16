@@ -57,7 +57,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
     MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, check_truth, ended, main, pings, run, statuses,
-    stop_container, stop_group, target,
+    stop_container, stop_group, target, opamp_url,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -146,11 +146,10 @@ HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-    base = f"http://{HOST}:{port}"
     telemetry = f"http://{HOST}:{telemetry_port}"
     env = {
         "OTEL_SERVICE_NAME": "checkout",
-        "OTEL_OPAMP_ENDPOINT": f"{base}/v1/opamp",
+        "OTEL_OPAMP_ENDPOINT": opamp_url(port, HOST),
         "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20example",
         "OTEL_OPAMP_STATE_DIR": str(state) if LOCAL else "/state",
         "OTEL_OPAMP_HEARTBEAT_INTERVAL": "1s",

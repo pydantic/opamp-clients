@@ -4,6 +4,7 @@
 
 # the core, fetched (scripts/fetch_core.py): the cache and what it puts in place
 .opamp-core/
+.opamp-core-candidate/
 target/
 dist/
 /spec/

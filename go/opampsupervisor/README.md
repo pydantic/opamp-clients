@@ -2,7 +2,7 @@
 
 A downstream fork of upstream's
 [`opampsupervisor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/cmd/opampsupervisor)
-at `cmd/opampsupervisor/v0.162.0`, with its OpAMP client replaced: upstream's runs on opamp-go;
+at `cmd/opampsupervisor/v0.163.0`, with its OpAMP client replaced: upstream's runs on opamp-go;
 this one runs on [`go/opamp`](../opamp), the shared core in Go mode (net/http and
 gorilla/websocket, so the configured TLS settings and the environment's proxies apply as before).
 It supervises any vendor's collector, as upstream's does: the collector needs the `opamp`

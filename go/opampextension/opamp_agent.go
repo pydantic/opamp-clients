@@ -165,6 +165,10 @@ func (o *opampAgent) Start(_ context.Context, host component.Host) error {
 	if err != nil {
 		return err
 	}
+	authHeader, err := newAuthHeader(o.cfg.Server, host, o.logger)
+	if err != nil {
+		return err
+	}
 
 	if o.cfg.PPID != 0 {
 		go monitorPPID(o.lifetimeCtx, o.cfg.PPIDPollInterval, o.cfg.PPID, o.reportFunc)
@@ -200,6 +204,7 @@ func (o *opampAgent) Start(_ context.Context, host component.Host) error {
 		// environment's proxies and auth extensions apply as they do to its other clients.
 		Mode:                     opamp.ModeGo,
 		HTTPClient:               httpClient,
+		AuthHeader:               authHeader,
 		StateFile:                o.cfg.StateFile,
 		StateSealer:              sealer,
 		AcceptConnectionSettings: o.capabilities.AcceptsOpAMPConnectionSettings,

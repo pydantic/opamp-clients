@@ -5,7 +5,10 @@ package opampextension
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/extension/extensionauth"
 	"go.opentelemetry.io/collector/extension/extensiontest"
 	"go.uber.org/zap/zaptest"
@@ -58,9 +62,17 @@ func TestConfig_ValidateAdditions(t *testing.T) {
 			wantErr: "state_key requires state_file",
 		},
 		{
-			name:    "an auth extension over ws",
-			mutate:  func(c *Config) { c.Server.WS.Auth = auth },
-			wantErr: "an auth extension is supported over http only, not ws",
+			name:   "an auth extension over ws",
+			mutate: func(c *Config) { c.Server.WS.Auth = auth },
+		},
+		{
+			name: "accepting connection settings with an auth extension over ws",
+			mutate: func(c *Config) {
+				c.Server.WS.Auth = auth
+				c.StateFile = "/var/lib/otelcol/opamp.state"
+				c.Capabilities.AcceptsOpAMPConnectionSettings = true
+			},
+			wantErr: "accepts_opamp_connection_settings can't be used with an auth extension",
 		},
 		{
 			name:   "an auth extension over http",
@@ -141,6 +153,62 @@ func TestAuthExtensionOverHTTP(t *testing.T) {
 	for _, a := range auths {
 		assert.Equal(t, "Bearer from-auth", a)
 	}
+}
+
+// tokenAuth is an auth extension whose token the test renews.
+type tokenAuth struct {
+	component.StartFunc
+	component.ShutdownFunc
+	token *atomic.Value
+}
+
+func (a tokenAuth) RoundTripper(base http.RoundTripper) (http.RoundTripper, error) {
+	return roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		r = r.Clone(r.Context())
+		r.Header.Set("Authorization", "Bearer "+a.token.Load().(string))
+		return base.RoundTrip(r)
+	}), nil
+}
+
+// Over WebSocket the auth extension gives the headers of each upgrade: the first one carries its
+// token in place of the configured header, and an upgrade after the token is renewed carries the
+// new one.
+func TestAuthExtensionOverWebSocket(t *testing.T) {
+	ts := newTestServer(t)
+	id := component.MustNewID("testauth")
+	cfg := createDefaultConfig().(*Config)
+	cfg.Server = transports(ts)["ws"]
+	cfg.Server.WS.Headers = map[string]configopaque.String{"Authorization": "Bearer configured"}
+	cfg.Server.WS.Auth = id
+	require.NoError(t, cfg.Validate())
+
+	token := &atomic.Value{}
+	token.Store("first")
+	set := extensiontest.NewNopSettings(extensiontest.NopType)
+	set.Logger = zaptest.NewLogger(t)
+	o, err := newOpampAgent(cfg, set)
+	require.NoError(t, err)
+	host := &authHost{availableComponentsHost{t: t}, map[component.ID]component.Component{id: tokenAuth{token: token}}}
+	require.NoError(t, o.Start(t.Context(), host))
+	defer stopAgent(t, o)
+
+	ts.waitMsg("a first message", func(*protobufs.AgentToServer) bool { return true })
+	assert.Equal(t, []string{"Bearer first"}, ts.seenAuths())
+
+	// The client asks the extension again about every second: an upgrade after that carries the
+	// renewed token. Each round drops the connection and waits for the client to open another.
+	token.Store("renewed")
+	deadline := time.Now().Add(waitFor)
+	for round := 0; !slices.Contains(ts.seenAuths(), "Bearer renewed"); round++ {
+		require.True(t, time.Now().Before(deadline), "no upgrade with the renewed token: %v", ts.seenAuths())
+		ts.forget()
+		ts.dropNext()
+		// A health change sends a message on the open connection, and the server drops that
+		// connection. The client then opens a new one.
+		o.setHealth(&protobufs.ComponentHealth{Healthy: true, Status: fmt.Sprintf("round %d", round)})
+		ts.waitMsg("a message after the reconnection", func(*protobufs.AgentToServer) bool { return len(ts.auths) > 0 })
+	}
+	assert.NotContains(t, ts.seenAuths(), "Bearer configured", "the configured header is replaced")
 }
 
 // A configured auth extension that isn't there, or isn't an HTTP client's, stops the start.

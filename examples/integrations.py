@@ -97,6 +97,7 @@ saved settings), and no /changed.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import contextlib
 import functools
 import itertools
@@ -136,6 +137,31 @@ DEBUG = 10
 # AcceptsOpAMPConnectionSettings and ReportsConnectionSettingsStatus: what an agent declares for the
 # server to hand it a key of its own.
 TAKES_KEYS = 0x100 | 0x8000
+
+
+def websocket() -> bool:
+    """Whether the applications talk to the server over a WebSocket (OPAMP_EXAMPLES_TRANSPORT
+    `websocket`) or plain HTTP (`http`, the default)."""
+    transport = os.environ.get("OPAMP_EXAMPLES_TRANSPORT", "http")
+    if transport not in ("http", "websocket"):
+        sys.exit(f"OPAMP_EXAMPLES_TRANSPORT={transport}: http or websocket")
+    return transport == "websocket"
+
+
+def opamp_url(port: str, host: str = "127.0.0.1") -> str:
+    """The OpAMP endpoint an application is given for the server on `port`: plain HTTP, or a
+    WebSocket (websocket()). The checks are the same over either, and judge_transport() holds
+    every run, and every next start, to the one asked for."""
+    return f"{'ws' if websocket() else 'http'}://{host}:{port}/v1/opamp"
+
+
+def judge_transport(events: list[dict]) -> list[tuple[str, bool]]:
+    """Every message the server took came over the transport asked for (opamp_url())."""
+    want = "ws" if websocket() else "http"
+    a2s = [e for e in events if e["event"] == "a2s"]
+    came = sorted({e.get("transport") for e in a2s}, key=str)
+    return [(f"every message came over {'a WebSocket' if want == 'ws' else 'plain HTTP'} ({len(a2s)}, {came})",
+             bool(a2s) and came == [want])]
 
 
 def target(name: str) -> Path:
@@ -259,7 +285,12 @@ def server_binary(target_: Path) -> Path:
     """The server, built if this process hasn't yet, in `target_` (run() starts it from there)."""
     target_.mkdir(parents=True, exist_ok=True)
     binary = target_ / "server"
-    shutil.copy2(built_server(), binary)
+    # Copied aside, then renamed over it: a check running at once (main()'s --jobs) may be running
+    # the server there, and Linux refuses to write a file being run (ETXTBSY). The rename leaves
+    # that one running the file it started.
+    aside = target_ / f".server-{os.getpid()}"
+    shutil.copy2(built_server(), aside)
+    os.replace(aside, binary)
     return binary
 
 
@@ -850,6 +881,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
                   until=lambda events: len(statuses(events)) >= 5, settle=10)
         print(f"run 1: remote config statuses {[s for _, s, _ in statuses(one)]}")
         expect(judge_first(one, service, switch_at_once))
+        expect(judge_transport(one))
         expect(judge_inventory(one, instrumentation, switch_at_once, switches, versioned))
 
         # Until the application has made its requests with the agent connected, then long enough
@@ -859,6 +891,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
         print(f"run 2: {sum(e['event'] == 'a2s' for e in two)} messages, {len(pings(two))} application requests, "
               f"{len(spans(two))} span exports")
         expect(judge_second(one, two, switches))
+        expect(judge_transport(two))
     finally:
         # Files a container wrote as root may stay; the next check makes a directory of its own.
         shutil.rmtree(state, ignore_errors=True)
@@ -885,6 +918,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
         print(f"run 3: remote config statuses {[s for _, s, _ in statuses(three)]}, "
               f"{len(signal(three, 'metrics'))} metrics and {len(signal(three, 'logs'))} log exports")
         expect(judge_signals(three, service, switch_at_once))
+        expect(judge_transport(three))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]
@@ -894,6 +928,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
                    until=enough, settle=2 * MARGIN, env=SIGNALS)
         print(f"run 4: {sum(e['event'] == 'a2s' for e in four)} messages, {len(pings(four))} application requests")
         expect(judge_signals_restart(four))
+        expect(judge_transport(four))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -1033,7 +1068,7 @@ def check_truth(launch: Launch, target_: Path, setup: str, expected_aside: set[s
                      until=lambda ev: len(statuses(ev)) >= judged and len(pings(ev, statuses(ev)[-1][0])) > 8 * REQUESTS,
                      settle=2, env={**SIGNALS, **(env or {}), "EXAMPLE_SETUP": setup})
         print(f"truth ({setup}): remote config statuses {[s for _, s, _ in statuses(events)]}")
-        for what, cond in judge_truth(events, expected_aside, switch_at_once, service):
+        for what, cond in judge_truth(events, expected_aside, switch_at_once, service) + judge_transport(events):
             ok &= cond
             print(f"  {'ok  ' if cond else 'FAIL'} {what}")
     finally:
@@ -1099,7 +1134,9 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
               f"key {'confirmed' if promoted(six) else 'not confirmed'}; the next start: "
               f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
         expect(judge_right_key(six))
+        expect(judge_transport(six))
         expect(judge_own_key(again))
+        expect(judge_transport(again))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -1126,46 +1163,84 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
             st = statuses(events)
             return len(st) >= 5 and len(pings(events, st[-1][0])) > REQUESTS
 
-        seven = run(launch, app_settings_scenario(), state, "run7", seconds[0], listen, target_, until=done,
+        # (Its files are app7 and app8: an integration's own runs 7 to 9 write run7 to run9 in the same
+        # directory, and the two checks may run at once, main()'s --jobs.)
+        seven = run(launch, app_settings_scenario(), state, "app7", seconds[0], listen, target_, until=done,
                     settle=MARGIN, env=env)
         print(f"run 7: remote config statuses {[s for _, s, _ in statuses(seven)]}, "
               f"{len(requests(seven, '/feature'))} /feature and {len(requests(seven, '/changed'))} /changed requests")
         expect(judge_app_settings(seven))
+        expect(judge_transport(seven))
 
         def enough(events: list[dict]) -> bool:
             a2s = [e for e in events if e["event"] == "a2s"]
             return bool(a2s) and len(pings(events, a2s[0]["t"])) > 2 * REQUESTS
 
-        eight = run(launch, {"server": {}}, state, "run8", seconds[1], listen, target_, until=enough,
+        eight = run(launch, {"server": {}}, state, "app8", seconds[1], listen, target_, until=enough,
                     settle=MARGIN, env=env)
         print(f"run 8: {len(pings(eight))} application requests, {len(requests(eight, '/feature'))} /feature")
         expect(judge_app_settings_restart(eight))
+        expect(judge_transport(eight))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
 
 
 def main(checks: dict[str, Callable[[], bool]], prepare: Callable[[], object] = lambda: None,
-         argv: list[str] | None = None, options: tuple[str, ...] = ()) -> int:
+         argv: list[str] | None = None, options: tuple[str, ...] = (), script: str | None = None) -> int:
     """An integration's try.py: run the checks it names (`checks`, each independent of the others:
     its own server, state directory and logs), in order, every one by default; the exit status.
 
-        try.py                 # every check, after prepare() (the integration's build)
-        try.py signals setup   # those alone, as one of CI's jobs runs its share
-        try.py --list          # their names
+        try.py                    # every check, after prepare() (the integration's build)
+        try.py signals setup      # those alone, as one of CI's jobs runs its share
+        try.py --jobs 4 signals   # up to four at once, each in a process of its own, after one prepare()
+        try.py --list             # their names
 
-    `options`: the flags of the try.py's own (`--local`), left for it to read."""
-    argv = [a for a in (sys.argv[1:] if argv is None else argv) if a not in options]
+    A check waits on its scenario's clock (one message a second), not on the machine, so several
+    run side by side in the time of the longest; each one's output is printed whole when it ends.
+    `options`: the flags of the try.py's own (`--local`), left for it to read, and given to each
+    check's process. `script`: the try.py, for those processes (the program run, by default)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    given = [a for a in argv if a in options]
+    argv = [a for a in argv if a not in options]
     if argv == ["--list"]:
         print("\n".join(checks))
         return 0
+    jobs, prepared = 1, False
+    while argv[:1] in (["--jobs"], ["--prepared"]):
+        if argv[0] == "--prepared":
+            # (A check's process under --jobs: the build is done.)
+            prepared, argv = True, argv[1:]
+        elif len(argv) < 2 or not argv[1].isdigit() or int(argv[1]) < 1:
+            print("--jobs: how many checks at once, 1 or more", file=sys.stderr)
+            return 2
+        else:
+            jobs, argv = int(argv[1]), argv[2:]
     unknown = [a for a in argv if a not in checks]
     if unknown:
         print(f"no such check: {' '.join(unknown)}; the checks: {' '.join(checks)}", file=sys.stderr)
         return 2
-    prepare()
+    if not prepared:
+        prepare()
+    names = argv or list(checks)
+    if jobs > 1 and len(names) > 1:
+        program = script or sys.argv[0]
+
+        def one(name: str) -> tuple[str, int]:
+            r = subprocess.run([sys.executable, program, *given, "--prepared", name], stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, text=True, check=False)
+            return r.stdout, r.returncode
+
+        ok = True
+        # Each check's output as soon as it ends: a job cut short keeps what had finished.
+        with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
+            for done in concurrent.futures.as_completed([pool.submit(one, name) for name in names]):
+                output, code = done.result()
+                print(output, end="", flush=True)
+                ok &= code == 0
+        return 0 if ok else 1
     ok = True
-    for name in argv or checks:
+    for name in names:
         print(f"=== {name}", flush=True)
         start = time.monotonic()
         passed = checks[name]()
