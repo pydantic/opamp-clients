@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -27,6 +28,9 @@ func TestMain(m *testing.M) {
 	_ = os.RemoveAll(home)
 	os.Exit(code)
 }
+
+// slots is how many processes of one program keep their own identity by default (the core's).
+const slots = 16
 
 // released: the process that held the default state directory ends.
 func released(s *server) {
@@ -102,7 +106,7 @@ func TestAServiceInstanceIDThatIsntAUUIDKeepsTheDefaultStateDirectory(t *testing
 		if s.stateDir == "" {
 			t.Fatal("no default state directory")
 		}
-		uids = append(uids, identity(s.stateDir, attrs))
+		uids = append(uids, identity(s.stateDir, attrs, time.Now()))
 		released(s) // as the process exiting would
 	}
 	if uids[0] != uids[1] {
@@ -154,21 +158,19 @@ func TestTheDefaultStateDirectoryGivesWay(t *testing.T) {
 	}
 }
 
+// The default directory is the core's to name (docs/default-state-dir.md): here, that the slot
+// this package takes is under it, named for the service.
 func TestTheDefaultStateDirectoryIsNamedForTheService(t *testing.T) {
 	dir := t.TempDir()
-	vars := with(stateHome(dir), map[string]string{"OTEL_RESOURCE_ATTRIBUTES": "service.name=pay%20ments/eu,service.namespace=shop"})
-	got, f := defaultStateDir(env(vars), []string{"/usr/bin/checkout"})
-	defer f.Close()
-	rel, _ := filepath.Rel(dir, got)
+	vars := with(stateHome(dir), map[string]string{"OTEL_OPAMP_ENDPOINT": "http://s",
+		"OTEL_RESOURCE_ATTRIBUTES": "service.name=pay%20ments/eu,service.namespace=shop"})
+	s := serverFromEnv(env(vars))
+	defer released(s)
+	rel, _ := filepath.Rel(dir, s.stateDir)
 	parts := strings.Split(filepath.ToSlash(rel), "/")
 	if len(parts) != 3 || parts[0] != "opamp" || !strings.HasPrefix(parts[1], "pay_ments_eu-") || len(parts[1]) != len("pay_ments_eu-")+8 ||
 		parts[2] != "1" {
 		t.Fatalf("%s", rel)
-	}
-	long, g := defaultStateDir(env(with(vars, map[string]string{"OTEL_SERVICE_NAME": strings.Repeat("a", 100)})), nil)
-	defer g.Close()
-	if name := filepath.Base(filepath.Dir(long)); name != strings.Repeat("a", 64)+name[64:] || len(name) != 64+1+8 {
-		t.Fatalf("cut to 64 characters: %s", name)
 	}
 	if programName([]string{`/opt/app/checkout.exe`}) != "checkout" {
 		t.Fatal("the program's name")

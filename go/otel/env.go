@@ -4,23 +4,23 @@
 package opampotel
 
 import (
-	"fmt"
+	"context"
 	"log/slog"
-	"math"
 	"net/http"
-	"net/url"
 	"os"
-	"regexp"
+	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"golang.org/x/net/http/httpguts"
+
+	"github.com/pydantic/opamp-clients/go/opamp"
 )
 
-// server is where the OpAMP server is, from Setup's options and OTEL_OPAMP_*.
+// server is where the OpAMP server is, as the core's Setup decides it from Setup's options and
+// OTEL_OPAMP_*.
 type server struct {
 	endpoint  string
 	header    http.Header
@@ -31,9 +31,10 @@ type server struct {
 	// send_metrics is not declared to the settings layer. A policy that overrides the metrics
 	// export is then refused, not answered as done.
 	metricsUngated bool
-	// endpointFrom and headersFrom name what gave each, the option or the variable, for the
-	// warning when the server can't be reached.
-	endpointFrom, headersFrom string
+	// shown is the endpoint as it is safe to log; hints, what to check when the server can't be
+	// reached, naming what gave the endpoint and the headers (the option or the variable).
+	shown string
+	hints *opamp.SetupHints
 }
 
 // Option gives Setup one of the OTEL_OPAMP_* settings in code; it wins over the variable.
@@ -43,8 +44,8 @@ type Option func(*options)
 
 type options struct {
 	endpoint, stateDir string
-	header             http.Header   // nil: not given
-	heartbeat          time.Duration // 0: not given
+	header             map[string]string // nil: not given
+	heartbeat          time.Duration     // 0: not given
 }
 
 // WithEndpoint is OTEL_OPAMP_ENDPOINT; given, the package is on without the variable.
@@ -60,12 +61,8 @@ func WithEndpoint(endpoint string) Option {
 // variable's headers, not adds to them.
 func WithHeaders(headers map[string]string) Option {
 	return func(o *options) {
-		if len(headers) == 0 {
-			return
-		}
-		o.header = http.Header{}
-		for k, v := range headers {
-			addHeader(o.header, "WithHeaders", k, v)
+		if len(headers) != 0 {
+			o.header = headers
 		}
 	}
 }
@@ -88,126 +85,85 @@ func WithHeartbeatInterval(d time.Duration) Option {
 	}
 }
 
-// serverFromEnv reads OTEL_OPAMP_*, each overridden by the option that gives it; nil without an
-// endpoint (the package is off).
-// Without a state directory it is one of the user's own (defaultStateDir); "none" turns that off.
-// A heartbeat interval it can't read is the client's default: it warns, and holds nothing up.
+// setupVariables are the variables the core's Setup reads.
+var setupVariables = []string{"OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
+	"OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME",
+	"LOCALAPPDATA"}
+
+// setupOS is this operating system, as Setup names it.
+func setupOS() opamp.SetupOs {
+	switch runtime.GOOS {
+	case "windows":
+		return opamp.SetupOsWindows
+	case "darwin", "ios":
+		return opamp.SetupOsMacOS
+	}
+	return opamp.SetupOsUnix
+}
+
+// serverFromEnv is where the server is, from OTEL_OPAMP_*, each overridden by the option that
+// gives it; nil without an endpoint (the package is off). The rules are the core's (its Setup
+// call), the same in every language; what is here is the I/O: reading the variables, taking a
+// slot of the default state directory, and saying the warnings. A setting it can't use is never
+// an error: the default, with a warning.
 func serverFromEnv(getenv func(string) string, opts ...Option) *server {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
 	}
-	endpoint, name := strings.TrimSpace(o.endpoint), "WithEndpoint"
-	if endpoint == "" {
-		endpoint, name = strings.TrimSpace(getenv("OTEL_OPAMP_ENDPOINT")), "OTEL_OPAMP_ENDPOINT"
+	code := &opamp.SetupInCode{EndpointName: "WithEndpoint", HeadersName: "WithHeaders",
+		HeartbeatName: "WithHeartbeatInterval"}
+	if o.endpoint != "" {
+		code.Endpoint = &o.endpoint
 	}
-	if endpoint == "" {
+	if o.stateDir != "" {
+		code.StateDir = &o.stateDir
+	}
+	if o.header != nil {
+		code.HeadersGiven = true
+		names := make([]string, 0, len(o.header))
+		for name := range o.header {
+			names = append(names, name)
+		}
+		sort.Strings(names) // a map has no order of its own: the same every start
+		for _, name := range names {
+			code.Headers = append(code.Headers, &opamp.Header{Name: name, Value: o.header[name]})
+		}
+	}
+	if o.heartbeat != 0 {
+		ms := o.heartbeat.Milliseconds()
+		code.HeartbeatMs = &ms
+	}
+	start := &opamp.SetupStart{Os: setupOS(), Program: programName(os.Args), Code: code}
+	for _, name := range setupVariables {
+		if v := getenv(name); v != "" {
+			start.Env = append(start.Env, &opamp.Variable{Name: name, Value: v})
+		}
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		start.Cwd = cwd
+	}
+	s, err := opamp.StartSetup(context.Background(), start)
+	if err != nil {
+		slog.Error("opamp: the core could not read the settings; the SDK runs unmanaged", "error", err)
 		return nil
 	}
-	if !strings.Contains(endpoint, "://") {
-		slog.Warn(fmt.Sprintf("opamp: %s %q has no scheme, so it is taken as http://; "+
-			"name it in full, as https://host/v1/opamp or wss://host/v1/opamp", name, where(endpoint)))
-		endpoint = "http://" + endpoint // as the warning says: the client refuses it without one
+	for _, w := range s.GetWarnings() {
+		slog.Warn("opamp: " + w)
 	}
-	s := &server{endpoint: endpoint, header: o.header, endpointFrom: name, headersFrom: "WithHeaders"}
-	if s.header == nil {
-		s.header, s.headersFrom = headers(getenv("OTEL_OPAMP_HEADERS")), "OTEL_OPAMP_HEADERS"
+	if s.GetOff() {
+		return nil
 	}
-	dir := strings.TrimSpace(o.stateDir)
-	if dir == "" {
-		dir = strings.TrimSpace(getenv("OTEL_OPAMP_STATE_DIR"))
+	srv := &server{endpoint: s.GetEndpoint(), header: http.Header{}, stateDir: s.GetStateDir(),
+		heartbeat: time.Duration(s.GetHeartbeatIntervalMs()) * time.Millisecond, shown: s.GetShownEndpoint(),
+		hints: s.GetHints()}
+	for _, h := range s.GetHeaders() {
+		srv.header.Add(h.GetName(), h.GetValue())
 	}
-	switch {
-	case strings.EqualFold(dir, "none"):
-	case dir != "":
-		s.stateDir = dir
-	case !choseUID(getenv("OTEL_RESOURCE_ATTRIBUTES")):
-		// A service.instance.id the application chose stays its choice: no default to override it.
-		// One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
-		s.stateDir, s.stateLock = defaultStateDir(getenv, os.Args)
+	if srv.stateDir == "" {
+		srv.stateDir, srv.stateLock = slot(s.GetDefaultSlots(), s.GetAllSlotsTaken())
 	}
-	switch v := strings.TrimSpace(getenv("OTEL_OPAMP_HEARTBEAT_INTERVAL")); {
-	case o.heartbeat < 0:
-		slog.Warn("opamp: WithHeartbeatInterval is negative, using the default", "interval", o.heartbeat)
-	case o.heartbeat > 0:
-		s.heartbeat = o.heartbeat
-	case v != "":
-		if d, err := duration(v); err != nil {
-			slog.Warn("opamp: OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable, using the default", "error", err)
-		} else {
-			s.heartbeat = d
-		}
-	}
-	return s
-}
-
-// choseUID: OTEL_RESOURCE_ATTRIBUTES gives a service.instance.id that is a UUID, the instance UID
-// the application chose.
-func choseUID(resourceAttrs string) bool {
-	_, ok := chosenUID(resourceAttrs)
-	return ok
-}
-
-// chosenUID is the service.instance.id OTEL_RESOURCE_ATTRIBUTES gives, if it is a UUID.
-func chosenUID(resourceAttrs string) (uuid.UUID, bool) {
-	for _, kv := range strings.Split(resourceAttrs, ",") {
-		k, v, _ := strings.Cut(kv, "=")
-		if strings.TrimSpace(k) == instanceID {
-			if u, err := uuid.Parse(strings.TrimSpace(v)); err == nil {
-				return u, true
-			}
-		}
-	}
-	return uuid.UUID{}, false
-}
-
-// headers parses `name=value,...`, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS.
-func headers(spec string) http.Header {
-	h := http.Header{}
-	for _, pair := range strings.Split(spec, ",") {
-		name, value, ok := strings.Cut(pair, "=")
-		name = strings.TrimSpace(name)
-		if !ok || name == "" {
-			continue
-		}
-		if v, err := url.PathUnescape(strings.TrimSpace(value)); err == nil {
-			addHeader(h, "OTEL_OPAMP_HEADERS", name, v)
-		} else {
-			slog.Warn("opamp: OTEL_OPAMP_HEADERS has a value that isn't percent-encoded, leaving it out", "header", name)
-		}
-	}
-	return h
-}
-
-// addHeader adds one header, or, when HTTP can't carry it, warns and leaves it out: a header no
-// request could be sent with would stop the client reaching the server at all.
-func addHeader(h http.Header, from, name, value string) {
-	name = strings.TrimSpace(name)
-	if !httpguts.ValidHeaderFieldName(name) || !httpguts.ValidHeaderFieldValue(value) {
-		slog.Warn(fmt.Sprintf("opamp: %s has a header HTTP can't carry, leaving it out", from), "header", name)
-		return
-	}
-	h.Add(name, value)
-}
-
-var durationRE = regexp.MustCompile(`^\s*(\d+)\s*(ms|s|m)?\s*$`)
-
-// duration parses `1500` (milliseconds, as the SDK's variables), or `500ms`, `30s`, `2m`.
-func duration(v string) (time.Duration, error) {
-	m := durationRE.FindStringSubmatch(v)
-	if m == nil {
-		return 0, fmt.Errorf("not a duration: %q", v)
-	}
-	n, err := strconv.ParseInt(m[1], 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("not a duration: %q", v)
-	}
-	unit := map[string]time.Duration{"": time.Millisecond, "ms": time.Millisecond, "s": time.Second, "m": time.Minute}[m[2]]
-	// Multiplied out, a longer one would wrap around int64 nanoseconds to some short interval.
-	if n > int64(math.MaxInt64/unit) {
-		return 0, fmt.Errorf("out of range (at most %v): %q", time.Duration(math.MaxInt64), v)
-	}
-	return time.Duration(n) * unit, nil
+	return srv
 }
 
 // samplerFromEnv is the sampler OTEL_TRACES_SAMPLER names, as the SDK builds it when given none

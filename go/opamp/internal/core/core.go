@@ -254,3 +254,47 @@ func (t *tap) close() {
 		t.f = nil
 	}
 }
+
+// Setup runs the core's Setup call (an SDK integration's start-up decisions): stateless, on an
+// instance of its own that it closes. The reply's error is the core's word that the call is
+// unusable (a bug in the caller).
+func Setup(ctx context.Context, call *corepb.SetupCall) (*corepb.SetupReply, error) {
+	compileCore()
+	if compileErr != nil {
+		return nil, fmt.Errorf("compile the OpAMP core: %w", compileErr)
+	}
+	mod, err := runtime.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(""))
+	if err != nil {
+		return nil, fmt.Errorf("instantiate the OpAMP core: %w", err)
+	}
+	defer mod.Close(ctx)
+	in, err := proto.Marshal(call)
+	if err != nil {
+		return nil, err
+	}
+	res, err := mod.ExportedFunction("alloc").Call(ctx, uint64(len(in)))
+	if err != nil {
+		return nil, fmt.Errorf("OpAMP core alloc: %w", err)
+	}
+	ptr := uint32(res[0])
+	if !mod.Memory().Write(ptr, in) {
+		return nil, errors.New("OpAMP core: input out of range")
+	}
+	// The core takes ownership of the input buffer.
+	if res, err = mod.ExportedFunction("setup").Call(ctx, uint64(ptr), uint64(len(in))); err != nil {
+		return nil, fmt.Errorf("OpAMP core trapped: %w", err)
+	}
+	outPtr, outLen := uint32(res[0]>>32), uint32(res[0])
+	raw, ok := mod.Memory().Read(outPtr, outLen)
+	if !ok {
+		return nil, errors.New("OpAMP core: reply out of range")
+	}
+	reply := &corepb.SetupReply{}
+	if err := proto.Unmarshal(raw, reply); err != nil {
+		return nil, fmt.Errorf("OpAMP core setup reply: %w", err)
+	}
+	if e := reply.GetError(); e != "" {
+		return nil, fmt.Errorf("OpAMP core: %s", e)
+	}
+	return reply, nil
+}
