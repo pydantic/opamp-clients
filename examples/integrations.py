@@ -144,8 +144,8 @@ def websocket() -> bool:
 
 def opamp_url(port: str, host: str = "127.0.0.1") -> str:
     """The OpAMP endpoint an application is given for the server on `port`: plain HTTP, or a
-    WebSocket (websocket()). The checks are the same over either, and judge_transport() holds the
-    run to the one asked for."""
+    WebSocket (websocket()). The checks are the same over either, and judge_transport() holds
+    every run, and every next start, to the one asked for."""
     return f"{'ws' if websocket() else 'http'}://{host}:{port}/v1/opamp"
 
 
@@ -880,6 +880,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
         print(f"run 2: {sum(e['event'] == 'a2s' for e in two)} messages, {len(pings(two))} application requests, "
               f"{len(spans(two))} span exports")
         expect(judge_second(one, two, switches))
+        expect(judge_transport(two))
     finally:
         # Files a container wrote as root may stay; the next check makes a directory of its own.
         shutil.rmtree(state, ignore_errors=True)
@@ -916,6 +917,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
                    until=enough, settle=2 * MARGIN, env=SIGNALS)
         print(f"run 4: {sum(e['event'] == 'a2s' for e in four)} messages, {len(pings(four))} application requests")
         expect(judge_signals_restart(four))
+        expect(judge_transport(four))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -981,6 +983,7 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
         expect(judge_right_key(six))
         expect(judge_transport(six))
         expect(judge_own_key(again))
+        expect(judge_transport(again))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
@@ -1022,6 +1025,7 @@ def check_app_settings(launch: Launch, target_: Path, listen: str = "127.0.0.1:0
                     settle=MARGIN, env=env)
         print(f"run 8: {len(pings(eight))} application requests, {len(requests(eight, '/feature'))} /feature")
         expect(judge_app_settings_restart(eight))
+        expect(judge_transport(eight))
     finally:
         shutil.rmtree(state, ignore_errors=True)
     return ok
