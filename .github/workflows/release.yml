@@ -63,6 +63,7 @@ jobs:
       # archive.sh from this workflow's commit, so a tag cut before it existed (v0.1.0) still builds.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.workflow_sha }}
           path: .release
           sparse-checkout: go/opampsupervisor/packaging/archive.sh
           sparse-checkout-cone-mode: false
