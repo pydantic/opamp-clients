@@ -74,7 +74,9 @@ extension's customizers run last, and it reads what the SDK is built with:
   are `send_logs`, `send_logs_level`, `send_logs_level_by_scope`, `send_logs_per_second`,
   `debug_send_logs_level` and the two redaction settings. For metrics it is `send_metrics`. The
   agent logs a WARNING that names what was added and what is set aside. The inventory lists it,
-  ungated.
+  ungated. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
+  counted: the agent adds such processors itself, and one that exported would send spans before
+  they end.
 - **What is left alone.** A processor or reader the agent built from `otel.*.exporter` stays
   gated, also when another extension's processor customizer wrapped it. A span processor that
   isn't told when a span ends can't export, so it changes nothing: the agent's thread details and
