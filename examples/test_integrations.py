@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from integrations import (APP_KEY, POLICY_FILE, POLICY_V1, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
-                          judge_truth, key_from_env, key_in_code, policy, truth_scenario,
+                          judge_truth, key_from_env, key_in_code, policy, scenario, truth_scenario,
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
                           judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
@@ -361,6 +361,12 @@ class Inventory(unittest.TestCase):
 
 
 class First(unittest.TestCase):
+    def test_the_switch_offers_each_instrumentation_by_name(self):
+        # Node.js switches three instrumentations off, given as "http,net,dns": the policy takes
+        # an array of names, and refuses a name with a comma in it.
+        last = json.loads(scenario("http,net,dns")["server"]["faults"][-1]["body"])
+        self.assertEqual(last["instrumentations"], {"mode": "override", "disabled": ["http", "net", "dns"]})
+
     def test_a_good_run_passes(self):
         for at_once in (False, True):
             with self.subTest(switch_at_once=at_once):

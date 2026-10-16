@@ -271,7 +271,7 @@ def scenario(instrumentation: str) -> dict:
         offer(22, {"head_sampling": {"ratio": 1}}),
         # Well after the fourth: a fast-polling client (the Java agent, two messages a second)
         # still leaves a window to see spans come back in.
-        offer(40, {"instrumentations": {"disabled": [instrumentation]}}),
+        offer(40, {"instrumentations": {"disabled": instrumentation.split(",")}}),
     ]}}
 
 
