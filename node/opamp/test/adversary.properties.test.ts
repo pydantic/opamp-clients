@@ -29,7 +29,6 @@ import { createServer, get, type IncomingMessage, STATUS_CODES, type Server, typ
 import type { AddressInfo, Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { WebSocketServer } from "ws";
@@ -37,8 +36,12 @@ import { WebSocketServer } from "ws";
 import { TEST_CORE_MODULE } from "../src/core.js";
 import { Client, ComponentHealthSchema, type Config, create, type Notification } from "../src/index.js";
 import { rawMark, RawServer } from "./adversary.raw.js";
+import { annotatedTest } from "./annotate.js";
 
 const PREFIX = "opamp-adversary";
+/** Every test here prints, when it fails, an annotation with how to replay it (annotate.ts): the
+ * seeds come from OPAMP_ADVERSARY_BASE and OPAMP_ADVERSARY_SEEDS, printed with it when set. */
+const test = annotatedTest("adversary.properties.test.js");
 /** stop returns within this, or the seed fails. */
 const STOP_DEADLINE_MS = 15_000;
 /** After stop has returned: how long connections have to close, and what is watched for. */
