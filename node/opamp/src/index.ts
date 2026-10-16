@@ -48,7 +48,28 @@ import type {
 
 export * from "./gen/opamp/v1/opamp_pb.js";
 export * from "./gen/opamp/v1/anyvalue_pb.js";
-export { CoreError } from "./core.js";
+export { CoreError, identifySetup, startSetup } from "./core.js";
+// The core's Setup call: an OpenTelemetry integration's start-up decisions (core.ts).
+export {
+  type Header as SetupHeader,
+  HeaderSchema as SetupHeaderSchema,
+  type SetupHints,
+  type SetupIdentified,
+  type SetupIdentity,
+  SetupIdentitySchema,
+  type SetupInCode,
+  SetupInCodeSchema,
+  SetupOs,
+  type SetupStart,
+  SetupStartSchema,
+  type SetupStarted,
+  SetupUidFrom,
+  type Variable as SetupVariable,
+  VariableSchema as SetupVariableSchema,
+} from "./gen/opamp/core/v1/core_pb.js";
+/** The files in a state directory's slot: the lock a process holds while it runs, and the UID. */
+export const SETUP_LOCK_FILE = "lock";
+export const SETUP_UID_FILE = "instance-uid";
 export type { ProxyOptions, TlsOptions, TlsVersion } from "./transport.js";
 export { saveState } from "./executor.js";
 // To build the messages above: create(AgentDescriptionSchema, {...}).

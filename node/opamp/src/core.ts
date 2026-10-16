@@ -19,6 +19,12 @@ import {
   type Output,
   OutputSchema,
   ReplySchema,
+  type SetupIdentified,
+  type SetupIdentity,
+  type SetupStart,
+  type SetupStarted,
+  SetupCallSchema,
+  SetupReplySchema,
   StepSchema,
 } from "./gen/opamp/core/v1/core_pb.js";
 
@@ -191,4 +197,49 @@ export class Core {
   get instanceUid(): Uint8Array {
     return this.#uid;
   }
+}
+
+interface SetupExports {
+  memory: WebAssembly.Memory;
+  alloc(len: number): number;
+  free(ptr: number, len: number): void;
+  setup(ptr: number, len: number): bigint;
+}
+
+/** The core's Setup call, on an instance of its own: stateless, it needs no client. */
+function setupCall(call: Parameters<typeof create<typeof SetupCallSchema>>[1]) {
+  const x = new WebAssembly.Instance(module(), {}).exports as unknown as SetupExports;
+  const data = toBinary(SetupCallSchema, create(SetupCallSchema, call));
+  const ptr = x.alloc(data.length);
+  new Uint8Array(x.memory.buffer, ptr, data.length).set(data);
+  let packed: bigint;
+  try {
+    packed = x.setup(ptr, data.length);
+  } catch (e) {
+    throw new CoreError(`trap: ${String(e)}`);
+  }
+  const outPtr = Number(packed >> 32n);
+  const outLen = Number(packed & 0xffffffffn);
+  const reply = fromBinary(SetupReplySchema, new Uint8Array(x.memory.buffer, outPtr, outLen).slice());
+  if (reply.result.case === "error") throw new CoreError(reply.result.value);
+  return reply.result;
+}
+
+/**
+ * Where the server is and how to reach it, from the environment and what the code gives: the
+ * core's Setup call (an OpenTelemetry integration's start-up decisions, the same in every
+ * language). `off` without an endpoint. Throws CoreError on a failure of the core.
+ */
+export function startSetup(start: SetupStart): SetupStarted {
+  const r = setupCall({ call: { case: "start", value: start } });
+  if (r.case !== "started") throw new CoreError("setup: no answer to start");
+  return r.value;
+}
+
+/** The instance UID, once the state directory is known (and its slot locked): the core's Setup
+ * call. Throws CoreError on a failure of the core, or a call it can't use. */
+export function identifySetup(identity: SetupIdentity): SetupIdentified {
+  const r = setupCall({ call: { case: "identity", value: identity } });
+  if (r.case !== "identified") throw new CoreError("setup: no answer to identity");
+  return r.value;
 }

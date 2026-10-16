@@ -40,7 +40,9 @@ node --import @pydantic/opamp-otel/register app.js
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it (or with `OTEL_SDK_DISABLED=true`), this is upstream's `register`. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
-| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; it never stops the application. |
+| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the application. |
+
+The core reads these (and the options below), by the same rules in every language: the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
 
 ### In code
 
@@ -62,8 +64,9 @@ const { shutdown } = register({
 Called this way, the shutdown and the loader hook for `import` are the application's to arrange;
 `node --import @pydantic/opamp-otel/register` does both, and reads only the variables. A blank
 `endpoint` or `stateDir` is not given (its variable applies). A value it can't use never stops the
-application: one of the wrong type (as plain JavaScript may pass) is warned about and not used, and
-a `heartbeatIntervalMs` that isn't a whole number of milliseconds is warned about and the default.
+application: one of the wrong type (as plain JavaScript may pass, or a `heartbeatIntervalMs` that
+isn't a finite number) is warned about and not used; a `heartbeatIntervalMs` of 0 or less is warned
+about and the default, a fraction of a millisecond is cut off, and longer than a day is a day.
 `register` again once `shutdown` has finished (a test harness, a reload) is the same instance:
 the client starts again, with the same state directory and instance UID.
 

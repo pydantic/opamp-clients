@@ -33,10 +33,8 @@ import {
   batchLogOptions,
   batchSpanOptions,
   Controls,
-  durationMs,
   exporterNames,
   exportersFromEnv,
-  headers,
   hostFromEnv,
   metricReaderOptions,
   preparing,
@@ -44,13 +42,27 @@ import {
   Reachability,
   release,
   say,
-  where,
   samplerFromEnv,
+  shownEndpoint,
   setupFromEnv,
   type Options,
   type Setup,
-  SLOTS,
 } from "../src/index.js";
+
+/** Processes of one program that each keep their own identity by default (the core's). */
+const SLOTS = 16;
+
+/** What a Setup carries to the client, without what it logs (the endpoint shown, the hints). */
+function bare(s: Setup | undefined): Partial<Setup> | undefined {
+  if (s === undefined) return undefined;
+  const { shown: _shown, hints: _hints, ...rest } = s;
+  return rest;
+}
+
+/** The core's hints and the endpoint as shown, for a server given by OTEL_OPAMP_ENDPOINT. */
+function shownFor(endpoint: string): Setup {
+  return setupFromEnv({ OTEL_OPAMP_ENDPOINT: endpoint, OTEL_OPAMP_STATE_DIR: "none" })!;
+}
 
 // The default state directory (and every child process's) under the test's own home.
 beforeEach(() => {
@@ -245,10 +257,13 @@ test("a switched-off instrumentation's metrics and log records aren't exported",
 });
 
 test("settings read as the SDK reads its own", () => {
-  assert.deepEqual(headers("Authorization=Bearer%20a%20b, x=1=2,broken"), { Authorization: "Bearer a b", x: "1=2" });
-  assert.deepEqual(["1500", "500ms", "30s", "2m"].map(durationMs), [1500, 500, 30_000, 120_000]);
+  const none = { OTEL_OPAMP_ENDPOINT: "http://s", OTEL_OPAMP_STATE_DIR: "none" };
+  assert.deepEqual(setupFromEnv({ ...none, OTEL_OPAMP_HEADERS: "Authorization=Bearer%20a%20b, x=1=2,broken" })!.headers,
+    { Authorization: "Bearer a b", x: "1=2" });
+  assert.deepEqual(["1500", "500ms", "30s", "2m"].map((v) => setupFromEnv({ ...none, OTEL_OPAMP_HEARTBEAT_INTERVAL: v })!.heartbeatMs),
+    [1500, 500, 30_000, 120_000]);
   assert.equal(setupFromEnv({}), undefined);
-  assert.deepEqual(setupFromEnv({ OTEL_OPAMP_ENDPOINT: " ws://s/v1/opamp ", OTEL_OPAMP_HEARTBEAT_INTERVAL: "1s" }),
+  assert.deepEqual(bare(setupFromEnv({ OTEL_OPAMP_ENDPOINT: " ws://s/v1/opamp ", OTEL_OPAMP_HEARTBEAT_INTERVAL: "1s" })),
     { endpoint: "ws://s/v1/opamp", headers: {}, heartbeatMs: 1000 });
   assert.match(samplerFromEnv({}).toString(), /ParentBased\{root=AlwaysOnSampler/);
   assert.match(samplerFromEnv({ OTEL_TRACES_SAMPLER: "traceidratio", OTEL_TRACES_SAMPLER_ARG: "0.1" }).toString(),
@@ -722,8 +737,13 @@ test("headers in code replace OTEL_OPAMP_HEADERS whole, as given", () => {
   // None of the variable's is merged in; none given is none sent.
   assert.deepEqual(setupFromEnv(env, { headers: { b: "3" } })!.headers, { b: "3" });
   assert.deepEqual(setupFromEnv(env, { headers: {} })!.headers, {});
-  // Not percent-decoded or trimmed: given in code, a value is what is sent.
-  assert.deepEqual(setupFromEnv(env, { headers: { a: "Bearer%20x", " b ": " y " } })!.headers, { a: "Bearer%20x", " b ": " y " });
+  // Not percent-decoded: given in code, a value is what is sent; a header HTTP can't carry (a name
+  // with spaces) is left out, with a warning.
+  const lines = said(() => {
+    assert.deepEqual(setupFromEnv(env, { headers: { a: "Bearer%20x", " b ": "y" } })!.headers, { a: "Bearer%20x" });
+  });
+  assert.deepEqual(lines.filter(([level]) => level === "warn"),
+    [["warn", `OpAMP: the headers given to register(): " b " isn't a header HTTP can carry, so it is left out`]]);
   // A copy: the application changing its object later changes nothing.
   const mine = { a: "1" };
   const setup = setupFromEnv(env, { headers: mine })!;
@@ -763,33 +783,38 @@ const ENV: NodeJS.ProcessEnv = {
   OTEL_OPAMP_HEARTBEAT_INTERVAL: "5s",
 };
 const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: "/state/env", heartbeatMs: 5000 };
-const heartbeat = (v: string) => `OpAMP: heartbeatIntervalMs ${v} is not a whole number of milliseconds: using the default, 30s`;
+const notMs = (v: string) => `OpAMP: heartbeatIntervalMs ${v} is not a number of milliseconds: it is not used`;
 const INVALID: [string, unknown, string | undefined, Partial<Setup>][] = [
   ["an endpoint without a scheme", { endpoint: "opamp.example.com:4320/v1/opamp" },
-    "OpAMP: the endpoint 'opamp.example.com:4320/v1/opamp' has no scheme, so it is taken as http://; name it in full, "
-      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://opamp.example.com:4320/v1/opamp", endpointFrom: "the endpoint given to register()" }],
+    'OpAMP: the endpoint given to register() "opamp.example.com:4320/v1/opamp" has no scheme, so it is taken as http://; name it in full, '
+      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://opamp.example.com:4320/v1/opamp" }],
   // Its secrets are kept out of the warning.
   ["an endpoint without a scheme, with user info and a query", { endpoint: "user:secret@opamp.example.com/v1/opamp?token=x" },
-    "OpAMP: the endpoint 'opamp.example.com/v1/opamp' has no scheme, so it is taken as http://; name it in full, "
-      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://user:secret@opamp.example.com/v1/opamp?token=x", endpointFrom: "the endpoint given to register()" }],
+    'OpAMP: the endpoint given to register() "opamp.example.com/v1/opamp" has no scheme, so it is taken as http://; name it in full, '
+      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://user:secret@opamp.example.com/v1/opamp?token=x" }],
   // Kept: the client refuses it when it starts, and the SDK runs unmanaged; nothing stops.
   ["an endpoint with a scheme the client doesn't speak", { endpoint: "ftp://opamp.example.com/v1/opamp" },
-    undefined, { endpoint: "ftp://opamp.example.com/v1/opamp", endpointFrom: "the endpoint given to register()" }],
+    undefined, { endpoint: "ftp://opamp.example.com/v1/opamp" }],
   ["an endpoint that is a number", { endpoint: 4320 }, "OpAMP: endpoint 4320 is not a string: it is not used", {}],
   ["an endpoint that is a URL object", { endpoint: new URL("http://code/v1/opamp") },
     "OpAMP: endpoint http://code/v1/opamp is not a string: it is not used", {}],
   ["headers as a string", { headers: "a=code" }, "OpAMP: headers is not an object of names to values: it is not used", {}],
   ["headers as an array", { headers: [["a", "code"]] }, "OpAMP: headers is not an object of names to values: it is not used", {}],
   ["a header whose value isn't a string", { headers: { a: 1, b: "code" } },
-    "OpAMP: headers: the value of 'a' is not a string: that header is not sent", { headers: { b: "code" }, headersFrom: "the headers given to register()" }],
+    "OpAMP: headers: the value of 'a' is not a string: that header is not sent", { headers: { b: "code" } }],
   ["a stateDir that is a number", { stateDir: 7 }, "OpAMP: stateDir 7 is not a string: it is not used", {}],
   ["a stateDir that is true", { stateDir: true }, "OpAMP: stateDir true is not a string: it is not used", {}],
-  ["a negative heartbeat interval", { heartbeatIntervalMs: -1 }, heartbeat("-1"), { heartbeatMs: 0 }],
-  ["a NaN heartbeat interval", { heartbeatIntervalMs: NaN }, heartbeat("NaN"), { heartbeatMs: 0 }],
-  ["an infinite heartbeat interval", { heartbeatIntervalMs: Infinity }, heartbeat("Infinity"), { heartbeatMs: 0 }],
-  ["a fractional heartbeat interval", { heartbeatIntervalMs: 1.5 }, heartbeat("1.5"), { heartbeatMs: 0 }],
-  ["a heartbeat interval past 2^53", { heartbeatIntervalMs: 2 ** 53 }, heartbeat("9007199254740992"), { heartbeatMs: 0 }],
-  ["a heartbeat interval as a duration string", { heartbeatIntervalMs: "5s" }, heartbeat('"5s"'), { heartbeatMs: 0 }],
+  // The core's rule: 0 or less is the default; longer than a day is a day; each with a warning.
+  ["a negative heartbeat interval", { heartbeatIntervalMs: -1 },
+    "OpAMP: heartbeatIntervalMs (-1 ms) is no interval: using the default", { heartbeatMs: 0 }],
+  ["a heartbeat interval past 2^53", { heartbeatIntervalMs: 2 ** 53 },
+    "OpAMP: heartbeatIntervalMs is more than a day: a day it is, the longest", { heartbeatMs: 86_400_000 }],
+  // A fraction of a millisecond is cut off, as every language's duration in milliseconds.
+  ["a fractional heartbeat interval", { heartbeatIntervalMs: 1.5 }, undefined, { heartbeatMs: 1 }],
+  // Not a number of milliseconds: not given, as any value of the wrong type.
+  ["a NaN heartbeat interval", { heartbeatIntervalMs: NaN }, notMs("NaN"), {}],
+  ["an infinite heartbeat interval", { heartbeatIntervalMs: Infinity }, notMs("Infinity"), {}],
+  ["a heartbeat interval as a duration string", { heartbeatIntervalMs: "5s" }, notMs('"5s"'), {}],
   ["options that are a string", "http://code/v1/opamp",
     'OpAMP: register\'s options "http://code/v1/opamp" are not an object: using the variables', {}],
   ["options that are a number", 5, "OpAMP: register's options 5 are not an object: using the variables", {}],
@@ -802,7 +827,7 @@ test("a value in code it can't use warns and is not used; nothing throws", () =>
     const lines = said(() => {
       setup = setupFromEnv(ENV, options as Options);
     });
-    assert.deepEqual(setup, { ...FROM_ENV, ...expected }, what);
+    assert.deepEqual(bare(setup), { ...FROM_ENV, ...expected }, what);
     assert.deepEqual(lines.filter(([level]) => level === "warn"), warning === undefined ? [] : [["warn", warning]], what);
     // Without the variables: the default, and on only if an endpoint is left.
     said(() => {
@@ -873,7 +898,8 @@ test("a lock left by a process that is gone is taken over; a running one's isn't
 test("connecting, failing and recovering are each said once", () => {
   const uid = "00000000-0000-0000-0000-000000000007";
   const lines = said(() => {
-    const r = new Reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid);
+    const s = shownFor("https://user:secret@opamp.example.com/v1/opamp?token=x");
+    const r = new Reachability(s.shown, "checkout", uid, s.hints);
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connected" });
@@ -897,7 +923,7 @@ test("connecting, failing and recovering are each said once", () => {
 test("after the server moved the agent, what is said names the endpoint the client uses now", () => {
   let inUse: string | undefined; // none yet: the configured one
   const lines = said(() => {
-    const r = new Reachability("https://a.example.com/v1/opamp");
+    const r = new Reachability(shownFor("https://a.example.com/v1/opamp").shown);
     r.inUse = () => inUse;
     r.notified({ kind: "connected" });
     inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
@@ -925,7 +951,7 @@ test("the warning names what gave the server: the option given in code, else the
   for (const [options, endpointFrom, headersFrom] of cases) {
     const s = setupFromEnv(env, options)!;
     const lines = said(() => {
-      const r = new Reachability(s.endpoint, "", "u", s.endpointFrom, s.headersFrom);
+      const r = new Reachability(s.shown, "", "u", s.hints);
       for (const status of [401, 404, undefined]) {
         r.notified({ kind: "connectFailed", status, detail: "" });
         r.notified({ kind: "connected" });
@@ -938,23 +964,29 @@ test("the warning names what gave the server: the option given in code, else the
   }
 });
 
-test("a bad heartbeat interval warns and is the default; a bad header escape is kept as written", () => {
-  for (const bad of ["soon", "-5s", "1h", "9".repeat(400)]) {
+test("a bad heartbeat interval warns and is the default; a header with a bad escape is left out", () => {
+  for (const bad of ["soon", "-5s", "1h"]) {
     let setup;
     const lines = said(() => {
       setup = setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s/v1/opamp", OTEL_OPAMP_HEARTBEAT_INTERVAL: bad });
     });
-    assert.deepEqual(setup, { endpoint: "http://s/v1/opamp", headers: {}, heartbeatMs: 0 });
-    assert.deepEqual(lines.filter(([level]) => level === "warn"), [["warn", `OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL '${bad}' is not a duration (as 1500, `
-      + "500ms, 30s or 2m): using the default, 30s"]]);
+    assert.deepEqual(bare(setup), { endpoint: "http://s/v1/opamp", headers: {}, heartbeatMs: 0 });
+    assert.deepEqual(lines.filter(([level]) => level === "warn"), [["warn", `OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "${bad}" is not a duration (as 1500, `
+      + "500ms, 30s or 2m): using the default"]]);
   }
+  // Too long to count: a day, the longest, as for one the server offers.
+  const long = said(() => {
+    assert.equal(setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s/v1/opamp", OTEL_OPAMP_HEARTBEAT_INTERVAL: "9".repeat(400) })!.heartbeatMs,
+      86_400_000);
+  });
+  assert.equal(long.filter(([level, m]) => level === "warn" && m.includes("is more than a day")).length, 1);
   let h;
   const lines = said(() => {
-    h = headers("a=x%zzy,b=%,c=%e9,d=ok%20");
+    h = setupFromEnv({ OTEL_OPAMP_ENDPOINT: "http://s/v1/opamp", OTEL_OPAMP_HEADERS: "a=x%zzy,b=%,c=%e9,d=ok%21" })!.headers;
   });
-  assert.deepEqual(h, { a: "x%zzy", b: "%", c: "%e9", d: "ok " });
-  assert.deepEqual(lines.filter(([level]) => level === "warn"), ["a", "b", "c"].map((k) => ["warn", `OpAMP: OTEL_OPAMP_HEADERS: the value of '${k}' has a `
-    + "percent escape that can't be decoded: it is sent as written"]));
+  assert.deepEqual(h, { d: "ok!" });
+  assert.deepEqual(lines.filter(([level]) => level === "warn"), ["a", "b", "c"].map((k) => ["warn", `OpAMP: OTEL_OPAMP_HEADERS: the value of "${k}" has a `
+    + "percent escape that can't be decoded, so it is left out"]));
   // The agent is still on, at the default.
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   said(() => {
@@ -975,13 +1007,11 @@ test("an endpoint without a scheme is warned about, and taken as http://", () =>
 });
 
 test("the endpoint is logged without its secrets, whatever it is", () => {
-  assert.equal(where("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f"),
+  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f"),
     "https://opamp.example.com:4320/v1/opamp");
-  assert.equal(where("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x"),
+  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x"),
     "https://opamp.example.com:notaport/v1/opamp");
-  assert.equal(where("https://user:secret@[::1/v1/opamp?k=v"), "https://[::1/v1/opamp");
-  assert.equal(where("user:secret@opamp.example.com/v1/opamp?k=v"), "opamp.example.com/v1/opamp");
-  assert.equal(where("https://user:secret@?k=v"), "");
+  assert.equal(shownEndpoint("https://user:secret@[::1/v1/opamp?k=v"), "https://[::1/v1/opamp");
 });
 
 test("without OTEL_LOG_LEVEL, warnings and errors go to the console; info stays on diag", (t) => {
@@ -993,7 +1023,8 @@ test("without OTEL_LOG_LEVEL, warnings and errors go to the console; info stays 
   diag.setLogger({ error: () => {}, warn: () => {}, info: (m) => void lines.push(m), debug: () => {}, verbose: () => {} },
     DiagLogLevel.ALL);
   try {
-    const r = new Reachability("http://opamp.example.com/v1/opamp", "", "u");
+    const s = shownFor("http://opamp.example.com/v1/opamp");
+    const r = new Reachability(s.shown, "", "u", s.hints);
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
     r.notified({ kind: "connected" });
     say.error("OpAMP: x");
