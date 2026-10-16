@@ -97,6 +97,9 @@ is a table out of date.
 | Integration | Setup | What the application does | Set aside |
 |---|---|---|---|
 | Python | `late-processor` | adds a span and a log record processor of its own, exporting over OTLP, once the SDK is built | the trace and log gates' settings and redaction; the sampler's stay |
+| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | the sampler's settings, `send_traces`, redaction and the instrumentation switches |
+| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | `send_metrics` |
+| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | the log settings and redaction |
 | Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | the trace, metric and log gates' settings and redaction; the sampler's stay |
 | Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | the sampler's settings |
 | .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | the trace and log gates' settings and redaction; the sampler's stay |
