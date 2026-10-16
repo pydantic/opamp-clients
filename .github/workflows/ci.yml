@@ -1039,26 +1039,6 @@ jobs:
           name: pydantic-opamp-supervisor-windows
           path: go/opampsupervisor/packaging/dist/*.msi
 
-  infra:
-    name: The package hosting's Pulumi program, against Pulumi's mocks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ${{ env.CLIENTS_REPOSITORY }}
-          ref: ${{ env.CLIENTS_REF }}
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.26"
-          cache-dependency-path: infra/packages/go.sum
-      - name: Vetted, formatted and tested (what it would make, without a cloud)
-        working-directory: infra/packages
-        run: |
-          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
-          go vet ./...
-          go test ./...
-
   # ---------------------------------------------------------------- Conformance
   # Every scenario, one client to a job, against the Go reference server (conformance/server); an
   # upstream client must match the baseline.
@@ -1212,7 +1192,6 @@ jobs:
       - collector-packages
       - installer-macos
       - installer-windows
-      - infra
       - conformance
       - conformance-differential
     runs-on: ubuntu-24.04

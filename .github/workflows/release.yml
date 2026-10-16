@@ -1,0 +1,123 @@
+# Copyright (c) 2026 Bill Easton. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+#
+# Publishes a Supervisor release as a GitHub Release on its tag: for Linux, macOS and Windows on
+# amd64 and arm64, an archive of the Supervisor and the bundled collector (packaging/archive.sh),
+# with SHA256SUMS and a build provenance attestation for each archive. No installers yet: the deb,
+# rpm, .pkg and .msi stay built and tested in CI, not published. Runs on a go/opampsupervisor/vX.Y.Z
+# tag, or by hand for a tag already pushed (GitHub sends no push event when more than three tags
+# are pushed at once).
+name: Release
+
+on:
+  push:
+    tags: ["go/opampsupervisor/v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, e.g. 0.1.0 (its go/opampsupervisor/vX.Y.Z tag must exist)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  VERSION_IN: ${{ inputs.version || github.ref_name }}
+
+jobs:
+  version:
+    name: The version, from the tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          version=${VERSION_IN#go/opampsupervisor/v}
+          # Releases alone, for now: no pre-releases.
+          if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$version isn't a version like 0.1.0"; exit 1
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+
+  build:
+    name: The archive (${{ matrix.goos }}/${{ matrix.goarch }})
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Built from the tag, also when run by hand.
+          ref: go/opampsupervisor/v${{ needs.version.outputs.version }}
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: go/opampsupervisor/go.sum
+      - name: Built
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go/opampsupervisor/packaging/archive.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: archive-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            go/opampsupervisor/packaging/dist/*.tar.gz
+            go/opampsupervisor/packaging/dist/*.zip
+          if-no-files-found: error
+
+  release:
+    name: The GitHub Release
+    needs: [version, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # the release
+      id-token: write # the attestation's signing certificate
+      attestations: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: archive-*
+          path: dist
+          merge-multiple: true
+      - name: The checksums
+        working-directory: dist
+        run: |
+          sha256sum -- *.tar.gz *.zip >SHA256SUMS
+          cat SHA256SUMS
+          test "$(wc -l <SHA256SUMS)" -eq 6
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+      - name: Published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="go/opampsupervisor/v$VERSION"
+          notes="The Supervisor and a collector with this repository's opamp extension, for Linux, macOS and Windows on amd64 and arm64.
+          Each archive holds \`opampsupervisor\` and \`otelcol\`; see [the collector docs](https://github.com/$GH_REPO/blob/$tag/docs/collector.md).
+          Check a download with \`sha256sum --check --ignore-missing SHA256SUMS\` or \`gh attestation verify <file> --repo $GH_REPO\`."
+          # A rerun after a partial upload replaces the assets instead of failing on an existing release.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* --verify-tag --title "Supervisor $VERSION" --notes "$notes"
+          fi

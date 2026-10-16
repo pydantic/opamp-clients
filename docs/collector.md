@@ -72,13 +72,29 @@ service, and enroll the host with one command, `pydantic-opamp-enroll`:
 | macOS | a `.pkg` | a LaunchDaemon; the state key in the System Keychain |
 | Windows | an `.msi` | a Windows service; the state key protected with DPAPI |
 
-The Packages workflow publishes them for each `go/opampsupervisor/vX.Y.Z` tag. Until the first,
-build them with the scripts in [packaging/](../go/opampsupervisor/packaging/). The
+None is published yet: build them with the scripts in
+[packaging/](../go/opampsupervisor/packaging/). Each `go/opampsupervisor/vX.Y.Z` tag publishes
+archives instead (see [Release archives](#release-archives)). The
 [packaging README](../go/opampsupervisor/packaging/README.md) covers installing, enrolling,
 running a collector without a server, building, signing and publishing, for
 [Linux](../go/opampsupervisor/packaging/README.md#linux),
 [macOS](../go/opampsupervisor/packaging/README.md#macos) and
 [Windows](../go/opampsupervisor/packaging/README.md#windows).
+
+### Release archives
+
+Each `go/opampsupervisor/vX.Y.Z` tag has a
+[GitHub Release](https://github.com/pydantic/opamp-clients/releases) with an archive for Linux,
+macOS and Windows on amd64 and arm64: `opampsupervisor`, `otelcol` (the collector above, with this
+extension), the licenses and a README. `SHA256SUMS` and a build provenance attestation
+(`gh attestation verify <file> --repo pydantic/opamp-clients`) check a download.
+
+```bash
+curl -fsSLO https://github.com/pydantic/opamp-clients/releases/download/go%2Fopampsupervisor%2Fv0.1.0/pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz
+tar -xzf pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz
+cd pydantic-opamp-supervisor_0.1.0_linux_amd64
+./opampsupervisor --config supervisor.yaml
+```
 
 ### From source
 
