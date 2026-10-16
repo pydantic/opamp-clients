@@ -54,8 +54,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_signals, key_in_code, main,  # noqa: E402
-                          read_log, server_binary, statuses, stop_group, target)
+from integrations import (ROOT, check, check_app_settings, check_setup, check_signals, check_truth,  # noqa: E402
+                          key_in_code, main, read_log, server_binary, statuses, stop_group, target)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("node-otel")
@@ -376,6 +376,20 @@ def check_settings() -> bool:
     return ok
 
 
+# --- check_truth's setups (setups.cjs) ----------------------------------------------------------
+
+#: What a tracer provider the application registers in place of the register's takes from the
+#: package's control: its own spans go past the sampler and the trace gate, so the settings either
+#: holds are set aside. Redaction too, which needs every span and log record.
+OWN_TRACER_PROVIDER = {"send_traces", "sampling_rate", "sampling_rules", "sampling_traces_per_second",
+                       "mask_attributes", "drop_attributes"}
+#: A logger provider of its own: the log gate's settings, and redaction.
+OWN_LOGGER_PROVIDER = {"send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
+                       "mask_attributes", "drop_attributes"}
+#: A meter provider of its own: send_metrics.
+OWN_METER_PROVIDER = {"send_metrics"}
+
+
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
     """A shared check of `app`, in a directory of its own: run_check(directory)."""
     def run_() -> bool:
@@ -407,6 +421,15 @@ CHECKS = {
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))
     for app in ["app.cjs", "app.mjs"]
+} | {
+    # The application's own spans aren't an instrumentation's: deactivate_all_instrumentations
+    # doesn't stop them, and the check can't tell them apart, so it isn't judged there.
+    "truth-own-tracer-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-tracer-provider",
+                                                                     OWN_TRACER_PROVIDER)),
+    "truth-own-logger-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-logger-provider",
+                                                                     OWN_LOGGER_PROVIDER, switch_at_once=True)),
+    "truth-own-meter-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-meter-provider",
+                                                                    OWN_METER_PROVIDER, switch_at_once=True)),
 }
 
 if __name__ == "__main__":
