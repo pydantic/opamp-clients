@@ -46,7 +46,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, key_in_code,  # noqa: E402
-                          check_signals, ended, main, pings, run, signal, spans, statuses, stop_group, target)
+                          check_signals, ended, main, pings, run, signal, spans, statuses, stop_group, target, opamp_url)
 import json  # noqa: E402
 import shutil  # noqa: E402
 import tempfile  # noqa: E402
@@ -59,7 +59,7 @@ APP = TARGET / "app"
 
 def launcher(in_code: bool, target_: Path):
     def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-        endpoint = f"http://127.0.0.1:{port}/v1/opamp"
+        endpoint = opamp_url(port)
         telemetry = f"http://127.0.0.1:{telemetry_port}"
         env = {k: v for k, v in os.environ.items() if not k.startswith("OTEL_OPAMP_")}
         env.update(OTEL_SERVICE_NAME="checkout",

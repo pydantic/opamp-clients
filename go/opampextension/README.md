@@ -58,10 +58,11 @@ across restarts (upstream makes up a new one at every start).
 
 ## Differences from upstream
 
-- An `auth` extension works over `http` only: it wraps the client's transport, so it runs on every
-  request (a refreshed token included). Over `ws` it is refused: the client has no hook to ask it
-  for headers at each upgrade. It can't be combined with `accepts_opamp_connection_settings`
-  either, since it would replace the headers the server issued.
+- An `auth` extension runs on every request over `http`: it wraps the client's transport, so a
+  refreshed token goes on the next request. Over `ws` the client asks it for its headers about
+  every second, and each upgrade carries the latest ones. An open connection keeps the headers
+  it opened with. An `auth` extension can't be combined with `accepts_opamp_connection_settings`,
+  because it would replace the headers the server issued.
 - A custom message is handed to the client, which queues it; `SendMessage`'s channel is closed at
   once, and a message the client can't send after all is logged. Before the extension has started,
   `SendMessage` returns an error.

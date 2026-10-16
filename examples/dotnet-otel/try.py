@@ -57,7 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
     MARGIN, ROOT, check, check_app_settings, check_setup, check_signals, ended, main, offered_before, pings, run,
-    statuses, stop_container, stop_group, target,
+    statuses, stop_container, stop_group, target, opamp_url,
 )
 
 IMAGE = "mcr.microsoft.com/dotnet/sdk:8.0"
@@ -86,12 +86,11 @@ def build() -> None:
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-    base = f"http://{HOST}:{port}"
     telemetry = f"http://{HOST}:{telemetry_port}"
     env = {
         "OTEL_DOTNET_AUTO_PLUGINS": "Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation",
         "OTEL_SERVICE_NAME": "checkout",
-        "OTEL_OPAMP_ENDPOINT": f"{base}/v1/opamp",
+        "OTEL_OPAMP_ENDPOINT": opamp_url(port, HOST),
         "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20example",
         "OTEL_OPAMP_STATE_DIR": str(state) if LOCAL else "/state",
         "OTEL_OPAMP_HEARTBEAT_INTERVAL": "1s",

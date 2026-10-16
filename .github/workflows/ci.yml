@@ -85,7 +85,7 @@ jobs:
           conformance/differential/test_shells.py conformance/torture/test_invariants.py
           conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
           examples/test_integrations.py examples/test_settings_cookbook.py scripts/test_native_dist.py
-          scripts/test_sdk_release.py scripts/test_redact_mutants.py
+          scripts/test_sdk_release.py scripts/test_redact_mutants.py scripts/test_collector_release.py
       - name: Every dropped-redaction mutant applies
         if: ${{ !cancelled() }}
         run: python3 scripts/redact_mutants.py --check
@@ -757,6 +757,8 @@ jobs:
             go/go.sum
             go/opampextension/go.sum
             go/opampsupervisor/go.sum
+      - name: Every pin of the collector's modules names one release
+        run: python3 scripts/collector_release.py pins
       - name: State encryption (go/statekey), unit tests
         working-directory: go
         run: |

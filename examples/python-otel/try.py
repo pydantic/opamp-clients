@@ -38,7 +38,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (DRIFT, MARGIN, ROOT, SETTINGS, check, check_app_settings, check_setup,  # noqa: E402
                           key_in_code,
-                          check_signals, main, pings, run, signal as exports, spans, statuses, stop_group, target)
+                          check_signals, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("python-otel")
@@ -52,7 +52,6 @@ APP = "app.py"
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
-    base = f"http://127.0.0.1:{port}"
     telemetry = f"http://127.0.0.1:{telemetry_port}"
     env = {k: v for k, v in os.environ.items() if not k.startswith("OTEL_OPAMP_")}
     env.update(OTEL_EXPORTER_OTLP_ENDPOINT=telemetry,
@@ -63,12 +62,12 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true")
     if APP == "app.py":
         env.update(OTEL_SERVICE_NAME="checkout",
-                   OTEL_OPAMP_ENDPOINT=f"{base}/v1/opamp",
+                   OTEL_OPAMP_ENDPOINT=opamp_url(port),
                    OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
                    OTEL_OPAMP_STATE_DIR=str(state),
                    OTEL_OPAMP_HEARTBEAT_INTERVAL="1s")
     else:  # the application's own settings, which it gives configure()
-        env.update(CHECKOUT_OPAMP_URL=f"{base}/v1/opamp",
+        env.update(CHECKOUT_OPAMP_URL=opamp_url(port),
                    CHECKOUT_OPAMP_KEY="example",
                    CHECKOUT_STATE_DIR=str(state),
                    CHECKOUT_OPAMP_HEARTBEAT="1s")
