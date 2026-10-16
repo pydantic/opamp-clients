@@ -50,6 +50,8 @@ type testServer struct {
 	changed chan struct{}
 	// respond, if set, answers a message (the instance UID is filled in); nil answers nothing.
 	respond func(auth string, msg *protobufs.AgentToServer) *protobufs.ServerToAgent
+	// drop, if set, closes the connection of the next message (dropNext).
+	drop bool
 }
 
 func newTestServer(t *testing.T) *testServer {
@@ -60,11 +62,15 @@ func newTestServer(t *testing.T) *testServer {
 			auth := r.Header.Get("Authorization")
 			ts.record(func() { ts.auths = append(ts.auths, auth) })
 			return types.ConnectionResponse{Accept: true, ConnectionCallbacks: types.ConnectionCallbacks{
-				OnMessage: func(_ context.Context, _ types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
+				OnMessage: func(_ context.Context, conn types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
 					ts.record(func() { ts.msgs = append(ts.msgs, msg) })
 					ts.mu.Lock()
-					respond := ts.respond
+					respond, drop := ts.respond, ts.drop
+					ts.drop = false
 					ts.mu.Unlock()
+					if drop {
+						go func() { _ = conn.Disconnect() }()
+					}
 					var answer *protobufs.ServerToAgent
 					if respond != nil {
 						answer = respond(auth, msg)
@@ -86,6 +92,13 @@ func newTestServer(t *testing.T) *testServer {
 	host := hs.Listener.Addr().String()
 	ts.ws, ts.url = "ws://"+host+"/v1/opamp", "http://"+host+"/v1/opamp"
 	return ts
+}
+
+// dropNext makes the server close the connection that the next message comes on.
+func (ts *testServer) dropNext() {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.drop = true
 }
 
 func (ts *testServer) record(f func()) {

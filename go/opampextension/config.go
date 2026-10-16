@@ -275,11 +275,6 @@ func (cfg *Config) Validate() error {
 		return errors.New("state_key requires state_file")
 	}
 
-	if cfg.Server.WS != nil && cfg.Server.WS.Auth != (component.ID{}) {
-		// The client has no hook to ask the auth extension for headers at each upgrade.
-		return errors.New("an auth extension is supported over http only, not ws")
-	}
-
 	if cfg.InstanceUID != "" {
 		_, err := parseInstanceIDString(cfg.InstanceUID)
 		if err != nil {
