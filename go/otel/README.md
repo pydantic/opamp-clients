@@ -5,12 +5,11 @@ variables and managed by an OpAMP server.
 
 ## Quickstart
 
-Until it is published, point the application's module at a checkout of the repository:
+Add it to the application's module (`go get` takes the client, `github.com/pydantic/opamp-clients/go`,
+with it):
 
 ```bash
-go mod edit -require=github.com/pydantic/opamp-clients/go/otel@v0.0.0 \
-    -replace=github.com/pydantic/opamp-clients/go/otel=../opamp/go/otel \
-    -replace=github.com/pydantic/opamp-clients/go=../opamp/go
+go get github.com/pydantic/opamp-clients/go/otel@latest
 ```
 
 Set up the SDK with `Setup` in `main`:

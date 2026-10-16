@@ -14,7 +14,7 @@ environments, so it waits on no approval.
 | npm | the client, otel | Make the scope on npm, and add a trusted publisher for each package: this repository, workflow `registries.yml`, environment `npm`. No token. |
 | Maven Central | the client, the Java agent extension | Verify the groupId's namespace on Central, and make a Central token and a signing key. The poms also need `developers` and `scm`, plus sources and javadoc jars. Until then, the job fails if it is enabled. |
 | NuGet | the client, its native core, the automatic instrumentation plugin | Reserve the id prefix on nuget.org, and set an API key as the `nuget` environment's secret `NUGET_API_KEY`. |
-| Go | nothing to upload | Push a `go/vX.Y.Z` tag; the module proxy serves it. `go/otel` needs a real version of `go` first, in place of its `replace`. |
+| Go | nothing to upload | Push a tag per module: `go/vX.Y.Z` for the client, then `go/otel/vX.Y.Z`, `go/opampextension/vX.Y.Z` and `go/opampsupervisor/vX.Y.Z` on a commit whose `go.mod` files require that client version. The module proxy serves them, and caches each tag for good. The `replace` in each `go.mod` only applies inside this repository; the Supervisor is installed from its packages, since `go install` refuses a module with one. |
 | crates.io | not published | The Rust client isn't published. |
 
 The names are Pydantic's: `pydantic-opamp-*` on PyPI, `@pydantic/opamp-*` on npm, `dev.pydantic`
