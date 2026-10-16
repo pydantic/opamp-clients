@@ -352,6 +352,7 @@ func (a *agent) stop(ctx context.Context) error {
 // notified handles a notification on the client's goroutine, answering through c.
 func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 	if a.reach != nil {
+		a.reach.inUse = c.Endpoint
 		a.reach.notified(n)
 	}
 	switch n.Kind {
@@ -377,16 +378,30 @@ func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 // reachability says when the client connects, when it can't (once a run of failures, with what
 // to check), and when it's back: setup that works or doesn't is never silent.
 type reachability struct {
-	endpoint string // as where gives it
-	service  string // "": none
-	uid      uuid.UUID
-	ever     bool // connected once
-	failing  bool // since the last connect
+	endpoint string // the configured one, as where gives it
+	// inUse is the endpoint the client uses now, as the client gives it (nil or "": the
+	// configured one): after the server moved the agent, the one it moved it to.
+	inUse   func() string
+	service string // "": none
+	uid     uuid.UUID
+	ever    bool // connected once
+	failing bool // since the last connect
 	// What gave the endpoint and the headers (server's); "": the variable.
 	endpointFrom, headersFrom string
 }
 
+// at is the endpoint the client uses now, as it is safe to log.
+func (r *reachability) at() string {
+	if r.inUse != nil {
+		if e := r.inUse(); e != "" {
+			return where(e)
+		}
+	}
+	return r.endpoint
+}
+
 func (r *reachability) notified(n opamp.Notification) {
+	endpoint := r.at()
 	switch n.Kind {
 	case opamp.Connected:
 		if !r.ever {
@@ -394,9 +409,9 @@ func (r *reachability) notified(n opamp.Notification) {
 			if r.service != "" {
 				who = " as " + r.service
 			}
-			slog.Info(fmt.Sprintf("opamp: connected to %s; this SDK is managed%s, instance %s", r.endpoint, who, r.uid))
+			slog.Info(fmt.Sprintf("opamp: connected to %s; this SDK is managed%s, instance %s", endpoint, who, r.uid))
 		} else if r.failing {
-			slog.Info("opamp: connected to " + r.endpoint + " again")
+			slog.Info("opamp: connected to " + endpoint + " again")
 		}
 		r.ever, r.failing = true, false
 	case opamp.ConnectFailed:
@@ -406,9 +421,9 @@ func (r *reachability) notified(n opamp.Notification) {
 				why = fmt.Sprintf("HTTP %d", n.Status)
 			}
 			slog.Warn(fmt.Sprintf("opamp: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its current settings meanwhile",
-				r.endpoint, why, hint(n.Status, r.endpointFrom, r.headersFrom)))
+				endpoint, why, hint(n.Status, r.endpointFrom, r.headersFrom)))
 		} else {
-			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", r.endpoint, n.Detail))
+			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", endpoint, n.Detail))
 		}
 		r.failing = true
 	}
