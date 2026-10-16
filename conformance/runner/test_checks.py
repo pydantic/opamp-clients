@@ -95,8 +95,8 @@ class Log:
             self.runner("restarted", run=run + 1, sha256=restarted, bytes=10)
         return self
 
-    def auth(self, token: str, ok: bool = True, switched: bool = False) -> "Log":
-        return self.server("auth", token=token, ok=ok, switched=switched, t=self.wall - 100)
+    def auth(self, token: str, ok: bool = True, switched: bool = False, moved: bool = False) -> "Log":
+        return self.server("auth", token=token, ok=ok, switched=switched, moved=moved, t=self.wall - 100)
 
     def settings(self, status: str, hash_: str = OFFER_HASH, error: str = "") -> "Log":
         return self.send(["connection_settings_status"],
@@ -137,6 +137,24 @@ def offered() -> Log:
     log = Log().driver("started").auth("boot").send(FULL).respond().auth("boot").send().respond(credentials_offer=OFFER_HASH)
     log.server_cfg = {"credentials": {"bootstrap": "boot", "offer": "new"}}
     return log
+
+THEN_HASH = "bb"
+
+
+def rotated() -> Log:
+    """A run under the rotation scenario, up to the offer of the second key: the first is in use."""
+    log = (offered().settings("APPLYING").auth("new", switched=True).settings("APPLIED")
+           .respond(credentials_offer=THEN_HASH, credentials_offer_step=1))
+    log.server_cfg = {"credentials": {"bootstrap": "boot", "offer": "new", "then": "newer"}}
+    return log
+
+
+def moved() -> Log:
+    """A run under the move scenario, up to the offer of the new endpoint and key."""
+    log = offered()
+    log.server_cfg = {"credentials": {"bootstrap": "boot", "offer": "new", "move": True}}
+    return log
+
 
 V7 = "01928f3a7c3e7a1b8c2d3e4f5a6b7c8d"
 NOT_V7 = "01928f3a7c3e4a1b8c2d3e4f5a6b7c8d"
@@ -1008,6 +1026,27 @@ CASES: dict[str, tuple[list[Log], list[Log]]] = {
         [offered().auth("new", switched=True).stop().driver("started").auth("boot", ok=False).auth("new").stop(),
          offered().auth("new", switched=True).stop().driver("started").stop(),
          offered().auth("new", ok=False).stop()],
+    ),
+    "connection_settings_rotated": (
+        [rotated().settings("APPLYING", hash_=THEN_HASH).auth("newer", switched=True)
+         .settings("APPLIED", hash_=THEN_HASH).stop().driver("started").auth("newer").stop()],
+        [offered().settings("APPLYING").auth("new", switched=True).settings("APPLIED"),
+         rotated().settings("APPLYING", hash_=THEN_HASH).settings("APPLIED", hash_=THEN_HASH),
+         rotated().auth("newer", switched=True).send(),
+         rotated().settings("APPLIED", hash_=THEN_HASH).auth("newer", switched=True),
+         rotated().auth("newer", switched=True).settings("APPLIED", hash_=THEN_HASH)
+         .stop().driver("started").auth("new", ok=False).auth("newer").stop()],
+    ),
+    "connection_settings_moved": (
+        [moved().settings("APPLYING").auth("new", switched=True, moved=True).settings("APPLIED")
+         .stop().driver("started").auth("new", moved=True).stop()],
+        [clean(),
+         moved().auth("new", switched=True).settings("APPLIED"),
+         moved().auth("boot", ok=True, moved=True).settings("APPLIED"),
+         moved().settings("APPLIED").auth("new", switched=True, moved=True),
+         moved().auth("new", switched=True, moved=True).send(),
+         moved().auth("new", switched=True, moved=True).settings("APPLIED")
+         .stop().driver("started").auth("boot", ok=False).auth("new", moved=True).stop()],
     ),
     "connected_over_tls": (
         [tls_hs().send(FULL, tls="TLS 1.3").respond().stop(),

@@ -230,6 +230,8 @@ Rust server offers once per connection, because every offer makes a supervisor r
 | `remote-config-restart` | http, ws | the agent restarts after applying the remote config: it gets the config back at start, and the server has no need to send it again (`remote_config_lifecycle`) |
 | `credential-offer` | http, ws | the server takes a shared bootstrap token, offers the agent its own and then accepts only that; the agent restarts halfway and must still get in (`connection_settings`) |
 | `credential-offer-broken` | http, ws | the server offers a token it will not accept: the agent reports FAILED and carries on with the bootstrap token (`connection_settings`) |
+| `credential-rotation` | http, ws | the server offers the agent its own token, then a second one once the first works, and accepts only the latest; the agent restarts halfway and must keep the second (`connection_settings`) |
+| `endpoint-move` | http, ws | the server moves the agent to its second endpoint with a new token; the agent restarts halfway and must go straight to the second endpoint (`connection_settings`) |
 | `own-metrics-restart` | http, ws | the server says where the agent sends its own metrics; the agent restarts after applying that, and gets it back at start (`telemetry_settings`) |
 | `available-components` | http, ws | the agent reports its components as a hash; the server asks for them in full once (`available_components`) |
 | `custom-messages` | http, ws | a custom message for a capability the agent declared, which it answers, and one for a capability it never declared, which the application must not see (`custom_messages`) |

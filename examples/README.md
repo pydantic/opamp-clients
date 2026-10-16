@@ -76,6 +76,16 @@ gives the wrong one, and the wrong one when the code gives the right one. The co
 times. With the wrong token, the agent's warning names the headers given in code, not
 `OTEL_OPAMP_HEADERS`. With the right token, the agent is accepted.
 
+Then `check_rotation` (the check `rotation`) runs the application against the same kind of server,
+whose operator rotates the agent's key and then moves it to the server's second listener, and
+starts it once more with the first endpoint still configured:
+
+| What the operator does | What the run checks |
+|---|---|
+| rotates the key the agent took | the agent takes the second key: the server confirms it, refusing no request |
+| moves the agent to another port, with a third key | the agent takes it there, refusing no request, opens no connection to the first port after it, and is traced throughout |
+| (the next start) | the agent goes straight to the second port on the key it was given there, takes no new key, and none of its requests is refused |
+
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
 second), not on the machine, so with `--jobs` they take about as long as the longest of them:
