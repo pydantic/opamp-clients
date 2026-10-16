@@ -65,12 +65,19 @@ times. With the wrong token, the agent's warning names the headers given in code
 `OTEL_OPAMP_HEADERS`. With the right token, the agent is accepted.
 
 Each check is independent of the others (its own server, state directory and logs), so one can
-run alone, by name, and CI deals each integration's checks to jobs side by side:
+run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
+second), not on the machine, so with `--jobs` they take about as long as the longest of them:
 
 ```sh
-python3 examples/python-otel/try.py --list          # its checks: first, signals, setup, ...
-python3 examples/python-otel/try.py signals setup   # those two alone
+python3 examples/python-otel/try.py --list                    # its checks: first, signals, setup, ...
+python3 examples/python-otel/try.py signals setup             # those two alone
+python3 examples/python-otel/try.py --jobs 4 signals setup next  # up to four at once, after one build
 ```
+
+Under `--jobs`, each check runs in a process of its own and its output is printed whole when it
+ends. Two checks of one integration that run at once must not name their runs alike: the runs'
+files share the integration's directory (`check_app_settings` names its runs `app7` and `app8`
+for that reason).
 
 A new check goes into one of its integration's `checks:` lists in the CI workflow that runs
 them. Each run prints how long each check took, for keeping those jobs even.
