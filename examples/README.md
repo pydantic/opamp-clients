@@ -83,6 +83,15 @@ checked by `check_app_settings` (the check `app`): its example application reads
 |---|---|
 | `custom` | none of `/feature` before the first config (the default); `/feature` once the flag is `on`, still after a bad map is FAILED naming `custom.example.feature`, none once `custom` is left out, again from a map in a string; `/changed` three times (on, off, on), not for the FAILED config or the same map sent again; after a restart with no offer, `/feature` from the start |
 
+An integration may also run `check_truth` under setups where some telemetry doesn't go through
+its gates (the checks `truth-<setup>`). The application runs with `EXAMPLE_SETUP=<setup>`, and the
+server offers one setting per config. Each setting must either show in the telemetry the sink
+receives, or be named as set aside in the effective config. The settings set aside must be
+exactly the ones the setup takes from the integration. .NET runs `truth-plugin-exporters` (a
+plugin of the application's own adds a span exporter and a log processor) and `truth-own-sdk`
+(`OTEL_DOTNET_AUTO_SETUP_SDK=false`, and the application builds its own tracer and meter
+providers).
+
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.
 The examples currently use the `elastic` settings format. The Logfire policy adapter is

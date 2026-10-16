@@ -50,6 +50,18 @@ internal static class Env
     public static bool Enabled(Func<string, string?> getenv, Signal signal) =>
         !string.Equals(getenv($"OTEL_DOTNET_AUTO_{signal.ToString().ToUpperInvariant()}_ENABLED")?.Trim(), "false", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Whether automatic instrumentation builds the signal's provider itself: not traces or metrics
+    /// when <c>OTEL_DOTNET_AUTO_SETUP_SDK</c> is false, which leaves those to the application (the
+    /// logs it still sets up).
+    /// </summary>
+    public static bool SetsUpSdk(Func<string, string?> getenv, Signal signal) =>
+        signal == Signal.Logs ||
+        !string.Equals(getenv("OTEL_DOTNET_AUTO_SETUP_SDK")?.Trim(), "false", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether automatic instrumentation sets the signal up, and builds its provider itself (<see cref="Enabled"/>, <see cref="SetsUpSdk"/>).</summary>
+    public static bool SetsUp(Func<string, string?> getenv, Signal signal) => Enabled(getenv, signal) && SetsUpSdk(getenv, signal);
+
     /// <summary>The exporters <c>OTEL_{SIGNAL}_EXPORTER</c> (default <c>otlp</c>) builds for the signal, as it names them; one it doesn't know builds none.</summary>
     public static IEnumerable<string> Exporters(Func<string, string?> getenv, Signal signal) =>
         (getenv($"OTEL_{signal.ToString().ToUpperInvariant()}_EXPORTER") ?? "otlp")

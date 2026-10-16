@@ -348,11 +348,15 @@ processor goes on exporting. Where the integration sees such an exporter when it
 it doesn't declare that signal's settings, so they are set aside, named as not carried out:
 Python for exporters it doesn't build and span or log processors or metric exporters passed to
 `configure()`; Node.js for exporters it doesn't build; the .NET plugin and `WithOpAmp` whenever
-one of a signal's exporters can't be stopped (not OTLP, beside another exporter, or, in
-`WithOpAmp`, with a path or an `HttpClientFactory` of its own); the Java agent under a
+one of a signal's exporters can't be stopped (not OTLP, beside another exporter, another
+plugin's, or, in `WithOpAmp`, with a path or an `HttpClientFactory` of its own), and the .NET
+plugin for traces and metrics under `OTEL_DOTNET_AUTO_SETUP_SDK=false`; the Java agent under a
 configuration file for a span or log processor that is neither batch nor simple, or a metric
-reader neither periodic nor pull. A processor added after the SDK is built isn't seen: the
-setting is still answered APPLIED.
+reader neither periodic nor pull. .NET reads the built providers again, before each decision and
+every 30 s, and the plugin reads each logger provider on its first log record: a processor added
+later sets its signal's settings aside from then on, and the effective config is reported again.
+Elsewhere, a processor added after the SDK is built isn't seen: the setting is still answered
+APPLIED.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
@@ -403,6 +407,9 @@ What else to know:
 - **An SDK the application builds on its own isn't reached.** Python (`opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
+  In .NET, a tracer or meter provider the application builds beside the managed one listens to
+  the same instrumentations. The integration can't see it, so the settings stay answered APPLIED
+  while its telemetry goes on.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
   file's sampler and exporters aren't its own: `sampling_rate` and the `send_*` settings are

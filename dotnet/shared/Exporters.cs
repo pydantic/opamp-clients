@@ -7,16 +7,15 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Otel;
-
-namespace Pydantic.OpAmp.Extensions.Hosting;
+namespace Pydantic.OpAmp.Otel;
 
 /// <summary>
 /// Which signals' exports the gate can't stop, read from the built providers. The SDK keeps their
 /// processors and readers in internal members, read by reflection as the sampler is
-/// (<see cref="Samplers"/>). A signal is gated only when every exporter it has is OTLP, sends to
-/// its signal's path (the gate tells signals by path) and through the gate's HTTP client; what
-/// can't be read counts as not gated.
+/// (<see cref="Samplers"/>). A signal is gated only when every exporter it has is OTLP and sends
+/// through the gate's HTTP client, the gate for its signal (a gate that tells signals by path:
+/// to its signal's path); what can't be read counts as not gated. Read again whenever asked: a
+/// processor the application adds to a built provider is found the next time.
 /// </summary>
 internal static class Exporters
 {
@@ -34,21 +33,22 @@ internal static class Exporters
     /// can't see into is listed by its own type, not gated); and the signals some exporter of which
     /// goes on sending whatever the server says.
     /// </summary>
-    public static (HashSet<Signal> Ungated, List<(Signal Signal, string Name, bool Gated)> Built) Read(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs)
+    public static (HashSet<Signal> Ungated, List<(Signal Signal, string Name, bool Gated)> Built) Read(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs) =>
+        Read([(Signal.Traces, tracing), (Signal.Metrics, metrics), (Signal.Logs, logs)]);
+
+    /// <summary>The same, of any number of providers, each of its signal (several logger providers, say).</summary>
+    public static (HashSet<Signal> Ungated, List<(Signal Signal, string Name, bool Gated)> Built) Read(IEnumerable<(Signal Signal, object? Provider)> providers)
     {
         var ungated = new HashSet<Signal>();
         var built = new List<(Signal, string, bool)>();
-        foreach (var (signal, provider, part) in new (Signal, object?, string)[]
-                 {
-                     (Signal.Traces, tracing, "Processor"),
-                     (Signal.Metrics, metrics, "Reader"),
-                     (Signal.Logs, logs, "Processor"),
-                 })
+        foreach (var (signal, provider) in providers)
         {
             if (provider is null)
             {
                 continue;
             }
+
+            var part = signal == Signal.Metrics ? "Reader" : "Processor";
 
             var found = new List<(string Name, bool Gated)>();
             if (!TryMember(provider, part, out var p))
@@ -156,14 +156,17 @@ internal static class Exporters
 
     private static string TypeName(Type type) => type.Name.Split('`')[0];
 
-    /// <summary>An OTLP exporter whose export client sends to its signal's path, through the gate.</summary>
+    /// <summary>
+    /// An OTLP exporter whose export client sends through the gate for its signal: one given the
+    /// signal (the plugin's), or one that tells it by path, from an endpoint with its signal's path.
+    /// </summary>
     private static bool GatedExporter(Signal signal, object exporter) =>
         exporter.GetType().Assembly == typeof(OtlpExporterOptions).Assembly &&
         TryMember(exporter, "transmissionHandler", out var handler) && handler is not null &&
         TryMember(handler, "ExportClient", out var client) && client is not null &&
-        TryMember(client, "Endpoint", out var endpoint) && Controls.SignalOf(endpoint as Uri) == signal &&
         TryMember(client, "HttpClient", out var http) && http is HttpClient h &&
-        TryMember(h, "_handler", out var first) && first is GateHandler;
+        TryMember(h, "_handler", out var first) && first is GateHandler gate &&
+        (gate.Signal ?? (TryMember(client, "Endpoint", out var endpoint) ? Controls.SignalOf(endpoint as Uri) : null)) == signal;
 
     /// <summary>
     /// The exporters and processors a processor of another kind holds in its fields, alone or in a
