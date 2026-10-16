@@ -157,7 +157,8 @@ type Credentials struct {
 	// Once the agent uses it, the server accepts only that (a rotation).
 	Then string `json:"then"`
 	// Move: Offer names this server's second listener (another port) instead of the one the
-	// agent uses (a move). The second listener serves the same as the first.
+	// agent uses (a move). The second listener serves the same as the first, in plain TCP: a
+	// move takes neither tls nor proxy.
 	Move bool `json:"move"`
 }
 
@@ -219,6 +220,11 @@ func loadScenario(path string) (*Scenario, error) {
 	}
 	if err := json.Unmarshal(raw, &file); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	// The second listener a move offers is plain TCP, reached directly: a scenario with TLS or a
+	// proxy in front of the server would be offered an endpoint its clients can't reach that way.
+	if c := file.Server.Credentials; c != nil && c.Move && (file.Server.TLS != nil || file.Server.Proxy != nil) {
+		return nil, fmt.Errorf("%s: credentials.move works without tls and proxy only", path)
 	}
 	for i, f := range file.Server.Faults {
 		if !actions[f.Action] {
