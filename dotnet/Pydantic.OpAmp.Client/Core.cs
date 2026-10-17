@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Bill Easton. All rights reserved.
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
+using System.Security.AccessControl;
 using Google.Protobuf;
 using Pydantic.OpAmp.Core;
 using Config = Pydantic.OpAmp.Core.Config;
@@ -127,13 +128,37 @@ internal sealed class CoreTap : IDisposable
         try
         {
             // Unbuffered: each record is one write, so a killed process leaves whole records.
-            return new CoreTap(new FileStream(name, FileMode.Append, FileAccess.Write, FileShare.ReadWrite, bufferSize: 0));
+            return new CoreTap(Append(name));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             Console.Error.WriteLine($"opamp: the core tap {name} can't be opened, running without it: {e.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// <paramref name="name"/> to append to. It holds the Config's headers and the credentials
+    /// saved, so a new file is the user's only (0600, or a list of the user alone), as the state
+    /// file is; one already there is kept as it is.
+    /// </summary>
+    private static FileStream Append(string name)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return new FileInfo(name).Create(
+                FileMode.Append, FileSystemRights.Write, FileShare.ReadWrite, bufferSize: 1, FileOptions.None,
+                StateFile.UserOnlyFile(StateFile.CurrentUser()));
+        }
+
+        return new FileStream(name, new FileStreamOptions
+        {
+            Mode = FileMode.Append,
+            Access = FileAccess.Write,
+            Share = FileShare.ReadWrite,
+            BufferSize = 0,
+            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+        });
     }
 
     /// <summary>Append one record: <paramref name="kind"/>, the length, the time, <paramref name="bytes"/>.</summary>

@@ -15,6 +15,10 @@ import dev.pydantic.opamp.core.CoreModule;
 import dev.pydantic.opamp.core.CoreProto;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.channels.Channels;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Path;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Collections;
@@ -195,6 +199,8 @@ final class Core implements AutoCloseable {
   // <path>.<pid>.<n>. Unset, it costs nothing. With a state file, the file operations of the
   // client's saves and downloads go to it too: kind 5, one JSON object each (opamp-tap's
   // file records), from the threads that carry them out, so records are written under a lock.
+  // The file holds the Config's headers and the credentials saved, so a new one is the user's
+  // only (0600, or an ACL of the user alone), as the state file is.
   static final class Tap {
     static final String VARIABLE = "OPAMP_CORE_TAP";
     static final int INIT_IN = 1;
@@ -207,10 +213,10 @@ final class Core implements AutoCloseable {
 
     /** The file written, for tests. */
     final String path;
-    private final FileOutputStream out;
+    private final OutputStream out;
     private boolean closed;
 
-    private Tap(String path, FileOutputStream out) {
+    private Tap(String path, OutputStream out) {
       this.path = path;
       this.out = out;
     }
@@ -220,10 +226,19 @@ final class Core implements AutoCloseable {
       long n = TAPPED.getAndIncrement();
       String path = n == 0 ? base : base + "." + ProcessHandle.current().pid() + "." + n;
       try {
-        return new Tap(path, new FileOutputStream(path, true));
-      } catch (IOException | SecurityException e) {
+        return new Tap(path, append(Path.of(path)));
+      } catch (IOException | RuntimeException e) {
         System.err.println("opamp: the core tap " + path + " can't be opened, running without it: " + e);
         return null;
+      }
+    }
+
+    /** {@code path} to append to: made the user's only if new, as it was if not. */
+    private static OutputStream append(Path path) throws IOException {
+      try {
+        return Channels.newOutputStream(StateFile.createPrivate(path));
+      } catch (FileAlreadyExistsException e) {
+        return new FileOutputStream(path.toFile(), true);
       }
     }
 

@@ -135,7 +135,9 @@ disk holds up neither heartbeats nor `stop`, which doesn't wait for a save alrea
 client started next on the same state file in the same process waits for it (and for a stopped
 client's downloads to delete their files) before it reads the file. A download's file is made
 new, never written over one already there. With `OPAMP_CORE_TAP` set, every file operation is
-recorded in the tap too, for the `opamp-tap` checker to check against a disk that can crash.
+recorded in the tap too, for the `opamp-tap` checker to check against a disk that can crash. A
+tap holds the headers sent (the enrollment key) and the credentials saved, so a new one is the
+user's only.
 
 ## Rust mode and Node mode
 
