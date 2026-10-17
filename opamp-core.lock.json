@@ -1,14 +1,62 @@
 {
   "source": "pydantic/opamp-clients",
   "version": "0.5.0",
-  "commit": "f31ce8c29b7d2d1695221e719e790445208fea5e",
+  "commit": "13084f84cc78964c677bcafa311c8aa79f94d092",
   "files": {
+    "native-linux-arm64-libopamp_native.so": {
+      "sha256": "dc0fec23a7740874db21d3064375da876e85d4737e60fd20fc77d87bbb643887",
+      "kind": "native",
+      "target": "linux-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-arm64-libopamp_native.so": {
+      "sha256": "cb02de431dcb67a383310995387ece68a989959bedd78aa614c10a7963159cef",
+      "kind": "native",
+      "target": "linux-musl-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-x64-libopamp_native.so": {
+      "sha256": "707c323b5ec342fbc477084c07026132e9e2190b7091aa0ccb1ce977044c31d0",
+      "kind": "native",
+      "target": "linux-musl-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-x64-libopamp_native.so": {
+      "sha256": "56acb70200519910230949c783d1448fe8c1a656c789ca5235baab4b09f6a043",
+      "kind": "native",
+      "target": "linux-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-osx-arm64-libopamp_native.dylib": {
+      "sha256": "dc93cb3a761e94e8274b642203eea017c7247eca30b91c01a3926e8d3eabce2c",
+      "kind": "native",
+      "target": "osx-arm64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-osx-x64-libopamp_native.dylib": {
+      "sha256": "286ad3dea80bdb8bd772610d06f06163028c03c604e809514372ba761dd13630",
+      "kind": "native",
+      "target": "osx-x64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-win-arm64-opamp_native.dll": {
+      "sha256": "18b939cc27ca0d4201acbb161603b58024f48446564063115bb288534e17d872",
+      "kind": "native",
+      "target": "win-arm64",
+      "lib": "opamp_native.dll"
+    },
+    "native-win-x64-opamp_native.dll": {
+      "sha256": "2d745cc1a3a168b6a0b11f0f359f4a0e6d0973bf4d4b45e0d2ff60a673e1a825",
+      "kind": "native",
+      "target": "win-x64",
+      "lib": "opamp_native.dll"
+    },
     "opamp-core-tree.tar.gz": {
-      "sha256": "f732aaaf7592bdacfc2091a191a9cc467cac861e8266f30e86a14daefaadebb2",
+      "sha256": "08946346b1fd8b455580c9e8d2f78e9c63cd4549e13f3dd1dd364e213bd8f5b3",
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "9af7a1631eaaed7ed374ef299e7f221e18541995dc4deb68e03824389db89d56",
+      "sha256": "3c749cadd5fd0960b8dcc883ef204cacb3291b927112160a6872f72e475184ca",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
@@ -19,20 +67,20 @@
       "sha256": "5e49ab19b544a10a965115b7dfd254a27b88bad9e0f81cee987731b7e88615b5",
       "kind": "wasm"
     },
-    "native-linux-x64-libopamp_native.so": {
-      "sha256": "b114606b0041a64a7a567c19d525db917fd113e6c049bdcff43affd2adaa72d2",
-      "kind": "native",
+    "tool-linux-x64-opamp-tap": {
+      "sha256": "7d9971e634e619dadbf218fbea3a91ab6f854051e254c15559a1edd95fb3c749",
+      "kind": "tool",
       "target": "linux-x64",
-      "lib": "libopamp_native.so"
+      "bin": "opamp-tap"
     }
   },
   "tree": {
-    "proto/opamp/core/v1/core.proto": "3a48913ac6dbf495823c94d64c4166de47cca00125c48c26394e3ae8583d9a30",
+    "proto/opamp/core/v1/core.proto": "b723373fb38e13fa068be40fda57805823a1cbaf134907cc7714d8734487bde1",
     "proto/opamp/sdk/v1/settings.proto": "75b82c1309dd281a18628e10a77fd421d7c6f085340aa25fa8198d50d66ec436",
     "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
     "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
     "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",
-    "spec/shell-contract.md": "5f268cb444e9897e7f51f6bebafcfb84d437a73e453b107375a4b8c0bbc5e4e5",
+    "spec/shell-contract.md": "d30b1f7b630352abc958946338f1def2832a44b91285de1106c46e92a36dda34",
     "testdata/sdk-settings/caps.json": "c6d267fbb8690a6720d811033579fd61bfc4bf846c00a44f70c870a971013005",
     "testdata/sdk-settings/components.json": "12759e0879f57dca2a89b8dca31ba02afb107267e73ff8be2c2bdd685275bca5",
     "testdata/sdk-settings/custom.json": "695d4289d9438bc6ac12ab435b6fdcfaf6645e31a36133ecd2468d0f7b5d0664",
