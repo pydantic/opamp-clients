@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 # Copyright (c) 2026 Bill Easton. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
-"""Generate the language clients' types for the SDK settings layer, and, where the layer's
-sources are, build its WebAssembly module.
+"""Generate the language clients' types for the SDK settings layer.
 
     scripts/gen_sdk_settings.py            # everything
     scripts/gen_sdk_settings.py --check    # fail if anything checked in is out of date (CI)
 
-- proto/opamp/sdk/v1/settings.proto -> each client's types.
-- Where the sources are (a Cargo.toml at the root): the module (opamp_sdk_settings.wasm), copied
-  into each client that ships it, so it is checked in. Built in the same pinned container as the
-  client core's (scripts/gen_core.py), so it is the same bytes on every machine. Without the
-  sources it is the core's release, which scripts/fetch_core.py puts in place and checks, and this
-  generates and checks the types alone.
+proto/opamp/sdk/v1/settings.proto -> each client's types. The layer's module
+(opamp_sdk_settings.wasm) is the core's release: scripts/fetch_core.py puts it in place and checks
+it.
 
 The layer is separate from the client core: its own module and interface, so either changes
 without the other.
@@ -28,11 +24,6 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# Whether the layer's sources are here to build its module from.
-CORE_SOURCE = (ROOT / "Cargo.toml").is_file()
-RUST_IMAGE = "rust:1.95.0"
-WASM_TARGET = ROOT / "target" / "wasm-build"
-WASM = WASM_TARGET / "wasm32-unknown-unknown" / "release" / "opamp_sdk_settings_wasm.wasm"
 PROTO = "opamp/sdk/v1/settings.proto"
 JAVA = "java/opamp/src/main/java"
 PY = "python/src/opamp_client/_proto"
@@ -45,17 +36,12 @@ DOTNET = "dotnet/Pydantic.OpAmp.Client"
 # Every generated file, relative to the repository root. A language joins when its integration
 # does.
 TARGETS = [
-    "java/opamp/src/main/wasm/opamp_sdk_settings.wasm",
     f"{JAVA}/dev/pydantic/opamp/sdk/SettingsProto.java",
-    "python/src/opamp_client/opamp_sdk_settings.wasm",
     f"{PY}/opamp/sdk/v1/settings_pb2.py",
     f"{PY}/opamp/sdk/v1/settings_pb2.pyi",
     *(f"{PY}{d}/__init__.py" for d in PY_PACKAGES),
-    "node/opamp/core/opamp_sdk_settings.wasm",
     "node/opamp/src/gen/opamp/sdk/v1/settings_pb.ts",
-    "go/opamp/sdk/opamp_sdk_settings.wasm",
     "go/opamp/sdk/settingspb/settings.pb.go",
-    f"{DOTNET}/opamp_sdk_settings.wasm",
     f"{DOTNET}/Generated/Settings.cs",
 ]
 
@@ -65,38 +51,8 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True, cwd=ROOT)
 
 
-def build_wasm() -> None:
-    flags = "--remap-path-prefix=/usr/local/cargo=cargo --remap-path-prefix=/work=."
-    # linux/amd64 on every machine, the one place an emulated image is used on purpose: the
-    # module's bytes depend on the host the compiler runs on (its code, not only symbol names),
-    # and CI's runners and --check build on amd64.
-    run(["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{ROOT}:/work", "-w", "/work",
-         "-v", "opamp-clients-rustup:/usr/local/rustup", "-v", "opamp-clients-cargo:/usr/local/cargo/registry",
-         "-e", f"CARGO_TARGET_DIR=/work/{WASM_TARGET.relative_to(ROOT)}", "-e", f"RUSTFLAGS={flags}",
-         RUST_IMAGE, "cargo", "build", "-q", "--locked", "-p", "opamp-sdk-settings-wasm", "--release",
-         "--target", "wasm32-unknown-unknown"])
-
-
-def fresh_wasm_target() -> None:
-    """Empty the module's target directory, so that --check builds it from the sources alone, as
-    scripts/gen_core.py's fresh_wasm_target says."""
-    run(["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{ROOT}:/work", RUST_IMAGE,
-         "rm", "-rf", f"/work/{WASM_TARGET.relative_to(ROOT)}"])
-
-
-def generated() -> list[str]:
-    """The targets this generates here: the module only where the layer's sources are."""
-    return [t for t in TARGETS if CORE_SOURCE or not t.endswith(".wasm")]
-
-
 def build(out: Path) -> None:
     """Generate every target under `out` (at the same relative paths)."""
-    if CORE_SOURCE:
-        build_wasm()
-        for t in TARGETS:
-            if t.endswith(".wasm"):
-                (out / t).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy(WASM, out / t)
     (out / JAVA).mkdir(parents=True, exist_ok=True)
     run(["protoc", "-I", "spec/proto", "-I", "proto", f"--java_out=lite:{out / JAVA}", PROTO])
 
@@ -132,14 +88,19 @@ def build(out: Path) -> None:
 
 
 def main() -> int:
-    if "--check" not in sys.argv:
+    args = sys.argv[1:]
+    if {"-h", "--help"} & set(args):
+        print(__doc__)
+        return 0
+    if set(args) - {"--check"}:
+        print(__doc__, file=sys.stderr)
+        return 2
+    if "--check" not in args:
         build(ROOT)
         return 0
-    if CORE_SOURCE:
-        fresh_wasm_target()
     with tempfile.TemporaryDirectory() as tmp:
         build(Path(tmp))
-        stale = [t for t in generated()
+        stale = [t for t in TARGETS
                  if not (ROOT / t).exists() or not filecmp.cmp(Path(tmp) / t, ROOT / t, shallow=False)]
     if stale:
         print("out of date (run scripts/gen_sdk_settings.py):", *stale, sep="\n  ")

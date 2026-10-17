@@ -147,6 +147,31 @@ class CoreTest {
     c.close();
   }
 
+  // The tap holds the Config's headers (the enrollment key): a new file is the user's only.
+  @Test
+  void theTapIsTheUsersOnly(@TempDir Path dir) throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+    Core.Tap tap = Core.Tap.open(dir.resolve("core.tap").toString());
+    tap.record(Core.Tap.INIT_IN, new byte[] {1});
+    tap.close();
+    assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
+        Files.getPosixFilePermissions(Path.of(tap.path))));
+    assertEquals(14, Files.size(Path.of(tap.path)));
+  }
+
+  @Test
+  void aTapAlreadyThereIsNarrowedToTheUsersOnly(@TempDir Path dir) throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+    Path file = dir.resolve("core.tap");
+    Files.write(file, new byte[0]);
+    Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+    Core.Tap.append(file).close();
+    assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
+        Files.getPosixFilePermissions(file)));
+  }
+
   @Test
   void withoutTheVariableThereIsNoTap(@TempDir Path dir) throws Exception {
     CoreProto.Config config = CoreProto.Config.newBuilder().setInstanceUid(uid(7)).setEndpoint("http://server/v1/opamp").build();

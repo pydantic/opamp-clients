@@ -119,7 +119,7 @@ func TestAClientThatStopsOnItsOwnSaysWhy(t *testing.T) {
 // a millisecond is noise.
 func BenchmarkStep(b *testing.B) {
 	ctx := context.Background()
-	c, _, err := core.New(ctx, &corepb.Config{InstanceUid: make([]byte, 16)})
+	c, _, err := core.New(ctx, core.Options{}, &corepb.Config{InstanceUid: make([]byte, 16)})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func BenchmarkStep(b *testing.B) {
 func BenchmarkNewCore(b *testing.B) {
 	ctx := context.Background()
 	for i := 0; i < b.N; i++ {
-		c, _, err := core.New(ctx, &corepb.Config{InstanceUid: make([]byte, 16)})
+		c, _, err := core.New(ctx, core.Options{}, &corepb.Config{InstanceUid: make([]byte, 16)})
 		if err != nil {
 			b.Fatal(err)
 		}

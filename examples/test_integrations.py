@@ -953,9 +953,9 @@ class WrongKey(unittest.TestCase):
     def test_the_key_in_code_runs_beside_the_other_key_in_the_variable(self):
         key = key_in_code("CHECKOUT_OPAMP_KEY")
         self.assertEqual(key("wrong"), {"CHECKOUT_OPAMP_KEY": "wrong",
-                                        "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20example"})
-        self.assertEqual(key("example"), {"CHECKOUT_OPAMP_KEY": "example",
-                                          "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20wrong"})
+                                        "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20example-enrollment-key"})
+        self.assertEqual(key("example-enrollment-key"), {"CHECKOUT_OPAMP_KEY": "example-enrollment-key",
+                                                         "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20wrong"})
         self.assertEqual(key_from_env("wrong"), {"OTEL_OPAMP_HEADERS": "Authorization=Bearer%20wrong"})
 
 

@@ -12,6 +12,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields
+from typing import Any
 
 import aiohttp
 
@@ -263,7 +264,7 @@ class Client:
     :meth:`stop` awaited on any loop (on another, it is carried out on the client's)."""
 
     def __init__(self, config: Config, status: Status, notify: Callable[[Notification], None] | None,
-                 _token: object, _core_module: bytes | None = None, _files: Files | None = None,
+                 _token: object, _core_engine: Any = None, _files: Files | None = None,
                  _sessions: Callable[[str], aiohttp.ClientSession] | None = None) -> None:
         if _token is not _START:
             raise TypeError("use Client.start")
@@ -304,7 +305,7 @@ class Client:
             streams=rust,
             splice_downloads=rust and config.rust_splice,
             proxy=proxy_choice(transport) if rust else None,
-        ), _module=_core_module)
+        ), _engine=_core_engine)
         # All of stop takes the core's stop timeout, as given or by default: its start reports it.
         self._stop_timeout = (self._core.limits.stop_timeout_ms if self._core.limits else 0) / 1000
         self._stop_called: float | None = None  # when stop() was first called (the loop's clock)
@@ -345,15 +346,15 @@ class Client:
     @classmethod
     def start(cls, config: Config, status: Status,
               notify: Callable[[Notification], None] | None = None, *,
-              _core_module: bytes | None = None, _files: Files | None = None,
+              _core_engine: Any = None, _files: Files | None = None,
               _sessions: Callable[[str], aiohttp.ClientSession] | None = None) -> Client:
         """Start a client on the running event loop. `notify` is called for every notification,
         on the loop, never before `start` returns (a saved remote config is handed over at start):
         keep it quick. TLS or proxy settings that can't work raise here: ValueError, or OSError
         and ssl.SSLError for files and PEM that can't be loaded."""
-        # Tests only: _core_module, another module with the core's ABI (the adversary); _files, a
+        # Tests only: _core_engine, run instead of the native core (the adversary); _files, a
         # file system standing in for the real one; _sessions (Executor's).
-        return cls(config, status, notify, _START, _core_module, _files, _sessions)
+        return cls(config, status, notify, _START, _core_engine, _files, _sessions)
 
     @property
     def instance_uid(self) -> bytes:

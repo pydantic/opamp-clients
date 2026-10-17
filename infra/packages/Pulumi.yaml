@@ -1,5 +1,0 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
-name: pydantic-opamp-packages
-description: Where the signed apt and yum repositories are published (docs/package-hosting.md)
-runtime: go

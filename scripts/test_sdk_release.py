@@ -50,6 +50,18 @@ class Stamp(unittest.TestCase):
         self.assertRegex(self.read("java/opamp-javaagent/pom.xml"),
                          r"<artifactId>opamp-client</artifactId>\s*<version>7\.8\.9</version>")
 
+    # Every NuGet package native_dist.py packs is stamped, the hosting package too.
+    def test_every_packed_nuget_package_is_stamped(self) -> None:
+        stamped = {Path(rel).stem for rel in sdk_release.CSPROJS}
+        for name in ("Pydantic.OpAmp.Core.Native", "Pydantic.OpAmp.Client", "Pydantic.OpAmp.Extensions.Hosting"):
+            self.assertIn(name, stamped)
+
+    # pack copies each classified jar the pom really builds, by its name there.
+    def test_classified_jars_are_ones_the_poms_build(self) -> None:
+        for rel, classifiers in sdk_release.CLASSIFIERS.items():
+            for c in classifiers:
+                self.assertIn(f"<classifier>{c}</classifier>", self.read(rel), rel)
+
     # The pin rewrites dependencies only: a stamped `name` is no project name at all.
     def test_names_stay_as_they_are(self) -> None:
         for rel in sdk_release.PYPROJECTS:
@@ -88,9 +100,9 @@ class Check(unittest.TestCase):
         write_zip(self.dist / "wheels" / "otel.whl", ["m.py"])
         for name in ("client.tgz", "otel.tgz"):
             write_tgz(self.dist / "npm" / name, ["package/index.js", "package/core/opamp_core.wasm"])
-        for name in ("client.jar", "ext.jar"):
+        for name in ("client.jar", "ext.jar", "ext-app-settings.jar"):
             write_zip(self.dist / "maven" / name, ["A.class"])
-        for name in ("core.nupkg", "client.nupkg"):
+        for name in ("core.nupkg", "client.nupkg", "hosting.nupkg"):
             write_zip(self.native / "nuget" / name, ["lib/a.dll"])
         write_zip(self.dist / "nuget" / "plugin.nupkg", ["lib/b.dll"])
 
@@ -106,6 +118,14 @@ class Check(unittest.TestCase):
     def test_a_source_distribution_fails(self) -> None:
         write_tgz(self.native / "wheels" / "core.tar.gz", ["PKG-INFO"])
         self.assertEqual(["core.tar.gz: a source distribution"], sdk_release.check(self.dist, self.native))
+
+    def test_a_missing_app_settings_jar_fails(self) -> None:
+        (self.dist / "maven" / "ext-app-settings.jar").unlink()
+        self.assertEqual(["2 Maven jars, not at least 3"], sdk_release.check(self.dist, self.native))
+
+    def test_a_missing_nuget_package_fails(self) -> None:
+        (self.native / "nuget" / "hosting.nupkg").unlink()
+        self.assertEqual(["3 NuGet packages, not at least 4"], sdk_release.check(self.dist, self.native))
 
     def test_a_missing_registry_fails(self) -> None:
         (self.dist / "npm" / "otel.tgz").unlink()

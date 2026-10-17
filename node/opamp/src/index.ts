@@ -650,7 +650,7 @@ export class Client {
     const left = () => Math.max(0, releasedBy - this.#now());
     void (async () => {
       // Whatever is still under way (the client stopped on its own) is given up on; downloads
-      // given up on have deleted what they wrote (S3), or the bound has passed.
+      // given up on have deleted what they wrote, or the bound has passed.
       await x?.shutdown(left());
       // Rust mode: files still being written are deleted once their write in flight is over.
       await this.#streams?.shutdown(left());

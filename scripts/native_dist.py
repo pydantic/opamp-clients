@@ -12,16 +12,10 @@ run.
     scripts/native_dist.py check    # each binary is the format and machine its name says
     scripts/native_dist.py smoke    # install and run them in Docker: glibc and musl, x64 and arm64
 
-Without the core's sources (no Cargo.toml at the root), build packs the libraries the core's release
-carries, which `scripts/fetch_core.py fetch --all-platforms` puts in dist/native/runtimes. With
-them, it cross-builds the libraries first, and the Rust targets (rustup target add), cargo-zigbuild,
-cargo-xwin and zig 0.14 (on PATH, or `python3 -m ziglang`) must be installed: CI installs them.
-
-Linux and macOS are built with cargo-zigbuild (zig 0.14: glibc 2.17, so the manylinux wheels and
-the .NET libraries run on any distribution since), Windows with cargo-xwin (the MSVC CRT and SDK
-it downloads). musl's static C runtime can't make a shared library: those targets are built
-without it (-crt-static), which Alpine provides. macOS and Windows binaries are built and checked
-here but run nowhere: CI has only Linux runners. Arm64 runs under QEMU.
+build packs the libraries the core's release carries, which `scripts/fetch_core.py fetch
+--all-platforms` puts in dist/native/runtimes (glibc 2.17, so the manylinux wheels and the .NET
+libraries run on any distribution since). macOS and Windows binaries are checked here but run
+nowhere: CI has only Linux runners. Arm64 runs under QEMU.
 """
 from __future__ import annotations
 
@@ -38,8 +32,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# Whether the core's sources are here to build the libraries from; else they are fetched.
-CORE_SOURCE = (ROOT / "Cargo.toml").is_file()
 DIST = ROOT / "dist" / "native"
 PYTHON = ROOT / "python"
 sys.path.insert(0, str(PYTHON / "core"))
@@ -54,10 +46,6 @@ class Target:
     plat: str  # pydantic-opamp-core's wheel's platform tag
     lib: str  # the library's file name
     magic: tuple[str, str]  # what `file` says of it: the format, and the machine
-
-    @property
-    def triple(self) -> str:
-        return self.rust.split(".")[0]
 
 
 ELF = "ELF 64-bit LSB shared object"
@@ -97,31 +85,6 @@ def run(cmd: list[str], **kw) -> None:
     subprocess.run(cmd, check=True, **kw)
 
 
-def env_for(t: Target) -> dict[str, str]:
-    env = dict(os.environ)
-    if zig := shutil.which("zig"):
-        env.setdefault("CARGO_ZIGBUILD_ZIG_PATH", zig)
-    # No symbol table: only the exported C functions keep their names (check() holds to it).
-    env["CARGO_PROFILE_RELEASE_STRIP"] = "symbols"
-    if "musl" in t.rust:
-        env["RUSTFLAGS"] = (env.get("RUSTFLAGS", "") + " -C target-feature=-crt-static").strip()
-    return env
-
-
-def build_libs(runtimes: Path) -> list[tuple[Target, Path]]:
-    """Every target's library, built at runtimes/<rid>/native/<lib> (the core's release carries them too)."""
-    libs = []
-    for t in TARGETS:
-        tool = ["zigbuild"] if t.tool == "zigbuild" else ["xwin", "build"]
-        run(["cargo", *tool, "--release", "--locked", "-p", "opamp-native", "--target", t.rust], cwd=ROOT,
-            env=env_for(t))
-        out = runtimes / t.rid / "native"
-        out.mkdir(parents=True)
-        shutil.copy2(ROOT / "target" / t.triple / "release" / t.lib, out / t.lib)
-        libs.append((t, out / t.lib))
-    return libs
-
-
 def fetched_libs(runtimes: Path) -> list[tuple[Target, Path]]:
     """Every target's library where scripts/fetch_core.py fetch --all-platforms put it."""
     libs = [(t, runtimes / t.rid / "native" / t.lib) for t in TARGETS]
@@ -131,13 +94,9 @@ def fetched_libs(runtimes: Path) -> list[tuple[Target, Path]]:
 
 
 def build() -> None:
-    if CORE_SOURCE:
-        shutil.rmtree(DIST, ignore_errors=True)
-        libs = build_libs(DIST / "runtimes")
-    else:
-        for d in ("wheels", "nuget"):
-            shutil.rmtree(DIST / d, ignore_errors=True)
-        libs = fetched_libs(DIST / "runtimes")
+    for d in ("wheels", "nuget"):
+        shutil.rmtree(DIST / d, ignore_errors=True)
+    libs = fetched_libs(DIST / "runtimes")
     (DIST / "wheels").mkdir(parents=True)
     for t, lib in libs:
         print("+ wheel", build_backend.wheel(lib, t.plat, DIST / "wheels").name, flush=True)

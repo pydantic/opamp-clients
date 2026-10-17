@@ -175,7 +175,7 @@ func TestInitReportsTheStopTimeoutStopIsBoundedBy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		c, out, err := core.New(context.Background(), cc)
+		c, out, err := core.New(context.Background(), core.Options{}, cc)
 		if err != nil {
 			t.Fatal(err)
 		}

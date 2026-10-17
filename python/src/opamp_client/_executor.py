@@ -32,7 +32,8 @@ Deliver = Callable[[corepb.Input], None]
 
 def _headers(hs) -> CIMultiDict[str]:
     """The headers of a request the core asks for, as aiohttp takes them. The core has checked
-    them already: every header list it asks for meets its rule, or it doesn't ask (issue #218)."""
+    them already: every header list it asks for meets the rule an offered header meets, or it
+    doesn't ask."""
     return CIMultiDict((h.name, h.value) for h in hs)
 
 

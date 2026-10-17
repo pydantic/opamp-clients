@@ -1,5 +1,10 @@
 # The packages
 
+Releases are archives for now, not installers: each `go/opampsupervisor/vX.Y.Z` tag gets a
+[GitHub Release](https://github.com/pydantic/opamp-clients/releases) with the Supervisor and the
+collector for Linux, macOS and Windows on amd64 and arm64 (see [Releases](#releases)). The
+installers below are built and tested in CI but not published yet.
+
 There are three: a deb and an rpm for Linux, a [.pkg for macOS](#macos), and an
 [.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run, and
 enrolls with one command.
@@ -15,8 +20,8 @@ OpAMP:
 - a systemd unit;
 - `pydantic-opamp-enroll`.
 
-Install it from the signed apt or yum repository. `$REPO_URL` is where it's published:
-`https://packages.pydantic.dev` from the first release on (see [Publishing](#publishing)).
+Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
+install it from there. `$REPO_URL` is where it's served:
 
 ```sh
 # Debian, Ubuntu
@@ -125,18 +130,31 @@ REPO_BUCKET=gs://pydantic-opamp-packages REPO_URL=https://packages.pydantic.dev 
   go/opampsupervisor/packaging/publish.sh
 ```
 
-The [Packages workflow](../../../.github/workflows/packages.yml) runs it for each
-`go/opampsupervisor/vX.Y.Z` tag, for amd64 and arm64, then installs the release from the live URL.
-It runs in the `packages` environment. The Pulumi program in [infra/packages](../../../infra/packages)
-makes everything it publishes to: the bucket, served at `https://packages.pydantic.dev` through a
-CDN that keeps the objects' `Cache-Control`; a service account that can write that bucket alone,
-which the workflow becomes through Workload Identity Federation, with no key to store; and the
-environment, with the variables `PACKAGES_BUCKET`, `PACKAGES_URL`, `PACKAGES_SERVICE_ACCOUNT` and
-`PACKAGES_WORKLOAD_IDENTITY_PROVIDER`.
+Nothing runs it yet: no repository is hosted, and there is no signing key.
 
-The signing key is set by hand, as the secret `PACKAGES_SIGNING_KEY` (the armored secret key;
-`PACKAGES_SIGNING_KEY_PASSPHRASE` too if it has one). Keep an offline copy: without it, no new
-release can be signed for the machines that trust it.
+### Releases
+
+[archive.sh](archive.sh) builds one release archive into `packaging/dist/`: `opampsupervisor` and
+`otelcol` (built with ocb from [collector.yaml](collector.yaml)), the licenses and a README, as a
+`.tar.gz` for Linux and macOS and a `.zip` for Windows. Both binaries are cross-built without cgo,
+so any machine builds every target:
+
+```sh
+VERSION=0.1.0 GOOS=darwin GOARCH=arm64 go/opampsupervisor/packaging/archive.sh
+```
+
+The [Release workflow](../../../.github/workflows/release.yml) runs it for each
+`go/opampsupervisor/vX.Y.Z` tag, for linux, darwin and windows on amd64 and arm64, and publishes
+the six archives as the tag's GitHub Release, with `SHA256SUMS` and a build provenance attestation
+for each. It needs no secrets. Run it by hand, with the version, for a tag already pushed: GitHub
+sends no push event when more than three tags are pushed at once.
+
+Check a download with either:
+
+```sh
+sha256sum --check --ignore-missing SHA256SUMS
+gh attestation verify pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+```
 
 ## macOS
 

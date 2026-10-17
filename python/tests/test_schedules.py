@@ -15,7 +15,7 @@ Each step is one of:
   later step sends the rest or resets, a reset); a quarter of what the client gives up on finishes
   anyway (a connection, response or file that comes after its cancel);
 - the server pushes on an open WebSocket, closes it, or drops it;
-- the application calls the client: from the loop, from another thread (known bug S8: it must be
+- the application calls the client: from the loop, from another thread (it must be
   marshalled), or from inside its callback; or its callback raises on its next call;
 - the state file's writer: the next save fails, or takes a while (virtual time);
 - time passes (timeouts fire: the core cancels);
@@ -56,6 +56,7 @@ import threading
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Any
 
 import hypothesis.core
 import pytest
@@ -269,11 +270,11 @@ class Monitor:
 class TappedCore(_core_mod.Core):
     """The real core, with a fixed seed and wall clock (a run is its seeds), checked at each step."""
 
-    def __init__(self, config: corepb.Config, *, _module: bytes | None = None) -> None:
+    def __init__(self, config: corepb.Config, *, _engine: Any = None) -> None:
         config.seed = 0x5EED
         config.entropy = bytes(range(32))
         config.unix_ms = UNIX0
-        super().__init__(config, _module=_module)
+        super().__init__(config, _engine=_engine)
         assert CURRENT is not None
         self.monitor = CURRENT.monitor
 
@@ -598,7 +599,7 @@ class ScheduleMachine(RuleBasedStateMachine):
         elif where == "loop":
             self._run(k, lambda: self._call(what))
         else:
-            # Known bug S8: a direct call from another thread, while the loop runs (the loop's thread
+            # A direct call from another thread, while the loop runs (the loop's thread
             # waits for it here, so where it lands in the schedule is the seed's).
             def from_thread() -> None:
                 t = threading.Thread(target=self._call, args=(what,), name="app-thread")

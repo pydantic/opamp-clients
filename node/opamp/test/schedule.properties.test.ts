@@ -1627,7 +1627,7 @@ class World {
       waited += 250;
     }
     assert.ok(this.stopSettled, `stop returned within ${STOP_BOUND_MS} ms of (mocked) time once idle (RULE-SHELL-07)`);
-    assert.deepEqual(this.heldAtStop, [], "nothing held once stop returned (RULE-SHELL-07, S1, S3)");
+    assert.deepEqual(this.heldAtStop, [], "nothing held once stop returned (RULE-SHELL-07)");
     // Nothing after stop: a call does nothing, nothing is started, no callback comes.
     const told = this.life.notes.length;
     this.call();
@@ -1916,7 +1916,7 @@ test("a WebSocket whose write fails ends once (seed 1)", async () => {
 
 // Found by the test above (seed 1, once the double end was fixed): a download that shutdown
 // aborted went on after stop had returned: its write in flight, its file's close and the removal
-// of what it had written all came later (S3's class: a client restarted on the same state file
+// of what it had written all came later (so a client restarted on the same state file
 // could have its own download of the same id deleted). The replay pins that run; the property
 // under it shuts the executor down at every point of a download.
 // covers: RULE-SHELL-07

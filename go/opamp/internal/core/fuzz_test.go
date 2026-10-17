@@ -209,7 +209,7 @@ func FuzzCoreSteps(f *testing.F) {
 		if persist {
 			cfg.SavedState = saved
 		}
-		c, first, err := New(ctx, cfg)
+		c, first, err := New(ctx, Options{}, cfg)
 		if err != nil {
 			if strings.Contains(err.Error(), "trapped") {
 				t.Fatalf("init trapped: %v", err)
