@@ -3,7 +3,7 @@
 """The shared core and the SDK settings layer, compiled (a native library), through their C
 interface: protobuf bytes in and out, as their WebAssembly modules take and answer them.
 
-The library comes from pydantic-opamp-core (opamp_core/), or OPAMP_NATIVE_LIB names one. Each
+The library comes from pydantic-opamp-core (opamp_core/), the version this package pins. Each
 call hands the library the input for the duration of the call and gets back bytes it allocated,
 which are copied out and handed back to it to free. ctypes lets go of the GIL for the call."""
 
@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import ctypes
 import importlib.util
-import os
 import sys
 from pathlib import Path
 
@@ -29,8 +28,6 @@ def _lib_name() -> str:
 
 
 def _find() -> str:
-    if path := os.environ.get("OPAMP_NATIVE_LIB"):
-        return path
     spec = importlib.util.find_spec("opamp_core")
     for d in (spec.submodule_search_locations or []) if spec else []:
         if (lib := Path(d) / _lib_name()).is_file():

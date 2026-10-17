@@ -186,14 +186,18 @@ def _load(env: dict[str, str]) -> subprocess.CompletedProcess:
 
 
 def test_the_library_comes_from_the_core_package() -> None:
-    found = _load({"OPAMP_NATIVE_LIB": ""})
+    found = _load({})
     assert found.returncode == 0, found.stderr
     assert Path(found.stdout.strip()).parent.name == "opamp_core"
 
 
-def test_a_missing_library_fails_the_import() -> None:
-    found = _load({"OPAMP_NATIVE_LIB": "/nonexistent/libopamp_native.so"})
-    assert found.returncode != 0 and "/nonexistent/libopamp_native.so" in found.stderr
+def test_a_missing_library_fails_the_import(tmp_path: Path) -> None:
+    # A core package without the library: no other library is looked for.
+    (tmp_path / "opamp_core").mkdir()
+    (tmp_path / "opamp_core" / "__init__.py").write_text("")
+    path = os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])])
+    found = _load({"PYTHONPATH": path, "OPAMP_NATIVE_LIB": str(tmp_path / "libopamp_native.so")})
+    assert found.returncode != 0 and "isn't installed" in found.stderr, found.stderr
 
 
 def test_a_closed_session_frees_its_handle_once() -> None:
