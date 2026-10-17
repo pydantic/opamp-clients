@@ -75,8 +75,13 @@ type server struct {
 	conns    int
 	open     map[int]*wsConn
 	// Credentials (scenario "credentials").
-	accepted      map[string]bool
-	offerAnswered bool
+	accepted map[string]bool
+	// answered: how many of the offers the agent has answered (APPLIED or FAILED); latest: the
+	// token offered last, which the server switches to once the agent uses it.
+	answered int
+	latest   string
+	// movedPort: the second listener's port (scenario credentials.move).
+	movedPort string
 	// The remote config hash the agent last reported (scenario "remote_config").
 	reportedConfig []byte
 	// The connection-settings hash the agent last reported, and its capabilities (scenario
@@ -247,6 +252,18 @@ func main() {
 	})
 	srv := &http.Server{Handler: s.withRawHead(s.flagHostile(mux)), ConnContext: connContext}
 	go srv.Serve(ln)
+	// The endpoint a move offers (scenario credentials.move): the same server on another port.
+	if c := sc.Credentials; c != nil && c.Move {
+		host, _, _ := net.SplitHostPort(ln.Addr().String())
+		moved, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+		_, s.movedPort, _ = net.SplitHostPort(moved.Addr().String())
+		ready["moved"] = moved.Addr().String()
+		go srv.Serve(rawListener{moved})
+	}
 	// Also on the IPv6 loopback, for a client told "localhost" that tries ::1 first (scenario
 	// "host"). Optional: without it such a client falls back to 127.0.0.1.
 	if host, port, _ := net.SplitHostPort(ln.Addr().String()); host == "127.0.0.1" && sc.TLS == nil && sc.Proxy == nil {
@@ -485,12 +502,13 @@ func (s *server) authorized(r *http.Request, upgrade bool) bool {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	s.mu.Lock()
 	ok := s.accepted[token]
-	switched := ok && token == c.Offer && len(s.accepted) > 1
+	switched := ok && token == s.latest && len(s.accepted) > 1
 	if switched {
 		s.accepted = map[string]bool{token: true}
 	}
 	s.mu.Unlock()
-	s.log.emit("auth", map[string]any{"token": token, "ok": ok, "upgrade": upgrade, "switched": switched})
+	s.log.emit("auth", map[string]any{"token": token, "ok": ok, "upgrade": upgrade, "switched": switched,
+		"moved": s.movedPort != "" && strings.HasSuffix(r.Host, ":"+s.movedPort)})
 	return ok
 }
 
@@ -614,6 +632,16 @@ func endpoint(r *http.Request, upgrade bool) string {
 		scheme += "s"
 	}
 	return scheme + "://" + r.Host + r.URL.Path
+}
+
+// withPort is url with its port replaced.
+func withPort(url, port string) string {
+	scheme, rest, _ := strings.Cut(url, "://")
+	host, path, _ := strings.Cut(rest, "/")
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return scheme + "://" + net.JoinHostPort(host, port) + "/" + path
 }
 
 // messageFaults registers one more AgentToServer and returns the faults triggered by it.
@@ -1156,30 +1184,45 @@ func (s *server) respond(msg *protobufs.AgentToServer, faults []Fault, n int, ur
 		}
 	}
 	if c := s.sc.Credentials; c != nil {
-		sum := sha256.Sum256([]byte(c.Offer))
-		if st := msg.ConnectionSettingsStatus; st != nil && bytes.Equal(st.LastConnectionSettingsHash, sum[:]) &&
-			(st.Status == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED ||
-				st.Status == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_FAILED) {
-			s.mu.Lock()
-			s.offerAnswered = true
-			s.mu.Unlock()
-		}
 		s.mu.Lock()
-		offer := n >= c.OfferOn && !s.offerAnswered && msg.AgentDisconnect == nil
-		if offer && !c.Broken {
-			s.accepted[c.Offer] = true
-		}
+		offers, step := c.offers(), s.answered
 		s.mu.Unlock()
-		if offer {
+		if step < len(offers) {
+			token := offers[step]
+			sum := sha256.Sum256([]byte(token))
+			if st := msg.ConnectionSettingsStatus; st != nil && bytes.Equal(st.LastConnectionSettingsHash, sum[:]) &&
+				(st.Status == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED ||
+					st.Status == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_FAILED) {
+				s.mu.Lock()
+				s.answered++
+				s.mu.Unlock()
+				step++
+			}
+		}
+		if step < len(offers) && n >= c.OfferOn && msg.AgentDisconnect == nil {
+			token := offers[step]
+			sum := sha256.Sum256([]byte(token))
+			if !c.Broken {
+				s.mu.Lock()
+				s.accepted[token] = true
+				s.latest = token
+				s.mu.Unlock()
+			}
+			dest := url
+			if c.Move && step == 0 {
+				dest = withPort(url, s.movedPort)
+			}
 			resp.ConnectionSettings = &protobufs.ConnectionSettingsOffers{
 				Hash: sum[:],
 				Opamp: &protobufs.OpAMPConnectionSettings{
-					DestinationEndpoint: url,
+					DestinationEndpoint: dest,
 					Headers: &protobufs.Headers{Headers: []*protobufs.Header{
-						{Key: "Authorization", Value: "Bearer " + c.Offer}}},
+						{Key: "Authorization", Value: "Bearer " + token}}},
 				},
 			}
 			info["credentials_offer"] = hex.EncodeToString(sum[:])
+			info["credentials_offer_step"] = step
+			info["credentials_offer_endpoint"] = dest
 		}
 	}
 	if cs := s.hostileSettings(msg, n, url, info); cs != nil {

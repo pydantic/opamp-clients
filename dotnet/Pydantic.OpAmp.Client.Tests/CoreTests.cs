@@ -91,6 +91,12 @@ public class CoreTests
 
         var name = Assert.Single(Taps());
         Assert.True(name == path || Later(name), name);
+        if (!OperatingSystem.IsWindows())
+        {
+            // It holds the Config's headers (the enrollment key): the user's only.
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(name));
+        }
+
         var records = Records(File.ReadAllBytes(name));
         Assert.Equal(new byte[] { 1, 2, 3, 4 }, records.Select(r => r.Kind).ToArray());
         Assert.Equal(config, Config.Parser.ParseFrom(records[0].Bytes));

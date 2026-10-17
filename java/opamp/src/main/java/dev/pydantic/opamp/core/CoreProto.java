@@ -163,6 +163,256 @@ public final class CoreProto {
     // @@protoc_insertion_point(enum_scope:opamp.core.v1.StatusField)
   }
 
+  /**
+   * <pre>
+   * The operating system, for where the user's state directory is.
+   * </pre>
+   *
+   * Protobuf enum {@code opamp.core.v1.SetupOs}
+   */
+  public enum SetupOs
+      implements com.google.protobuf.Internal.EnumLite {
+    /**
+     * <pre>
+     * Linux and every other Unix: $XDG_STATE_HOME, else $HOME/.local/state
+     * </pre>
+     *
+     * <code>SETUP_OS_UNIX = 0;</code>
+     */
+    SETUP_OS_UNIX(0),
+    /**
+     * <pre>
+     * $HOME/Library/Application Support
+     * </pre>
+     *
+     * <code>SETUP_OS_MACOS = 1;</code>
+     */
+    SETUP_OS_MACOS(1),
+    /**
+     * <pre>
+     * %LOCALAPPDATA%, and &#92; between the parts of a path
+     * </pre>
+     *
+     * <code>SETUP_OS_WINDOWS = 2;</code>
+     */
+    SETUP_OS_WINDOWS(2),
+    UNRECOGNIZED(-1),
+    ;
+
+    /**
+     * <pre>
+     * Linux and every other Unix: $XDG_STATE_HOME, else $HOME/.local/state
+     * </pre>
+     *
+     * <code>SETUP_OS_UNIX = 0;</code>
+     */
+    public static final int SETUP_OS_UNIX_VALUE = 0;
+    /**
+     * <pre>
+     * $HOME/Library/Application Support
+     * </pre>
+     *
+     * <code>SETUP_OS_MACOS = 1;</code>
+     */
+    public static final int SETUP_OS_MACOS_VALUE = 1;
+    /**
+     * <pre>
+     * %LOCALAPPDATA%, and &#92; between the parts of a path
+     * </pre>
+     *
+     * <code>SETUP_OS_WINDOWS = 2;</code>
+     */
+    public static final int SETUP_OS_WINDOWS_VALUE = 2;
+
+
+    @java.lang.Override
+    public final int getNumber() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalArgumentException(
+            "Can't get the number of an unknown enum value.");
+      }
+      return value;
+    }
+
+    /**
+     * @param value The number of the enum to look for.
+     * @return The enum associated with the given number.
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static SetupOs valueOf(int value) {
+      return forNumber(value);
+    }
+
+    public static SetupOs forNumber(int value) {
+      switch (value) {
+        case 0: return SETUP_OS_UNIX;
+        case 1: return SETUP_OS_MACOS;
+        case 2: return SETUP_OS_WINDOWS;
+        default: return null;
+      }
+    }
+
+    public static com.google.protobuf.Internal.EnumLiteMap<SetupOs>
+        internalGetValueMap() {
+      return internalValueMap;
+    }
+    private static final com.google.protobuf.Internal.EnumLiteMap<
+        SetupOs> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<SetupOs>() {
+            @java.lang.Override
+            public SetupOs findValueByNumber(int number) {
+              return SetupOs.forNumber(number);
+            }
+          };
+
+    public static com.google.protobuf.Internal.EnumVerifier 
+        internalGetVerifier() {
+      return SetupOsVerifier.INSTANCE;
+    }
+
+    private static final class SetupOsVerifier implements 
+         com.google.protobuf.Internal.EnumVerifier { 
+            static final com.google.protobuf.Internal.EnumVerifier
+                INSTANCE = new SetupOsVerifier();
+            @java.lang.Override
+            public boolean isInRange(int number) {
+              return SetupOs.forNumber(number) != null;
+            }
+          };
+
+    private final int value;
+
+    private SetupOs(int value) {
+      this.value = value;
+    }
+
+    // @@protoc_insertion_point(enum_scope:opamp.core.v1.SetupOs)
+  }
+
+  /**
+   * Protobuf enum {@code opamp.core.v1.SetupUidFrom}
+   */
+  public enum SetupUidFrom
+      implements com.google.protobuf.Internal.EnumLite {
+    /**
+     * <pre>
+     * a new UUIDv7, of entropy and unix_ms
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_MADE = 0;</code>
+     */
+    SETUP_UID_FROM_MADE(0),
+    /**
+     * <pre>
+     * the state directory's instance-uid file
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_SAVED = 1;</code>
+     */
+    SETUP_UID_FROM_SAVED(1),
+    /**
+     * <pre>
+     * a UUID service.instance.id in OTEL_RESOURCE_ATTRIBUTES
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_GIVEN = 2;</code>
+     */
+    SETUP_UID_FROM_GIVEN(2),
+    UNRECOGNIZED(-1),
+    ;
+
+    /**
+     * <pre>
+     * a new UUIDv7, of entropy and unix_ms
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_MADE = 0;</code>
+     */
+    public static final int SETUP_UID_FROM_MADE_VALUE = 0;
+    /**
+     * <pre>
+     * the state directory's instance-uid file
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_SAVED = 1;</code>
+     */
+    public static final int SETUP_UID_FROM_SAVED_VALUE = 1;
+    /**
+     * <pre>
+     * a UUID service.instance.id in OTEL_RESOURCE_ATTRIBUTES
+     * </pre>
+     *
+     * <code>SETUP_UID_FROM_GIVEN = 2;</code>
+     */
+    public static final int SETUP_UID_FROM_GIVEN_VALUE = 2;
+
+
+    @java.lang.Override
+    public final int getNumber() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalArgumentException(
+            "Can't get the number of an unknown enum value.");
+      }
+      return value;
+    }
+
+    /**
+     * @param value The number of the enum to look for.
+     * @return The enum associated with the given number.
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static SetupUidFrom valueOf(int value) {
+      return forNumber(value);
+    }
+
+    public static SetupUidFrom forNumber(int value) {
+      switch (value) {
+        case 0: return SETUP_UID_FROM_MADE;
+        case 1: return SETUP_UID_FROM_SAVED;
+        case 2: return SETUP_UID_FROM_GIVEN;
+        default: return null;
+      }
+    }
+
+    public static com.google.protobuf.Internal.EnumLiteMap<SetupUidFrom>
+        internalGetValueMap() {
+      return internalValueMap;
+    }
+    private static final com.google.protobuf.Internal.EnumLiteMap<
+        SetupUidFrom> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<SetupUidFrom>() {
+            @java.lang.Override
+            public SetupUidFrom findValueByNumber(int number) {
+              return SetupUidFrom.forNumber(number);
+            }
+          };
+
+    public static com.google.protobuf.Internal.EnumVerifier 
+        internalGetVerifier() {
+      return SetupUidFromVerifier.INSTANCE;
+    }
+
+    private static final class SetupUidFromVerifier implements 
+         com.google.protobuf.Internal.EnumVerifier { 
+            static final com.google.protobuf.Internal.EnumVerifier
+                INSTANCE = new SetupUidFromVerifier();
+            @java.lang.Override
+            public boolean isInRange(int number) {
+              return SetupUidFrom.forNumber(number) != null;
+            }
+          };
+
+    private final int value;
+
+    private SetupUidFrom(int value) {
+      this.value = value;
+    }
+
+    // @@protoc_insertion_point(enum_scope:opamp.core.v1.SetupUidFrom)
+  }
+
   public interface ConfigOrBuilder extends
       // @@protoc_insertion_point(interface_extends:opamp.core.v1.Config)
       com.google.protobuf.MessageLiteOrBuilder {
@@ -6843,6 +7093,29 @@ public final class CoreProto {
      */
     dev.pydantic.opamp.core.CoreProto.Headers getSetAuthHeaders();
 
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     * @return Whether the abort field is set.
+     */
+    boolean hasAbort();
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     * @return The abort.
+     */
+    dev.pydantic.opamp.core.CoreProto.Empty getAbort();
+
     public dev.pydantic.opamp.core.CoreProto.Input.KindCase getKindCase();
   }
   /**
@@ -6898,6 +7171,7 @@ public final class CoreProto {
       STREAM_SPLICED(32),
       DOWNLOAD_RESPONSE(33),
       SET_AUTH_HEADERS(34),
+      ABORT(35),
       KIND_NOT_SET(0);
       private final int value;
       private KindCase(int value) {
@@ -6947,6 +7221,7 @@ public final class CoreProto {
           case 32: return STREAM_SPLICED;
           case 33: return DOWNLOAD_RESPONSE;
           case 34: return SET_AUTH_HEADERS;
+          case 35: return ABORT;
           case 0: return KIND_NOT_SET;
           default: return null;
         }
@@ -9221,6 +9496,88 @@ public final class CoreProto {
      */
     private void clearSetAuthHeaders() {
       if (kindCase_ == 34) {
+        kindCase_ = 0;
+        kind_ = null;
+      }
+    }
+
+    public static final int ABORT_FIELD_NUMBER = 35;
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     */
+    @java.lang.Override
+    public boolean hasAbort() {
+      return kindCase_ == 35;
+    }
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Empty getAbort() {
+      if (kindCase_ == 35) {
+         return (dev.pydantic.opamp.core.CoreProto.Empty) kind_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.Empty.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAbort(dev.pydantic.opamp.core.CoreProto.Empty value) {
+      value.getClass();  // minimal bytecode null check
+      kind_ = value;
+      kindCase_ = 35;
+    }
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeAbort(dev.pydantic.opamp.core.CoreProto.Empty value) {
+      value.getClass();  // minimal bytecode null check
+      if (kindCase_ == 35 &&
+          kind_ != dev.pydantic.opamp.core.CoreProto.Empty.getDefaultInstance()) {
+        kind_ = dev.pydantic.opamp.core.CoreProto.Empty.newBuilder((dev.pydantic.opamp.core.CoreProto.Empty) kind_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        kind_ = value;
+      }
+      kindCase_ = 35;
+    }
+    /**
+     * <pre>
+     * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+     * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+     * Close), says stopped in the same step unless it had, and does nothing in any step after.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Empty abort = 35;</code>
+     */
+    private void clearAbort() {
+      if (kindCase_ == 35) {
         kindCase_ = 0;
         kind_ = null;
       }
@@ -11560,6 +11917,90 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      @java.lang.Override
+      public boolean hasAbort() {
+        return instance.hasAbort();
+      }
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Empty getAbort() {
+        return instance.getAbort();
+      }
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      public Builder setAbort(dev.pydantic.opamp.core.CoreProto.Empty value) {
+        copyOnWrite();
+        instance.setAbort(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      public Builder setAbort(
+          dev.pydantic.opamp.core.CoreProto.Empty.Builder builderForValue) {
+        copyOnWrite();
+        instance.setAbort(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      public Builder mergeAbort(dev.pydantic.opamp.core.CoreProto.Empty value) {
+        copyOnWrite();
+        instance.mergeAbort(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+       * cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+       * Close), says stopped in the same step unless it had, and does nothing in any step after.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Empty abort = 35;</code>
+       */
+      public Builder clearAbort() {
+        copyOnWrite();
+        instance.clearAbort();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Input)
     }
     @java.lang.Override
@@ -11612,14 +12053,15 @@ public final class CoreProto {
               dev.pydantic.opamp.core.CoreProto.Id.class,
               dev.pydantic.opamp.core.CoreProto.DownloadResponse.class,
               dev.pydantic.opamp.core.CoreProto.Headers.class,
+              dev.pydantic.opamp.core.CoreProto.Empty.class,
             };
             java.lang.String info =
-                "\u0000\"\u0001\u0000\u0001\"\"\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
-                "<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000\n<" +
-                "\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000\u0010<\u0000\u0011" +
-                "<\u0000\u0012<\u0000\u0013<\u0000\u0014<\u0000\u0015<\u0000\u0016<\u0000\u0017<\u0000" +
-                "\u0018<\u0000\u0019<\u0000\u001a<\u0000\u001b<\u0000\u001c<\u0000\u001d<\u0000\u001e" +
-                "<\u0000\u001f<\u0000 <\u0000!<\u0000\"<\u0000";
+                "\u0000#\u0001\u0000\u0001##\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003<\u0000" +
+                "\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000\n<\u0000\u000b" +
+                "<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000\u0010<\u0000\u0011<\u0000\u0012" +
+                "<\u0000\u0013<\u0000\u0014<\u0000\u0015<\u0000\u0016<\u0000\u0017<\u0000\u0018<\u0000" +
+                "\u0019<\u0000\u001a<\u0000\u001b<\u0000\u001c<\u0000\u001d<\u0000\u001e<\u0000\u001f" +
+                "<\u0000 <\u0000!<\u0000\"<\u0000#<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -33500,6 +33942,8664 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<StatusTooLarge> PARSER;
 
     public static com.google.protobuf.Parser<StatusTooLarge> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupCallOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupCall)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     * @return Whether the start field is set.
+     */
+    boolean hasStart();
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     * @return The start.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupStart getStart();
+
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     * @return Whether the identity field is set.
+     */
+    boolean hasIdentity();
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     * @return The identity.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupIdentity getIdentity();
+
+    public dev.pydantic.opamp.core.CoreProto.SetupCall.CallCase getCallCase();
+  }
+  /**
+   * Protobuf type {@code opamp.core.v1.SetupCall}
+   */
+  public  static final class SetupCall extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupCall, SetupCall.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupCall)
+      SetupCallOrBuilder {
+    private SetupCall() {
+    }
+    private int callCase_ = 0;
+    private java.lang.Object call_;
+    public enum CallCase
+        implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
+      START(1),
+      IDENTITY(2),
+      CALL_NOT_SET(0);
+      private final int value;
+      private CallCase(int value) {
+        this.value = value;
+      }
+      /**
+       * @deprecated Use {@link #forNumber(int)} instead.
+       */
+      @java.lang.Deprecated
+      public static CallCase valueOf(int value) {
+        return forNumber(value);
+      }
+
+      public static CallCase forNumber(int value) {
+        switch (value) {
+          case 1: return START;
+          case 2: return IDENTITY;
+          case 0: return CALL_NOT_SET;
+          default: return null;
+        }
+      }
+      @java.lang.Override public int getNumber() {
+        return this.value;
+      }
+    };
+
+    @java.lang.Override
+    public CallCase
+    getCallCase() {
+      return CallCase.forNumber(
+          callCase_);
+    }
+
+    private void clearCall() {
+      callCase_ = 0;
+      call_ = null;
+    }
+
+    public static final int START_FIELD_NUMBER = 1;
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     */
+    @java.lang.Override
+    public boolean hasStart() {
+      return callCase_ == 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupStart getStart() {
+      if (callCase_ == 1) {
+         return (dev.pydantic.opamp.core.CoreProto.SetupStart) call_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.SetupStart.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStart(dev.pydantic.opamp.core.CoreProto.SetupStart value) {
+      value.getClass();  // minimal bytecode null check
+      call_ = value;
+      callCase_ = 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeStart(dev.pydantic.opamp.core.CoreProto.SetupStart value) {
+      value.getClass();  // minimal bytecode null check
+      if (callCase_ == 1 &&
+          call_ != dev.pydantic.opamp.core.CoreProto.SetupStart.getDefaultInstance()) {
+        call_ = dev.pydantic.opamp.core.CoreProto.SetupStart.newBuilder((dev.pydantic.opamp.core.CoreProto.SetupStart) call_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        call_ = value;
+      }
+      callCase_ = 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStart start = 1;</code>
+     */
+    private void clearStart() {
+      if (callCase_ == 1) {
+        callCase_ = 0;
+        call_ = null;
+      }
+    }
+
+    public static final int IDENTITY_FIELD_NUMBER = 2;
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasIdentity() {
+      return callCase_ == 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupIdentity getIdentity() {
+      if (callCase_ == 2) {
+         return (dev.pydantic.opamp.core.CoreProto.SetupIdentity) call_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.SetupIdentity.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setIdentity(dev.pydantic.opamp.core.CoreProto.SetupIdentity value) {
+      value.getClass();  // minimal bytecode null check
+      call_ = value;
+      callCase_ = 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeIdentity(dev.pydantic.opamp.core.CoreProto.SetupIdentity value) {
+      value.getClass();  // minimal bytecode null check
+      if (callCase_ == 2 &&
+          call_ != dev.pydantic.opamp.core.CoreProto.SetupIdentity.getDefaultInstance()) {
+        call_ = dev.pydantic.opamp.core.CoreProto.SetupIdentity.newBuilder((dev.pydantic.opamp.core.CoreProto.SetupIdentity) call_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        call_ = value;
+      }
+      callCase_ = 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+     */
+    private void clearIdentity() {
+      if (callCase_ == 2) {
+        callCase_ = 0;
+        call_ = null;
+      }
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupCall prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.core.v1.SetupCall}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupCall, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupCall)
+        dev.pydantic.opamp.core.CoreProto.SetupCallOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupCall.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+      @java.lang.Override
+      public CallCase
+          getCallCase() {
+        return instance.getCallCase();
+      }
+
+      public Builder clearCall() {
+        copyOnWrite();
+        instance.clearCall();
+        return this;
+      }
+
+
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      @java.lang.Override
+      public boolean hasStart() {
+        return instance.hasStart();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupStart getStart() {
+        return instance.getStart();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      public Builder setStart(dev.pydantic.opamp.core.CoreProto.SetupStart value) {
+        copyOnWrite();
+        instance.setStart(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      public Builder setStart(
+          dev.pydantic.opamp.core.CoreProto.SetupStart.Builder builderForValue) {
+        copyOnWrite();
+        instance.setStart(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      public Builder mergeStart(dev.pydantic.opamp.core.CoreProto.SetupStart value) {
+        copyOnWrite();
+        instance.mergeStart(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStart start = 1;</code>
+       */
+      public Builder clearStart() {
+        copyOnWrite();
+        instance.clearStart();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasIdentity() {
+        return instance.hasIdentity();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupIdentity getIdentity() {
+        return instance.getIdentity();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      public Builder setIdentity(dev.pydantic.opamp.core.CoreProto.SetupIdentity value) {
+        copyOnWrite();
+        instance.setIdentity(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      public Builder setIdentity(
+          dev.pydantic.opamp.core.CoreProto.SetupIdentity.Builder builderForValue) {
+        copyOnWrite();
+        instance.setIdentity(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      public Builder mergeIdentity(dev.pydantic.opamp.core.CoreProto.SetupIdentity value) {
+        copyOnWrite();
+        instance.mergeIdentity(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentity identity = 2;</code>
+       */
+      public Builder clearIdentity() {
+        copyOnWrite();
+        instance.clearIdentity();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupCall)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupCall();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "call_",
+              "callCase_",
+              dev.pydantic.opamp.core.CoreProto.SetupStart.class,
+              dev.pydantic.opamp.core.CoreProto.SetupIdentity.class,
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0001\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001<\u0000\u0002<" +
+                "\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupCall> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupCall.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupCall>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupCall)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupCall DEFAULT_INSTANCE;
+    static {
+      SetupCall defaultInstance = new SetupCall();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupCall.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupCall getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupCall> PARSER;
+
+    public static com.google.protobuf.Parser<SetupCall> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupReplyOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupReply)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     * @return Whether the started field is set.
+     */
+    boolean hasStarted();
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     * @return The started.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupStarted getStarted();
+
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     * @return Whether the identified field is set.
+     */
+    boolean hasIdentified();
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     * @return The identified.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupIdentified getIdentified();
+
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return Whether the error field is set.
+     */
+    boolean hasError();
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return The error.
+     */
+    java.lang.String getError();
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return The bytes for error.
+     */
+    com.google.protobuf.ByteString
+        getErrorBytes();
+
+    public dev.pydantic.opamp.core.CoreProto.SetupReply.ResultCase getResultCase();
+  }
+  /**
+   * Protobuf type {@code opamp.core.v1.SetupReply}
+   */
+  public  static final class SetupReply extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupReply, SetupReply.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupReply)
+      SetupReplyOrBuilder {
+    private SetupReply() {
+    }
+    private int resultCase_ = 0;
+    private java.lang.Object result_;
+    public enum ResultCase
+        implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
+      STARTED(1),
+      IDENTIFIED(2),
+      ERROR(3),
+      RESULT_NOT_SET(0);
+      private final int value;
+      private ResultCase(int value) {
+        this.value = value;
+      }
+      /**
+       * @deprecated Use {@link #forNumber(int)} instead.
+       */
+      @java.lang.Deprecated
+      public static ResultCase valueOf(int value) {
+        return forNumber(value);
+      }
+
+      public static ResultCase forNumber(int value) {
+        switch (value) {
+          case 1: return STARTED;
+          case 2: return IDENTIFIED;
+          case 3: return ERROR;
+          case 0: return RESULT_NOT_SET;
+          default: return null;
+        }
+      }
+      @java.lang.Override public int getNumber() {
+        return this.value;
+      }
+    };
+
+    @java.lang.Override
+    public ResultCase
+    getResultCase() {
+      return ResultCase.forNumber(
+          resultCase_);
+    }
+
+    private void clearResult() {
+      resultCase_ = 0;
+      result_ = null;
+    }
+
+    public static final int STARTED_FIELD_NUMBER = 1;
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     */
+    @java.lang.Override
+    public boolean hasStarted() {
+      return resultCase_ == 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupStarted getStarted() {
+      if (resultCase_ == 1) {
+         return (dev.pydantic.opamp.core.CoreProto.SetupStarted) result_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.SetupStarted.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStarted(dev.pydantic.opamp.core.CoreProto.SetupStarted value) {
+      value.getClass();  // minimal bytecode null check
+      result_ = value;
+      resultCase_ = 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeStarted(dev.pydantic.opamp.core.CoreProto.SetupStarted value) {
+      value.getClass();  // minimal bytecode null check
+      if (resultCase_ == 1 &&
+          result_ != dev.pydantic.opamp.core.CoreProto.SetupStarted.getDefaultInstance()) {
+        result_ = dev.pydantic.opamp.core.CoreProto.SetupStarted.newBuilder((dev.pydantic.opamp.core.CoreProto.SetupStarted) result_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        result_ = value;
+      }
+      resultCase_ = 1;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+     */
+    private void clearStarted() {
+      if (resultCase_ == 1) {
+        resultCase_ = 0;
+        result_ = null;
+      }
+    }
+
+    public static final int IDENTIFIED_FIELD_NUMBER = 2;
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasIdentified() {
+      return resultCase_ == 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupIdentified getIdentified() {
+      if (resultCase_ == 2) {
+         return (dev.pydantic.opamp.core.CoreProto.SetupIdentified) result_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.SetupIdentified.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setIdentified(dev.pydantic.opamp.core.CoreProto.SetupIdentified value) {
+      value.getClass();  // minimal bytecode null check
+      result_ = value;
+      resultCase_ = 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeIdentified(dev.pydantic.opamp.core.CoreProto.SetupIdentified value) {
+      value.getClass();  // minimal bytecode null check
+      if (resultCase_ == 2 &&
+          result_ != dev.pydantic.opamp.core.CoreProto.SetupIdentified.getDefaultInstance()) {
+        result_ = dev.pydantic.opamp.core.CoreProto.SetupIdentified.newBuilder((dev.pydantic.opamp.core.CoreProto.SetupIdentified) result_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        result_ = value;
+      }
+      resultCase_ = 2;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+     */
+    private void clearIdentified() {
+      if (resultCase_ == 2) {
+        resultCase_ = 0;
+        result_ = null;
+      }
+    }
+
+    public static final int ERROR_FIELD_NUMBER = 3;
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return Whether the error field is set.
+     */
+    @java.lang.Override
+    public boolean hasError() {
+      return resultCase_ == 3;
+    }
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return The error.
+     */
+    @java.lang.Override
+    public java.lang.String getError() {
+      java.lang.String ref = "";
+      if (resultCase_ == 3) {
+        ref = (java.lang.String) result_;
+      }
+      return ref;
+    }
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @return The bytes for error.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getErrorBytes() {
+      java.lang.String ref = "";
+      if (resultCase_ == 3) {
+        ref = (java.lang.String) result_;
+      }
+      return com.google.protobuf.ByteString.copyFromUtf8(ref);
+    }
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @param value The error to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setError(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      resultCase_ = 3;
+      result_ = value;
+    }
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     */
+    private void clearError() {
+      if (resultCase_ == 3) {
+        resultCase_ = 0;
+        result_ = null;
+      }
+    }
+    /**
+     * <pre>
+     * an unusable call: a bug in the integration
+     * </pre>
+     *
+     * <code>string error = 3;</code>
+     * @param value The bytes for error to set.
+     */
+    private void setErrorBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      result_ = value.toStringUtf8();
+      resultCase_ = 3;
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupReply prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.core.v1.SetupReply}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupReply, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupReply)
+        dev.pydantic.opamp.core.CoreProto.SetupReplyOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupReply.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+      @java.lang.Override
+      public ResultCase
+          getResultCase() {
+        return instance.getResultCase();
+      }
+
+      public Builder clearResult() {
+        copyOnWrite();
+        instance.clearResult();
+        return this;
+      }
+
+
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      @java.lang.Override
+      public boolean hasStarted() {
+        return instance.hasStarted();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupStarted getStarted() {
+        return instance.getStarted();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      public Builder setStarted(dev.pydantic.opamp.core.CoreProto.SetupStarted value) {
+        copyOnWrite();
+        instance.setStarted(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      public Builder setStarted(
+          dev.pydantic.opamp.core.CoreProto.SetupStarted.Builder builderForValue) {
+        copyOnWrite();
+        instance.setStarted(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      public Builder mergeStarted(dev.pydantic.opamp.core.CoreProto.SetupStarted value) {
+        copyOnWrite();
+        instance.mergeStarted(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupStarted started = 1;</code>
+       */
+      public Builder clearStarted() {
+        copyOnWrite();
+        instance.clearStarted();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasIdentified() {
+        return instance.hasIdentified();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupIdentified getIdentified() {
+        return instance.getIdentified();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      public Builder setIdentified(dev.pydantic.opamp.core.CoreProto.SetupIdentified value) {
+        copyOnWrite();
+        instance.setIdentified(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      public Builder setIdentified(
+          dev.pydantic.opamp.core.CoreProto.SetupIdentified.Builder builderForValue) {
+        copyOnWrite();
+        instance.setIdentified(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      public Builder mergeIdentified(dev.pydantic.opamp.core.CoreProto.SetupIdentified value) {
+        copyOnWrite();
+        instance.mergeIdentified(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupIdentified identified = 2;</code>
+       */
+      public Builder clearIdentified() {
+        copyOnWrite();
+        instance.clearIdentified();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @return Whether the error field is set.
+       */
+      @java.lang.Override
+      public boolean hasError() {
+        return instance.hasError();
+      }
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @return The error.
+       */
+      @java.lang.Override
+      public java.lang.String getError() {
+        return instance.getError();
+      }
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @return The bytes for error.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getErrorBytes() {
+        return instance.getErrorBytes();
+      }
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @param value The error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setError(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setError(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearError() {
+        copyOnWrite();
+        instance.clearError();
+        return this;
+      }
+      /**
+       * <pre>
+       * an unusable call: a bug in the integration
+       * </pre>
+       *
+       * <code>string error = 3;</code>
+       * @param value The bytes for error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrorBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setErrorBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupReply)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupReply();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "result_",
+              "resultCase_",
+              dev.pydantic.opamp.core.CoreProto.SetupStarted.class,
+              dev.pydantic.opamp.core.CoreProto.SetupIdentified.class,
+            };
+            java.lang.String info =
+                "\u0000\u0003\u0001\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001<\u0000\u0002<" +
+                "\u0000\u0003\u023b\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupReply> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupReply.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupReply>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupReply)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupReply DEFAULT_INSTANCE;
+    static {
+      SetupReply defaultInstance = new SetupReply();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupReply.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupReply getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupReply> PARSER;
+
+    public static com.google.protobuf.Parser<SetupReply> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface VariableOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.Variable)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    java.lang.String getName();
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    com.google.protobuf.ByteString
+        getNameBytes();
+
+    /**
+     * <code>string value = 2;</code>
+     * @return The value.
+     */
+    java.lang.String getValue();
+    /**
+     * <code>string value = 2;</code>
+     * @return The bytes for value.
+     */
+    com.google.protobuf.ByteString
+        getValueBytes();
+  }
+  /**
+   * <pre>
+   * A variable of the environment.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.Variable}
+   */
+  public  static final class Variable extends
+      com.google.protobuf.GeneratedMessageLite<
+          Variable, Variable.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.Variable)
+      VariableOrBuilder {
+    private Variable() {
+      name_ = "";
+      value_ = "";
+    }
+    public static final int NAME_FIELD_NUMBER = 1;
+    private java.lang.String name_;
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    @java.lang.Override
+    public java.lang.String getName() {
+      return name_;
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(name_);
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The name to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      name_ = value;
+    }
+    /**
+     * <code>string name = 1;</code>
+     */
+    private void clearName() {
+
+      name_ = getDefaultInstance().getName();
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The bytes for name to set.
+     */
+    private void setNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      name_ = value.toStringUtf8();
+
+    }
+
+    public static final int VALUE_FIELD_NUMBER = 2;
+    private java.lang.String value_;
+    /**
+     * <code>string value = 2;</code>
+     * @return The value.
+     */
+    @java.lang.Override
+    public java.lang.String getValue() {
+      return value_;
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @return The bytes for value.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getValueBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(value_);
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @param value The value to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setValue(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      value_ = value;
+    }
+    /**
+     * <code>string value = 2;</code>
+     */
+    private void clearValue() {
+
+      value_ = getDefaultInstance().getValue();
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @param value The bytes for value to set.
+     */
+    private void setValueBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      value_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Variable parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.Variable prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * A variable of the environment.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.Variable}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.Variable, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.Variable)
+        dev.pydantic.opamp.core.CoreProto.VariableOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.Variable.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>string name = 1;</code>
+       * @return The name.
+       */
+      @java.lang.Override
+      public java.lang.String getName() {
+        return instance.getName();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return The bytes for name.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getNameBytes() {
+        return instance.getNameBytes();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setName(value);
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearName() {
+        copyOnWrite();
+        instance.clearName();
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The bytes for name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setNameBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string value = 2;</code>
+       * @return The value.
+       */
+      @java.lang.Override
+      public java.lang.String getValue() {
+        return instance.getValue();
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @return The bytes for value.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getValueBytes() {
+        return instance.getValueBytes();
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @param value The value to set.
+       * @return This builder for chaining.
+       */
+      public Builder setValue(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setValue(value);
+        return this;
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearValue() {
+        copyOnWrite();
+        instance.clearValue();
+        return this;
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @param value The bytes for value to set.
+       * @return This builder for chaining.
+       */
+      public Builder setValueBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setValueBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.Variable)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.Variable();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "name_",
+              "value_",
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.Variable> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.Variable.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.Variable>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.Variable)
+    private static final dev.pydantic.opamp.core.CoreProto.Variable DEFAULT_INSTANCE;
+    static {
+      Variable defaultInstance = new Variable();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        Variable.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Variable getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<Variable> PARSER;
+
+    public static com.google.protobuf.Parser<Variable> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupStartOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupStart)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    java.util.List<dev.pydantic.opamp.core.CoreProto.Variable> 
+        getEnvList();
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    dev.pydantic.opamp.core.CoreProto.Variable getEnv(int index);
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    int getEnvCount();
+
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @return The enum numeric value on the wire for os.
+     */
+    int getOsValue();
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @return The os.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupOs getOs();
+
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @return The program.
+     */
+    java.lang.String getProgram();
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @return The bytes for program.
+     */
+    com.google.protobuf.ByteString
+        getProgramBytes();
+
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @return The cwd.
+     */
+    java.lang.String getCwd();
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @return The bytes for cwd.
+     */
+    com.google.protobuf.ByteString
+        getCwdBytes();
+
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     * @return Whether the code field is set.
+     */
+    boolean hasCode();
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     * @return The code.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupInCode getCode();
+  }
+  /**
+   * <pre>
+   * Where the server is and how to reach it, from the environment and what the code gives.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.SetupStart}
+   */
+  public  static final class SetupStart extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupStart, SetupStart.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupStart)
+      SetupStartOrBuilder {
+    private SetupStart() {
+      env_ = emptyProtobufList();
+      program_ = "";
+      cwd_ = "";
+    }
+    private int bitField0_;
+    public static final int ENV_FIELD_NUMBER = 1;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Variable> env_;
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.core.CoreProto.Variable> getEnvList() {
+      return env_;
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.core.CoreProto.VariableOrBuilder> 
+        getEnvOrBuilderList() {
+      return env_;
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.Override
+    public int getEnvCount() {
+      return env_.size();
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Variable getEnv(int index) {
+      return env_.get(index);
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    public dev.pydantic.opamp.core.CoreProto.VariableOrBuilder getEnvOrBuilder(
+        int index) {
+      return env_.get(index);
+    }
+    private void ensureEnvIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Variable> tmp = env_;
+      if (!tmp.isModifiable()) {
+        env_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEnv(
+        int index, dev.pydantic.opamp.core.CoreProto.Variable value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.set(index, value);
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnv(dev.pydantic.opamp.core.CoreProto.Variable value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.add(value);
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnv(
+        int index, dev.pydantic.opamp.core.CoreProto.Variable value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.add(index, value);
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    private void addAllEnv(
+        java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Variable> values) {
+      ensureEnvIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, env_);
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    private void clearEnv() {
+      env_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+     */
+    private void removeEnv(int index) {
+      ensureEnvIsMutable();
+      env_.remove(index);
+    }
+
+    public static final int OS_FIELD_NUMBER = 2;
+    private int os_;
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @return The enum numeric value on the wire for os.
+     */
+    @java.lang.Override
+    public int getOsValue() {
+      return os_;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @return The os.
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupOs getOs() {
+      dev.pydantic.opamp.core.CoreProto.SetupOs result = dev.pydantic.opamp.core.CoreProto.SetupOs.forNumber(os_);
+      return result == null ? dev.pydantic.opamp.core.CoreProto.SetupOs.UNRECOGNIZED : result;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @param value The enum numeric value on the wire for os to set.
+     * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+     */
+    private void setOsValue(int value) {
+        os_ = value;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     * @param value The os to set.
+     */
+    private void setOs(dev.pydantic.opamp.core.CoreProto.SetupOs value) {
+      os_ = value.getNumber();
+
+    }
+    /**
+     * <code>.opamp.core.v1.SetupOs os = 2;</code>
+     */
+    private void clearOs() {
+
+      os_ = 0;
+    }
+
+    public static final int PROGRAM_FIELD_NUMBER = 3;
+    private java.lang.String program_;
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @return The program.
+     */
+    @java.lang.Override
+    public java.lang.String getProgram() {
+      return program_;
+    }
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @return The bytes for program.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getProgramBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(program_);
+    }
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @param value The program to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setProgram(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      program_ = value;
+    }
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     */
+    private void clearProgram() {
+
+      program_ = getDefaultInstance().getProgram();
+    }
+    /**
+     * <pre>
+     * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+     * </pre>
+     *
+     * <code>string program = 3;</code>
+     * @param value The bytes for program to set.
+     */
+    private void setProgramBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      program_ = value.toStringUtf8();
+
+    }
+
+    public static final int CWD_FIELD_NUMBER = 4;
+    private java.lang.String cwd_;
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @return The cwd.
+     */
+    @java.lang.Override
+    public java.lang.String getCwd() {
+      return cwd_;
+    }
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @return The bytes for cwd.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getCwdBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(cwd_);
+    }
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @param value The cwd to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setCwd(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      cwd_ = value;
+    }
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     */
+    private void clearCwd() {
+
+      cwd_ = getDefaultInstance().getCwd();
+    }
+    /**
+     * <pre>
+     * the working directory; empty where it can't be had
+     * </pre>
+     *
+     * <code>string cwd = 4;</code>
+     * @param value The bytes for cwd to set.
+     */
+    private void setCwdBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      cwd_ = value.toStringUtf8();
+
+    }
+
+    public static final int CODE_FIELD_NUMBER = 5;
+    private dev.pydantic.opamp.core.CoreProto.SetupInCode code_;
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     */
+    @java.lang.Override
+    public boolean hasCode() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupInCode getCode() {
+      return code_ == null ? dev.pydantic.opamp.core.CoreProto.SetupInCode.getDefaultInstance() : code_;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setCode(dev.pydantic.opamp.core.CoreProto.SetupInCode value) {
+      value.getClass();  // minimal bytecode null check
+      code_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeCode(dev.pydantic.opamp.core.CoreProto.SetupInCode value) {
+      value.getClass();  // minimal bytecode null check
+      if (code_ != null &&
+          code_ != dev.pydantic.opamp.core.CoreProto.SetupInCode.getDefaultInstance()) {
+        code_ =
+          dev.pydantic.opamp.core.CoreProto.SetupInCode.newBuilder(code_).mergeFrom(value).buildPartial();
+      } else {
+        code_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+     */
+    private void clearCode() {
+      code_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupStart prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * Where the server is and how to reach it, from the environment and what the code gives.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.SetupStart}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupStart, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupStart)
+        dev.pydantic.opamp.core.CoreProto.SetupStartOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupStart.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.core.CoreProto.Variable> getEnvList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getEnvList());
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      @java.lang.Override
+      public int getEnvCount() {
+        return instance.getEnvCount();
+      }/**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Variable getEnv(int index) {
+        return instance.getEnv(index);
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder setEnv(
+          int index, dev.pydantic.opamp.core.CoreProto.Variable value) {
+        copyOnWrite();
+        instance.setEnv(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder setEnv(
+          int index, dev.pydantic.opamp.core.CoreProto.Variable.Builder builderForValue) {
+        copyOnWrite();
+        instance.setEnv(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder addEnv(dev.pydantic.opamp.core.CoreProto.Variable value) {
+        copyOnWrite();
+        instance.addEnv(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder addEnv(
+          int index, dev.pydantic.opamp.core.CoreProto.Variable value) {
+        copyOnWrite();
+        instance.addEnv(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder addEnv(
+          dev.pydantic.opamp.core.CoreProto.Variable.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnv(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder addEnv(
+          int index, dev.pydantic.opamp.core.CoreProto.Variable.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnv(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder addAllEnv(
+          java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Variable> values) {
+        copyOnWrite();
+        instance.addAllEnv(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder clearEnv() {
+        copyOnWrite();
+        instance.clearEnv();
+        return this;
+      }
+      /**
+       * <pre>
+       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Variable env = 1;</code>
+       */
+      public Builder removeEnv(int index) {
+        copyOnWrite();
+        instance.removeEnv(index);
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupOs os = 2;</code>
+       * @return The enum numeric value on the wire for os.
+       */
+      @java.lang.Override
+      public int getOsValue() {
+        return instance.getOsValue();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupOs os = 2;</code>
+       * @param value The os to set.
+       * @return This builder for chaining.
+       */
+      public Builder setOsValue(int value) {
+        copyOnWrite();
+        instance.setOsValue(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupOs os = 2;</code>
+       * @return The os.
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupOs getOs() {
+        return instance.getOs();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupOs os = 2;</code>
+       * @param value The enum numeric value on the wire for os to set.
+       * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+       * @return This builder for chaining.
+       */
+      public Builder setOs(dev.pydantic.opamp.core.CoreProto.SetupOs value) {
+        copyOnWrite();
+        instance.setOs(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupOs os = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearOs() {
+        copyOnWrite();
+        instance.clearOs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+       * </pre>
+       *
+       * <code>string program = 3;</code>
+       * @return The program.
+       */
+      @java.lang.Override
+      public java.lang.String getProgram() {
+        return instance.getProgram();
+      }
+      /**
+       * <pre>
+       * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+       * </pre>
+       *
+       * <code>string program = 3;</code>
+       * @return The bytes for program.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getProgramBytes() {
+        return instance.getProgramBytes();
+      }
+      /**
+       * <pre>
+       * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+       * </pre>
+       *
+       * <code>string program = 3;</code>
+       * @param value The program to set.
+       * @return This builder for chaining.
+       */
+      public Builder setProgram(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setProgram(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+       * </pre>
+       *
+       * <code>string program = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearProgram() {
+        copyOnWrite();
+        instance.clearProgram();
+        return this;
+      }
+      /**
+       * <pre>
+       * the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+       * </pre>
+       *
+       * <code>string program = 3;</code>
+       * @param value The bytes for program to set.
+       * @return This builder for chaining.
+       */
+      public Builder setProgramBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setProgramBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the working directory; empty where it can't be had
+       * </pre>
+       *
+       * <code>string cwd = 4;</code>
+       * @return The cwd.
+       */
+      @java.lang.Override
+      public java.lang.String getCwd() {
+        return instance.getCwd();
+      }
+      /**
+       * <pre>
+       * the working directory; empty where it can't be had
+       * </pre>
+       *
+       * <code>string cwd = 4;</code>
+       * @return The bytes for cwd.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getCwdBytes() {
+        return instance.getCwdBytes();
+      }
+      /**
+       * <pre>
+       * the working directory; empty where it can't be had
+       * </pre>
+       *
+       * <code>string cwd = 4;</code>
+       * @param value The cwd to set.
+       * @return This builder for chaining.
+       */
+      public Builder setCwd(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setCwd(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the working directory; empty where it can't be had
+       * </pre>
+       *
+       * <code>string cwd = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearCwd() {
+        copyOnWrite();
+        instance.clearCwd();
+        return this;
+      }
+      /**
+       * <pre>
+       * the working directory; empty where it can't be had
+       * </pre>
+       *
+       * <code>string cwd = 4;</code>
+       * @param value The bytes for cwd to set.
+       * @return This builder for chaining.
+       */
+      public Builder setCwdBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setCwdBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      @java.lang.Override
+      public boolean hasCode() {
+        return instance.hasCode();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupInCode getCode() {
+        return instance.getCode();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      public Builder setCode(dev.pydantic.opamp.core.CoreProto.SetupInCode value) {
+        copyOnWrite();
+        instance.setCode(value);
+        return this;
+        }
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      public Builder setCode(
+          dev.pydantic.opamp.core.CoreProto.SetupInCode.Builder builderForValue) {
+        copyOnWrite();
+        instance.setCode(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      public Builder mergeCode(dev.pydantic.opamp.core.CoreProto.SetupInCode value) {
+        copyOnWrite();
+        instance.mergeCode(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupInCode code = 5;</code>
+       */
+      public Builder clearCode() {  copyOnWrite();
+        instance.clearCode();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupStart)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupStart();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "env_",
+              dev.pydantic.opamp.core.CoreProto.Variable.class,
+              "os_",
+              "program_",
+              "cwd_",
+              "code_",
+            };
+            java.lang.String info =
+                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u001b\u0002\f" +
+                "\u0003\u0208\u0004\u0208\u0005\u1009\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupStart> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupStart.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupStart>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupStart)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupStart DEFAULT_INSTANCE;
+    static {
+      SetupStart defaultInstance = new SetupStart();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupStart.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStart getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupStart> PARSER;
+
+    public static com.google.protobuf.Parser<SetupStart> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupInCodeOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupInCode)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return Whether the endpoint field is set.
+     */
+    boolean hasEndpoint();
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <pre>
+     * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+     * </pre>
+     *
+     * <code>bool headers_given = 2;</code>
+     * @return The headersGiven.
+     */
+    boolean getHeadersGiven();
+
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    java.util.List<dev.pydantic.opamp.core.CoreProto.Header> 
+        getHeadersList();
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index);
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    int getHeadersCount();
+
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return Whether the stateDir field is set.
+     */
+    boolean hasStateDir();
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return The stateDir.
+     */
+    java.lang.String getStateDir();
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return The bytes for stateDir.
+     */
+    com.google.protobuf.ByteString
+        getStateDirBytes();
+
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     * @return Whether the heartbeatMs field is set.
+     */
+    boolean hasHeartbeatMs();
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     * @return The heartbeatMs.
+     */
+    long getHeartbeatMs();
+
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @return The endpointName.
+     */
+    java.lang.String getEndpointName();
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @return The bytes for endpointName.
+     */
+    com.google.protobuf.ByteString
+        getEndpointNameBytes();
+
+    /**
+     * <code>string headers_name = 7;</code>
+     * @return The headersName.
+     */
+    java.lang.String getHeadersName();
+    /**
+     * <code>string headers_name = 7;</code>
+     * @return The bytes for headersName.
+     */
+    com.google.protobuf.ByteString
+        getHeadersNameBytes();
+
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @return The heartbeatName.
+     */
+    java.lang.String getHeartbeatName();
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @return The bytes for heartbeatName.
+     */
+    com.google.protobuf.ByteString
+        getHeartbeatNameBytes();
+  }
+  /**
+   * <pre>
+   * What the application gives in code: each part given wins over its variable. A warning names
+   * the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
+   * "the endpoint given in code".
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.SetupInCode}
+   */
+  public  static final class SetupInCode extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupInCode, SetupInCode.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupInCode)
+      SetupInCodeOrBuilder {
+    private SetupInCode() {
+      endpoint_ = "";
+      headers_ = emptyProtobufList();
+      stateDir_ = "";
+      endpointName_ = "";
+      headersName_ = "";
+      heartbeatName_ = "";
+    }
+    private int bitField0_;
+    public static final int ENDPOINT_FIELD_NUMBER = 1;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return Whether the endpoint field is set.
+     */
+    @java.lang.Override
+    public boolean hasEndpoint() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      bitField0_ |= 0x00000001;
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     */
+    private void clearEndpoint() {
+      bitField0_ = (bitField0_ & ~0x00000001);
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * blank: as if not given
+     * </pre>
+     *
+     * <code>optional string endpoint = 1;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+      bitField0_ |= 0x00000001;
+    }
+
+    public static final int HEADERS_GIVEN_FIELD_NUMBER = 2;
+    private boolean headersGiven_;
+    /**
+     * <pre>
+     * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+     * </pre>
+     *
+     * <code>bool headers_given = 2;</code>
+     * @return The headersGiven.
+     */
+    @java.lang.Override
+    public boolean getHeadersGiven() {
+      return headersGiven_;
+    }
+    /**
+     * <pre>
+     * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+     * </pre>
+     *
+     * <code>bool headers_given = 2;</code>
+     * @param value The headersGiven to set.
+     */
+    private void setHeadersGiven(boolean value) {
+      
+      headersGiven_ = value;
+    }
+    /**
+     * <pre>
+     * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+     * </pre>
+     *
+     * <code>bool headers_given = 2;</code>
+     */
+    private void clearHeadersGiven() {
+
+      headersGiven_ = false;
+    }
+
+    public static final int HEADERS_FIELD_NUMBER = 3;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> headers_;
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+      return headers_;
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder> 
+        getHeadersOrBuilderList() {
+      return headers_;
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public int getHeadersCount() {
+      return headers_.size();
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+      return headers_.get(index);
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder getHeadersOrBuilder(
+        int index) {
+      return headers_.get(index);
+    }
+    private void ensureHeadersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> tmp = headers_;
+      if (!tmp.isModifiable()) {
+        headers_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.set(index, value);
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(value);
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(index, value);
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void addAllHeaders(
+        java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+      ensureHeadersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, headers_);
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void clearHeaders() {
+      headers_ = emptyProtobufList();
+    }
+    /**
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void removeHeaders(int index) {
+      ensureHeadersIsMutable();
+      headers_.remove(index);
+    }
+
+    public static final int STATE_DIR_FIELD_NUMBER = 4;
+    private java.lang.String stateDir_;
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return Whether the stateDir field is set.
+     */
+    @java.lang.Override
+    public boolean hasStateDir() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return The stateDir.
+     */
+    @java.lang.Override
+    public java.lang.String getStateDir() {
+      return stateDir_;
+    }
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @return The bytes for stateDir.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getStateDirBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(stateDir_);
+    }
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @param value The stateDir to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStateDir(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      bitField0_ |= 0x00000002;
+      stateDir_ = value;
+    }
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     */
+    private void clearStateDir() {
+      bitField0_ = (bitField0_ & ~0x00000002);
+      stateDir_ = getDefaultInstance().getStateDir();
+    }
+    /**
+     * <pre>
+     * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+     * </pre>
+     *
+     * <code>optional string state_dir = 4;</code>
+     * @param value The bytes for stateDir to set.
+     */
+    private void setStateDirBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      stateDir_ = value.toStringUtf8();
+      bitField0_ |= 0x00000002;
+    }
+
+    public static final int HEARTBEAT_MS_FIELD_NUMBER = 5;
+    private long heartbeatMs_;
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     * @return Whether the heartbeatMs field is set.
+     */
+    @java.lang.Override
+    public boolean hasHeartbeatMs() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     * @return The heartbeatMs.
+     */
+    @java.lang.Override
+    public long getHeartbeatMs() {
+      return heartbeatMs_;
+    }
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     * @param value The heartbeatMs to set.
+     */
+    private void setHeartbeatMs(long value) {
+      bitField0_ |= 0x00000004;
+      heartbeatMs_ = value;
+    }
+    /**
+     * <pre>
+     * 0 or less: no interval (the default, with a warning)
+     * </pre>
+     *
+     * <code>optional sint64 heartbeat_ms = 5;</code>
+     */
+    private void clearHeartbeatMs() {
+      bitField0_ = (bitField0_ & ~0x00000004);
+      heartbeatMs_ = 0L;
+    }
+
+    public static final int ENDPOINT_NAME_FIELD_NUMBER = 6;
+    private java.lang.String endpointName_;
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @return The endpointName.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpointName() {
+      return endpointName_;
+    }
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @return The bytes for endpointName.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpointName_);
+    }
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @param value The endpointName to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpointName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpointName_ = value;
+    }
+    /**
+     * <code>string endpoint_name = 6;</code>
+     */
+    private void clearEndpointName() {
+
+      endpointName_ = getDefaultInstance().getEndpointName();
+    }
+    /**
+     * <code>string endpoint_name = 6;</code>
+     * @param value The bytes for endpointName to set.
+     */
+    private void setEndpointNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpointName_ = value.toStringUtf8();
+
+    }
+
+    public static final int HEADERS_NAME_FIELD_NUMBER = 7;
+    private java.lang.String headersName_;
+    /**
+     * <code>string headers_name = 7;</code>
+     * @return The headersName.
+     */
+    @java.lang.Override
+    public java.lang.String getHeadersName() {
+      return headersName_;
+    }
+    /**
+     * <code>string headers_name = 7;</code>
+     * @return The bytes for headersName.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getHeadersNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(headersName_);
+    }
+    /**
+     * <code>string headers_name = 7;</code>
+     * @param value The headersName to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHeadersName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      headersName_ = value;
+    }
+    /**
+     * <code>string headers_name = 7;</code>
+     */
+    private void clearHeadersName() {
+
+      headersName_ = getDefaultInstance().getHeadersName();
+    }
+    /**
+     * <code>string headers_name = 7;</code>
+     * @param value The bytes for headersName to set.
+     */
+    private void setHeadersNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      headersName_ = value.toStringUtf8();
+
+    }
+
+    public static final int HEARTBEAT_NAME_FIELD_NUMBER = 8;
+    private java.lang.String heartbeatName_;
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @return The heartbeatName.
+     */
+    @java.lang.Override
+    public java.lang.String getHeartbeatName() {
+      return heartbeatName_;
+    }
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @return The bytes for heartbeatName.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getHeartbeatNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(heartbeatName_);
+    }
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @param value The heartbeatName to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHeartbeatName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      heartbeatName_ = value;
+    }
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     */
+    private void clearHeartbeatName() {
+
+      heartbeatName_ = getDefaultInstance().getHeartbeatName();
+    }
+    /**
+     * <code>string heartbeat_name = 8;</code>
+     * @param value The bytes for heartbeatName to set.
+     */
+    private void setHeartbeatNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      heartbeatName_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupInCode prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * What the application gives in code: each part given wins over its variable. A warning names
+     * the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
+     * "the endpoint given in code".
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.SetupInCode}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupInCode, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupInCode)
+        dev.pydantic.opamp.core.CoreProto.SetupInCodeOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupInCode.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @return Whether the endpoint field is set.
+       */
+      @java.lang.Override
+      public boolean hasEndpoint() {
+        return instance.hasEndpoint();
+      }
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * blank: as if not given
+       * </pre>
+       *
+       * <code>optional string endpoint = 1;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+       * </pre>
+       *
+       * <code>bool headers_given = 2;</code>
+       * @return The headersGiven.
+       */
+      @java.lang.Override
+      public boolean getHeadersGiven() {
+        return instance.getHeadersGiven();
+      }
+      /**
+       * <pre>
+       * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+       * </pre>
+       *
+       * <code>bool headers_given = 2;</code>
+       * @param value The headersGiven to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeadersGiven(boolean value) {
+        copyOnWrite();
+        instance.setHeadersGiven(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+       * </pre>
+       *
+       * <code>bool headers_given = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeadersGiven() {
+        copyOnWrite();
+        instance.clearHeadersGiven();
+        return this;
+      }
+
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getHeadersList());
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public int getHeadersCount() {
+        return instance.getHeadersCount();
+      }/**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+        return instance.getHeaders(index);
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.setHeaders(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addAllHeaders(
+          java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+        copyOnWrite();
+        instance.addAllHeaders(values);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder clearHeaders() {
+        copyOnWrite();
+        instance.clearHeaders();
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder removeHeaders(int index) {
+        copyOnWrite();
+        instance.removeHeaders(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @return Whether the stateDir field is set.
+       */
+      @java.lang.Override
+      public boolean hasStateDir() {
+        return instance.hasStateDir();
+      }
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @return The stateDir.
+       */
+      @java.lang.Override
+      public java.lang.String getStateDir() {
+        return instance.getStateDir();
+      }
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @return The bytes for stateDir.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getStateDirBytes() {
+        return instance.getStateDirBytes();
+      }
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @param value The stateDir to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateDir(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setStateDir(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStateDir() {
+        copyOnWrite();
+        instance.clearStateDir();
+        return this;
+      }
+      /**
+       * <pre>
+       * as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+       * </pre>
+       *
+       * <code>optional string state_dir = 4;</code>
+       * @param value The bytes for stateDir to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateDirBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setStateDirBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * 0 or less: no interval (the default, with a warning)
+       * </pre>
+       *
+       * <code>optional sint64 heartbeat_ms = 5;</code>
+       * @return Whether the heartbeatMs field is set.
+       */
+      @java.lang.Override
+      public boolean hasHeartbeatMs() {
+        return instance.hasHeartbeatMs();
+      }
+      /**
+       * <pre>
+       * 0 or less: no interval (the default, with a warning)
+       * </pre>
+       *
+       * <code>optional sint64 heartbeat_ms = 5;</code>
+       * @return The heartbeatMs.
+       */
+      @java.lang.Override
+      public long getHeartbeatMs() {
+        return instance.getHeartbeatMs();
+      }
+      /**
+       * <pre>
+       * 0 or less: no interval (the default, with a warning)
+       * </pre>
+       *
+       * <code>optional sint64 heartbeat_ms = 5;</code>
+       * @param value The heartbeatMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeartbeatMs(long value) {
+        copyOnWrite();
+        instance.setHeartbeatMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * 0 or less: no interval (the default, with a warning)
+       * </pre>
+       *
+       * <code>optional sint64 heartbeat_ms = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeartbeatMs() {
+        copyOnWrite();
+        instance.clearHeartbeatMs();
+        return this;
+      }
+
+      /**
+       * <code>string endpoint_name = 6;</code>
+       * @return The endpointName.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpointName() {
+        return instance.getEndpointName();
+      }
+      /**
+       * <code>string endpoint_name = 6;</code>
+       * @return The bytes for endpointName.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointNameBytes() {
+        return instance.getEndpointNameBytes();
+      }
+      /**
+       * <code>string endpoint_name = 6;</code>
+       * @param value The endpointName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpointName(value);
+        return this;
+      }
+      /**
+       * <code>string endpoint_name = 6;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpointName() {
+        copyOnWrite();
+        instance.clearEndpointName();
+        return this;
+      }
+      /**
+       * <code>string endpoint_name = 6;</code>
+       * @param value The bytes for endpointName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointNameBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string headers_name = 7;</code>
+       * @return The headersName.
+       */
+      @java.lang.Override
+      public java.lang.String getHeadersName() {
+        return instance.getHeadersName();
+      }
+      /**
+       * <code>string headers_name = 7;</code>
+       * @return The bytes for headersName.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getHeadersNameBytes() {
+        return instance.getHeadersNameBytes();
+      }
+      /**
+       * <code>string headers_name = 7;</code>
+       * @param value The headersName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeadersName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setHeadersName(value);
+        return this;
+      }
+      /**
+       * <code>string headers_name = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeadersName() {
+        copyOnWrite();
+        instance.clearHeadersName();
+        return this;
+      }
+      /**
+       * <code>string headers_name = 7;</code>
+       * @param value The bytes for headersName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeadersNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setHeadersNameBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string heartbeat_name = 8;</code>
+       * @return The heartbeatName.
+       */
+      @java.lang.Override
+      public java.lang.String getHeartbeatName() {
+        return instance.getHeartbeatName();
+      }
+      /**
+       * <code>string heartbeat_name = 8;</code>
+       * @return The bytes for heartbeatName.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getHeartbeatNameBytes() {
+        return instance.getHeartbeatNameBytes();
+      }
+      /**
+       * <code>string heartbeat_name = 8;</code>
+       * @param value The heartbeatName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeartbeatName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setHeartbeatName(value);
+        return this;
+      }
+      /**
+       * <code>string heartbeat_name = 8;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeartbeatName() {
+        copyOnWrite();
+        instance.clearHeartbeatName();
+        return this;
+      }
+      /**
+       * <code>string heartbeat_name = 8;</code>
+       * @param value The bytes for heartbeatName to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeartbeatNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setHeartbeatNameBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupInCode)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupInCode();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "endpoint_",
+              "headersGiven_",
+              "headers_",
+              dev.pydantic.opamp.core.CoreProto.Header.class,
+              "stateDir_",
+              "heartbeatMs_",
+              "endpointName_",
+              "headersName_",
+              "heartbeatName_",
+            };
+            java.lang.String info =
+                "\u0000\b\u0000\u0001\u0001\b\b\u0000\u0001\u0000\u0001\u1208\u0000\u0002\u0007\u0003" +
+                "\u001b\u0004\u1208\u0001\u0005\u1010\u0002\u0006\u0208\u0007\u0208\b\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupInCode> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupInCode.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupInCode>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupInCode)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupInCode DEFAULT_INSTANCE;
+    static {
+      SetupInCode defaultInstance = new SetupInCode();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupInCode.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupInCode getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupInCode> PARSER;
+
+    public static com.google.protobuf.Parser<SetupInCode> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupStartedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupStarted)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * </pre>
+     *
+     * <code>bool off = 1;</code>
+     * @return The off.
+     */
+    boolean getOff();
+
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    java.util.List<dev.pydantic.opamp.core.CoreProto.Header> 
+        getHeadersList();
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index);
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    int getHeadersCount();
+
+    /**
+     * <pre>
+     * 0: the client's default; at most a day
+     * </pre>
+     *
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @return The heartbeatIntervalMs.
+     */
+    long getHeartbeatIntervalMs();
+
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @return The stateDir.
+     */
+    java.lang.String getStateDir();
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @return The bytes for stateDir.
+     */
+    com.google.protobuf.ByteString
+        getStateDirBytes();
+
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @return A list containing the defaultSlots.
+     */
+    java.util.List<java.lang.String>
+        getDefaultSlotsList();
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @return The count of defaultSlots.
+     */
+    int getDefaultSlotsCount();
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param index The index of the element to return.
+     * @return The defaultSlots at the given index.
+     */
+    java.lang.String getDefaultSlots(int index);
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param index The index of the element to return.
+     * @return The defaultSlots at the given index.
+     */
+    com.google.protobuf.ByteString
+        getDefaultSlotsBytes(int index);
+
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @return The allSlotsTaken.
+     */
+    java.lang.String getAllSlotsTaken();
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @return The bytes for allSlotsTaken.
+     */
+    com.google.protobuf.ByteString
+        getAllSlotsTakenBytes();
+
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @return The service.
+     */
+    java.lang.String getService();
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @return The bytes for service.
+     */
+    com.google.protobuf.ByteString
+        getServiceBytes();
+
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @return The shownEndpoint.
+     */
+    java.lang.String getShownEndpoint();
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @return The bytes for shownEndpoint.
+     */
+    com.google.protobuf.ByteString
+        getShownEndpointBytes();
+
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     * @return Whether the hints field is set.
+     */
+    boolean hasHints();
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     * @return The hints.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupHints getHints();
+
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @return A list containing the warnings.
+     */
+    java.util.List<java.lang.String>
+        getWarningsList();
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @return The count of warnings.
+     */
+    int getWarningsCount();
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    java.lang.String getWarnings(int index);
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    com.google.protobuf.ByteString
+        getWarningsBytes(int index);
+  }
+  /**
+   * Protobuf type {@code opamp.core.v1.SetupStarted}
+   */
+  public  static final class SetupStarted extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupStarted, SetupStarted.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupStarted)
+      SetupStartedOrBuilder {
+    private SetupStarted() {
+      endpoint_ = "";
+      headers_ = emptyProtobufList();
+      stateDir_ = "";
+      defaultSlots_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+      allSlotsTaken_ = "";
+      service_ = "";
+      shownEndpoint_ = "";
+      warnings_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    private int bitField0_;
+    public static final int OFF_FIELD_NUMBER = 1;
+    private boolean off_;
+    /**
+     * <pre>
+     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * </pre>
+     *
+     * <code>bool off = 1;</code>
+     * @return The off.
+     */
+    @java.lang.Override
+    public boolean getOff() {
+      return off_;
+    }
+    /**
+     * <pre>
+     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * </pre>
+     *
+     * <code>bool off = 1;</code>
+     * @param value The off to set.
+     */
+    private void setOff(boolean value) {
+      
+      off_ = value;
+    }
+    /**
+     * <pre>
+     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * </pre>
+     *
+     * <code>bool off = 1;</code>
+     */
+    private void clearOff() {
+
+      off_ = false;
+    }
+
+    public static final int ENDPOINT_FIELD_NUMBER = 2;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * with a scheme (http:// added, with a warning, where it had none)
+     * </pre>
+     *
+     * <code>string endpoint = 2;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int HEADERS_FIELD_NUMBER = 3;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> headers_;
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+      return headers_;
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder> 
+        getHeadersOrBuilderList() {
+      return headers_;
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public int getHeadersCount() {
+      return headers_.size();
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+      return headers_.get(index);
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    public dev.pydantic.opamp.core.CoreProto.HeaderOrBuilder getHeadersOrBuilder(
+        int index) {
+      return headers_.get(index);
+    }
+    private void ensureHeadersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Header> tmp = headers_;
+      if (!tmp.isModifiable()) {
+        headers_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.set(index, value);
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(value);
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addHeaders(
+        int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+      value.getClass();  // minimal bytecode null check
+      ensureHeadersIsMutable();
+      headers_.add(index, value);
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void addAllHeaders(
+        java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+      ensureHeadersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, headers_);
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void clearHeaders() {
+      headers_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * those the core's header rule takes; the rest left out, with a warning
+     * </pre>
+     *
+     * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+     */
+    private void removeHeaders(int index) {
+      ensureHeadersIsMutable();
+      headers_.remove(index);
+    }
+
+    public static final int HEARTBEAT_INTERVAL_MS_FIELD_NUMBER = 4;
+    private long heartbeatIntervalMs_;
+    /**
+     * <pre>
+     * 0: the client's default; at most a day
+     * </pre>
+     *
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @return The heartbeatIntervalMs.
+     */
+    @java.lang.Override
+    public long getHeartbeatIntervalMs() {
+      return heartbeatIntervalMs_;
+    }
+    /**
+     * <pre>
+     * 0: the client's default; at most a day
+     * </pre>
+     *
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     * @param value The heartbeatIntervalMs to set.
+     */
+    private void setHeartbeatIntervalMs(long value) {
+      
+      heartbeatIntervalMs_ = value;
+    }
+    /**
+     * <pre>
+     * 0: the client's default; at most a day
+     * </pre>
+     *
+     * <code>uint64 heartbeat_interval_ms = 4;</code>
+     */
+    private void clearHeartbeatIntervalMs() {
+
+      heartbeatIntervalMs_ = 0L;
+    }
+
+    public static final int STATE_DIR_FIELD_NUMBER = 5;
+    private java.lang.String stateDir_;
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @return The stateDir.
+     */
+    @java.lang.Override
+    public java.lang.String getStateDir() {
+      return stateDir_;
+    }
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @return The bytes for stateDir.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getStateDirBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(stateDir_);
+    }
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @param value The stateDir to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStateDir(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      stateDir_ = value;
+    }
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     */
+    private void clearStateDir() {
+
+      stateDir_ = getDefaultInstance().getStateDir();
+    }
+    /**
+     * <pre>
+     * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+     * </pre>
+     *
+     * <code>string state_dir = 5;</code>
+     * @param value The bytes for stateDir to set.
+     */
+    private void setStateDirBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      stateDir_ = value.toStringUtf8();
+
+    }
+
+    public static final int DEFAULT_SLOTS_FIELD_NUMBER = 6;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> defaultSlots_;
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @return A list containing the defaultSlots.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getDefaultSlotsList() {
+      return defaultSlots_;
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @return The count of defaultSlots.
+     */
+    @java.lang.Override
+    public int getDefaultSlotsCount() {
+      return defaultSlots_.size();
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param index The index of the element to return.
+     * @return The defaultSlots at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getDefaultSlots(int index) {
+      return defaultSlots_.get(index);
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the defaultSlots at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDefaultSlotsBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          defaultSlots_.get(index));
+    }
+    private void ensureDefaultSlotsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          defaultSlots_;  if (!tmp.isModifiable()) {
+        defaultSlots_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param index The index to set the value at.
+     * @param value The defaultSlots to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDefaultSlots(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureDefaultSlotsIsMutable();
+      defaultSlots_.set(index, value);
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param value The defaultSlots to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addDefaultSlots(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureDefaultSlotsIsMutable();
+      defaultSlots_.add(value);
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param values The defaultSlots to add.
+     */
+    private void addAllDefaultSlots(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureDefaultSlotsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, defaultSlots_);
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     */
+    private void clearDefaultSlots() {
+      defaultSlots_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * No state directory named, and none turned off: the default one's slots, in order. The
+     * integration takes the first it can make (readable by the user only, with its parents) and
+     * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+     * empty: no state directory (each start is a new instance).
+     * </pre>
+     *
+     * <code>repeated string default_slots = 6;</code>
+     * @param value The bytes of the defaultSlots to add.
+     */
+    private void addDefaultSlotsBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureDefaultSlotsIsMutable();
+      defaultSlots_.add(value.toStringUtf8());
+    }
+
+    public static final int ALL_SLOTS_TAKEN_FIELD_NUMBER = 7;
+    private java.lang.String allSlotsTaken_;
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @return The allSlotsTaken.
+     */
+    @java.lang.Override
+    public java.lang.String getAllSlotsTaken() {
+      return allSlotsTaken_;
+    }
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @return The bytes for allSlotsTaken.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getAllSlotsTakenBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(allSlotsTaken_);
+    }
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @param value The allSlotsTaken to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAllSlotsTaken(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      allSlotsTaken_ = value;
+    }
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     */
+    private void clearAllSlotsTaken() {
+
+      allSlotsTaken_ = getDefaultInstance().getAllSlotsTaken();
+    }
+    /**
+     * <pre>
+     * the line to say (at INFO) when every slot is taken
+     * </pre>
+     *
+     * <code>string all_slots_taken = 7;</code>
+     * @param value The bytes for allSlotsTaken to set.
+     */
+    private void setAllSlotsTakenBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      allSlotsTaken_ = value.toStringUtf8();
+
+    }
+
+    public static final int SERVICE_FIELD_NUMBER = 8;
+    private java.lang.String service_;
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @return The service.
+     */
+    @java.lang.Override
+    public java.lang.String getService() {
+      return service_;
+    }
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @return The bytes for service.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getServiceBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(service_);
+    }
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @param value The service to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setService(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      service_ = value;
+    }
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     */
+    private void clearService() {
+
+      service_ = getDefaultInstance().getService();
+    }
+    /**
+     * <pre>
+     * the service the slots' directory is named for, as it is safe to log
+     * </pre>
+     *
+     * <code>string service = 8;</code>
+     * @param value The bytes for service to set.
+     */
+    private void setServiceBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      service_ = value.toStringUtf8();
+
+    }
+
+    public static final int SHOWN_ENDPOINT_FIELD_NUMBER = 9;
+    private java.lang.String shownEndpoint_;
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @return The shownEndpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getShownEndpoint() {
+      return shownEndpoint_;
+    }
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @return The bytes for shownEndpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getShownEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(shownEndpoint_);
+    }
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @param value The shownEndpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setShownEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      shownEndpoint_ = value;
+    }
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     */
+    private void clearShownEndpoint() {
+
+      shownEndpoint_ = getDefaultInstance().getShownEndpoint();
+    }
+    /**
+     * <pre>
+     * the endpoint as it is safe to log: no user info, query or fragment
+     * </pre>
+     *
+     * <code>string shown_endpoint = 9;</code>
+     * @param value The bytes for shownEndpoint to set.
+     */
+    private void setShownEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      shownEndpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int HINTS_FIELD_NUMBER = 10;
+    private dev.pydantic.opamp.core.CoreProto.SetupHints hints_;
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     */
+    @java.lang.Override
+    public boolean hasHints() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupHints getHints() {
+      return hints_ == null ? dev.pydantic.opamp.core.CoreProto.SetupHints.getDefaultInstance() : hints_;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHints(dev.pydantic.opamp.core.CoreProto.SetupHints value) {
+      value.getClass();  // minimal bytecode null check
+      hints_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeHints(dev.pydantic.opamp.core.CoreProto.SetupHints value) {
+      value.getClass();  // minimal bytecode null check
+      if (hints_ != null &&
+          hints_ != dev.pydantic.opamp.core.CoreProto.SetupHints.getDefaultInstance()) {
+        hints_ =
+          dev.pydantic.opamp.core.CoreProto.SetupHints.newBuilder(hints_).mergeFrom(value).buildPartial();
+      } else {
+        hints_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+     */
+    private void clearHints() {
+      hints_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
+    public static final int WARNINGS_FIELD_NUMBER = 11;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> warnings_;
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @return A list containing the warnings.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getWarningsList() {
+      return warnings_;
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @return The count of warnings.
+     */
+    @java.lang.Override
+    public int getWarningsCount() {
+      return warnings_.size();
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getWarnings(int index) {
+      return warnings_.get(index);
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the warnings at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getWarningsBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          warnings_.get(index));
+    }
+    private void ensureWarningsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          warnings_;  if (!tmp.isModifiable()) {
+        warnings_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param index The index to set the value at.
+     * @param value The warnings to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setWarnings(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureWarningsIsMutable();
+      warnings_.set(index, value);
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param value The warnings to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addWarnings(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureWarningsIsMutable();
+      warnings_.add(value);
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param values The warnings to add.
+     */
+    private void addAllWarnings(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureWarningsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, warnings_);
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     */
+    private void clearWarnings() {
+      warnings_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * to say, at WARN, in order
+     * </pre>
+     *
+     * <code>repeated string warnings = 11;</code>
+     * @param value The bytes of the warnings to add.
+     */
+    private void addWarningsBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureWarningsIsMutable();
+      warnings_.add(value.toStringUtf8());
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupStarted prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.core.v1.SetupStarted}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupStarted, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupStarted)
+        dev.pydantic.opamp.core.CoreProto.SetupStartedOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupStarted.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * </pre>
+       *
+       * <code>bool off = 1;</code>
+       * @return The off.
+       */
+      @java.lang.Override
+      public boolean getOff() {
+        return instance.getOff();
+      }
+      /**
+       * <pre>
+       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * </pre>
+       *
+       * <code>bool off = 1;</code>
+       * @param value The off to set.
+       * @return This builder for chaining.
+       */
+      public Builder setOff(boolean value) {
+        copyOnWrite();
+        instance.setOff(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * </pre>
+       *
+       * <code>bool off = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearOff() {
+        copyOnWrite();
+        instance.clearOff();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * with a scheme (http:// added, with a warning, where it had none)
+       * </pre>
+       *
+       * <code>string endpoint = 2;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * with a scheme (http:// added, with a warning, where it had none)
+       * </pre>
+       *
+       * <code>string endpoint = 2;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * with a scheme (http:// added, with a warning, where it had none)
+       * </pre>
+       *
+       * <code>string endpoint = 2;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * with a scheme (http:// added, with a warning, where it had none)
+       * </pre>
+       *
+       * <code>string endpoint = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * with a scheme (http:// added, with a warning, where it had none)
+       * </pre>
+       *
+       * <code>string endpoint = 2;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.core.CoreProto.Header> getHeadersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getHeadersList());
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public int getHeadersCount() {
+        return instance.getHeadersCount();
+      }/**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Header getHeaders(int index) {
+        return instance.getHeaders(index);
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.setHeaders(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder setHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header value) {
+        copyOnWrite();
+        instance.addHeaders(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addHeaders(
+          int index, dev.pydantic.opamp.core.CoreProto.Header.Builder builderForValue) {
+        copyOnWrite();
+        instance.addHeaders(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder addAllHeaders(
+          java.lang.Iterable<? extends dev.pydantic.opamp.core.CoreProto.Header> values) {
+        copyOnWrite();
+        instance.addAllHeaders(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder clearHeaders() {
+        copyOnWrite();
+        instance.clearHeaders();
+        return this;
+      }
+      /**
+       * <pre>
+       * those the core's header rule takes; the rest left out, with a warning
+       * </pre>
+       *
+       * <code>repeated .opamp.core.v1.Header headers = 3;</code>
+       */
+      public Builder removeHeaders(int index) {
+        copyOnWrite();
+        instance.removeHeaders(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * 0: the client's default; at most a day
+       * </pre>
+       *
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @return The heartbeatIntervalMs.
+       */
+      @java.lang.Override
+      public long getHeartbeatIntervalMs() {
+        return instance.getHeartbeatIntervalMs();
+      }
+      /**
+       * <pre>
+       * 0: the client's default; at most a day
+       * </pre>
+       *
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @param value The heartbeatIntervalMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHeartbeatIntervalMs(long value) {
+        copyOnWrite();
+        instance.setHeartbeatIntervalMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * 0: the client's default; at most a day
+       * </pre>
+       *
+       * <code>uint64 heartbeat_interval_ms = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHeartbeatIntervalMs() {
+        copyOnWrite();
+        instance.clearHeartbeatIntervalMs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+       * </pre>
+       *
+       * <code>string state_dir = 5;</code>
+       * @return The stateDir.
+       */
+      @java.lang.Override
+      public java.lang.String getStateDir() {
+        return instance.getStateDir();
+      }
+      /**
+       * <pre>
+       * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+       * </pre>
+       *
+       * <code>string state_dir = 5;</code>
+       * @return The bytes for stateDir.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getStateDirBytes() {
+        return instance.getStateDirBytes();
+      }
+      /**
+       * <pre>
+       * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+       * </pre>
+       *
+       * <code>string state_dir = 5;</code>
+       * @param value The stateDir to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateDir(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setStateDir(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+       * </pre>
+       *
+       * <code>string state_dir = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStateDir() {
+        copyOnWrite();
+        instance.clearStateDir();
+        return this;
+      }
+      /**
+       * <pre>
+       * a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+       * </pre>
+       *
+       * <code>string state_dir = 5;</code>
+       * @param value The bytes for stateDir to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateDirBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setStateDirBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @return A list containing the defaultSlots.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getDefaultSlotsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getDefaultSlotsList());
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @return The count of defaultSlots.
+       */
+      @java.lang.Override
+      public int getDefaultSlotsCount() {
+        return instance.getDefaultSlotsCount();
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param index The index of the element to return.
+       * @return The defaultSlots at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getDefaultSlots(int index) {
+        return instance.getDefaultSlots(index);
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the defaultSlots at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDefaultSlotsBytes(int index) {
+        return instance.getDefaultSlotsBytes(index);
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param index The index to set the value at.
+       * @param value The defaultSlots to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDefaultSlots(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setDefaultSlots(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param value The defaultSlots to add.
+       * @return This builder for chaining.
+       */
+      public Builder addDefaultSlots(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addDefaultSlots(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param values The defaultSlots to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllDefaultSlots(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllDefaultSlots(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDefaultSlots() {
+        copyOnWrite();
+        instance.clearDefaultSlots();
+        return this;
+      }
+      /**
+       * <pre>
+       * No state directory named, and none turned off: the default one's slots, in order. The
+       * integration takes the first it can make (readable by the user only, with its parents) and
+       * whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+       * empty: no state directory (each start is a new instance).
+       * </pre>
+       *
+       * <code>repeated string default_slots = 6;</code>
+       * @param value The bytes of the defaultSlots to add.
+       * @return This builder for chaining.
+       */
+      public Builder addDefaultSlotsBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addDefaultSlotsBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the line to say (at INFO) when every slot is taken
+       * </pre>
+       *
+       * <code>string all_slots_taken = 7;</code>
+       * @return The allSlotsTaken.
+       */
+      @java.lang.Override
+      public java.lang.String getAllSlotsTaken() {
+        return instance.getAllSlotsTaken();
+      }
+      /**
+       * <pre>
+       * the line to say (at INFO) when every slot is taken
+       * </pre>
+       *
+       * <code>string all_slots_taken = 7;</code>
+       * @return The bytes for allSlotsTaken.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getAllSlotsTakenBytes() {
+        return instance.getAllSlotsTakenBytes();
+      }
+      /**
+       * <pre>
+       * the line to say (at INFO) when every slot is taken
+       * </pre>
+       *
+       * <code>string all_slots_taken = 7;</code>
+       * @param value The allSlotsTaken to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAllSlotsTaken(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setAllSlotsTaken(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the line to say (at INFO) when every slot is taken
+       * </pre>
+       *
+       * <code>string all_slots_taken = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAllSlotsTaken() {
+        copyOnWrite();
+        instance.clearAllSlotsTaken();
+        return this;
+      }
+      /**
+       * <pre>
+       * the line to say (at INFO) when every slot is taken
+       * </pre>
+       *
+       * <code>string all_slots_taken = 7;</code>
+       * @param value The bytes for allSlotsTaken to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAllSlotsTakenBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setAllSlotsTakenBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the service the slots' directory is named for, as it is safe to log
+       * </pre>
+       *
+       * <code>string service = 8;</code>
+       * @return The service.
+       */
+      @java.lang.Override
+      public java.lang.String getService() {
+        return instance.getService();
+      }
+      /**
+       * <pre>
+       * the service the slots' directory is named for, as it is safe to log
+       * </pre>
+       *
+       * <code>string service = 8;</code>
+       * @return The bytes for service.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getServiceBytes() {
+        return instance.getServiceBytes();
+      }
+      /**
+       * <pre>
+       * the service the slots' directory is named for, as it is safe to log
+       * </pre>
+       *
+       * <code>string service = 8;</code>
+       * @param value The service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setService(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setService(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the service the slots' directory is named for, as it is safe to log
+       * </pre>
+       *
+       * <code>string service = 8;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearService() {
+        copyOnWrite();
+        instance.clearService();
+        return this;
+      }
+      /**
+       * <pre>
+       * the service the slots' directory is named for, as it is safe to log
+       * </pre>
+       *
+       * <code>string service = 8;</code>
+       * @param value The bytes for service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setServiceBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setServiceBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the endpoint as it is safe to log: no user info, query or fragment
+       * </pre>
+       *
+       * <code>string shown_endpoint = 9;</code>
+       * @return The shownEndpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getShownEndpoint() {
+        return instance.getShownEndpoint();
+      }
+      /**
+       * <pre>
+       * the endpoint as it is safe to log: no user info, query or fragment
+       * </pre>
+       *
+       * <code>string shown_endpoint = 9;</code>
+       * @return The bytes for shownEndpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getShownEndpointBytes() {
+        return instance.getShownEndpointBytes();
+      }
+      /**
+       * <pre>
+       * the endpoint as it is safe to log: no user info, query or fragment
+       * </pre>
+       *
+       * <code>string shown_endpoint = 9;</code>
+       * @param value The shownEndpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setShownEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setShownEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the endpoint as it is safe to log: no user info, query or fragment
+       * </pre>
+       *
+       * <code>string shown_endpoint = 9;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearShownEndpoint() {
+        copyOnWrite();
+        instance.clearShownEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * the endpoint as it is safe to log: no user info, query or fragment
+       * </pre>
+       *
+       * <code>string shown_endpoint = 9;</code>
+       * @param value The bytes for shownEndpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setShownEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setShownEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      @java.lang.Override
+      public boolean hasHints() {
+        return instance.hasHints();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupHints getHints() {
+        return instance.getHints();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      public Builder setHints(dev.pydantic.opamp.core.CoreProto.SetupHints value) {
+        copyOnWrite();
+        instance.setHints(value);
+        return this;
+        }
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      public Builder setHints(
+          dev.pydantic.opamp.core.CoreProto.SetupHints.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHints(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      public Builder mergeHints(dev.pydantic.opamp.core.CoreProto.SetupHints value) {
+        copyOnWrite();
+        instance.mergeHints(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupHints hints = 10;</code>
+       */
+      public Builder clearHints() {  copyOnWrite();
+        instance.clearHints();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @return A list containing the warnings.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getWarningsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getWarningsList());
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @return The count of warnings.
+       */
+      @java.lang.Override
+      public int getWarningsCount() {
+        return instance.getWarningsCount();
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param index The index of the element to return.
+       * @return The warnings at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getWarnings(int index) {
+        return instance.getWarnings(index);
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the warnings at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getWarningsBytes(int index) {
+        return instance.getWarningsBytes(index);
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param index The index to set the value at.
+       * @param value The warnings to set.
+       * @return This builder for chaining.
+       */
+      public Builder setWarnings(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setWarnings(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param value The warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addWarnings(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addWarnings(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param values The warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllWarnings(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllWarnings(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearWarnings() {
+        copyOnWrite();
+        instance.clearWarnings();
+        return this;
+      }
+      /**
+       * <pre>
+       * to say, at WARN, in order
+       * </pre>
+       *
+       * <code>repeated string warnings = 11;</code>
+       * @param value The bytes of the warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addWarningsBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addWarningsBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupStarted)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupStarted();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "off_",
+              "endpoint_",
+              "headers_",
+              dev.pydantic.opamp.core.CoreProto.Header.class,
+              "heartbeatIntervalMs_",
+              "stateDir_",
+              "defaultSlots_",
+              "allSlotsTaken_",
+              "service_",
+              "shownEndpoint_",
+              "hints_",
+              "warnings_",
+            };
+            java.lang.String info =
+                "\u0000\u000b\u0000\u0001\u0001\u000b\u000b\u0000\u0003\u0000\u0001\u0007\u0002\u0208" +
+                "\u0003\u001b\u0004\u0003\u0005\u0208\u0006\u021a\u0007\u0208\b\u0208\t\u0208\n\u1009" +
+                "\u0000\u000b\u021a";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupStarted> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupStarted.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupStarted>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupStarted)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupStarted DEFAULT_INSTANCE;
+    static {
+      SetupStarted defaultInstance = new SetupStarted();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupStarted.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupStarted getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupStarted> PARSER;
+
+    public static com.google.protobuf.Parser<SetupStarted> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupHintsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupHints)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The refused.
+     */
+    java.lang.String getRefused();
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The bytes for refused.
+     */
+    com.google.protobuf.ByteString
+        getRefusedBytes();
+
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The notFound.
+     */
+    java.lang.String getNotFound();
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The bytes for notFound.
+     */
+    com.google.protobuf.ByteString
+        getNotFoundBytes();
+
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The unreachable.
+     */
+    java.lang.String getUnreachable();
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The bytes for unreachable.
+     */
+    com.google.protobuf.ByteString
+        getUnreachableBytes();
+
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The error.
+     */
+    java.lang.String getError();
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The bytes for error.
+     */
+    com.google.protobuf.ByteString
+        getErrorBytes();
+  }
+  /**
+   * <pre>
+   * What to check when the server can't be reached, by what went wrong; each names what gave the
+   * endpoint or the headers (the variable, or the code).
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.SetupHints}
+   */
+  public  static final class SetupHints extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupHints, SetupHints.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupHints)
+      SetupHintsOrBuilder {
+    private SetupHints() {
+      refused_ = "";
+      notFound_ = "";
+      unreachable_ = "";
+      error_ = "";
+    }
+    public static final int REFUSED_FIELD_NUMBER = 1;
+    private java.lang.String refused_;
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The refused.
+     */
+    @java.lang.Override
+    public java.lang.String getRefused() {
+      return refused_;
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The bytes for refused.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getRefusedBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(refused_);
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @param value The refused to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setRefused(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      refused_ = value;
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     */
+    private void clearRefused() {
+
+      refused_ = getDefaultInstance().getRefused();
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @param value The bytes for refused to set.
+     */
+    private void setRefusedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      refused_ = value.toStringUtf8();
+
+    }
+
+    public static final int NOT_FOUND_FIELD_NUMBER = 2;
+    private java.lang.String notFound_;
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The notFound.
+     */
+    @java.lang.Override
+    public java.lang.String getNotFound() {
+      return notFound_;
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The bytes for notFound.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNotFoundBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(notFound_);
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @param value The notFound to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setNotFound(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      notFound_ = value;
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     */
+    private void clearNotFound() {
+
+      notFound_ = getDefaultInstance().getNotFound();
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @param value The bytes for notFound to set.
+     */
+    private void setNotFoundBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      notFound_ = value.toStringUtf8();
+
+    }
+
+    public static final int UNREACHABLE_FIELD_NUMBER = 3;
+    private java.lang.String unreachable_;
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The unreachable.
+     */
+    @java.lang.Override
+    public java.lang.String getUnreachable() {
+      return unreachable_;
+    }
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The bytes for unreachable.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUnreachableBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(unreachable_);
+    }
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @param value The unreachable to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUnreachable(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      unreachable_ = value;
+    }
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     */
+    private void clearUnreachable() {
+
+      unreachable_ = getDefaultInstance().getUnreachable();
+    }
+    /**
+     * <pre>
+     * no HTTP status: no connection
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @param value The bytes for unreachable to set.
+     */
+    private void setUnreachableBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      unreachable_ = value.toStringUtf8();
+
+    }
+
+    public static final int ERROR_FIELD_NUMBER = 4;
+    private java.lang.String error_;
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The error.
+     */
+    @java.lang.Override
+    public java.lang.String getError() {
+      return error_;
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The bytes for error.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getErrorBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(error_);
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @param value The error to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setError(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      error_ = value;
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     */
+    private void clearError() {
+
+      error_ = getDefaultInstance().getError();
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @param value The bytes for error to set.
+     */
+    private void setErrorBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      error_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupHints prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * What to check when the server can't be reached, by what went wrong; each names what gave the
+     * endpoint or the headers (the variable, or the code).
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.SetupHints}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupHints, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupHints)
+        dev.pydantic.opamp.core.CoreProto.SetupHintsOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupHints.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return The refused.
+       */
+      @java.lang.Override
+      public java.lang.String getRefused() {
+        return instance.getRefused();
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return The bytes for refused.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getRefusedBytes() {
+        return instance.getRefusedBytes();
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @param value The refused to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefused(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setRefused(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRefused() {
+        copyOnWrite();
+        instance.clearRefused();
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @param value The bytes for refused to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefusedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setRefusedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return The notFound.
+       */
+      @java.lang.Override
+      public java.lang.String getNotFound() {
+        return instance.getNotFound();
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return The bytes for notFound.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getNotFoundBytes() {
+        return instance.getNotFoundBytes();
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @param value The notFound to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNotFound(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setNotFound(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNotFound() {
+        copyOnWrite();
+        instance.clearNotFound();
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @param value The bytes for notFound to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNotFoundBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setNotFoundBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * no HTTP status: no connection
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return The unreachable.
+       */
+      @java.lang.Override
+      public java.lang.String getUnreachable() {
+        return instance.getUnreachable();
+      }
+      /**
+       * <pre>
+       * no HTTP status: no connection
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return The bytes for unreachable.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUnreachableBytes() {
+        return instance.getUnreachableBytes();
+      }
+      /**
+       * <pre>
+       * no HTTP status: no connection
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @param value The unreachable to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnreachable(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setUnreachable(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * no HTTP status: no connection
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUnreachable() {
+        copyOnWrite();
+        instance.clearUnreachable();
+        return this;
+      }
+      /**
+       * <pre>
+       * no HTTP status: no connection
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @param value The bytes for unreachable to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnreachableBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUnreachableBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return The error.
+       */
+      @java.lang.Override
+      public java.lang.String getError() {
+        return instance.getError();
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return The bytes for error.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getErrorBytes() {
+        return instance.getErrorBytes();
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @param value The error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setError(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setError(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearError() {
+        copyOnWrite();
+        instance.clearError();
+        return this;
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @param value The bytes for error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrorBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setErrorBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupHints)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupHints();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "refused_",
+              "notFound_",
+              "unreachable_",
+              "error_",
+            };
+            java.lang.String info =
+                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "\u0003\u0208\u0004\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupHints> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupHints.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupHints>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupHints)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupHints DEFAULT_INSTANCE;
+    static {
+      SetupHints defaultInstance = new SetupHints();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupHints.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupHints getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupHints> PARSER;
+
+    public static com.google.protobuf.Parser<SetupHints> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupIdentityOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupIdentity)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * a state directory is in use
+     * </pre>
+     *
+     * <code>bool state_dir = 1;</code>
+     * @return The stateDir.
+     */
+    boolean getStateDir();
+
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @return The saved.
+     */
+    java.lang.String getSaved();
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @return The bytes for saved.
+     */
+    com.google.protobuf.ByteString
+        getSavedBytes();
+
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @return The resourceAttributes.
+     */
+    java.lang.String getResourceAttributes();
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @return The bytes for resourceAttributes.
+     */
+    com.google.protobuf.ByteString
+        getResourceAttributesBytes();
+
+    /**
+     * <pre>
+     * at least 10 bytes from the platform's CSPRNG
+     * </pre>
+     *
+     * <code>bytes entropy = 4;</code>
+     * @return The entropy.
+     */
+    com.google.protobuf.ByteString getEntropy();
+
+    /**
+     * <pre>
+     * the wall clock
+     * </pre>
+     *
+     * <code>uint64 unix_ms = 5;</code>
+     * @return The unixMs.
+     */
+    long getUnixMs();
+  }
+  /**
+   * <pre>
+   * The instance UID, once the state directory is known (and locked).
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.SetupIdentity}
+   */
+  public  static final class SetupIdentity extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupIdentity, SetupIdentity.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupIdentity)
+      SetupIdentityOrBuilder {
+    private SetupIdentity() {
+      saved_ = "";
+      resourceAttributes_ = "";
+      entropy_ = com.google.protobuf.ByteString.EMPTY;
+    }
+    public static final int STATE_DIR_FIELD_NUMBER = 1;
+    private boolean stateDir_;
+    /**
+     * <pre>
+     * a state directory is in use
+     * </pre>
+     *
+     * <code>bool state_dir = 1;</code>
+     * @return The stateDir.
+     */
+    @java.lang.Override
+    public boolean getStateDir() {
+      return stateDir_;
+    }
+    /**
+     * <pre>
+     * a state directory is in use
+     * </pre>
+     *
+     * <code>bool state_dir = 1;</code>
+     * @param value The stateDir to set.
+     */
+    private void setStateDir(boolean value) {
+      
+      stateDir_ = value;
+    }
+    /**
+     * <pre>
+     * a state directory is in use
+     * </pre>
+     *
+     * <code>bool state_dir = 1;</code>
+     */
+    private void clearStateDir() {
+
+      stateDir_ = false;
+    }
+
+    public static final int SAVED_FIELD_NUMBER = 2;
+    private java.lang.String saved_;
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @return The saved.
+     */
+    @java.lang.Override
+    public java.lang.String getSaved() {
+      return saved_;
+    }
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @return The bytes for saved.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getSavedBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(saved_);
+    }
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @param value The saved to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setSaved(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      saved_ = value;
+    }
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     */
+    private void clearSaved() {
+
+      saved_ = getDefaultInstance().getSaved();
+    }
+    /**
+     * <pre>
+     * its instance-uid file's text; empty: none, or unreadable
+     * </pre>
+     *
+     * <code>string saved = 2;</code>
+     * @param value The bytes for saved to set.
+     */
+    private void setSavedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      saved_ = value.toStringUtf8();
+
+    }
+
+    public static final int RESOURCE_ATTRIBUTES_FIELD_NUMBER = 3;
+    private java.lang.String resourceAttributes_;
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @return The resourceAttributes.
+     */
+    @java.lang.Override
+    public java.lang.String getResourceAttributes() {
+      return resourceAttributes_;
+    }
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @return The bytes for resourceAttributes.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getResourceAttributesBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(resourceAttributes_);
+    }
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @param value The resourceAttributes to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setResourceAttributes(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      resourceAttributes_ = value;
+    }
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     */
+    private void clearResourceAttributes() {
+
+      resourceAttributes_ = getDefaultInstance().getResourceAttributes();
+    }
+    /**
+     * <pre>
+     * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+     * </pre>
+     *
+     * <code>string resource_attributes = 3;</code>
+     * @param value The bytes for resourceAttributes to set.
+     */
+    private void setResourceAttributesBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      resourceAttributes_ = value.toStringUtf8();
+
+    }
+
+    public static final int ENTROPY_FIELD_NUMBER = 4;
+    private com.google.protobuf.ByteString entropy_;
+    /**
+     * <pre>
+     * at least 10 bytes from the platform's CSPRNG
+     * </pre>
+     *
+     * <code>bytes entropy = 4;</code>
+     * @return The entropy.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getEntropy() {
+      return entropy_;
+    }
+    /**
+     * <pre>
+     * at least 10 bytes from the platform's CSPRNG
+     * </pre>
+     *
+     * <code>bytes entropy = 4;</code>
+     * @param value The entropy to set.
+     */
+    private void setEntropy(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      entropy_ = value;
+    }
+    /**
+     * <pre>
+     * at least 10 bytes from the platform's CSPRNG
+     * </pre>
+     *
+     * <code>bytes entropy = 4;</code>
+     */
+    private void clearEntropy() {
+
+      entropy_ = getDefaultInstance().getEntropy();
+    }
+
+    public static final int UNIX_MS_FIELD_NUMBER = 5;
+    private long unixMs_;
+    /**
+     * <pre>
+     * the wall clock
+     * </pre>
+     *
+     * <code>uint64 unix_ms = 5;</code>
+     * @return The unixMs.
+     */
+    @java.lang.Override
+    public long getUnixMs() {
+      return unixMs_;
+    }
+    /**
+     * <pre>
+     * the wall clock
+     * </pre>
+     *
+     * <code>uint64 unix_ms = 5;</code>
+     * @param value The unixMs to set.
+     */
+    private void setUnixMs(long value) {
+      
+      unixMs_ = value;
+    }
+    /**
+     * <pre>
+     * the wall clock
+     * </pre>
+     *
+     * <code>uint64 unix_ms = 5;</code>
+     */
+    private void clearUnixMs() {
+
+      unixMs_ = 0L;
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupIdentity prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * The instance UID, once the state directory is known (and locked).
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.SetupIdentity}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupIdentity, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupIdentity)
+        dev.pydantic.opamp.core.CoreProto.SetupIdentityOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupIdentity.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * a state directory is in use
+       * </pre>
+       *
+       * <code>bool state_dir = 1;</code>
+       * @return The stateDir.
+       */
+      @java.lang.Override
+      public boolean getStateDir() {
+        return instance.getStateDir();
+      }
+      /**
+       * <pre>
+       * a state directory is in use
+       * </pre>
+       *
+       * <code>bool state_dir = 1;</code>
+       * @param value The stateDir to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateDir(boolean value) {
+        copyOnWrite();
+        instance.setStateDir(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * a state directory is in use
+       * </pre>
+       *
+       * <code>bool state_dir = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStateDir() {
+        copyOnWrite();
+        instance.clearStateDir();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * its instance-uid file's text; empty: none, or unreadable
+       * </pre>
+       *
+       * <code>string saved = 2;</code>
+       * @return The saved.
+       */
+      @java.lang.Override
+      public java.lang.String getSaved() {
+        return instance.getSaved();
+      }
+      /**
+       * <pre>
+       * its instance-uid file's text; empty: none, or unreadable
+       * </pre>
+       *
+       * <code>string saved = 2;</code>
+       * @return The bytes for saved.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getSavedBytes() {
+        return instance.getSavedBytes();
+      }
+      /**
+       * <pre>
+       * its instance-uid file's text; empty: none, or unreadable
+       * </pre>
+       *
+       * <code>string saved = 2;</code>
+       * @param value The saved to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSaved(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setSaved(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * its instance-uid file's text; empty: none, or unreadable
+       * </pre>
+       *
+       * <code>string saved = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSaved() {
+        copyOnWrite();
+        instance.clearSaved();
+        return this;
+      }
+      /**
+       * <pre>
+       * its instance-uid file's text; empty: none, or unreadable
+       * </pre>
+       *
+       * <code>string saved = 2;</code>
+       * @param value The bytes for saved to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSavedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setSavedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+       * </pre>
+       *
+       * <code>string resource_attributes = 3;</code>
+       * @return The resourceAttributes.
+       */
+      @java.lang.Override
+      public java.lang.String getResourceAttributes() {
+        return instance.getResourceAttributes();
+      }
+      /**
+       * <pre>
+       * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+       * </pre>
+       *
+       * <code>string resource_attributes = 3;</code>
+       * @return The bytes for resourceAttributes.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getResourceAttributesBytes() {
+        return instance.getResourceAttributesBytes();
+      }
+      /**
+       * <pre>
+       * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+       * </pre>
+       *
+       * <code>string resource_attributes = 3;</code>
+       * @param value The resourceAttributes to set.
+       * @return This builder for chaining.
+       */
+      public Builder setResourceAttributes(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setResourceAttributes(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+       * </pre>
+       *
+       * <code>string resource_attributes = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearResourceAttributes() {
+        copyOnWrite();
+        instance.clearResourceAttributes();
+        return this;
+      }
+      /**
+       * <pre>
+       * OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+       * </pre>
+       *
+       * <code>string resource_attributes = 3;</code>
+       * @param value The bytes for resourceAttributes to set.
+       * @return This builder for chaining.
+       */
+      public Builder setResourceAttributesBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setResourceAttributesBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * at least 10 bytes from the platform's CSPRNG
+       * </pre>
+       *
+       * <code>bytes entropy = 4;</code>
+       * @return The entropy.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getEntropy() {
+        return instance.getEntropy();
+      }
+      /**
+       * <pre>
+       * at least 10 bytes from the platform's CSPRNG
+       * </pre>
+       *
+       * <code>bytes entropy = 4;</code>
+       * @param value The entropy to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEntropy(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEntropy(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * at least 10 bytes from the platform's CSPRNG
+       * </pre>
+       *
+       * <code>bytes entropy = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEntropy() {
+        copyOnWrite();
+        instance.clearEntropy();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the wall clock
+       * </pre>
+       *
+       * <code>uint64 unix_ms = 5;</code>
+       * @return The unixMs.
+       */
+      @java.lang.Override
+      public long getUnixMs() {
+        return instance.getUnixMs();
+      }
+      /**
+       * <pre>
+       * the wall clock
+       * </pre>
+       *
+       * <code>uint64 unix_ms = 5;</code>
+       * @param value The unixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnixMs(long value) {
+        copyOnWrite();
+        instance.setUnixMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the wall clock
+       * </pre>
+       *
+       * <code>uint64 unix_ms = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUnixMs() {
+        copyOnWrite();
+        instance.clearUnixMs();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupIdentity)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupIdentity();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "stateDir_",
+              "saved_",
+              "resourceAttributes_",
+              "entropy_",
+              "unixMs_",
+            };
+            java.lang.String info =
+                "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u0007\u0002\u0208" +
+                "\u0003\u0208\u0004\n\u0005\u0003";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupIdentity> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupIdentity.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupIdentity>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupIdentity)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupIdentity DEFAULT_INSTANCE;
+    static {
+      SetupIdentity defaultInstance = new SetupIdentity();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupIdentity.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentity getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupIdentity> PARSER;
+
+    public static com.google.protobuf.Parser<SetupIdentity> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface SetupIdentifiedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.SetupIdentified)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 1;</code>
+     * @return The instanceUid.
+     */
+    com.google.protobuf.ByteString getInstanceUid();
+
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @return The enum numeric value on the wire for from.
+     */
+    int getFromValue();
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @return The from.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupUidFrom getFrom();
+
+    /**
+     * <pre>
+     * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+     * fails, say so (at WARN) and use `unsaved_uid` instead.
+     * </pre>
+     *
+     * <code>bool save = 3;</code>
+     * @return The save.
+     */
+    boolean getSave();
+
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @return The text.
+     */
+    java.lang.String getText();
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @return The bytes for text.
+     */
+    com.google.protobuf.ByteString
+        getTextBytes();
+
+    /**
+     * <code>bytes unsaved_uid = 5;</code>
+     * @return The unsavedUid.
+     */
+    com.google.protobuf.ByteString getUnsavedUid();
+
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @return The enum numeric value on the wire for unsavedFrom.
+     */
+    int getUnsavedFromValue();
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @return The unsavedFrom.
+     */
+    dev.pydantic.opamp.core.CoreProto.SetupUidFrom getUnsavedFrom();
+  }
+  /**
+   * Protobuf type {@code opamp.core.v1.SetupIdentified}
+   */
+  public  static final class SetupIdentified extends
+      com.google.protobuf.GeneratedMessageLite<
+          SetupIdentified, SetupIdentified.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupIdentified)
+      SetupIdentifiedOrBuilder {
+    private SetupIdentified() {
+      instanceUid_ = com.google.protobuf.ByteString.EMPTY;
+      text_ = "";
+      unsavedUid_ = com.google.protobuf.ByteString.EMPTY;
+    }
+    public static final int INSTANCE_UID_FIELD_NUMBER = 1;
+    private com.google.protobuf.ByteString instanceUid_;
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 1;</code>
+     * @return The instanceUid.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getInstanceUid() {
+      return instanceUid_;
+    }
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 1;</code>
+     * @param value The instanceUid to set.
+     */
+    private void setInstanceUid(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      instanceUid_ = value;
+    }
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 1;</code>
+     */
+    private void clearInstanceUid() {
+
+      instanceUid_ = getDefaultInstance().getInstanceUid();
+    }
+
+    public static final int FROM_FIELD_NUMBER = 2;
+    private int from_;
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @return The enum numeric value on the wire for from.
+     */
+    @java.lang.Override
+    public int getFromValue() {
+      return from_;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @return The from.
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupUidFrom getFrom() {
+      dev.pydantic.opamp.core.CoreProto.SetupUidFrom result = dev.pydantic.opamp.core.CoreProto.SetupUidFrom.forNumber(from_);
+      return result == null ? dev.pydantic.opamp.core.CoreProto.SetupUidFrom.UNRECOGNIZED : result;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @param value The enum numeric value on the wire for from to set.
+     * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+     */
+    private void setFromValue(int value) {
+        from_ = value;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     * @param value The from to set.
+     */
+    private void setFrom(dev.pydantic.opamp.core.CoreProto.SetupUidFrom value) {
+      from_ = value.getNumber();
+
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+     */
+    private void clearFrom() {
+
+      from_ = 0;
+    }
+
+    public static final int SAVE_FIELD_NUMBER = 3;
+    private boolean save_;
+    /**
+     * <pre>
+     * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+     * fails, say so (at WARN) and use `unsaved_uid` instead.
+     * </pre>
+     *
+     * <code>bool save = 3;</code>
+     * @return The save.
+     */
+    @java.lang.Override
+    public boolean getSave() {
+      return save_;
+    }
+    /**
+     * <pre>
+     * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+     * fails, say so (at WARN) and use `unsaved_uid` instead.
+     * </pre>
+     *
+     * <code>bool save = 3;</code>
+     * @param value The save to set.
+     */
+    private void setSave(boolean value) {
+      
+      save_ = value;
+    }
+    /**
+     * <pre>
+     * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+     * fails, say so (at WARN) and use `unsaved_uid` instead.
+     * </pre>
+     *
+     * <code>bool save = 3;</code>
+     */
+    private void clearSave() {
+
+      save_ = false;
+    }
+
+    public static final int TEXT_FIELD_NUMBER = 4;
+    private java.lang.String text_;
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @return The text.
+     */
+    @java.lang.Override
+    public java.lang.String getText() {
+      return text_;
+    }
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @return The bytes for text.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getTextBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(text_);
+    }
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @param value The text to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setText(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      text_ = value;
+    }
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     */
+    private void clearText() {
+
+      text_ = getDefaultInstance().getText();
+    }
+    /**
+     * <pre>
+     * instance_uid, as the file holds it: lower-case, hyphenated
+     * </pre>
+     *
+     * <code>string text = 4;</code>
+     * @param value The bytes for text to set.
+     */
+    private void setTextBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      text_ = value.toStringUtf8();
+
+    }
+
+    public static final int UNSAVED_UID_FIELD_NUMBER = 5;
+    private com.google.protobuf.ByteString unsavedUid_;
+    /**
+     * <code>bytes unsaved_uid = 5;</code>
+     * @return The unsavedUid.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getUnsavedUid() {
+      return unsavedUid_;
+    }
+    /**
+     * <code>bytes unsaved_uid = 5;</code>
+     * @param value The unsavedUid to set.
+     */
+    private void setUnsavedUid(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      unsavedUid_ = value;
+    }
+    /**
+     * <code>bytes unsaved_uid = 5;</code>
+     */
+    private void clearUnsavedUid() {
+
+      unsavedUid_ = getDefaultInstance().getUnsavedUid();
+    }
+
+    public static final int UNSAVED_FROM_FIELD_NUMBER = 6;
+    private int unsavedFrom_;
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @return The enum numeric value on the wire for unsavedFrom.
+     */
+    @java.lang.Override
+    public int getUnsavedFromValue() {
+      return unsavedFrom_;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @return The unsavedFrom.
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.SetupUidFrom getUnsavedFrom() {
+      dev.pydantic.opamp.core.CoreProto.SetupUidFrom result = dev.pydantic.opamp.core.CoreProto.SetupUidFrom.forNumber(unsavedFrom_);
+      return result == null ? dev.pydantic.opamp.core.CoreProto.SetupUidFrom.UNRECOGNIZED : result;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @param value The enum numeric value on the wire for unsavedFrom to set.
+     * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+     */
+    private void setUnsavedFromValue(int value) {
+        unsavedFrom_ = value;
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     * @param value The unsavedFrom to set.
+     */
+    private void setUnsavedFrom(dev.pydantic.opamp.core.CoreProto.SetupUidFrom value) {
+      unsavedFrom_ = value.getNumber();
+
+    }
+    /**
+     * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+     */
+    private void clearUnsavedFrom() {
+
+      unsavedFrom_ = 0;
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.SetupIdentified prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.core.v1.SetupIdentified}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.SetupIdentified, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.SetupIdentified)
+        dev.pydantic.opamp.core.CoreProto.SetupIdentifiedOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.SetupIdentified.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 1;</code>
+       * @return The instanceUid.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getInstanceUid() {
+        return instance.getInstanceUid();
+      }
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 1;</code>
+       * @param value The instanceUid to set.
+       * @return This builder for chaining.
+       */
+      public Builder setInstanceUid(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setInstanceUid(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearInstanceUid() {
+        copyOnWrite();
+        instance.clearInstanceUid();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+       * @return The enum numeric value on the wire for from.
+       */
+      @java.lang.Override
+      public int getFromValue() {
+        return instance.getFromValue();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+       * @param value The from to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFromValue(int value) {
+        copyOnWrite();
+        instance.setFromValue(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+       * @return The from.
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupUidFrom getFrom() {
+        return instance.getFrom();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+       * @param value The enum numeric value on the wire for from to set.
+       * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+       * @return This builder for chaining.
+       */
+      public Builder setFrom(dev.pydantic.opamp.core.CoreProto.SetupUidFrom value) {
+        copyOnWrite();
+        instance.setFrom(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom from = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFrom() {
+        copyOnWrite();
+        instance.clearFrom();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+       * fails, say so (at WARN) and use `unsaved_uid` instead.
+       * </pre>
+       *
+       * <code>bool save = 3;</code>
+       * @return The save.
+       */
+      @java.lang.Override
+      public boolean getSave() {
+        return instance.getSave();
+      }
+      /**
+       * <pre>
+       * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+       * fails, say so (at WARN) and use `unsaved_uid` instead.
+       * </pre>
+       *
+       * <code>bool save = 3;</code>
+       * @param value The save to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSave(boolean value) {
+        copyOnWrite();
+        instance.setSave(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+       * fails, say so (at WARN) and use `unsaved_uid` instead.
+       * </pre>
+       *
+       * <code>bool save = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSave() {
+        copyOnWrite();
+        instance.clearSave();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * instance_uid, as the file holds it: lower-case, hyphenated
+       * </pre>
+       *
+       * <code>string text = 4;</code>
+       * @return The text.
+       */
+      @java.lang.Override
+      public java.lang.String getText() {
+        return instance.getText();
+      }
+      /**
+       * <pre>
+       * instance_uid, as the file holds it: lower-case, hyphenated
+       * </pre>
+       *
+       * <code>string text = 4;</code>
+       * @return The bytes for text.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getTextBytes() {
+        return instance.getTextBytes();
+      }
+      /**
+       * <pre>
+       * instance_uid, as the file holds it: lower-case, hyphenated
+       * </pre>
+       *
+       * <code>string text = 4;</code>
+       * @param value The text to set.
+       * @return This builder for chaining.
+       */
+      public Builder setText(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setText(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * instance_uid, as the file holds it: lower-case, hyphenated
+       * </pre>
+       *
+       * <code>string text = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearText() {
+        copyOnWrite();
+        instance.clearText();
+        return this;
+      }
+      /**
+       * <pre>
+       * instance_uid, as the file holds it: lower-case, hyphenated
+       * </pre>
+       *
+       * <code>string text = 4;</code>
+       * @param value The bytes for text to set.
+       * @return This builder for chaining.
+       */
+      public Builder setTextBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setTextBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>bytes unsaved_uid = 5;</code>
+       * @return The unsavedUid.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getUnsavedUid() {
+        return instance.getUnsavedUid();
+      }
+      /**
+       * <code>bytes unsaved_uid = 5;</code>
+       * @param value The unsavedUid to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnsavedUid(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUnsavedUid(value);
+        return this;
+      }
+      /**
+       * <code>bytes unsaved_uid = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUnsavedUid() {
+        copyOnWrite();
+        instance.clearUnsavedUid();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+       * @return The enum numeric value on the wire for unsavedFrom.
+       */
+      @java.lang.Override
+      public int getUnsavedFromValue() {
+        return instance.getUnsavedFromValue();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+       * @param value The unsavedFrom to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnsavedFromValue(int value) {
+        copyOnWrite();
+        instance.setUnsavedFromValue(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+       * @return The unsavedFrom.
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.SetupUidFrom getUnsavedFrom() {
+        return instance.getUnsavedFrom();
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+       * @param value The enum numeric value on the wire for unsavedFrom to set.
+       * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+       * @return This builder for chaining.
+       */
+      public Builder setUnsavedFrom(dev.pydantic.opamp.core.CoreProto.SetupUidFrom value) {
+        copyOnWrite();
+        instance.setUnsavedFrom(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.core.v1.SetupUidFrom unsaved_from = 6;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUnsavedFrom() {
+        copyOnWrite();
+        instance.clearUnsavedFrom();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.SetupIdentified)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.SetupIdentified();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "instanceUid_",
+              "from_",
+              "save_",
+              "text_",
+              "unsavedUid_",
+              "unsavedFrom_",
+            };
+            java.lang.String info =
+                "\u0000\u0006\u0000\u0000\u0001\u0006\u0006\u0000\u0000\u0000\u0001\n\u0002\f\u0003" +
+                "\u0007\u0004\u0208\u0005\n\u0006\f";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.SetupIdentified> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.SetupIdentified.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.SetupIdentified>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.SetupIdentified)
+    private static final dev.pydantic.opamp.core.CoreProto.SetupIdentified DEFAULT_INSTANCE;
+    static {
+      SetupIdentified defaultInstance = new SetupIdentified();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        SetupIdentified.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.SetupIdentified getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<SetupIdentified> PARSER;
+
+    public static com.google.protobuf.Parser<SetupIdentified> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }

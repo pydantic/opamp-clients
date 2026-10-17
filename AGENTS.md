@@ -20,4 +20,6 @@ the core's modules, and any credential.
 
 The clients load the core compiled, from a `core/vX.Y.Z` release of this repository, pinned by
 `opamp-core.lock.json` (every file's sha256). `scripts/fetch_core.py fetch` puts it in place and
-`check` verifies it. Moving to a new core is a PR that changes only the lock.
+`check` verifies it. Moving to a new core is one PR holding the lock, the module copies checked in
+beside each client and the types regenerated from it: `fetch_core.py lock <version>`, `fetch`,
+then `scripts/gen_core.py` and `scripts/gen_sdk_settings.py`.

@@ -21,9 +21,10 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { AgentRemoteConfigSchema, type Client, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type Client, RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings } from "@pydantic/opamp-client/sdk";
 import { keepApplied } from "./kept.js";
+import { config as policyConfig, off, overridden, policy } from "./policy.js";
 
 import {
   Agent,
@@ -64,21 +65,18 @@ const text = (s: string) => new TextEncoder().encode(s);
 const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv({})).settings;
 // Every setting (docs/sdk-settings.md), and those a host built from `env` doesn't declare.
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
-  "deactivate_instrumentations", "drop_attributes", "mask_attributes", "opamp_polling_interval", "sampling_rate",
+  "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
   "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level", "send_logs_level_by_scope",
   "send_logs_per_second", "send_metrics", "send_traces"];
 const undeclared = (env: NodeJS.ProcessEnv) => {
   const host = hostFromEnv(env);
-  return SETTINGS.filter((k) => !host.live!.includes(k) && !host.nextStart!.includes(k));
+  return SETTINGS.filter((k) => !host.live!.includes(k));
 };
 const LOG_GATE = ["debug_send_logs_level", "drop_attributes", "mask_attributes", "send_logs", "send_logs_level",
   "send_logs_level_by_scope", "send_logs_per_second"];
-const config = (body?: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body ?? ""),
-    config: { configMap: body === undefined ? {} : { elastic: { body: text(body), contentType: "application/json" } } },
-  });
-const effective = (a: Agent) => JSON.parse(new TextDecoder().decode(a.effective?.configMap?.configMap.elastic?.body));
+const config = (body: string) => policyConfig(body, body);
+/** The controls the agent's effective config reports overridden. */
+const effective = (a: Agent) => overridden(a.effective);
 
 /** What the package says on the diag logger while `fn` runs, as [level, message]. */
 function said(fn: () => void): [string, string][] {
@@ -109,14 +107,14 @@ test("the SDK's sampler until a rate is set, and again when it is withdrawn", ()
   const own = new AlwaysOffSampler();
   c.sampler.wrap(own);
   assert.equal(c.sampler.current, own);
-  c.apply(settings('{"sampling_rate":"0.25"}'));
+  c.apply(settings(policy({ head_sampling: { ratio: 0.25 } })));
   assert.equal(c.sampler.current.toString(),
     new ParentBasedSampler({ root: new TraceIdRatioBasedSampler(0.25) }).toString());
-  c.apply(settings("{}"));
+  c.apply(settings(policy()));
   assert.equal(c.sampler.current, own);
   // A rate saved before the SDK builds its sampler still holds.
   const d = new Controls();
-  d.apply(settings('{"sampling_rate":"0"}'));
+  d.apply(settings(policy({ head_sampling: { ratio: 0 } })));
   d.sampler.wrap(new AlwaysOnSampler());
   assert.match(d.sampler.current.toString(), /TraceIdRatioBased\{0\}/);
 });
@@ -131,11 +129,11 @@ test("spans stop and start with send_traces, and a rate of 0 samples nothing", a
   const t = provider.getTracer("t");
   const span = (name: string) => context.with(ROOT_CONTEXT, () => t.startSpan(name, { kind: SpanKind.INTERNAL }).end());
   span("one");
-  c.apply(settings('{"send_traces":"false"}'));
+  c.apply(settings(policy({ signal_exports: off("traces") })));
   span("dropped");
-  c.apply(settings('{"sampling_rate":"0"}'));
+  c.apply(settings(policy({ head_sampling: { ratio: 0 } })));
   for (let i = 0; i < 50; i++) span("unsampled");
-  c.apply(settings("{}"));
+  c.apply(settings(policy()));
   span("two");
   await provider.forceFlush();
   assert.deepEqual(out.getFinishedSpans().map((s) => s.name), ["one", "two"]);
@@ -154,7 +152,7 @@ test("metrics and logs stop with send_metrics and send_logs", () => {
   const done = () => {};
   metrics.export({ scopeMetrics: [] } as never, done);
   logs.export([], done);
-  c.apply(settings('{"send_metrics":"false","send_logs":"false"}'));
+  c.apply(settings(policy({ signal_exports: off("metrics", "logs") })));
   metrics.export({ scopeMetrics: [] } as never, done);
   logs.export([], done);
   assert.deepEqual(reached, ["metrics", "logs"]);
@@ -176,14 +174,14 @@ test("send_logs_level drops the log records below it, live", () => {
   const results: number[] = [];
   const done = (r: { code: number }) => results.push(r.code);
   logs.export(records, done);
-  c.apply(settings('{"send_logs_level":"warn"}'));
+  c.apply(settings(policy({ log_levels: { level: "warn" } })));
   assert.equal(c.sendLogsMinSeverity, 13);
   logs.export(records, done);
   // Every record below the floor: nothing goes out, and the export succeeds.
   logs.export([record(9)] as never, done);
-  c.apply(settings('{"send_logs_level":"warn","send_logs":"false"}'));
+  c.apply(settings(policy({ log_levels: { level: "warn" }, signal_exports: off("logs") })));
   logs.export(records, done);
-  c.apply(settings("{}"));
+  c.apply(settings(policy()));
   assert.equal(c.sendLogsMinSeverity, undefined);
   logs.export(records, done);
   assert.deepEqual(sent, [[0, 0, 1, 5, 9, 12, 13, 17, 21], [0, 0, 13, 17, 21], [0, 0, 1, 5, 9, 12, 13, 17, 21]]);
@@ -201,14 +199,14 @@ test("instrumentations are switched by name, or all at once; the application's o
   const http = "@opentelemetry/instrumentation-http";
   const pg = "@opentelemetry/instrumentation-pg";
   assert.deepEqual([c.off(http), c.off(pg)], [false, false]);
-  c.apply(settings('{"deactivate_instrumentations":"http, fs"}'));
+  c.apply(settings(policy({ instrumentations: { disabled: ["http", "fs"] } })));
   assert.deepEqual([c.off(http), c.off(pg)], [true, false]);
   // fs isn't loaded (it is off by default): nothing to switch.
   assert.deepEqual(c.unloaded, ["fs"]);
-  c.apply(settings('{"deactivate_all_instrumentations":"true"}'));
+  c.apply(settings(policy({ instrumentations: { all_disabled: true } })));
   assert.deepEqual([c.off(http), c.off(pg), c.off("checkout"), c.off("@opentelemetry/instrumentation-fs")],
     [true, true, false, false]);
-  c.apply(settings("{}"));
+  c.apply(settings(policy()));
   assert.deepEqual([c.off(http), c.off(pg)], [false, false]);
 });
 
@@ -233,12 +231,12 @@ test("a switched-off instrumentation's metrics and log records aren't exported",
     l.export(scopes("@opentelemetry/instrumentation-pino", "checkout") as never, done);
   };
   both();
-  c.apply(settings('{"deactivate_instrumentations":"http,pino"}'));
+  c.apply(settings(policy({ instrumentations: { disabled: ["http", "pino"] } })));
   both();
-  c.apply(settings('{"deactivate_all_instrumentations":"true"}'));
+  c.apply(settings(policy({ instrumentations: { all_disabled: true } })));
   m.export({ scopeMetrics: scopes("@opentelemetry/instrumentation-http") } as never, done); // nothing left
   l.export(scopes("@opentelemetry/instrumentation-pino") as never, done);
-  c.apply(settings("{}"));
+  c.apply(settings(policy()));
   both();
   assert.deepEqual(metrics, [["@opentelemetry/instrumentation-http", "checkout"], ["checkout"],
     ["@opentelemetry/instrumentation-http", "checkout"]]);
@@ -328,15 +326,15 @@ test("resource attributes reach the server typed, lists as lists", () => {
 test("live settings are applied at once and reported, the package saving nothing; a wrong config changes nothing", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const { agent } = prepared(dir);
-  const s = agent.remoteConfig(config('{"sampling_rate":"0.5","send_logs":"false"}'));
+  const s = agent.remoteConfig(config(policy({ head_sampling: { ratio: 0.5 }, signal_exports: off("logs") })));
   assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.sendLogs, false);
-  assert.deepEqual(effective(agent), { sampling_rate: "0.5", send_logs: "false" });
+  assert.deepEqual(effective(agent), { head_sampling: { ratio: 0.5 }, signal_exports: off("logs") });
   // The client keeps the config applied, in its own state: nothing of the package's own.
   assert.equal(existsSync(join(dir, "sdk-settings.json")), false);
-  const bad = agent.remoteConfig(config('{"send_logs":"true","sampling_rate":"2"}'));
+  const bad = agent.remoteConfig(config(policy({ head_sampling: { ratio: 2 } })));
   assert.equal(bad.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.match(bad.errorMessage, /^sampling_rate:/);
+  assert.match(bad.errorMessage, /^head_sampling:/);
   assert.equal(agent.controls.sendLogs, false);
 });
 
@@ -345,31 +343,36 @@ test("instrumentations are switched at once, reported, and still switched at the
   const { agent } = prepared(dir);
   agent.instrument([loaded("http")]);
   const http = "@opentelemetry/instrumentation-http";
-  assert.equal(agent.remoteConfig(config('{"deactivate_instrumentations":"http"}')).status,
-    RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
+  const sw = policy({ instrumentations: { disabled: ["http"] } });
+  assert.equal(agent.remoteConfig(config(sw)).status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.off(http), true);
-  assert.deepEqual(effective(agent), { deactivate_instrumentations: "http" });
-  keepApplied(dir, '{"deactivate_instrumentations":"http"}'); // as the client does, before APPLIED goes out
+  assert.deepEqual(effective(agent), { instrumentations: { disabled: ["http"] } });
+  keepApplied(dir, sw); // as the client does, before APPLIED goes out
   const { agent: next, env } = prepared(dir, { OTEL_NODE_DISABLED_INSTRUMENTATIONS: "fs" });
   next.instrument([loaded("http")]);
   assert.equal(next.controls.off(http), true);
-  assert.deepEqual(effective(next), { deactivate_instrumentations: "http" });
+  assert.deepEqual(effective(next), { instrumentations: { disabled: ["http"] } });
   // Through the SDK, not the environment: a child process doesn't inherit it.
   assert.equal(env.OTEL_NODE_DISABLED_INSTRUMENTATIONS, "fs");
-  // Left out again: on again, at once.
-  next.remoteConfig(config("{}"));
+  // Local again: on again, at once.
+  next.remoteConfig(config(policy()));
   assert.equal(next.controls.off(http), false);
   assert.deepEqual(effective(next), {});
 });
 
-test("a signal whose exporter NodeSDK builds, ungated, isn't carried out", () => {
+test("a signal whose exporter NodeSDK builds, ungated, isn't carried out: a policy that overrides it is refused", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const { agent } = prepared(dir, { OTEL_TRACES_EXPORTER: "zipkin" });
-  const s = agent.remoteConfig(config('{"send_traces":"false","send_logs":"false"}'));
-  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.equal(agent.controls.sendTraces, true); // ignored: nothing could stop it
+  const s = agent.remoteConfig(config(policy({ signal_exports: off("traces", "logs") })));
+  // Refused whole: nothing could stop the traces, so nothing changes.
+  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
+  assert.equal(s.errorMessage, "signal_exports.traces: this SDK cannot apply the requested override");
+  assert.equal(agent.controls.sendTraces, true);
+  assert.equal(agent.controls.sendLogs, true);
+  assert.deepEqual(effective(agent), {});
+  assert.equal(agent.remoteConfig(config(policy({ signal_exports: off("logs") }))).status,
+    RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.sendLogs, false);
-  assert.deepEqual(effective(agent), { send_logs: "false" });
   assert.deepEqual(undeclared({}), []);
   assert.deepEqual(undeclared({ OTEL_METRICS_EXPORTER: "console,none", OTEL_EXPORTER_OTLP_PROTOCOL: "grpc" }), []);
   // An unknown protocol is http/protobuf, as NodeSDK reads it: built here, so the server can stop it.
@@ -380,23 +383,21 @@ test("a signal whose exporter NodeSDK builds, ungated, isn't carried out", () =>
   assert.deepEqual(undeclared({ OTEL_LOGS_EXPORTER: "otlp,custom" }), LOG_GATE);
   assert.deepEqual(undeclared({ OTEL_TRACES_EXPORTER: "zipkin" }), ["drop_attributes", "mask_attributes", "send_traces"]);
   const ungated = prepared(mkdtempSync(join(tmpdir(), "opamp-otel-")), { OTEL_LOGS_EXPORTER: "custom" }).agent;
-  ungated.remoteConfig(config('{"send_logs_level":"error"}'));
+  const level = ungated.remoteConfig(config(policy({ log_levels: { level: "error" } })));
+  assert.equal(level.errorMessage, "log_levels: level: this SDK cannot apply the requested override");
   assert.equal(ungated.controls.sendLogsMinSeverity, undefined);
   assert.deepEqual(effective(ungated), {});
 });
 
-test("without a state directory a next-start change is failed; live ones are fine", () => {
+test("without a state directory every setting is still carried out: none waits for the next start", () => {
   const agent = new Agent();
   agent.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp" });
-  const s = agent.remoteConfig(config('{"opamp_polling_interval":"10s"}'));
-  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.match(s.errorMessage, /take effect at the next start/);
-  assert.equal(agent.remoteConfig(config('{"sampling_rate":"0.5"}')).status,
+  assert.equal(agent.remoteConfig(config(policy({ head_sampling: { ratio: 0.5 } }))).status,
     RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   // Instrumentations are switched while the application runs: nothing to keep for a restart.
-  assert.equal(agent.remoteConfig(config('{"deactivate_all_instrumentations":"true"}')).status,
+  assert.equal(agent.remoteConfig(config(policy({ instrumentations: { all_disabled: true } }))).status,
     RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.deepEqual(effective(agent), { deactivate_all_instrumentations: "true" });
+  assert.deepEqual(effective(agent), { instrumentations: { all_disabled: true } });
 });
 
 test("one UID names the instance and is kept; without an endpoint nothing changes", () => {
@@ -503,7 +504,7 @@ test("register after its shutdown, in one process: the same slot, the same UID, 
 
 test("a register right after its shutdown starts from a config applied just before: the shutdown waits for its save", async () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
-  keepApplied(dir, '{"sampling_rate":"0.25"}');
+  keepApplied(dir, policy({ head_sampling: { ratio: 0.25 } }));
   const { agent, env } = prepared(dir);
   assert.equal(agent.controls.sampler.samplingRate, 0.25);
   // A config applied just before the shutdown: the client's save of it is still writing when its
@@ -513,7 +514,7 @@ test("a register right after its shutdown starts from a config applied just befo
   agent.client = {
     stop: async () => {
       setTimeout(() => {
-        keepApplied(dir, '{"sampling_rate":"0.5"}');
+        keepApplied(dir, policy({ head_sampling: { ratio: 0.5 } }));
         land();
       }, 50);
     },
@@ -554,13 +555,13 @@ test("the settings to start with are the config the client kept applied, else th
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const rate = () => prepared(dir).agent.controls.sampler.samplingRate;
   // Kept before the client kept the config applied (an earlier release): it carries over.
-  writeFileSync(join(dir, "sdk-settings.json"), '{"sampling_rate":"0.25"}');
+  writeFileSync(join(dir, "sdk-settings.json"), policy({ head_sampling: { ratio: 0.25 } }));
   assert.equal(rate(), 0.25);
   // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
-  keepApplied(dir, '{"sampling_rate":"0.5"}');
+  keepApplied(dir, policy({ head_sampling: { ratio: 0.5 } }));
   assert.equal(rate(), 0.5);
-  // A config applied with no settings entry: every setting the SDK's own, not the old file's.
-  keepApplied(dir, "{}");
+  // A config applied with no policy: every setting the SDK's own, not the old file's.
+  keepApplied(dir, undefined);
   assert.equal(rate(), undefined);
   // A client state that doesn't read: the old file again.
   writeFileSync(join(dir, "opamp-state"), new Uint8Array([0xff, 0xff]));
@@ -889,6 +890,24 @@ test("connecting, failing and recovering are each said once", () => {
       + "and that the server is up. Retrying in the background; the SDK keeps its current settings meanwhile"],
     ["info", "OpAMP: connected to https://opamp.example.com/v1/opamp again"],
   ]);
+  const all = lines.map(([, m]) => m).join("\n");
+  assert.ok(!all.includes("secret") && !all.includes("token=x"));
+});
+
+test("after the server moved the agent, what is said names the endpoint the client uses now", () => {
+  let inUse: string | undefined; // none yet: the configured one
+  const lines = said(() => {
+    const r = new Reachability("https://a.example.com/v1/opamp");
+    r.inUse = () => inUse;
+    r.notified({ kind: "connected" });
+    inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+    r.notified({ kind: "connectFailed", detail: "connection refused" });
+    r.notified({ kind: "connected" });
+  }).filter(([level]) => level !== "debug");
+  assert.equal(lines.length, 3, JSON.stringify(lines));
+  assert.ok(lines[0]![1].startsWith("OpAMP: connected to https://a.example.com/v1/opamp;"), lines[0]![1]);
+  assert.ok(lines[1]![1].startsWith("OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)"), lines[1]![1]);
+  assert.equal(lines[2]![1], "OpAMP: connected to https://b.example.com/v1/opamp again");
   const all = lines.map(([, m]) => m).join("\n");
   assert.ok(!all.includes("secret") && !all.includes("token=x"));
 });

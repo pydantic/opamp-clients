@@ -38,6 +38,7 @@ from aiohttp import web
 
 from opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
 from opamp_client import _executor
+from opamp_client._client import STOP_GRACE_S
 from opamp_client._executor import Executor, _save, download_path, downloads_dir, read_state
 from opamp_client._files import REAL, Files, Journal
 from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
@@ -634,7 +635,7 @@ def test_a_fault_in_a_download_file_is_survived_and_no_partial_file_is_handed_ov
     asyncio.run(run())
 
 
-# S4 for downloads: a slow disk under a download's file holds up neither heartbeats nor the loop.
+# Downloads: a slow disk under a download's file holds up neither heartbeats nor the loop.
 
 @pytest.mark.parametrize("op", ["mkdir", "create", "write", "sync", "remove"])
 @pytest.mark.parametrize("mode", MODES)
@@ -677,7 +678,7 @@ def test_a_slow_download_file_holds_up_neither_heartbeats_nor_the_loop(mode: str
     asyncio.run(run())
 
 
-# S4 at start: deleting the downloads a run before left holds up neither start nor the loop, and
+# At start: deleting the downloads a run before left holds up neither start nor the loop, and
 # no download makes its file before it is over.
 
 @pytest.mark.parametrize("mode", MODES)
@@ -771,7 +772,47 @@ def test_python_mode_a_download_ended_while_its_file_operation_runs_leaves_nothi
     asyncio.run(run())
 
 
-# Known bug S3: a client restarted on the same state file mid-download.
+# RULE-SHELL-07: a download whose file is still being flushed when the core says stopped is the
+# shell's to delete (the core gave up on it), once the flush is over; and by the time stop
+# returns, however much of the stop timeout the core took. The shell gave it what was left of
+# the stop timeout: a core that took all of it left nothing, and the file was deleted after stop
+# had returned (the adversary's harness, on loaded runners: "downloads changed after stop").
+
+@pytest.mark.parametrize("mode", MODES)
+def test_a_download_file_being_flushed_as_the_core_stops_is_gone_when_stop_returns(mode: str, tmp_path) -> None:
+    state = str(tmp_path / "state")
+    downloads = downloads_dir(state)
+    flush_s = 0.6  # longer than the stop timeout, well within STOP_GRACE_S of it
+    faulty = Faulty("sync", 0, "slow", lambda p: p.startswith(downloads + os.sep), flush_s)
+
+    def listing() -> list[str]:
+        return sorted(os.listdir(downloads)) if os.path.isdir(downloads) else []
+
+    async def run() -> tuple[float, list[str], list[str]]:
+        server = await Server(package=os.urandom(100_000)).start()
+        app = App()
+        try:
+            app.client = Client.start(config(server, state, mode, accept_packages=True, stop_timeout_ms=100),
+                                      Status(), app, _files=faulty)
+            await until("the download's file being flushed", lambda: faulty.fired is not None, 30)
+            t0 = time.monotonic()
+            await asyncio.wait_for(app.client.stop(), 10)
+            took = time.monotonic() - t0
+            at_return = listing()
+            await asyncio.sleep(flush_s + 0.5)
+            return took, at_return, listing()
+        finally:
+            await server.close()
+            assert not app.installed
+
+    took, at_return, later = asyncio.run(run())
+    assert faulty.slow, "the flush ended"
+    assert at_return == [], f"{mode} mode: stop returned with {at_return} still there (deleted later: {later == []})"
+    assert later == []
+    assert took < 0.1 + STOP_GRACE_S + 0.5, f"{mode} mode: stop took {took:.2f} s"
+
+
+# A client restarted on the same state file mid-download.
 
 @pytest.mark.parametrize("mode", MODES)
 def test_a_download_does_not_outlive_stop_into_the_next_clients_file(mode: str, tmp_path) -> None:

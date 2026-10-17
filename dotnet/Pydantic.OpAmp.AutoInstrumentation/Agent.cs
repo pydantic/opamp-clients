@@ -4,6 +4,8 @@
 using OpAmp.Proto.V1;
 using OpenTelemetry;
 using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client;
 using Pydantic.OpAmp.Client.Sdk;
@@ -24,7 +26,11 @@ internal sealed class Agent
     private readonly HashSet<Signal> gated = [];
     private readonly OtlpTls? tls;
     private readonly SdkAgent agent;
+    // Held weakly: a logger provider holds its watch, and one the application let go of goes with it.
+    private readonly List<WeakReference<LogsWatch>> logs = [];
     private bool samplerWrapped;
+    private TracerProvider? tracing;
+    private MeterProvider? metrics;
 
     private Agent(Server server, Func<string, string?> getenv, FileStream? stateLock, Clock clock, AppSettingsStore app)
     {
@@ -145,6 +151,61 @@ internal sealed class Agent
         Controls.Gate(options, this.Controls, signal, this.tls);
     }
 
+    /// <summary>The tracer or meter provider automatic instrumentation built: what it exports through is read from it (<see cref="Exporters"/>).</summary>
+    public void Built(BaseProvider provider)
+    {
+        lock (this.logs)
+        {
+            if (provider is TracerProvider t)
+            {
+                this.tracing = t;
+            }
+            else if (provider is MeterProvider m)
+            {
+                this.metrics = m;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A logger provider's options, as automatic instrumentation configures them for each logger
+    /// factory the application creates (it builds a logger provider for each): a processor of the
+    /// plugin's is added first, which exports nothing. Through it the plugin reads what the
+    /// provider exports through, once it is built, and as it handles its first log record, before
+    /// any exporter does, asks the agent to check again (<see cref="SdkAgent.Recheck"/>): another
+    /// plugin's processor exports past the gate.
+    /// </summary>
+    public void Watch(OpenTelemetryLoggerOptions options)
+    {
+        var watch = new LogsWatch(this.agent);
+        lock (this.logs)
+        {
+            this.logs.RemoveAll(w => !w.TryGetTarget(out _));
+            this.logs.Add(new WeakReference<LogsWatch>(watch));
+        }
+
+        options.AddProcessor(watch);
+    }
+
+    /// <summary>The signals some exporter of which the built providers send through past the gates.</summary>
+    internal HashSet<Signal> Ungated()
+    {
+        List<(Signal, object?)> providers;
+        lock (this.logs)
+        {
+            providers = [(Signal.Traces, this.tracing), (Signal.Metrics, this.metrics)];
+            foreach (var w in this.logs)
+            {
+                if (w.TryGetTarget(out var watch))
+                {
+                    providers.Add((Signal.Logs, watch.ParentProvider));
+                }
+            }
+        }
+
+        return Exporters.Read(providers).Ungated;
+    }
+
     /// <summary>ASP.NET Core's instrumentation options: the sampler's Filter, chained after any the configuration set.</summary>
     public void Filter(object options)
     {
@@ -155,7 +216,16 @@ internal sealed class Agent
     }
 
     /// <summary>Once the SDK is built: join the fleet, reporting what it runs.</summary>
-    public void Start(IEnumerable<KeyValuePair<string, object>> resource) => this.agent.Start(resource, this.Inventory());
+    public void Start(IEnumerable<KeyValuePair<string, object>> resource)
+    {
+        foreach (var signal in this.Ungated().Where(this.gated.Contains))
+        {
+            var name = signal.ToString().ToLowerInvariant();
+            Log.Info($"{name} also go to an exporter another plugin added, which can't be stopped: send_{name} is not carried out");
+        }
+
+        this.agent.Start(resource, () => this.Inventory());
+    }
 
     /// <summary>
     /// What it runs (docs/available-components.md): every instrumentation automatic instrumentation
@@ -171,16 +241,17 @@ internal sealed class Agent
         autoVersion ??= AutoInstrumentationVersion();
         var instrumentations = Env.Runnable.Select(name => new Instrumentation { Name = name, Version = autoVersion });
         var exporters = new List<Exporter>();
+        var ungated = this.Ungated();
         foreach (var signal in Enum.GetValues<Signal>())
         {
-            if (this.fileConfig || !Env.Enabled(this.getenv, signal))
+            if (this.fileConfig || !Env.SetsUp(this.getenv, signal))
             {
                 continue;
             }
 
             foreach (var name in Env.Exporters(this.getenv, signal))
             {
-                exporters.Add(Inventories.Exporter(signal, name, this.gated.Contains(signal)));
+                exporters.Add(Inventories.Exporter(signal, name, this.gated.Contains(signal) && !ungated.Contains(signal)));
             }
         }
 
@@ -214,11 +285,15 @@ internal sealed class Agent
     /// <summary>
     /// What this SDK carries out, declared to the layer, which sets aside any setting not named
     /// (docs/sdk-settings.md, "The host"). Once the providers are built, whether the sampler could
-    /// be wrapped is known too (no tracer provider: it wasn't).
+    /// be wrapped is known too (no tracer provider: it wasn't), and what they export through: a
+    /// signal some exporter of which another plugin added past the gate is gated no more.
     /// </summary>
     internal Host HostNow(bool providersBuilt)
     {
-        var h = new Host { NextStart = { "opamp_polling_interval" } };
+        var ungated = providersBuilt ? this.Ungated() : [];
+        bool Gated(Signal s) => this.gated.Contains(s) && !ungated.Contains(s);
+        bool Covered(Signal s) => Gated(s) || (!ungated.Contains(s) && this.ExportsNothing(s));
+        var h = new Host();
         if (!this.fileConfig)
         {
             // Read as the application starts, from the instrumentation variables.
@@ -226,12 +301,12 @@ internal sealed class Agent
             h.NextStart.Add("deactivate_all_instrumentations");
         }
 
-        foreach (var signal in Enum.GetValues<Signal>().Where(this.gated.Contains))
+        foreach (var signal in Enum.GetValues<Signal>().Where(Gated))
         {
             h.Live.Add($"send_{signal.ToString().ToLowerInvariant()}");
         }
 
-        if (this.gated.Contains(Signal.Logs))
+        if (Gated(Signal.Logs))
         {
             // The levels and the cap are held at the logs exporter's gate.
             h.Live.Add("send_logs_level");
@@ -241,7 +316,7 @@ internal sealed class Agent
 
         // Redaction is at the traces and logs gates: every span and log record exported has to go
         // through one, or nothing is exported at all.
-        if (this.Covered(Signal.Traces) && this.Covered(Signal.Logs))
+        if (Covered(Signal.Traces) && Covered(Signal.Logs))
         {
             h.Live.Add("drop_attributes");
             h.Live.Add("mask_attributes");
@@ -256,8 +331,8 @@ internal sealed class Agent
         }
 
         // Debug mode: the layer folds it into the settings it hands over, and SdkAgent's timer
-        // ends it. Its rate and level are set aside, as sampling_rate and send_logs_level are, where
-        // those aren't declared.
+        // ends it. Where sampling_rate or send_logs_level is not declared, the layer refuses a
+        // policy that overrides the debug rate or level, as it refuses one that overrides those.
         h.Live.Add("debug_until");
         h.Live.Add("debug_sampling_rate");
         h.Live.Add("debug_send_logs_level");
@@ -271,20 +346,25 @@ internal sealed class Agent
     /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
     internal void Notified(OpAmpClient client, OpAmpNotification n) => this.agent.Notified(client, n);
 
-    /// <summary>Whether everything a signal exports goes through its gate: it is gated, or exported nowhere (<c>none</c>).</summary>
-    private bool Covered(Signal signal) =>
-        this.gated.Contains(signal) || (!this.fileConfig &&
-            (this.getenv($"OTEL_{signal.ToString().ToUpperInvariant()}_EXPORTER") ?? "otlp")
-                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).All(e => e == "none"));
+    /// <summary>
+    /// Whether automatic instrumentation exports the signal nowhere (<c>none</c>) and nothing else
+    /// sets it up: not the application, in place of automatic instrumentation.
+    /// </summary>
+    private bool ExportsNothing(Signal signal) =>
+        !this.fileConfig && Env.SetsUpSdk(this.getenv, signal) &&
+        (this.getenv($"OTEL_{signal.ToString().ToUpperInvariant()}_EXPORTER") ?? "otlp")
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).All(e => e == "none");
 
     /// <summary>
     /// Whether a signal's exports can be stopped: its every exporter is OTLP (the gate is on the
     /// OTLP client; beside another, only half the setting would be carried out). With file-based
-    /// configuration, never.
+    /// configuration, never; nor for traces and metrics when automatic instrumentation leaves the
+    /// SDK to the application (<c>OTEL_DOTNET_AUTO_SETUP_SDK=false</c>): its exporters aren't the
+    /// plugin's to gate.
     /// </summary>
     private bool Gateable(Signal signal)
     {
-        if (this.fileConfig)
+        if (this.fileConfig || !Env.SetsUpSdk(this.getenv, signal))
         {
             return false;
         }
@@ -292,6 +372,25 @@ internal sealed class Agent
         var name = signal.ToString().ToUpperInvariant();
         var exporters = (this.getenv($"OTEL_{name}_EXPORTER") ?? "otlp").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         return exporters.All(e => e == "otlp");
+    }
+}
+
+/// <summary>
+/// The plugin's processor in each logger provider automatic instrumentation builds: it exports
+/// nothing. The provider it is in is what the plugin reads the provider's exporters from
+/// (<see cref="BaseProcessor{T}.ParentProvider"/>). Its first log record, which it sees before the
+/// provider's exporters do, has the agent check again, off the application's thread.
+/// </summary>
+internal sealed class LogsWatch(SdkAgent agent) : BaseProcessor<OpenTelemetry.Logs.LogRecord>
+{
+    private int seen;
+
+    public override void OnEnd(OpenTelemetry.Logs.LogRecord data)
+    {
+        if (Volatile.Read(ref this.seen) == 0 && Interlocked.Exchange(ref this.seen, 1) == 0)
+        {
+            ThreadPool.UnsafeQueueUserWorkItem(a => a.Recheck(), agent, preferLocal: false);
+        }
     }
 }
 

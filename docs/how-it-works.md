@@ -38,7 +38,7 @@ sends, and the integration carries that out ([sdk-settings.md](sdk-settings.md))
 
 ## The interface
 
-[`proto/opamp/core/v1/core.proto`](../proto/opamp/core/v1/core.proto) is the contract: a
+`proto/opamp/core/v1/core.proto` (put in place by `scripts/fetch_core.py fetch`) is the contract: a
 `Config` to start, then `Step{now, Input}` in and `Reply{Output{effects, wake_at}}` out. It reuses
 the spec's OpAMP messages. Each language generates its types with its usual protobuf tooling.
 
@@ -158,8 +158,8 @@ language, `tests/shell-tables`), moves bytes with backpressure, runs the timer a
 Every byte on the wire is then the same in every language. In **platform mode** the language's
 own HTTP and WebSocket libraries carry out the core's requests and connections, for applications
 that bring their own client or need that stack. [sdks.md](sdks.md#rust-mode-and-platform-mode)
-says how to choose; [spec/shell-contract.md](../spec/shell-contract.md) has the precise rules of
-the byte streams.
+says how to choose; `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`) has
+the precise rules of the byte streams.
 
 ## Order
 
@@ -214,8 +214,9 @@ The core is released compiled, pinned by hash: `opamp-core.lock.json` names a co
 the sha256 of every file in it, and `fetch_core.py fetch` (in `scripts/`) downloads it, checks every byte
 against the lock, and puts each file where the clients load it: the module copies Go, Node.js and
 Java embed, the native library in `target/release` (and every platform's under `dist/native` with
-`--all-platforms`, for packaging), and the files the clients' tests read (`proto/`,
-`spec/shell-contract.md`, `tests/shell-tables`). `fetch_core.py check` fails unless the tree
+`--all-platforms`, for packaging), and the files the clients' tests read (`proto/`, `spec/proto/`,
+`spec/shell-contract.md`, `tests/shell-tables` and the SDK settings' shared test vectors in
+`testdata/sdk-settings`). `fetch_core.py check` fails unless the tree
 holds exactly what the lock pins. The generated types are checked in beside each client; `scripts/gen_core.py`
 regenerates them from `core.proto`.
 

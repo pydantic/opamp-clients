@@ -20,6 +20,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 
 namespace Pydantic.OpAmp.Extensions.Hosting.Tests;
@@ -94,7 +95,7 @@ public class HostingTests
     [Fact]
     public async Task TheServersSettingsAreCarriedOutAndAnswered()
     {
-        const string body = "{\"sampling_rate\":\"0.25\",\"send_logs\":\"false\",\"deactivate_instrumentations\":\"httpclient\"}";
+        var body = Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:StateDirectory"] = Kit.TempDir(), ["OpAmp:HeartbeatInterval"] = "100ms" });
         b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s")).WithOpAmp();
@@ -108,18 +109,18 @@ public class HostingTests
         await Kit.Until(() => server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s &&
                                                        s.LastRemoteConfigHash.ToStringUtf8() == body), "the remote config answered APPLIED");
         Assert.False(agent.Controls.SendLogs);
-        // In force, as reported: what it carries out, not the instrumentations it names in code.
-        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("send_logs")), "the effective config reported");
+        // In force, as reported: every control it carries out, at once.
+        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("signal_exports.logs")), "the effective config reported");
         var effective = server.Messages.Select(Effective).Last(e => e.Length > 0);
-        Assert.Contains("sampling_rate", effective);
-        Assert.DoesNotContain("deactivate_instrumentations", effective);
+        Assert.Contains("head_sampling", effective);
         await host.StopAsync(Cancel);
     }
 
     private static ulong Capabilities(OpAmpServer server) => server.Messages.Select(m => m.Capabilities).FirstOrDefault(c => c != 0);
 
+    /// <summary>The overrides of the policy a message reports in force (<see cref="Policy.Overrides(string)"/>); empty when it reports none.</summary>
     private static string Effective(AgentToServer m) =>
-        m.EffectiveConfig?.ConfigMap?.ConfigMap.TryGetValue("elastic", out var e) == true ? e.Body.ToStringUtf8() : string.Empty;
+        m.EffectiveConfig?.ConfigMap?.ConfigMap.TryGetValue(Policy.File, out var e) == true ? Policy.Overrides(e.Body.ToStringUtf8()) : string.Empty;
 
     [Fact]
     public async Task StoppingTheHostTellsTheServer()
@@ -183,7 +184,7 @@ public class HostingTests
     [Fact]
     public async Task EachSignalsExportsStopWhileTheServerSaysSo()
     {
-        const string body = "{\"send_traces\":\"false\",\"send_logs\":\"false\"}";
+        var body = Policy.Stop("traces", "logs");
         await using var server = new OpAmpServer(Kit.Config(body));
         await using var collector = new Collector();
         void Otlp(OtlpExporterOptions o, string path)
@@ -230,7 +231,7 @@ public class HostingTests
     [Fact]
     public async Task TheLogsBelowTheServersLevelAreNotSentAndAllAreOnceItIsLeftOut()
     {
-        await using var server = new OpAmpServer(Kit.Config("{\"send_logs_level\":\"warn\"}"));
+        await using var server = new OpAmpServer(Kit.Config(Policy.Of(("log_levels", """{"level":"warn"}"""))));
         await using var collector = new Collector();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
         b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e =>
@@ -271,7 +272,7 @@ public class HostingTests
     [Fact]
     public async Task EachLoggerCategoryIsHeldToItsOwnLevel()
     {
-        const string body = "{\"send_logs_level\":\"warn\",\"send_logs_level_by_scope\":\"Checkout.Db*=debug,Checkout.Noisy=off\"}";
+        var body = Policy.Of(("log_levels", """{"level":"warn","scopes":{"Checkout.Db*":"debug","Checkout.Noisy":"off"}}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         await using var collector = new Collector();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
@@ -299,14 +300,14 @@ public class HostingTests
         Assert.Contains("db-debug", Exported());
         Assert.DoesNotContain("noisy-critical", Exported());
         Assert.DoesNotContain("api-info", Exported());
-        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("send_logs_level_by_scope")), "the levels reported in force");
+        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("\"scopes\"")), "the levels reported in force");
         await host.StopAsync(Cancel);
     }
 
     [Fact]
     public async Task TheLogRateCapLetsTheFirstRecordsThrough()
     {
-        await using var server = new OpAmpServer(Kit.Config("{\"send_logs_per_second\":\"2\"}"));
+        await using var server = new OpAmpServer(Kit.Config(Policy.Of(("log_rate_limit", """{"records_per_second":2}"""))));
         await using var collector = new Collector();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
         // Only the test's records: the host's and the agent's own (information) would take tokens too.
@@ -342,7 +343,7 @@ public class HostingTests
     [Fact]
     public async Task SpanAndLogAttributesAreRedactedAtExport()
     {
-        const string body = "{\"drop_attributes\":\"secret.*\",\"mask_attributes\":\"user.email\"}";
+        var body = Policy.Of(("attribute_redaction", """{"drop":["secret.*"],"mask":["user.email"]}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         await using var collector = new Collector();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
@@ -393,7 +394,7 @@ public class HostingTests
     {
         // A window of five seconds from now, by this machine's clock.
         var until = DateTimeOffset.UtcNow.AddSeconds(5).ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
-        var body = "{\"sampling_rate\":\"0.1\",\"debug_until\":\"" + until + "\",\"debug_sampling_rate\":\"1\"}";
+        var body = Policy.Of(("head_sampling", """{"ratio":0.1}"""), ("debug", $$"""{"until":"{{until}}","sampling_ratio":1}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
         b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("x")).WithOpAmp();
@@ -405,15 +406,15 @@ public class HostingTests
             Assert.Contains(key, agent.HostNow(providersBuilt: true).Live);
         }
 
-        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("debug_until")), "debug mode reported in force");
+        await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("\"debug\"")), "debug mode reported in force");
         Assert.Equal(1, agent.Controls.Sampler.Policy.Rate);
-        await Kit.Until(() => server.Messages.Any(m => Effective(m) == "{\"sampling_rate\":\"0.1\"}"), "its end reported, the server not needed");
+        await Kit.Until(() => server.Messages.Any(m => Effective(m) == """{"head_sampling":{"ratio":0.1}}"""), "its end reported, the server not needed");
         Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
         await host.StopAsync(Cancel);
     }
 
     [Fact]
-    public async Task WithASpanExporterTheGateIsntInFrontOfRedactionIsIgnored()
+    public async Task WithASpanExporterTheGateIsntInFrontOfRedactionIsRefused()
     {
         await using var server = new OpAmpServer();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint });
@@ -422,14 +423,32 @@ public class HostingTests
         await host.StartAsync(Cancel);
         var agent = host.Services.GetRequiredService<OpAmpAgent>();
         Assert.DoesNotContain("drop_attributes", agent.HostNow(providersBuilt: true).Live);
-        agent.Agent!.RemoteConfig(Kit.Config("{\"drop_attributes\":\"token\"}"));
+        var refused = agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("attribute_redaction: drop: this SDK cannot apply the requested override", refused.ErrorMessage);
         Assert.Null(agent.Controls.Policy(Signal.Traces).Redact);
+        await host.StopAsync(Cancel);
+    }
+
+    // The application names its instrumentations in code, so the server cannot switch them off.
+    [Fact]
+    public async Task AnOverrideOfTheInstrumentationsIsRefused()
+    {
+        await using var server = new OpAmpServer();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:StateDirectory"] = Kit.TempDir() });
+        b.Services.AddOpenTelemetry().WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        var agent = host.Services.GetRequiredService<OpAmpAgent>();
+        var refused = agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("instrumentations", """{"disabled":["httpclient"]}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("instrumentations: disabled: this SDK cannot apply the requested override", refused.ErrorMessage);
         await host.StopAsync(Cancel);
     }
 
     // A logs exporter the gate isn't in front of: the levels, global or per scope, can't be held.
     [Fact]
-    public async Task WithALogsExporterTheGateIsntInFrontOfTheLevelsAreIgnored()
+    public async Task WithALogsExporterTheGateIsntInFrontOfTheLevelsAreRefused()
     {
         await using var server = new OpAmpServer();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint });
@@ -441,7 +460,9 @@ public class HostingTests
         var h = agent.HostNow(providersBuilt: true);
         Assert.Contains("send_logs_level", h.Undeclared());
         Assert.DoesNotContain("send_logs_level_by_scope", h.Live);
-        agent.Agent!.RemoteConfig(Kit.Config("{\"send_logs_level\":\"error\",\"send_logs_level_by_scope\":\"x=off\"}"));
+        var refused = agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("log_levels", """{"level":"error","scopes":{"x":"off"}}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("log_levels: level: this SDK cannot apply the requested override", refused.ErrorMessage);
         Assert.False(agent.Controls.LogLevels.Active);
         await host.StopAsync(Cancel);
     }
@@ -504,13 +525,14 @@ public class HostingTests
     }
 
     /// <summary>
-    /// Every signal turned off by the server, with the SDK <paramref name="setup"/> sets up: the
-    /// signals in <paramref name="ignored"/> go on sending, so they are ignored (not in force, not
-    /// in the effective config, named as not carried out); the rest are in force.
+    /// Every signal turned off by the server, with the SDK <paramref name="setup"/> sets up. The
+    /// signals in <paramref name="ungated"/> go to an exporter the gate is not in front of. Their
+    /// send_* is not carried out, so the policy is refused and every signal goes on sending. With
+    /// none, the policy is applied and every signal is off.
     /// </summary>
-    private static async Task SendingIsIgnoredFor(string[] ignored, Action<HostApplicationBuilder, string> setup)
+    private static async Task SendingIsRefusedFor(string[] ungated, Action<HostApplicationBuilder, string> setup)
     {
-        const string body = "{\"send_traces\":\"false\",\"send_metrics\":\"false\",\"send_logs\":\"false\"}";
+        var body = Policy.Stop("traces", "metrics", "logs");
         await using var server = new OpAmpServer(Kit.Config(body));
         await using var collector = new Collector();
         var said = new Said();
@@ -520,33 +542,47 @@ public class HostingTests
         using var host = b.Build();
         await host.StartAsync(Cancel);
         var agent = host.Services.GetRequiredService<OpAmpAgent>();
-        await Kit.Until(() => server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s &&
-                                                       s.LastRemoteConfigHash.ToStringUtf8() == body), "the remote config answered APPLIED");
+        var signals = Enum.GetValues<Signal>().Select(s => s.ToString().ToLowerInvariant()).ToArray();
+        var refusedFor = signals.FirstOrDefault(name => ungated.Contains($"send_{name}"));
+        var answered = refusedFor is null ? RemoteConfigStatuses.Applied : RemoteConfigStatuses.Failed;
+        await Kit.Until(() => server.Messages.Any(m => m.RemoteConfigStatus is { } s && s.Status == answered &&
+                                                       s.LastRemoteConfigHash.ToStringUtf8() == body), $"the remote config answered {answered}");
+        var status = server.Messages.Select(m => m.RemoteConfigStatus).Last(s => s is not null && s.LastRemoteConfigHash.ToStringUtf8() == body);
+        Assert.Equal(refusedFor is null ? string.Empty : $"signal_exports.{refusedFor}: this SDK cannot apply the requested override", status.ErrorMessage);
         await Kit.Until(() => server.Messages.Any(m => Effective(m).Length > 0), "the effective config reported");
         var effective = server.Messages.Select(Effective).Last(e => e.Length > 0);
+        Assert.Equal(
+            refusedFor is null ? """{"signal_exports.logs":{"enabled":false},"signal_exports.metrics":{"enabled":false},"signal_exports.traces":{"enabled":false}}""" : "{}",
+            effective);
         foreach (var signal in Enum.GetValues<Signal>())
         {
-            var name = $"send_{signal.ToString().ToLowerInvariant()}";
-            Assert.Equal(ignored.Contains(name), agent.Controls.Sends(signal));
-            Assert.Equal(!ignored.Contains(name), effective.Contains(name, StringComparison.Ordinal));
+            Assert.Equal(refusedFor is not null, agent.Controls.Sends(signal));
         }
 
         // send_logs_level is held at the logs gate: it is carried out exactly where send_logs is.
-        Assert.Equal(ignored.Contains("send_logs"), agent.HostNow(providersBuilt: true).Undeclared().Contains("send_logs_level"));
+        Assert.Equal(ungated.Contains("send_logs"), agent.HostNow(providersBuilt: true).Undeclared().Contains("send_logs_level"));
 
-        // The inventory says the same: an exporter of a signal whose sending is ignored isn't gated,
-        // and every other one is.
+        // The description lists only the signals whose export the SDK can stop.
+        var description = server.Messages.Select(m => m.AgentDescription).First(d => d is not null);
+        var controls = description.NonIdentifyingAttributes.Single(a => a.Key == "logfire.opamp.supported_controls").Value.ArrayValue.Values.Select(v => v.StringValue);
+        foreach (var name in signals)
+        {
+            Assert.Equal(!ungated.Contains($"send_{name}"), controls.Contains($"signal_exports.{name}"));
+        }
+
+        // The inventory says the same: an exporter of a signal whose sending is not carried out is
+        // not gated, and every other one is.
         var exporters = agent.Agent!.Components!.Components["exporters"].SubComponentMap;
         foreach (var (signal, named) in exporters)
         {
-            Assert.All(named.SubComponentMap.Values, e => Assert.Equal(!ignored.Contains($"send_{signal}"), e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
+            Assert.All(named.SubComponentMap.Values, e => Assert.Equal(!ungated.Contains($"send_{signal}"), e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
         }
 
-        Assert.All(ignored, name => Assert.Contains(name["send_".Length..], exporters.Keys));
+        Assert.All(ungated, name => Assert.Contains(name["send_".Length..], exporters.Keys));
 
-        var notCarriedOut = said.Lines.Where(l => l.Contains("settings this SDK doesn't carry out: ", StringComparison.Ordinal))
-            .Select(l => l.Split(':').Last().Split(',', StringSplitOptions.TrimEntries)).SingleOrDefault() ?? [];
-        Assert.Equal(ignored.Order(), notCarriedOut.Order());
+        var notCarriedOut = said.Lines.Where(l => l.EndsWith(" is not carried out", StringComparison.Ordinal) && l.Contains("exporter that can't be stopped", StringComparison.Ordinal))
+            .Select(l => l.Split(' ')[^5]).ToArray();
+        Assert.Equal(ungated.Order(), notCarriedOut.Order());
         await host.StopAsync(Cancel);
     }
 
@@ -557,9 +593,9 @@ public class HostingTests
     }
 
     [Fact]
-    public async Task ASignalWithAnExporterThatIsntOtlpIsIgnored()
+    public async Task AnOverrideOfASignalWithAnExporterThatIsntOtlpIsRefused()
     {
-        await SendingIsIgnoredFor(["send_logs", "send_traces"], (b, collector) =>
+        await SendingIsRefusedFor(["send_logs", "send_traces"], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddProcessor(new SimpleLogRecordExportProcessor(new Kept<LogRecord>())));
             b.Services.AddOpenTelemetry()
@@ -569,7 +605,7 @@ public class HostingTests
         });
 
         // A metric reader of its own, likewise.
-        await SendingIsIgnoredFor(["send_metrics"], (b, collector) =>
+        await SendingIsRefusedFor(["send_metrics"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithMetrics(m => m.AddMeter("kept").AddOtlpExporter(e => Otlp(e, collector + "/v1/metrics")).AddReader(new PeriodicExportingMetricReader(new Kept<Metric>())))
                 .WithOpAmp());
@@ -592,15 +628,15 @@ public class HostingTests
     // An exporter held in a processor's collection is found too.
     [Fact]
     public async Task AnExporterInAProcessorsListIsFound() =>
-        await SendingIsIgnoredFor(["send_traces"], (b, collector) =>
+        await SendingIsRefusedFor(["send_traces"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")).AddProcessor(new FanOut(new Kept<Activity>())))
                 .WithOpAmp());
 
     // The gate tells signals by path: an endpoint with a path of its own isn't gated.
     [Fact]
-    public async Task AnOtlpEndpointWithAPathOfItsOwnIsIgnored() =>
-        await SendingIsIgnoredFor(["send_traces"], (b, collector) =>
+    public async Task AnOtlpEndpointWithAPathOfItsOwnIsNotGated() =>
+        await SendingIsRefusedFor(["send_traces"], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector + "/v1/logs")));
             b.Services.AddOpenTelemetry()
@@ -610,8 +646,8 @@ public class HostingTests
         });
 
     [Fact]
-    public async Task AnOtlpExporterWithAnHttpClientFactoryOfItsOwnIsIgnored() =>
-        await SendingIsIgnoredFor(["send_metrics"], (b, collector) =>
+    public async Task AnOtlpExporterWithAnHttpClientFactoryOfItsOwnIsNotGated() =>
+        await SendingIsRefusedFor(["send_metrics"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")))
                 .WithMetrics(m => m.AddMeter("m").AddOtlpExporter(e =>
@@ -621,16 +657,63 @@ public class HostingTests
                 }))
                 .WithOpAmp());
 
-    // Every exporter OTLP and gated, or none at all: nothing is ignored.
+    // Every exporter OTLP and gated, or none at all: every signal can be stopped.
     [Fact]
     public async Task GatedOrNoExportersAreCarriedOut() =>
-        await SendingIsIgnoredFor([], (b, collector) =>
+        await SendingIsRefusedFor([], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector + "/v1/logs")));
             b.Services.AddOpenTelemetry()
                 .WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")).AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")))
                 .WithOpAmp();
         });
+
+    // A processor added to a built provider once the host has started exports past the gate. Before
+    // the next policy is decided, that signal's export (here, traces) is set aside in the policy in
+    // force and reported local, and the next policy, which overrides it, is refused; a check between
+    // policies (here, logs; the health timer's, or Recheck) reports the effective config again. The
+    // inventory no longer says those signals are gated.
+    [Fact]
+    public async Task AProcessorAddedToABuiltProviderSetsItsSignalAside()
+    {
+        var first = Policy.Stop("traces", "logs");
+        var next = Policy.Of(("head_sampling", """{"ratio":1}"""), ("signal_exports.traces", """{"enabled":false}"""), ("signal_exports.logs", """{"enabled":false}"""));
+        await using var server = new OpAmpServer(Kit.Config(first));
+        await using var collector = new Collector();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
+        b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector.Endpoint + "/v1/logs")));
+        b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector.Endpoint + "/v1/traces"))).WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        var agent = host.Services.GetRequiredService<OpAmpAgent>();
+        await Kit.Until(() => Applied(server, first), "the first config answered APPLIED");
+        Assert.False(agent.Controls.Sends(Signal.Traces));
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+
+        host.Services.GetRequiredService<TracerProvider>().AddProcessor(new SimpleActivityExportProcessor(new Kept<Activity>()));
+        var refused = agent.Agent!.RemoteConfig(Kit.Config(next));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", refused.ErrorMessage);
+        Assert.True(agent.Controls.Sends(Signal.Traces));
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+        Assert.Equal(Policy.Overrides(Policy.Stop("logs")), Policy.Overrides(agent.Agent.Effective));
+
+        host.Services.GetRequiredService<LoggerProvider>().AddProcessor(new SimpleLogRecordExportProcessor(new Kept<LogRecord>()));
+        agent.Agent.Recheck();
+        Assert.True(agent.Controls.Sends(Signal.Logs));
+        await Kit.Until(() => server.Messages.Any(m => m.EffectiveConfig?.ConfigMap?.ConfigMap.TryGetValue(Policy.File, out var e) == true &&
+                                                       Policy.Overrides(e.Body.ToStringUtf8()) == "{}"), "the effective config reported again");
+        var exporters = agent.Agent.Components!.Components["exporters"].SubComponentMap;
+        foreach (var signal in new[] { "traces", "logs" })
+        {
+            Assert.All(exporters[signal].SubComponentMap.Values, e => Assert.False(e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
+        }
+
+        await host.StopAsync(Cancel);
+    }
+
+    private static bool Applied(OpAmpServer server, string body) =>
+        server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s && s.LastRemoteConfigHash.ToStringUtf8() == body);
 
     // An exporter given a client certificate or a CA builds them into its own HTTP client: the
     // gate's carries the same, and every signal can still be stopped.

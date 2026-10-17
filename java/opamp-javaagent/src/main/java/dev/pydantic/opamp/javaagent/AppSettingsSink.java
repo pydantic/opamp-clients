@@ -83,8 +83,8 @@ final class AppSettingsSink {
 
   /**
    * The bootstrap's bridge, put there first if it isn't yet; null (logged) when it can't be: then
-   * the application reads its defaults, and the extension doesn't declare {@code custom}, so the
-   * server's are ignored rather than answered APPLIED for nothing.
+   * the application reads its defaults, and the extension does not declare {@code custom}. So a
+   * policy that overrides app_settings is refused, not answered APPLIED for nothing.
    */
   static AppSettingsSink install() {
     try {
@@ -102,7 +102,7 @@ final class AppSettingsSink {
       return new AppSettingsSink(c.getField("SHARED").get(null));
     } catch (Exception | LinkageError e) {
       LOG.log(Level.WARNING, "OpAMP: can't hand the application its own settings (dev.pydantic.opamp.AppSettings "
-          + "reads its defaults); the server's are ignored", e);
+          + "reads its defaults); a policy that overrides app_settings is refused", e);
       return null;
     }
   }

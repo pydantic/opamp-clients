@@ -13,7 +13,7 @@
 //
 // A state file's work (saves, downloads' files) is counted for the whole process: a client
 // started on a state file waits for whatever a client before it left under way there (a save
-// still writing, a cancelled download deleting its file) before it reads the file (known bugs S3, S4).
+// still writing, a cancelled download deleting its file) before it reads the file.
 
 import { rmSync } from "node:fs";
 import { type FileHandle, mkdir, open, rename, unlink } from "node:fs/promises";

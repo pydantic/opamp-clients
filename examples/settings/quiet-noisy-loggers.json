@@ -1,1 +1,17 @@
-{"send_logs_level": "warn", "send_logs_level_by_scope": "com.acme.payments*=debug,urllib3=error,noisy.lib=off"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "override", "level": "warn", "scopes": {"com.acme.payments*": "debug", "urllib3": "error", "noisy.lib": "off"}},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"}
+}

@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// TestACustomMessageOnALostConnectionGoesAgain (#379): over WebSocket a custom message goes in a
+// TestACustomMessageOnALostConnectionGoesAgain: over WebSocket a custom message goes in a
 // message the server never reads, a push the server wrote before that (unsolicited: an offer)
 // reaches the client after it, and then the connection drops. The push is no answer to the
 // message, but the core takes it for one (Unanswered::answer pops the oldest unanswered message),

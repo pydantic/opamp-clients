@@ -18,8 +18,8 @@ import (
 )
 
 // The application's own settings, as the OpAMP server sends them (docs/app-settings.md): the
-// custom map of the remote config's elastic entry, string keys to string values, which the SDK
-// doesn't read but hands on for the application to read here.
+// values of the Logfire SDK policy's app_settings control, string keys to string values. The SDK
+// does not read them. It hands them on for the application to read here.
 
 // AppSetting is the value of the application setting key in force, or def while there is none:
 // before the first config arrives (unless one was saved before a restart), when the config in

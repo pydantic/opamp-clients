@@ -25,7 +25,7 @@ import (
 func TestStartSendsTheFirstReport(t *testing.T) {
 	ctx := context.Background()
 	uid := bytes.Repeat([]byte{7}, 16)
-	c, _, err := New(ctx, &corepb.Config{InstanceUid: uid, Endpoint: "http://server/v1/opamp"})
+	c, _, err := New(ctx, Options{}, &corepb.Config{InstanceUid: uid, Endpoint: "http://server/v1/opamp"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,18 +98,18 @@ func TestStartSendsTheFirstReport(t *testing.T) {
 }
 
 func TestBadConfigIsAnError(t *testing.T) {
-	if _, _, err := New(context.Background(), &corepb.Config{InstanceUid: []byte{1, 2}}); err == nil {
+	if _, _, err := New(context.Background(), Options{}, &corepb.Config{InstanceUid: []byte{1, 2}}); err == nil {
 		t.Fatal("a 2-byte UID was accepted")
 	}
 }
 
 func TestCoresAreIndependent(t *testing.T) {
 	ctx := context.Background()
-	a, _, err := New(ctx, &corepb.Config{InstanceUid: bytes.Repeat([]byte{1}, 16), Endpoint: "http://server/v1/opamp"})
+	a, _, err := New(ctx, Options{}, &corepb.Config{InstanceUid: bytes.Repeat([]byte{1}, 16), Endpoint: "http://server/v1/opamp"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _, err := New(ctx, &corepb.Config{InstanceUid: bytes.Repeat([]byte{2}, 16), Endpoint: "http://server/v1/opamp"})
+	b, _, err := New(ctx, Options{}, &corepb.Config{InstanceUid: bytes.Repeat([]byte{2}, 16), Endpoint: "http://server/v1/opamp"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestCoresAreIndependent(t *testing.T) {
 func TestTheCoreMakesTheUID(t *testing.T) {
 	ctx := context.Background()
 	ms := uint64(time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC).UnixMilli())
-	c, first, err := New(ctx, &corepb.Config{Endpoint: "http://server/v1/opamp",
+	c, first, err := New(ctx, Options{}, &corepb.Config{Endpoint: "http://server/v1/opamp",
 		Entropy: bytes.Repeat([]byte{0xab}, 32), UnixMs: ms})
 	if err != nil {
 		t.Fatal(err)
@@ -195,7 +195,7 @@ func TestTheTapRecordsEveryCall(t *testing.T) {
 	firstName, secondName := name(tapped.Load()), name(tapped.Load()+1)
 
 	cfg := &corepb.Config{InstanceUid: bytes.Repeat([]byte{7}, 16), Endpoint: "http://server/v1/opamp"}
-	c, _, err := New(ctx, cfg)
+	c, _, err := New(ctx, Options{}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestTheTapRecordsEveryCall(t *testing.T) {
 	}
 
 	// A second core: a file of its own.
-	c2, _, err := New(ctx, cfg)
+	c2, _, err := New(ctx, Options{}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +250,7 @@ func TestTheTapRecordsEveryCall(t *testing.T) {
 	before := tapped.Load()
 	off := t.TempDir()
 	t.Chdir(off)
-	c3, _, err := New(ctx, cfg)
+	c3, _, err := New(ctx, Options{}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestTheTapRecordsEveryCall(t *testing.T) {
 func TestAnUnopenableTapIsSkipped(t *testing.T) {
 	t.Setenv("OPAMP_CORE_TAP", filepath.Join(t.TempDir(), "missing", "core.tap"))
 	ctx := context.Background()
-	c, _, err := New(ctx, &corepb.Config{InstanceUid: bytes.Repeat([]byte{7}, 16), Endpoint: "http://server/v1/opamp"})
+	c, _, err := New(ctx, Options{}, &corepb.Config{InstanceUid: bytes.Repeat([]byte{7}, 16), Endpoint: "http://server/v1/opamp"})
 	if err != nil {
 		t.Fatal(err)
 	}

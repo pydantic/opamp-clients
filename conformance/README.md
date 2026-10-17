@@ -1,10 +1,10 @@
 # Conformance suite
 
 Every client runs the same scenarios against the same reference server, and the recorded
-traces are checked against the spec. Where the core's sources are (a Cargo.toml at the root),
-the same clients also run against the Rust server built from them (`--server rust`), which checks
-the server as well. `OPAMP_CORE_ROOT` names a checkout with the core's sources elsewhere: the
-runner then builds what comes from them there and runs it from its `target/`.
+traces are checked against the spec. With `OPAMP_CORE_ROOT` naming a checkout with the core's
+sources, the same clients also run against the Rust server built from them (`--server rust`),
+which checks the server as well: the runner builds what comes from them there and runs it from its
+`target/`.
 
 - `server/`: the reference server, in Go. It speaks plain HTTP and WebSocket directly
   (not through opamp-go's server) so that it can send a Close frame and wait for the answer,
@@ -13,7 +13,7 @@ runner then builds what comes from them there and runs it from its `target/`.
   scenario's times (`at_s`, `window_s`, a hold's `from_s`) count from the driver's first request
   (`first_contact` in the log), not from the server's start: a driver in a container that starts
   seconds late meets the faults at the same point of its run as one in process.
-- The Rust reference server, built from the core's sources where they are. It takes the Go
+- The Rust reference server, built from the core's sources (`OPAMP_CORE_ROOT`). It takes the Go
   server's flags and writes the same log, plus a `core` event for each decision it
   makes. It injects no faults: it is here to be tested, not to test.
 - `drivers/`: one small program per client, all following [DRIVERS.md](DRIVERS.md).
@@ -32,8 +32,7 @@ python3 conformance/runner/run.py                         # everything
 python3 conformance/runner/run.py --client go,java        # some clients
 python3 conformance/runner/run.py --scenario close-frame  # some scenarios
 python3 conformance/runner/run.py --list                  # clients, scenarios and checks
-python3 conformance/runner/run.py --server rust           # every client against the Rust server (where it is built)
-OPAMP_CORE_ROOT=../core python3 conformance/runner/run.py --server rust   # the same, the core's sources in ../core
+OPAMP_CORE_ROOT=../core python3 conformance/runner/run.py --server rust   # every client against the Rust server, the core's sources in ../core
 python3 conformance/runner/run.py --jobs 4                # four runs at once (CI's setting)
 python3 -m unittest conformance/runner/test_checks.py     # the checks' own tests
 ```
@@ -89,7 +88,7 @@ clients have these features (`clients.toml` lists them), except that Java has no
 Java mode (`java-core`): the JDK's HTTP client has none. In Rust mode (`java-core-rust`) the core
 speaks SOCKS5 itself, and every SDK's Rust mode has them all.
 
-Each of the five WebAssembly SDKs is two clients here, one per mode: `go-core`, `node`,
+Each of the five SDKs is two clients here, one per mode: `go-core`, `node`,
 `python-core`, `java-core` and `dotnet-core` are platform mode, and the same names with `-rust`
 are Rust mode, the SDKs' default. Each driver asks for its mode by name (the `-rust` clients set
 `OPAMP_<LANGUAGE>_MODE=rust`), so neither depends on what the SDK's default is.
@@ -230,6 +229,8 @@ Rust server offers once per connection, because every offer makes a supervisor r
 | `remote-config-restart` | http, ws | the agent restarts after applying the remote config: it gets the config back at start, and the server has no need to send it again (`remote_config_lifecycle`) |
 | `credential-offer` | http, ws | the server takes a shared bootstrap token, offers the agent its own and then accepts only that; the agent restarts halfway and must still get in (`connection_settings`) |
 | `credential-offer-broken` | http, ws | the server offers a token it will not accept: the agent reports FAILED and carries on with the bootstrap token (`connection_settings`) |
+| `credential-rotation` | http, ws | the server offers the agent its own token, then a second one once the first works, and accepts only the latest; the agent restarts halfway and must keep the second (`connection_settings`) |
+| `endpoint-move` | http, ws | the server moves the agent to its second endpoint with a new token; the agent restarts halfway and must go straight to the second endpoint (`connection_settings`) |
 | `own-metrics-restart` | http, ws | the server says where the agent sends its own metrics; the agent restarts after applying that, and gets it back at start (`telemetry_settings`) |
 | `available-components` | http, ws | the agent reports its components as a hash; the server asks for them in full once (`available_components`) |
 | `custom-messages` | http, ws | a custom message for a capability the agent declared, which it answers, and one for a capability it never declared, which the application must not see (`custom_messages`) |

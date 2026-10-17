@@ -5,7 +5,9 @@ server. It sets up what `@opentelemetry/auto-instrumentations-node/register` set
 every auto-instrumentation, configured by the `OTEL_*` variables. The SDK then joins the server's
 fleet and takes its settings from it: sampling, what to send and which instrumentations are on,
 while it runs ([sdk-settings.md](sdk-settings.md)). It reaches the SDK this
-package sets up: an application that builds its own tracer provider isn't managed. The application needs no code. It works for CommonJS and ES modules alike:
+package sets up. A provider the application builds on its own isn't managed: where the application
+registers it as the global one, the package sets aside the settings it can no longer carry out
+([below](#a-provider-of-the-applications-own)). The application needs no code. It works for CommonJS and ES modules alike:
 the register installs the instrumentations' loader hook for `import`, which upstream leaves to a
 separate `--experimental-loader` flag.
 
@@ -37,7 +39,7 @@ node --import @pydantic/opamp-otel/register app.js
 |---|---|
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it (or with `OTEL_SDK_DISABLED=true`), this is upstream's `register`. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and a change to the one setting that takes effect at the next start (`opamp_polling_interval`) is refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; it never stops the application. |
 
 ### In code
@@ -97,32 +99,35 @@ process running.
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the SDK's resource, detected once (the same detectors as upstream's
   `register`) and handed to NodeSDK. `service.name`, `service.namespace` and
-  `service.instance.id` identify it; the rest describes it.
+  `service.instance.id` identify it, and the rest describes it. The description also names the
+  policy format the package reads (`logfire.opamp.config_format`)
+  and the controls this process carries out (`logfire.opamp.supported_controls`).
 - **Reports its inventory**: this package's and the SDK's versions, the instrumentations it loaded
   and the exporters it built, as its available components ([below](#inventory)).
-- **Takes settings** from the remote config's `elastic` entry:
+- **Takes settings** from the Logfire SDK policy, the remote config's only file
+  (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
+  override:
 
-  | Setting | How |
+  | Control | How |
   |---|---|
-  | `sampling_rate` | a sampler in place of the one `OTEL_TRACES_SAMPLER` names; a span whose parent was sampled, here or by the caller, is sampled at any rate, 0 included. Left out: that sampler. |
-  | `sampling_rules`, `sampling_traces_per_second` | the same sampler: a rate per kind of new trace, and at most this many traces a second ([below](#sampling-rules)). |
-  | `send_traces`, `send_metrics`, `send_logs` | each signal's exporters this package builds (OTLP and `console`, below), wrapped: `false` drops what would be exported. Spans are still made and sampled, so services downstream still trace them. |
-  | `send_logs_level` | the same log exporters, wrapped: a record whose severity number is below the level's is dropped from the next export on, and one without a severity number is kept. Left out: every severity. |
-  | `send_logs_level_by_scope` | the same log exporters: a level per scope, over `send_logs_level` ([below](#log-levels-per-scope)). |
-  | `send_logs_per_second` | the same log exporters: at most this many records a second ([below](#rate-caps)). |
-  | `drop_attributes`, `mask_attributes` | the span and log exporters: attributes removed or masked at export ([below](#redaction)). |
-  | `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` | until a time, another rate and log level, then back on its own ([below](#debug-mode)). |
-  | `deactivate_instrumentations` | from then on, the named instrumentations' tracers start no span, and their metrics and log records aren't exported ([below](#switching-instrumentations-off)). Names are upstream's short ones: `http`, `express`, `pg`, and so on. `http`, `net` and `dns` all trace an outgoing HTTP request. |
-  | `deactivate_all_instrumentations` | the same, for every instrumentation the package loaded. The application's own tracers aren't switched. |
-  | `opamp_polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
+  | `head_sampling` | a sampler in place of the one `OTEL_TRACES_SAMPLER` names. A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: that sampler. |
+  | `sampling_rules`, `trace_rate_limit` | the same sampler: a rate per kind of new trace, and at most this many traces a second ([below](#sampling-rules)). |
+  | `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs` | each signal's exporters this package builds (OTLP and `console`, below), wrapped. `enabled: false` drops what would be exported. Spans are still made and sampled, so services downstream still trace them. |
+  | `log_levels` (`level`) | the same log exporters, wrapped. A record whose severity number is below the level's is dropped from the next export on, and one without a severity number is kept. Local: every severity. |
+  | `log_levels` (`scopes`) | the same log exporters: a level per scope, over `level` ([below](#log-levels-per-scope)). |
+  | `log_rate_limit` | the same log exporters: at most this many records a second ([below](#rate-caps)). |
+  | `attribute_redaction` | the span and log exporters: attributes removed or masked at export ([below](#redaction)). |
+  | `debug` | until a time, another sampling ratio and log level, then back on its own ([below](#debug-mode)). |
+  | `instrumentations` (`disabled`) | from then on, the named instrumentations' tracers start no span, and their metrics and log records are not exported ([below](#switching-instrumentations-off)). Names are upstream's short ones: `http`, `express`, `pg`, and so on. `http`, `net` and `dns` all trace an outgoing HTTP request. |
+  | `instrumentations` (`all_disabled`) | the same, for every instrumentation the package loaded. The application's own tracers are not switched. |
+  | `app_settings` | to the application, at once. See [the application's own settings](#the-applications-own-settings). |
 
-  `logging_level` and `infer_spans` (EDOT settings) aren't carried out, so the server can't change a
-  log level; the package logs them at `info` (`OTEL_LOG_LEVEL`), which the default level hides.
+  A policy that overrides a control this process does not carry out is refused whole (FAILED),
+  and the error names the control. A field the policy format does not know is refused too.
 - **Doesn't trace itself.** The OpAMP client runs with tracing suppressed, so its requests (and its
   goodbye) never show up as the application's spans.
-- **Answers** each remote config APPLIED or FAILED, and reports the settings in force as its
-  effective config, with the settings it set aside or didn't know named beside them in an
-  `elastic.set_aside` entry ([sdk-settings.md](sdk-settings.md#the-answer)).
+- **Answers** each remote config APPLIED or FAILED, and reports the policy in force as its
+  effective config, one `logfire-sdk-policy.json` file ([sdk-settings.md](sdk-settings.md#the-answer)).
 - **Says goodbye** (`agent_disconnect`) on shutdown, before the SDK flushes.
 
 NodeSDK builds its exporters from the environment internally, so this package builds the ones it
@@ -132,8 +137,8 @@ name listed twice is one exporter, `none` is read as NodeSDK reads it (for trace
 other names means the default `otlp` alone), and `OTEL_METRIC_EXPORT_INTERVAL`,
 `OTEL_METRIC_EXPORT_TIMEOUT`, `OTEL_BSP_*` and `OTEL_BLRP_*` fall back to their defaults when not a
 number above 0, and an OTLP protocol it doesn't know is `http/protobuf`, with a warning. A signal configured with anything else (`zipkin`, `prometheus`) is left to NodeSDK
-and can't be stopped by the server; the package logs it, and its `send_*` setting (and for logs `send_logs_level`) is ignored
-rather than answered as done ([the host](sdk-settings.md#the-host)). What the package logs goes
+and cannot be stopped by the server. The package logs it, and refuses a policy that overrides
+that signal's `signal_exports` (and for logs, `log_levels`) ([the host](sdk-settings.md#the-host)). What the package logs goes
 to the logger `OTEL_LOG_LEVEL` sets up, from the start. Without `OTEL_LOG_LEVEL`, OpenTelemetry's
 `diag` logger shows nothing, so the package's own warnings and errors (`OpAMP: ...`) go to the
 console (stderr) instead, and its INFO lines aren't shown.
@@ -149,7 +154,7 @@ NodeSDK has started hands each one a tracer provider of its own. While the instr
 switched off, its tracer starts no span: it hands back a span that only carries the parent's span
 context, so the trace goes on through the instrumentations still on, and propagation doesn't
 change. Switched on again, its next span is recorded. The switch is read at each span, so it takes
-effect at once, and the saved settings switch the same instrumentations off from the next start.
+effect at once, and the saved policy switches the same instrumentations off from the next start.
 
 - **Loaded, not removed.** A switched-off instrumentation's patches stay in place; they only record
   nothing. To keep an instrumentation from loading at all, use `OTEL_NODE_DISABLED_INSTRUMENTATIONS`.
@@ -162,6 +167,40 @@ effect at once, and the saved settings switch the same instrumentations off from
   back in the totals once it is on again. A log bridge's records (`pino`, `bunyan`) are left out by
   their scope, the instrumentation's name. Only the exporters this package builds leave them out:
   a `prometheus` reader still serves them.
+
+### A provider of the application's own
+
+The package's sampler and gates are inside the SDK's providers. What the application sends through
+a tracer, logger or meter provider it builds itself goes past them.
+
+- **Registered as the global one.** The API holds one global provider per signal, and refuses
+  another until the first is disabled (`trace.disable()`, `logs.disable()`, `metrics.disable()`).
+  When the application then registers its own (`trace.setGlobalTracerProvider`,
+  `provider.register()`, `logs.setGlobalLoggerProvider`, `metrics.setGlobalMeterProvider`), the
+  package sees it at once. It warns, and no longer carries out the controls that provider takes
+  past it. In the policy in force, each of their overrides is set aside: reported `local` in the
+  effective config, which the package reports to the server at once, with the inventory's
+  settings. The rest of the policy stays in force. A policy offered from then on that overrides
+  one is refused (`head_sampling: this SDK cannot apply the requested override`). A provider the
+  application registered before `register()` is seen the same way, as the SDK's is refused.
+
+  | The application's own | Set aside from then on |
+  |---|---|
+  | tracer provider | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `debug` (`sampling_ratio`), `signal_exports.traces`, `attribute_redaction` |
+  | logger provider | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug` (`log_level`), `attribute_redaction` |
+  | meter provider | `signal_exports.metrics` |
+
+- **The instrumentations keep the SDK's providers.** Each got its providers when NodeSDK started.
+  So their spans are still sampled and gated, and the server still switches them. But a control
+  that no longer reaches all of the application's telemetry isn't answered as carried out. The
+  controls stay set aside until the next start.
+- **Not registered, not seen.** A provider the application builds and uses directly
+  (`provider.getTracer("app")`) goes past the package unseen, and a policy that overrides its
+  controls is still answered APPLIED. The same holds for one registered through another copy of
+  `@opentelemetry/api` or `@opentelemetry/api-logs`: every copy shares the one global, but the
+  package watches its own copy's setters. npm installs one copy where the versions agree.
+- **No processor added later.** The SDK's providers take no span or log record processor once
+  they are built, so nothing joins them past the gates.
 
 ### Is it working?
 
@@ -184,23 +223,28 @@ endpoint without a scheme gets a warning at start: it is taken as `http://`.
 
 ## The settings that match telemetry
 
-These settings act on what the sampler and the exporters this package builds see (OTLP and
-`console`; [sdk-settings.md](sdk-settings.md#settings-that-match-telemetry) has their contract).
-Each is declared to the layer ([the host](sdk-settings.md#the-host)) only where the package
-carries it out, so a setting it can't carry out is set aside, never answered APPLIED. Each document below is the remote config's
-`elastic` entry, as a server sends it.
+These controls act on what the sampler and the exporters this package builds see (OTLP and
+`console`). [sdk-settings.md](sdk-settings.md#settings-that-match-telemetry) has their contract.
+The package declares each to the layer ([the host](sdk-settings.md#the-host)) only where it
+carries it out. Thus a policy that overrides a control the package cannot carry out is FAILED,
+never APPLIED. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 
 ### Sampling rules
 
-`sampling_rules` sets the sampling rate per kind of new trace, first match wins, before
-`sampling_rate`:
+`sampling_rules` sets the sampling rate per kind of new trace, before `head_sampling`. The first
+match wins:
 
 ```json
-{"sampling_rate": "0.1", "sampling_rules": [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 1, "name": "checkout *"}, {"rate": 0.5, "attributes": {"tenant.id": "acme"}}]}
+{"head_sampling": {"mode": "override", "ratio": 0.1},
+ "sampling_rules": {"mode": "override",
+                    "rules": [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 1, "name": "checkout *"},
+                              {"rate": 0.5, "attributes": {"tenant.id": "acme"}}]}}
 ```
 
 - In the package's sampler, for a span with no parent: the first rule it matches decides the rate,
-  applied by the SDK's `TraceIdRatioBasedSampler`; if none matches, `sampling_rate`; if that isn't
+  applied by the SDK's `TraceIdRatioBasedSampler`; if none matches, `head_sampling`; if that is not
   set either, the sampler `OTEL_TRACES_SAMPLER` names. A span with a parent follows it, sampled or
   not, here or in the caller, whatever the rules say.
 - A rule sees what the span has when it starts. The `http` instrumentation starts a server span
@@ -213,11 +257,12 @@ carries it out, so a setting it can't carry out is set aside, never answered APP
   JavaScript a number that is an integer (`1.0` too) is an integer, as OTLP exports it; another
   number, or an array, never matches.
 
-`sampling_traces_per_second` caps the traces this process starts or joins, after the rules and the
+`trace_rate_limit` caps the traces this process starts or joins, after the rules and the
 rate have said to sample:
 
 ```json
-{"sampling_rate": "1", "sampling_traces_per_second": "50"}
+{"head_sampling": {"mode": "override", "ratio": 1},
+ "trace_rate_limit": {"mode": "override", "traces_per_second": 50}}
 ```
 
 - A root span the sampler sampled takes a token, and so does a span whose remote parent (a traced
@@ -225,15 +270,18 @@ rate have said to sample:
   a span sampled in this process is always sampled and takes none: the cap refuses whole traces.
   Nor does a span sampled under a remote parent that wasn't (the application's own sampler may sample
   one when only a cap is set).
-- The same bucket as `send_logs_per_second` ([rate caps](#rate-caps)), on its own.
-- Both are declared whatever the exporters: the sampler is always this package's.
+- The same bucket as `log_rate_limit` ([rate caps](#rate-caps)), on its own.
+- Both are declared whatever the exporters: the sampler is always this package's. But it samples
+  only the SDK's spans: once the application registers a tracer provider of its own, the
+  sampler's controls are set aside ([above](#a-provider-of-the-applications-own)).
 
 ### Log levels per scope
 
-`send_logs_level_by_scope` sets a level per log scope, on top of `send_logs_level`:
+`log_levels` `scopes` sets a level per log scope, on top of `level`:
 
 ```json
-{"send_logs_level": "warn", "send_logs_level_by_scope": "@opentelemetry/instrumentation-pino=error, app*=debug, noisy=off"}
+{"log_levels": {"mode": "override", "level": "warn",
+                "scopes": {"@opentelemetry/instrumentation-pino": "error", "app*": "debug", "noisy": "off"}}}
 ```
 
 - The scope is the name a record is exported under. For a record the application emits through
@@ -241,36 +289,41 @@ rate have said to sample:
   is the bridge's package (`@opentelemetry/instrumentation-pino`), not the application's logger
   name, which becomes an attribute. So in Node.js a level is per logs API logger, or per bridge.
 - A record's level is its scope's exact entry, else the longest prefix entry (`app*`), else
-  `send_logs_level`; `off` drops every record of the scope, severity 0 too. A scope's level may be
-  lower than `send_logs_level` as well as higher.
-- Filtered at the log exporters' wrapper, from the next export on, after `send_logs` and before a
-  rate cap. Where a log exporter is left to NodeSDK, it isn't declared, so it is ignored.
+  `level`. `off` drops every record of the scope, severity 0 too. A scope's level may be
+  lower than `level` as well as higher.
+- Filtered at the log exporters' wrapper, from the next export on, after `signal_exports.logs`
+  and before a rate cap. Where a log exporter is left to NodeSDK, the package does not declare
+  `log_levels`, so a policy that overrides it is FAILED.
 
 ### Redaction
 
-`drop_attributes` and `mask_attributes` keep attributes out of what is exported:
+`attribute_redaction` keeps attributes out of what is exported:
 
 ```json
-{"drop_attributes": "http.request.header.authorization, http.request.header.cookie", "mask_attributes": "*password*, *token*, user.email"}
+{"attribute_redaction": {"mode": "override",
+                         "drop": ["http.request.header.authorization", "http.request.header.cookie"],
+                         "mask": ["*password*", "*token*", "user.email"]}}
 ```
 
-- Globs on attribute keys, ignoring ASCII case: a key `drop_attributes` matches is removed, one
-  only `mask_attributes` matches is exported as `"[REDACTED]"`, whatever its type.
+- Globs on attribute keys, ignoring ASCII case. A key `drop` matches is removed. A key only
+  `mask` matches is exported as `"[REDACTED]"`, whatever its type.
 - Span attributes, span event and span link attributes, and log record attributes, at the span and
   log exporters' wrappers. The application's span or record isn't changed: the wrapper exports an
   object over it with the redacted attributes, so a processor or exporter the application added
   itself still sees the original. Names, log bodies, resource and scope attributes, and metrics
   are left alone.
 - Declared only when both the span and the log exporters are this package's (OTLP, `console` or
-  `none`): with either left to NodeSDK, both settings are ignored rather than half carried out.
+  `none`). With either left to NodeSDK, a policy that overrides `attribute_redaction` is FAILED,
+  so the control is never half carried out. The same holds once the application registers a
+  tracer or logger provider of its own, and an override already in force is then set aside.
 
 ### Rate caps
 
-`send_logs_per_second` is a safety valve: whatever the levels say, no more log records a second
-than this (`sampling_traces_per_second` is its traces' counterpart, [above](#sampling-rules)).
+`log_rate_limit` is a safety valve: whatever the levels say, no more log records a second
+than this. `trace_rate_limit` is its traces' counterpart ([above](#sampling-rules)).
 
 ```json
-{"send_logs_per_second": "200"}
+{"log_rate_limit": {"mode": "override", "records_per_second": 200}}
 ```
 
 - A token bucket on `performance.now()`: full to start, refilled at n a second, holding at most a
@@ -279,21 +332,23 @@ than this (`sampling_traces_per_second` is its traces' counterpart, [above](#sam
   batch, the first records the tokens allow go on, the rest are dropped. With the default batch
   delay (`OTEL_BLRP_SCHEDULE_DELAY`, 1 s) that is n records a second; a longer delay makes the cap
   stricter.
-- A new n starts a full bucket; the same n sent again keeps the bucket it has; left out, there is
-  no cap from the next export on. It stays in force in debug mode.
+- A new n starts a full bucket. The same n sent again keeps the bucket it has. With the control
+  local, there is no cap from the next export on. It stays in force in debug mode.
 
 ### Debug mode
 
-`debug_until` turns everything up until a time, and the package turns it back down on its own, the
+`debug` turns everything up until a time, and the package turns it back down on its own, the
 server reachable or not:
 
 ```json
-{"sampling_rate": "0.05", "send_logs_level": "warn", "debug_until": "2026-10-14T15:30:00Z", "debug_sampling_rate": "1", "debug_send_logs_level": "debug"}
+{"head_sampling": {"mode": "override", "ratio": 0.05},
+ "log_levels": {"mode": "override", "level": "warn"},
+ "debug": {"mode": "override", "until": "2026-10-14T15:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
-- Until then the sampler samples at `debug_sampling_rate` (1 if left out), the rules set aside, and
-  the log gate exports from `debug_send_logs_level` (`debug` if left out), the levels per scope set
-  aside. The `send_*` switches, redaction and the rate caps stay as they are.
+- Until then the sampler samples at `sampling_ratio` (1 if left out), and the rules do not apply.
+  The log gate exports from `log_level` (`debug` if left out), and the levels per scope do not
+  apply. The signal exports, redaction and the rate caps stay as they are.
 - The layer decides, against this process's clock (`Date.now()`): it folds the debug settings in,
   and says when to ask again. The package runs one timer for that time (unref'd, so it never keeps
   the process alive), waited for on Node's monotonic timer clock; when it fires it asks the layer,
@@ -302,8 +357,9 @@ server reachable or not:
 - A time more than 24 h ahead is FAILED; one already past is applied but over. The same document
   sent again (a reconnect) keeps its end; a restart before the end is still in debug mode (with a
   state directory), after it, not.
-- `debug_send_logs_level` is declared only where the package builds the log exporters;
-  `debug_until` and `debug_sampling_rate` everywhere.
+- The package carries out `debug` `log_level` only where it builds the log exporters, `until`
+  everywhere, and `sampling_ratio` where it carries out `head_sampling`. Elsewhere a policy that
+  sets `log_level` or `sampling_ratio` is FAILED.
 
 ### Export health
 
@@ -319,9 +375,9 @@ read the agent's health:
 
 - Each export's result is counted as the exporter's callback gives it, after the OTLP exporter's
   own retries: `exports.ok`, `exports.failed`, `items.failed` (spans, metric data points or log
-  records), and `items.filtered`, those dropped on purpose (a `send_*` false, a switched-off
+  records), and `items.filtered`, those dropped on purpose (a signal's exports off, a switched-off
   instrumentation, a level, a cap). A signal is `failing` while its last export failed, `off`
-  while its `send_*` is false.
+  while its exports are off.
 - The top-level `healthy` stays `true`: an exporter that can't reach its backend doesn't make the
   application look down.
 - Looked at every 30 s on the agent's one timer (the same as debug mode's end); the layer says
@@ -331,8 +387,8 @@ read the agent's health:
 
 ## The application's own settings
 
-The server may also send settings of the application's own in `custom` (a feature flag, a log
-verbosity, a limit), which the package hands on rather than reads. The contract (what the server
+The server may also send settings of the application's own in the policy's `app_settings`
+control (a feature flag, a log verbosity, a limit), which the package hands on rather than reads. The contract (what the server
 sends, what is refused, when a callback is called) is [app-settings.md](app-settings.md); in
 Node.js the application reads them through `appSettings`:
 
@@ -353,7 +409,7 @@ const unsubscribe = appSettings.onChange((settings, changed) => {
 ```
 
 - `get(key, def)` is the value in force, or `def` while there is none: before the first config
-  (and no saved one), when the config in force leaves the key out, and without
+  (and no saved one), when the policy in force leaves the key out, and without
   `OTEL_OPAMP_ENDPOINT`. Always a string (or `undefined` with no default given), never an error,
   whatever the key; a key named like one of Object's own (`constructor`, `toString`) is only ever
   a value the server sent.
@@ -368,7 +424,7 @@ const unsubscribe = appSettings.onChange((settings, changed) => {
   callback gets the frozen map now in force and the keys added, changed or removed, sorted, once
   per change, in order, each callback in the order it was added: when a config is applied, at the
   timer's Refresh, at start from the saved settings (before the application's code runs, so an
-  application isn't told of those: read the snapshot). The same map again, another setting
+  application is not told of those: read the snapshot). The same map again, another control
   changing, debug mode's start and end, and a FAILED config tell nothing. A callback that throws,
   or returns a promise that rejects, is logged as an error (on the console without
   `OTEL_LOG_LEVEL`), and the other callbacks are still called and the config still APPLIED. One
@@ -376,8 +432,8 @@ const unsubscribe = appSettings.onChange((settings, changed) => {
   part of the OpAMP client's own work, which isn't traced: requests it starts aren't either, so
   hand the work to the application's own code, as the examples do.
 - A change is logged at `info`: `OpAMP: application settings changed: <keys>`.
-- `custom` is declared live always, whatever builds the exporters. With a state directory the map
-  is saved with the rest of the document and in force again from the start of the next run,
+- The package carries out `app_settings` always, whatever builds the exporters. With a state
+  directory the map is saved with the rest of the policy and in force again from the start of the next run,
   whether the server can be reached or not; without one, each start begins from the defaults.
 - One map per process: the register's and the application's imports share it whichever way each
   loads the package (it is kept on `globalThis`). A worker thread has its own, which nothing
@@ -404,16 +460,18 @@ sends the hash at start, and the components in full when the server asks.
   `telemetry.sdk.language` and `telemetry.sdk.version`, as the resource has them.
 - `instrumentations`: every instrumentation the variables loaded (`OTEL_NODE_ENABLED_INSTRUMENTATIONS`,
   `OTEL_NODE_DISABLED_INSTRUMENTATIONS`), switched off or not, under the short name
-  `deactivate_instrumentations` takes (`http` for `@opentelemetry/instrumentation-http`), with its
+  the `instrumentations` control takes (`http` for `@opentelemetry/instrumentation-http`), with its
   version. One not loaded isn't listed: the server can't switch it on.
 - `exporters`: each signal's exporters, named as `OTEL_*_EXPORTER` names them, once each, with
   `none` read as NodeSDK reads it. Those this package builds are `gated`; a signal it leaves to
   NodeSDK (a `prometheus` or `zipkin` exporter among them) is listed as NodeSDK builds it, every
-  exporter `gated: false`, and its `send_*` isn't carried out, so it isn't under `settings`. A name
-  NodeSDK doesn't know builds nothing, and isn't listed.
-- `settings`: those the package carries out, as it declares them to the layer: the instrumentations
-  switched `at once`, the log settings only where it builds the log exporters.
-- Worked out once, as the client starts: nothing it lists changes while the application runs.
+  exporter `gated: false`. Its `send_*` setting is not carried out, so it is not under `settings`.
+  A name NodeSDK does not know builds nothing, and is not listed.
+- `settings`: the settings the package carries out, by the layer's names for them, as it declares
+  them to the layer. The instrumentations are switched `at once`. The log settings are there only
+  where the package builds the log exporters.
+- Worked out once, as the client starts. Only `settings` can change while the application runs:
+  a provider of the application's own takes its settings out, and the components are sent again.
 
 ## How it is checked
 
@@ -424,7 +482,8 @@ sends the hash at start, and the components in full when the server asks.
     `fetch` (`undici`, on) through a server whose `http` instrumentation is off to the
     application's own span; a switched-off instrumentation's metrics and log records aren't
     exported;
-  - the answers, saving and reporting follow the layer;
+  - the answers, saving and reporting follow the layer, and the description names the policy
+    formats and the controls the host carries out;
   - the UID is kept across starts, a UID the server assigns is the next start's, and neither goes
     into the environment;
   - the exporters, metric readers, log batching and sampler are built from the variables as
@@ -453,10 +512,14 @@ sends the hash at start, and the components in full when the server asks.
     the layer and through the agent (what the application reads, and the effective config), its
     typed reads (beyond the safe integers, the default); reads before any config and with keys
     named like Object's own; once per change and never for the same map, however it is sent;
-    `custom` left out; a FAILED config and a failed save changing nothing; the timer's Refresh and
+    `app_settings` local; a FAILED config and a failed save changing nothing; the timer's Refresh and
     debug mode telling nothing; callbacks in order, ones that throw or reject, unsubscribing and
     subscribing from inside a callback; restarts with and without a state directory; one map for
     the register and the application, by `import` or `require`;
+  - a provider of the application's own (`test/providers.test.ts`): a tracer, logger or meter
+    provider registered once NodeSDK has started sets exactly its settings aside, reported at
+    once with the inventory's settings, and the configs decided after; one the API refuses
+    changes nothing; one registered before NodeSDK starts is seen as the SDK's is refused;
   - the inventory (`test/inventory.test.ts`): a typical setup's components; every instrumentation
     `getNodeAutoInstrumentations` loads listed with its version, and switched off by the name
     listed; no instrumentations, exporters set to `none`, repeated and unknown ones; an exporter
@@ -477,4 +540,10 @@ sends the hash at start, and the components in full when the server asks.
   `check_app_settings` (the checks `app-cjs` and `app-mjs`): the programs read the flag
   `example.feature` (`appSettings`), which the server turns on, sends a bad map for (FAILED, still
   on), leaves out (off), sends in a string (on) and sends again (nothing to tell); after a restart
-  with no offer it is on from the start.
+  with no offer it is on from the start. Last, `check_truth` (the checks `truth-own-*`): app.cjs
+  registers a tracer, logger or meter provider of its own (`EXAMPLE_SETUP`, setups.cjs), exporting
+  to the same sink. The server offers one policy per control. A control is set aside
+  when the policy is FAILED as an override the package can't carry out, or APPLIED with that
+  override reported `local` in the effective config. Every other override must show in the
+  telemetry, and the controls set aside must be exactly those that provider takes past the
+  package.

@@ -15,7 +15,7 @@ from _servers import MODES, UID, OpampServer, wait_for
 from opamp_client import Client, Config, CoreError, Notification, Status, opamp_pb2 as pb
 
 # Headers the core refuses in every mode, and why: it checks every header list it sends by the
-# rule an offered header meets (issue #218). aiohttp sent each as given: a name that isn't a token
+# rule an offered header meets, in both modes. aiohttp sent each as given: a name that isn't a token
 # (the server reads "A:B: v" as header A, "B: v"), one of the headers the HTTP stack writes itself
 # (a second Host; a Content-Length of 0 before a body, which the server reads as the next request;
 # a Connection in place of the upgrade's), a value with whitespace at an end (dropped by the

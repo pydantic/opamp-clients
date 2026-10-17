@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 // The client's file operations (src/files.ts), in both modes: journaled into the core tap as the
-// tap checker expects (its file records), off the event loop (known bug S4), and never on a
-// file left by another client or a crashed run (S3, a download's file made new).
+// tap checker expects (its file records), off the event loop, and never on a file left by another
+// client or a crashed run (a download's file made new).
 
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -120,8 +120,8 @@ for (const mode of MODES) {
     checked(t, tap);
   });
 
-  // Known bug S3, its second half: a download given up on at stop never touches the file of the
-  // download of the same id a client started next on the state file makes.
+  // A download given up on at stop never touches the file of the download of the same id a client
+  // started next on the state file makes.
   // covers: RULE-SHELL-07
   test(`${mode} mode: a download held at stop doesn't touch the next client's file of the same id`, async () => {
     const file = Buffer.from("the package, version 1");
@@ -215,11 +215,67 @@ test("a download never writes over a file already at its path (Rust mode)", asyn
   assert.equal(readFileSync(downloadPath(state, 2n), "utf8"), "SOMEONE ELSE'S");
 });
 
-// Known bug S4: saves are off the event loop. A slow save holds up neither heartbeats nor stop, and a
+// RULE-SHELL-07: a download whose file is still being flushed when the core says stopped is the
+// shell's to delete (the core gave up on it), once the flush is over; and by the time stop returns,
+// however much of the stop timeout the core took (STOP_GRACE_MS at least, after it).
+// covers: RULE-SHELL-07
+for (const mode of MODES) {
+  test(`${mode} mode: a download's file being flushed as the core stops is gone when stop returns`, async () => {
+    const pkg = Buffer.from("the package ".repeat(10_000));
+    const server = await opampServer({ pkg });
+    const state = join(dir("flushed"), "state.bin");
+    const downloads = downloadsDir(state);
+    const flushMs = 600; // longer than the stop timeout, well within the grace after it
+    let flushing = false;
+    let flushed = false;
+    const ops = {
+      ...REAL,
+      async create(path: string) {
+        const f = await REAL.create(path);
+        if (!path.startsWith(downloads)) return f;
+        return {
+          path: f.path,
+          write: (bufs: Uint8Array[]) => f.write(bufs),
+          async sync() {
+            flushing = true;
+            await sleep(flushMs);
+            await f.sync();
+            flushed = true;
+          },
+          close: () => f.close(),
+        };
+      },
+    };
+    const listing = () => (existsSync(downloads) ? readdirSync(downloads).sort() : []);
+    const installed: string[] = [];
+    const config = { endpoint: server.url, stateFile: state, acceptPackages: true, heartbeatIntervalMs: 60_000,
+      stopTimeoutMs: 100, mode, proxy: false, [TEST_FILE_OPS]: ops } as Config;
+    try {
+      const c = Client.start(config, {}, (n) => {
+        if (n.kind === "installPackage") installed.push(n.path);
+      });
+      await until("the download's file being flushed", () => flushing);
+      const t0 = performance.now();
+      await c.stop();
+      const took = performance.now() - t0;
+      const atReturn = listing();
+      await sleep(flushMs + 500);
+      assert.ok(flushed, "the flush ended");
+      assert.deepEqual(atReturn, [], `stop returned with ${atReturn} still there (deleted later: ${listing().length === 0})`);
+      assert.deepEqual(listing(), []);
+      assert.ok(took < 100 + 1000 + 500, `stop took ${took} ms`);
+      assert.deepEqual(installed, []);
+    } finally {
+      server.close();
+    }
+  });
+}
+
+// Saves are off the event loop. A slow save holds up neither heartbeats nor stop, and a
 // client started next on the state file waits for it, and starts from what it saved.
 // covers: RULE-SHELL-07, RULE-SHELL-09
 for (const mode of MODES) {
-  test(`${mode} mode: S4, a slow save holds up neither heartbeats nor stop; the next client waits for it`, async () => {
+  test(`${mode} mode: a slow save holds up neither heartbeats nor stop; the next client waits for it`, async () => {
     const server = await opampServer({});
     const state = join(dir("s4"), "state.bin");
     let gate: () => void = () => {};

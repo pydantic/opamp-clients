@@ -154,7 +154,7 @@ public class SamplingTests
     public void ARateOfAHalfKeepsHalfTheTracesByTheirIds()
     {
         var controls = this.Controls();
-        controls.Apply(Vectors.Settings("{\"sampling_rules\":[{\"rate\":0.5,\"name\":\"GET\"}]}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("sampling_rules", """{"rules":[{"rate":0.5,"name":"GET"}]}"""))));
         var kept = 0;
         for (var i = 0; i < 10_000; i++)
         {
@@ -177,11 +177,11 @@ public class SamplingTests
         var other = new SamplingParameters(default, ActivityTraceId.CreateRandom(), "GET", ActivityKind.Server, [new("url.path", "/checkout")]);
         Assert.Equal(SamplingDecision.RecordOnly, controls.Sampler.ShouldSample(health).Decision);
 
-        controls.Apply(Vectors.Settings("{\"sampling_rules\":[{\"rate\":0,\"path\":\"/health\"}]}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("sampling_rules", """{"rules":[{"rate":0,"path":"/health"}]}"""))));
         Assert.Equal(SamplingDecision.Drop, controls.Sampler.ShouldSample(health).Decision);
         Assert.Equal(SamplingDecision.RecordOnly, controls.Sampler.ShouldSample(other).Decision); // no rule, no rate: the app's
 
-        controls.Apply(Vectors.Settings("{\"sampling_rules\":[{\"rate\":1,\"path\":\"/health\"}],\"sampling_rate\":\"0\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("sampling_rules", """{"rules":[{"rate":1,"path":"/health"}]}"""), ("head_sampling", """{"ratio":0}"""))));
         Assert.Equal(SamplingDecision.RecordAndSample, controls.Sampler.ShouldSample(health).Decision);
         Assert.Equal(SamplingDecision.Drop, controls.Sampler.ShouldSample(other).Decision);
 
@@ -197,7 +197,7 @@ public class SamplingTests
         var controls = this.Controls();
         var refused = 0;
         controls.Sampler.Capped = () => refused++;
-        controls.Apply(Vectors.Settings("{\"sampling_rules\":[{\"rate\":0,\"name\":\"health\"}],\"sampling_rate\":\"1\",\"sampling_traces_per_second\":\"2\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("sampling_rules", """{"rules":[{"rate":0,"name":"health"}]}"""), ("head_sampling", """{"ratio":1}"""), ("trace_rate_limit", """{"traces_per_second":2}"""))));
         SamplingResult Root(string name) => controls.Sampler.ShouldSample(new SamplingParameters(default, ActivityTraceId.CreateRandom(), name, ActivityKind.Server));
         SamplingResult Child() => controls.Sampler.ShouldSample(new SamplingParameters(
             new ActivityContext(ActivityTraceId.CreateRandom(), ActivitySpanId.CreateRandom(), ActivityTraceFlags.Recorded), default, "child", ActivityKind.Internal));
@@ -217,9 +217,9 @@ public class SamplingTests
         Assert.Equal(SamplingDecision.RecordAndSample, Root("d").Decision);
 
         // The cap left out: unlimited again; a cap again: a full bucket.
-        controls.Apply(Vectors.Settings("{\"sampling_rate\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.HeadSampling(1)));
         Assert.All(Enumerable.Range(0, 10), _ => Assert.Equal(SamplingDecision.RecordAndSample, Root("e").Decision));
-        controls.Apply(Vectors.Settings("{\"sampling_traces_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("trace_rate_limit", """{"traces_per_second":1}"""))));
         Assert.Equal(SamplingDecision.RecordAndSample, Root("f").Decision);
         Assert.Equal(SamplingDecision.Drop, Root("g").Decision);
     }
@@ -229,7 +229,7 @@ public class SamplingTests
     {
         var controls = this.Controls();
         controls.Sampler.Wrap(new ParentBasedSampler(new AlwaysOnSampler()));
-        controls.Apply(Vectors.Settings("{\"sampling_traces_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("trace_rate_limit", """{"traces_per_second":1}"""))));
         Assert.False(controls.Sampler.Policy.Decides);
         var first = new SamplingParameters(default, ActivityTraceId.CreateRandom(), "a", ActivityKind.Server);
         Assert.Equal(SamplingDecision.RecordAndSample, controls.Sampler.ShouldSample(first).Decision);
@@ -254,7 +254,7 @@ public class SamplingTests
     [Fact]
     public async Task ARuleOnARequestPathDropsTheWholeTraceInTheFilter()
     {
-        await using var rig = await Rig.Start(this, "{\"sampling_rules\":[{\"rate\":0,\"path\":\"/health*\"},{\"rate\":1,\"kind\":\"server\",\"path\":\"/api/*\"}]}");
+        await using var rig = await Rig.Start(this, Policy.Of(("sampling_rules", """{"rules":[{"rate":0,"path":"/health*"},{"rate":1,"kind":"server","path":"/api/*"}]}""")));
         var health = new List<Answer>();
         var api = new List<Answer>();
         for (var i = 0; i < 5; i++)
@@ -282,7 +282,7 @@ public class SamplingTests
         Assert.Contains(rig.Spans.Exported, s => s.Path == "/api/orders/0" && s.Root);
 
         // The rules changed while the application runs: /health is sampled now.
-        rig.Agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"1\"}"));
+        rig.Agent.RemoteConfig(Vectors.Config(Policy.HeadSampling(1)));
         var now = await rig.App.Get("/health");
         rig.Flush();
         Assert.Equal(3, rig.Spans.Of(now.TraceId));
@@ -291,7 +291,7 @@ public class SamplingTests
     [Fact]
     public async Task ARequestPathRuleAtAHalfFollowsTheTraceIdRatio()
     {
-        await using var rig = await Rig.Start(this, "{\"sampling_rules\":[{\"rate\":0.5,\"path\":\"/api/*\"}]}");
+        await using var rig = await Rig.Start(this, Policy.Of(("sampling_rules", """{"rules":[{"rate":0.5,"path":"/api/*"}]}""")));
         var kept = 0;
         for (var i = 0; i < 60; i++)
         {
@@ -309,7 +309,7 @@ public class SamplingTests
     [Fact]
     public async Task ARemoteParentDecidesARequestWhateverItsPath()
     {
-        await using var rig = await Rig.Start(this, "{\"sampling_rules\":[{\"rate\":0,\"path\":\"/zero\"},{\"rate\":1,\"path\":\"/one\"}]}");
+        await using var rig = await Rig.Start(this, Policy.Of(("sampling_rules", """{"rules":[{"rate":0,"path":"/zero"},{"rate":1,"path":"/one"}]}""")));
         var sampled = ActivityTraceId.CreateRandom();
         var unsampled = ActivityTraceId.CreateRandom();
         var a = await rig.App.Get("/zero", $"00-{sampled}-{ActivitySpanId.CreateRandom()}-01");
@@ -326,7 +326,7 @@ public class SamplingTests
     {
         await using var rig = await Rig.Start(
             this,
-            "{\"sampling_rate\":\"1\",\"sampling_traces_per_second\":\"4\"}",
+            Policy.Of(("head_sampling", """{"ratio":1}"""), ("trace_rate_limit", """{"traces_per_second":4}""")),
             ctx => !ctx.Request.Path.StartsWithSegments("/private"));
         var refused = 0;
         rig.Agent.Controls.Sampler.Capped = () => refused++;
@@ -354,7 +354,7 @@ public class SamplingTests
     {
         // No rule matches /a, so the application's sampler decides it: RecordOnly.
         await using var rig = await Rig.Start(
-            this, "{\"sampling_rules\":[{\"rate\":1,\"path\":\"/health\"}]}", appSampler: new Fixed(SamplingDecision.RecordOnly));
+            this, Policy.Of(("sampling_rules", """{"rules":[{"rate":1,"path":"/health"}]}""")), appSampler: new Fixed(SamplingDecision.RecordOnly));
         var r = await rig.App.Get("/a");
         rig.Flush();
         Assert.Equal(1, rig.Spans.EndedRootsOf(r.TraceId)); // the processors saw the request

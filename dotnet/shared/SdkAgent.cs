@@ -107,6 +107,11 @@ internal sealed class SdkAgent
     private Reachability? reachability;
     private AvailableComponents? components;
 
+    // Once started: what the SDK runs, as the caller reads it now, for the available components.
+    // A host that narrows (Recheck) lists them again.
+    private Func<Inventory>? inventory;
+    private AvailableComponents? unsent;
+
     /// <summary>
     /// Load the saved settings and put them in force on <paramref name="controls"/>; name the instance.
     /// <paramref name="hostNow"/> says what the SDK carries out (its argument: whether the providers are built).
@@ -243,12 +248,14 @@ internal sealed class SdkAgent
     /// <summary>
     /// Once the SDK is built: join the fleet, described by the SDK's resource, with
     /// <paramref name="health"/> (null: healthy) and the <paramref name="inventory"/> of what it
-    /// built, reported as its available components. The client runs with instrumentation
-    /// suppressed, so its requests are never the application's spans.
+    /// built, reported as its available components (read again if the host narrows). The client
+    /// runs with instrumentation suppressed, so its requests are never the application's spans.
     /// </summary>
-    public void Start(IEnumerable<KeyValuePair<string, object>> attributes, Inventory inventory, ComponentHealth? health = null)
+    public void Start(IEnumerable<KeyValuePair<string, object>> attributes, Func<Inventory> inventory, ComponentHealth? health = null)
     {
         var resource = attributes.ToList(); // read twice below
+        Host described;
+        ulong describedAt;
         lock (this.gate)
         {
             // What this SDK turned out to carry out is known now: answer and report by it.
@@ -261,9 +268,12 @@ internal sealed class SdkAgent
             // A setting it turned out not to carry out is the SDK's own again.
             this.Put(loaded.Settings);
             this.Arm(loaded.RefreshAtUnixMs, now);
-            // By the same host and clock: what it lists of the settings is what it carries out. The
-            // host is settled from here on, so the list doesn't change while the process runs.
-            this.components = this.layer.Components(inventory, this.host, now);
+            // By the same host and clock: what it lists of the settings is what it carries out. It
+            // changes only if the host narrows (Recheck).
+            this.inventory = inventory;
+            this.components = this.layer.Components(inventory(), this.host, now);
+            described = this.host;
+            describedAt = now;
         }
 
         var options = new OpAmpClientOptions
@@ -271,9 +281,7 @@ internal sealed class SdkAgent
             Endpoint = this.server.Endpoint,
             InstanceUid = Uuid.Bytes(this.Uid),
             Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig,
-            HeartbeatInterval = this.atStart.Settings.HasOpampPollingIntervalMs
-                ? TimeSpan.FromMilliseconds(this.atStart.Settings.OpampPollingIntervalMs)
-                : this.server.Heartbeat,
+            HeartbeatInterval = this.server.Heartbeat,
             Headers = this.server.Headers,
             StateFile = this.server.StateDir is { } dir ? Path.Combine(dir, "opamp-state") : null,
             // A key of its own, offered by the server: taken with a state directory (StateFile)
@@ -294,14 +302,18 @@ internal sealed class SdkAgent
 
         var status = new OpAmpStatus
         {
-            Description = this.layer.Describe(resource.Select(Attribute)),
+            // By the same host and clock: the controls it lists are those it carries out.
+            Description = this.layer.Describe(resource.Select(Attribute), described, describedAt),
             Health = first,
             EffectiveConfig = this.effective,
             AvailableComponents = this.components,
         };
         var service = resource.FirstOrDefault(a => a.Key == "service.name").Value;
         this.reachability = new Reachability(this.server.Endpoint, this.server.Named,
-            Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log);
+            Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log)
+        {
+            InUse = () => Volatile.Read(ref this.client)?.Endpoint,
+        };
         using (SuppressInstrumentationScope.Begin())
         {
             // Notifications come one at a time on the client's loop, never before Start returns,
@@ -334,6 +346,71 @@ internal sealed class SdkAgent
         }
 
         c?.SetHealth(merged);
+    }
+
+    /// <summary>
+    /// Ask the caller again what the SDK carries out, once started: a processor or reader the
+    /// application added to a built provider exports past the gates, and the settings it takes
+    /// from them are set aside from then on. When the host narrows, what is in force is decided
+    /// again (the layer's refresh), and the effective config and the available components are
+    /// reported. Also asked before each remote config is decided, and on the health timer.
+    /// </summary>
+    public void Recheck()
+    {
+        EffectiveConfig? report = null;
+        AvailableComponents? listed = null;
+        OpAmpClient? c;
+        lock (this.gate)
+        {
+            if (this.RehostLocked(this.clock.WallMs()))
+            {
+                report = this.effective;
+                listed = this.unsent;
+                this.unsent = null;
+            }
+
+            c = this.client;
+        }
+
+        if (c is not null && report is not null)
+        {
+            c.SetEffectiveConfig(report);
+            if (listed is not null)
+            {
+                c.SetAvailableComponents(listed);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The host now, if started (before, the host is the one to start with): when it differs, the
+    /// settings in force are what the layer decides under it, and the components are listed
+    /// again. Whether it changed.
+    /// </summary>
+    private bool RehostLocked(ulong nowUnixMs)
+    {
+        if (this.inventory is not { } listing || this.stopped)
+        {
+            return false;
+        }
+
+        var now = this.hostNow(true);
+        if (now.Equals(this.host))
+        {
+            return false;
+        }
+
+        var lost = this.host.Live.Concat(this.host.NextStart).Except(now.Live.Concat(now.NextStart)).Order(StringComparer.Ordinal).ToList();
+        this.host = now;
+        if (lost.Count > 0)
+        {
+            this.log.Warn($"the SDK now exports past the gates (an exporter, processor or reader that isn't the gated OTLP one): {string.Join(", ", lost)} can't be carried out and are set aside");
+        }
+
+        this.RefreshLocked(nowUnixMs);
+        this.Rearm();
+        this.unsent = this.components = this.layer.Components(listing(), now, nowUnixMs);
+        return true;
     }
 
     /// <summary>The application's health, with export health's entry as last sent (none yet: none).</summary>
@@ -407,20 +484,13 @@ internal sealed class SdkAgent
             // tells the server APPLIED once that is saved: nothing for the agent to save. Without one,
             // nothing is kept, and a next-start change is refused.
             var now = this.clock.WallMs();
+            // Decided under the host as it is now: a processor added since may have narrowed it.
+            this.RehostLocked(now);
             Action<byte[]>? save = this.server.StateDir == null ? null : _ => { };
             var d = this.layer.Decide(config, this.current, this.atStart.Current, this.host, now, save);
             if (d.Apply is { } apply)
             {
                 this.Put(apply);
-                if (apply.Unsupported.Count > 0)
-                {
-                    this.log.Info($"settings this SDK doesn't carry out: {string.Join(", ", apply.Unsupported)}");
-                }
-
-                if (apply.Ignored.Count > 0)
-                {
-                    this.log.Info($"settings unknown to this SDK: {string.Join(", ", apply.Ignored)}");
-                }
             }
 
             if (d.PendingRestart.Count > 0)
@@ -547,6 +617,7 @@ internal sealed class SdkAgent
         try
         {
             EffectiveConfig? report = null;
+            AvailableComponents? listed = null;
             ComponentHealth? health = null;
             OpAmpClient? c;
             lock (this.gate)
@@ -557,6 +628,14 @@ internal sealed class SdkAgent
                 }
 
                 var now = this.clock.Nanos();
+                if (this.nextHealth is { } due && now >= due && this.RehostLocked(this.clock.WallMs()))
+                {
+                    // With the health report: the host narrowed since the last decision.
+                    report = this.effective;
+                    listed = this.unsent;
+                    this.unsent = null;
+                }
+
                 if (this.refreshAt != 0 && now >= this.refreshDeadline)
                 {
                     // On the monotonic deadline, the window is over whatever the wall clock says.
@@ -578,6 +657,11 @@ internal sealed class SdkAgent
                 c?.SetEffectiveConfig(report);
             }
 
+            if (listed is not null)
+            {
+                c?.SetAvailableComponents(listed);
+            }
+
             if (health is not null)
             {
                 this.HealthSent = health;
@@ -590,6 +674,9 @@ internal sealed class SdkAgent
         }
     }
 
+    /// <summary>For tests: the endpoint what the agent says of reaching its server names now.</summary>
+    internal string? EndpointSaid => this.reachability?.At();
+
     /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
     public void Notified(OpAmpClient client, OpAmpNotification n)
     {
@@ -599,12 +686,20 @@ internal sealed class SdkAgent
             case OpAmpNotification.RemoteConfig rc:
                 var status = this.RemoteConfig(rc.Config);
                 EffectiveConfig eff;
+                AvailableComponents? listed;
                 lock (this.gate)
                 {
                     eff = this.effective;
+                    listed = this.unsent;
+                    this.unsent = null;
                 }
 
                 client.SetEffectiveConfig(eff);
+                if (listed is not null)
+                {
+                    client.SetAvailableComponents(listed);
+                }
+
                 client.SetRemoteConfigStatus(status);
                 break;
             case OpAmpNotification.InstanceUidChanged { InstanceUid: var uid }:

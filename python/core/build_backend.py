@@ -3,8 +3,7 @@
 """Build pydantic-opamp-core: a wheel holding opamp_core/<the native library> and nothing else.
 
 A PEP 517 backend for building from the repository (uv sync builds one for this machine from the
-library scripts/fetch_core.py fetched, or with cargo where the core's source is);
-scripts/native_dist.py calls wheel() with each platform's library and tag. There is no source
+library scripts/fetch_core.py fetched); scripts/native_dist.py calls wheel() with each platform's library and tag. There is no source
 distribution: the core ships compiled only.
 """
 from __future__ import annotations
@@ -12,7 +11,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
-import subprocess
 import sys
 import sysconfig
 import tomllib
@@ -62,19 +60,16 @@ def wheel(lib: Path, tag: str, out: Path) -> Path:
 
 
 def target_dir() -> Path:
-    """Where cargo puts what it builds: CARGO_TARGET_DIR (relative to the repository, where cargo
-    runs), or the repository's target/."""
+    """Where this machine's library is: the repository's target/ (scripts/fetch_core.py puts it in
+    target/release), or CARGO_TARGET_DIR (relative to the repository) if set, as
+    scripts/redact_mutants.py sets it for a copy of the repository."""
     return ROOT / os.environ.get("CARGO_TARGET_DIR", "target")
 
 
 def build_wheel(wheel_directory: str, config_settings: dict | None = None, metadata_directory: str | None = None) -> str:
-    """This machine's wheel: the library scripts/fetch_core.py put in target/release, or, where the
-    core's source is (a Cargo.toml at the root), the one cargo builds there."""
+    """This machine's wheel: the library scripts/fetch_core.py put in target/release."""
     lib = target_dir() / "release" / lib_name()
-    if (ROOT / "Cargo.toml").exists():
-        subprocess.run(["cargo", "build", "--release", "--locked", "-p", "opamp-native"], cwd=ROOT, check=True,
-                       stdout=sys.stderr)
-    elif not lib.exists():
+    if not lib.exists():
         sys.exit(f"{lib} is missing: run scripts/fetch_core.py fetch")
     tag = sysconfig.get_platform().replace("-", "_").replace(".", "_")
     return wheel(lib, tag, Path(wheel_directory)).name

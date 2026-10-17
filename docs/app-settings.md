@@ -1,97 +1,107 @@
 # Application settings
 
 An OpAMP server can send an application settings of its own, beside the SDK's: a feature flag, a
-log verbosity, a limit. The SDK doesn't read them; it hands them to the application, which reads
+log verbosity, a limit. The SDK does not read them. It hands them to the application, which reads
 one by its key, with a default, and can ask to be told when they change. This page is the
-contract every integration keeps: what the server sends, what the layer checks, and the API each
-language gives the application.
+contract that every integration keeps: what the server sends, what the layer checks, and the API
+that each language gives the application.
 
 ## On the wire
 
-They are the `custom` setting of the settings document, the remote config's `elastic` entry
-([sdk-settings.md](sdk-settings.md#the-document)): a JSON object of keys to values.
+They are the `app_settings` control of the Logfire SDK policy, the remote config's only file
+([sdk-settings.md](sdk-settings.md#the-policy)), `logfire-sdk-policy/v1`. Its override has one
+field, `values`: a JSON object of keys to
+values.
 
 ```json
-{"sampling_rate": "0.25", "custom": {"checkout.new_flow": "on", "example.log_level": "debug"}}
-```
-
-A server that sends only strings (Kibana, o11yfleet's renderer) may send the object encoded in a
-string, as it does `sampling_rules`:
-
-```json
-{"custom": "{\"checkout.new_flow\": \"on\"}"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "override", "ratio": 0.25},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "override", "values": {"checkout.new_flow": "on", "example.log_level": "debug"}},
+  "instrumentations": {"mode": "local"}
+}
 ```
 
 - **Keys**: ASCII letters, digits, `.`, `_` and `-`, starting with a letter or a digit, 1 to 128
-  bytes. Case-sensitive: `Flag` and `flag` are two keys. Dots are a convention for namespaces
-  (`checkout.new_flow`), nothing more.
-- **Values** are text: a string is kept exactly as sent (not trimmed, an empty string included),
-  a number or a boolean as its JSON text (`25` is `"25"`, `true` is `"true"`, `1e21` is
-  `"1e+21"`: send strings to keep the text you mean). At most 4096 bytes (UTF-8) each.
-- At most **128 entries**. A `null` entry is that key left out (it still counts towards the 128).
-- `custom` left out, `null`, `{}` or a blank string is the setting left out: **every key back to
-  the application's default**. So is a remote config with no `elastic` entry.
+  bytes. Keys are case-sensitive: `Flag` and `flag` are two keys. Dots are a convention for
+  namespaces (`checkout.new_flow`), nothing more.
+- **Values** are text. A string is kept exactly as sent (not trimmed, an empty string included).
+  A number or a boolean is kept as its JSON text (`25` is `"25"`, `true` is `"true"`, `1e21` is
+  `"1e+21"`). Send strings to keep the text you mean. Each value is at most 4096 bytes (UTF-8).
+- At most **128 entries**, and at least one.
+- `app_settings` local puts **every key back to the application's default**. So does a policy
+  that leaves `app_settings` out.
 
-What is wrong is refused as every other wrong setting is
-([sdk-settings.md](sdk-settings.md#the-document)): the whole config is answered **FAILED**, naming
-the entry, and nothing changes, the application's values included. `custom` is a setting the
-layer knows, so a bad value of it is a bad value, not an unknown key; and applying a map with an
-entry missing would leave the application reading a mix the server never sent.
+What is wrong is refused as every other wrong control is
+([sdk-settings.md](sdk-settings.md#the-policy)). The whole config is answered **FAILED**, the
+reason names the control, and nothing changes, the application's values included. Thus the
+application never reads a mix of values that the server never sent.
 
 | Sent | FAILED with |
 |---|---|
-| not an object (or one in a string) | `custom: must be a JSON object of keys to values, or one in a string` |
-| a string that isn't an object | `custom: not a JSON object of keys to values` |
-| a bad key | `custom: "a b" is not a key (ASCII letters, digits, ...)` |
-| a key sent twice | `custom.flag: sent more than once` |
-| an array or object as a value | `custom.flag: values must be strings, numbers or booleans` |
-| a value over 4096 bytes | `custom.flag: 4097 bytes, at most 4096` |
-| over 128 entries | `custom: 129 entries, at most 128` |
+| `values` not an object of keys to strings, numbers or booleans (an array, a string, an empty object, or an array, object or `null` as a value) | `app_settings: values must be an object of keys to strings, numbers or booleans` |
+| a bad key | `app_settings: values: "a b" is not a key (ASCII letters, digits, ...)` |
+| a key sent twice | `app_settings: values.flag: sent more than once` |
+| a value over 4096 bytes | `app_settings: values.flag: 4097 bytes, at most 4096` |
+| over 128 entries | `app_settings: values: 129 entries, at most 128` |
+| an override with no `values` | `app_settings: mode override needs values` |
 
-`testdata/sdk-settings/custom.json` holds each of these, and the maps taken, as shared
-vectors; [examples/settings/flip-a-feature-flag.json](../examples/settings/flip-a-feature-flag.json)
-is a whole document.
+`testdata/sdk-settings/custom.json` holds each of these, and the values taken, as shared
+vectors. [examples/settings/flip-a-feature-flag.json](../examples/settings/flip-a-feature-flag.json)
+is a whole policy.
 
 ## Through the layer
 
-`custom` is a **live** setting a host has to **declare**, as every setting is ([the
-host](sdk-settings.md#the-host)): an integration names `custom` in `Host.live` where the
-application can read the values. Undeclared (an integration that doesn't have this API yet), it
-is set aside: unchecked, named in `Settings.unsupported`, never reported in force, and the rest of
-the config still APPLIED.
+Inside the layer, `app_settings` sets the setting `custom`. It is a **live** setting that a host
+has to **declare**, as every setting is ([the host](sdk-settings.md#the-host)). An integration
+names `custom` in `Host.live` where the application can read the values. Where an integration
+does not declare it, the SDK refuses a policy that overrides `app_settings`
+(`app_settings: values: this SDK cannot apply the requested override`), and nothing changes. The
+description lists `app_settings` in `logfire.opamp.supported_controls` only where `custom` is
+declared ([sdk-settings.md](sdk-settings.md#the-description)).
 
-Declared, the layer reads and checks it with the rest of the document, and hands the map over in
+Declared, the layer reads and checks it with the rest of the policy, and hands the values over in
 the typed settings, `Settings.custom` (a `map<string, string>`, field 16 of
 `proto/opamp/sdk/v1/settings.proto`), in every reply that carries settings: `Loaded.settings`
-(at start, from the saved document), `Decision.apply` (APPLIED) and `Refreshed.settings`. There
-is no new call and no new WebAssembly or C export: an integration reads one more field of what
-it already gets. Debug mode leaves it alone.
+(at start, from the saved policy), `Decision.apply` (APPLIED) and `Refreshed.settings`. There is
+no new call and no new WebAssembly or C export: an integration reads one more field of what it
+already gets. Debug mode leaves it alone.
 
-The **effective config** reports it as the other structured settings are reported, a string
-holding compact JSON, keys sorted, every value a string, so the server sees exactly what the SDK
-took (`25` sent is `"25"` taken):
+The **effective config** reports the values as the SDK took them, each as a string, so the server
+sees exactly what the SDK took (`25` sent is `"25"` taken). Its keys are sorted. This is its `app_settings` control:
 
 ```json
-{"custom": "{\"checkout.new_flow\":\"on\",\"example.log_level\":\"debug\"}", "sampling_rate": "0.25"}
+{"mode":"override","values":{"checkout.new_flow":"on","example.log_level":"debug"}}
 ```
 
-The same map sent another way (in a string, keys in another order, `25` for `"25"`) is the same
-text, so it is no change.
+The same values sent another way (keys in another order, `25` for `"25"`) are the same text, so
+they are no change.
 
 **Restarts.** With a state directory the client keeps the last config applied in its saved
 state, and the integrations `Load` the settings from it before the application's code runs
-([sdk-settings.md](sdk-settings.md#at-start)). `custom` is in it, so the values in force at exit
+([sdk-settings.md](sdk-settings.md#at-start)). The values are in it, so the values in force at exit
 are in force again from the start, before any config arrives and whether the server can be
 reached or not. Without one,
-each start begins from the defaults until the server sends a config (it is live, so it needs no
-state to be applied).
+each start begins from the defaults until the server sends a policy (the control is live, so it
+needs no state to be applied).
 
 ## The API
 
 Every integration gives the application the same five things, named as its language names them:
 
 - **`get(key, default)`**: the value in force, or `default` while there is none: before the first
-  config (and no saved one), when the config in force leaves the key out, without an OpAMP server
+  policy (and no saved one), when the policy in force does not have the key, without an OpAMP server
   configured at all, and in an integration that isn't managed. Always a string, never an error,
   whatever the key.
 - **Typed reads** (optional, but where given, exactly these rules, so that the same text reads
@@ -109,8 +119,8 @@ Every integration gives the application the same five things, named as its langu
   - Called after a change is put in force, once per change, whatever the cause: a config
     APPLIED, the saved settings loaded at start (if the callback was added before that, which in
     most integrations it can't be), a forked worker following its parent. Not called when a
-    config leaves the map as it was (the same map again, another setting changed, a FAILED
-    config), and not called at subscription with the values already in force: read the snapshot
+    policy leaves the values as they were (the same values again, another control changed, a
+    FAILED policy), and not called at subscription with the values already in force: read the snapshot
     for those.
   - Changes are told one at a time, in the order they happened, each callback in the order it was
     added; `get` already returns the new values inside the callback.
@@ -183,8 +193,8 @@ callback the application adds is told of the server's changes from then on, not 
 - End to end, `check_app_settings` in [examples/integrations.py](../examples/integrations.py):
   the example application reads the flag `example.feature` and, while it is `on`, requests
   `/feature` each round; it requests `/changed` once per change it is told of. The server turns
-  the flag on, sends a bad map (FAILED, the flag stays on), leaves `custom` out (the flag back to
-  `off`), sends it in a string (on again) and the same map again (nothing to tell): three
-  `/changed`. After a restart with no offer the flag is on from the start. An integration opts in
+  the flag on, sends a bad value (FAILED, the flag stays on), sends a policy that
+  leaves `app_settings` out (the flag back to `off`), turns it on again, and sends the same
+  values again (nothing to tell): three `/changed`. After a restart with no offer the flag is on from the start. An integration opts in
   by giving its example application that behaviour and calling `check_app_settings(launch,
   target)` from its `try.py`, as every integration's `examples/*/try.py` does (its check `app`).

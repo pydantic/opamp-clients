@@ -934,6 +934,65 @@ def never_locked_out(t: Trace) -> Result:
     return Result("pass", f"{len(starts) - 1} run(s)")
 
 
+def offer_at(t: Trace, step: int) -> tuple[dict | None, str]:
+    """The first response carrying the offer at `step` (0 the first, 1 the key after it), and its
+    hash."""
+    offers = [e for e in t.server("s2a") if e.get("credentials_offer") and e.get("credentials_offer_step", 0) == step]
+    return (offers[0], offers[0]["credentials_offer"]) if offers else (None, "")
+
+
+@check("connection_settings_rotated", "MUST", ["OPAMP-CONNSET-03", "OPAMP-CONNSET-06"])
+def connection_settings_rotated(t: Trace) -> Result:
+    """A second key, offered once the agent has the first: the agent connects with it, only then
+    reports APPLIED for it, and never sends an older key again, a restart included."""
+    offer, h = offer_at(t, 1)
+    if offer is None:
+        return Result("fail", "the server never got to offer the second key")
+    creds = t.scenario["server"]["credentials"]
+    auth = t.server("auth")
+    used = [e for e in auth if e["ok"] and e["token"] == creds["then"] and e["wall"] >= offer["wall"]]
+    if not used:
+        return Result("fail", "the agent never connected with the second key")
+    applied = settings_status(t, h, "APPLIED")
+    if not applied:
+        return Result("fail", "no APPLIED status for the second key")
+    if applied[0]["wall"] < used[0]["wall"]:
+        return Result("fail", f"message {applied[0]['msg']} reports APPLIED before the second key was used")
+    old = [e for e in auth if e["token"] != creds["then"] and e["wall"] > used[0]["wall"]]
+    if old:
+        return Result("fail", f"sent the older key {old[0]['token']!r} {old[0]['t']:.1f}s in, after the second one worked")
+    return Result("pass", f"APPLIED {applied[0]['wall'] - offer['wall']:.1f}s after the offer")
+
+
+@check("connection_settings_moved", "MUST", ["OPAMP-CONNSET-03", "OPAMP-CONNSET-06"])
+def connection_settings_moved(t: Trace) -> Result:
+    """An offer of another endpoint with a new key (a move): the agent goes there with the new key,
+    never sends the new key to the old endpoint nor the old key to the new one, and once there
+    stays there, a restart included."""
+    offer, h = offer_at(t, 0)
+    if offer is None:
+        return Result("fail", "the server never got to offer the move")
+    creds = t.scenario["server"]["credentials"]
+    auth = t.server("auth")
+    for e in auth:
+        if e["token"] == creds["offer"] and not e.get("moved"):
+            return Result("fail", f"sent the new key to the old endpoint {e['t']:.1f}s in")
+        if e.get("moved") and e["token"] != creds["offer"]:
+            return Result("fail", f"sent the key {e['token']!r} to the new endpoint {e['t']:.1f}s in")
+    there = [e for e in auth if e["ok"] and e.get("moved")]
+    if not there:
+        return Result("fail", "the agent never reached the new endpoint")
+    back = [e for e in auth if not e.get("moved") and e["wall"] > there[0]["wall"]]
+    if back:
+        return Result("fail", f"went back to the old endpoint {back[0]['t']:.1f}s in, after reaching the new one")
+    applied = settings_status(t, h, "APPLIED")
+    if not applied:
+        return Result("fail", "no APPLIED status for the move")
+    if applied[0]["wall"] < there[0]["wall"]:
+        return Result("fail", f"message {applied[0]['msg']} reports APPLIED before the new endpoint answered")
+    return Result("pass", f"moved {there[0]['wall'] - offer['wall']:.1f}s after the offer")
+
+
 # ------------------------------------------------------------------------------------------
 # The remote config lifecycle (scenario "remote_config"; docs/remote-config.md)
 
@@ -1336,7 +1395,8 @@ def uid_not_requested_after_restart(t: Trace) -> Result:
 # ------------------------------------------------------------------------------------------
 # HTTP as the core says (docs/how-it-works.md)
 
-CORE_USER_AGENT = "opamp-clients"
+# The core's default User-Agent: pydantic-opamp/<core version> (older cores sent "opamp-clients").
+CORE_USER_AGENT = re.compile(r"pydantic-opamp/[0-9]+\.[0-9]+\.[0-9]+|opamp-clients")
 
 
 @check("redirects_not_followed", "MUST", ["RULE-CLIENT-04"])
@@ -1364,8 +1424,8 @@ def sends_core_headers(t: Trace) -> Result:
     if not requests and not upgrades:
         return Result("fail", "no requests")
     for e in requests + upgrades:
-        if e.get("user_agent") != CORE_USER_AGENT:
-            return Result("fail", f"User-Agent {e.get('user_agent')!r}, not {CORE_USER_AGENT!r}")
+        if not CORE_USER_AGENT.fullmatch(e.get("user_agent") or ""):
+            return Result("fail", f"User-Agent {e.get('user_agent')!r}, not the core's")
     for e in requests:
         if "accept_encoding" in e and e["accept_encoding"] != "identity":
             return Result("fail", f"Accept-Encoding {e['accept_encoding']!r}, not 'identity'")

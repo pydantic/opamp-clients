@@ -87,10 +87,10 @@ def attribute_text(value) -> str | None:
 
 
 class Bucket:
-    """A rate cap's token bucket, the algorithm every language runs (testdata/caps.json pins it):
-    full at its first take; refilled at `per_second` a second on a monotonic clock, up to
-    max(per_second, 1); a take of n gets the whole tokens there are, up to n. In floats, in the
-    layer's order. Thread-safe."""
+    """A rate cap's token bucket, the algorithm every language runs
+    (testdata/sdk-settings/caps.json pins it): full at its first take; refilled at `per_second` a
+    second on a monotonic clock, up to max(per_second, 1); a take of n gets the whole tokens there
+    are, up to n. In floats, in the layer's order. Thread-safe."""
 
     def __init__(self, per_second: float, clock: Callable[[], int] = time.monotonic_ns) -> None:
         self.per_second = per_second

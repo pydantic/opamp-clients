@@ -569,17 +569,6 @@ public final class SettingsProto {
     boolean getDeactivateAllInstrumentations();
 
     /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return Whether the opampPollingIntervalMs field is set.
-     */
-    boolean hasOpampPollingIntervalMs();
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return The opampPollingIntervalMs.
-     */
-    long getOpampPollingIntervalMs();
-
-    /**
      * <pre>
      * custom: the application's own settings, key to value, which the SDK doesn't read but hands
      * to the application (docs/app-settings.md): its readers see this map, whole, from the moment
@@ -654,96 +643,6 @@ java.lang.String defaultValue);
 
     java.lang.String getCustomOrThrow(
         java.lang.String key);
-
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @return A list containing the ignored.
-     */
-    java.util.List<java.lang.String>
-        getIgnoredList();
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @return The count of ignored.
-     */
-    int getIgnoredCount();
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param index The index of the element to return.
-     * @return The ignored at the given index.
-     */
-    java.lang.String getIgnored(int index);
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param index The index of the element to return.
-     * @return The ignored at the given index.
-     */
-    com.google.protobuf.ByteString
-        getIgnoredBytes(int index);
-
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @return A list containing the unsupported.
-     */
-    java.util.List<java.lang.String>
-        getUnsupportedList();
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @return The count of unsupported.
-     */
-    int getUnsupportedCount();
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param index The index of the element to return.
-     * @return The unsupported at the given index.
-     */
-    java.lang.String getUnsupported(int index);
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param index The index of the element to return.
-     * @return The unsupported at the given index.
-     */
-    com.google.protobuf.ByteString
-        getUnsupportedBytes(int index);
   }
   /**
    * <pre>
@@ -764,8 +663,6 @@ java.lang.String defaultValue);
       sendLogsScopeLevels_ = emptyProtobufList();
       dropAttributes_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
       maskAttributes_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-      ignored_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-      unsupported_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
     }
     private int bitField0_;
     public static final int SAMPLING_RATE_FIELD_NUMBER = 1;
@@ -1781,40 +1678,6 @@ java.lang.String defaultValue);
       deactivateAllInstrumentations_ = false;
     }
 
-    public static final int OPAMP_POLLING_INTERVAL_MS_FIELD_NUMBER = 7;
-    private long opampPollingIntervalMs_;
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return Whether the opampPollingIntervalMs field is set.
-     */
-    @java.lang.Override
-    public boolean hasOpampPollingIntervalMs() {
-      return ((bitField0_ & 0x00000200) != 0);
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return The opampPollingIntervalMs.
-     */
-    @java.lang.Override
-    public long getOpampPollingIntervalMs() {
-      return opampPollingIntervalMs_;
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @param value The opampPollingIntervalMs to set.
-     */
-    private void setOpampPollingIntervalMs(long value) {
-      bitField0_ |= 0x00000200;
-      opampPollingIntervalMs_ = value;
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     */
-    private void clearOpampPollingIntervalMs() {
-      bitField0_ = (bitField0_ & ~0x00000200);
-      opampPollingIntervalMs_ = 0L;
-    }
-
     public static final int CUSTOM_FIELD_NUMBER = 16;
     private static final class CustomDefaultEntryHolder {
       static final com.google.protobuf.MapEntryLite<
@@ -1950,286 +1813,6 @@ java.lang.String defaultValue) {
     private java.util.Map<java.lang.String, java.lang.String>
     getMutableCustomMap() {
       return internalGetMutableCustom();
-    }
-
-    public static final int IGNORED_FIELD_NUMBER = 8;
-    private com.google.protobuf.Internal.ProtobufList<java.lang.String> ignored_;
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @return A list containing the ignored.
-     */
-    @java.lang.Override
-    public java.util.List<java.lang.String> getIgnoredList() {
-      return ignored_;
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @return The count of ignored.
-     */
-    @java.lang.Override
-    public int getIgnoredCount() {
-      return ignored_.size();
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param index The index of the element to return.
-     * @return The ignored at the given index.
-     */
-    @java.lang.Override
-    public java.lang.String getIgnored(int index) {
-      return ignored_.get(index);
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param index The index of the value to return.
-     * @return The bytes of the ignored at the given index.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getIgnoredBytes(int index) {
-      return com.google.protobuf.ByteString.copyFromUtf8(
-          ignored_.get(index));
-    }
-    private void ensureIgnoredIsMutable() {
-      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
-          ignored_;  if (!tmp.isModifiable()) {
-        ignored_ =
-            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-       }
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param index The index to set the value at.
-     * @param value The ignored to set.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setIgnored(
-        int index, java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensureIgnoredIsMutable();
-      ignored_.set(index, value);
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param value The ignored to add.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void addIgnored(
-        java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensureIgnoredIsMutable();
-      ignored_.add(value);
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param values The ignored to add.
-     */
-    private void addAllIgnored(
-        java.lang.Iterable<java.lang.String> values) {
-      ensureIgnoredIsMutable();
-      com.google.protobuf.AbstractMessageLite.addAll(
-          values, ignored_);
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     */
-    private void clearIgnored() {
-      ignored_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-    }
-    /**
-     * <pre>
-     * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-     * are not refused).
-     * </pre>
-     *
-     * <code>repeated string ignored = 8;</code>
-     * @param value The bytes of the ignored to add.
-     */
-    private void addIgnoredBytes(
-        com.google.protobuf.ByteString value) {
-      checkByteStringIsUtf8(value);
-      ensureIgnoredIsMutable();
-      ignored_.add(value.toStringUtf8());
-    }
-
-    public static final int UNSUPPORTED_FIELD_NUMBER = 17;
-    private com.google.protobuf.Internal.ProtobufList<java.lang.String> unsupported_;
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @return A list containing the unsupported.
-     */
-    @java.lang.Override
-    public java.util.List<java.lang.String> getUnsupportedList() {
-      return unsupported_;
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @return The count of unsupported.
-     */
-    @java.lang.Override
-    public int getUnsupportedCount() {
-      return unsupported_.size();
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param index The index of the element to return.
-     * @return The unsupported at the given index.
-     */
-    @java.lang.Override
-    public java.lang.String getUnsupported(int index) {
-      return unsupported_.get(index);
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param index The index of the value to return.
-     * @return The bytes of the unsupported at the given index.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getUnsupportedBytes(int index) {
-      return com.google.protobuf.ByteString.copyFromUtf8(
-          unsupported_.get(index));
-    }
-    private void ensureUnsupportedIsMutable() {
-      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
-          unsupported_;  if (!tmp.isModifiable()) {
-        unsupported_ =
-            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-       }
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param index The index to set the value at.
-     * @param value The unsupported to set.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setUnsupported(
-        int index, java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensureUnsupportedIsMutable();
-      unsupported_.set(index, value);
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param value The unsupported to add.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void addUnsupported(
-        java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensureUnsupportedIsMutable();
-      unsupported_.add(value);
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param values The unsupported to add.
-     */
-    private void addAllUnsupported(
-        java.lang.Iterable<java.lang.String> values) {
-      ensureUnsupportedIsMutable();
-      com.google.protobuf.AbstractMessageLite.addAll(
-          values, unsupported_);
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     */
-    private void clearUnsupported() {
-      unsupported_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-    }
-    /**
-     * <pre>
-     * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-     * they are not refused either, and never reported in force).
-     * </pre>
-     *
-     * <code>repeated string unsupported = 17;</code>
-     * @param value The bytes of the unsupported to add.
-     */
-    private void addUnsupportedBytes(
-        com.google.protobuf.ByteString value) {
-      checkByteStringIsUtf8(value);
-      ensureUnsupportedIsMutable();
-      unsupported_.add(value.toStringUtf8());
     }
 
     public static dev.pydantic.opamp.sdk.SettingsProto.Settings parseFrom(
@@ -3382,42 +2965,6 @@ java.lang.String defaultValue) {
         return this;
       }
 
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return Whether the opampPollingIntervalMs field is set.
-       */
-      @java.lang.Override
-      public boolean hasOpampPollingIntervalMs() {
-        return instance.hasOpampPollingIntervalMs();
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return The opampPollingIntervalMs.
-       */
-      @java.lang.Override
-      public long getOpampPollingIntervalMs() {
-        return instance.getOpampPollingIntervalMs();
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @param value The opampPollingIntervalMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setOpampPollingIntervalMs(long value) {
-        copyOnWrite();
-        instance.setOpampPollingIntervalMs(value);
-        return this;
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearOpampPollingIntervalMs() {
-        copyOnWrite();
-        instance.clearOpampPollingIntervalMs();
-        return this;
-      }
-
       @java.lang.Override
 
       public int getCustomCount() {
@@ -3574,280 +3121,6 @@ java.lang.String defaultValue) {
         return this;
       }
 
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @return A list containing the ignored.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.String>
-          getIgnoredList() {
-        return java.util.Collections.unmodifiableList(
-            instance.getIgnoredList());
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @return The count of ignored.
-       */
-      @java.lang.Override
-      public int getIgnoredCount() {
-        return instance.getIgnoredCount();
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param index The index of the element to return.
-       * @return The ignored at the given index.
-       */
-      @java.lang.Override
-      public java.lang.String getIgnored(int index) {
-        return instance.getIgnored(index);
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param index The index of the value to return.
-       * @return The bytes of the ignored at the given index.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getIgnoredBytes(int index) {
-        return instance.getIgnoredBytes(index);
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param index The index to set the value at.
-       * @param value The ignored to set.
-       * @return This builder for chaining.
-       */
-      public Builder setIgnored(
-          int index, java.lang.String value) {
-        copyOnWrite();
-        instance.setIgnored(index, value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param value The ignored to add.
-       * @return This builder for chaining.
-       */
-      public Builder addIgnored(
-          java.lang.String value) {
-        copyOnWrite();
-        instance.addIgnored(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param values The ignored to add.
-       * @return This builder for chaining.
-       */
-      public Builder addAllIgnored(
-          java.lang.Iterable<java.lang.String> values) {
-        copyOnWrite();
-        instance.addAllIgnored(values);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearIgnored() {
-        copyOnWrite();
-        instance.clearIgnored();
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that nothing here knows: another SDK's, or misspelt (log them; they
-       * are not refused).
-       * </pre>
-       *
-       * <code>repeated string ignored = 8;</code>
-       * @param value The bytes of the ignored to add.
-       * @return This builder for chaining.
-       */
-      public Builder addIgnoredBytes(
-          com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.addIgnoredBytes(value);
-        return this;
-      }
-
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @return A list containing the unsupported.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.String>
-          getUnsupportedList() {
-        return java.util.Collections.unmodifiableList(
-            instance.getUnsupportedList());
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @return The count of unsupported.
-       */
-      @java.lang.Override
-      public int getUnsupportedCount() {
-        return instance.getUnsupportedCount();
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param index The index of the element to return.
-       * @return The unsupported at the given index.
-       */
-      @java.lang.Override
-      public java.lang.String getUnsupported(int index) {
-        return instance.getUnsupported(index);
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param index The index of the value to return.
-       * @return The bytes of the unsupported at the given index.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getUnsupportedBytes(int index) {
-        return instance.getUnsupportedBytes(index);
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param index The index to set the value at.
-       * @param value The unsupported to set.
-       * @return This builder for chaining.
-       */
-      public Builder setUnsupported(
-          int index, java.lang.String value) {
-        copyOnWrite();
-        instance.setUnsupported(index, value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param value The unsupported to add.
-       * @return This builder for chaining.
-       */
-      public Builder addUnsupported(
-          java.lang.String value) {
-        copyOnWrite();
-        instance.addUnsupported(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param values The unsupported to add.
-       * @return This builder for chaining.
-       */
-      public Builder addAllUnsupported(
-          java.lang.Iterable<java.lang.String> values) {
-        copyOnWrite();
-        instance.addAllUnsupported(values);
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearUnsupported() {
-        copyOnWrite();
-        instance.clearUnsupported();
-        return this;
-      }
-      /**
-       * <pre>
-       * Settings in the document that this host doesn't carry out: it doesn't declare them (log them;
-       * they are not refused either, and never reported in force).
-       * </pre>
-       *
-       * <code>repeated string unsupported = 17;</code>
-       * @param value The bytes of the unsupported to add.
-       * @return This builder for chaining.
-       */
-      public Builder addUnsupportedBytes(
-          com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.addUnsupportedBytes(value);
-        return this;
-      }
-
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Settings)
     }
     @java.lang.Override
@@ -3871,8 +3144,6 @@ java.lang.String defaultValue) {
               "sendLogs_",
               "deactivateInstrumentations_",
               "deactivateAllInstrumentations_",
-              "opampPollingIntervalMs_",
-              "ignored_",
               "sendLogsMinSeverity_",
               "samplingRules_",
               dev.pydantic.opamp.sdk.SettingsProto.SamplingRule.class,
@@ -3884,13 +3155,12 @@ java.lang.String defaultValue) {
               "sendLogsPerSecond_",
               "custom_",
               CustomDefaultEntryHolder.defaultEntry,
-              "unsupported_",
             };
             java.lang.String info =
-                "\u0000\u0011\u0000\u0001\u0001\u0011\u0011\u0001\u0006\u0000\u0001\u1000\u0000\u0002" +
+                "\u0000\u000e\u0000\u0001\u0001\u0010\u000e\u0001\u0004\u0000\u0001\u1000\u0000\u0002" +
                 "\u1007\u0001\u0003\u1007\u0002\u0004\u1007\u0003\u0005\u1009\u0007\u0006\u1007\b" +
-                "\u0007\u1003\t\b\u021a\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000" +
-                "\u0005\u000f\u1000\u0006\u00102\u0011\u021a";
+                "\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0005\u000f\u1000" +
+                "\u0006\u00102";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -5957,8 +5227,8 @@ java.lang.String defaultValue) {
   /**
    * <pre>
    * What the host (a language's integration) carries out, declared from what it built: a setting
-   * it doesn't name is one it can't carry out, set aside (Settings.unsupported) and never reported
-   * in force. Unset, it carries out nothing. A name that is no setting, or a live setting named in
+   * it doesn't name is one it can't carry out: a policy that overrides it is refused, and the
+   * description doesn't list its control. Unset, it carries out nothing. A name that is no setting, or a live setting named in
    * next_start, makes the reply an error.
    * </pre>
    *
@@ -6339,8 +5609,8 @@ java.lang.String defaultValue) {
     /**
      * <pre>
      * What the host (a language's integration) carries out, declared from what it built: a setting
-     * it doesn't name is one it can't carry out, set aside (Settings.unsupported) and never reported
-     * in force. Unset, it carries out nothing. A name that is no setting, or a live setting named in
+     * it doesn't name is one it can't carry out: a policy that overrides it is refused, and the
+     * description doesn't list its control. Unset, it carries out nothing. A name that is no setting, or a live setting named in
      * next_start, makes the reply an error.
      * </pre>
      *
@@ -15048,10 +14318,40 @@ java.lang.String defaultValue) {
      * <code>repeated .opamp.proto.v1.KeyValue resource = 1;</code>
      */
     int getResourceCount();
+
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * @return Whether the host field is set.
+     */
+    boolean hasHost();
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * @return The host.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.Host getHost();
+
+    /**
+     * <pre>
+     * as Load's: debug is listed only with a clock
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 3;</code>
+     * @return The nowUnixMs.
+     */
+    long getNowUnixMs();
   }
   /**
    * <pre>
-   * The agent description, from the SDK's resource.
+   * The agent description, from the SDK's resource, with the policy format and the controls the
+   * host carries out (logfire.opamp.config_format, logfire.opamp.supported_controls).
    * </pre>
    *
    * Protobuf type {@code opamp.sdk.v1.Describe}
@@ -15064,6 +14364,7 @@ java.lang.String defaultValue) {
     private Describe() {
       resource_ = emptyProtobufList();
     }
+    private int bitField0_;
     public static final int RESOURCE_FIELD_NUMBER = 1;
     private com.google.protobuf.Internal.ProtobufList<opamp.proto.v1.Anyvalue.KeyValue> resource_;
     /**
@@ -15161,6 +14462,112 @@ java.lang.String defaultValue) {
       resource_.remove(index);
     }
 
+    public static final int HOST_FIELD_NUMBER = 2;
+    private dev.pydantic.opamp.sdk.SettingsProto.Host host_;
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasHost() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.Host getHost() {
+      return host_ == null ? dev.pydantic.opamp.sdk.SettingsProto.Host.getDefaultInstance() : host_;
+    }
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHost(dev.pydantic.opamp.sdk.SettingsProto.Host value) {
+      value.getClass();  // minimal bytecode null check
+      host_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeHost(dev.pydantic.opamp.sdk.SettingsProto.Host value) {
+      value.getClass();  // minimal bytecode null check
+      if (host_ != null &&
+          host_ != dev.pydantic.opamp.sdk.SettingsProto.Host.getDefaultInstance()) {
+        host_ =
+          dev.pydantic.opamp.sdk.SettingsProto.Host.newBuilder(host_).mergeFrom(value).buildPartial();
+      } else {
+        host_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * as Load's; unset, it lists no control
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     */
+    private void clearHost() {
+      host_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
+    public static final int NOW_UNIX_MS_FIELD_NUMBER = 3;
+    private long nowUnixMs_;
+    /**
+     * <pre>
+     * as Load's: debug is listed only with a clock
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 3;</code>
+     * @return The nowUnixMs.
+     */
+    @java.lang.Override
+    public long getNowUnixMs() {
+      return nowUnixMs_;
+    }
+    /**
+     * <pre>
+     * as Load's: debug is listed only with a clock
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 3;</code>
+     * @param value The nowUnixMs to set.
+     */
+    private void setNowUnixMs(long value) {
+      
+      nowUnixMs_ = value;
+    }
+    /**
+     * <pre>
+     * as Load's: debug is listed only with a clock
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 3;</code>
+     */
+    private void clearNowUnixMs() {
+
+      nowUnixMs_ = 0L;
+    }
+
     public static dev.pydantic.opamp.sdk.SettingsProto.Describe parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
@@ -15246,7 +14653,8 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * The agent description, from the SDK's resource.
+     * The agent description, from the SDK's resource, with the policy format and the controls the
+     * host carries out (logfire.opamp.config_format, logfire.opamp.supported_controls).
      * </pre>
      *
      * Protobuf type {@code opamp.sdk.v1.Describe}
@@ -15364,6 +14772,117 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasHost() {
+        return instance.hasHost();
+      }
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.Host getHost() {
+        return instance.getHost();
+      }
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      public Builder setHost(dev.pydantic.opamp.sdk.SettingsProto.Host value) {
+        copyOnWrite();
+        instance.setHost(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      public Builder setHost(
+          dev.pydantic.opamp.sdk.SettingsProto.Host.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHost(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      public Builder mergeHost(dev.pydantic.opamp.sdk.SettingsProto.Host value) {
+        copyOnWrite();
+        instance.mergeHost(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as Load's; unset, it lists no control
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       */
+      public Builder clearHost() {  copyOnWrite();
+        instance.clearHost();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as Load's: debug is listed only with a clock
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 3;</code>
+       * @return The nowUnixMs.
+       */
+      @java.lang.Override
+      public long getNowUnixMs() {
+        return instance.getNowUnixMs();
+      }
+      /**
+       * <pre>
+       * as Load's: debug is listed only with a clock
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 3;</code>
+       * @param value The nowUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNowUnixMs(long value) {
+        copyOnWrite();
+        instance.setNowUnixMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as Load's: debug is listed only with a clock
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNowUnixMs() {
+        copyOnWrite();
+        instance.clearNowUnixMs();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Describe)
     }
     @java.lang.Override
@@ -15380,11 +14899,15 @@ java.lang.String defaultValue) {
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
               "resource_",
               opamp.proto.v1.Anyvalue.KeyValue.class,
+              "host_",
+              "nowUnixMs_",
             };
             java.lang.String info =
-                "\u0000\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0001\u0000\u0001\u001b";
+                "\u0000\u0003\u0000\u0001\u0001\u0003\u0003\u0000\u0001\u0000\u0001\u001b\u0002\u1009" +
+                "\u0000\u0003\u0003";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

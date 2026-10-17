@@ -222,7 +222,7 @@ func (a *agent) inventory() (*settingspb.Inventory, uint64) {
 // (the same host and clock as Load and Decide); nil when it can't. Under a.mu.
 func (a *agent) components(ctx context.Context) *protobufs.AvailableComponents {
 	inventory, gen := a.inventory()
-	c, err := a.layer.Components(ctx, inventory, a.server.host(), unixMs(a.now()))
+	c, err := a.layer.Components(ctx, inventory, a.host(), unixMs(a.now()))
 	if err != nil {
 		slog.Warn("opamp: the inventory could not be built", "error", err)
 		return nil

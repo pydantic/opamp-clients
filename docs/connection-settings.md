@@ -155,7 +155,7 @@ other connection's endpoint and a proxy's URL ("a URL, host:port or some other d
 specifier") need only hold no control character and be at most 8000 octets. Package downloads
 are checked the same way ([packages.md](packages.md)).
 
-**Heartbeat intervals.** The core takes any interval the server offers, but at most a day (as for the polling interval in an SDK's settings): 2^64 - 1 seconds is a day.
+**Heartbeat intervals.** The core takes any interval the server offers, but at most a day: 2^64 - 1 seconds is a day.
 So no deadline the core hands a client is more than a day away, which Node's 32-bit `setTimeout`
 and .NET's `TimeSpan` can hold, and a server that meant "rarely" still hears from the agent. An
 offer of 0 turns heartbeats off over WebSocket and keeps the configured polling interval over
@@ -249,8 +249,7 @@ enrollment key in `OTEL_OPAMP_HEADERS`, or in code) are the configured settings:
 the endpoint, discards the saved ones. Headers come from the configuration alone: no integration
 has a callback that would overwrite the ones the server issued (the collector extension and the
 supervisor refuse an auth extension with `accepts_opamp_connection_settings` for that reason). The offer's heartbeat interval holds
-until the next start, over the SDK's own (`OTEL_OPAMP_HEARTBEAT_INTERVAL`,
-`opamp_polling_interval`). Each integration's unit tests take a key from a server that offers
+until the next start, over the SDK's own (`OTEL_OPAMP_HEARTBEAT_INTERVAL`). Each integration's unit tests take a key from a server that offers
 one, and `check_setup` (`examples/integrations.py`) takes one from the reference server and comes
 back with it at the next start, in every language.
 
@@ -317,6 +316,34 @@ ever, so a client should report such a refusal as one. Without this, a candidate
 connected was dropped after a restart, and so was one whose upgrade had worked, lost before the
 answer: a server that switched later locked the agent out.
 
+## Moves and rotations
+
+A server can move an agent to another server: it offers a new endpoint (of the same transport)
+with a new key. It can also rotate keys: a second key, a third, at the same endpoint. Either is an
+offer like the first one, and every SDK integration follows it the same way:
+
+- The new endpoint and key are one candidate. The SDK never sends the new key to the old endpoint,
+  nor the old key to the new one.
+- The old endpoint and key stay saved until the new ones are answered. The SDK reports APPLIED,
+  with the offer's hash, only after that answer.
+- If nothing answers (a closed port, a refusal, the verification timeout), the SDK goes back to
+  the old endpoint with the old key and reports FAILED with the offer's hash. It keeps working
+  there.
+- The new endpoint and key are kept across a restart. The next start goes to them first, not to
+  the configured endpoint. (Changing the configured endpoint or headers discards them, as it
+  discards any saved settings.)
+- What the SDK logs about reaching its server (the "can't reach" warning, "connected to") names
+  the endpoint the client uses now, so after a move it names the new server. Each client tells
+  it (`Endpoint()` in Go, `endpoint` in Python and Node, `endpoint()` in Java, `Endpoint` in .NET):
+  where its latest OpAMP request or connection went. A client in Rust mode can't tell it, so the
+  SDK names the configured endpoint then.
+
+Each integration's unit tests check a move to a second server, a second key at the same
+endpoint, and a move to an endpoint nobody listens on, each across a restart where it applies. End to end, `check_rotation` (`examples/integrations.py`, the check `rotation` of each
+integration's `try.py`) has the reference server's operator rotate an agent's key and then move it
+to the server's second listener: the agent takes both, and its next start goes straight to the
+new endpoint.
+
 ## How it is checked
 
 - The core is checked on its own before it is released: against a model of the design, with and
@@ -333,4 +360,7 @@ answer: a server that switched later locked the agent out.
   (and `hostile-heartbeat`: intervals of 0 and huge ones).
 - The conformance scenarios `credential-offer` (the server offers each agent its own token,
   then accepts only that, and the agent restarts halfway) and `credential-offer-broken` (the
-  offered token never works), for every client over both transports.
+  offered token never works), `credential-rotation` (a second token once the first works, and
+  the agent never sends an older one again) and `endpoint-move` (a new token at the server's
+  second endpoint: the new token goes only there, the old one never does, and after a restart
+  the agent goes straight there), for every client over both transports.

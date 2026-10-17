@@ -282,6 +282,8 @@ type Client struct {
 	// loopG is the id of the client's goroutine, the one the callback runs on (0 until it runs):
 	// Stop called there is a stop asked for from the callback, which can't wait for the client.
 	loopG atomic.Uint64
+	// used is where the latest OpAMP request or connection went (the executor's).
+	used *atomic.Pointer[string]
 }
 
 // Start starts a client. notify is called for every Notification, one at a time, on the client's
@@ -332,7 +334,7 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		// Files downloaded before a restart: the core downloads again what it still needs.
 		_ = os.RemoveAll(downloadsDir(cfg.StateFile))
 	}
-	c, out, err := core.NewWith(ctx, core.Options{Module: cfg.coreModule, Tap: cfg.tapFile}, cc)
+	c, out, err := core.New(ctx, core.Options{Module: cfg.coreModule, Tap: cfg.tapFile}, cc)
 	if err != nil {
 		return nil, err
 	}
@@ -350,6 +352,7 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	}
 	first = append(first, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
 	x := newExecutor(conn)
+	cl.used = &x.used
 	if cfg.fs != nil {
 		x.fs = cfg.fs
 	}
@@ -423,6 +426,22 @@ func authInput(h http.Header) *corepb.Input {
 // InstanceUID is the instance UID in use: the application's, one saved before a restart, one the
 // core made, or one the server assigned since (InstanceUIDChanged).
 func (c *Client) InstanceUID() [16]byte { return *c.uid.Load() }
+
+// Endpoint is the endpoint the client uses now: where its latest OpAMP request or WebSocket
+// connection went, which after the server moved the agent (an offer of connection settings) is
+// the offered one, or the configured one again once an offer failed. It is "" before any outcome,
+// and in Rust mode, where the core makes the requests itself (the configured one is all there is
+// to name then).
+// It holds the URL as the core gave it, credentials and query included: redact it before logging.
+func (c *Client) Endpoint() string {
+	if c.used == nil {
+		return ""
+	}
+	if u := c.used.Load(); u != nil {
+		return *u
+	}
+	return ""
+}
 
 func (c *Client) setUID(uid []byte) {
 	if len(uid) != 16 {

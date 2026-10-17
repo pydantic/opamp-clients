@@ -3,6 +3,11 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.every;
+import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.full;
+import static dev.pydantic.opamp.javaagent.Vectors.override;
+import static dev.pydantic.opamp.javaagent.Vectors.v1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -27,6 +32,7 @@ import java.util.UUID;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import opamp.proto.v1.Opamp;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -187,8 +193,7 @@ class DeclarativeTest {
   @Test
   void savedSettingsAreInForceFromTheStartTheNextStartOnesWhereTheAgentReadsThem(@TempDir Path dir) throws Exception {
     Files.writeString(dir.resolve("sdk-settings.json"),
-        "{\"send_logs\":\"false\",\"deactivate_instrumentations\":\"java-http-client,jdbc\","
-            + "\"deactivate_all_instrumentations\":\"true\"}");
+        every("signal_exports", exports("", "", "off"), "instrumentations", override("\"disabled\":[\"java-http-client\",\"jdbc\"],\"all_disabled\":true")));
     Extension e = Extension.forTest(null);
     OpenTelemetryConfigurationModel m = Declarative.setUp(e, config(dir), model(FILE + """
         distribution:
@@ -252,9 +257,10 @@ class DeclarativeTest {
 
   @Test
   void aSignalThroughAProcessorOfItsOwnHasNoneOfItsSettingsCarriedOut(@TempDir Path dir) throws Exception {
-    // Saved before: send_traces false. The file's spans go through a processor of its own, past the
-    // gate, so the agent can't stop them: neither in force nor answered as done.
-    Files.writeString(dir.resolve("sdk-settings.json"), "{\"send_traces\":\"false\",\"send_metrics\":\"false\"}");
+    // Saved before: the metrics export off. The file's spans go through a processor of its own, past
+    // the gate, so the agent cannot stop them: a policy that switches the traces off is refused.
+    String saved = v1("signal_exports", exports("", "off", ""));
+    Files.writeString(dir.resolve("sdk-settings.json"), saved);
     System.setProperty("otel.opamp.endpoint", "http://server/v1/opamp");
     System.setProperty("otel.opamp.state.dir", dir.toString());
     Extension e = Extension.INSTANCE;
@@ -272,10 +278,12 @@ class DeclarativeTest {
       assertTrue(e.on());
       assertTrue(e.controls.gates.sendTraces());
       assertFalse(e.controls.gates.sendMetrics()); // the reader is the agent's: gated
-      assertEquals("{\"send_metrics\":\"false\"}", ExtensionTest.effective(e));
-      e.remoteConfig(ExtensionTest.config("elastic", "{\"send_traces\":\"false\"}"));
+      assertEquals(full(saved), ExtensionTest.effective(e));
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(v1("signal_exports", exports("off", "", ""))));
+      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
+      assertEquals("signal_exports.traces: this SDK cannot apply the requested override", s.getErrorMessage());
       assertTrue(e.controls.gates.sendTraces());
-      assertEquals("{}", ExtensionTest.effective(e));
+      assertEquals(full(saved), ExtensionTest.effective(e));
     } finally {
       System.clearProperty("otel.opamp.endpoint");
       System.clearProperty("otel.opamp.state.dir");
@@ -290,7 +298,7 @@ class DeclarativeTest {
   @Test
   void theSdkRunsTheExtensionsHooksFromAConfigurationFile(@TempDir Path dir) throws Exception {
     // Through the SPI, as in the agent: the customizers find the endpoint in system properties.
-    Files.writeString(dir.resolve("sdk-settings.json"), "{\"send_metrics\":\"false\"}");
+    Files.writeString(dir.resolve("sdk-settings.json"), v1("signal_exports", exports("", "off", "")));
     System.setProperty("otel.opamp.endpoint", "http://server/v1/opamp");
     System.setProperty("otel.opamp.state.dir", dir.toString());
     Extension e = Extension.INSTANCE;
@@ -305,6 +313,10 @@ class DeclarativeTest {
       assertTrue(sdk.getSdkTracerProvider().toString().contains("OpampLiveSampler"));
       assertTrue(sdk.getSdkTracerProvider().toString().contains("OpampGated{LoggingSpanExporter"));
       assertNull(e.notHooked(config(dir)));
+      // The SDK as built samples with the extension's sampler, around the file's: nothing set aside.
+      var declared = e.host();
+      e.built(sdk);
+      assertEquals(declared, e.host());
     } finally {
       System.clearProperty("otel.opamp.endpoint");
       System.clearProperty("otel.opamp.state.dir");

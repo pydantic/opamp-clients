@@ -5,6 +5,8 @@
 .github/actions/*/action.yml
 .gitignore
 AGENTS.md
+# Skills for agent sessions working here (same public rules as AGENTS.md).
+.claude/skills/
 LICENSE
 PUBLIC_ALLOWLIST
 README.md
@@ -21,7 +23,6 @@ dotnet/
 examples/
 conformance/
 docs/
-infra/packages/
 # The hostile stand-in the clients' harness tests load (fetch_core.py check holds it to the lock).
 testdata/core/opamp_core_adversary.wasm
 scripts/sdk_release.py

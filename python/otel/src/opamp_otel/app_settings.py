@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 """The application's own settings, as the OpAMP server sends them (docs/app-settings.md).
 
-The server sends them beside the SDK's settings, in the ``custom`` map of the remote config's
-``elastic`` entry: string keys to string values, which the SDK doesn't read but hands on. The
+The server sends them beside the SDK's settings, in the ``app_settings`` control of the Logfire SDK
+policy: string keys to values, which the SDK does not read but hands on as strings. The
 application reads them here::
 
     from opamp_otel import app_settings

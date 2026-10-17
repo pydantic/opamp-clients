@@ -38,7 +38,7 @@ def _answering(got: list[pb.AgentToServer]) -> web.Application:
     return app
 
 
-# S1: stop while the WebSocket handshake is under way. The server holds the upgrade for 2 s, then
+# Stop while the WebSocket handshake is under way. The server holds the upgrade for 2 s, then
 # accepts it: stop returns, and the connection is closed, not left reading.
 # covers: RULE-CLIENT-16
 def test_stop_during_a_websocket_handshake_returns_and_leaves_nothing_open() -> None:
@@ -70,7 +70,7 @@ def test_stop_during_a_websocket_handshake_returns_and_leaves_nothing_open() -> 
     asyncio.run(run())
 
 
-# S4: a save that takes 2 s holds up neither start, nor the heartbeats.
+# A save that takes 2 s holds up neither start, nor the heartbeats.
 def test_a_slow_save_holds_up_neither_start_nor_heartbeats(tmp_path, monkeypatch) -> None:
     real = _executor._save
 
@@ -97,7 +97,7 @@ def test_a_slow_save_holds_up_neither_start_nor_heartbeats(tmp_path, monkeypatch
     asyncio.run(run())
 
 
-# S8: a call from another thread reaches the core on the loop's thread, never on its own.
+# A call from another thread reaches the core on the loop's thread, never on its own.
 def test_calls_from_another_thread_step_the_core_on_the_loop(monkeypatch) -> None:
     threads: set[int] = set()
     real = Core.step

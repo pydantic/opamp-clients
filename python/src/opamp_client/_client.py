@@ -12,6 +12,7 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields
+from typing import Any
 
 import aiohttp
 
@@ -196,6 +197,11 @@ class Notification:
     error: BaseException | None = None
 
 
+#: Once the core has stopped, at least this for what it gave up on to unwind (a download's file
+#: deleted once the write in flight is over, a cancelled request's task ended), however much of
+#: the stop timeout the core took: stop returns within stop_timeout_ms and this.
+STOP_GRACE_S = 1.0
+
 # The inputs that report an effect's outcome, each naming the effect by its id.
 _RESULTS = frozenset({"http_response", "http_failed", "ws_opened", "ws_failed", "ws_message", "ws_closed", "ws_lost",
                       "stored", "store_failed", "downloaded", "download_failed", "download_response"})
@@ -258,7 +264,7 @@ class Client:
     :meth:`stop` awaited on any loop (on another, it is carried out on the client's)."""
 
     def __init__(self, config: Config, status: Status, notify: Callable[[Notification], None] | None,
-                 _token: object, _core_module: bytes | None = None, _files: Files | None = None,
+                 _token: object, _core_engine: Any = None, _files: Files | None = None,
                  _sessions: Callable[[str], aiohttp.ClientSession] | None = None) -> None:
         if _token is not _START:
             raise TypeError("use Client.start")
@@ -299,7 +305,7 @@ class Client:
             streams=rust,
             splice_downloads=rust and config.rust_splice,
             proxy=proxy_choice(transport) if rust else None,
-        ), _module=_core_module)
+        ), _engine=_core_engine)
         # All of stop takes the core's stop timeout, as given or by default: its start reports it.
         self._stop_timeout = (self._core.limits.stop_timeout_ms if self._core.limits else 0) / 1000
         self._stop_called: float | None = None  # when stop() was first called (the loop's clock)
@@ -340,21 +346,30 @@ class Client:
     @classmethod
     def start(cls, config: Config, status: Status,
               notify: Callable[[Notification], None] | None = None, *,
-              _core_module: bytes | None = None, _files: Files | None = None,
+              _core_engine: Any = None, _files: Files | None = None,
               _sessions: Callable[[str], aiohttp.ClientSession] | None = None) -> Client:
         """Start a client on the running event loop. `notify` is called for every notification,
         on the loop, never before `start` returns (a saved remote config is handed over at start):
         keep it quick. TLS or proxy settings that can't work raise here: ValueError, or OSError
         and ssl.SSLError for files and PEM that can't be loaded."""
-        # Tests only: _core_module, another module with the core's ABI (the adversary); _files, a
+        # Tests only: _core_engine, run instead of the native core (the adversary); _files, a
         # file system standing in for the real one; _sessions (Executor's).
-        return cls(config, status, notify, _START, _core_module, _files, _sessions)
+        return cls(config, status, notify, _START, _core_engine, _files, _sessions)
 
     @property
     def instance_uid(self) -> bytes:
         """The instance UID in use: the application's, one saved before a restart, one the core
         made, or one the server assigned (``instance_uid_changed`` tells of a new one)."""
         return self._core.instance_uid
+
+    @property
+    def endpoint(self) -> str | None:
+        """The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
+        went, which after the server moved the agent (an offer of connection settings) is the
+        offered one, or the configured one again once an offer failed. None before any outcome,
+        and in Rust mode, where the core makes the requests itself (the configured one is all
+        there is to name then). The URL is as the core gave it: redact it before logging."""
+        return None if self._streams is not None else self._x.used
 
     def _release(self) -> None:
         """Deliver what came while starting, now that the caller has the client."""
@@ -535,12 +550,22 @@ class Client:
 
         async def finish() -> None:
             # The core has already waited for the goodbye: anything left is dropped. All of stop
-            # takes stop_timeout: what the core took of it (from stop()) is not given again.
-            begun = self._loop.time() if self._stop_called is None else self._stop_called
-            await self._x.close(max(0.0, begun + self._stop_timeout - self._loop.time()))
+            # takes stop_timeout: what the core took of it (from stop()) is not given again, but
+            # for STOP_GRACE_S at least for what was given up on to unwind (RULE-SHELL-07: it is
+            # released, the deletion of a download's file included, by the time stop returns). A
+            # core that takes all of its stop timeout and then says stopped with a download's file
+            # still being written leaves the shell to delete it: given nothing, it was deleted
+            # after stop had returned.
+            loop = self._loop
+            begun = loop.time() if self._stop_called is None else self._stop_called
+            left = begun + self._stop_timeout - loop.time()
+            released_by = loop.time() + max(left, STOP_GRACE_S)
+            # A save still writing lands whole whenever it does: waited for within the stop
+            # timeout only.
+            await self._x.close(max(0.0, left), release=released_by - loop.time())
             # Rust mode: files still being written are deleted once their write in flight is over.
             if self._streams is not None:
-                await self._streams.shutdown(max(0.0, begun + self._stop_timeout - self._loop.time()))
+                await self._streams.shutdown(max(0.0, released_by - loop.time()))
             if not self._done.done():
                 if err is None:
                     self._done.set_result(None)

@@ -272,8 +272,12 @@ const EMPTY = create(EmptySchema);
 
 /** The longest delay a Node timer takes (setTimeout takes a longer one as 1 ms). */
 const MAX_DELAY_MS = 2 ** 31 - 1;
-/** Once the core has stopped, at least this for what it gave up on to unwind. */
-const STOP_GRACE_MS = 250;
+/** Once the core has stopped, at least this for what it gave up on to unwind (a download's file
+ * deleted once the write in flight is over), however much of the stop timeout the core took: stop
+ * returns within the stop timeout and this. 250 ms was too little on a loaded machine: a core that
+ * took all of its stop timeout and then stopped with a file being written left the file to be
+ * deleted after stop had returned (measured: up to 1.1 s on one CPU shared with 28 processes). */
+const STOP_GRACE_MS = 1000;
 
 /** Effects that open something new: a connection, a download, a stream. */
 const STARTS = new Set(["wsOpen", "download", "streamOpen"]);
@@ -502,6 +506,15 @@ export class Client {
     return uid && uid.length === 16 ? uid.slice() : undefined;
   }
 
+  /** The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
+   * went, which after the server moved the agent (an offer of connection settings) is the offered
+   * one, or the configured one again once an offer failed. Undefined before any outcome, and in
+   * Rust mode, where the core makes the requests itself (the configured one is all there is to
+   * name then). The URL is as the core gave it: redact it before logging. */
+  get endpoint(): string | undefined {
+    return this.#streams === undefined ? this.#x?.used : undefined;
+  }
+
   /** Send agent_disconnect if a message can still be sent, then stop. Stop is the application's
    * work: from here until the client has stopped (within the stop timeout) it does keep Node.js
    * running, so a program that ends by awaiting stop() says its goodbye first. (The client's own
@@ -632,10 +645,12 @@ export class Client {
     const core = this.#core;
     // All of stop takes one stop timeout from stop() (RULE-SHELL-07).
     const begun = this.#stopAt ?? this.#now();
-    const left = () => Math.max(STOP_GRACE_MS, begun + this.#stopMs - this.#now());
+    // One deadline for all of it: the grace is given once, not to each part.
+    const releasedBy = Math.max(begun + this.#stopMs, this.#now() + STOP_GRACE_MS);
+    const left = () => Math.max(0, releasedBy - this.#now());
     void (async () => {
       // Whatever is still under way (the client stopped on its own) is given up on; downloads
-      // given up on have deleted what they wrote (S3), or the bound has passed.
+      // given up on have deleted what they wrote, or the bound has passed.
       await x?.shutdown(left());
       // Rust mode: files still being written are deleted once their write in flight is over.
       await this.#streams?.shutdown(left());

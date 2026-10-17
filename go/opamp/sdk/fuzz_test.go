@@ -30,11 +30,13 @@ var (
 // exactly what it applied, saved when the host can keep state, a config whose save fails is
 // FAILED, and a FAILED one changes nothing.
 func FuzzSettingsLayer(f *testing.F) {
-	f.Add([]byte(`{"send_logs":"false"}`), []byte(`{"sampling_rate":"0.25"}`), "application/json", byte(1))
-	f.Add([]byte(`not json`), []byte(`{"sampling_rate":"x"}`), "application/json", byte(0))
-	f.Add([]byte{}, []byte(`{"deactivate_instrumentations":"otelhttp,grpc","opamp_polling_interval":"30s"}`), "", byte(3))
-	f.Add([]byte(`{"deactivate_all_instrumentations":"true","unknown":"1"}`), []byte(`{}`), "text/yaml", byte(7))
-	f.Add([]byte(`{"sampling_rate":1e309}`), []byte(`{"send_traces":true,"send_metrics":"maybe"}`), "application/json", byte(2))
+	f.Add([]byte(v1("signal_exports", logsOff)), []byte(v1("head_sampling", override(`"ratio":0.25`))), "application/json", byte(1))
+	f.Add([]byte(`not json`), []byte(v1("head_sampling", override(`"ratio":"x"`))), "application/json", byte(0))
+	f.Add([]byte{}, []byte(every("instrumentations", override(`"disabled":["otelhttp","grpc"]`))), "", byte(3))
+	f.Add([]byte(every("instrumentations", override(`"all_disabled":true`))), []byte(`{}`), "text/yaml", byte(7))
+	f.Add([]byte(`{"schema":"logfire-sdk-policy/v1","head_sampling":{"mode":"override","ratio":1e309}}`),
+		[]byte(every("signal_exports", `{"traces":{"mode":"override","enabled":true},"metrics":{"mode":"override","enabled":"maybe"},"logs":{"mode":"local"}}`)),
+		"application/json", byte(2))
 	f.Fuzz(func(t *testing.T, saved, body []byte, contentType string, flags byte) {
 		fuzzLayerOnce.Do(func() { fuzzLayer, fuzzLayerErr = New(context.Background()) })
 		if fuzzLayerErr != nil {
@@ -48,7 +50,7 @@ func FuzzSettingsLayer(f *testing.F) {
 		if flags&4 != 0 {
 			// Neither deactivate_all_instrumentations nor send_metrics declared.
 			host.Live = slices.DeleteFunc(slices.Clone(host.Live), func(k string) bool { return k == "send_metrics" })
-			host.NextStart = []string{"deactivate_instrumentations", "opamp_polling_interval"}
+			host.NextStart = []string{"deactivate_instrumentations"}
 		}
 		// flags&1: the host keeps state; flags&8: its save fails.
 		var asked []byte
@@ -78,7 +80,7 @@ func FuzzSettingsLayer(f *testing.F) {
 		// A remote config comes decoded, from the core: its strings are UTF-8.
 		contentType = strings.ToValidUTF8(contentType, "\uFFFD")
 		config := &protobufs.AgentRemoteConfig{ConfigHash: []byte("h"), Config: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigObject{"elastic": {Body: body, ContentType: contentType}}}}
+			ConfigMap: map[string]*protobufs.AgentConfigObject{policyFile: {Body: body, ContentType: contentType}}}}
 		d, err := l.Decide(ctx, config, loaded.GetCurrent(), loaded.GetCurrent(), host, save)
 		if err != nil {
 			t.Fatalf("decide %q: %v", body, err)

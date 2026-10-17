@@ -21,7 +21,7 @@
   taken to have one worker each (the loop's own has; so has the client's writer): while an
   executor's job sleeps, the jobs queued behind it wait too, and don't hold the clock;
 - **owns everything**: ``call_soon``, ``call_at`` and ``create_task`` from any thread but the
-  loop's are recorded in ``wrong_thread`` (a call that should have been marshalled, known bug S8).
+  loop's are recorded in ``wrong_thread`` (a call that should have been marshalled to the loop).
 
 Given the same seed and the same inputs, a run is the same run: the seed is all a failure needs
 to replay (with the test's own steps).

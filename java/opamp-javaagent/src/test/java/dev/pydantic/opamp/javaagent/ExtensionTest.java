@@ -3,6 +3,12 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import static dev.pydantic.opamp.javaagent.Vectors.every;
+import static dev.pydantic.opamp.javaagent.Vectors.exports;
+import static dev.pydantic.opamp.javaagent.Vectors.full;
+import static dev.pydantic.opamp.javaagent.Vectors.override;
+import static dev.pydantic.opamp.javaagent.Vectors.sorted;
+import static dev.pydantic.opamp.javaagent.Vectors.v1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -42,14 +48,14 @@ class ExtensionTest {
         .setConfigHash(ByteString.copyFromUtf8(key + body)).build();
   }
 
-  static String effective(Extension e) {
-    return e.effective().getConfigMap().getConfigMapMap().get("elastic").getBody().toString(StandardCharsets.UTF_8);
+  /** A remote config with the policy {@code body} as its only file. */
+  static Opamp.AgentRemoteConfig config(String body) {
+    return config(Vectors.POLICY_FILE, body);
   }
 
-  /** What the effective config names as set aside (its elastic.set_aside entry): "null" without one. */
-  static String setAside(Extension e) {
-    var f = e.effective().getConfigMap().getConfigMapMap().get("elastic.set_aside");
-    return f == null ? "null" : f.getBody().toString(StandardCharsets.UTF_8);
+  /** The policy the extension's effective config reports: the test fails if it holds another file. */
+  static String effective(Extension e) {
+    return Vectors.effective(e.effective());
   }
 
   static Extension.Setup setup(Path dir) {
@@ -59,23 +65,25 @@ class ExtensionTest {
   @Test
   void liveSettingsAreAppliedAtOnceAndAnsweredWithTheConfigsHash(@TempDir Path dir) throws Exception {
     Extension e = Extension.forTest(setup(dir));
-    Opamp.AgentRemoteConfig c = config("elastic", "{\"sampling_rate\":\"0.5\",\"send_logs\":\"false\"}");
+    String doc = v1("head_sampling", override("\"ratio\":0.5"), "signal_exports", exports("", "", "off"));
+    Opamp.AgentRemoteConfig c = config(doc);
     Opamp.RemoteConfigStatus s = e.remoteConfig(c);
     assertEquals(APPLIED, s.getStatus());
     assertEquals(c.getConfigHash(), s.getLastRemoteConfigHash());
     assertFalse(e.controls.gates.sendLogs());
-    assertEquals("{\"sampling_rate\":\"0.5\",\"send_logs\":\"false\"}", effective(e));
+    assertEquals(full(doc), effective(e));
     // The client keeps the config applied, in its own state: nothing of the agent's own.
     assertFalse(Files.exists(dir.resolve("sdk-settings.json")));
   }
 
   @Test
-  void aLogLevelIsAppliedAtOnceAndReportedByItsLowercaseName(@TempDir Path dir) {
+  void aLogLevelIsAppliedAtOnceAndReported(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    assertEquals(APPLIED, e.remoteConfig(config("elastic", "{\"send_logs_level\":\"WARNING\"}")).getStatus());
+    String doc = every("log_levels", override("\"level\":\"warn\""));
+    assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(13, e.controls.gates.logLevels().min());
-    assertEquals("{\"send_logs_level\":\"warn\"}", effective(e));
-    e.remoteConfig(config("elastic", "{}"));
+    assertEquals(sorted(doc), effective(e));
+    e.remoteConfig(config(every()));
     assertEquals(0, e.controls.gates.logLevels().min());
   }
 
@@ -83,19 +91,20 @@ class ExtensionTest {
   void levelsPerScopeAreDeclaredAppliedAtOnceAndReportedSorted(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().contains("send_logs_level_by_scope"));
     Extension e = Extension.forTest(setup(dir));
-    assertEquals(APPLIED, e.remoteConfig(config("elastic",
-        "{\"send_logs_level_by_scope\":\"noisy.lib=OFF, com.acme.db*=debug, com.acme.db=Warning\"}")).getStatus());
+    String doc = every("log_levels",
+        override("\"scopes\":{\"noisy.lib\":\"off\",\"com.acme.db*\":\"debug\",\"com.acme.db\":\"warn\"}"));
+    assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     // As the layer sorts them for matching: the longest name first, an exact name before its prefix.
     assertEquals(List.of("com.acme.db", "com.acme.db*", "noisy.lib"),
         e.controls.gates.logLevels().byScope().stream().map(l -> l.getPattern()).toList());
-    assertEquals("{\"send_logs_level_by_scope\":\"com.acme.db=warn,com.acme.db*=debug,noisy.lib=off\"}", effective(e));
-    // A level that isn't one: FAILED, naming the setting, and the levels stay.
-    Opamp.RemoteConfigStatus bad = e.remoteConfig(config("elastic", "{\"send_logs_level_by_scope\":\"a=loud\"}"));
+    assertEquals(sorted(doc), effective(e));
+    // A level that is not one: FAILED, naming the control, and the levels stay.
+    Opamp.RemoteConfigStatus bad = e.remoteConfig(config(every("log_levels", override("\"scopes\":{\"a\":\"loud\"}"))));
     assertEquals(FAILED, bad.getStatus());
-    assertTrue(bad.getErrorMessage().startsWith("send_logs_level_by_scope:"), bad.getErrorMessage());
+    assertTrue(bad.getErrorMessage().startsWith("log_levels:"), bad.getErrorMessage());
     assertEquals(3, e.controls.gates.logLevels().byScope().size());
-    // Left out: none.
-    e.remoteConfig(config("elastic", "{}"));
+    // Local: none.
+    e.remoteConfig(config(every()));
     assertFalse(e.controls.gates.logLevels().any());
   }
 
@@ -103,14 +112,15 @@ class ExtensionTest {
   void theLogCapIsDeclaredAppliedAtOnceAndZeroIsRefused(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().contains("send_logs_per_second"));
     Extension e = Extension.forTest(setup(dir));
-    assertEquals(APPLIED, e.remoteConfig(config("elastic", "{\"send_logs_per_second\":\"0.5\"}")).getStatus());
+    String doc = every("log_rate_limit", override("\"records_per_second\":0.5"));
+    assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(0.5, e.controls.gates.logCap().perSecond);
-    assertEquals("{\"send_logs_per_second\":\"0.5\"}", effective(e));
-    Opamp.RemoteConfigStatus zero = e.remoteConfig(config("elastic", "{\"send_logs_per_second\":\"0\"}"));
+    assertEquals(sorted(doc), effective(e));
+    Opamp.RemoteConfigStatus zero = e.remoteConfig(config(every("log_rate_limit", override("\"records_per_second\":0"))));
     assertEquals(FAILED, zero.getStatus());
-    assertTrue(zero.getErrorMessage().contains("send_logs false"), zero.getErrorMessage());
+    assertTrue(zero.getErrorMessage().startsWith("log_rate_limit:"), zero.getErrorMessage());
     assertEquals(0.5, e.controls.gates.logCap().perSecond);
-    e.remoteConfig(config("elastic", "{}"));
+    e.remoteConfig(config(every()));
     assertEquals(null, e.controls.gates.logCap());
   }
 
@@ -118,11 +128,12 @@ class ExtensionTest {
   void redactionIsDeclaredAppliedAtOnceAndReportedLowercaseAndSorted(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().containsAll(List.of("drop_attributes", "mask_attributes")));
     Extension e = Extension.forTest(setup(dir));
-    assertEquals(APPLIED, e.remoteConfig(config("elastic",
-        "{\"drop_attributes\":\"Cookie, Authorization, cookie\",\"mask_attributes\":\"*Token*\"}")).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(every("attribute_redaction",
+        override("\"drop\":[\"Cookie\",\"Authorization\",\"cookie\"],\"mask\":[\"*Token*\"]")))).getStatus());
     assertTrue(e.controls.gates.redaction().any());
-    assertEquals("{\"drop_attributes\":\"authorization,cookie\",\"mask_attributes\":\"*token*\"}", effective(e));
-    e.remoteConfig(config("elastic", "{\"drop_attributes\":\" , \"}"));
+    assertEquals(sorted(every("attribute_redaction",
+        override("\"drop\":[\"authorization\",\"cookie\"],\"mask\":[\"*token*\"]"))), effective(e));
+    e.remoteConfig(config(every()));
     assertFalse(e.controls.gates.redaction().any());
   }
 
@@ -130,19 +141,20 @@ class ExtensionTest {
   void samplingRulesAndTheTraceCapAreDeclaredAppliedAtOnceAndReportedCanonically(@TempDir Path dir) {
     assertTrue(Extension.HOST.getLiveList().containsAll(List.of("sampling_rules", "sampling_traces_per_second")));
     Extension e = Extension.forTest(setup(dir));
-    // Sent in a string, as a server that only sends strings does.
-    assertEquals(APPLIED, e.remoteConfig(config("elastic", "{\"sampling_rules\":\"[{\\\"path\\\": \\\"/health*\\\", "
-        + "\\\"rate\\\": 0.0, \\\"kind\\\": \\\"SERVER\\\"}]\",\"sampling_traces_per_second\":\"50\"}")).getStatus());
+    String doc = every("sampling_rules", override("\"rules\":[{\"path\":\"/health*\",\"rate\":0.0,\"kind\":\"server\"}]"),
+        "trace_rate_limit", override("\"traces_per_second\":50"));
+    assertEquals(APPLIED, e.remoteConfig(config(doc)).getStatus());
     assertEquals(50.0, e.controls.sampler.cap().perSecond);
-    assertEquals("{\"sampling_rules\":\"[{\\\"kind\\\":\\\"server\\\",\\\"path\\\":\\\"/health*\\\",\\\"rate\\\":0}]\","
-        + "\"sampling_traces_per_second\":\"50\"}", effective(e));
-    // route isn't a matcher: FAILED, naming the rule, and nothing changes.
-    Opamp.RemoteConfigStatus route = e.remoteConfig(config("elastic",
-        "{\"sampling_rules\":[{\"rate\":1},{\"rate\":0,\"route\":\"/users/:id\"}]}"));
+    assertEquals(sorted(every("sampling_rules", override("\"rules\":[{\"kind\":\"server\",\"path\":\"/health*\",\"rate\":0}]"),
+        "trace_rate_limit", override("\"traces_per_second\":50"))), effective(e));
+    // route is not a matcher: FAILED, naming the rule, and nothing changes.
+    Opamp.RemoteConfigStatus route = e.remoteConfig(config(every("sampling_rules",
+        override("\"rules\":[{\"rate\":1},{\"rate\":0,\"route\":\"/users/:id\"}]"))));
     assertEquals(FAILED, route.getStatus());
-    assertTrue(route.getErrorMessage().startsWith("sampling_rules[1].route:"), route.getErrorMessage());
+    assertTrue(route.getErrorMessage().startsWith("sampling_rules:") && route.getErrorMessage().contains("route"),
+        route.getErrorMessage());
     assertEquals(50.0, e.controls.sampler.cap().perSecond);
-    e.remoteConfig(config("elastic", "{}"));
+    e.remoteConfig(config(every()));
     assertEquals(null, e.controls.sampler.cap());
   }
 
@@ -183,7 +195,7 @@ class ExtensionTest {
                   e = Extension.forTest(setup(canSave ? dir : null));
                   e.wallClock = () -> now[0];
                 }
-                Opamp.RemoteConfigStatus st = e.remoteConfig(config("elastic", step.get("document").asText()));
+                Opamp.RemoteConfigStatus st = e.remoteConfig(config(step.get("document").asText()));
                 if (st.getStatus() == APPLIED && canSave) {
                   Kept.keepApplied(dir, step.get("document").asText()); // as the client does, before APPLIED goes out
                 }
@@ -208,10 +220,7 @@ class ExtensionTest {
               assertEquals(want.get("refresh_at_unix_ms").asLong(), e.armedForTest()[1], step.toString());
             }
             if (want.has("effective")) {
-              assertEquals(want.get("effective"), Vectors.JSON.readTree(effective(e)), step.toString());
-            }
-            if (want.has("set_aside")) {
-              assertEquals(want.get("set_aside"), Vectors.JSON.readTree(setAside(e)), step.toString());
+              assertEquals(want.get("effective").asText(), effective(e), step.toString());
             }
           }
           e.refresh(0); // disarm
@@ -224,10 +233,12 @@ class ExtensionTest {
         "debug_send_logs_level")));
     Extension e = Extension.forTest(setup(dir));
     e.wallClock = () -> Vectors.NOW;
-    assertEquals(APPLIED, e.remoteConfig(config("elastic", "{\"sampling_rate\":\"0.01\",\"sampling_rules\":"
-        + "[{\"rate\":0,\"name\":\"GET\"}],\"send_logs_level\":\"error\",\"send_logs_level_by_scope\":\"noisy=off\","
-        + "\"send_logs_per_second\":\"100\",\"sampling_traces_per_second\":\"10\",\"mask_attributes\":\"user.*\","
-        + "\"debug_until\":\"2026-10-14T12:30:00Z\",\"debug_sampling_rate\":\"0.5\"}")).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.01"),
+        "sampling_rules", override("\"rules\":[{\"rate\":0,\"name\":\"GET\"}]"),
+        "log_levels", override("\"level\":\"error\",\"scopes\":{\"noisy\":\"off\"}"),
+        "log_rate_limit", override("\"records_per_second\":100"), "trace_rate_limit", override("\"traces_per_second\":10"),
+        "attribute_redaction", override("\"mask\":[\"user.*\"]"),
+        "debug", override("\"until\":\"2026-10-14T12:30:00Z\",\"sampling_ratio\":0.5")))).getStatus());
     // The debug rate in place of the rate and the rules, the debug level in place of the levels.
     var root = io.opentelemetry.api.trace.SpanContext.getInvalid();
     var d = e.controls.sampler.decide(root, "GET", io.opentelemetry.api.trace.SpanKind.SERVER,
@@ -241,7 +252,7 @@ class ExtensionTest {
     assertTrue(e.controls.gates.redaction().any());
     assertEquals(Vectors.NOW + 30 * 60_000, e.armedForTest()[1]);
 
-    // The timer ends it: the rules and levels again, reported without debug_until.
+    // The timer ends it: the rules and levels again, reported without the debug window.
     long[] armed = e.armedForTest();
     e.fire(armed[0], armed[1]);
     d = e.controls.sampler.decide(root, "GET", io.opentelemetry.api.trace.SpanKind.SERVER,
@@ -250,7 +261,7 @@ class ExtensionTest {
     assertEquals(0, d.rule());
     assertEquals(17, e.controls.gates.logLevels().min());
     assertEquals(0, e.armedForTest()[1]);
-    assertFalse(effective(e).contains("debug_until"), effective(e));
+    assertFalse(effective(e).contains("until"), effective(e));
   }
 
   @Test
@@ -258,20 +269,25 @@ class ExtensionTest {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
     e.wallClock = () -> now[0];
-    e.remoteConfig(config("elastic", "{\"debug_until\":\"2026-10-14T12:10:00Z\"}"));
+    e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-14T12:10:00Z\""))));
     long[] stale = e.armedForTest();
     // A newer window, sent before the first ends.
-    e.remoteConfig(config("elastic", "{\"debug_until\":\"2026-10-14T12:20:00Z\",\"sampling_rate\":\"0.1\"}"));
+    e.remoteConfig(config(debugWindow("0.1", "2026-10-14T12:20:00Z")));
     now[0] = Vectors.NOW + 10 * 60_000;
     e.fire(stale[0], stale[1]);
     assertEquals(1.0, e.inForce().getSamplingRate());
-    assertTrue(effective(e).contains("debug_until"));
+    assertTrue(effective(e).contains("\"until\":\"2026-10-14T12:20:00Z\""), effective(e));
     // Its own timer ends it, even if the wall clock went back meanwhile: the time waited counts.
     now[0] = Vectors.NOW;
     long[] armed = e.armedForTest();
     e.fire(armed[0], armed[1]);
     assertEquals(0.1, e.inForce().getSamplingRate());
-    assertEquals("{\"sampling_rate\":\"0.1\"}", effective(e));
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(e));
+  }
+
+  /** A policy with the head sampling ratio and debug mode until the given time. */
+  static String debugWindow(String ratio, String until) {
+    return every("head_sampling", override("\"ratio\":" + ratio), "debug", override("\"until\":\"" + until + "\""));
   }
 
   /**
@@ -284,11 +300,11 @@ class ExtensionTest {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
     e.wallClock = () -> now[0];
-    e.remoteConfig(config("elastic", "{\"sampling_rate\":\"0.1\",\"debug_until\":\"2026-10-14T12:10:00Z\"}"));
+    e.remoteConfig(config(debugWindow("0.1", "2026-10-14T12:10:00Z")));
     assertEquals(1.0, e.inForce().getSamplingRate());
     now[0] = Vectors.NOW + 25 * 60_000;
-    assertEquals(FAILED, e.remoteConfig(config("elastic", "{\"sampling_rate\":\"7\"}")).getStatus());
-    assertEquals("{\"sampling_rate\":\"0.1\"}", effective(e));
+    assertEquals(FAILED, e.remoteConfig(config(v1("head_sampling", override("\"ratio\":7")))).getStatus());
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(e));
     assertEquals(0.1, e.inForce().getSamplingRate());
     assertEquals(0, e.armedForTest()[1]);
   }
@@ -297,7 +313,7 @@ class ExtensionTest {
   void aWindowMoreThanADayAheadIsRefused(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     e.wallClock = () -> Vectors.NOW;
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config("elastic", "{\"debug_until\":\"2026-10-17T00:00:00Z\"}"));
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-17T00:00:00Z\""))));
     assertEquals(FAILED, s.getStatus());
     assertTrue(s.getErrorMessage().contains("24h"), s.getErrorMessage());
     assertEquals(0, e.armedForTest()[1]);
@@ -307,15 +323,14 @@ class ExtensionTest {
   void debugModeEndsOnItsOwnOnTheRealClock(@TempDir Path dir) throws Exception {
     Extension e = Extension.forTest(setup(dir));
     String until = java.time.Instant.ofEpochMilli(System.currentTimeMillis() + 1500).toString();
-    assertEquals(APPLIED, e.remoteConfig(config("elastic",
-        "{\"sampling_rate\":\"0.2\",\"debug_until\":\"" + until + "\"}")).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(debugWindow("0.2", until))).getStatus());
     assertEquals(1.0, e.inForce().getSamplingRate());
     long deadline = System.nanoTime() + 10_000_000_000L;
     while (e.inForce().getSamplingRate() != 0.2 && System.nanoTime() < deadline) {
       Thread.sleep(50);
     }
     assertEquals(0.2, e.inForce().getSamplingRate());
-    assertEquals("{\"sampling_rate\":\"0.2\"}", effective(e));
+    assertEquals(sorted(every("head_sampling", override("\"ratio\":0.2"))), effective(e));
   }
 
   /** health.json, through the extension's health step: what it sends, and the agent health it sends it in. */
@@ -339,7 +354,7 @@ class ExtensionTest {
                 default -> counts.setLogs(sc);
               }
             }
-            var settings = Vectors.settings(step.has("settings") ? step.get("settings").toString() : "{}", Vectors.NOW);
+            var settings = Vectors.settings(step.has("settings") ? step.get("settings").toString() : v1(), Vectors.NOW);
             Opamp.ComponentHealth before = e.health();
             Opamp.ComponentHealth sent = e.health(counts.build(), settings, step.get("now_unix_ms").asLong());
             var want = step.get("want");
@@ -414,8 +429,8 @@ class ExtensionTest {
     exporter.next = io.opentelemetry.sdk.common.CompletableResultCode.ofSuccess();
     gate.export(List.of(span));
     assertEquals("ok", tick.get().getComponentHealthMapMap().get("exporters").getStatus());
-    // send_traces false: off, not failing.
-    e.remoteConfig(config("elastic", "{\"send_traces\":\"false\"}"));
+    // The traces export switched off: off, not failing.
+    e.remoteConfig(config(v1("signal_exports", exports("off", "", ""))));
     assertEquals("off", tick.get().getComponentHealthMapMap().get("exporters").getComponentHealthMapMap()
         .get("traces").getStatus());
   }
@@ -435,62 +450,94 @@ class ExtensionTest {
   @Test
   void aWrongConfigIsFailedAndChangesNothing(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    e.remoteConfig(config("elastic", "{\"send_traces\":\"false\"}"));
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config("elastic", "{\"send_traces\":\"true\",\"sampling_rate\":\"2\"}"));
+    String off = v1("signal_exports", exports("off", "", ""));
+    e.remoteConfig(config(off));
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(v1("head_sampling", override("\"ratio\":2"),
+        "signal_exports", exports("on", "", ""))));
     assertEquals(FAILED, s.getStatus());
-    assertTrue(s.getErrorMessage().startsWith("sampling_rate:"), s.getErrorMessage());
+    assertTrue(s.getErrorMessage().startsWith("head_sampling:"), s.getErrorMessage());
     assertFalse(e.controls.gates.sendTraces());
-    assertEquals("{\"send_traces\":\"false\"}", effective(e));
+    assertEquals(full(off), effective(e));
   }
 
   @Test
-  void noSettingsEntryMeansTheAgentsOwnValues(@TempDir Path dir) {
+  void aConfigWithoutAPolicyIsFailedAndEveryControlLocalIsTheAgentsOwnValues(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    e.remoteConfig(config("elastic", "{\"send_traces\":\"false\"}"));
-    assertEquals(APPLIED, e.remoteConfig(config(null, "")).getStatus());
+    String off = v1("signal_exports", exports("off", "", ""));
+    e.remoteConfig(config(off));
+    Opamp.RemoteConfigStatus none = e.remoteConfig(config(null, ""));
+    assertEquals(FAILED, none.getStatus());
+    assertTrue(none.getErrorMessage().startsWith("config_map:"), none.getErrorMessage());
+    assertFalse(e.controls.gates.sendTraces());
+    assertEquals(full(off), effective(e));
+    assertEquals(APPLIED, e.remoteConfig(config(v1())).getStatus());
     assertTrue(e.controls.gates.sendTraces());
-    assertEquals("{}", effective(e));
+    assertEquals(full(v1()), effective(e));
+  }
+
+  /** An override the agent does not carry out is refused, saying which, and changes nothing. */
+  @Test
+  void anOverrideTheAgentDoesNotCarryOutIsFailed(@TempDir Path dir) {
+    Extension e = Extension.forTest(setup(dir));
+    // Without the bridge to the application's settings, the agent does not declare custom.
+    String values = every("app_settings", override("\"values\":{\"a\":\"1\"}"));
+    if (!e.host().getLiveList().contains("custom")) {
+      Opamp.RemoteConfigStatus s = e.remoteConfig(config(values));
+      assertEquals(FAILED, s.getStatus());
+      assertEquals("app_settings: values: this SDK cannot apply the requested override", s.getErrorMessage());
+    }
+    // Where the metrics exporter passes no gate of the agent's, the metrics switch is refused.
+    Extension ungated = Extension.forTest(setup(dir));
+    ungated.notGated(java.util.Set.of("metrics"));
+    Opamp.RemoteConfigStatus s = ungated.remoteConfig(config(v1("signal_exports", exports("", "off", ""))));
+    assertEquals(FAILED, s.getStatus());
+    assertEquals("signal_exports.metrics: this SDK cannot apply the requested override", s.getErrorMessage());
+    assertTrue(ungated.controls.gates.sendMetrics());
+    assertEquals(full(v1()), effective(ungated));
   }
 
   @Test
   void nextStartSettingsWaitForTheRestartAndShowAsPendingUntilThen(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config("elastic", "{\"deactivate_instrumentations\":\"jdbc\"}"));
+    String doc = every("instrumentations", override("\"disabled\":[\"jdbc\"]"));
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(doc));
     assertEquals(APPLIED, s.getStatus());
     // Not in force yet: the effective config still has the agent's own.
-    assertEquals("{}", effective(e));
-    Kept.keepApplied(dir, "{\"deactivate_instrumentations\":\"jdbc\"}"); // as the client does, before APPLIED goes out
+    assertEquals(sorted(every()), effective(e));
+    Kept.keepApplied(dir, doc); // as the client does, before APPLIED goes out
 
     // The next start reads them, as agent properties, and they are in force.
     Extension next = Extension.forTest(null);
     Map<String, String> props = next.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
     assertEquals(Map.of("otel.instrumentation.jdbc.enabled", "false"), props);
-    assertEquals("{\"deactivate_instrumentations\":\"jdbc\"}", effective(next));
+    assertEquals(sorted(doc), effective(next));
   }
 
   @Test
   void withoutAStateDirectoryNextStartSettingsAreFailed() {
     Extension e = Extension.forTest(setup(null));
-    Opamp.RemoteConfigStatus s = e.remoteConfig(config("elastic", "{\"sampling_rate\":\"0.5\",\"deactivate_all_instrumentations\":\"true\"}"));
+    Opamp.RemoteConfigStatus s = e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.5"),
+        "instrumentations", override("\"all_disabled\":true"))));
     assertEquals(FAILED, s.getStatus());
-    assertTrue(s.getErrorMessage().contains("take effect at the next start"), s.getErrorMessage());
+    assertEquals("instrumentations: takes effect at the next start, which needs somewhere to keep state",
+        s.getErrorMessage());
     // Nothing of it applied, the live setting included.
-    assertEquals("{}", effective(e));
+    assertEquals(full(v1()), effective(e));
     // Live settings alone are fine.
-    assertEquals(APPLIED, e.remoteConfig(config("elastic", "{\"sampling_rate\":\"0.5\"}")).getStatus());
+    assertEquals(APPLIED, e.remoteConfig(config(v1("head_sampling", override("\"ratio\":0.5")))).getStatus());
   }
 
   @Test
   void theSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore(@TempDir Path dir) throws Exception {
     // Kept before the client kept the config applied (an earlier release): it carries over.
-    Files.writeString(dir.resolve("sdk-settings.json"), "{\"sampling_rate\":\"0.25\"}");
+    Files.writeString(dir.resolve("sdk-settings.json"), v1("head_sampling", override("\"ratio\":0.25")));
     assertEquals(0.25, startedIn(dir).inForce().getSamplingRate());
     // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
-    Kept.keepApplied(dir, "{\"sampling_rate\":\"0.5\"}");
+    Kept.keepApplied(dir, v1("head_sampling", override("\"ratio\":0.5")));
     assertEquals(0.5, startedIn(dir).inForce().getSamplingRate());
-    // A config applied with no settings entry: every setting the SDK's own, not the old file's.
-    Kept.keepApplied(dir, "{}");
+    // A config applied with every control local: every setting the SDK's own, not the old file's.
+    Kept.keepApplied(dir, v1());
     assertFalse(startedIn(dir).inForce().hasSamplingRate());
     // A client state that doesn't read: the old file again.
     Files.write(dir.resolve("opamp-state"), new byte[] {(byte) 0xff, (byte) 0xff});
@@ -506,12 +553,13 @@ class ExtensionTest {
 
   @Test
   void savedSettingsAreInForceFromTheStart(@TempDir Path dir) throws Exception {
-    Kept.keepApplied(dir, "{\"send_metrics\":\"false\",\"sampling_rate\":\"0\"}");
+    String doc = v1("head_sampling", override("\"ratio\":0.0"), "signal_exports", exports("", "off", ""));
+    Kept.keepApplied(dir, doc);
     Extension e = Extension.forTest(null);
     e.properties(DefaultConfigProperties.createFromMap(
         Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", dir.toString())));
     assertFalse(e.controls.gates.sendMetrics());
-    assertEquals("{\"sampling_rate\":\"0\",\"send_metrics\":\"false\"}", effective(e));
+    assertEquals(full(doc), effective(e));
   }
 
   @Test
@@ -591,7 +639,7 @@ class ExtensionTest {
     // The agent saves nothing: the client keeps the config applied with its state, and until that
     // save lands the server hears APPLYING, not APPLIED (the client's own tests). The same in
     // every language.
-    Opamp.RemoteConfigStatus live = e.remoteConfig(config("elastic", "{\"send_logs\":\"false\"}"));
+    Opamp.RemoteConfigStatus live = e.remoteConfig(config(v1("signal_exports", exports("", "", "off"))));
     assertEquals(APPLIED, live.getStatus());
     assertFalse(e.controls.gates.sendLogs());
   }
@@ -697,6 +745,28 @@ class ExtensionTest {
     for (String m : all) {
       assertFalse(m.contains("secret") || m.contains("token=x") || m.contains("frag"), m);
     }
+  }
+
+  /**
+   * After the server moved the agent to another endpoint, what it says names the one the client uses
+   * now (logged without credentials), not the one configured.
+   */
+  @Test
+  void whatIsSaidNamesTheEndpointInUse() {
+    String[] inUse = {null}; // none yet: the configured one
+    Extension.Reachability r = new Extension.Reachability("https://a.example.com/v1/opamp", null, new UUID(0, 1));
+    r.inUse = () -> inUse[0];
+    List<String> said = logged(Level.INFO, () -> {
+      r.notified(new Notification.Connected());
+      inUse[0] = "https://user:secret@b.example.com/v1/opamp?token=x";
+      r.notified(new Notification.ConnectFailed(null, "connection refused"));
+      r.notified(new Notification.Connected());
+    });
+    assertEquals(3, said.size(), said.toString());
+    assertTrue(said.get(0).startsWith("INFO OpAMP: connected to https://a.example.com/v1/opamp;"), said.get(0));
+    assertTrue(said.get(1).startsWith("WARNING OpAMP: can't reach https://b.example.com/v1/opamp (connection refused)"),
+        said.get(1));
+    assertEquals("INFO OpAMP: connected to https://b.example.com/v1/opamp again", said.get(2));
   }
 
   @Test

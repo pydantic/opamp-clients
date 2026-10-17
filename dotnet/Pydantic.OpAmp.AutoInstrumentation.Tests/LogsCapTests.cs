@@ -3,8 +3,10 @@
 
 using System.Net.Http.Headers;
 using Google.Protobuf;
+using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 using static Pydantic.OpAmp.AutoInstrumentation.Tests.Otlp;
 
@@ -88,7 +90,7 @@ public class LogsCapTests
     public void ABatchKeepsItsFirstRecordsAndTheLevelsDropBeforeTheCapCounts()
     {
         var controls = this.Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"warn\",\"send_logs_per_second\":\"3\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"warn"}"""), ("log_rate_limit", """{"records_per_second":3}"""))));
         var export = Logs(
             ScopeLogs("a", [Record(9, "a-info"), Record(13, "a-1"), Record(9, "a-info-2"), Record(17, "a-2")]),
             ScopeLogs("b", [Record(13, "b-3"), Record(21, "b-4"), Record(13, "b-5")]));
@@ -104,11 +106,11 @@ public class LogsCapTests
     {
         var controls = this.Controls();
         var two = Logs(ScopeLogs("a", [Record(9, "1"), Record(9, "2")]));
-        controls.Apply(Vectors.Settings("{\"send_logs_per_second\":\"2\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":2}"""))));
         Assert.Equal(2, Through(controls, two).Count);
-        controls.Apply(Vectors.Settings("{\"send_logs_per_second\":\"2\",\"send_logs\":\"true\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":2}"""), ("signal_exports.logs", """{"enabled":true}"""))));
         Assert.Empty(Through(controls, two)); // the same cap: its bucket, still empty
-        controls.Apply(Vectors.Settings("{\"send_logs_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":1}"""))));
         Assert.Single(Through(controls, two)); // a new cap: a full bucket of 1
         controls.Apply(new Settings());
         Assert.Equal(2, Through(controls, two).Count);
@@ -119,10 +121,10 @@ public class LogsCapTests
     public void ADroppedLogsExportTakesNoTokens()
     {
         var controls = this.Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs\":\"false\",\"send_logs_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("signal_exports.logs", """{"enabled":false}"""), ("log_rate_limit", """{"records_per_second":1}"""))));
         var one = Logs(ScopeLogs("a", [Record(9, "1")]));
         Assert.Empty(Through(controls, one));
-        controls.Apply(Vectors.Settings("{\"send_logs_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":1}"""))));
         Assert.Single(Through(controls, one));
     }
 
@@ -133,7 +135,9 @@ public class LogsCapTests
         Assert.Contains("send_logs_per_second", otlp.HostNow(providersBuilt: false).Live);
         var none = Agent.Prepare(n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_LOGS_EXPORTER" => "otlp,console", _ => null }, (_, _) => { })!;
         Assert.DoesNotContain("send_logs_per_second", none.HostNow(providersBuilt: false).Live);
-        none.RemoteConfig(Vectors.Config("{\"send_logs_per_second\":\"5\"}"));
+        var refused = none.RemoteConfig(Vectors.Config(Policy.Of(("log_rate_limit", """{"records_per_second":5}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("log_rate_limit: records_per_second: this SDK cannot apply the requested override", refused.ErrorMessage);
         Assert.Null(none.Controls.Policy(Signal.Logs).Cap);
     }
 }

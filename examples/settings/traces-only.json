@@ -1,1 +1,9 @@
-{"send_metrics": "false", "send_logs": "false"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "override", "enabled": false},
+    "logs": {"mode": "override", "enabled": false}
+  }
+}

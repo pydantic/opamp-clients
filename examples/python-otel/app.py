@@ -23,6 +23,11 @@ import urllib.request
 
 from opamp_otel import app_settings
 
+if os.environ.get("EXAMPLE_SETUP"):  # check_truth's setups (setups.py): none otherwise
+    import setups
+
+    setups.apply(os.environ["EXAMPLE_SETUP"])
+
 log = logging.getLogger("app")
 noisy = logging.getLogger("app.noisy")
 logging.getLogger().setLevel(logging.INFO)

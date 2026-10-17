@@ -28,18 +28,19 @@ import (
 )
 
 // host is what this package carries out, declared to the settings layer (docs/sdk-settings.md,
-// "The host"), which sets aside any setting not named: every live setting in every configuration
+// "The host"). The layer refuses a policy that overrides a setting not named here, and the
+// description lists only the controls named. The host names every live setting in every configuration
 // Setup builds (the sampler wraps whichever one OTEL_TRACES_SAMPLER names, and every span and log
 // exporter it builds goes through a gate), send_metrics only where the metrics reader is built
 // around a gated exporter, the instrumentation switches at once too (a switched-off
-// instrumentation's tracer starts no span from then on), and the polling interval at the next
-// start.
+// instrumentation's tracer starts no span from then on), so nothing waits for the next start. A
+// global provider the application sets in place of Setup's narrows it (agent.host).
 func (s *server) host() *settingspb.Host {
 	live := append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations"}, carried...)
 	if !s.metricsUngated {
 		live = append(live, "send_metrics")
 	}
-	return &settingspb.Host{Live: live, NextStart: []string{"opamp_polling_interval"}}
+	return &settingspb.Host{Live: live}
 }
 
 // carried are the live settings this package carries out whatever it built: those of its sampler,
@@ -58,7 +59,8 @@ var carried = []string{
 	"debug_until",
 	"debug_sampling_rate",
 	"debug_send_logs_level",
-	// The application's own settings (docs/app-settings.md), which it reads with AppSetting.
+	// The application's own settings, the policy's app_settings control (docs/app-settings.md),
+	// which it reads with AppSetting.
 	"custom",
 }
 
@@ -101,6 +103,16 @@ type agent struct {
 	// last listed (under mu).
 	exporters []*settingspb.Exporter
 	listed    uint64
+	// relist: the host narrowed before there was a client to tell; start sends the inventory.
+	relist bool
+
+	// The global providers Setup set (set before start), which of them the application has
+	// replaced since (under mu), the global providers now (a test's own in tests), and what
+	// stops watching them.
+	ours      providers
+	replaced  replaced
+	globals   func() providers
+	watchStop chan struct{}
 }
 
 // stopper is a timer that can be stopped (*time.Timer).
@@ -136,7 +148,8 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	if err != nil {
 		return nil, err
 	}
-	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second}
+	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second,
+		globals: globalProviders}
 	changed := func() { go a.scopesChanged() }
 	controls.scopes.changed.Store(&changed)
 	var saved, coreState []byte
@@ -239,7 +252,7 @@ func untraced() *http.Client {
 // start joins the fleet, once the SDK is built. A client that can't start leaves the SDK
 // running unmanaged.
 func (a *agent) start(ctx context.Context, res *resource.Resource) {
-	description, err := a.layer.Describe(ctx, keyValues(res))
+	description, err := a.layer.Describe(ctx, keyValues(res), a.server.host(), unixMs(a.now()))
 	if err != nil {
 		slog.Error("opamp: the client did not start; the SDK runs unmanaged", "error", err)
 		return
@@ -257,9 +270,6 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		// through net/http, on a transport of its own that no instrumentation wraps.
 		Mode:       opamp.ModeGo,
 		HTTPClient: untraced(),
-	}
-	if ms := a.atStart.GetSettings().OpampPollingIntervalMs; ms != nil {
-		cfg.HeartbeatInterval = time.Duration(*ms) * time.Millisecond
 	}
 	if a.server.stateDir != "" {
 		cfg.StateFile = filepath.Join(a.server.stateDir, "opamp-state")
@@ -294,14 +304,23 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 	if a.effective != effective { // a timer changed it since
 		client.SetEffectiveConfig(a.effective)
 	}
-	if a.controls.scopes.gen.Load() != a.listed { // an instrumentation came since
+	if a.controls.scopes.gen.Load() != a.listed || a.relist { // an instrumentation came since, or the host narrowed
 		if c := a.components(ctx); c != nil {
 			a.reporter.SetAvailableComponents(c)
+			a.relist = false
 		}
 	}
 	a.nextHealth = a.now().Add(a.healthEvery)
 	a.arm()
+	if a.ours != (providers{}) && !a.stopped {
+		a.watchStop = make(chan struct{})
+		go a.watch(a.watchStop, watchEvery)
+	}
 }
+
+// host is what this package carries out now: the server's host (server.host), less what a global
+// provider the application set in place of Setup's takes from it. Under a.mu.
+func (a *agent) host() *settingspb.Host { return a.replaced.without(a.server.host()) }
 
 // healthReport is the agent's health: the application's (healthy, as it runs), with export
 // health under component_health_map["exporters"] as the layer builds it from the gates' counts,
@@ -341,6 +360,10 @@ func (a *agent) stop(ctx context.Context) error {
 	if a.timer != nil {
 		a.timer.Stop()
 	}
+	if a.watchStop != nil {
+		close(a.watchStop)
+		a.watchStop = nil
+	}
 	a.mu.Unlock()
 	var errs []error
 	if a.client != nil {
@@ -352,6 +375,7 @@ func (a *agent) stop(ctx context.Context) error {
 // notified handles a notification on the client's goroutine, answering through c.
 func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 	if a.reach != nil {
+		a.reach.inUse = c.Endpoint
 		a.reach.notified(n)
 	}
 	switch n.Kind {
@@ -377,16 +401,30 @@ func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 // reachability says when the client connects, when it can't (once a run of failures, with what
 // to check), and when it's back: setup that works or doesn't is never silent.
 type reachability struct {
-	endpoint string // as where gives it
-	service  string // "": none
-	uid      uuid.UUID
-	ever     bool // connected once
-	failing  bool // since the last connect
+	endpoint string // the configured one, as where gives it
+	// inUse is the endpoint the client uses now, as the client gives it (nil or "": the
+	// configured one): after the server moved the agent, the one it moved it to.
+	inUse   func() string
+	service string // "": none
+	uid     uuid.UUID
+	ever    bool // connected once
+	failing bool // since the last connect
 	// What gave the endpoint and the headers (server's); "": the variable.
 	endpointFrom, headersFrom string
 }
 
+// at is the endpoint the client uses now, as it is safe to log.
+func (r *reachability) at() string {
+	if r.inUse != nil {
+		if e := r.inUse(); e != "" {
+			return where(e)
+		}
+	}
+	return r.endpoint
+}
+
 func (r *reachability) notified(n opamp.Notification) {
+	endpoint := r.at()
 	switch n.Kind {
 	case opamp.Connected:
 		if !r.ever {
@@ -394,9 +432,9 @@ func (r *reachability) notified(n opamp.Notification) {
 			if r.service != "" {
 				who = " as " + r.service
 			}
-			slog.Info(fmt.Sprintf("opamp: connected to %s; this SDK is managed%s, instance %s", r.endpoint, who, r.uid))
+			slog.Info(fmt.Sprintf("opamp: connected to %s; this SDK is managed%s, instance %s", endpoint, who, r.uid))
 		} else if r.failing {
-			slog.Info("opamp: connected to " + r.endpoint + " again")
+			slog.Info("opamp: connected to " + endpoint + " again")
 		}
 		r.ever, r.failing = true, false
 	case opamp.ConnectFailed:
@@ -406,9 +444,9 @@ func (r *reachability) notified(n opamp.Notification) {
 				why = fmt.Sprintf("HTTP %d", n.Status)
 			}
 			slog.Warn(fmt.Sprintf("opamp: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its current settings meanwhile",
-				r.endpoint, why, hint(n.Status, r.endpointFrom, r.headersFrom)))
+				endpoint, why, hint(n.Status, r.endpointFrom, r.headersFrom)))
 		} else {
-			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", r.endpoint, n.Detail))
+			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", endpoint, n.Detail))
 		}
 		r.failing = true
 	}
@@ -479,19 +517,18 @@ func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteC
 	if a.server.stateDir != "" {
 		save = func([]byte) error { return nil }
 	}
-	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.server.host(), unixMs(now), save)
+	// A provider replaced since the last look is seen before the decision, so the answer is for
+	// what this package carries out now.
+	if a.noticeReplaced() {
+		a.narrowed(now)
+	}
+	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.host(), unixMs(now), save)
 	if err != nil {
 		return failed(config, err.Error())
 	}
 	if s := d.GetApply(); s != nil {
 		a.controls.Apply(s)
 		a.settings = s
-		if len(s.GetUnsupported()) > 0 {
-			slog.Info("opamp: settings this SDK doesn't carry out: " + strings.Join(s.GetUnsupported(), ", "))
-		}
-		if len(s.GetIgnored()) > 0 {
-			slog.Info("opamp: settings unknown to this SDK: " + strings.Join(s.GetIgnored(), ", "))
-		}
 	}
 	if len(d.GetPendingRestart()) > 0 {
 		slog.Info("opamp: " + strings.Join(d.GetPendingRestart(), ", ") + " changed; in force when the application restarts")
@@ -570,8 +607,13 @@ func (a *agent) fired(gen uint64) {
 // decides that it has come: the layer is told at least refreshAt, should the wall clock have
 // moved back since. Under a.mu.
 func (a *agent) refresh(now time.Time) {
-	ms := max(unixMs(now), a.refreshAt)
-	r, err := a.layer.Refresh(context.Background(), a.current, a.atStart.GetCurrent(), a.server.host(), ms)
+	a.decideAgain(now, max(unixMs(now), a.refreshAt))
+}
+
+// decideAgain asks the layer what is in force at ms under the host as it is now, puts it in
+// force, and reports the effective config. Under a.mu.
+func (a *agent) decideAgain(now time.Time, ms uint64) {
+	r, err := a.layer.Refresh(context.Background(), a.current, a.atStart.GetCurrent(), a.host(), ms)
 	if err != nil {
 		slog.Warn("opamp: the settings in force could not be refreshed; asking again in a minute", "error", err)
 		a.refreshAfter(ms+60_000, now)
