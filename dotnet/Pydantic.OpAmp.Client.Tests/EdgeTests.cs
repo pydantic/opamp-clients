@@ -15,7 +15,7 @@ namespace Pydantic.OpAmp.Client.Tests;
 public class EdgeTests
 {
     // Headers the core refuses in both modes, and why: it checks every header list it sends by the
-    // rule an offered header meets (issue #218). .NET mode sent a value's CR LF as it was (the
+    // rule an offered header meets, in both modes. .NET mode sent a value's CR LF as it was (the
     // server read a second header, "Injected"), sent a Host of the caller's in place of its own and
     // a Connection beside the upgrade's, and dropped a name that isn't a token without a word.
     public static TheoryData<OpAmpMode, string, string, string, string> Refused()

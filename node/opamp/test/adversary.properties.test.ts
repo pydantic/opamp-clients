@@ -65,10 +65,10 @@ const MODES = ["node", "rust"] as const;
 type Mode = (typeof MODES)[number];
 
 /**
- * Known bugs: the productions that trigger one in this SDK, in each mode, with its S-number.
+ * Known bugs: the productions that trigger one in this SDK, in each mode, with what it breaks.
  * The main run leaves them out (`off`); "known bugs" below runs each in `focus` and expects the
  * run to fail.
- * None today: S7 (a wake_at over 2^31 - 1 ms away armed as 1 ms) is fixed in index.ts (#arm);
+ * None today: a wake_at over 2^31 - 1 ms away, once armed as 1 ms, is fixed in index.ts (#arm);
  * wake_far, wake_huge and wake_max hold the far wake armed until an answer comes, so a timer that
  * fires early fails the run.
  */
@@ -483,7 +483,7 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
     }
   }
   const after = listing(downloads);
-  if (after !== before) fail(`a download changed after stop (S3, RULE-SHELL-07): [${before}] -> [${after}]`);
+  if (after !== before) fail(`a download changed after stop (RULE-SHELL-07): [${before}] -> [${after}]`);
 
   // The verdict: one, without violations, and the state file holds what was last stored.
   let verdict: Verdict | undefined;

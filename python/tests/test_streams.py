@@ -847,7 +847,7 @@ def test_rust_mode_downloads_go_through_the_proxy_with_tls_and_redirects(kind: s
 
 # covers: RULE-CLIENT-16
 def test_rust_mode_stop_while_the_upgrade_is_held_returns_and_closes_the_connection() -> None:
-    """#85 S1: a server that holds the upgrade; stop 300 ms after start returns within 5 s, and
+    """A server that holds the upgrade; stop 300 ms after start returns within 5 s, and
     the server sees the connection closed."""
     async def run() -> None:
         closed = asyncio.Event()

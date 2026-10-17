@@ -14,8 +14,8 @@ the full reference.
 go get github.com/pydantic/opamp-clients/go@latest
 ```
 
-There are no version tags yet, so this resolves to a pseudo-version of `main`. Nothing else is
-needed: the core is embedded in the module.
+`@latest` resolves to the newest `go/vX.Y.Z` tag. Nothing else is needed: the core is embedded
+in the module.
 
 ## Start and stop
 

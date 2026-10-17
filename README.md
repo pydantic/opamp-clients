@@ -22,9 +22,12 @@ Python and .NET load, and the interface (`.proto`) files the clients generate th
 scripts/fetch_core.py fetch                  # download what the lock pins, verify it, put it in place
 scripts/fetch_core.py fetch --all-platforms  # and every platform's native library, for packaging
 scripts/fetch_core.py check                  # what is in place is what the lock pins
-scripts/fetch_core.py lock 0.2.0             # move to another core release
+scripts/fetch_core.py lock <version>         # move to another core release
 ```
 
-Moving to a new core is a PR that changes only the lock.
+Moving to a new core is one PR: `scripts/fetch_core.py lock <version>`, then `fetch`, then
+`scripts/gen_core.py` and `scripts/gen_sdk_settings.py`. It holds the lock, the module copies
+checked in beside each client and the regenerated types; CI's `fetch_core.py check` and the
+generators' `--check` keep them in step.
 
 This repository is public and holds only what `PUBLIC_ALLOWLIST` names; see `AGENTS.md`.

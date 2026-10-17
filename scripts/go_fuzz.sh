@@ -21,7 +21,7 @@ cd "$(dirname "$0")/../go"
 # Go's fuzz coordinator (internal/fuzz.CoordinateFuzzing) stops on its -fuzztime context's Done
 # and keeps the error unless it equals its child context's, but a context closes Done before it
 # cancels its children: a stop that lands in between fails a run that found nothing with a bare
-# "context deadline exceeded" (#406; about one run in six of this script when the deadline lands
+# "context deadline exceeded" (about one run in six of this script when the deadline lands
 # while a worker is in a slow input). A crash always writes its input, so the failure is the
 # engine's only when nothing was written and that line is all the test said.
 deadline_race() { # TEST OUTPUT
@@ -51,7 +51,7 @@ for pkg in ./opamp ./opamp/internal/core ./opamp/sdk; do
 			continue
 		fi
 		if [ "$(ls "$corpus" 2>/dev/null || true)" = "$before" ] && deadline_race "$t" "$out"; then
-			echo "::notice::$pkg $t: ran its ${seconds}s and found nothing; go's own stop reported the deadline as a failure (#406)"
+			echo "::notice::$pkg $t: ran its ${seconds}s and found nothing; go's own stop reported the deadline as a failure"
 			continue
 		fi
 		failed+=("$pkg $t")

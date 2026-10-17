@@ -1,9 +1,9 @@
 # Copyright (c) 2026 Bill Easton. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
-"""Tests only: a core run as a WebAssembly module in wasmtime (a dev dependency, not one of this
-package's), behind the interface the client runs the native core through. The shipped modules
-(opamp_core.wasm, opamp_sdk_settings.wasm, in this directory but not in the wheel) are the oracle
-the native extension is held to; another module with the core's ABI is a hostile core
+"""A core run as a WebAssembly module in wasmtime (a dev dependency, not one of the package's),
+behind the interface the client runs the native core through. The modules beside the package's
+sources (src/opamp_client/opamp_core.wasm, opamp_sdk_settings.wasm, not in the wheel) are the
+oracle the native extension is held to; another module with the core's ABI is a hostile core
 (the adversary, testdata/core/opamp_core_adversary.wasm)."""
 
 from __future__ import annotations
@@ -13,16 +13,16 @@ from pathlib import Path
 
 import wasmtime
 
-from ._native import Trap
+from opamp_client._native import Trap
 
-_HERE = Path(__file__).resolve().parent
+_HERE = Path(__file__).resolve().parent.parent / "src" / "opamp_client"
 _lock = threading.Lock()
 _engine = wasmtime.Engine()
 _modules: dict[bytes, wasmtime.Module] = {}
 
 
 def shipped(name: str = "opamp_core.wasm") -> bytes:
-    """A module checked in beside this file (scripts/gen_core.py, gen_sdk_settings.py)."""
+    """A module checked in beside the package's sources (scripts/gen_core.py, gen_sdk_settings.py)."""
     return (_HERE / name).read_bytes()
 
 

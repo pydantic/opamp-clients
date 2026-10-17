@@ -1,10 +1,9 @@
 # SDK application examples
 
 The OpenTelemetry SDK integrations run against a reference OpAMP server that plays each check's
-scenario, with a telemetry sink that receives the exported spans, metrics and logs. Where the
-server's sources are (a Cargo.toml at the root) `examples/integrations.py` builds it; elsewhere
-`OPAMP_EXAMPLES_SERVER` names its binary, and without one the checks stop and say so. The Go
-conformance server is not part of these integration examples.
+scenario, with a telemetry sink that receives the exported spans, metrics and logs. This
+repository does not build that server: `OPAMP_EXAMPLES_SERVER` names its binary, and without one
+the checks stop and say so. The Go conformance server is not part of these integration examples.
 
 Run one integration:
 
@@ -27,8 +26,9 @@ versions (Go's example builds our package from this checkout, which has no versi
 inventory must leave ours out); it lists the instrumentations the run switches off, a traces exporter the `send_*`
 switch reaches, and when `sampling_rate`, `send_traces` and `deactivate_instrumentations` apply.
 To see an application's inventory yourself, run it against the reference server and read the
-`components` of the server log's `a2s` lines: after `just sdk-integration python`, in
-`target/integrations/python-otel/run1.jsonl` (each language's directory is its example's name).
+`components` of the server log's `a2s` lines: after `python3 examples/python-otel/try.py first`, in
+`target/integrations/python-otel/app-py/run1.jsonl` (each language's directory is its example's
+name; Python's and Node.js's have one more, for the application).
 
 Each integration then runs `check_signals`: two more runs with metrics and logs exported too
 (every application writes a log line per request), which prove every remote setting end to end:
@@ -57,7 +57,7 @@ to prove the local connection settings:
 | `OTEL_OPAMP_HEADERS` | with the wrong token every request is refused, the application is traced all the same, and the agent's warning names `OTEL_OPAMP_HEADERS`; with the right one the agent is accepted |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | the accepted agent checks in as often as it says |
 
-The Python, Go, Node.js and Rust integrations also have an example application that gives the
+The Python, Go and Node.js integrations also have an example application that gives the
 server in code, and they run `check_setup` against it too, as the check `setup-in-code`. There the
 token is given in code, and `OTEL_OPAMP_HEADERS` holds the other token: the right one when the code
 gives the wrong one, and the wrong one when the code gives the right one. The code wins both
@@ -89,8 +89,12 @@ ends. Two checks of one integration that run at once must not name their runs al
 files share the integration's directory (`check_app_settings` names its runs `app7` and `app8`
 for that reason).
 
-A new check goes into one of its integration's `checks:` lists in the CI workflow that runs
-them. Each run prints how long each check took, for keeping those jobs even.
+A new check goes into its integration's `try.py`, in `CHECKS`, under a name of its own. Each run
+prints how long each check took.
+
+CI does not run these checks: they need the reference server's binary. It runs the checks' own
+tests (`examples/test_integrations.py`, `examples/test_settings_cookbook.py`) and each
+integration's unit tests.
 
 Every integration lets the application read its own settings ([docs/app-settings.md](../docs/app-settings.md)),
 checked by `check_app_settings` (the check `app`): its example application reads the flag

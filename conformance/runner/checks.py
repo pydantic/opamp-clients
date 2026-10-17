@@ -1395,7 +1395,8 @@ def uid_not_requested_after_restart(t: Trace) -> Result:
 # ------------------------------------------------------------------------------------------
 # HTTP as the core says (docs/how-it-works.md)
 
-CORE_USER_AGENT = "opamp-clients"
+# The core's default User-Agent: pydantic-opamp/<core version> (older cores sent "opamp-clients").
+CORE_USER_AGENT = re.compile(r"pydantic-opamp/[0-9]+\.[0-9]+\.[0-9]+|opamp-clients")
 
 
 @check("redirects_not_followed", "MUST", ["RULE-CLIENT-04"])
@@ -1423,8 +1424,8 @@ def sends_core_headers(t: Trace) -> Result:
     if not requests and not upgrades:
         return Result("fail", "no requests")
     for e in requests + upgrades:
-        if e.get("user_agent") != CORE_USER_AGENT:
-            return Result("fail", f"User-Agent {e.get('user_agent')!r}, not {CORE_USER_AGENT!r}")
+        if not CORE_USER_AGENT.fullmatch(e.get("user_agent") or ""):
+            return Result("fail", f"User-Agent {e.get('user_agent')!r}, not the core's")
     for e in requests:
         if "accept_encoding" in e and e["accept_encoding"] != "identity":
             return Result("fail", f"Accept-Encoding {e['accept_encoding']!r}, not 'identity'")

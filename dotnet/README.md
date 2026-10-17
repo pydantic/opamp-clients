@@ -62,7 +62,8 @@ and the core is told the status and, for a redirect, the `Location` resolved wit
 `new Uri(requested, location)` and its origin: the core decides whether to follow it.
 
 Set `OPAMP_CORE_TAP=<path>` to record every call into the core (for `opamp-tap`): the first
-core in the process writes `<path>`, each later one `<path>.<pid>.<n>`.
+core in the process writes `<path>`, each later one `<path>.<pid>.<n>`. A tap holds the headers
+sent (the enrollment key) and the credentials saved, so a new one is the user's only.
 
 The native core comes in its own package, `Pydantic.OpAmp.Core.Native`, which this one depends
 on: the library alone for Linux (glibc and musl, so Alpine too), macOS and Windows, on x64 and
@@ -108,7 +109,8 @@ var options = new OpAmpClientOptions
 - `socks4://` and `socks4a://` are refused, and so is any other scheme: a proxy the client can't
   use is an error, never a direct connection.
 - Without `Proxy` the proxy comes from the environment by the rule every SDK's Rust mode follows:
-  [tests/shell-tables/README.md](../tests/shell-tables/README.md), "Rust mode's proxy rule"
+  `tests/shell-tables/README.md`, "Rust mode's proxy rule" (put in place by
+  `scripts/fetch_core.py fetch`)
   (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY`, the upper-case name first; NO_PROXY
   names, addresses and CIDR networks; nothing under CGI). `ProxyUseLocalResolver` then applies
   to a SOCKS5 proxy the environment names. It does not read the system's proxy settings on
@@ -204,4 +206,4 @@ The conformance suite runs this client through `conformance/drivers/dotnet-core`
 run Rust mode over an in-memory network (`MemNet`, with `MemServer` at its far end) as well as
 real sockets.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are [the shell contract](../spec/shell-contract.md) (it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.

@@ -47,6 +47,7 @@ import sys
 import tempfile
 import threading
 from pathlib import Path
+from typing import Any
 
 HERE = Path(__file__).resolve().parent
 sys.path[:0] = [str(HERE), str(HERE.parent)]
@@ -90,11 +91,11 @@ class Problem(AssertionError):
 class FixedCore(_core_mod.Core):
     """The real core with a fixed seed, entropy and wall clock: the same input is the same run."""
 
-    def __init__(self, config: corepb.Config, *, _module: bytes | None = None) -> None:
+    def __init__(self, config: corepb.Config, *, _engine: Any = None) -> None:
         config.seed = 0x5EED
         config.entropy = bytes(range(32))
         config.unix_ms = UNIX0
-        super().__init__(config, _module=_module)
+        super().__init__(config, _engine=_engine)
 
     #: The run whose answers it notes (Python mode tags each with an X-Answer header).
     run: Run | None = None

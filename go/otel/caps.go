@@ -8,10 +8,10 @@ import (
 	"sync"
 )
 
-// bucket is a rate cap's token bucket, the algorithm every language runs (testdata/caps.json):
-// full at its first take; refilled at perSecond a second on a monotonic clock, up to
-// max(perSecond, 1); a take of n gets the whole tokens there are, up to n. In float64, in the
-// layer's order.
+// bucket is a rate cap's token bucket, the algorithm every language runs
+// (testdata/sdk-settings/caps.json): full at its first take; refilled at perSecond a second on a
+// monotonic clock, up to max(perSecond, 1); a take of n gets the whole tokens there are, up to n.
+// In float64, in the layer's order.
 type bucket struct {
 	perSecond float64
 	mu        sync.Mutex // tokens, last, started

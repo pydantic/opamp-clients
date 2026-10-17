@@ -17,8 +17,8 @@ interval. After each step the notifications seen so far are checked against the 
 - the order the model can predict: the saved remote config first, the server's custom messages
   and remote configs in the order offered, the descriptions set in the order they were set.
 
-Python S8 (a known bug, fixed): a call from another thread is made directly from that thread; the client
-carries it out on the loop. The separate test at the end does the same alone.
+A call from another thread is made directly from that thread; the client carries it out on the
+loop. The separate test at the end does the same alone.
 
 Each test runs in both modes: Python mode (aiohttp), and Rust mode (the core's own HTTP and
 WebSocket, over asyncio's connections), against the same server.
@@ -69,7 +69,7 @@ def description(n: int) -> pb.AgentDescription:
 class Server:
     """An OpAMP server over HTTP and WebSocket that sends what the steps offer (once each), and
     records the descriptions it hears. A WebSocket idle for 3 s is closed: a connection that opens
-    after stop (known bug S1) then ends, so that stop returns."""
+    after stop then ends, so that stop returns."""
 
     IDLE_CLOSE = 3.0
 
@@ -331,7 +331,7 @@ class CallbackModel(RuleBasedStateMachine):
         took = time.monotonic() - begun
         if took > 1.5 and run.ws:
             print(f"stop took {took:.1f} s over WebSocket: a connection that opened after stop held it "
-                  "until the server closed it (known bug S1)")
+                  "until the server closed it")
         if err is not run.thrown:
             run.problems.append(f"stop gave {err!r}, expected {run.thrown!r}")
 
@@ -368,7 +368,7 @@ class CallbackModel(RuleBasedStateMachine):
     @precondition(lambda self: self.run is not None)
     @rule(what=st.sampled_from(METHODS))
     def call_from_another_thread(self, what: str) -> None:
-        # S8 (fixed): called directly from the thread; the client carries it out on the loop.
+        # Called directly from the thread; the client carries it out on the loop.
         run = self.run
         assert run is not None
 

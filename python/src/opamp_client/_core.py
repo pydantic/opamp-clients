@@ -12,6 +12,7 @@ import struct
 import sys
 import threading
 import time
+from typing import Any
 
 from . import _native
 from ._proto.opamp.core.v1 import core_pb2 as corepb
@@ -54,15 +55,10 @@ def _open_tap() -> int | None:
 class Core:
     """One instance of the core: one client's state."""
 
-    def __init__(self, config: corepb.Config, *, _module: bytes | None = None) -> None:
-        # _module: tests only, a WebAssembly module with the core's ABI run instead of the native
-        # core (the adversary), in wasmtime (opamp_client._wasm, a dev dependency).
-        if _module is None:
-            engine = _native.Core()
-        else:
-            from ._wasm import WasmCore
-
-            engine = WasmCore(_module)
+    def __init__(self, config: corepb.Config, *, _engine: Any = None) -> None:
+        # _engine: tests only, run instead of the native core: a WebAssembly module with the
+        # core's ABI (the adversary) in wasmtime (tests/_wasm.py's WasmCore).
+        engine = _native.Core() if _engine is None else _engine
         self._init, self._step = engine.init, engine.step
         self._close_engine = getattr(engine, "close", None)  # the native core's session
         #: The instance UID in use, as the core last said (the application's, a saved one, or

@@ -22,7 +22,7 @@ dev = [
     "pytest>=9",
     "trustme>=1.2.1",
     # The WebAssembly modules, as the oracle the native core is held to and to run a hostile
-    # core (opamp_client._wasm): tests only.
+    # core (tests/_wasm.py): tests only.
     "wasmtime>=30",
 ]
 
@@ -32,7 +32,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/opamp_client"]
-# The WebAssembly modules are the tests' oracle (opamp_client._wasm), not shipped.
+# The WebAssembly modules are the tests' oracle (tests/_wasm.py), not shipped.
 exclude = ["src/opamp_client/*.wasm"]
 
 [tool.pytest.ini_options]

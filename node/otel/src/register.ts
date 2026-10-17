@@ -18,7 +18,8 @@ await import(pathToFileURL(fromInstrumentation.resolve("import-in-the-middle/lib
 
 // ES modules: `import` doesn't go through require, so the instrumentations can patch what it
 // loads only through import-in-the-middle's loader hook. Upstream's register leaves that to a
-// separate --experimental-loader flag; one --import does both here, as EDOT's does.
+// separate --experimental-loader flag; one --import here installs both the require hooks and
+// import-in-the-middle's loader hook, so the application needs no --experimental-loader flag.
 registerHooks("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
 
 const { shutdown } = register();

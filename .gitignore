@@ -7,6 +7,8 @@
 .opamp-core-candidate/
 target/
 dist/
+# the conformance runs' taps and reports
+/conformance/out/
 /spec/
 /proto/
 /tests/shell-tables/

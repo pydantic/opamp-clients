@@ -5,9 +5,8 @@
 #   client, to where the core's sources are).
 # run:   the driver command. {bin} is conformance/out/bin, {conf} is conformance/, {core} is where
 #   the core's sources are.
-# source = true: the client is built from the core's sources, so it runs only where they are (a
-#   Cargo.toml at the root, or at OPAMP_CORE_ROOT: a checkout with the core's sources); elsewhere
-#   the runner leaves it out.
+# source = true: the client is built from the core's sources, so it runs only where they are
+#   (OPAMP_CORE_ROOT: a checkout with the core's sources); elsewhere the runner leaves it out.
 # docker = true: the driver runs in a container. The server then listens on every interface and
 #   the driver reaches it as host.docker.internal; conformance/out is mounted at /out. A variable
 #   reaches the driver only if `run` names it with -e: torture.py's must all be there for a client

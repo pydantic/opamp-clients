@@ -102,7 +102,8 @@ const client = Client.start(
   with an `http://` or `https://` proxy it throws. Only the application sets it.
 
 Without `proxy`, the proxy comes from the environment, by the rule every SDK's Rust mode shares
-([tests/shell-tables](../../tests/shell-tables/README.md), "Rust mode's proxy rule"):
+(`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+`scripts/fetch_core.py fetch`):
 `HTTP_PROXY` for `http://` and `ws://`, `HTTPS_PROXY` for `https://` and `wss://`, else
 `ALL_PROXY`; the upper-case name first; `NO_PROXY` names (and their subdomains), `*`, addresses
 and CIDR networks; nothing under CGI (`REQUEST_METHOD` set: there `HTTP_PROXY` may be a request's
@@ -135,7 +136,9 @@ disk holds up neither heartbeats nor `stop`, which doesn't wait for a save alrea
 client started next on the same state file in the same process waits for it (and for a stopped
 client's downloads to delete their files) before it reads the file. A download's file is made
 new, never written over one already there. With `OPAMP_CORE_TAP` set, every file operation is
-recorded in the tap too, for the `opamp-tap` checker to check against a disk that can crash.
+recorded in the tap too, for the `opamp-tap` checker to check against a disk that can crash. A
+tap holds the headers sent (the enrollment key) and the credentials saved, so a new one is the
+user's only.
 
 ## Rust mode and Node mode
 
@@ -193,4 +196,4 @@ npm test                    # compile, then node --test
 
 The conformance suite runs this client through `conformance/drivers/node`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are [the shell contract](../../spec/shell-contract.md) (it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Node mode and in Rust mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Node mode and in Rust mode.

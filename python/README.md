@@ -124,7 +124,8 @@ A proxy you configure is used for every connection, whatever the host. `NO_PROXY
 apply to it.
 
 Without `proxy` the client uses the environment's proxies, by the rule every SDK's Rust mode
-shares ([tests/shell-tables](../tests/shell-tables/README.md), "Rust mode's proxy rule"):
+shares (`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+`scripts/fetch_core.py fetch`):
 `HTTP_PROXY` is for `http://` and `ws://` URLs, `HTTPS_PROXY` for `https://` and `wss://`,
 `ALL_PROXY` for either when its own is unset; the upper-case name first. `NO_PROXY` lists hosts
 to reach directly (`*` for all): names (and the names under them), IP addresses and networks in
@@ -220,4 +221,4 @@ checker (`target/release/opamp-tap <tap files...>`, which `fetch_core.py fetch` 
 
 The conformance suite runs this client through `conformance/drivers/python-core`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are [the shell contract](../spec/shell-contract.md) (it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Python mode and in Rust mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Python mode and in Rust mode.

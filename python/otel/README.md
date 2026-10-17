@@ -4,12 +4,13 @@ OpenTelemetry auto-instrumentation for Python, under an OpAMP server.
 
 ## Quickstart
 
-From the repository root (until it is published), install it next to the instrumentations the
-application needs, then run the application under `opentelemetry-instrument` with the server's
-address and enrollment key:
+From the repository root (until it is published), fetch the core, install it with the client and
+this package next to the instrumentations the application needs, then run the application under
+`opentelemetry-instrument` with the server's address and enrollment key:
 
 ```bash
-pip install ./python ./python/otel opentelemetry-instrumentation-flask
+scripts/fetch_core.py fetch               # the core release the lock pins, verified
+pip install ./python/core ./python ./python/otel opentelemetry-instrumentation-flask
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \

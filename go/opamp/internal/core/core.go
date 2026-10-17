@@ -35,7 +35,7 @@ var (
 	compiled    wazero.CompiledModule
 	compileErr  error
 
-	// Modules other than the embedded core (tests only: NewWith), compiled once each.
+	// Modules other than the embedded core (tests only: Options.Module), compiled once each.
 	othersMu sync.Mutex
 	others   = map[[sha256.Size]byte]wazero.CompiledModule{}
 )
@@ -57,17 +57,7 @@ func compileCore() {
 	})
 }
 
-// New starts a core with the given settings. It returns init's output too: the instance UID in
-// use from the start (one the core made, if cfg has none).
-func New(ctx context.Context, cfg *corepb.Config) (*Core, *corepb.Output, error) {
-	compileCore()
-	if compileErr != nil {
-		return nil, nil, fmt.Errorf("compile the OpAMP core: %w", compileErr)
-	}
-	return instantiate(ctx, compiled, cfg, openTap(""))
-}
-
-// Options are a core's settings for tests only.
+// Options override a core's defaults. Production passes the zero value; tests set them.
 type Options struct {
 	// Module is a WebAssembly module with the core's exports and ABI, run instead of the embedded
 	// core (the adversary, testdata/core/opamp_core_adversary.wasm). nil: the embedded core.
@@ -76,8 +66,9 @@ type Options struct {
 	Tap string
 }
 
-// NewWith starts a core as New does, with opts: for tests only.
-func NewWith(ctx context.Context, opts Options, cfg *corepb.Config) (*Core, *corepb.Output, error) {
+// New starts a core with the given settings and opts. It returns init's output too: the
+// instance UID in use from the start (one the core made, if cfg has none).
+func New(ctx context.Context, opts Options, cfg *corepb.Config) (*Core, *corepb.Output, error) {
 	compileCore()
 	if compileErr != nil {
 		return nil, nil, fmt.Errorf("compile the OpAMP core: %w", compileErr)
