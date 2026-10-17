@@ -5,6 +5,8 @@
 .github/actions/*/action.yml
 .gitignore
 AGENTS.md
+# Skills for agent sessions working here (same public rules as AGENTS.md).
+.claude/skills/
 LICENSE
 PUBLIC_ALLOWLIST
 README.md
