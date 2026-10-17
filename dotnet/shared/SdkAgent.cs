@@ -254,6 +254,8 @@ internal sealed class SdkAgent
     public void Start(IEnumerable<KeyValuePair<string, object>> attributes, Func<Inventory> inventory, ComponentHealth? health = null)
     {
         var resource = attributes.ToList(); // read twice below
+        Host described;
+        ulong describedAt;
         lock (this.gate)
         {
             // What this SDK turned out to carry out is known now: answer and report by it.
@@ -270,6 +272,8 @@ internal sealed class SdkAgent
             // changes only if the host narrows (Recheck).
             this.inventory = inventory;
             this.components = this.layer.Components(inventory(), this.host, now);
+            described = this.host;
+            describedAt = now;
         }
 
         var options = new OpAmpClientOptions
@@ -277,9 +281,7 @@ internal sealed class SdkAgent
             Endpoint = this.server.Endpoint,
             InstanceUid = Uuid.Bytes(this.Uid),
             Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig,
-            HeartbeatInterval = this.atStart.Settings.HasOpampPollingIntervalMs
-                ? TimeSpan.FromMilliseconds(this.atStart.Settings.OpampPollingIntervalMs)
-                : this.server.Heartbeat,
+            HeartbeatInterval = this.server.Heartbeat,
             Headers = this.server.Headers,
             StateFile = this.server.StateDir is { } dir ? Path.Combine(dir, "opamp-state") : null,
             // A key of its own, offered by the server: taken with a state directory (StateFile)
@@ -300,7 +302,8 @@ internal sealed class SdkAgent
 
         var status = new OpAmpStatus
         {
-            Description = this.layer.Describe(resource.Select(Attribute)),
+            // By the same host and clock: the controls it lists are those it carries out.
+            Description = this.layer.Describe(resource.Select(Attribute), described, describedAt),
             Health = first,
             EffectiveConfig = this.effective,
             AvailableComponents = this.components,
@@ -488,15 +491,6 @@ internal sealed class SdkAgent
             if (d.Apply is { } apply)
             {
                 this.Put(apply);
-                if (apply.Unsupported.Count > 0)
-                {
-                    this.log.Info($"settings this SDK doesn't carry out: {string.Join(", ", apply.Unsupported)}");
-                }
-
-                if (apply.Ignored.Count > 0)
-                {
-                    this.log.Info($"settings unknown to this SDK: {string.Join(", ", apply.Ignored)}");
-                }
             }
 
             if (d.PendingRestart.Count > 0)

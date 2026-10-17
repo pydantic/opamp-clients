@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 // A global provider the application registers in place of the SDK's: what it sends through the
-// API goes past the package's sampler and gates, so the settings held there are set aside, named
-// as such and reported at once. The tests share the API's globals, so they run in order.
+// API goes past the package's sampler and gates, so the overrides held there are set aside,
+// reported local at once, and a policy that overrides them from then on is refused. The tests
+// share the API's globals, so they run in order.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -19,33 +20,26 @@ import {
 } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type AvailableComponents, AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type AvailableComponents, type EffectiveConfig, RemoteConfigStatuses } from "@pydantic/opamp-client";
 
 import { Agent, samplerFromEnv, say, watchProviders } from "../src/index.js";
+import { config as configOf, off, overridden, policy } from "./policy.js";
 
-const text = (s: string) => new TextEncoder().encode(s);
-const json = (b: Uint8Array | undefined) => JSON.parse(new TextDecoder().decode(b));
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
+const config = (body: string) => configOf(body, body);
 
-const DOCUMENT = JSON.stringify({
-  sampling_rate: "1", send_traces: "false", send_metrics: "false", send_logs: "false", send_logs_level: "warn",
-  drop_attributes: "x", deactivate_all_instrumentations: "true",
+const POLICY = policy({
+  head_sampling: { ratio: 1 }, signal_exports: off("traces", "metrics", "logs"), log_levels: { level: "warn" },
+  attribute_redaction: { drop: ["x"] }, instrumentations: { all_disabled: true },
 });
+const UNSUPPORTED = "this SDK cannot apply the requested override";
 
 /** An agent as the register prepares one, with every exporter its own; its client keeps what it is handed. */
 function agent() {
   const a = new Agent();
-  const got = { effective: [] as object[], components: [] as AvailableComponents[], warned: [] as string[] };
+  const got = { effective: [] as Record<string, unknown>[], components: [] as AvailableComponents[], warned: [] as string[] };
   a.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: "none" });
   a.client = {
-    setEffectiveConfig: (e: { configMap?: { configMap: Record<string, { body: Uint8Array }> } }) => {
-      const m = e.configMap!.configMap;
-      got.effective.push([json(m.elastic?.body), m["elastic.set_aside"] ? json(m["elastic.set_aside"].body).unsupported : []]);
-    },
+    setEffectiveConfig: (e: EffectiveConfig) => void got.effective.push(overridden(e)),
     setAvailableComponents: (c: AvailableComponents) => got.components.push(c),
     setHealth: () => {},
   } as never;
@@ -66,9 +60,8 @@ function sdk(a: Agent) {
   });
 }
 
-/** The settings each effective config reported names as set aside. */
-const aside = (got: { effective: object[] }) => (got.effective.at(-1) as [object, string[]])[1];
-const inForce = (got: { effective: object[] }) => (got.effective.at(-1) as [Record<string, string>, string[]])[0];
+/** The overrides the last effective config reported in force: what was set aside is local. */
+const inForce = (got: { effective: Record<string, unknown>[] }) => got.effective.at(-1);
 const settingsListed = (c: AvailableComponents | undefined) =>
   Object.keys(c?.components.settings?.subComponentMap ?? {}).sort();
 
@@ -77,10 +70,13 @@ test("a provider of the application's own, registered once the SDK has started, 
   const s = sdk(a);
   watchProviders(a, () => s.start());
   a.instrument([], {});
-  const status = a.remoteConfig(config(DOCUMENT));
+  const status = a.remoteConfig(config(POLICY));
   assert.equal(status.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   a.client!.setEffectiveConfig(a.effective!);
-  assert.deepEqual(aside(got), []);
+  assert.deepEqual(inForce(got), {
+    head_sampling: { ratio: 1 }, signal_exports: off("traces", "metrics", "logs"), log_levels: { level: "warn" },
+    attribute_redaction: { drop: ["x"] }, instrumentations: { all_disabled: true },
+  });
   assert.equal(a.controls.sampler.samplingRate, 1);
   const before = settingsListed(a.components());
   assert.ok(before.includes("send_traces") && before.includes("sampling_rate"), before.join(", "));
@@ -95,11 +91,10 @@ test("a provider of the application's own, registered once the SDK has started, 
   assert.equal(trace.setGlobalTracerProvider(new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(own)] })), true);
   trace.getTracer("app").startSpan("mine").end();
   assert.equal(own.getFinishedSpans().length, 1);
-  // Reported at once: the sampler's settings, send_traces and redaction set aside, the rest in force.
+  // Reported at once: head_sampling, the traces' export and redaction set aside (local), the rest in force.
   assert.equal(got.effective.length, 2);
-  assert.deepEqual(aside(got), ["drop_attributes", "sampling_rate", "send_traces"]);
   assert.deepEqual(inForce(got), {
-    send_metrics: "false", send_logs: "false", send_logs_level: "warn", deactivate_all_instrumentations: "true",
+    signal_exports: off("metrics", "logs"), log_levels: { level: "warn" }, instrumentations: { all_disabled: true },
   });
   assert.equal(a.controls.sampler.samplingRate, undefined);
   assert.equal(a.controls.sendTraces, true);
@@ -117,19 +112,19 @@ test("a provider of the application's own, registered once the SDK has started, 
   // A logger provider: the log gate's settings.
   logs.disable();
   logs.setGlobalLoggerProvider(new LoggerProvider());
-  assert.deepEqual(aside(got), ["drop_attributes", "sampling_rate", "send_logs", "send_logs_level", "send_traces"]);
+  assert.deepEqual(inForce(got), { signal_exports: off("metrics"), instrumentations: { all_disabled: true } });
   assert.equal(a.controls.sendLogs, true);
-  // A meter provider: send_metrics.
+  // A meter provider: the metrics' export.
   metrics.disable();
   metrics.setGlobalMeterProvider(new MeterProvider());
-  assert.deepEqual(aside(got),
-    ["drop_attributes", "sampling_rate", "send_logs", "send_logs_level", "send_metrics", "send_traces"]);
-  assert.deepEqual(inForce(got), { deactivate_all_instrumentations: "true" });
+  assert.deepEqual(inForce(got), { instrumentations: { all_disabled: true } });
 
-  // A config decided from now on sets them aside too.
-  a.remoteConfig(config(JSON.stringify({ sampling_rate: "0.5", send_traces: "false" })));
+  // A policy decided from now on that overrides them is refused, and changes nothing.
+  const refused = a.remoteConfig(config(policy({ head_sampling: { ratio: 0.5 }, signal_exports: off("traces") })));
+  assert.equal(refused.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
+  assert.equal(refused.errorMessage, `head_sampling: ${UNSUPPORTED}`);
   a.client!.setEffectiveConfig(a.effective!);
-  assert.deepEqual(aside(got), ["sampling_rate", "send_traces"]);
+  assert.deepEqual(inForce(got), { instrumentations: { all_disabled: true } });
   await s.shutdown();
 });
 
@@ -144,12 +139,15 @@ test("a provider of the application's own, registered before the SDK starts, is 
   const s = sdk(a);
   watchProviders(a, () => s.start());
   a.instrument([], {});
-  a.remoteConfig(config(DOCUMENT));
+  // Traces past the SDK from the start: a policy that overrides what they need is refused.
+  const refused = a.remoteConfig(config(POLICY));
+  assert.equal(refused.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
+  assert.equal(refused.errorMessage, `head_sampling: ${UNSUPPORTED}`);
+  // The SDK's logger and meter providers registered, so logs and metrics are still carried out.
+  const status = a.remoteConfig(config(policy({ signal_exports: off("metrics", "logs") })));
+  assert.equal(status.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   a.client!.setEffectiveConfig(a.effective!);
-  // Traces set aside; the SDK's logger and meter providers registered, so logs and metrics stay.
-  assert.deepEqual(aside(got), ["drop_attributes", "sampling_rate", "send_traces"]);
-  assert.equal(inForce(got).send_logs, "false");
-  assert.equal(inForce(got).send_metrics, "false");
+  assert.deepEqual(inForce(got), { signal_exports: off("metrics", "logs") });
   await s.shutdown();
 });
 

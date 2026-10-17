@@ -113,7 +113,8 @@ public final class CoreFuzz {
         case 1 -> {
           Opamp.AgentConfigMap.Builder m = Opamp.AgentConfigMap.newBuilder();
           for (int n = r.u8() % 3; n > 0; n--) {
-            m.putConfigMap(r.text(16), Opamp.AgentConfigObject.newBuilder().setBody(r.bytes(1024))
+            // The policy's own file name half the time: the layer reads only that file.
+            m.putConfigMap(r.bit() ? "logfire-sdk-policy.json" : r.text(16), Opamp.AgentConfigObject.newBuilder().setBody(r.bytes(1024))
                 .setContentType(r.pick(List.of("", "application/json", "text/yaml", r.text(16)))).build());
           }
           LAYER.decide(Opamp.AgentRemoteConfig.newBuilder().setConfigHash(r.bytes(32)).setConfig(m).build(),
@@ -125,7 +126,7 @@ public final class CoreFuzz {
             resource.add(Anyvalue.KeyValue.newBuilder().setKey(r.text(16))
                 .setValue(Anyvalue.AnyValue.newBuilder().setStringValue(r.text(32))).build());
           }
-          LAYER.describe(resource);
+          LAYER.describe(resource, null, r.bit() ? 0 : 1_791_979_200_000L);
         }
       }
     } catch (IllegalArgumentException e) {

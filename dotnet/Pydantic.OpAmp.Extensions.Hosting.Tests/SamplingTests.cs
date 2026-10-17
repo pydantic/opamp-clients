@@ -46,7 +46,7 @@ public class SamplingTests
     [Fact]
     public async Task ARuleOnARequestPathDropsTheWholeTrace()
     {
-        const string body = "{\"sampling_rules\":[{\"rate\":0,\"path\":\"/health*\"}],\"sampling_rate\":\"1\"}";
+        var body = Policy.Of(("sampling_rules", """{"rules":[{"rate":0,"path":"/health*"}]}"""), ("head_sampling", """{"ratio":1}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         var (app, agent, spans) = await Start(server);
         await using var _ = app;
@@ -67,7 +67,7 @@ public class SamplingTests
     [Fact]
     public async Task TheApplicationsOwnFilterStillRunsFirst()
     {
-        const string body = "{\"sampling_rules\":[{\"rate\":1,\"kind\":\"server\"}]}";
+        var body = Policy.Of(("sampling_rules", """{"rules":[{"rate":1,"kind":"server"}]}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         var (app, agent, spans) = await Start(server, ctx => !ctx.Request.Path.StartsWithSegments("/private"));
         await using var _ = app;

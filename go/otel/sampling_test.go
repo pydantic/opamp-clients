@@ -197,6 +197,24 @@ func TestTheTraceCapVectors(t *testing.T) {
 	}
 }
 
+// rules is a policy whose sampling_rules control overrides the rules with the given JSON array
+// ("": local) and whose head_sampling control overrides the ratio ("": local).
+func rules(list, ratio string) string {
+	var set []string
+	if list != "" {
+		set = append(set, "sampling_rules", override(`"rules":`+list))
+	}
+	if ratio != "" {
+		set = append(set, "head_sampling", override(`"ratio":`+ratio))
+	}
+	return every(set...)
+}
+
+// traceCap is a policy whose trace_rate_limit control overrides the traces a second.
+func traceCap(perSecond string) string {
+	return every("trace_rate_limit", override(`"traces_per_second":`+perSecond))
+}
+
 // The spec's edge cases, on the real SDK: the first rule wins, a rule of rate 0 over
 // sampling_rate 1, parents followed whatever the rules say, children of a sampled root kept.
 func TestSamplingRulesOnTheSDK(t *testing.T) {
@@ -205,8 +223,8 @@ func TestSamplingRulesOnTheSDK(t *testing.T) {
 	tp := c.TracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSampler(c.Sampler.Wrap(sdktrace.ParentBased(sdktrace.AlwaysSample()))),
 		sdktrace.WithSpanProcessor(rec)))
 	tracer := tp.Tracer("t")
-	c.Apply(settingsOf(t, []byte(`{"sampling_rate":"1","sampling_rules":[{"rate":0,"kind":"server","path":"/health*"},`+
-		`{"rate":1,"name":"checkout *"},{"rate":0,"name":"checkout*"}]}`), 0))
+	c.Apply(settingsOf(t, []byte(rules(`[{"rate":0,"kind":"server","path":"/health*"},`+
+		`{"rate":1,"name":"checkout *"},{"rate":0,"name":"checkout*"}]`, "1")), 0))
 	start := func(ctx context.Context, name string, kind trace.SpanKind, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 		return tracer.Start(ctx, name, trace.WithSpanKind(kind), trace.WithAttributes(attrs...))
 	}
@@ -228,7 +246,7 @@ func TestSamplingRulesOnTheSDK(t *testing.T) {
 	for _, flags := range []trace.TraceFlags{trace.FlagsSampled, 0} {
 		remote := trace.ContextWithRemoteSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
 			TraceID: trace.TraceID{9}, SpanID: trace.SpanID{9}, TraceFlags: flags, Remote: true}))
-		c.Apply(settingsOf(t, []byte(fmt.Sprintf(`{"sampling_rules":[{"rate":%d}]}`, 1-int(flags))), 0))
+		c.Apply(settingsOf(t, []byte(rules(fmt.Sprintf(`[{"rate":%d}]`, 1-int(flags)), "")), 0))
 		if _, s := start(remote, "GET", trace.SpanKindServer); sampled(s) != flags.IsSampled() {
 			t.Fatalf("a caller sampled %v was not followed", flags.IsSampled())
 		}
@@ -247,12 +265,12 @@ func TestSamplingRulesChangeLiveAndRevert(t *testing.T) {
 		doc  string
 		want samplingWant
 	}{
-		{`{}`, samplingWant{How: "app_sampler"}},
-		{`{"sampling_rules":[{"rate":0,"path":"/health"}]}`, samplingWant{How: "rate", Rate: 0}},
-		{`{"sampling_rules":[{"rate":0.25,"path":"/health"}],"sampling_rate":"1"}`, samplingWant{How: "rate", Rate: 0.25}},
-		{`{"sampling_rate":"1"}`, samplingWant{How: "rate", Rate: 1}},
-		{`{"sampling_rules":"[{\"rate\":0.5}]"}`, samplingWant{How: "rate", Rate: 0.5}},
-		{`{}`, samplingWant{How: "app_sampler"}},
+		{every(), samplingWant{How: "app_sampler"}},
+		{rules(`[{"rate":0,"path":"/health"}]`, ""), samplingWant{How: "rate", Rate: 0}},
+		{rules(`[{"rate":0.25,"path":"/health"}]`, "1"), samplingWant{How: "rate", Rate: 0.25}},
+		{rules("", "1"), samplingWant{How: "rate", Rate: 1}},
+		{rules(`[{"rate":0.5}]`, ""), samplingWant{How: "rate", Rate: 0.5}},
+		{every(), samplingWant{How: "app_sampler"}},
 	}
 	for _, s := range steps {
 		apply(s.doc)
@@ -261,7 +279,7 @@ func TestSamplingRulesChangeLiveAndRevert(t *testing.T) {
 		}
 	}
 	// The configured sampler, set after the rules (as Setup does), keeps them.
-	apply(`{"sampling_rules":[{"rate":0}]}`)
+	apply(rules(`[{"rate":0}]`, ""))
 	c.Sampler.Wrap(sdktrace.AlwaysSample())
 	if err := judge(c.Sampler, p, samplingWant{How: "rate", Rate: 0}); err != nil {
 		t.Fatal(err)
@@ -271,7 +289,7 @@ func TestSamplingRulesChangeLiveAndRevert(t *testing.T) {
 // A rule of 0.5 samples half of 10,000 random trace IDs, within 3%.
 func TestARuleOfAHalfSamplesHalf(t *testing.T) {
 	c := NewControls()
-	c.Apply(settingsOf(t, []byte(`{"sampling_rules":[{"rate":0.5,"name":"GET"}]}`), 0))
+	c.Apply(settingsOf(t, []byte(rules(`[{"rate":0.5,"name":"GET"}]`, "")), 0))
 	r := rand.New(rand.NewPCG(7, 8))
 	n := 0
 	for range 10_000 {
@@ -296,7 +314,7 @@ func TestTheTraceCapOnTheSDK(t *testing.T) {
 	clock := withClock(c)
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSampler(c.Sampler))
 	tracer := tp.Tracer("t")
-	c.Apply(settingsOf(t, []byte(`{"sampling_traces_per_second":"2"}`), 0))
+	c.Apply(settingsOf(t, []byte(traceCap("2")), 0))
 	root := func(ctx context.Context) (context.Context, bool) {
 		ctx, s := tracer.Start(ctx, "root")
 		defer s.End()
@@ -326,14 +344,14 @@ func TestTheTraceCapOnTheSDK(t *testing.T) {
 	if _, again := root(context.Background()); !again {
 		t.Fatal("half a second at 2 a second refills one")
 	}
-	c.Apply(settingsOf(t, []byte(`{"sampling_traces_per_second":"2"}`), 0)) // the same: the same bucket
+	c.Apply(settingsOf(t, []byte(traceCap("2")), 0)) // the same: the same bucket
 	if _, again := root(context.Background()); again {
 		t.Fatal("the same cap applied again refilled the bucket")
 	}
-	c.Apply(settingsOf(t, []byte(`{}`), 0))
+	c.Apply(settingsOf(t, []byte(every()), 0))
 	for range 5 {
 		if _, s := root(context.Background()); !s {
-			t.Fatal("the cap left out still capped")
+			t.Fatal("the cap made local still capped")
 		}
 	}
 	if !strings.Contains(c.Sampler.Description(), "OpampLiveSampler") {
@@ -356,7 +374,7 @@ func TestSamplingRulesMatchTheLayers(t *testing.T) {
 	pv := map[string]settingspb.Parent{"none": settingspb.Parent_PARENT_NONE, "local_sampled": settingspb.Parent_PARENT_LOCAL_SAMPLED,
 		"remote_unsampled": settingspb.Parent_PARENT_REMOTE_UNSAMPLED}
 	for i := 0; i < 300; i++ {
-		var rules []map[string]any
+		var rs []map[string]any
 		for range r.IntN(4) {
 			rule := map[string]any{"rate": []float64{0, 0.25, 1}[r.IntN(3)]}
 			if r.IntN(2) == 0 {
@@ -371,13 +389,18 @@ func TestSamplingRulesMatchTheLayers(t *testing.T) {
 			if r.IntN(3) == 0 {
 				rule["attributes"] = map[string]string{"k": word()}
 			}
-			rules = append(rules, rule)
+			rs = append(rs, rule)
 		}
-		settings := map[string]any{"sampling_rules": rules}
+		list := ""
+		if len(rs) > 0 {
+			b, _ := json.Marshal(rs)
+			list = string(b)
+		}
+		ratio := ""
 		if r.IntN(2) == 0 {
-			settings["sampling_rate"] = "0.5"
+			ratio = "0.5"
 		}
-		doc, _ := json.Marshal(settings)
+		doc := []byte(rules(list, ratio))
 		name, kind, parent := word(), kindNames[r.IntN(5)], parents[r.IntN(5)]
 		var attrs []attribute.KeyValue
 		var wire []*protobufs.KeyValue

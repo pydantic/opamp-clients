@@ -11,7 +11,9 @@ import { join } from "node:path";
 
 import { AgentRemoteConfigSchema, create, toBinary } from "@pydantic/opamp-client";
 
-const BEFORE = "a core state saved before the core kept the config applied: the document kept before carries over";
+import { FILE } from "./policy.js";
+
+const BEFORE = "a core state saved before the core kept the config applied: the policy kept before carries over";
 
 function varint(n: number): number[] {
   const out: number[] = [];
@@ -23,8 +25,8 @@ function varint(n: number): number[] {
   }
 }
 
-/** A client state whose config applied has `document` as its settings entry. */
-export function coreState(document: Uint8Array | string): Uint8Array {
+/** A client state whose config applied has `document` as its policy (undefined: a config with no policy). */
+export function coreState(document: Uint8Array | string | undefined): Uint8Array {
   const start = JSON.parse(
     readFileSync(new URL("../../../../testdata/sdk-settings/start.json", import.meta.url), "utf8"),
   ) as { cases: { name: string; core_state?: string }[] };
@@ -32,12 +34,12 @@ export function coreState(document: Uint8Array | string): Uint8Array {
   const body = typeof document === "string" ? new TextEncoder().encode(document) : document;
   const applied = toBinary(AgentRemoteConfigSchema, create(AgentRemoteConfigSchema, {
     configHash: new TextEncoder().encode("applied"),
-    config: { configMap: { elastic: { body, contentType: "application/json" } } },
+    config: { configMap: body === undefined ? {} : { [FILE]: { body, contentType: "application/json" } } },
   }));
   return new Uint8Array([...base, 0x82, 0x01, ...varint(applied.length), ...applied]);
 }
 
 /** Leave in `dir` what the client would after a config with `document` was applied. */
-export function keepApplied(dir: string, document: Uint8Array | string): void {
+export function keepApplied(dir: string, document: Uint8Array | string | undefined): void {
   writeFileSync(join(dir, "opamp-state"), coreState(document));
 }

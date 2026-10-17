@@ -50,7 +50,7 @@ class InventoryTest {
         "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces")) {
       m.put(k, "at once");
     }
-    for (String k : List.of("deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval")) {
+    for (String k : List.of("deactivate_all_instrumentations", "deactivate_instrumentations")) {
       m.put(k, "next start");
     }
     return m;
@@ -167,12 +167,14 @@ class InventoryTest {
   }
 
   @Test
-  void theInstrumentationsAreListedByTheNamesDeactivateInstrumentationsTakes(@TempDir Path dir) {
+  void theInstrumentationsAreListedByTheNamesTheInstrumentationsControlTakes(@TempDir Path dir) {
     Opamp.AvailableComponents c = components(props("http://server/v1/opamp", dir));
     List<String> names = new ArrayList<>(instrumentations(c).keySet());
     // Loaded at start, as a saved document: next-start settings are in force there.
-    SettingsProto.Settings s = Vectors.LAYER.load(("{\"deactivate_instrumentations\":\"" + String.join(",", names)
-        + "\"}").getBytes(StandardCharsets.UTF_8), Extension.HOST, Vectors.NOW).getSettings();
+    String disabled = names.stream().map(n -> "\"" + n + "\"").collect(java.util.stream.Collectors.joining(","));
+    SettingsProto.Settings s = Vectors.LAYER.load(Vectors.every("instrumentations",
+        Vectors.override("\"disabled\":[" + disabled + "]")).getBytes(StandardCharsets.UTF_8), Extension.HOST,
+        Vectors.NOW).getSettings();
     // Each name switches off exactly that instrumentation, as the agent reads its property.
     Map<String, String> want = new LinkedHashMap<>();
     names.forEach(n -> want.put("otel.instrumentation." + n + ".enabled", "false"));

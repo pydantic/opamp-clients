@@ -157,11 +157,10 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		"logs": {"console": true}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("exporters %v, want %v", got, want)
 	}
-	// The settings: those of the host Load and Decide are given, send_metrics unsupported.
+	// The settings: those of the host Load and Decide are given, without send_metrics.
 	settings := listed(c.GetComponents()["settings"])
 	if _, ok := settings["send_metrics"]; ok || settings["send_traces"]["applies"] != "at once" ||
-		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" ||
-		settings["opamp_polling_interval"]["applies"] != "next start" {
+		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" {
 		t.Fatalf("settings %v", settings)
 	}
 	ref, err := testLayer(t).Components(context.Background(), &settingspb.Inventory{}, sdk.agent.server.host(), vectorNow)
@@ -175,7 +174,7 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		off = append(off, name)
 	}
 	if st := sdk.agent.remoteConfig(context.Background(),
-		remote(`{"deactivate_instrumentations":"`+strings.Join(off, ",")+`"}`)); st.GetStatus() != applied {
+		remote(every("instrumentations", override(`"disabled":["`+strings.Join(off, `","`)+`"]`)))); st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
 	}
 	for _, scope := range []string{otelhttp, autoexportScope, "checkout.db"} {
@@ -263,8 +262,8 @@ func TestAnInventoryOfNothing(t *testing.T) {
 		len(c.GetComponents()["exporters"].GetSubComponentMap()) != 0 || len(listed(c.GetComponents()["settings"])) == 0 {
 		t.Fatalf("components %v", c)
 	}
-	// Without a state directory a next-start setting can't be kept: still listed, as the layer says.
-	if listed(c.GetComponents()["settings"])["opamp_polling_interval"]["applies"] != "next start" {
+	// Without a state directory every setting is still carried out at once, as the layer says.
+	if listed(c.GetComponents()["settings"])["deactivate_instrumentations"]["applies"] != "at once" {
 		t.Fatalf("settings %v", listed(c.GetComponents()["settings"]))
 	}
 }

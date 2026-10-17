@@ -27,6 +27,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.util._importlib_metadata import entry_points
 
 import opamp_otel
+from _policy import config_map, policy
 from opamp_otel import Agent, Controls
 
 LAYER = SdkSettings()
@@ -86,7 +87,8 @@ def test_the_instrumentations_are_the_names_opentelemetry_instrument_matches_at_
     assert got == instrumentors() and "aiohttp-client" in got  # the dev group's
     assert got["aiohttp-client"] == version("opentelemetry-instrumentation-aiohttp-client")
     # Each is a name the switch takes: it lands in the variable opentelemetry-instrument reads.
-    s = LAYER.decide(_config('{"deactivate_instrumentations":"aiohttp-client"}'), b"{}", b"{}",
+    local = policy().encode()
+    s = LAYER.decide(_config(policy(instrumentations={"disabled": ["aiohttp-client"]})), local, local,
                      opamp_otel.sdk_host(["otlp"]), save=lambda doc: None).apply
     assert opamp_otel.disabled_instrumentations(s, "") == "aiohttp-client"
 
@@ -211,9 +213,7 @@ def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_
 
 
 def _config(body: str) -> opamp_pb2.AgentRemoteConfig:
-    m = opamp_pb2.AgentConfigMap()
-    m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=body.encode(), content_type="application/json"))
-    return opamp_pb2.AgentRemoteConfig(config=m, config_hash=body.encode())
+    return opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body.encode())
 
 
 def _asking():
@@ -263,7 +263,7 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     # newer settings aren't declared, and with a console metric exporter nothing stops metrics.
     # The application's own settings are handed on whoever built the SDK.
     assert set(parts(theirs.components)["settings"]) == {
-        "custom", "deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"}
+        "custom", "deactivate_all_instrumentations", "deactivate_instrumentations"}
     # The first message of each carries them in full, its hash set by the client.
     sent = [m.available_components for m in server.got if m.HasField("available_components")]
     full = _full(server)

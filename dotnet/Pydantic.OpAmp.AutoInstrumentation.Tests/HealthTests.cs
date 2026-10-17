@@ -125,7 +125,7 @@ public class HealthTests
         var now = 0L;
         var controls = new Controls(() => now);
         var sink = new Sink();
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"warn\",\"send_logs_per_second\":\"1\",\"sampling_traces_per_second\":\"1\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"warn"}"""), ("log_rate_limit", """{"records_per_second":1}"""), ("trace_rate_limit", """{"traces_per_second":1}"""))));
         Post(controls, sink, "/v1/logs", Logs(ScopeLogs("s", [Record(9, "info"), Record(13, "w1"), Record(13, "w2")])), signal: Signal.Logs);
         var l = controls.Tally.Counts().Logs;
         Assert.Equal(2UL, l.ItemsFiltered); // the info record by the level, one warning by the cap
@@ -141,7 +141,7 @@ public class HealthTests
         Assert.Equal(1UL, controls.Tally.Counts().Traces.ItemsFiltered);
 
         // Under redaction an export the gate can't read isn't sent: a failure, not a filter.
-        controls.Apply(Vectors.Settings("{\"drop_attributes\":\"secret\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["secret"]}"""))));
         Post(controls, sink, "/v1/traces", [0xff, 0xff, 0xff], signal: Signal.Traces);
         Assert.Equal(1UL, controls.Tally.Counts().Traces.ExportsFailed);
         Assert.False(controls.Tally.Counts().Traces.LastError.Length == 0);
@@ -151,7 +151,7 @@ public class HealthTests
     public void ASignalTurnedOffIsntCountedTheLayerReportsItOff()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"send_traces\":\"false\"}"));
+        controls.Apply(Vectors.Settings(Policy.Stop("traces")));
         Post(controls, new Sink(), "/v1/traces", ThreeSpans, signal: Signal.Traces);
         var t = controls.Tally.Counts().Traces;
         Assert.Equal(0UL, t.ExportsOk + t.ExportsFailed + t.ItemsFiltered);
@@ -188,7 +188,7 @@ public class HealthTests
                         this.nanos += 30 * Second;
                     }
 
-                    var settings = step.TryGetProperty("settings", out var doc) ? doc.GetRawText() : "{}";
+                    var settings = step.TryGetProperty("settings", out var doc) ? doc.GetRawText() : Policy.Local;
                     Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(settings)).Status);
                     Kept.KeepApplied(dir, settings);
                     foreach (var signal in Enum.GetValues<Signal>())

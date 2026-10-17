@@ -8,6 +8,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 using static Pydantic.OpAmp.AutoInstrumentation.Tests.Otlp;
 
@@ -57,7 +58,7 @@ public class ScopeLevelsTests
     public void EachRecordIsHeldToItsOwnScopesLevelInOneExport()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"warn\",\"send_logs_level_by_scope\":\"com.acme.db*=debug, noisy.lib=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"warn","scopes":{"com.acme.db*":"debug","noisy.lib":"off"}}"""))));
         var export = Logs(
             ScopeLogs("com.acme.db.pool", [Record(5, "db-debug"), Record(1, "db-trace")]),
             ScopeLogs("noisy.lib", [Record(21, "noisy-fatal"), Record(null, "noisy-unspecified")]),
@@ -73,13 +74,13 @@ public class ScopeLevelsTests
     public void AScopeWrittenAfterItsRecordsStillNamesThem()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs_level_by_scope\":\"noisy=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"noisy":"off"}}"""))));
         var export = Logs(ScopeLogs("noisy", [Record(21, "late-scope")], scopeLast: true), ScopeLogs("quiet", [Record(21, "kept")], scopeLast: true));
         Assert.Equal([("quiet", "kept")], Through(controls, export));
         // No scope at all: the empty name, which only * matches.
-        controls.Apply(Vectors.Settings("{\"send_logs_level_by_scope\":\"a*=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"a*":"off"}}"""))));
         Assert.Single(Through(controls, Logs(ScopeLogs(null, [Record(9, "unnamed")]))));
-        controls.Apply(Vectors.Settings("{\"send_logs_level_by_scope\":\"*=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"*":"off"}}"""))));
         Assert.Empty(Through(controls, Logs(ScopeLogs(null, [Record(9, "unnamed")]))));
     }
 
@@ -90,11 +91,11 @@ public class ScopeLevelsTests
         var export = Logs(ScopeLogs("noisy", [Record(9, "noisy-info")]), ScopeLogs("app", [Record(5, "app-debug")]));
         Assert.Equal(2, Through(controls, export).Count);
 
-        controls.Apply(Vectors.Settings("{\"send_logs_level_by_scope\":\"noisy=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"noisy":"off"}}"""))));
         Assert.Equal([("app", "app-debug")], Through(controls, export));
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"info\",\"send_logs_level_by_scope\":\"app=trace\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"info","scopes":{"app":"trace"}}"""))));
         Assert.Equal([("noisy", "noisy-info"), ("app", "app-debug")], Through(controls, export));
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"error\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"error"}"""))));
         Assert.Empty(Through(controls, export)); // and none left: answered without leaving
         controls.Apply(new Settings());
         Assert.Equal(2, Through(controls, export).Count);
@@ -107,7 +108,7 @@ public class ScopeLevelsTests
     public async Task OverGrpcAndGzipTheSame(bool grpc, bool gzip)
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs_level_by_scope\":\"noisy*=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"noisy*":"off"}}"""))));
         var sink = new Sink();
         using var client = new HttpClient(new GateHandler(controls, Signal.Logs) { InnerHandler = sink });
         var message = Logs(ScopeLogs("noisy.lib", [Record(21, "dropped")]), ScopeLogs("app", [Record(9, "kept")]));
@@ -133,7 +134,7 @@ public class ScopeLevelsTests
     public void TheOtlpExportersScopeIsTheILoggerCategory()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"send_logs_level\":\"warn\",\"send_logs_level_by_scope\":\"Checkout.Db*=debug,Checkout.Noisy=off\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("log_levels", """{"level":"warn","scopes":{"Checkout.Db*":"debug","Checkout.Noisy":"off"}}"""))));
         var sink = new Sink();
         using (var factory = LoggerFactory.Create(b => b.SetMinimumLevel(LogLevel.Trace).AddOpenTelemetry(o => o.AddOtlpExporter(e =>
         {
@@ -155,7 +156,7 @@ public class ScopeLevelsTests
     [Fact]
     public void ALevelForEveryScopeIsTheLayersOrderLongestFirst()
     {
-        var levels = new LogLevels(13, Vectors.Settings("{\"send_logs_level_by_scope\":\"a*=error,a.b*=debug,a.b=info,*=fatal\"}").SendLogsScopeLevels);
+        var levels = new LogLevels(13, Vectors.Settings(Policy.Of(("log_levels", """{"scopes":{"a*":"error","a.b*":"debug","a.b":"info","*":"fatal"}}"""))).SendLogsScopeLevels);
         Assert.Equal(9u, levels.Threshold("a.b"));      // exact beats prefix
         Assert.Equal(5u, levels.Threshold("a.bc"));     // the longer prefix
         Assert.Equal(17u, levels.Threshold("a.c"));     // the shorter
@@ -164,17 +165,17 @@ public class ScopeLevelsTests
         Assert.Equal(13u, new LogLevels(13, []).Threshold("x"));
     }
 
-    // Declared where the logs gate is: every logs exporter is OTLP. Where it isn't, the layer
-    // ignores it, as it does send_logs_level there.
+    // Declared where the logs gate is: every logs exporter is OTLP. Where it is not, the layer
+    // refuses a policy that overrides the scopes, as it refuses one that overrides the level.
     [Fact]
     public void ThePluginDeclaresItOnlyWhereTheLogsAreGated()
     {
-        const string doc = "{\"send_logs_level_by_scope\":\"noisy=off\"}";
+        var doc = Policy.Of(("log_levels", """{"scopes":{"noisy":"off"}}"""));
         var otlp = Agent.Prepare(n => n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : null, (_, _) => { })!;
         Assert.Contains("send_logs_level_by_scope", otlp.HostNow(providersBuilt: false).Live);
         Assert.Equal(RemoteConfigStatuses.Applied, otlp.RemoteConfig(Vectors.Config(doc)).Status);
         Assert.Equal(LogLevels.Off, otlp.Controls.LogLevels.Threshold("noisy"));
-        Assert.Contains("send_logs_level_by_scope", otlp.Effective.ConfigMap.ConfigMap["elastic"].Body.ToStringUtf8());
+        Assert.Equal("""{"log_levels":{"scopes":{"noisy":"off"}}}""", Policy.Overrides(otlp.Effective));
 
         var console = Agent.Prepare(n => n switch
         {
@@ -183,8 +184,10 @@ public class ScopeLevelsTests
             _ => null,
         }, (_, _) => { })!;
         Assert.DoesNotContain("send_logs_level_by_scope", console.HostNow(providersBuilt: false).Live);
-        Assert.Equal(RemoteConfigStatuses.Applied, console.RemoteConfig(Vectors.Config(doc)).Status);
-        Assert.Equal(0u, console.Controls.LogLevels.Threshold("noisy")); // ignored: nothing could hold it
-        Assert.DoesNotContain("send_logs_level_by_scope", console.Effective.ConfigMap.ConfigMap["elastic"].Body.ToStringUtf8());
+        var refused = console.RemoteConfig(Vectors.Config(doc));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("log_levels: scopes: this SDK cannot apply the requested override", refused.ErrorMessage);
+        Assert.Equal(0u, console.Controls.LogLevels.Threshold("noisy")); // nothing could hold it
+        Assert.Equal("{}", Policy.Overrides(console.Effective));
     }
 }

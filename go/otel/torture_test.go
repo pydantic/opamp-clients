@@ -86,7 +86,8 @@ func TestSettingsFlippedWhileTelemetryFlows(t *testing.T) {
 	}
 }
 
-// tortureDoc is a settings document of a round, and what the round's invariants need of it.
+// tortureDoc is the settings of a round, by the names the layer hands them over with, and what the
+// round's invariants need of them. json gives the policy that sends them.
 type tortureDoc struct {
 	doc         map[string]any
 	settings    *settingspb.Settings
@@ -96,7 +97,68 @@ type tortureDoc struct {
 	logsOff     bool // send_logs false
 }
 
-func (d tortureDoc) json() []byte { b, _ := json.Marshal(d.doc); return b }
+// json is the policy that sends doc's settings: each setting is the override of its control, and
+// a control none of doc's settings names is local.
+func (d tortureDoc) json() []byte {
+	num := func(key string) any {
+		f, err := strconv.ParseFloat(d.doc[key].(string), 64)
+		if err != nil {
+			panic(err)
+		}
+		return f
+	}
+	list := func(key string) []string { return strings.Split(d.doc[key].(string), ",") }
+	controls := map[string]map[string]any{}
+	set := func(control, setting, field string, value func(string) any) {
+		if _, ok := d.doc[setting]; !ok {
+			return
+		}
+		if controls[control] == nil {
+			controls[control] = map[string]any{"mode": "override"}
+		}
+		controls[control][field] = value(setting)
+	}
+	as := func(key string) any { return d.doc[key] }
+	set("head_sampling", "sampling_rate", "ratio", num)
+	set("sampling_rules", "sampling_rules", "rules", as)
+	set("trace_rate_limit", "sampling_traces_per_second", "traces_per_second", num)
+	set("log_rate_limit", "send_logs_per_second", "records_per_second", num)
+	set("log_levels", "send_logs_level", "level", as)
+	set("log_levels", "send_logs_level_by_scope", "scopes", func(key string) any {
+		scopes := map[string]string{}
+		for _, e := range list(key) {
+			pattern, level, _ := strings.Cut(e, "=")
+			scopes[pattern] = level
+		}
+		return scopes
+	})
+	set("attribute_redaction", "drop_attributes", "drop", func(key string) any { return list(key) })
+	set("attribute_redaction", "mask_attributes", "mask", func(key string) any { return list(key) })
+	set("debug", "debug_until", "until", as)
+	set("debug", "debug_sampling_rate", "sampling_ratio", num)
+	set("debug", "debug_send_logs_level", "log_level", as)
+	var pairs []string
+	for control, fields := range controls {
+		b, _ := json.Marshal(fields)
+		pairs = append(pairs, control, string(b))
+	}
+	exportsSet := false
+	signal := func(key string) string {
+		v, ok := d.doc[key]
+		if !ok {
+			return ""
+		}
+		exportsSet = true
+		if v == true {
+			return "on"
+		}
+		return "off"
+	}
+	if e := exports(signal("send_traces"), signal("send_metrics"), signal("send_logs")); exportsSet {
+		pairs = append(pairs, "signal_exports", e)
+	}
+	return []byte(every(pairs...))
+}
 
 // pick is one of the choices, at random.
 func pick[T any](r *rand.Rand, choices ...T) T { return choices[r.IntN(len(choices))] }
@@ -117,7 +179,7 @@ var tortureScopeLevels = []string{"app.db*=debug", "app.db=error", "noisy=off", 
 
 var tortureLevels = []string{"trace", "debug", "info", "warn", "error", "fatal"}
 
-// genDoc is a settings document; strict says the round's invariants hold in it (secret.token
+// genDoc is the settings of a policy; strict says the round's invariants hold in it (secret.token
 // dropped where a signal is sent, user.email masked), logsOff that it sends no logs. traceCaps and
 // logCaps are the caps it may set: the last document's are ones the flipping never set, so that it
 // starts full buckets.
@@ -412,7 +474,7 @@ func (e noPanicLogs) Export(ctx context.Context, r []sdklog.Record) (err error) 
 func tortureRound(t *testing.T, seed, round uint64) error {
 	r := rand.New(rand.NewPCG(seed, round))
 	// A round of each kind in turn: every document redacting, every document redacting and
-	// sending no logs, and anything goes (the empty document included).
+	// sending no logs, and anything goes (every control local included).
 	strict, logsOff := round%3 != 2, round%3 == 1
 	var pool []tortureDoc
 	for range 24 {

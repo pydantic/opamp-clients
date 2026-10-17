@@ -135,11 +135,11 @@ func TestTheLogCapLive(t *testing.T) {
 	if n := exportBatch(t, c, 50); n != 50 {
 		t.Fatalf("no cap: %d of 50", n)
 	}
-	apply(`{"send_logs_per_second":"10"}`)
+	apply(logCap("10"))
 	if n := exportBatch(t, c, 15); n != 10 {
 		t.Fatalf("a full bucket of 10: %d of 15", n)
 	}
-	apply(`{"send_logs_per_second":"10"}`) // the same cap again: the same bucket, still empty
+	apply(logCap("10")) // the same cap again: the same bucket, still empty
 	if n := exportBatch(t, c, 5); n != 0 {
 		t.Fatalf("the same cap re-applied refilled the bucket: %d of 5", n)
 	}
@@ -147,11 +147,11 @@ func TestTheLogCapLive(t *testing.T) {
 	if n := exportBatch(t, c, 15); n != 5 {
 		t.Fatalf("half a second at 10 a second: %d of 15, want 5", n)
 	}
-	apply(`{"send_logs_per_second":"20"}`) // a change of n: a full bucket
+	apply(logCap("20")) // a change of n: a full bucket
 	if n := exportBatch(t, c, 30); n != 20 {
 		t.Fatalf("a new cap of 20: %d of 30", n)
 	}
-	apply(`{}`) // left out: no cap, at once
+	apply(every()) // local: no cap, at once
 	if n := exportBatch(t, c, 30); n != 30 {
 		t.Fatalf("cap removed: %d of 30", n)
 	}
@@ -161,7 +161,7 @@ func TestTheLogCapLive(t *testing.T) {
 func TestRecordsDroppedByLevelTakeNoToken(t *testing.T) {
 	c := NewControls()
 	withClock(c)
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn","send_logs_per_second":"2"}`), 0))
+	c.Apply(settingsOf(t, []byte(every("log_levels", override(`"level":"warn"`), "log_rate_limit", override(`"records_per_second":2`))), 0))
 	sink := &recordSink{}
 	batch := make([]sdklog.Record, 6)
 	for i := range batch {
@@ -178,12 +178,17 @@ func TestRecordsDroppedByLevelTakeNoToken(t *testing.T) {
 	}
 }
 
+// logCap is a policy whose log_rate_limit control overrides the records a second.
+func logCap(perSecond string) string {
+	return every("log_rate_limit", override(`"records_per_second":`+perSecond))
+}
+
 // The gate's bucket against the layer's (Evaluate), on generated runs.
 func TestTheLogCapMatchesTheLayers(t *testing.T) {
 	r := rand.New(rand.NewPCG(3, 4))
 	for i := 0; i < 200; i++ {
 		perSecond := []string{"0.25", "0.5", "1", "1.5", "3", "7.5", "100"}[r.IntN(7)]
-		doc := []byte(fmt.Sprintf(`{"send_logs_per_second":%q}`, perSecond))
+		doc := []byte(logCap(perSecond))
 		run := &settingspb.CapRun{Signal: settingspb.CapRun_LOGS}
 		at := uint64(r.IntN(1_000_000_000))
 		for range 1 + r.IntN(8) {

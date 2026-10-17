@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
@@ -16,6 +15,9 @@ public class DebugTests
 {
     private const ulong Noon = Vectors.Now; // 2026-10-14T12:00:00Z
     private const ulong Minute = 60_000;
+
+    private static readonly string TenthWithDebugUntil1210 =
+        Policy.Of(("head_sampling", """{"ratio":0.1}"""), ("debug", """{"until":"2026-10-14T12:10:00Z"}"""));
 
     private readonly List<(TimeSpan Delay, Action Fire, Scheduled Handle)> timers = [];
     private ulong wall = Noon;
@@ -47,12 +49,8 @@ public class DebugTests
         return agent;
     }
 
-    private static string Effective(EffectiveConfig e) =>
-        e.ConfigMap?.ConfigMap.TryGetValue("elastic", out var c) == true ? c.Body.ToStringUtf8() : "{}";
-
-    // What the effective config names as set aside (its elastic.set_aside entry): "null" without one.
-    private static string SetAside(EffectiveConfig e) =>
-        e.ConfigMap?.ConfigMap.TryGetValue("elastic.set_aside", out var c) == true ? c.Body.ToStringUtf8() : "null";
+    /// <summary>The overrides of the policy an effective config reports (<see cref="Policy.Overrides(string)"/>).</summary>
+    private static string Effective(EffectiveConfig e) => Policy.Overrides(e);
 
     // Every case of testdata/debug.json and saving.json, each step through the agent the plugin
     // runs: a decide is a remote config (kept applied as the client keeps it, where there is a state
@@ -131,16 +129,9 @@ public class DebugTests
                         failed.Add($"{where}: refresh at {agent.Sdk.RefreshAt}");
                     }
 
-                    if (want.TryGetProperty("effective", out var effective) &&
-                        !JsonNode.DeepEquals(JsonNode.Parse(Effective(agent.Effective)), JsonNode.Parse(effective.GetRawText())))
+                    if (want.TryGetProperty("effective", out var effective) && Policy.Text(agent.Effective) != effective.GetString())
                     {
-                        failed.Add($"{where}: effective {Effective(agent.Effective)}");
-                    }
-
-                    if (want.TryGetProperty("set_aside", out var names) &&
-                        !JsonNode.DeepEquals(JsonNode.Parse(SetAside(agent.Effective)), JsonNode.Parse(names.GetRawText())))
-                    {
-                        failed.Add($"{where}: set aside {SetAside(agent.Effective)}");
+                        failed.Add($"{where}: effective {Policy.Text(agent.Effective)}");
                     }
                 }
             }
@@ -160,11 +151,12 @@ public class DebugTests
         try
         {
             Assert.Null(this.Armed); // no window, no timer
-            var status = agent.RemoteConfig(Vectors.Config(
-                "{\"sampling_rate\":\"0.1\",\"debug_until\":\"2026-10-14T12:10:00Z\",\"debug_sampling_rate\":\"1\"}"));
+            var status = agent.RemoteConfig(Vectors.Config(Policy.Of(
+                ("head_sampling", """{"ratio":0.1}"""),
+                ("debug", """{"until":"2026-10-14T12:10:00Z","sampling_ratio":1}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             Assert.Equal(1, agent.Controls.Sampler.Policy.Rate);
-            Assert.Contains("debug_until", Effective(agent.Effective));
+            Assert.Contains("\"debug\"", Effective(agent.Effective));
             var (delay, fire) = this.Armed!.Value;
             Assert.Equal(TimeSpan.FromMinutes(10), delay);
 
@@ -173,7 +165,7 @@ public class DebugTests
             this.nanos = (long)TimeSpan.FromMinutes(10).TotalMilliseconds * 1_000_000;
             fire();
             Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
-            Assert.DoesNotContain("debug_until", Effective(agent.Effective));
+            Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Effective(agent.Effective));
             Assert.Null(this.Armed);
         }
         finally
@@ -188,7 +180,7 @@ public class DebugTests
         var agent = this.Start(null);
         try
         {
-            agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"0.1\",\"debug_until\":\"2026-10-14T12:10:00Z\"}"));
+            agent.RemoteConfig(Vectors.Config(TenthWithDebugUntil1210));
             var (_, fire) = this.Armed!.Value;
             this.wall = Noon + (20 * Minute); // the wall clock jumped forward
             this.nanos = (long)TimeSpan.FromMinutes(5).TotalMilliseconds * 1_000_000;
@@ -208,15 +200,15 @@ public class DebugTests
         var agent = this.Start(null);
         try
         {
-            agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"0.1\",\"debug_until\":\"2026-10-14T12:10:00Z\"}"));
+            agent.RemoteConfig(Vectors.Config(TenthWithDebugUntil1210));
             Assert.Equal(1, agent.Controls.Sampler.Policy.Rate);
 
             // The machine sleeps: the wall clock passes the end, the process's clock doesn't move,
             // so the timer hasn't gone off. Then a bad document comes.
             this.wall = Noon + (25 * Minute);
-            var status = agent.RemoteConfig(Vectors.Config("{\"sampling_rate\":\"7\"}"));
+            var status = agent.RemoteConfig(Vectors.Config(Policy.HeadSampling(7)));
             Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
-            Assert.Equal("{\"sampling_rate\":\"0.1\"}", Effective(agent.Effective));
+            Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Effective(agent.Effective));
             Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
             Assert.Null(this.Armed);
         }
@@ -232,9 +224,9 @@ public class DebugTests
         var agent = this.Start(null);
         try
         {
-            agent.RemoteConfig(Vectors.Config("{\"debug_until\":\"2026-10-14T12:10:00Z\",\"debug_sampling_rate\":\"0.5\"}"));
+            agent.RemoteConfig(Vectors.Config(Policy.Of(("debug", """{"until":"2026-10-14T12:10:00Z","sampling_ratio":0.5}"""))));
             var (_, stale) = this.Armed!.Value;
-            agent.RemoteConfig(Vectors.Config("{\"debug_until\":\"2026-10-14T12:20:00Z\",\"debug_sampling_rate\":\"0.5\"}"));
+            agent.RemoteConfig(Vectors.Config(Policy.Of(("debug", """{"until":"2026-10-14T12:20:00Z","sampling_ratio":0.5}"""))));
             Assert.Equal(TimeSpan.FromMinutes(20), this.Armed!.Value.Delay);
             this.nanos = (long)TimeSpan.FromMinutes(10).TotalMilliseconds * 1_000_000;
             this.wall = Noon + (10 * Minute);
@@ -242,8 +234,8 @@ public class DebugTests
             Assert.Equal(0.5, agent.Controls.Sampler.Policy.Rate);
             Assert.Contains("12:20:00Z", Effective(agent.Effective));
 
-            // A config without debug_until ends it at once, and the timer with it.
-            agent.RemoteConfig(Vectors.Config("{\"send_logs\":\"true\"}"));
+            // A policy with debug local ends it at once, and the timer with it.
+            agent.RemoteConfig(Vectors.Config(Policy.Of(("signal_exports.logs", """{"enabled":true}"""))));
             Assert.Null(agent.Controls.Sampler.Policy.Rate);
             Assert.Null(this.Armed);
         }
@@ -259,10 +251,12 @@ public class DebugTests
         var agent = this.Start(null);
         try
         {
-            var status = agent.RemoteConfig(Vectors.Config(
-                "{\"sampling_rules\":[{\"rate\":0,\"name\":\"GET\"}],\"send_logs_level_by_scope\":\"noisy.*=error\"," +
-                "\"sampling_traces_per_second\":\"5\",\"send_logs_per_second\":\"7\"," +
-                "\"debug_until\":\"2026-10-14T12:10:00Z\",\"debug_send_logs_level\":\"debug\"}"));
+            var status = agent.RemoteConfig(Vectors.Config(Policy.Of(
+                ("sampling_rules", """{"rules":[{"rate":0,"name":"GET"}]}"""),
+                ("log_levels", """{"scopes":{"noisy.*":"error"}}"""),
+                ("trace_rate_limit", """{"traces_per_second":5}"""),
+                ("log_rate_limit", """{"records_per_second":7}"""),
+                ("debug", """{"until":"2026-10-14T12:10:00Z","log_level":"debug"}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             Assert.Empty(agent.Controls.Sampler.Policy.Rules);
             Assert.Equal(5, agent.Controls.Sampler.Policy.Cap!.PerSecond);

@@ -29,6 +29,7 @@
   <ItemGroup>
     <!-- The SharpFuzz targets, run on their seeds and on every input kept under crashes/ (FuzzInputsTests). -->
     <Compile Include="../Pydantic.OpAmp.Client.Fuzz/Targets/*.cs" Link="Fuzz/%(Filename)%(Extension)" />
+    <Compile Include="../Pydantic.OpAmp.AutoInstrumentation.Tests/Policy.cs" Link="Policy.cs" />
     <None Include="../Pydantic.OpAmp.Client.Fuzz/crashes/**/*" Link="fuzz-crashes/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

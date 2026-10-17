@@ -27,6 +27,8 @@ import {
   toBinary,
 } from "@pydantic/opamp-client";
 
+import { FILE, policy } from "./policy.js";
+
 const REGISTER = new URL("../src/register.js", import.meta.url).href;
 const INDEX = new URL("../src/index.js", import.meta.url).href;
 
@@ -315,7 +317,7 @@ test("bad values given in code are warned about and the program runs: a scheme t
  * that says it takes connection settings a key of its own in its answer to the agent's first
  * message with the enrollment key; once the agent uses its own key, the enrollment key speaks for
  * it no more (401). */
-/** An OpAMP server that offers `offer` (an `elastic` settings document) in its first answer, if
+/** An OpAMP server that offers `offer` (a Logfire SDK policy) in its first answer, if
  * given: the statuses it is sent, and the settings each first message reports in force. */
 async function configServer(offer?: string) {
   const seen = { polls: 0, applied: false, firstEffective: [] as string[] };
@@ -324,13 +326,13 @@ async function configServer(offer?: string) {
     seen.polls++;
     const status = msg.remoteConfigStatus;
     if (status?.status === RemoteConfigStatuses.RemoteConfigStatuses_APPLIED) seen.applied = true;
-    const elastic = msg.effectiveConfig?.configMap?.configMap.elastic;
-    if (msg.sequenceNum === 0n && elastic) seen.firstEffective.push(new TextDecoder().decode(elastic.body));
+    const reported = msg.effectiveConfig?.configMap?.configMap[FILE];
+    if (msg.sequenceNum === 0n && reported) seen.firstEffective.push(new TextDecoder().decode(reported.body));
     const reply = create(ServerToAgentSchema, { instanceUid: msg.instanceUid });
     if (offer !== undefined && seen.polls === 1) {
       const body = new TextEncoder().encode(offer);
       reply.remoteConfig = create(AgentRemoteConfigSchema, {
-        configHash: body, config: { configMap: { elastic: { body, contentType: "application/json" } } },
+        configHash: body, config: { configMap: { [FILE]: { body, contentType: "application/json" } } },
       });
     }
     res.setHeader("Content-Type", "application/x-protobuf");
@@ -342,7 +344,7 @@ async function configServer(offer?: string) {
 
 test("a config applied through the server is where the next start begins, with no file of the package's own", async () => {
   // The server hears APPLIED once the client has saved the config with its state.
-  const first = await configServer('{"sampling_rate":"0.5"}');
+  const first = await configServer(policy({ head_sampling: { ratio: 0.5 } }));
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-state-"));
   const env = { OTEL_OPAMP_STATE_DIR: dir };
   try {
@@ -360,7 +362,8 @@ test("a config applied through the server is where the next start begins, with n
   const second = await configServer();
   try {
     const r = await run("setTimeout(() => {}, 1000);", second.endpoint, undefined, undefined, env);
-    assert.deepEqual(second.seen.firstEffective.map((e) => JSON.parse(e)), [{ sampling_rate: "0.5" }], r.out);
+    const sampling = second.seen.firstEffective.map((e) => JSON.parse(e).head_sampling);
+    assert.deepEqual(sampling, [{ mode: "override", ratio: 0.5 }], r.out);
   } finally {
     second.close();
   }

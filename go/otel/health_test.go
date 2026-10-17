@@ -98,7 +98,7 @@ func TestTheHealthVectors(t *testing.T) {
 			for i, s := range c.Steps {
 				doc := s.Settings
 				if doc == nil {
-					doc = json.RawMessage(`{}`)
+					doc = json.RawMessage(v1()) // left out: every control local
 				}
 				settings := settingsOf(t, doc, s.Now)
 				counts := &settingspb.ExportCounts{}
@@ -204,14 +204,14 @@ func TestTheGatesCount(t *testing.T) {
 	span()
 	span()
 	spans.err = nil
-	c.Apply(settingsOf(t, []byte(`{"send_traces":"false"}`), 0))
+	c.Apply(settingsOf(t, []byte(v1("signal_exports", exports("off", "", ""))), 0))
 	span()
 	tr := c.Counts().GetTraces()
 	if tr.GetExportsOk() != 1 || tr.GetExportsFailed() != 2 || tr.GetItemsFailed() != 2 || tr.GetItemsFiltered() != 1 ||
 		!tr.GetLastFailed() || tr.GetLastError() != "connection refused" {
 		t.Fatalf("traces: %v", tr)
 	}
-	c.Apply(settingsOf(t, []byte(`{}`), 0))
+	c.Apply(settingsOf(t, []byte(v1()), 0))
 	span()
 	if tr := c.Counts().GetTraces(); tr.GetLastFailed() || tr.GetLastError() != "" || tr.GetExportsOk() != 2 {
 		t.Fatalf("a success clears the failure: %v", tr)
@@ -219,12 +219,12 @@ func TestTheGatesCount(t *testing.T) {
 
 	logSink := &recordSink{}
 	lp := gatedLogs(c, logSink)
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn","send_logs_per_second":"1"}`), 0))
+	c.Apply(settingsOf(t, []byte(every("log_levels", override(`"level":"warn"`), "log_rate_limit", override(`"records_per_second":1`))), 0))
 	emit(lp, "app", log.SeverityDebug) // the level
 	emit(lp, "app", log.SeverityError) // the cap's one token
 	emit(lp, "app", log.SeverityError) // the cap
 	logSink.err = errors.New("HTTP 503")
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn"}`), 0))
+	c.Apply(settingsOf(t, []byte(every("log_levels", override(`"level":"warn"`))), 0))
 	emit(lp, "app", log.SeverityError)
 	lg := c.Counts().GetLogs()
 	if lg.GetExportsOk() != 1 || lg.GetExportsFailed() != 1 || lg.GetItemsFailed() != 1 || lg.GetItemsFiltered() != 2 ||
@@ -238,7 +238,7 @@ func TestTheGatesCount(t *testing.T) {
 		{Metrics: []metricdata.Metrics{{Data: metricdata.Histogram[float64]{DataPoints: make([]metricdata.HistogramDataPoint[float64], 2)}}}},
 	}}
 	rm.ScopeMetrics[0].Scope.Name, rm.ScopeMetrics[1].Scope.Name = "app", otelhttp
-	c.Apply(settingsOf(t, []byte(`{"deactivate_instrumentations":"otelhttp"}`), 0))
+	c.Apply(settingsOf(t, []byte(every("instrumentations", override(`"disabled":["otelhttp"]`))), 0))
 	_ = c.Metrics(m).Export(context.Background(), rm)
 	if mt := c.Counts().GetMetrics(); mt.GetExportsFailed() != 1 || mt.GetItemsFailed() != 3 || mt.GetItemsFiltered() != 2 {
 		t.Fatalf("metrics: %v", mt)
@@ -287,7 +287,7 @@ func TestExportHealthIsReportedOnTheTimer(t *testing.T) {
 		t.Fatalf("recovered: %d reports", len(rep.health))
 	}
 	// The debug timer and the health timer are one: a debug window's end is not held up by it.
-	a.remoteConfig(context.Background(), remote(`{"debug_until":"2026-10-14T12:02:00Z"}`))
+	a.remoteConfig(context.Background(), remote(every("debug", override(`"until":"2026-10-14T12:02:00Z"`))))
 	if ft.pending() != 1 {
 		t.Fatalf("%d timers armed", ft.pending())
 	}

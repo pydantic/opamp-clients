@@ -10,6 +10,8 @@ import { test } from "node:test";
 import { create } from "@bufbuild/protobuf";
 
 import {
+  AgentConfigObjectSchema,
+  type AgentDescription,
   AgentRemoteConfigSchema,
   type AvailableComponents,
   type ComponentDetails,
@@ -17,93 +19,17 @@ import {
   RemoteConfigStatuses,
 } from "../src/index.js";
 import { type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
+import { config, full, off, overridden, policy, reported, V1 } from "./policy.js";
 
 const text = (s: string) => new TextEncoder().encode(s);
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text("h"),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
-const effective = (e: { configMap?: { configMap: Record<string, { body: Uint8Array }> } } | undefined) =>
-  new TextDecoder().decode(e?.configMap?.configMap.elastic?.body);
-/** What the effective config names as set aside (its elastic.set_aside entry), if anything. */
-const setAside = (e: { configMap?: { configMap: Record<string, { body: Uint8Array; contentType: string }> } } | undefined) => {
-  const files = e?.configMap?.configMap ?? {};
-  assert.deepEqual(Object.keys(files).filter((k) => k !== "elastic" && k !== "elastic.set_aside"), []);
-  const f = files["elastic.set_aside"];
-  if (f === undefined) return undefined;
-  assert.equal(f.contentType, "application/json");
-  return JSON.parse(new TextDecoder().decode(f.body)) as unknown;
-};
-
-test("loads, decides and describes", () => {
-  const layer = new SdkSettings();
-  const loaded = layer.load(text('{"send_logs":"false"}'), declaring);
-  assert.equal(loaded.settings?.sendLogs, false);
-  assert.equal(effective(loaded.effective), '{"send_logs":"false"}');
-
-  const kept: Uint8Array[] = [];
-  const d = layer.decide(config('{"sampling_rate":"0.25"}'), loaded.current, loaded.current, declaring, 0n, (doc) => {
-    kept.push(doc);
-  });
-  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.deepEqual(d.status?.lastRemoteConfigHash, text("h"));
-  assert.equal(d.apply?.samplingRate, 0.25);
-  assert.deepEqual(kept, [text('{"sampling_rate":"0.25"}')]);
-  assert.equal(effective(d.effective), '{"sampling_rate":"0.25"}');
-  assert.equal(setAside(d.effective), undefined); // nothing set aside, no entry
-
-  const bad = layer.decide(config('{"sampling_rate":"x"}'), d.current, loaded.current, declaring, 0n, () => {});
-  assert.equal(bad.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.match(bad.status?.errorMessage ?? "", /^sampling_rate:/);
-  assert.equal(bad.apply, undefined);
-  assert.deepEqual(bad.current, d.current);
-  assert.equal(kept.length, 1); // refused: nothing to keep
-
-  const desc = layer.describe([
-    create(KeyValueSchema, { key: "service.name", value: { value: { case: "stringValue", value: "checkout" } } }),
-    create(KeyValueSchema, { key: "host.name", value: { value: { case: "stringValue", value: "h" } } }),
-  ]);
-  assert.deepEqual(desc.identifyingAttributes.map((kv) => kv.key), ["service.name"]);
-  assert.deepEqual(desc.nonIdentifyingAttributes.map((kv) => kv.key), ["host.name"]);
-});
-
-test("a host says what it carries out", () => {
-  const layer = new SdkSettings();
-  const host = { live: ["deactivate_instrumentations"] };
-  const d = layer.decide(config('{"send_traces":"false","deactivate_instrumentations":"http","x":"1"}'), new Uint8Array(), new Uint8Array(), host);
-  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  // Not declared, so not carried out; a setting nothing knows is told apart from it.
-  assert.deepEqual([d.apply?.unsupported, d.apply?.ignored], [["send_traces"], ["x"]]);
-  assert.deepEqual(d.apply?.deactivateInstrumentations?.names, ["http"]); // live: in force now, no state needed
-  assert.equal(effective(d.effective), '{"deactivate_instrumentations":"http"}');
-  // Named for the server beside what is in force (#215), by Decide, Load and Refresh alike, and
-  // still after a FAILED, which leaves the document in force.
-  const names = { ignored: ["x"], unsupported: ["send_traces"] };
-  assert.deepEqual(setAside(d.effective), names);
-  assert.equal(d.status?.errorMessage, "");
-  assert.deepEqual(setAside(layer.load(d.current, host).effective), names);
-  assert.deepEqual(setAside(layer.refresh(d.current, new Uint8Array(), 1n, host).effective), names);
-  const failed = layer.decide(config('{"deactivate_instrumentations":"HTTP"}'), d.current, new Uint8Array(), host);
-  assert.equal(failed.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.deepEqual(setAside(failed.effective), names);
-  assert.equal(layer.load(text('{"send_traces":"false"}'), host).settings?.sendTraces, undefined);
-  // A host naming what is no setting has a bug: an error, saying which.
-  assert.throws(() => layer.load(undefined, { live: ["send_metric"] }), /send_metric/);
-});
-
-test("a log level arrives as the lowest severity number to export", () => {
-  const layer = new SdkSettings();
-  const d = layer.decide(config('{"send_logs_level":"Warning"}'), new Uint8Array(), new Uint8Array(), declaring);
-  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.equal(d.apply?.sendLogsMinSeverity, 13);
-  assert.equal(effective(d.effective), '{"send_logs_level":"warn"}');
-  assert.equal(layer.load(text("{}"), declaring).settings?.sendLogsMinSeverity, undefined); // unset: every severity
-});
+const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
+const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
+const none = new Uint8Array();
 
 // A host that declares every setting: each live one at once, each next-start one at the next start.
 const declaring = {
   live: [
+    "custom",
     "debug_sampling_rate",
     "debug_send_logs_level",
     "debug_until",
@@ -119,17 +45,131 @@ const declaring = {
     "send_metrics",
     "send_traces",
   ],
-  nextStart: ["deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"],
+  nextStart: ["deactivate_all_instrumentations", "deactivate_instrumentations"],
 };
 const now = 1_791_979_200_000n; // 2026-10-14T12:00:00Z
 
+test("loads, decides and describes", () => {
+  const layer = new SdkSettings();
+  const logsOff = policy({ signal_exports: off("logs") });
+  const loaded = layer.load(text(logsOff), declaring);
+  assert.equal(loaded.settings?.sendLogs, false);
+  assert.equal(reported(loaded.effective), full(logsOff));
+
+  const kept: Uint8Array[] = [];
+  const quarter = policy({ head_sampling: { ratio: 0.25 } });
+  const d = layer.decide(config(quarter), loaded.current, loaded.current, declaring, 0n, (doc) => {
+    kept.push(doc);
+  });
+  assert.equal(d.status?.status, APPLIED);
+  assert.deepEqual(d.status?.lastRemoteConfigHash, text("h"));
+  assert.equal(d.apply?.samplingRate, 0.25);
+  assert.deepEqual(kept, [text(quarter)]);
+  assert.equal(reported(d.effective), full(quarter));
+
+  const bad = layer.decide(config(policy({ head_sampling: { ratio: "x" } })), d.current, loaded.current, declaring, 0n, () => {});
+  assert.equal(bad.status?.status, FAILED);
+  assert.match(bad.status?.errorMessage ?? "", /^head_sampling:/);
+  assert.equal(bad.apply, undefined);
+  assert.deepEqual(bad.current, d.current);
+  assert.equal(kept.length, 1); // refused: nothing to keep
+
+  const desc = layer.describe([
+    create(KeyValueSchema, { key: "service.name", value: { value: { case: "stringValue", value: "checkout" } } }),
+    create(KeyValueSchema, { key: "host.name", value: { value: { case: "stringValue", value: "h" } } }),
+  ], declaring, now);
+  assert.deepEqual(desc.identifyingAttributes.map((kv) => kv.key), ["service.name"]);
+  assert.equal(desc.nonIdentifyingAttributes[0]?.key, "host.name");
+});
+
+/** The description's policy attributes: a string's text, an array's strings. */
+function described(desc: AgentDescription): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const kv of desc.nonIdentifyingAttributes) {
+    if (!kv.key.startsWith("logfire.opamp.")) continue;
+    const v = kv.value?.value;
+    out[kv.key] = v?.case === "arrayValue"
+      ? v.value.values.map((x) => (x.value.case === "stringValue" ? x.value.value : undefined))
+      : v?.value;
+  }
+  return out;
+}
+
+test("the description names the policy format and the controls the host carries out", () => {
+  const layer = new SdkSettings();
+  const host = { live: ["sampling_rate", "send_logs", "custom"], nextStart: ["deactivate_instrumentations"] };
+  assert.deepEqual(described(layer.describe([], host, now)), {
+    "logfire.opamp.config_format": V1,
+    "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings", "instrumentations"],
+  });
+  // Every setting declared: every control. No host: none.
+  const every = described(layer.describe([], declaring, now))["logfire.opamp.supported_controls"] as string[];
+  for (const c of ["head_sampling", "sampling_rules", "debug", "app_settings", "instrumentations"]) assert.ok(every.includes(c), c);
+  assert.deepEqual(described(layer.describe([]))["logfire.opamp.supported_controls"], []);
+});
+
+test("a host says what it carries out", () => {
+  const layer = new SdkSettings();
+  const host = { live: ["deactivate_instrumentations"] };
+  const sw = policy({ instrumentations: { disabled: ["http"] } });
+  const d = layer.decide(config(sw), none, none, host);
+  assert.equal(d.status?.status, APPLIED);
+  assert.deepEqual(d.apply?.deactivateInstrumentations?.names, ["http"]); // live: in force now, no state needed
+  assert.deepEqual(overridden(d.effective), { instrumentations: { disabled: ["http"] } });
+  // An override the host does not carry out refuses the whole policy, and what was in force stays.
+  const tracesOff = policy({ signal_exports: off("traces") });
+  const refused = layer.decide(config(tracesOff), d.current, none, host);
+  assert.equal(refused.status?.status, FAILED);
+  assert.equal(refused.status?.errorMessage, "signal_exports.traces: this SDK cannot apply the requested override");
+  assert.equal(refused.apply, undefined);
+  assert.deepEqual(refused.current, d.current);
+  assert.deepEqual(overridden(refused.effective), { instrumentations: { disabled: ["http"] } });
+  // A control past the first two names the field too.
+  const rules = layer.decide(config(policy({ sampling_rules: { rules: [{ rate: 0 }] } })), d.current, none, host);
+  assert.equal(rules.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
+  // A field nothing here knows refuses it too.
+  const unknown = JSON.stringify({ ...JSON.parse(sw), x: "1" });
+  assert.equal(layer.decide(config(unknown), d.current, none, host).status?.errorMessage, 'policy: unknown field "x"');
+  // Saved under another host, a setting this one does not carry out is not in force.
+  assert.equal(layer.load(text(tracesOff), host).settings?.sendTraces, undefined);
+  // Declared nothing, nothing is carried out: every override is refused.
+  const nothing = layer.decide(config(policy({ head_sampling: { ratio: 0.5 } })), none, none, undefined, 0n, () => {});
+  assert.equal(nothing.status?.errorMessage, "head_sampling: this SDK cannot apply the requested override");
+  // A host naming what is no setting has a bug: an error, saying which.
+  assert.throws(() => layer.load(undefined, { live: ["send_metric"] }), /send_metric/);
+});
+
+test("a policy is the config's only file", () => {
+  const layer = new SdkSettings();
+  const beside = config(policy());
+  beside.config!.configMap["other.json"] = create(AgentConfigObjectSchema, { body: text("{}"), contentType: "application/json" });
+  const d = layer.decide(beside, none, none, declaring);
+  assert.equal(d.status?.status, FAILED);
+  assert.match(d.status?.errorMessage ?? "", /^config_map:/);
+  const empty = create(AgentRemoteConfigSchema, { configHash: text("h"), config: { configMap: {} } });
+  assert.match(layer.decide(empty, none, none, declaring).status?.errorMessage ?? "", /^config_map:/);
+});
+
+test("a log level arrives as the lowest severity number to export", () => {
+  const layer = new SdkSettings();
+  const d = layer.decide(config(policy({ log_levels: { level: "Warning" } })), none, none, declaring);
+  assert.equal(d.status?.status, APPLIED);
+  assert.equal(d.apply?.sendLogsMinSeverity, 13);
+  assert.deepEqual(overridden(d.effective), { log_levels: { level: "warn" } });
+  assert.equal(layer.load(text(policy()), declaring).settings?.sendLogsMinSeverity, undefined); // unset: every severity
+});
+
 test("the settings that match telemetry arrive typed, where the host declares them", () => {
   const layer = new SdkSettings();
-  const doc =
-    '{"sampling_rules":[{"rate":0,"kind":"server","path":"/health*"}],"send_logs_level_by_scope":"com.acme.db*=debug",' +
-    '"drop_attributes":"*token*","mask_attributes":"User.Email","sampling_traces_per_second":"50","send_logs_per_second":"0.5"}';
-  const d = layer.decide(config(doc), new Uint8Array(), new Uint8Array(), declaring, now);
-  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
+  const doc = policy({
+    sampling_rules: { rules: [{ rate: 0, kind: "server", path: "/health*" }] },
+    log_levels: { scopes: { "com.acme.db*": "debug" } },
+    attribute_redaction: { drop: ["*token*"], mask: ["User.Email"] },
+    trace_rate_limit: { traces_per_second: 50 },
+    log_rate_limit: { records_per_second: 0.5 },
+  });
+  const d = layer.decide(config(doc), none, none, declaring, now);
+  assert.equal(d.status?.status, APPLIED);
   const s = d.apply!;
   assert.equal(s.samplingRules.length, 1);
   const [rule] = s.samplingRules;
@@ -139,27 +179,27 @@ test("the settings that match telemetry arrive typed, where the host declares th
   assert.deepEqual(s.sendLogsScopeLevels.map((l) => [l.pattern, l.minSeverity]), [["com.acme.db*", 5]]);
   assert.deepEqual([s.dropAttributes, s.maskAttributes], [["*token*"], ["user.email"]]);
   assert.deepEqual([s.samplingTracesPerSecond, s.sendLogsPerSecond], [50, 0.5]);
-  // Undeclared: ignored, never in force.
-  const plain = layer.decide(config(doc), new Uint8Array(), new Uint8Array(), { live: ["sampling_rate"] });
-  assert.equal(plain.apply?.samplingRules.length, 0);
-  assert.equal(plain.apply?.unsupported.length, 6);
-  assert.equal(effective(plain.effective), "{}");
+  // Undeclared: refused, never in force.
+  const plain = layer.decide(config(doc), none, none, { live: ["sampling_rate"] });
+  assert.equal(plain.status?.status, FAILED);
+  assert.equal(plain.apply, undefined);
+  assert.equal(plain.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
 });
 
 test("debug mode arrives folded in, and a refresh at its end ends it", () => {
   const layer = new SdkSettings();
-  const doc = '{"sampling_rate":"0.1","debug_until":"2026-10-14T12:30:00Z","debug_send_logs_level":"info"}';
-  const d = layer.decide(config(doc), new Uint8Array(), new Uint8Array(), declaring, now, () => {});
+  const doc = policy({ head_sampling: { ratio: 0.1 }, debug: { until: "2026-10-14T12:30:00Z", log_level: "info" } });
+  const d = layer.decide(config(doc), none, none, declaring, now, () => {});
   assert.equal(d.apply?.samplingRate, 1);
   assert.equal(d.apply?.sendLogsMinSeverity, 9);
   const end = now + 30n * 60_000n;
   assert.equal(d.refreshAtUnixMs, end);
-  const before = layer.refresh(d.current, new Uint8Array(), end - 1n, declaring);
+  const before = layer.refresh(d.current, none, end - 1n, declaring);
   assert.equal(before.settings?.samplingRate, 1);
-  const after = layer.refresh(d.current, new Uint8Array(), end, declaring);
+  const after = layer.refresh(d.current, none, end, declaring);
   assert.equal(after.settings?.samplingRate, 0.1);
   assert.equal(after.refreshAtUnixMs, 0n);
-  assert.equal(effective(after.effective), '{"sampling_rate":"0.1"}');
+  assert.deepEqual(overridden(after.effective), { head_sampling: { ratio: 0.1 } });
   assert.equal(layer.load(d.current, declaring, now).refreshAtUnixMs, end);
 });
 
@@ -185,34 +225,32 @@ test("export health: sent at the first call and on a failure, held while nothing
 interface CustomCase {
   name: string;
   document: string;
-  host?: { live?: string[] };
+  host?: { live?: string[]; next_start?: string[] };
   refused?: string;
   custom?: Record<string, string>;
-  effective?: Record<string, string>;
-  set_aside?: object;
+  effective?: string;
 }
+
+const hostOf = (h: { live?: string[]; next_start?: string[] } | undefined) =>
+  h === undefined ? declaring : { live: h.live ?? [], nextStart: h.next_start ?? [] };
 
 test("vectors: custom.json, the application's own settings, through Decide, Load and Refresh", () => {
   const url = new URL("../../../../testdata/sdk-settings/custom.json", import.meta.url);
   const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: CustomCase[] }).cases;
-  assert.ok(cases.length >= 30);
+  assert.ok(cases.length >= 15);
   const layer = new SdkSettings();
-  const none = new Uint8Array();
-  // Without a host of its own, a case's host declares every setting, as the Rust vectors' does.
-  const every = { ...declaring, live: [...declaring.live, "custom"] };
   for (const c of cases) {
-    const host = c.host ?? every;
+    const host = hostOf(c.host);
     const d = layer.decide(config(c.document), none, none, host, now, () => {});
     if (c.refused !== undefined) {
-      assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED, c.name);
+      assert.equal(d.status?.status, FAILED, c.name);
       assert.equal(d.status?.errorMessage, c.refused, c.name);
       assert.equal(d.apply, undefined, c.name);
       continue;
     }
-    assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, `${c.name}: ${d.status?.errorMessage}`);
+    assert.equal(d.status?.status, APPLIED, `${c.name}: ${d.status?.errorMessage}`);
     assert.deepEqual({ ...d.apply!.custom }, c.custom, c.name);
-    assert.deepEqual(JSON.parse(effective(d.effective)), c.effective, c.name);
-    assert.deepEqual(setAside(d.effective), c.set_aside, c.name);
+    assert.equal(reported(d.effective), c.effective, c.name);
     // The same map at the next start (Load of what Decide saved) and at the timer's Refresh.
     const loaded = layer.load(d.current, host, now);
     assert.deepEqual({ ...loaded.settings!.custom }, c.custom, `${c.name} (load)`);
@@ -221,37 +259,69 @@ test("vectors: custom.json, the application's own settings, through Decide, Load
   }
 });
 
+interface SettingsCase {
+  name: string;
+  document: string;
+  host?: { live?: string[]; next_start?: string[] };
+  now_unix_ms?: number;
+  refused?: string;
+  effective?: string;
+  refresh_at_unix_ms?: number;
+}
+
+test("vectors: settings.json, how the layer reads a policy, through Decide", () => {
+  const url = new URL("../../../../testdata/sdk-settings/settings.json", import.meta.url);
+  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: SettingsCase[] }).cases;
+  assert.ok(cases.length > 100);
+  const layer = new SdkSettings();
+  for (const c of cases) {
+    // The policy is also the one in force at start, so a next-start setting is in force at once.
+    const doc = text(c.document);
+    const d = layer.decide(config(doc), none, doc, hostOf(c.host), BigInt(c.now_unix_ms ?? 0), () => {});
+    if (c.refused !== undefined) {
+      assert.equal(d.status?.errorMessage, c.refused, c.name);
+      assert.equal(d.status?.status, FAILED, c.name);
+      continue;
+    }
+    assert.equal(d.status?.status, APPLIED, `${c.name}: ${d.status?.errorMessage}`);
+    assert.equal(reported(d.effective), c.effective, c.name);
+    if (c.refresh_at_unix_ms !== undefined) assert.equal(d.refreshAtUnixMs, BigInt(c.refresh_at_unix_ms), c.name);
+  }
+});
+
 test("the save the layer asks for decides the answer (#215: decide, then commit)", () => {
   const layer = new SdkSettings();
-  const current = text('{"sampling_rate":"0.5"}');
-  const failed = layer.decide(config('{"sampling_rate":"0.25"}'), current, current, declaring, 0n, () => {
+  const current = text(policy({ head_sampling: { ratio: 0.5 } }));
+  const quarter = config(policy({ head_sampling: { ratio: 0.25 } }));
+  const failed = layer.decide(quarter, current, current, declaring, 0n, () => {
     throw new Error("ENOSPC: no space left on device");
   });
-  assert.equal(failed.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
+  assert.equal(failed.status?.status, FAILED);
   assert.equal(failed.status?.errorMessage, "can't save the settings: ENOSPC: no space left on device");
   assert.equal(failed.apply, undefined);
   assert.deepEqual(failed.current, current);
-  assert.equal(effective(failed.effective), '{"sampling_rate":"0.5"}');
+  assert.deepEqual(overridden(failed.effective), { head_sampling: { ratio: 0.5 } });
   // Whatever is thrown refuses the config.
-  const odd = layer.decide(config('{"sampling_rate":"0.25"}'), current, current, declaring, 0n, () => {
+  const odd = layer.decide(quarter, current, current, declaring, 0n, () => {
     throw "a string";
   });
   assert.equal(odd.status?.errorMessage, "can't save the settings: a string");
   // Nowhere to keep state: a live change is applied, a next-start one refused.
-  const live = layer.decide(config('{"sampling_rate":"0.25"}'), current, current, declaring);
-  assert.equal(live.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  const later = layer.decide(config('{"opamp_polling_interval":"1m"}'), current, current, declaring);
+  const live = layer.decide(quarter, current, current, declaring);
+  assert.equal(live.status?.status, APPLIED);
+  const redis = policy({ instrumentations: { disabled: ["redis"] } });
+  const later = layer.decide(config(redis), current, current, declaring);
   assert.equal(
     later.status?.errorMessage,
-    "opamp_polling_interval take effect at the next start, which needs somewhere to keep state",
+    "instrumentations: takes effect at the next start, which needs somewhere to keep state",
   );
   const kept: Uint8Array[] = [];
-  const saved = layer.decide(config('{"opamp_polling_interval":"1m"}'), current, current, declaring, 0n, (doc) => {
+  const saved = layer.decide(config(redis), current, current, declaring, 0n, (doc) => {
     kept.push(doc);
   });
-  assert.equal(saved.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  assert.deepEqual(saved.pendingRestart, ["opamp_polling_interval"]);
-  assert.deepEqual(kept, [text('{"opamp_polling_interval":"1m"}')]);
+  assert.equal(saved.status?.status, APPLIED);
+  assert.deepEqual(saved.pendingRestart, ["deactivate_instrumentations"]);
+  assert.deepEqual(kept, [text(redis)]);
 });
 
 test("a string that starts with U+FEFF comes back from the layer as it was sent", () => {
@@ -259,11 +329,10 @@ test("a string that starts with U+FEFF comes back from the layer as it was sent"
   // matchers run on would differ from every other language's.
   const layer = new SdkSettings();
   const d = layer.decide(
-    config(JSON.stringify({
-      sampling_rules: [{ rate: 1, name: "﻿GET", attributes: { "﻿k": "﻿*" } }],
-      send_logs_level_by_scope: "﻿app*=error",
-      drop_attributes: "﻿secret",
-      mask_attributes: "﻿﻿pass*",
+    config(policy({
+      sampling_rules: { rules: [{ rate: 1, name: "﻿GET", attributes: { "﻿k": "﻿*" } }] },
+      log_levels: { scopes: { "﻿app*": "error" } },
+      attribute_redaction: { drop: ["﻿secret"], mask: ["﻿﻿pass*"] },
     })),
     new Uint8Array(),
     new Uint8Array(),
@@ -324,10 +393,10 @@ test("vectors: components.json, each inventory through Components", () => {
   assert.ok(cases.length > 10);
   const layer = new SdkSettings();
   for (const c of cases) {
-    // Without a host, one that declares every setting, the application's own too (as custom.json's).
+    // Without a host, one that declares every setting, the application's own too.
     const host: HostInit = c.host
       ? { live: c.host.live ?? [], nextStart: c.host.next_start ?? [] }
-      : { live: [...declaring.live, "custom"], nextStart: declaring.nextStart };
+      : declaring;
     const i = c.inventory;
     const inventory: InventoryInit = {
       integration: i.integration,
@@ -345,7 +414,7 @@ test("vectors: components.json, each inventory through Components", () => {
   }
 });
 
-type StartCase = { name: string; core_state?: string; saved?: string; want: string | null };
+type StartCase = { name: string; core_state?: string; saved?: string; want: string; warns: boolean };
 
 test("vectors: start.json, the settings to start with from the core's saved state", () => {
   const url = new URL("../../../../testdata/sdk-settings/start.json", import.meta.url);
@@ -354,7 +423,8 @@ test("vectors: start.json, the settings to start with from the core's saved stat
   for (const c of cases) {
     const coreState = c.core_state === undefined ? undefined : new Uint8Array(Buffer.from(c.core_state, "hex"));
     const saved = c.saved === undefined ? undefined : new TextEncoder().encode(c.saved);
-    const loaded = layer.load(saved, undefined, 0n, coreState);
-    assert.equal(new TextDecoder().decode(loaded.current), c.want ?? "{}", c.name);
+    const loaded = layer.load(saved, declaring, 0n, coreState);
+    assert.equal(new TextDecoder().decode(loaded.current), c.want, c.name);
+    assert.equal(loaded.warning !== "", c.warns, `${c.name}: ${loaded.warning}`);
   }
 });

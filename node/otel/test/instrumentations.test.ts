@@ -14,16 +14,10 @@ import { trace } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { node } from "@opentelemetry/sdk-node";
 import { InMemorySpanExporter, type ReadableSpan, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { RemoteConfigStatuses } from "@pydantic/opamp-client";
 
+import { config, policy } from "./policy.js";
 import { Agent } from "../src/index.js";
-
-const text = (s: string) => new TextEncoder().encode(s);
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
 
 // As the register: the instrumentations the variables load, then the SDK, then the server's.
 process.env.OTEL_NODE_ENABLED_INSTRUMENTATIONS = "http,undici";
@@ -36,7 +30,7 @@ agent.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp" });
 agent.instrument(instrumentations);
 
 function apply(settings: string): void {
-  assert.equal(agent.remoteConfig(config(settings)).status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
+  assert.equal(agent.remoteConfig(config(settings, settings)).status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
 }
 
 // Required after the instrumentations are on, as an application under the register requires it.
@@ -77,18 +71,18 @@ const UNDICI = "@opentelemetry/instrumentation-undici";
 test("http's spans stop when it is switched off and come back when it is switched on", async () => {
   // Client, server, and the application's own.
   assert.deepEqual(scopes(await request(get)), [HTTP, HTTP, "checkout"]);
-  apply('{"deactivate_instrumentations":"http"}');
+  apply(policy({ instrumentations: { disabled: ["http"] } }));
   assert.deepEqual(scopes(await request(get)), ["checkout"]);
-  apply("{}");
+  apply(policy());
   assert.deepEqual(scopes(await request(get)), [HTTP, HTTP, "checkout"]);
-  apply('{"deactivate_all_instrumentations":"true"}');
+  apply(policy({ instrumentations: { all_disabled: true } }));
   assert.deepEqual(scopes(await request(get)), ["checkout"]);
-  apply('{"deactivate_all_instrumentations":"false"}');
+  apply(policy({ instrumentations: { all_disabled: false } }));
   assert.deepEqual(scopes(await request(get)), [HTTP, HTTP, "checkout"]);
 });
 
 test("the trace goes on through the instrumentations still on", async () => {
-  apply('{"deactivate_instrumentations":"http"}');
+  apply(policy({ instrumentations: { disabled: ["http"] } }));
   try {
     // fetch (undici, on) calls the server (http, off): the request's span is the handler's parent.
     const made = await request(() => app.startActiveSpan("checkout", async (span) => {
@@ -108,6 +102,6 @@ test("the trace goes on through the instrumentations still on", async () => {
     assert.equal(handled.parentSpanContext?.spanId, client.spanContext().spanId);
     assert.equal(new Set(made.map((s) => s.spanContext().traceId)).size, 1);
   } finally {
-    apply("{}");
+    apply(policy());
   }
 });

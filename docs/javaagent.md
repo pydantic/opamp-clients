@@ -69,11 +69,11 @@ extension's customizers run last, and it reads what the SDK is built with:
 
 - **A processor or reader of its own.** A tracer, logger or meter provider customizer can add a
   span processor, a log record processor or a metric reader. What it exports doesn't go through
-  the extension's gate, so that signal's gate settings are set aside, as under a configuration
-  file. For traces these are `send_traces`, `drop_attributes` and `mask_attributes`. For logs they
-  are `send_logs`, `send_logs_level`, `send_logs_level_by_scope`, `send_logs_per_second`,
-  `debug_send_logs_level` and the two redaction settings. For metrics it is `send_metrics`. The
-  agent logs a WARNING that names what was added and what is set aside. The inventory lists it,
+  the extension's gate, so that signal's gate controls are set aside, as under a configuration
+  file. For traces these are `signal_exports.traces` and `attribute_redaction`. For logs they are
+  `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug`
+  (`log_level`) and `attribute_redaction`. For metrics it is `signal_exports.metrics`. The agent
+  logs a WARNING that names what was added and what is set aside. The inventory lists it,
   ungated. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
   counted: the agent adds such processors itself, and one that exported would send spans before
   they end.
@@ -85,12 +85,15 @@ extension's customizers run last, and it reads what the SDK is built with:
   So does the span processor the agent adds for `otel.javaagent.debug`, which logs every span.
 - **A sampler of its own.** A tracer provider customizer can set a sampler in place of the
   extension's. Once the SDK is built, the extension checks its sampler. If it isn't the
-  extension's, `sampling_rate`, `sampling_rules`, `sampling_traces_per_second` and
-  `debug_sampling_rate` are set aside, with a WARNING. A sampler set through
+  extension's, `head_sampling`, `sampling_rules`, `trace_rate_limit` and `debug`
+  (`sampling_ratio`) are set aside, with a WARNING. A sampler set through
   `otel.traces.sampler` or a sampler customizer is still the one the extension wraps.
 
-All of this is decided before the client starts, so the first effective config already names
-these settings as set aside. The SDK's builders don't expose their processors and readers, so the
+All of this is decided before the client starts, so the extension never declares these controls
+([the host](sdk-settings.md#the-host)). A policy that overrides one is refused, FAILED, and the
+error names the control and field (`signal_exports.traces: this SDK cannot apply the requested
+override`). A saved policy that overrides one is not used at start, and the SDK starts with its
+own settings. The SDK's builders don't expose their processors and readers, so the
 extension reads them reflectively. If it can't, it logs a WARNING and sees nothing added.
 
 The extension can't see an SDK the application builds itself. An application that makes its own
@@ -134,25 +137,29 @@ query string or a fragment. An endpoint without a scheme gets a warning at start
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the agent's resource: `service.name`, `service.namespace` and
   `service.instance.id` identify it. Host, process, runtime and `telemetry.distro.*` describe it.
-- **Takes settings** from the remote config's `elastic` entry:
+  The description also names the policy format the extension reads
+  (`logfire.opamp.config_format`) and the controls this agent carries out
+  (`logfire.opamp.supported_controls`).
+- **Takes settings** from the Logfire SDK policy, the remote config's only file
+  (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the agent's own value, or an
+  override:
 
-  | Setting | How |
+  | Control | How |
   |---|---|
-  | `sampling_rate` | a sampler in place of the agent's (`otel.traces.sampler`, whatever it names); a span whose parent was sampled, here or by the caller, is sampled at any rate, 0 included. Left out: the agent's own sampler. |
-  | `send_traces`, `send_metrics`, `send_logs` | the agent's exporters, wrapped: `false` drops what would be exported (it is lost, not held; spans are still made). A pull reader (`otel.metrics.exporter=prometheus`) is wrapped too: with `send_metrics: false` a scrape gets nothing. |
-  | `send_logs_level` | the same log exporters, at once: a record below that severity is dropped at export, one at it or above is exported, and one with no severity (SeverityNumber 0) is always exported. Left out: every severity. |
-  | `send_logs_level_by_scope`, `drop_attributes`, `mask_attributes`, `sampling_rules`, `sampling_traces_per_second`, `send_logs_per_second`, `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` | at once: see [the settings that match telemetry](#the-settings-that-match-telemetry). |
-  | `deactivate_instrumentations` | at the next start, `otel.instrumentation.<name>.enabled=false`. Names are the agent's: `jdbc`, `spring-webmvc` (every version) or `spring-webmvc-6.0` (one), `java-http-client`, and so on; `_` reads as `-`. |
-  | `deactivate_all_instrumentations` | at the next start, `otel.instrumentation.common.default-enabled=false`. The application's own spans, metrics and logs (through the OpenTelemetry API) stop too. |
-  | `opamp_polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
+  | `head_sampling` | a sampler in place of the agent's (`otel.traces.sampler`, whatever it names). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the agent's own sampler. |
+  | `signal_exports` (`traces`, `metrics`, `logs`) | the agent's exporters, wrapped. `enabled: false` drops what would be exported. It is lost, not held, and spans are still made. A pull reader (`otel.metrics.exporter=prometheus`) is wrapped too. With the metrics export off, a scrape gets nothing. |
+  | `log_levels` (`level`) | the same log exporters, at once. A record below that severity is dropped at export, one at it or above is exported, and one with no severity (SeverityNumber 0) is always exported. Local: every severity. |
+  | `log_levels` (`scopes`), `attribute_redaction`, `sampling_rules`, `trace_rate_limit`, `log_rate_limit`, `debug` | at once. See [the settings that match telemetry](#the-settings-that-match-telemetry). |
+  | `instrumentations` (`disabled`) | at the next start, `otel.instrumentation.<name>.enabled=false`. Names are the agent's: `jdbc`, `spring-webmvc` (every version) or `spring-webmvc-6.0` (one), `java-http-client`, and so on. `_` reads as `-`. |
+  | `instrumentations` (`all_disabled`) | at the next start, `otel.instrumentation.common.default-enabled=false`. The application's own spans, metrics and logs (through the OpenTelemetry API) stop too. |
+  | `app_settings` | at once, to the application ([below](#the-applications-own-settings)). |
 
-  `logging_level` and `infer_spans` (EDOT settings) aren't carried out, so the server can't change a
-  log level; the extension logs them.
+  A policy that overrides a control this agent does not carry out is refused whole (FAILED), and
+  the error names the control. A field the policy format does not know is refused too.
 - **Doesn't trace itself.** The OpAMP client runs with instrumentation suppressed (its own
   HTTP client runs every task that way), so its requests never show up as the application's spans.
-- **Answers** each remote config APPLIED or FAILED, and reports the settings in force as its
-  effective config, with the settings it set aside or didn't know named beside them in an
-  `elastic.set_aside` entry ([sdk-settings.md](sdk-settings.md#the-answer)).
+- **Answers** each remote config APPLIED or FAILED, and reports the policy in force as its
+  effective config, one `logfire-sdk-policy.json` file ([sdk-settings.md](sdk-settings.md#the-answer)).
 - **Says goodbye** (`agent_disconnect`) when the JVM stops (waiting up to 5 s), from a shutdown
   hook of its own. The agent's SDK flushes from its own hook meanwhile: the JVM runs shutdown hooks
   in no set order, so the goodbye isn't ordered before the flush.
@@ -166,53 +173,59 @@ The extension declares each of these to the layer ([the host](sdk-settings.md#th
 autoconfigure and declarative configuration alike: both put the same sampler and gates in. Under a
 configuration file, a span or log processor that is neither batch nor simple, or a metric reader
 neither periodic nor pull, is a component the extension can't gate: that signal's sending, and what
-its gate holds, aren't declared, and the agent logs a warning. What each means is in
-[sdk-settings.md](sdk-settings.md#settings-that-match-telemetry); here is where the agent carries
-it out, and what it sees. Each example is a whole `elastic` document, as the server sends it.
+its gate holds, are not declared. The agent logs a warning, and a policy that overrides them is
+refused. What each means is in
+[sdk-settings.md](sdk-settings.md#settings-that-match-telemetry). Here is where the agent carries
+it out, and what it sees. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 
 ### Sampling rules
 
 ```json
 {
-  "sampling_rate": "0.1",
-  "sampling_rules": [
+  "head_sampling": {"mode": "override", "ratio": 0.1},
+  "sampling_rules": {"mode": "override", "rules": [
     {"rate": 0, "kind": "server", "path": "/health*"},
     {"rate": 0, "kind": "client", "attributes": {"url.full": "*/health*"}},
     {"rate": 1, "name": "checkout *"}
-  ]
+  ]}
 }
 ```
 
 - In the extension's sampler, which is in place of the agent's (`LiveSampler`). For a new trace
   the first rule its root span matches decides the rate, applied by the SDK's trace-ID ratio
-  sampler; then `sampling_rate`; then the agent's own sampler. A span with a parent follows it.
+  sampler; then `head_sampling`; then the agent's own sampler. A span with a parent follows it.
 - A rule sees what the agent's instrumentation sets when it starts the span. HTTP server spans
   start with `url.path`, `http.request.method` and the kind `server`, and are named `GET`:
   `http.route` is mostly added later, so match `path`, not the route or the name. HTTP client
   spans start with `url.full`, `server.address` and `server.port`, so match those under
   `attributes`. Spans the application starts itself have their own name.
 - The sampler `otel.traces.sampler` names (the agent's, or another extension's) is what the
-  rules and the rate fall back to, and what decides every span while neither is set. A sampler
-  another extension sets in place of the extension's sets the rules aside
+  rules and the ratio fall back to. It decides every span while both controls are local. A
+  sampler another extension sets in place of the extension's sets the sampling controls aside
   ([what another extension adds](#what-another-extension-adds)).
 
 ### Log levels per scope
 
 ```json
-{"send_logs_level": "warn", "send_logs_level_by_scope": "com.acme.db*=debug, org.apache.kafka*=error, noisy.lib=off"}
+{"log_levels": {"mode": "override", "level": "warn",
+                "scopes": {"com.acme.db*": "debug", "org.apache.kafka*": "error", "noisy.lib": "off"}}}
 ```
 
-- At the log gate, beside `send_logs_level`. The scope is the logger's name: the agent's
+- At the log gate, beside `level`. The scope is the logger's name: the agent's
   logback, log4j and java.util.logging bridges name the scope after the logger, so
   `com.acme.db*` is every logger under `com.acme.db`.
 - The logging framework's own level still decides what is logged at all: a `debug` here can't
   export what logback was told to drop. It only drops more, or lets through what
-  `send_logs_level` would have dropped.
+  `level` would have dropped.
 
 ### Redaction
 
 ```json
-{"drop_attributes": "http.request.header.authorization, http.request.header.cookie", "mask_attributes": "*password*, *token*, user.email"}
+{"attribute_redaction": {"mode": "override",
+                         "drop": ["http.request.header.authorization", "http.request.header.cookie"],
+                         "mask": ["*password*", "*token*", "user.email"]}}
 ```
 
 - At the span and log gates: span attributes, span event attributes (an exception event stays
@@ -224,7 +237,9 @@ it out, and what it sees. Each example is a whole `elastic` document, as the ser
 ### Rate caps
 
 ```json
-{"sampling_rate": "1", "sampling_traces_per_second": "50", "send_logs_per_second": "200"}
+{"head_sampling": {"mode": "override", "ratio": 1},
+ "trace_rate_limit": {"mode": "override", "traces_per_second": 50},
+ "log_rate_limit": {"mode": "override", "records_per_second": 200}}
 ```
 
 - Traces: in the sampler, after the rules and the rate. A sampled root span, or a span whose
@@ -236,7 +251,9 @@ it out, and what it sees. Each example is a whole `elastic` document, as the ser
 ### Debug mode
 
 ```json
-{"sampling_rate": "0.05", "send_logs_level": "warn", "debug_until": "2026-10-14T15:30:00Z", "debug_sampling_rate": "1", "debug_send_logs_level": "debug"}
+{"head_sampling": {"mode": "override", "ratio": 0.05},
+ "log_levels": {"mode": "override", "level": "warn"},
+ "debug": {"mode": "override", "until": "2026-10-14T15:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
 - The extension passes the layer the JVM's wall clock, and runs one daemon timer
@@ -258,8 +275,8 @@ A pull reader (Prometheus) exports nothing, so nothing is counted for it.
 
 ## The application's own settings
 
-The server may send the application settings of its own in `custom` (a feature flag, a
-verbosity, a limit), which the extension hands on rather than reads
+The server may send the application settings of its own in the policy's `app_settings` control
+(a feature flag, a verbosity, a limit), which the extension hands on rather than reads
 ([app-settings.md](app-settings.md)). The application reads them with
 `dev.pydantic.opamp.AppSettings`, from the extension's second jar,
 `opamp-javaagent-extension-<version>-app-settings.jar` (the `app-settings` classifier: four
@@ -301,11 +318,12 @@ class loader delegates to (a servlet container's child-first loader too), and fr
 two speak in maps, sets and a `BiConsumer`. Each class loader that has `AppSettings` (each web
 application in an application server) gets its own copy, all filled from the one bridge, which
 holds them weakly, so undeploying an application frees its class loader. If the bridge can't be
-put in place the extension says so (a WARNING), every read is its default, and `custom` isn't
-declared, so the server's are set aside and named as unsupported rather than answered APPLIED for
-nothing.
+put in place, the extension says so (a WARNING) and every read is its default. The extension then
+does not carry out `app_settings`, so a policy that overrides it is refused (FAILED), not answered
+APPLIED for nothing.
 
-The extension declares `custom` (`Host.live`) when the bridge is in place. The values go in force
+The extension carries out `app_settings` (it declares `custom` in `Host.live`) when the bridge is
+in place. The values go in force
 after the SDK's settings of the same document, under the same lock, at the start (the saved
 settings, from the state directory), on each APPLIED config and on a refresh (the end of debug
 mode), so a listener sees the SDK's settings already in force. With a state directory the values
@@ -325,7 +343,7 @@ built by the SDK settings layer as in every language:
   version; `telemetry.sdk.language` `java` and the version of the SDK the agent bundles.
 - `instrumentations`: every instrumentation module the agent can run (its own and any
   extension's), switched off or not, under each name `otel.instrumentation.<name>.enabled` takes
-  for it, so the names are the ones `deactivate_instrumentations` takes: `spring-webmvc` and
+  for it, so the names are the ones the `instrumentations` control takes: `spring-webmvc` and
   `spring-webmvc-6.0`, `jdbc`, `java-http-client`. The version is the one the agent embeds for that
   instrumentation (`2.31.1-alpha`, the version its telemetry's scope carries); a module that embeds
   none has no version.
@@ -350,14 +368,14 @@ sent once, at start: the hash in the first message, the components in full when 
   and reports as the layer decides: a FAILED changes nothing; without a state directory, a
   next-start change is refused and a live one applied; with one it can't write, a change fails; the UID is kept
   across starts, and so is one the server assigns; saved files are the agent user's only. A pull
-  metric reader serves nothing while `send_metrics` is `false`. Under declarative configuration
+  metric reader serves nothing while the metrics export is off. Under declarative configuration
   the SDK is built from a configuration file through the extension's hooks, with the file's
   sampler and exporters inside the controls, the UID in the resource, and the next-start
   settings in the distribution.
 - The application's own settings (`AppSettingsTest`, `AppSettingsExtensionTest`): reads before
   any config, without the agent and once a key is left out; `custom.json`'s `typed` vectors and
   their edges; every `custom.json` case through the extension's own `Decide`, and the hosts that
-  don't declare it; a listener told once per change and never for the same map (sent again,
+  do not carry it out, which refuse it; a listener told once per change and never for the same map (sent again,
   another way, beside another setting, at the end of debug mode), in order, one at a time; an
   exception caught and logged with the others still told; unsubscribing, also from inside a
   listener; readers and subscribers on other threads, and documents applied from several threads
@@ -366,12 +384,12 @@ sent once, at start: the hash in the first message, the components in full when 
   gone no longer held; and the bridge's jar loaded by a class loader that sees the JDK alone.
 - What another extension adds (`OutsideTest`), on an SDK built through another extension's
   customizers and then the extension's: a span processor, a log record processor and a metric
-  reader of its own each set aside their signal's settings, named as unsupported, and are listed
-  ungated; a span processor that only starts spans, and another extension's wrapper around the
-  agent's own processors, set nothing aside; a sampler set in place of the extension's sets the
-  sampler's settings aside, while one set through the sampler customizer is still wrapped.
+  reader of its own each set aside their signal's controls, a policy that overrides one refused,
+  and are listed ungated; a span processor that only starts spans, and another extension's wrapper
+  around the agent's own processors, set nothing aside; a sampler set in place of the extension's
+  sets the sampler's controls aside, while one set through the sampler customizer is still wrapped.
 - The inventory (`InventoryTest`) of an SDK built through the extension's hooks: the
-  names `deactivate_instrumentations` takes, versions where embedded, each exporter as configured
+  names the `instrumentations` control takes, versions where embedded, each exporter as configured
   (`none`, another library's, a processor of a file's own kind ungated), and the client sending
   the hash first and the components in full when a test server asks.
 - The shared test vectors (`testdata/sdk-settings`), each case through the agent's own
@@ -382,11 +400,11 @@ sent once, at start: the hash in the first message, the components in full when 
 - End to end: `python3 examples/javaagent/try.py` (CI's `javaagent` job). A program with no
   OpenTelemetry code runs under agent 2.31.1 and the extension, against the reference server.
   The agent traces the program's HTTP requests.
-  1. The server sends a sampling rate: APPLIED, and spans arrive.
-  2. It sends `send_traces: false`: APPLIED, and no span is exported while it holds.
-  3. It sends a rate of 7: FAILED, naming `sampling_rate`, and nothing changes.
-  4. It sends a rate of 1 with `send_traces` left out: APPLIED, and spans come again.
-  5. It sends `deactivate_instrumentations`: APPLIED, and the instrumentation stays on until the
+  1. The server sends a sampling ratio: APPLIED, and spans arrive.
+  2. It switches the traces export off: APPLIED, and no span is exported while it holds.
+  3. It sends a ratio of 7: FAILED, naming `head_sampling`, and nothing changes.
+  4. It sends a ratio of 1 with the traces export local: APPLIED, and spans come again.
+  5. It overrides `instrumentations`: APPLIED, and the instrumentation stays on until the
      restart.
   6. After the restart: the same instance UID (16 bytes), the effective config reported, and the
      HTTP instrumentation off, so no spans although the program makes requests while the agent is
@@ -394,20 +412,22 @@ sent once, at start: the hash in the first message, the components in full when 
 
   7. The settings that match telemetry, one after the other, each checked in what the agent
      exports (through a recording proxy on its way to the reference sink): a rule of rate 0 for
-     the program's `/health` checks; `app.noisy=off`; a dropped and a masked attribute; and caps
+     the program's `/health` checks; the scope `app.noisy` at `off`; a dropped and a masked attribute; and caps
      of one trace and one log record a second.
-  8. Debug mode with `sampling_rate` 0: spans until `debug_until`, none after, and the effective
+  8. Debug mode with `head_sampling` at 0: spans until `until`, none after, and the effective
      config reported at the end, the server sending nothing.
   9. The proxy refuses trace exports for a minute: the agent sends its health once they fail, and
      again once they succeed.
 
   Then `check_truth`, once for each setup a second extension (`examples/javaagent/Setups.java`)
-  makes, named in `EXAMPLE_SETUP`. The server offers one setting a document, and each must show in
-  the telemetry or be named as set aside, never neither. `extension-processor` adds a span
-  processor, a log record processor and a metric reader exporting to the same sink: their
-  signals' gate settings are set aside, and the sampler's are carried out. `extension-sampler`
-  sets a sampler that samples every trace: `sampling_rate`, `sampling_rules` and
-  `sampling_traces_per_second` are set aside, and the gates' settings are carried out.
+  makes, named in `EXAMPLE_SETUP`. The server offers one policy per control. A control
+  is set aside when the policy is FAILED as an override the extension can't carry out, or APPLIED
+  with that override reported `local` in the effective config. Every other override must show in
+  the telemetry. `extension-processor` adds a span processor, a log record processor and a metric
+  reader exporting to the same sink: their signals' gate controls are set aside, and the
+  sampler's are carried out. `extension-sampler` sets a sampler that samples every trace:
+  `head_sampling`, `sampling_rules` and `trace_rate_limit` are set aside, and the gates' controls
+  are carried out.
 
   Then `check_app_settings` ([app-settings.md](app-settings.md#how-it-is-checked)): the program
   reads `example.feature` with `AppSettings`, which the server turns on and off; a bad map is

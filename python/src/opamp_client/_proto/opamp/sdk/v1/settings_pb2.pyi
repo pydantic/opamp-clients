@@ -38,7 +38,7 @@ PARENT_REMOTE_SAMPLED: Parent
 PARENT_REMOTE_UNSAMPLED: Parent
 
 class Settings(_message.Message):
-    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "opamp_polling_interval_ms", "custom", "ignored", "unsupported")
+    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "custom")
     class CustomEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -59,10 +59,7 @@ class Settings(_message.Message):
     SEND_LOGS_PER_SECOND_FIELD_NUMBER: _ClassVar[int]
     DEACTIVATE_INSTRUMENTATIONS_FIELD_NUMBER: _ClassVar[int]
     DEACTIVATE_ALL_INSTRUMENTATIONS_FIELD_NUMBER: _ClassVar[int]
-    OPAMP_POLLING_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
     CUSTOM_FIELD_NUMBER: _ClassVar[int]
-    IGNORED_FIELD_NUMBER: _ClassVar[int]
-    UNSUPPORTED_FIELD_NUMBER: _ClassVar[int]
     sampling_rate: float
     send_traces: bool
     send_metrics: bool
@@ -76,11 +73,8 @@ class Settings(_message.Message):
     send_logs_per_second: float
     deactivate_instrumentations: Names
     deactivate_all_instrumentations: bool
-    opamp_polling_interval_ms: int
     custom: _containers.ScalarMap[str, str]
-    ignored: _containers.RepeatedScalarFieldContainer[str]
-    unsupported: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., opamp_polling_interval_ms: _Optional[int] = ..., custom: _Optional[_Mapping[str, str]] = ..., ignored: _Optional[_Iterable[str]] = ..., unsupported: _Optional[_Iterable[str]] = ...) -> None: ...
+    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., custom: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class SamplingRule(_message.Message):
     __slots__ = ("rate", "name", "kind", "path", "attributes")
@@ -278,10 +272,14 @@ class HealthReport(_message.Message):
     def __init__(self, send: bool = ..., exporters: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., sent_unix_ms: _Optional[int] = ...) -> None: ...
 
 class Describe(_message.Message):
-    __slots__ = ("resource",)
+    __slots__ = ("resource", "host", "now_unix_ms")
     RESOURCE_FIELD_NUMBER: _ClassVar[int]
+    HOST_FIELD_NUMBER: _ClassVar[int]
+    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     resource: _containers.RepeatedCompositeFieldContainer[_anyvalue_pb2.KeyValue]
-    def __init__(self, resource: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ...) -> None: ...
+    host: Host
+    now_unix_ms: int
+    def __init__(self, resource: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ...) -> None: ...
 
 class Components(_message.Message):
     __slots__ = ("inventory", "host", "now_unix_ms")

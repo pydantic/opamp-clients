@@ -25,11 +25,11 @@ import opamp.proto.v1.Opamp;
  */
 final class Kept {
   private static final String BEFORE =
-      "a core state saved before the core kept the config applied: the document kept before carries over";
+      "a core state saved before the core kept the config applied: the policy kept before carries over";
 
   private Kept() {}
 
-  /** A client state whose config applied has {@code document} as its settings entry. */
+  /** A client state whose config applied has the policy {@code document} as its only file. */
   static byte[] coreState(String document) {
     String base = null;
     for (var c : Vectors.cases("start")) {
@@ -42,7 +42,7 @@ final class Kept {
     }
     Opamp.AgentRemoteConfig applied = Opamp.AgentRemoteConfig.newBuilder()
         .setConfigHash(ByteString.copyFromUtf8("applied"))
-        .setConfig(Opamp.AgentConfigMap.newBuilder().putConfigMap("elastic", Opamp.AgentConfigObject.newBuilder()
+        .setConfig(Opamp.AgentConfigMap.newBuilder().putConfigMap(Vectors.POLICY_FILE, Opamp.AgentConfigObject.newBuilder()
             .setBody(ByteString.copyFrom(document, StandardCharsets.UTF_8)).setContentType("application/json").build()))
         .build();
     try {
@@ -57,7 +57,7 @@ final class Kept {
     }
   }
 
-  /** Leave in {@code dir} what the client would after a config with {@code document} was applied. */
+  /** Leave in {@code dir} what the client would after a config with the policy {@code document} was applied. */
   static void keepApplied(Path dir, String document) {
     try {
       Files.write(dir.resolve("opamp-state"), coreState(document));

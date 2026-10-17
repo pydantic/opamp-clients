@@ -32,7 +32,10 @@ import type { AgentDescription, AgentRemoteConfig, AvailableComponents } from ".
 
 export * from "./gen/opamp/sdk/v1/settings_pb.js";
 
-/** What an SDK carries out: a setting it doesn't name is set aside (docs/sdk-settings.md#the-host). */
+/**
+ * What an SDK carries out. A policy that overrides a setting it does not name is refused
+ * (docs/sdk-settings.md#the-host).
+ */
 export type HostInit = MessageInitShape<typeof HostSchema>;
 
 /** What the integration lists of itself and its SDK (docs/available-components.md#what-the-sdk-integrations-report). */
@@ -63,9 +66,9 @@ export class SdkSettings {
   /**
    * At start, before the SDK is built: the settings to start with, from the document saved at the
    * last change (undefined: nothing saved). Put all of them in force, next-start ones too.
-   * `host`: the settings the SDK carries out, at once or at the next start; one it leaves out is set
-   * aside, never in force (left out: none carried out). `nowUnixMs`: the wall
-   * clock, which debug mode is decided by (0: none, and debug mode is ignored). `coreState`: the
+   * `host`: the settings the SDK carries out, at once or at the next start. A policy that overrides
+   * one it leaves out is refused (left out: none carried out). `nowUnixMs`: the wall clock, which
+   * debug mode is decided by (0: none, and the SDK cannot carry out debug mode). `coreState`: the
    * OpAMP core's saved state (what it asked the host to store; undefined: none). The settings then
    * come from the last config applied in it, and `saved` is read only when it holds none (a
    * document kept before the core kept the config applied).
@@ -139,9 +142,12 @@ export class SdkSettings {
     return r.result.value;
   }
 
-  /** The agent description, from the SDK's resource attributes. */
-  describe(resource: KeyValue[]): AgentDescription {
-    const r = this.#call({ call: { case: "describe", value: { resource } } });
+  /**
+   * The agent description, from the SDK's resource attributes. It also names the policy formats the
+   * SDK reads and the controls `host` carries out. `host` and `nowUnixMs` as for `load`.
+   */
+  describe(resource: KeyValue[], host?: HostInit, nowUnixMs = 0n): AgentDescription {
+    const r = this.#call({ call: { case: "describe", value: { resource, nowUnixMs, ...(host ? { host } : {}) } } });
     if (r.result.case !== "description") throw new Error(`describe answered ${r.result.case}`);
     return r.result.value;
   }

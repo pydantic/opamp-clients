@@ -490,7 +490,7 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 			Host      *settingspb.Host  `json:"host"`
 			Refused   string            `json:"refused"`
 			Custom    map[string]string `json:"custom"`
-			Effective map[string]string `json:"effective"`
+			Effective string            `json:"effective"`
 		} `json:"cases"`
 	}
 	b, err := os.ReadFile(filepath.Join("..", "..", "testdata", "sdk-settings", "custom.json"))
@@ -510,8 +510,7 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 			if c.Host != nil {
 				host = c.Host
 			}
-			d, err := layer.DecideAt(context.Background(), remote(c.Document), []byte("{}"), []byte("{}"), host,
-				vectorNow, nil)
+			d, err := layer.DecideAt(context.Background(), remote(c.Document), nil, nil, host, vectorNow, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -544,20 +543,22 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 				slices.Sort(keys)
 				tld.want(t, change{c.Custom, keys})
 			}
-			var effective map[string]string
-			if err := json.Unmarshal(d.GetEffective().GetConfigMap().GetConfigMap()["elastic"].GetBody(), &effective); err != nil {
-				t.Fatal(err)
-			}
-			if c.Effective != nil && !sameMap(effective, c.Effective) {
-				t.Fatalf("effective %v, want %v", effective, c.Effective)
+			if got := string(d.GetEffective().GetConfigMap().GetConfigMap()[policyFile].GetBody()); c.Effective != "" && got != c.Effective {
+				t.Fatalf("effective %s, want %s", got, c.Effective)
 			}
 		})
 	}
 }
 
+// appValues is a policy whose app_settings control overrides the values with the given JSON, and
+// whose other controls are local unless set gives them, as every takes them.
+func appValues(values string, set ...string) string {
+	return every(append([]string{"app_settings", override(`"values":` + values)}, set...)...)
+}
+
 func TestThePackageDeclaresCustom(t *testing.T) {
 	if !slices.Contains(goHost().GetLive(), "custom") {
-		t.Fatalf("live %v: custom undeclared is ignored, unchecked", goHost().GetLive())
+		t.Fatalf("live %v: with custom undeclared, the layer refuses every app_settings override", goHost().GetLive())
 	}
 }
 
@@ -571,14 +572,16 @@ func TestAConfigPutsTheValuesInForceAndTheEffectiveConfigReportsThem(t *testing.
 		}
 		tld.f(settings, changed)
 	})
-	st := a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0.5","custom":{"checkout.new_flow":"on","limit":25}}`))
+	doc := every("head_sampling", override(`"ratio":0.5`), "app_settings", override(`"values":{"checkout.new_flow":"on","limit":25}`))
+	st := a.remoteConfig(context.Background(), remote(doc))
 	if st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
 	}
 	if a.controls.app.get("checkout.new_flow", "off") != "on" || a.controls.app.getInt("limit", 0) != 25 {
 		t.Fatal("not in force")
 	}
-	if got, want := effectiveBody(a), `{"custom":"{\"checkout.new_flow\":\"on\",\"limit\":\"25\"}","sampling_rate":"0.5"}`; !sameJSON(t, got, json.RawMessage(want)) {
+	// The effective config reports each value as the application reads it: text.
+	if got, want := effectiveBody(a), sorted(t, strings.Replace(doc, `"limit":25`, `"limit":"25"`, 1)); got != want {
 		t.Fatalf("effective %s, want %s", got, want)
 	}
 	tld.want(t, change{m{"checkout.new_flow": "on", "limit": "25"}, []string{"checkout.new_flow", "limit"}})
@@ -588,10 +591,10 @@ func TestTheSameValuesSentAgainOrAnotherWayTellNothing(t *testing.T) {
 	a := newTestAgent(t, t.TempDir())
 	var tld told
 	a.controls.app.onChange(tld.f)
-	a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1","b":"2"}}`))
-	// New configs (other hashes) whose map is the same: in a string, keys in another order, a
-	// number for its text, another SDK setting beside it.
-	for _, body := range []string{`{"custom":"{\"b\":\"2\",\"a\":1}"}`, `{"custom":{"a":"1","b":"2"},"sampling_rate":"1"}`} {
+	a.remoteConfig(context.Background(), remote(appValues(`{"a":"1","b":"2"}`)))
+	// New configs (other hashes) whose map is the same: keys in another order, a number for its
+	// text, another SDK setting beside it.
+	for _, body := range []string{appValues(`{"b":"2","a":1}`), appValues(`{"a":"1","b":"2"}`, "head_sampling", override(`"ratio":1`))} {
 		if st := a.remoteConfig(context.Background(), remote(body)); st.GetStatus() != applied {
 			t.Fatalf("%s: %v", body, st)
 		}
@@ -604,13 +607,14 @@ func TestAWrongCustomEntryFailsTheConfigAndNothingChanges(t *testing.T) {
 	a := newTestAgent(t, dir)
 	var tld told
 	a.controls.app.onChange(tld.f)
-	a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1"},"sampling_rate":"0.5"}`))
+	before := appValues(`{"a":"1"}`, "head_sampling", override(`"ratio":0.5`))
+	a.remoteConfig(context.Background(), remote(before))
 	for _, tc := range []struct{ body, why string }{
-		{`{"custom":{"a":"2","b":["x"]},"sampling_rate":"1"}`, "custom.b: values must be"},
-		{`{"custom":{"a b":"2"}}`, `custom: "a b" is not a key`},
-		{`{"custom":{"a":"2","a":"3"}}`, "custom.a: sent more than once"},
-		{`{"custom":{"a":"` + strings.Repeat("x", 4097) + `"}}`, "custom.a: 4097 bytes, at most 4096"},
-		{`{"custom":7}`, "custom: must be a JSON object"},
+		{appValues(`{"a":"2","b":["x"]}`, "head_sampling", override(`"ratio":1`)), "app_settings: values must be an object"},
+		{appValues(`{"a b":"2"}`), `app_settings: values: "a b" is not a key`},
+		{appValues(`{"a":"2","a":"3"}`), "app_settings: values.a: sent more than once"},
+		{appValues(`{"a":"` + strings.Repeat("x", 4097) + `"}`), "app_settings: values.a: 4097 bytes, at most 4096"},
+		{appValues(`7`), "app_settings: values must be an object"},
 	} {
 		st := a.remoteConfig(context.Background(), remote(tc.body))
 		if st.GetStatus() != failed_ || !strings.HasPrefix(st.GetErrorMessage(), tc.why) {
@@ -620,7 +624,7 @@ func TestAWrongCustomEntryFailsTheConfigAndNothingChanges(t *testing.T) {
 	if a.controls.app.get("a", "") != "1" || *a.controls.Sampler.rate != 0.5 {
 		t.Fatal("a FAILED config changed what is in force")
 	}
-	if got := effectiveBody(a); !sameJSON(t, got, json.RawMessage(`{"custom":"{\"a\":\"1\"}","sampling_rate":"0.5"}`)) {
+	if got := effectiveBody(a); got != sorted(t, before) {
 		t.Fatalf("effective %s", got)
 	}
 	tld.want(t, change{m{"a": "1"}, []string{"a"}})
@@ -633,16 +637,20 @@ func TestAConfigWithoutCustomPutsEveryKeyBackToItsDefault(t *testing.T) {
 	a := newTestAgent(t, t.TempDir())
 	var tld told
 	a.controls.app.onChange(tld.f)
-	a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1"}}`))
-	a.remoteConfig(context.Background(), remote(`{"sampling_rate":"1"}`))
+	a.remoteConfig(context.Background(), remote(appValues(`{"a":"1"}`)))
+	a.remoteConfig(context.Background(), remote(v1("head_sampling", override(`"ratio":1`))))
 	if a.controls.app.get("a", "default") != "default" {
-		t.Fatal("custom left out: the default")
+		t.Fatal("a version 1 policy, which has no app_settings: the default")
 	}
-	a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1"}}`))
-	// A remote config with no settings entry at all.
-	a.remoteConfig(context.Background(), &protobufs.AgentRemoteConfig{ConfigHash: []byte("none"), Config: &protobufs.AgentConfigMap{}})
+	a.remoteConfig(context.Background(), remote(appValues(`{"a":"1"}`)))
+	// A remote config without a policy is refused, and the values stay.
+	st := a.remoteConfig(context.Background(), &protobufs.AgentRemoteConfig{ConfigHash: []byte("none"), Config: &protobufs.AgentConfigMap{}})
+	if st.GetStatus() != failed_ || !strings.HasPrefix(st.GetErrorMessage(), "config_map:") || a.controls.app.get("a", "default") != "1" {
+		t.Fatalf("no policy: %v", st)
+	}
+	a.remoteConfig(context.Background(), remote(every()))
 	if a.controls.app.get("a", "default") != "default" {
-		t.Fatal("no elastic entry: the default")
+		t.Fatal("app_settings local: the default")
 	}
 	tld.want(t,
 		change{m{"a": "1"}, []string{"a"}}, change{m{}, []string{"a"}},
@@ -653,11 +661,11 @@ func TestACallbackThatPanicsDoesNotBreakTheAnswer(t *testing.T) {
 	records(t)
 	a := newTestAgent(t, t.TempDir())
 	a.controls.app.onChange(func(map[string]string, []string) { panic(fmt.Errorf("nope")) })
-	st := a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1"}}`))
+	st := a.remoteConfig(context.Background(), remote(appValues(`{"a":"1"}`)))
 	if st.GetStatus() != applied || a.controls.app.get("a", "") != "1" {
 		t.Fatalf("status %v", st)
 	}
-	if got := effectiveBody(a); got != `{"custom":"{\"a\":\"1\"}"}` {
+	if got := effectiveBody(a); got != sorted(t, appValues(`{"a":"1"}`)) {
 		t.Fatalf("effective %s", got)
 	}
 }
@@ -670,7 +678,7 @@ func TestARefreshWithTheSameMapTellsNothing(t *testing.T) {
 	var tld told
 	a.controls.app.onChange(tld.f)
 	st := a.remoteConfig(context.Background(),
-		remote(`{"debug_until":"2026-10-14T12:10:00Z","sampling_rate":"0.1","custom":{"a":"1"}}`))
+		remote(appValues(`{"a":"1"}`, "head_sampling", override(`"ratio":0.1`), "debug", override(`"until":"2026-10-14T12:10:00Z"`))))
 	if st.GetStatus() != applied {
 		t.Fatalf("status %v", st)
 	}
@@ -696,22 +704,23 @@ func TestARefreshWithTheSameMapTellsNothing(t *testing.T) {
 
 func TestValuesSurviveARestartWithAStateDirectory(t *testing.T) {
 	dir := t.TempDir()
-	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"checkout.new_flow":"on"}}`)); st.GetStatus() != applied {
+	doc := appValues(`{"checkout.new_flow":"on"}`)
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(doc)); st.GetStatus() != applied {
 		t.Fatalf("%v", st)
 	}
-	keepApplied(t, dir, `{"custom":{"checkout.new_flow":"on"}}`) // as the client does, before APPLIED goes out
-	again := newTestAgent(t, dir)                                // the next start: before any config arrives
+	keepApplied(t, dir, doc)      // as the client does, before APPLIED goes out
+	again := newTestAgent(t, dir) // the next start: before any config arrives
 	if again.controls.app.get("checkout.new_flow", "off") != "on" {
 		t.Fatal("the saved values aren't in force at the next start")
 	}
-	if got := effectiveBody(again); got != `{"custom":"{\"checkout.new_flow\":\"on\"}"}` {
+	if got := effectiveBody(again); got != sorted(t, doc) {
 		t.Fatalf("effective %s", got)
 	}
 }
 
 func TestWithoutAStateDirectoryARestartStartsFromTheDefaults(t *testing.T) {
 	a := newTestAgent(t, "")
-	if st := a.remoteConfig(context.Background(), remote(`{"custom":{"a":"1"}}`)); st.GetStatus() != applied {
+	if st := a.remoteConfig(context.Background(), remote(appValues(`{"a":"1"}`))); st.GetStatus() != applied {
 		t.Fatalf("live: no state needed, %v", st)
 	}
 	if a.controls.app.get("a", "") != "1" {
@@ -727,10 +736,11 @@ func TestWithoutAStateDirectoryARestartStartsFromTheDefaults(t *testing.T) {
 func TestSetupPutsTheSavedValuesInForceBeforeItReturns(t *testing.T) {
 	ownAppSettings(t)
 	dir := t.TempDir()
-	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on","limit":"9"}}`)); st.GetStatus() != applied {
+	doc := appValues(`{"example.feature":"on","limit":"9"}`)
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(doc)); st.GetStatus() != applied {
 		t.Fatalf("%v", st)
 	}
-	keepApplied(t, dir, `{"custom":{"example.feature":"on","limit":"9"}}`) // as the client does, before APPLIED goes out
+	keepApplied(t, dir, doc) // as the client does, before APPLIED goes out
 	var tld told
 	defer OnAppSettingsChange(tld.f)()
 	os.Setenv("OTEL_TRACES_EXPORTER", "none")
@@ -750,7 +760,7 @@ func TestSetupPutsTheSavedValuesInForceBeforeItReturns(t *testing.T) {
 	}
 	tld.want(t, change{m{"example.feature": "on", "limit": "9"}, []string{"example.feature", "limit"}})
 	// The server's config, as the client hands it over.
-	sdk.agent.remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"off"}}`))
+	sdk.agent.remoteConfig(context.Background(), remote(appValues(`{"example.feature":"off"}`)))
 	if AppSetting("example.feature", "") != "off" || AppSettingInt("limit", 0) != 0 {
 		t.Fatalf("in force %v", AppSettings())
 	}
@@ -761,10 +771,11 @@ func TestSetupPutsTheSavedValuesInForceBeforeItReturns(t *testing.T) {
 func TestAFailedSetupTakesTheSavedValuesBack(t *testing.T) {
 	ownAppSettings(t)
 	dir := t.TempDir()
-	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(`{"custom":{"example.feature":"on"}}`)); st.GetStatus() != applied {
+	doc := appValues(`{"example.feature":"on"}`)
+	if st := newTestAgent(t, dir).remoteConfig(context.Background(), remote(doc)); st.GetStatus() != applied {
 		t.Fatalf("%v", st)
 	}
-	keepApplied(t, dir, `{"custom":{"example.feature":"on"}}`) // as the client does, before APPLIED goes out
+	keepApplied(t, dir, doc) // as the client does, before APPLIED goes out
 	var tld told
 	defer OnAppSettingsChange(tld.f)()
 	os.Setenv("OTEL_TRACES_EXPORTER", "none")

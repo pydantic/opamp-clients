@@ -842,8 +842,8 @@ def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrum
     record processor the application passed in (`span_processors`, `log_processors`): that one
     exports past the gate. send_metrics where every metric exporter (`metrics_exporters`, as
     named) is gated, unless a declarative configuration file (`config_file`) built them. The
-    polling interval at the next start always; the instrumentation switches only under
-    opentelemetry-instrument (`auto_instrumented`). The application's own settings (custom)
+    instrumentation switches, at the next start, only under opentelemetry-instrument
+    (`auto_instrumented`). The application's own settings (custom)
     always: the application reads them, whoever built the SDK."""
     live: list[str] = [APP_SETTINGS]
     if configured:
@@ -856,8 +856,7 @@ def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrum
             live += REDACTION
     if not config_file and _every_metric_exporter_gated(metrics_exporters):
         live.append("send_metrics")
-    next_start = ["opamp_polling_interval", *(INSTRUMENTATIONS if auto_instrumented else ())]
-    return settings_pb2.Host(live=live, next_start=next_start)
+    return settings_pb2.Host(live=live, next_start=INSTRUMENTATIONS if auto_instrumented else ())
 
 
 def _undeclared(host: settings_pb2.Host) -> list[str]:
@@ -959,7 +958,7 @@ def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter
     """What the package lists of itself and the SDK it runs (docs/available-components.md): the
     global providers unless others are given. Under `host`, a signal whose send_* setting it
     can't carry out has no gated exporter: the OTLP metric exporter beside one the package can't
-    stop is gated, but send_metrics is ignored, so nothing reaches it."""
+    stop is gated, but send_metrics is not declared, so nothing reaches it."""
     from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
 
     from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
@@ -1109,9 +1108,9 @@ class Agent:
         """Once the SDK is built: join the fleet, on a thread of the client's own."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
             return
-        # What was built is known now: the settings it can't carry out are declared no more, so
-        # they are set aside rather than answered as done. The settings loaded at start are loaded
-        # again, to report that.
+        # What was built is known now: the settings it cannot carry out are declared no more, so
+        # a policy that overrides one is refused. The settings loaded at start are loaded again,
+        # under the host as built.
         config_file = bool(os.environ.get("OTEL_CONFIG_FILE"))
         built = self._built_host()
         if built != self.host:
@@ -1134,11 +1133,9 @@ class Agent:
         loop = _loop_thread("opamp")
         self._loop = loop
         s = self.setup
-        at_start = self.loaded.settings
-        heartbeat = at_start.opamp_polling_interval_ms if at_start.HasField("opamp_polling_interval_ms") else s.heartbeat_ms
         config = Config(endpoint=s.endpoint, instance_uid=self.uid.bytes,
                         capabilities=opamp_pb2.AgentCapabilities_AcceptsRemoteConfig,
-                        heartbeat_interval_ms=heartbeat, headers=s.headers,
+                        heartbeat_interval_ms=s.heartbeat_ms, headers=s.headers,
                         state_file=str(s.state_dir / "opamp-state") if s.state_dir else None,
                         # A key of its own, offered by the server: taken with a state directory
                         # (state_file) and kept there; without one the client neither declares
@@ -1152,7 +1149,7 @@ class Agent:
         self.reachability.in_use = self._endpoint_in_use
         with self._lock:
             first = self._export_health()  # the first report is always sent: with the agent's first message
-        status = Status(description=self.layer.describe(attributes(resource)),
+        status = Status(description=self.layer.describe(attributes(resource), self.host, self.wall_ms()),
                         health=self._health_message(first), effective_config=self.effective,
                         available_components=self._components())
 
@@ -1408,10 +1405,6 @@ class Agent:
             d = self.layer.decide(config, self.current, self.loaded.current, self.host, now, save)
             if d.HasField("apply"):
                 self._put_in_force(d.apply)
-                if d.apply.unsupported:
-                    _log.info("OpAMP: settings this SDK doesn't carry out: %s", ", ".join(d.apply.unsupported))
-                if d.apply.ignored:
-                    _log.info("OpAMP: settings unknown to this SDK: %s", ", ".join(d.apply.ignored))
             if d.pending_restart:
                 _log.info("OpAMP: %s changed; in force when the application restarts", ", ".join(d.pending_restart))
             self.current = d.current

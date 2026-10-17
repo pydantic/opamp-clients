@@ -110,13 +110,15 @@ def _sdk(r: Reader, layer: SdkSettings) -> None:
         elif k == 2:
             config = pb.AgentRemoteConfig(config_hash=r.blob(32))
             for _ in range(r.byte() % 3):
-                obj = config.config.config_map[r.text(16)]
+                obj = config.config.config_map[r.pick(["logfire-sdk-policy.json", r.text(16)])]
                 obj.body = r.blob(1024)
                 obj.content_type = r.pick(["", "application/json", "text/yaml", r.text(16)])
             layer.decide(config, r.blob(512), r.blob(512), save=(lambda doc: None) if bool(r.byte() & 1) else None)
         else:
+            names = ["sampling_rate", "send_logs", "custom", r.text(16)]
+            host = sdkpb.Host(live=[r.pick(names) for _ in range(r.byte() % 3)]) if r.byte() & 1 else None
             layer.describe([anyvalue_pb2.KeyValue(key=r.text(16), value=anyvalue_pb2.AnyValue(string_value=r.text(32)))
-                            for _ in range(r.byte() % 3)])
+                            for _ in range(r.byte() % 3)], host, r.byte() * 1_000_000_000)
     except ValueError:
         pass  # refused, with the reason
     except (_native.Trap, RuntimeError) as e:

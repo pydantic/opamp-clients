@@ -11,6 +11,7 @@ using OpenTelemetry.Logs;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Pydantic.OpAmp.Tests;
 using Xunit;
 using static Pydantic.OpAmp.AutoInstrumentation.Tests.Otlp;
 using LogRecord = OpenTelemetry.Logs.LogRecord;
@@ -66,7 +67,7 @@ public class RedactionTests
     public void ADropLeavesDroppedAttributesCountAndEverythingElseAsItWas()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"drop_attributes\":\"secret\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["secret"]}"""))));
         var export = Traces(Span("checkout", [Str("secret", "s"), Str("kept", "k")]));
         var span = Assert.Single(ReadSpans(Assert.Single(Send(controls, "/v1/traces", export).Exports).Message));
         Assert.Equal("checkout", span.Name);
@@ -84,9 +85,9 @@ public class RedactionTests
         List<KeyValue> Exported() => Assert.Single(ReadLogs(Assert.Single(Send(controls, "/v1/logs", export).Exports).Message)).Attributes;
 
         Assert.Equal([Str("user.email", "a@b.c"), Int("card.number", 4111)], Exported());
-        controls.Apply(Vectors.Settings("{\"mask_attributes\":\"user.*,card.*\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"mask":["user.*","card.*"]}"""))));
         Assert.Equal([Str("user.email", "[REDACTED]"), Str("card.number", "[REDACTED]")], Exported());
-        controls.Apply(Vectors.Settings("{\"drop_attributes\":\"card.number\",\"mask_attributes\":\"*\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["card.number"],"mask":["*"]}"""))));
         Assert.Equal([Str("user.email", "[REDACTED]")], Exported());
         controls.Apply(new Settings());
         Assert.Equal([Str("user.email", "a@b.c"), Int("card.number", 4111)], Exported());
@@ -100,7 +101,7 @@ public class RedactionTests
     public async Task OverGrpcAndGzipTheSame(bool grpc, bool gzip)
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"mask_attributes\":\"authorization\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"mask":["authorization"]}"""))));
         var sink = new Sink();
         using var client = new HttpClient(new GateHandler(controls) { InnerHandler = sink });
         var message = Traces(Span("s", [Str("authorization", "Bearer x")]));
@@ -139,7 +140,7 @@ public class RedactionTests
         client.Send(Export("/v1/logs", [0xff, 0xff]));
         Assert.Equal(2, sink.Exports.Count);
 
-        controls.Apply(Vectors.Settings("{\"drop_attributes\":\"nothing.matches\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["nothing.matches"]}"""))));
         Assert.Equal(System.Net.HttpStatusCode.OK, client.Send(Brotli()).StatusCode);
         client.Send(Export("/v1/logs", [0xff, 0xff]));
         var grpc = Grpc(message, compressed: true); // compressed, with no codec named
@@ -168,7 +169,7 @@ public class RedactionTests
     public void AnotherExporterSeesTheOriginal()
     {
         var controls = new Controls();
-        controls.Apply(Vectors.Settings("{\"drop_attributes\":\"token\",\"mask_attributes\":\"user.email\"}"));
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"drop":["token"],"mask":["user.email"]}"""))));
         var sink = new Sink();
         var spans = new List<Activity>();
         var records = new List<List<KeyValuePair<string, object?>>>();
@@ -229,7 +230,9 @@ public class RedactionTests
         var console = Prepare(("OTEL_LOGS_EXPORTER", "console"));
         Assert.DoesNotContain("drop_attributes", console.HostNow(providersBuilt: false).Live);
         Assert.DoesNotContain("mask_attributes", Prepare(("OTEL_TRACES_EXPORTER", "zipkin")).HostNow(providersBuilt: false).Live);
-        console.RemoteConfig(Vectors.Config("{\"drop_attributes\":\"token\"}"));
-        Assert.Null(console.Controls.Policy(Signal.Traces).Redact); // ignored, not carried out by half
+        var refused = console.RemoteConfig(Vectors.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}"""))));
+        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
+        Assert.Equal("attribute_redaction: drop: this SDK cannot apply the requested override", refused.ErrorMessage);
+        Assert.Null(console.Controls.Policy(Signal.Traces).Redact); // refused, not carried out by half
     }
 }

@@ -88,22 +88,51 @@ import {
   SimpleSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { AgentRemoteConfigSchema, create, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { RemoteConfigStatuses } from "@pydantic/opamp-client";
 import { SdkSettings, type Settings } from "@pydantic/opamp-client/sdk";
+
+import { config as policyConfig, type Overrides, policy } from "./policy.js";
 
 import { Agent, Controls, glob, hostFromEnv, MASK } from "../src/index.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const EMPTY = new Uint8Array();
+/** The policy with every control local: what the SDK starts with when nothing was kept. */
+const EMPTY = text(policy());
 /** 2026-10-14T12:00:00Z, the vectors' clock. */
 const NOW = 1_791_979_200_000;
 
-const config = (body: string) =>
-  create(AgentRemoteConfigSchema, {
-    configHash: text(body),
-    config: { configMap: { elastic: { body: text(body), contentType: "application/json" } } },
-  });
+/**
+ * The policy a server sends for a generated document. The generator names each setting as
+ * Settings does, with its value as text. The policy carries each one in its control.
+ */
+function policyOf(d: Record<string, unknown>): string {
+  const list = (v: unknown) => String(v).split(",").map((s) => s.trim());
+  const o: Overrides = {};
+  if (d.sampling_rate !== undefined) o.head_sampling = { ratio: Number(d.sampling_rate) };
+  const signals = Object.fromEntries((["traces", "metrics", "logs"] as const)
+    .filter((s) => d[`send_${s}`] !== undefined).map((s) => [s, { enabled: d[`send_${s}`] === "true" }]));
+  if (Object.keys(signals).length > 0) o.signal_exports = signals;
+  if (d.sampling_rules !== undefined && (d.sampling_rules as object[]).length > 0) o.sampling_rules = { rules: d.sampling_rules };
+  if (d.sampling_traces_per_second !== undefined) o.trace_rate_limit = { traces_per_second: Number(d.sampling_traces_per_second) };
+  if (d.send_logs_per_second !== undefined) o.log_rate_limit = { records_per_second: Number(d.send_logs_per_second) };
+  const levels: Record<string, unknown> = {};
+  if (d.send_logs_level !== undefined) levels.level = d.send_logs_level;
+  if (d.send_logs_level_by_scope) levels.scopes = Object.fromEntries(list(d.send_logs_level_by_scope).map((e) => e.split("=")));
+  if (Object.keys(levels).length > 0) o.log_levels = levels;
+  const redaction: Record<string, unknown> = {};
+  if (d.drop_attributes !== undefined) redaction.drop = [...new Set(list(d.drop_attributes))];
+  if (d.mask_attributes !== undefined) redaction.mask = [...new Set(list(d.mask_attributes))];
+  if (Object.keys(redaction).length > 0) o.attribute_redaction = redaction;
+  if (d.debug_until !== undefined) {
+    o.debug = { until: d.debug_until };
+    if (d.debug_sampling_rate !== undefined) o.debug.sampling_ratio = Number(d.debug_sampling_rate);
+    if (d.debug_send_logs_level !== undefined) o.debug.log_level = d.debug_send_logs_level;
+  }
+  return policy(o);
+}
+
+const config = (doc: Record<string, unknown>) => policyConfig(policyOf(doc), policyOf(doc));
 
 // --- the seed, and a generator from it ---------------------------------------------------------
 
@@ -253,7 +282,7 @@ class FlippedAgent extends Agent {
 
   /** A document from the server, which must be applied. */
   send(doc: object): void {
-    const status = this.remoteConfig(config(JSON.stringify(doc)));
+    const status = this.remoteConfig(config(doc as Record<string, unknown>));
     assert.equal(status.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, `${status.errorMessage}: ${JSON.stringify(doc)}`);
   }
 
@@ -724,7 +753,7 @@ async function run(mode: Mode, seed: number): Promise<Reached> {
     const freshLogging = new LoggerProvider({
       processors: [new BatchLogRecordProcessor({ exporter: fresh.logs(freshLogs as never), maxExportBatchSize: 5, scheduledDelayMillis: 1 })],
     });
-    const d = LAYER.decide(config(JSON.stringify(final)), EMPTY, EMPTY, hostFromEnv({}), BigInt(agent.wall));
+    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv({}), BigInt(agent.wall));
     assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
     fresh.apply(d.apply);
 

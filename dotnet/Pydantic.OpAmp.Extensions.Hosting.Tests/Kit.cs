@@ -12,14 +12,8 @@ namespace Pydantic.OpAmp.Extensions.Hosting.Tests;
 /// <summary>What the tests run the package against: an OpAMP server and a collector, on loopback.</summary>
 internal static class Kit
 {
-    public static AgentRemoteConfig Config(string body) => new()
-    {
-        ConfigHash = ByteString.CopyFromUtf8(body),
-        Config = new AgentConfigMap
-        {
-            ConfigMap = { ["elastic"] = new AgentConfigObject { Body = ByteString.CopyFromUtf8(body), ContentType = "application/json" } },
-        },
-    };
+    /// <summary>A remote config whose only file is the policy <paramref name="document"/>.</summary>
+    public static AgentRemoteConfig Config(string document) => Pydantic.OpAmp.Tests.Policy.Config(document);
 
     public static string TempDir()
     {

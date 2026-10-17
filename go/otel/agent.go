@@ -28,18 +28,19 @@ import (
 )
 
 // host is what this package carries out, declared to the settings layer (docs/sdk-settings.md,
-// "The host"), which sets aside any setting not named: every live setting in every configuration
+// "The host"). The layer refuses a policy that overrides a setting not named here, and the
+// description lists only the controls named. The host names every live setting in every configuration
 // Setup builds (the sampler wraps whichever one OTEL_TRACES_SAMPLER names, and every span and log
 // exporter it builds goes through a gate), send_metrics only where the metrics reader is built
 // around a gated exporter, the instrumentation switches at once too (a switched-off
-// instrumentation's tracer starts no span from then on), and the polling interval at the next
-// start. A global provider the application sets in place of Setup's narrows it (agent.host).
+// instrumentation's tracer starts no span from then on), so nothing waits for the next start. A
+// global provider the application sets in place of Setup's narrows it (agent.host).
 func (s *server) host() *settingspb.Host {
 	live := append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations"}, carried...)
 	if !s.metricsUngated {
 		live = append(live, "send_metrics")
 	}
-	return &settingspb.Host{Live: live, NextStart: []string{"opamp_polling_interval"}}
+	return &settingspb.Host{Live: live}
 }
 
 // carried are the live settings this package carries out whatever it built: those of its sampler,
@@ -58,7 +59,8 @@ var carried = []string{
 	"debug_until",
 	"debug_sampling_rate",
 	"debug_send_logs_level",
-	// The application's own settings (docs/app-settings.md), which it reads with AppSetting.
+	// The application's own settings, the policy's app_settings control (docs/app-settings.md),
+	// which it reads with AppSetting.
 	"custom",
 }
 
@@ -250,7 +252,7 @@ func untraced() *http.Client {
 // start joins the fleet, once the SDK is built. A client that can't start leaves the SDK
 // running unmanaged.
 func (a *agent) start(ctx context.Context, res *resource.Resource) {
-	description, err := a.layer.Describe(ctx, keyValues(res))
+	description, err := a.layer.Describe(ctx, keyValues(res), a.server.host(), unixMs(a.now()))
 	if err != nil {
 		slog.Error("opamp: the client did not start; the SDK runs unmanaged", "error", err)
 		return
@@ -268,9 +270,6 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		// through net/http, on a transport of its own that no instrumentation wraps.
 		Mode:       opamp.ModeGo,
 		HTTPClient: untraced(),
-	}
-	if ms := a.atStart.GetSettings().OpampPollingIntervalMs; ms != nil {
-		cfg.HeartbeatInterval = time.Duration(*ms) * time.Millisecond
 	}
 	if a.server.stateDir != "" {
 		cfg.StateFile = filepath.Join(a.server.stateDir, "opamp-state")
@@ -530,12 +529,6 @@ func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteC
 	if s := d.GetApply(); s != nil {
 		a.controls.Apply(s)
 		a.settings = s
-		if len(s.GetUnsupported()) > 0 {
-			slog.Info("opamp: settings this SDK doesn't carry out: " + strings.Join(s.GetUnsupported(), ", "))
-		}
-		if len(s.GetIgnored()) > 0 {
-			slog.Info("opamp: settings unknown to this SDK: " + strings.Join(s.GetIgnored(), ", "))
-		}
 	}
 	if len(d.GetPendingRestart()) > 0 {
 		slog.Info("opamp: " + strings.Join(d.GetPendingRestart(), ", ") + " changed; in force when the application restarts")
