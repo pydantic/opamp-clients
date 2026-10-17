@@ -36,6 +36,7 @@ import sys
 import tarfile
 import urllib.error
 import urllib.request
+from collections.abc import Mapping
 from pathlib import Path
 
 ROOT = Path(os.environ.get("OPAMP_CLIENTS_ROOT") or Path(__file__).resolve().parent.parent)
@@ -181,7 +182,16 @@ def http(url: str, accept: str) -> bytes:
             req = urllib.request.Request(location, headers={"User-Agent": headers["User-Agent"]})
             with urllib.request.urlopen(req, timeout=300) as r:
                 return r.read()
-        raise SystemExit(f"GET {url}: HTTP {e.code} (the rate limit: set GH_TOKEN)") from e
+        raise SystemExit(f"GET {url}: HTTP {e.code}{why(e.code, e.headers)}") from e
+
+
+def why(code: int, headers: Mapping[str, str]) -> str:
+    """What a refused GET most likely means, as far as GitHub's answer says."""
+    if code == 429 or (code == 403 and headers.get("X-RateLimit-Remaining") == "0"):
+        return " (the rate limit: set GH_TOKEN)"
+    if code == 404:
+        return " (not found: no such release or file, or a repository you can't see without GH_TOKEN)"
+    return ""
 
 
 def lock(version: str, repo: str, directory: Path | None) -> dict:

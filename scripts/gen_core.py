@@ -95,7 +95,14 @@ def build(out: Path) -> None:
 
 
 def main() -> int:
-    if "--check" not in sys.argv:
+    args = sys.argv[1:]
+    if {"-h", "--help"} & set(args):
+        print(__doc__)
+        return 0
+    if set(args) - {"--check"}:
+        print(__doc__, file=sys.stderr)
+        return 2
+    if "--check" not in args:
         build(ROOT)
         return 0
     with tempfile.TemporaryDirectory() as tmp:
