@@ -418,7 +418,7 @@ func environmentProxyFor(rawURL string) (string, error) {
 func coreRoute(t *testing.T, choice *corepb.ProxyChoice, rawURL string) string {
 	t.Helper()
 	ctx := context.Background()
-	c, _, err := core.New(ctx, &corepb.Config{InstanceUid: make([]byte, 16), Endpoint: rawURL, Streams: true,
+	c, _, err := core.New(ctx, core.Options{}, &corepb.Config{InstanceUid: make([]byte, 16), Endpoint: rawURL, Streams: true,
 		Entropy: make([]byte, 32), Proxy: choice})
 	if err != nil {
 		t.Fatalf("%s: %v", rawURL, err)

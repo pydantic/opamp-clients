@@ -334,7 +334,7 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		// Files downloaded before a restart: the core downloads again what it still needs.
 		_ = os.RemoveAll(downloadsDir(cfg.StateFile))
 	}
-	c, out, err := core.NewWith(ctx, core.Options{Module: cfg.coreModule, Tap: cfg.tapFile}, cc)
+	c, out, err := core.New(ctx, core.Options{Module: cfg.coreModule, Tap: cfg.tapFile}, cc)
 	if err != nil {
 		return nil, err
 	}
