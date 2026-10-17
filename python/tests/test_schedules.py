@@ -56,6 +56,7 @@ import threading
 from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from typing import Any
 
 import hypothesis.core
 import pytest
@@ -269,11 +270,11 @@ class Monitor:
 class TappedCore(_core_mod.Core):
     """The real core, with a fixed seed and wall clock (a run is its seeds), checked at each step."""
 
-    def __init__(self, config: corepb.Config, *, _module: bytes | None = None) -> None:
+    def __init__(self, config: corepb.Config, *, _engine: Any = None) -> None:
         config.seed = 0x5EED
         config.entropy = bytes(range(32))
         config.unix_ms = UNIX0
-        super().__init__(config, _module=_module)
+        super().__init__(config, _engine=_engine)
         assert CURRENT is not None
         self.monitor = CURRENT.monitor
 

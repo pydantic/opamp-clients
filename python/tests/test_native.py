@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 import wasmtime
+from _wasm import WasmCore, WasmSdkSettings
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -22,7 +23,6 @@ from opamp_client._core import Core
 from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 from opamp_client._proto.opamp.sdk.v1 import settings_pb2
 from opamp_client._proto.opamp.v1 import opamp_pb2 as pb
-from opamp_client._wasm import WasmCore, WasmSdkSettings
 
 EXAMPLES = int(os.environ.get("OPAMP_NATIVE_EXAMPLES", "200"))
 
@@ -176,7 +176,7 @@ def test_a_trap_is_a_core_error() -> None:
         (func (export "init") (param i32 i32) (result i64) unreachable)
         (func (export "step") (param i32 i32) (result i64) unreachable))"""))
     with pytest.raises(CoreError, match="trap"):
-        Core(corepb.Config(instance_uid=bytes([1] * 16), endpoint="http://server/v1/opamp"), _module=trapping)
+        Core(corepb.Config(instance_uid=bytes([1] * 16), endpoint="http://server/v1/opamp"), _engine=WasmCore(trapping))
 
 
 def _load(env: dict[str, str]) -> subprocess.CompletedProcess:
