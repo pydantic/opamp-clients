@@ -69,7 +69,12 @@ class Tap {
       // user's only, as the state file is, whether new or already there (open's mode is for a new
       // file only).
       const fd = openSync(path, "a", 0o600);
-      if (process.platform !== "win32") fchmodSync(fd, 0o600);
+      try {
+        if (process.platform !== "win32") fchmodSync(fd, 0o600);
+      } catch (e) {
+        closeSync(fd);
+        throw e;
+      }
       return new Tap(fd);
     } catch (e) {
       console.error(`OPAMP_CORE_TAP: can't open ${path}: ${String(e)}`);

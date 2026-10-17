@@ -243,11 +243,10 @@ final class Core implements AutoCloseable {
       try {
         return Channels.newOutputStream(StateFile.createPrivate(path));
       } catch (FileAlreadyExistsException e) {
-        FileOutputStream out = new FileOutputStream(path.toFile(), true);
         if (path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
           Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
         }
-        return out;
+        return new FileOutputStream(path.toFile(), true);
       }
     }
 

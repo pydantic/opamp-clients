@@ -159,7 +159,16 @@ internal sealed class CoreTap : IDisposable
             BufferSize = 0,
             UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
         });
-        File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        try
+        {
+            File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+
         return stream;
     }
 
