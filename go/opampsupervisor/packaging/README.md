@@ -24,7 +24,7 @@ OpAMP:
 - `pydantic-opamp-enroll`.
 
 Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
-install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.1.0_linux_amd64.deb`.
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.1.0_amd64.deb`.
 On RHEL or Fedora, install the unsigned local rpm with
 `sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.1.0-1.x86_64.rpm`.
 The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
