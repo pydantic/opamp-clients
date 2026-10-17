@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Pydantic Services Inc.
-// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Bill Easton. All rights reserved.
+// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 // The interface to the shared OpAMP client core (written in Rust around a protocol kernel, and
 // compiled to WebAssembly and to a native library). A client feeds the core Inputs and carries
