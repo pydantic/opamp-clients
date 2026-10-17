@@ -147,7 +147,7 @@ count as held. Three more checks run:
 
 ## Results
 
-Our clients must pass every run, the five WebAssembly SDKs in both modes (`go-core-rust`,
+Our clients must pass every run, the five SDKs in both modes (`go-core-rust`,
 `node-rust`, `python-core-rust`, `java-core-rust` and `dotnet-core-rust` are Rust mode). The
 nightly job runs an hour per client and transport; the upstream clients' runs are recorded, not
 required to pass. A MUST failure of an upstream client

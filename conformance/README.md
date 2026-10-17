@@ -89,7 +89,7 @@ clients have these features (`clients.toml` lists them), except that Java has no
 Java mode (`java-core`): the JDK's HTTP client has none. In Rust mode (`java-core-rust`) the core
 speaks SOCKS5 itself, and every SDK's Rust mode has them all.
 
-Each of the five WebAssembly SDKs is two clients here, one per mode: `go-core`, `node`,
+Each of the five SDKs is two clients here, one per mode: `go-core`, `node`,
 `python-core`, `java-core` and `dotnet-core` are platform mode, and the same names with `-rust`
 are Rust mode, the SDKs' default. Each driver asks for its mode by name (the `-rust` clients set
 `OPAMP_<LANGUAGE>_MODE=rust`), so neither depends on what the SDK's default is.
