@@ -105,3 +105,12 @@ class Core:
 def sdk_settings_call(request: bytes) -> bytes:
     """Run one encoded SDK settings Request; returns the encoded Reply."""
     return _run(_lib.opamp_sdk_settings_call, data=request)
+
+
+def setup_call(call: bytes) -> bytes:
+    """Run one encoded SetupCall (the core's Setup: no session); returns the encoded SetupReply.
+    Bound at the first call: a library from before Setup still runs the client."""
+    fn = _lib.opamp_core_setup
+    fn.restype = ctypes.c_int32
+    fn.argtypes = _call
+    return _run(fn, data=call)

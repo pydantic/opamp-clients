@@ -217,10 +217,10 @@ test("a bad heartbeat interval or header escape is warned about, and the program
       XDG_STATE_HOME: home, HOME: home, LOCALAPPDATA: home,
     });
     assert.deepEqual([r.code, r.signal], [0, null], r.out);
-    assert.ok(r.out.includes("OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL 'soon' is not a duration (as 1500, 500ms, 30s or 2m): "
-      + "using the default, 30s"), r.out);
-    assert.ok(r.out.includes("OpAMP: OTEL_OPAMP_HEADERS: the value of 'Authorization' has a percent escape that can't "
-      + "be decoded: it is sent as written"), r.out);
+    assert.ok(r.out.includes('OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "soon" is not a duration (as 1500, 500ms, 30s or 2m): '
+      + "using the default"), r.out);
+    assert.ok(r.out.includes('OpAMP: OTEL_OPAMP_HEADERS: the value of "Authorization" has a percent escape that can\'t '
+      + "be decoded, so it is left out"), r.out);
     assert.ok(s.seen.polls > 0 && s.seen.goodbye, r.out);
   } finally {
     s.close();
@@ -308,7 +308,7 @@ test("bad values given in code are warned about and the program runs: a scheme t
   assert.match(out, /still running/);
   assert.match(out, /OpAMP: headers is not an object of names to values: it is not used/);
   assert.match(out, /OpAMP: stateDir 7 is not a string: it is not used/);
-  assert.match(out, /OpAMP: heartbeatIntervalMs -5 is not a whole number of milliseconds: using the default, 30s/);
+  assert.match(out, /OpAMP: heartbeatIntervalMs \(-5 ms\) is no interval: using the default/);
   // The client refuses the scheme at start (the shared core checks the endpoint): unmanaged, still running.
   assert.match(out, /OpAMP: the client did not start; the SDK runs unmanaged: .*a scheme the client doesn't take/);
 });

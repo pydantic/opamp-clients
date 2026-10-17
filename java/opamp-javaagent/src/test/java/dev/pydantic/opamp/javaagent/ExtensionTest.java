@@ -618,7 +618,7 @@ class ExtensionTest {
     Extension first = Extension.forTest(null);
     first.properties(DefaultConfigProperties.createFromMap(props));
     String before = first.resource(Resource.empty()).getAttribute(id);
-    java.util.UUID assigned = Extension.uuidV7();
+    java.util.UUID assigned = java.util.UUID.randomUUID();
     first.notified(new dev.pydantic.opamp.Notification.InstanceUidChanged(
         java.nio.ByteBuffer.allocate(16).putLong(assigned.getMostSignificantBits())
             .putLong(assigned.getLeastSignificantBits()).array()));
@@ -644,24 +644,28 @@ class ExtensionTest {
     assertFalse(e.controls.gates.sendLogs());
   }
 
-  @Test
-  void headersAreReadAsTheOtlpExporterReadsThem() {
-    assertEquals(Map.of("Authorization", "Bearer a b", "x", "1=2"),
-        Extension.headers("Authorization=Bearer%20a%20b, x=1=2,broken"));
-    // '+' is a plus, as every other SDK reads it: a base64 token keeps it.
-    assertEquals(Map.of("Authorization", "Bearer abc+def=="), Extension.headers("Authorization=Bearer abc+def=="));
+  /** The headers otel.opamp.headers gives, as the core reads them. */
+  static Map<String, String> headers(String spec) {
+    return setupFrom(Map.of("otel.opamp.endpoint", "http://server/v1/opamp", "otel.opamp.state.dir", "none",
+        "otel.opamp.headers", spec), Map.of()).headers();
   }
 
   @Test
-  void aHeaderItCantDecodeIsSentAsWrittenWithAWarningThatNamesOnlyTheHeader() {
-    List<String> said = logged(Level.WARNING, () -> assertEquals(
-        Map.of("Authorization", "Bearer 100%", "x", "%zz", "y", "ok"),
-        Extension.headers("Authorization=Bearer 100%,x=%zz,y=ok")));
+  void headersAreReadAsTheOtlpExporterReadsThem() {
+    assertEquals(Map.of("Authorization", "Bearer a b", "x", "1=2"), headers("Authorization=Bearer%20a%20b, x=1=2,broken"));
+    // '+' is a plus, as every other SDK reads it: a base64 token keeps it.
+    assertEquals(Map.of("Authorization", "Bearer abc+def=="), headers("Authorization=Bearer abc+def=="));
+  }
+
+  @Test
+  void aHeaderItCantDecodeIsLeftOutWithAWarningThatNamesOnlyTheHeader() {
+    List<String> said = logged(Level.WARNING, () -> assertEquals(Map.of("y", "ok"),
+        headers("Authorization=Bearer 100%,x=%zz,y=ok")));
     assertEquals(List.of(
-        "WARNING OpAMP: otel.opamp.headers: the value of 'Authorization' has a percent escape that can't be "
-            + "decoded: it is sent as written",
-        "WARNING OpAMP: otel.opamp.headers: the value of 'x' has a percent escape that can't be decoded: it is "
-            + "sent as written"), said);
+        "WARNING OpAMP: otel.opamp.headers: the value of \"Authorization\" has a percent escape that can't be "
+            + "decoded, so it is left out",
+        "WARNING OpAMP: otel.opamp.headers: the value of \"x\" has a percent escape that can't be decoded, so it "
+            + "is left out"), said);
   }
 
   @Test
@@ -670,8 +674,8 @@ class ExtensionTest {
         DefaultConfigProperties.createFromMap(Map.of("otel.opamp.endpoint", "http://server/v1/opamp",
             "otel.opamp.state.dir", dir.toString(), "otel.opamp.heartbeat.interval", "thirty")),
         Map.of(), null).heartbeat()));
-    assertEquals(List.of("WARNING OpAMP: otel.opamp.heartbeat.interval 'thirty' is not a duration (as 1500ms, "
-        + "30s or 2m): using the default, 30s"), said);
+    assertEquals(List.of("WARNING OpAMP: otel.opamp.heartbeat.interval \"thirty\" is not a duration (as 1500, "
+        + "500ms, 30s or 2m): using the default"), said);
   }
 
   @Test
@@ -720,8 +724,7 @@ class ExtensionTest {
   @Test
   void connectingFailingAndRecoveringAreEachSaidOnce() {
     UUID uid = new UUID(0, 7);
-    Extension.Reachability r = new Extension.Reachability(
-        "https://user:secret@opamp.example.com/v1/opamp?token=x#frag", "checkout", uid);
+    Extension.Reachability r = reachability("https://user:secret@opamp.example.com/v1/opamp?token=x#frag", "checkout", uid);
     List<String> all = logged(Level.ALL, () -> {
       r.notified(new Notification.ConnectFailed(401, "HTTP 401"));
       r.notified(new Notification.ConnectFailed(401, "HTTP 401"));
@@ -754,7 +757,7 @@ class ExtensionTest {
   @Test
   void whatIsSaidNamesTheEndpointInUse() {
     String[] inUse = {null}; // none yet: the configured one
-    Extension.Reachability r = new Extension.Reachability("https://a.example.com/v1/opamp", null, new UUID(0, 1));
+    Extension.Reachability r = reachability("https://a.example.com/v1/opamp", null, new UUID(0, 1));
     r.inUse = () -> inUse[0];
     List<String> said = logged(Level.INFO, () -> {
       r.notified(new Notification.Connected());
@@ -771,23 +774,29 @@ class ExtensionTest {
 
   @Test
   void theHintFollowsTheStatusAndTheServiceIsLeftOutWithoutOne() {
-    assertTrue(Extension.hint(403).startsWith("the server refused this agent's credentials"));
-    assertTrue(Extension.hint(404).startsWith("nothing serves OpAMP at that path"));
-    assertEquals("the server answered with an error", Extension.hint(500));
+    dev.pydantic.opamp.core.CoreProto.SetupHints hints = Extension.hintsFor("http://server/v1/opamp");
+    assertTrue(Extension.hint(hints, 403).startsWith("the server refused this agent's credentials"));
+    assertTrue(Extension.hint(hints, 404).startsWith("nothing serves OpAMP at that path"));
+    assertEquals("the server answered with an error", Extension.hint(hints, 500));
     UUID uid = new UUID(0, 1);
-    Extension.Reachability r = new Extension.Reachability("http://[::1]:4320/v1/opamp", null, uid);
+    Extension.Reachability r = reachability("http://[::1]:4320/v1/opamp", null, uid);
     assertEquals(List.of("INFO OpAMP: connected to http://[::1]:4320/v1/opamp; this SDK is managed, instance " + uid),
         logged(Level.INFO, () -> r.notified(new Notification.Connected())));
+  }
+
+  /** Reachability as the extension makes it: the endpoint and the hints as the core's Setup gives them. */
+  static Extension.Reachability reachability(String endpoint, String service, UUID uid) {
+    return new Extension.Reachability(Extension.shown(endpoint, endpoint), service, uid, Extension.hintsFor(endpoint));
   }
 
   @Test
   void theEndpointIsCutForTheLogNeverParsed() {
     assertEquals("https://opamp.example.com:notaport/v1/opamp",
-        Extension.where("https://u:p@opamp.example.com:notaport/v1/opamp?token=x#f"));
-    assertEquals("https://[::1/v1/opamp", Extension.where("https://u:p@[::1/v1/opamp?k=v"));
-    assertEquals("https://[::1/v1/opamp", Extension.where("https://[::1/v1/opamp?k=v"));
-    assertEquals("https://opamp.example.com", Extension.where("https://a@b@opamp.example.com#x"));
-    assertEquals("opamp.example.com/v1/opamp", Extension.where("u:p@opamp.example.com/v1/opamp?k=v"));
+        Extension.shown("https://u:p@opamp.example.com:notaport/v1/opamp?token=x#f", "?"));
+    assertEquals("https://[::1/v1/opamp", Extension.shown("https://u:p@[::1/v1/opamp?k=v", "?"));
+    assertEquals("https://[::1/v1/opamp", Extension.shown("https://[::1/v1/opamp?k=v", "?"));
+    assertEquals("https://opamp.example.com", Extension.shown("https://a@b@opamp.example.com#x", "?"));
+    assertEquals("http://opamp.example.com/v1/opamp", Extension.shown("u:p@opamp.example.com/v1/opamp?k=v", "?"));
   }
 
   @Test
@@ -796,7 +805,7 @@ class ExtensionTest {
     List<String> said = logged(Level.WARNING, () -> assertEquals("http://u:p@opamp.example.com:4320/v1/opamp?k=v",
         Extension.Setup.from(DefaultConfigProperties.createFromMap(
             Map.of("otel.opamp.endpoint", " u:p@opamp.example.com:4320/v1/opamp?k=v ")), Map.of(), null).endpoint()));
-    assertEquals(List.of("WARNING OpAMP: otel.opamp.endpoint 'opamp.example.com:4320/v1/opamp' has no scheme, so "
+    assertEquals(List.of("WARNING OpAMP: otel.opamp.endpoint \"opamp.example.com:4320/v1/opamp\" has no scheme, so "
         + "it is taken as http://; name it in full, as https://host/v1/opamp or wss://host/v1/opamp"), said);
   }
 
@@ -884,11 +893,11 @@ class ExtensionTest {
     assertEquals(null, setupFrom(on, home(file)).stateDir());
     // Every slot taken: none.
     List<Extension.Setup> held = new ArrayList<>();
-    for (int i = 0; i < Extension.SLOTS; i++) {
+    for (int i = 0; i < 16; i++) {
       held.add(setupFrom(on, home(base)));
     }
     assertTrue(held.stream().allMatch(h -> h.stateDir() != null));
-    assertEquals(Extension.SLOTS, held.stream().map(Extension.Setup::stateDir).distinct().count());
+    assertEquals(16, held.stream().map(Extension.Setup::stateDir).distinct().count());
     List<String> said = logged(Level.INFO, () -> assertEquals(null, setupFrom(on, home(base)).stateDir()));
     assertEquals(1, said.size(), said.toString());
     assertTrue(said.get(0).startsWith("INFO OpAMP: 16 processes of com.example.Checkout already"), said.get(0));

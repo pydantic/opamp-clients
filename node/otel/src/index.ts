@@ -30,7 +30,7 @@ import {
   writeSync,
 } from "node:fs";
 import { basename, join } from "node:path";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import {
   type AttributeValue,
@@ -115,6 +115,17 @@ import {
   type Notification,
   type RemoteConfigStatus,
   saveState,
+  SETUP_LOCK_FILE,
+  SETUP_UID_FILE,
+  type SetupHints,
+  SetupHeaderSchema,
+  SetupInCodeSchema,
+  SetupOs,
+  SetupIdentitySchema,
+  SetupStartSchema,
+  SetupVariableSchema,
+  identifySetup,
+  startSetup,
 } from "@pydantic/opamp-client";
 import {
   type HealthReport,
@@ -196,100 +207,31 @@ function positive(env: NodeJS.ProcessEnv, key: string): number | undefined {
   return value;
 }
 
-/**
- * `k=v,k2=v2`, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS. A value with an escape it
- * can't decode is kept as written, with a warning that names the header (not the value: it may
- * be a secret).
- */
-export function headers(spec: string): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const pair of spec.split(",")) {
-    const eq = pair.indexOf("=");
-    if (eq <= 0) continue;
-    const name = pair.slice(0, eq).trim();
-    const value = pair.slice(eq + 1).trim();
-    try {
-      out[name] = decodeURIComponent(value);
-    } catch {
-      say.warn(`OpAMP: OTEL_OPAMP_HEADERS: the value of '${name}' has a percent escape that can't be decoded: `
-        + "it is sent as written");
-      out[name] = value;
-    }
-  }
-  return out;
-}
-
-/** `1500` (milliseconds, as the SDK's variables), or `500ms`, `30s`, `2m`. */
-export function durationMs(value: string): number {
-  const m = /^\s*(\d+)\s*(ms|s|m)?\s*$/.exec(value);
-  const ms = m ? Number(m[1]) * ({ ms: 1, s: 1000, m: 60_000 }[m[2] ?? "ms"] ?? 1) : NaN;
-  if (!Number.isSafeInteger(ms)) throw new Error(`not a duration: ${JSON.stringify(value)}`);
-  return ms;
-}
-
 /** A UUID's 16 bytes as text. */
 function text(u: Uint8Array): string {
   const h = Buffer.from(u).toString("hex");
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-/** A UUIDv7: the time in milliseconds, then random bits. */
-export function uuid7(): string {
-  const b = randomBytes(16);
-  b.writeUIntBE(Date.now(), 0, 6);
-  b[6] = (b[6]! & 0x0f) | 0x70;
-  b[8] = (b[8]! & 0x3f) | 0x80;
-  return text(b);
-}
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** The service.instance.id OTEL_RESOURCE_ATTRIBUTES gives, if it is a UUID: the instance UID the application chose. */
-function chosenUid(env: NodeJS.ProcessEnv): string | undefined {
-  for (const a of (env.OTEL_RESOURCE_ATTRIBUTES ?? "").split(",")) {
-    const [key, value] = a.split("=", 2);
-    if (key?.trim() !== INSTANCE_ID || !value) continue;
-    let id: string;
-    try {
-      id = decodeURIComponent(value.trim());
-    } catch {
-      // A bad percent escape: not a UUID, so a UID of its own.
-      continue;
-    }
-    if (UUID.test(id)) return id;
-  }
-  return undefined;
-}
-
 function uuidBytes(u: string): Uint8Array {
   return Uint8Array.from(Buffer.from(u.replaceAll("-", ""), "hex"));
 }
 
-/**
- * The endpoint as it is safe to log: no user info, query or fragment. Split by hand, not parsed:
- * the host and port stay as written, and nothing here throws.
- */
-export function where(endpoint: string): string {
-  const bare = endpoint.split(/[?#]/, 1)[0]!;
-  const m = /^([A-Za-z][A-Za-z0-9+.-]*):\/\/([^/]*)(.*)$/.exec(bare);
-  const host = m?.[2]!.split("@").at(-1);
-  // Not a URL this can split (no scheme, no host): what could be secret cut from the text.
-  if (!m || !host) return bare.split("@").at(-1)!;
-  return `${m[1]}://${host}${m[3]}`;
+/** An endpoint as it is safe to log (no user info, query or fragment): the core's rule. */
+export function shownEndpoint(endpoint: string): string {
+  try {
+    return startSetup(create(SetupStartSchema, { code: { endpoint } })).shownEndpoint;
+  } catch {
+    return "the endpoint";
+  }
 }
 
-/**
- * What to check when the server can't be reached, by what went wrong. It names what gave the
- * endpoint and the headers: the option given in code, else the variable.
- */
-export function hint(status: number | undefined, endpointFrom = "OTEL_OPAMP_ENDPOINT",
-  headersFrom = "OTEL_OPAMP_HEADERS"): string {
-  if (status === 401 || status === 403) {
-    return `the server refused this agent's credentials: check ${headersFrom} (Authorization=Bearer <token>)`;
-  }
-  if (status === 404) return `nothing serves OpAMP at that path: check ${endpointFrom} (it usually ends in /v1/opamp)`;
-  if (status === undefined) return `check ${endpointFrom} and that the server is up`;
-  return "the server answered with an error";
+/** What to check when the server can't be reached, by what went wrong (the core's hints). */
+function hint(hints: SetupHints | undefined, status: number | undefined): string {
+  if (status === 401 || status === 403) return hints?.refused ?? "";
+  if (status === 404) return hints?.notFound ?? "";
+  if (status === undefined) return hints?.unreachable ?? "";
+  return hints?.error ?? "";
 }
 
 /**
@@ -305,15 +247,16 @@ export class Reachability {
   #ever = false;
   #failing = false;
 
-  constructor(endpoint: string, readonly service = "", readonly uid = "",
-    readonly endpointFrom = "OTEL_OPAMP_ENDPOINT", readonly headersFrom = "OTEL_OPAMP_HEADERS") {
-    this.endpoint = where(endpoint);
+  /** `endpoint`: as it is safe to log; `hints`: the core's, naming what gave the endpoint and
+   * the headers. */
+  constructor(endpoint: string, readonly service = "", readonly uid = "", readonly hints?: SetupHints) {
+    this.endpoint = endpoint;
   }
 
   /** The endpoint the client uses now, as it is safe to log. */
   at(): string {
     const e = this.inUse?.();
-    return e ? where(e) : this.endpoint;
+    return e ? shownEndpoint(e) : this.endpoint;
   }
 
   notified(n: Notification): void {
@@ -330,7 +273,7 @@ export class Reachability {
     } else if (n.kind === "connectFailed") {
       if (!this.#failing) {
         const why = n.detail || `HTTP ${n.status}`;
-        say.warn(`OpAMP: can't reach ${endpoint} (${why}): ${hint(n.status, this.endpointFrom, this.headersFrom)}. Retrying in the background; `
+        say.warn(`OpAMP: can't reach ${endpoint} (${why}): ${hint(this.hints, n.status)}. Retrying in the background; `
           + "the SDK keeps its current settings meanwhile");
       } else {
         diag.debug(`OpAMP: still can't reach ${endpoint}: ${n.detail}`);
@@ -339,9 +282,6 @@ export class Reachability {
     }
   }
 }
-
-/** Processes of one program on one host that each keep their own identity by default. */
-export const SLOTS = 16;
 
 /** The program, as a name: the script run, without its extension; `node` when there is none. */
 export function programName(argv: readonly string[] = process.argv): string {
@@ -432,57 +372,24 @@ export function release(path: string): void {
 }
 
 /**
- * Without OTEL_OPAMP_STATE_DIR: a state directory of the user's own, so an instance keeps its UID
- * across restarts with no setup (docs/default-state-dir.md). One per program, service and working
- * directory; a slot in it per process running at once, each held by a lock. The directory and its
- * lock file, or undefined where there's none to be had (no home, not writable, every slot taken):
- * then each start is a new instance, as before. Never throws.
+ * The first of the default state directory's slots (docs/default-state-dir.md, as the core names
+ * them) this process can make and lock: the directory and its lock file, or undefined where
+ * there's none to be had (not writable, every slot taken: `allTaken` is the line to say then):
+ * then each start is a new instance. Never throws.
  */
-export function defaultStateDir(
-  env: NodeJS.ProcessEnv = process.env,
-  argv: readonly string[] = process.argv,
-): { dir: string; lock: string } | undefined {
-  let service = "";
+function slot(slots: readonly string[], allTaken: string): { dir: string; lock: string } | undefined {
+  if (slots.length === 0) return undefined;
   try {
-    const home = env.HOME?.trim();
-    const base = process.platform === "win32"
-      ? env.LOCALAPPDATA?.trim()
-      : process.platform === "darwin"
-        ? home && join(home, "Library", "Application Support")
-        : env.XDG_STATE_HOME?.trim() || (home && join(home, ".local", "state"));
-    if (!base) return undefined;
-    const attrs: Record<string, string> = {};
-    for (const a of (env.OTEL_RESOURCE_ATTRIBUTES ?? "").split(",")) {
-      const eq = a.indexOf("=");
-      if (eq < 0) continue;
-      try {
-        attrs[a.slice(0, eq).trim()] = decodeURIComponent(a.slice(eq + 1).trim());
-      } catch {
-        attrs[a.slice(0, eq).trim()] = a.slice(eq + 1).trim();
-      }
-    }
-    service = env.OTEL_SERVICE_NAME?.trim() || attrs["service.name"] || programName(argv);
-    let cwd = "";
-    try {
-      cwd = process.cwd();
-    } catch {
-      // Removed from under the process: no working directory to tell it by.
-    }
-    const key = [service, attrs["service.namespace"] ?? "", programName(argv), cwd].join("\0");
-    const name = service.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 64) || "service";
-    const hash = createHash("sha256").update(key).digest("hex").slice(0, 8);
-    const root = join(base, "opamp", `${name}-${hash}`);
-    for (let slot = 1; slot <= SLOTS; slot++) {
-      const dir = join(root, String(slot));
+    for (const dir of slots) {
       mkdirSync(dir, { recursive: true, mode: 0o700 });
-      const path = join(dir, "lock");
+      const path = join(dir, SETUP_LOCK_FILE);
       if (lock(path)) return { dir, lock: path };
     }
   } catch (e) {
     diag.debug(`OpAMP: no state directory of its own (${String(e)}): each start is a new instance`);
     return undefined;
   }
-  diag.info(`OpAMP: ${SLOTS} processes of ${service} already keep their identity here: this one is a new instance each start`);
+  diag.info(`OpAMP: ${allTaken}`);
   return undefined;
 }
 
@@ -494,12 +401,10 @@ export interface Setup {
   heartbeatMs: number;
   /** The lock file on the default state directory, held while the process runs. */
   stateLock?: string;
-  /**
-   * The option that gave the endpoint, and the headers, when given in code (unset: the variable):
-   * the warning when the server can't be reached names it.
-   */
-  endpointFrom?: string;
-  headersFrom?: string;
+  /** The endpoint as it is safe to log, and what to check when the server can't be reached
+   * (naming what gave the endpoint and the headers): the core's. */
+  shown: string;
+  hints?: SetupHints;
 }
 
 /**
@@ -561,61 +466,80 @@ function given(options: unknown): Options {
 const ENDPOINT_IN_CODE = "the endpoint given to register()";
 const HEADERS_IN_CODE = "the headers given to register()";
 
+/** The variables the core's Setup reads. */
+const SETUP_VARIABLES = ["OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
+  "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA"];
+
+/**
+ * Where the server is, from OTEL_OPAMP_* and what the code gives; undefined when the package is
+ * off. The rules are the core's (its Setup call), the same in every language: what is here is the
+ * I/O, reading the variables, taking a slot of the default state directory, and saying the
+ * warnings. Nothing here throws.
+ */
 export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options = {}): Setup | undefined {
   const options = given(code);
-  const inCode = options.endpoint?.trim();
-  let endpoint = inCode || env.OTEL_OPAMP_ENDPOINT?.trim();
-  if (!endpoint) return undefined;
   // No SDK, nothing to manage: not an agent in the fleet either.
   if (env.OTEL_SDK_DISABLED?.trim().toLowerCase() === "true") return undefined;
-  if (!endpoint.includes("://")) {
-    say.warn(`OpAMP: ${inCode ? "the endpoint" : "OTEL_OPAMP_ENDPOINT"} '${where(endpoint)}' has no scheme, so it is taken as http://; `
-      + "name it in full, as https://host/v1/opamp or wss://host/v1/opamp");
-    endpoint = `http://${endpoint}`; // as the warning says: the client refuses it without one
+  let heartbeatMs: bigint | undefined;
+  const ms = options.heartbeatIntervalMs;
+  if (ms !== undefined) {
+    if (typeof ms === "number" && Number.isFinite(ms)) {
+      heartbeatMs = BigInt(Math.trunc(ms));
+    } else {
+      say.warn(`OpAMP: heartbeatIntervalMs ${shown(ms)} is not a number of milliseconds: it is not used`);
+    }
   }
+  let cwd = "";
+  try {
+    cwd = process.cwd();
+  } catch {
+    // Removed from under the process: no working directory to tell it by.
+  }
+  const start = create(SetupStartSchema, {
+    env: SETUP_VARIABLES.flatMap((name) => {
+      const value = env[name];
+      return value ? [create(SetupVariableSchema, { name, value })] : [];
+    }),
+    os: process.platform === "win32" ? SetupOs.WINDOWS : process.platform === "darwin" ? SetupOs.MACOS : SetupOs.UNIX,
+    program: programName(),
+    cwd,
+    code: create(SetupInCodeSchema, {
+      ...(options.endpoint !== undefined ? { endpoint: options.endpoint } : {}),
+      ...(options.stateDir !== undefined ? { stateDir: options.stateDir } : {}),
+      ...(heartbeatMs !== undefined ? { heartbeatMs } : {}),
+      headersGiven: options.headers !== undefined,
+      headers: Object.entries(options.headers ?? {}).map(([name, value]) => create(SetupHeaderSchema, { name, value })),
+      endpointName: ENDPOINT_IN_CODE,
+      headersName: HEADERS_IN_CODE,
+      heartbeatName: "heartbeatIntervalMs",
+    }),
+  });
+  let s;
+  try {
+    s = startSetup(start);
+  } catch (e) {
+    say.warn(`OpAMP: the core could not read the settings (${String(e)}): the SDK runs unmanaged`);
+    return undefined;
+  }
+  for (const w of s.warnings) say.warn(`OpAMP: ${w}`);
+  if (s.off) return undefined;
   const setup: Setup = {
-    endpoint,
-    headers: options.headers ? { ...options.headers } : headers(env.OTEL_OPAMP_HEADERS ?? ""),
-    heartbeatMs: options.heartbeatIntervalMs !== undefined ? heartbeatInCode(options.heartbeatIntervalMs) : heartbeatFromEnv(env),
+    endpoint: s.endpoint,
+    headers: Object.fromEntries(s.headers.map((h) => [h.name, h.value])),
+    heartbeatMs: Number(s.heartbeatIntervalMs),
+    shown: s.shownEndpoint,
+    ...(s.hints ? { hints: s.hints } : {}),
   };
-  if (inCode) setup.endpointFrom = ENDPOINT_IN_CODE;
-  if (options.headers) setup.headersFrom = HEADERS_IN_CODE;
-  const stateDir = options.stateDir?.trim() || env.OTEL_OPAMP_STATE_DIR?.trim(); // blank in code: not given
-  if (stateDir?.toLowerCase() === "none") {
-    // Turned off: each start is a new instance.
-  } else if (stateDir) {
-    setup.stateDir = stateDir;
-  } else if (chosenUid(env) === undefined) {
-    // A service.instance.id the application chose stays its choice: no default to override it.
-    // One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
-    const claimed = defaultStateDir(env);
+  if (s.stateDir) {
+    setup.stateDir = s.stateDir;
+  } else {
+    const claimed = slot(s.defaultSlots, s.allSlotsTaken);
     if (claimed) {
       setup.stateDir = claimed.dir;
       setup.stateLock = claimed.lock;
     }
   }
   return setup;
-}
-
-/** OTEL_OPAMP_HEARTBEAT_INTERVAL; 0, the client's default, when unset or unreadable: a bad one
- * warns, and holds nothing up. */
-function heartbeatFromEnv(env: NodeJS.ProcessEnv): number {
-  const heartbeat = env.OTEL_OPAMP_HEARTBEAT_INTERVAL?.trim();
-  if (!heartbeat) return 0;
-  try {
-    return durationMs(heartbeat);
-  } catch {
-    say.warn(`OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL '${heartbeat}' is not a duration (as 1500, 500ms, 30s or 2m): `
-      + "using the default, 30s");
-    return 0;
-  }
-}
-
-/** heartbeatIntervalMs, as the variable: the client's default for one it can't use. */
-function heartbeatInCode(ms: number): number {
-  if (Number.isSafeInteger(ms) && ms >= 0) return ms;
-  say.warn(`OpAMP: heartbeatIntervalMs ${shown(ms)} is not a whole number of milliseconds: using the default, 30s`);
-  return 0;
 }
 
 /** The sampler OTEL_TRACES_SAMPLER names, as the specification defines the values. */
@@ -1766,28 +1690,41 @@ export class Agent {
   }
 
   /**
-   * The instance UID: the one saved in the state directory; else a new one, saved there; else,
-   * where none can be kept (no state directory, or one it can't be saved in), a UUID
-   * service.instance.id given in OTEL_RESOURCE_ATTRIBUTES, the same at every start; else a new one.
+   * The instance UID, as the core's Setup decides it: the one saved in the state directory; else a
+   * new one, saved there; else, where none can be kept (no state directory, or one it can't be
+   * saved in), a UUID service.instance.id given in OTEL_RESOURCE_ATTRIBUTES, the same at every
+   * start; else a new one. What is here is the I/O: the file, the entropy and the clock.
    */
   #identity(env: NodeJS.ProcessEnv): string {
-    const path = this.setup?.stateDir ? join(this.setup.stateDir, "instance-uid") : undefined;
+    const dir = this.setup?.stateDir;
+    const path = dir ? join(dir, SETUP_UID_FILE) : undefined;
+    let saved = "";
     if (path) {
       try {
-        const saved = readFileSync(path, "utf8").trim();
-        if (UUID.test(saved)) return saved;
+        saved = readFileSync(path, "utf8");
       } catch {
         // None saved yet.
       }
-      const made = uuid7();
+    }
+    let id;
+    try {
+      id = identifySetup(create(SetupIdentitySchema, {
+        stateDir: path !== undefined, saved, resourceAttributes: env.OTEL_RESOURCE_ATTRIBUTES ?? "",
+        entropy: randomBytes(16), unixMs: BigInt(Date.now()),
+      }));
+    } catch (e) {
+      say.warn(`OpAMP: the core could not choose the instance UID (${String(e)}): this start is a new instance`);
+      return text(randomBytes(16));
+    }
+    if (path && id.save) {
       try {
-        write(path, made);
-        return made;
+        write(path, id.text);
       } catch (e) {
         say.warn(`OpAMP: can't save the instance UID: ${String(e)}`);
+        return text(id.unsavedUid);
       }
     }
-    return chosenUid(env) ?? uuid7();
+    return text(id.instanceUid);
   }
 
   /** Once the SDK is built: join the fleet. */
@@ -1798,8 +1735,7 @@ export class Agent {
     // Stopped first (a SIGTERM while the resource was being detected): don't start at all.
     if (!s || !layer || !uid || this.#stopping) return;
     const heartbeat = s.heartbeatMs;
-    this.reachability = new Reachability(s.endpoint, String(resource.attributes["service.name"] ?? ""), uid,
-      s.endpointFrom, s.headersFrom);
+    this.reachability = new Reachability(s.shown, String(resource.attributes["service.name"] ?? ""), uid, s.hints);
     this.reachability.inUse = () => this.client?.endpoint;
     try {
       const availableComponents = this.components();
@@ -1895,7 +1831,7 @@ export class Agent {
     const dir = this.setup?.stateDir;
     if (!dir) return;
     try {
-      write(join(dir, "instance-uid"), uid);
+      write(join(dir, SETUP_UID_FILE), uid);
       diag.info(`OpAMP: the server named this instance ${uid}; service.instance.id follows at the next start`);
     } catch (e) {
       say.warn(`OpAMP: can't save the instance UID the server assigned: ${String(e)}`);

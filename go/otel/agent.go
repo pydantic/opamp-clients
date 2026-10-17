@@ -5,6 +5,7 @@ package opampotel
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -183,7 +184,7 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	a.atStart, a.current, a.effective = loaded, loaded.GetCurrent(), loaded.GetEffective()
 	controls.Apply(loaded.GetSettings())
 	a.settings = loaded.GetSettings()
-	a.uid = identity(s.stateDir, resourceAttrs)
+	a.uid = identity(s.stateDir, resourceAttrs, start)
 	a.mu.Lock()
 	a.refreshAfter(loaded.GetRefreshAtUnixMs(), start)
 	a.arm()
@@ -191,35 +192,40 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	return a, nil
 }
 
-// identity is the instance UID: the one saved in the state directory; else a new one, saved
-// there; else, where none can be kept (no state directory, or one it can't be saved in), a UUID
-// service.instance.id given in OTEL_RESOURCE_ATTRIBUTES, the same at every start; else a new one.
-func identity(stateDir, resourceAttrs string) uuid.UUID {
+// identity is the instance UID, as the core's Setup decides it: the one saved in the state
+// directory; else a new one, saved there; else, where none can be kept (no state directory, or one
+// it can't be saved in), a UUID service.instance.id given in OTEL_RESOURCE_ATTRIBUTES, the same at
+// every start; else a new one. What is here is the I/O: the file read and written, the entropy, the
+// clock.
+func identity(stateDir, resourceAttrs string, now time.Time) uuid.UUID {
+	ask := &opamp.SetupIdentity{StateDir: stateDir != "", ResourceAttributes: resourceAttrs,
+		Entropy: make([]byte, 16), UnixMs: uint64(now.UnixMilli())}
+	path := filepath.Join(stateDir, opamp.SetupUIDFile)
 	if stateDir != "" {
-		path := filepath.Join(stateDir, "instance-uid")
 		if b, err := os.ReadFile(path); err == nil {
-			if u, err := uuid.Parse(strings.TrimSpace(string(b))); err == nil {
-				return u
-			}
+			ask.Saved = string(b)
 		}
-		u := newUID()
-		err := write(path, []byte(u.String()))
-		if err == nil {
-			return u
+	}
+	id, err := func() (*opamp.SetupIdentified, error) {
+		if _, err := rand.Read(ask.Entropy); err != nil {
+			return nil, err
 		}
-		slog.Warn("opamp: can't save the instance UID", "error", err)
-	}
-	if u, ok := chosenUID(resourceAttrs); ok {
-		return u
-	}
-	return newUID()
-}
-
-// newUID is a new UUIDv7 (a v4 if the clock can't be read).
-func newUID() uuid.UUID {
-	u, err := uuid.NewV7()
+		return opamp.IdentifySetup(context.Background(), ask)
+	}()
 	if err != nil {
-		u = uuid.New()
+		slog.Error("opamp: the core could not choose the instance UID; this start is a new instance", "error", err)
+		return uuid.Must(uuid.NewRandom())
+	}
+	uid := id.GetInstanceUid()
+	if id.GetSave() {
+		if err := write(path, []byte(id.GetText())); err != nil {
+			slog.Warn("opamp: can't save the instance UID", "error", err)
+			uid = id.GetUnsavedUid()
+		}
+	}
+	u, err := uuid.FromBytes(uid)
+	if err != nil {
+		return uuid.Must(uuid.NewRandom())
 	}
 	return u
 }
@@ -275,8 +281,8 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		cfg.StateFile = filepath.Join(a.server.stateDir, "opamp-state")
 	}
 	service, _ := res.Set().Value("service.name")
-	a.reach = &reachability{endpoint: where(a.server.endpoint), service: service.AsString(), uid: a.uid,
-		endpointFrom: a.server.endpointFrom, headersFrom: a.server.headersFrom}
+	a.reach = &reachability{endpoint: a.server.shown, service: service.AsString(), uid: a.uid,
+		hints: a.server.hints}
 	a.mu.Lock()
 	effective := a.effective
 	health, _ := a.healthReport(ctx, a.now()) // the first report: always sent
@@ -401,7 +407,7 @@ func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 // reachability says when the client connects, when it can't (once a run of failures, with what
 // to check), and when it's back: setup that works or doesn't is never silent.
 type reachability struct {
-	endpoint string // the configured one, as where gives it
+	endpoint string // the configured one, as it is safe to log
 	// inUse is the endpoint the client uses now, as the client gives it (nil or "": the
 	// configured one): after the server moved the agent, the one it moved it to.
 	inUse   func() string
@@ -409,15 +415,16 @@ type reachability struct {
 	uid     uuid.UUID
 	ever    bool // connected once
 	failing bool // since the last connect
-	// What gave the endpoint and the headers (server's); "": the variable.
-	endpointFrom, headersFrom string
+	// What to check when the server can't be reached (the core's Setup), naming what gave the
+	// endpoint and the headers.
+	hints *opamp.SetupHints
 }
 
 // at is the endpoint the client uses now, as it is safe to log.
 func (r *reachability) at() string {
 	if r.inUse != nil {
 		if e := r.inUse(); e != "" {
-			return where(e)
+			return shownEndpoint(e, r.endpoint)
 		}
 	}
 	return r.endpoint
@@ -444,7 +451,7 @@ func (r *reachability) notified(n opamp.Notification) {
 				why = fmt.Sprintf("HTTP %d", n.Status)
 			}
 			slog.Warn(fmt.Sprintf("opamp: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its current settings meanwhile",
-				endpoint, why, hint(n.Status, r.endpointFrom, r.headersFrom)))
+				endpoint, why, r.hint(n.Status)))
 		} else {
 			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", endpoint, n.Detail))
 		}
@@ -452,41 +459,27 @@ func (r *reachability) notified(n opamp.Notification) {
 	}
 }
 
-// where is the endpoint as it is safe to log: no user info, query or fragment. It parses nothing
-// (a bad port or an unclosed IPv6 bracket fails a URL parser), so it can't fail: scheme, then host
-// and port as written, then path; without a scheme, whatever follows the last '@'.
-func where(endpoint string) string {
-	endpoint, _, _ = strings.Cut(endpoint, "#")
-	endpoint, _, _ = strings.Cut(endpoint, "?")
-	scheme, rest, ok := strings.Cut(endpoint, "://")
-	if !ok {
-		return endpoint[strings.LastIndex(endpoint, "@")+1:]
+// shownEndpoint is an endpoint as it is safe to log (no user info, query or fragment), by the
+// core's rule; otherwise where the core can't be asked.
+func shownEndpoint(endpoint, otherwise string) string {
+	s, err := opamp.StartSetup(context.Background(), &opamp.SetupStart{Code: &opamp.SetupInCode{Endpoint: &endpoint}})
+	if err != nil || s.GetShownEndpoint() == "" {
+		return otherwise
 	}
-	authority, path := rest, ""
-	if i := strings.Index(rest, "/"); i >= 0 {
-		authority, path = rest[:i], rest[i:]
-	}
-	return scheme + "://" + authority[strings.LastIndex(authority, "@")+1:] + path
+	return s.GetShownEndpoint()
 }
 
-// hint is what to check when the server can't be reached, by the HTTP status (0: none). It names
-// what gave the endpoint and the headers: the option given in code, else ("") the variable.
-func hint(status int, endpointFrom, headersFrom string) string {
-	if endpointFrom == "" {
-		endpointFrom = "OTEL_OPAMP_ENDPOINT"
-	}
-	if headersFrom == "" {
-		headersFrom = "OTEL_OPAMP_HEADERS"
-	}
+// hint is what to check when the server can't be reached, by the HTTP status (0: none).
+func (r *reachability) hint(status int) string {
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return "the server refused this agent's credentials: check " + headersFrom + " (Authorization=Bearer <token>)"
+		return r.hints.GetRefused()
 	case http.StatusNotFound:
-		return "nothing serves OpAMP at that path: check " + endpointFrom + " (it usually ends in /v1/opamp)"
+		return r.hints.GetNotFound()
 	case 0:
-		return "check " + endpointFrom + " and that the server is up"
+		return r.hints.GetUnreachable()
 	}
-	return "the server answered with an error"
+	return r.hints.GetError()
 }
 
 // instanceUIDChanged keeps the UID the server assigned for the next start, which puts it in the
@@ -497,7 +490,7 @@ func (a *agent) instanceUIDChanged(uid uuid.UUID) {
 			"instance_uid", uid.String())
 		return
 	}
-	if err := write(filepath.Join(a.server.stateDir, "instance-uid"), []byte(uid.String())); err != nil {
+	if err := write(filepath.Join(a.server.stateDir, opamp.SetupUIDFile), []byte(uid.String())); err != nil {
 		slog.Warn("opamp: can't save the instance UID the server assigned", "error", err)
 		return
 	}

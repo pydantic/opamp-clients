@@ -20,11 +20,18 @@ public class ReachabilityTests
             m => this.Lines.Add($"Error: {m}"), m => this.Lines.Add($"Debug: {m}"));
     }
 
+    /// <summary>Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them for OTEL_OPAMP_*.</summary>
+    private static Reachability For(string endpoint, string service, AgentLog log)
+    {
+        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? endpoint : n == "OTEL_OPAMP_STATE_DIR" ? "none" : null, _ => { })!;
+        return new Reachability(server.ShownEndpoint, server.Hinted, service, Uid, log);
+    }
+
     [Fact]
     public void ConnectingFailingAndRecoveringAreEachSaidOnce()
     {
         var said = new Said();
-        var r = new Reachability(new Uri("https://user:secret@opamp.example.com/v1/opamp?token=x"), SettingNames.Env, "checkout", Uid, said.Log);
+        var r = For("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", said.Log);
         r.Notified(new OpAmpNotification.ConnectFailed(401, "HTTP 401"));
         r.Notified(new OpAmpNotification.ConnectFailed(401, "HTTP 401"));
         r.Notified(new OpAmpNotification.Connected());
@@ -54,7 +61,8 @@ public class ReachabilityTests
     {
         var said = new Said();
         string? inUse = null; // none yet: the configured one
-        var r = new Reachability(new Uri("https://a.example.com/v1/opamp"), SettingNames.Env, string.Empty, Uid, said.Log) { InUse = () => inUse };
+        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? "https://a.example.com/v1/opamp" : null, _ => { })!;
+        var r = new Reachability(server.ShownEndpoint, server.Hinted, string.Empty, Uid, said.Log) { InUse = () => inUse };
         r.Notified(new OpAmpNotification.Connected());
         inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
         r.Notified(new OpAmpNotification.ConnectFailed(null, "connection refused"));
@@ -70,7 +78,7 @@ public class ReachabilityTests
     public void WithoutAServiceNameTheInstanceIsNamedAlone()
     {
         var said = new Said();
-        new Reachability(new Uri("wss://opamp.example.com/v1/opamp"), SettingNames.Env, string.Empty, Uid, said.Log).Notified(new OpAmpNotification.Connected());
+        For("wss://opamp.example.com/v1/opamp", string.Empty, said.Log).Notified(new OpAmpNotification.Connected());
         Assert.Equal(["Info: connected to wss://opamp.example.com/v1/opamp; this SDK is managed, instance " + Uid], said.Lines);
     }
 
@@ -78,24 +86,26 @@ public class ReachabilityTests
     [InlineData(404, "nothing serves OpAMP at that path: check OTEL_OPAMP_ENDPOINT (it usually ends in /v1/opamp)")]
     [InlineData(403, "the server refused this agent's credentials: check OTEL_OPAMP_HEADERS (Authorization=Bearer <token>)")]
     [InlineData(503, "the server answered with an error")]
-    public void EachFailureSaysWhatToCheck(int status, string hint) => Assert.Equal(hint, Reachability.Hint(status, SettingNames.Env));
+    public void EachFailureSaysWhatToCheck(int status, string hint) =>
+        Assert.Equal(hint, Reachability.Hint(new Server(new Uri("http://s/v1/opamp"), new Dictionary<string, string>(), null, TimeSpan.Zero).Hinted, status));
 
     [Theory]
     [InlineData("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f", "https://opamp.example.com:4320/v1/opamp")]
     [InlineData("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x", "https://opamp.example.com:notaport/v1/opamp")]
     [InlineData("https://[::1/v1/opamp?k=v", "https://[::1/v1/opamp")]
     [InlineData("https://[::1]:4320", "https://[::1]:4320")]
-    [InlineData("user:secret@opamp.example.com/v1/opamp?token=x", "opamp.example.com/v1/opamp")]
-    public void TheEndpointIsLoggedWithoutUserInfoOrQuery(string endpoint, string logged) => Assert.Equal(logged, Reachability.Where(endpoint));
+    [InlineData("user:secret@opamp.example.com/v1/opamp?token=x", "http://opamp.example.com/v1/opamp")]
+    public void TheEndpointIsLoggedWithoutUserInfoOrQuery(string endpoint, string logged) => Assert.Equal(logged, Reachability.Shown(endpoint, "?"));
 
     [Fact]
     public void AnEndpointWithoutASchemeIsWarnedAbout()
     {
         var said = new Said();
-        var server = new Server(new Uri("opamp.example.com/v1/opamp", UriKind.Relative), new Dictionary<string, string>(), null, TimeSpan.Zero);
-        _ = new SdkAgent(server, _ => null, null, _ => new Host(), said.Log, new Controls());
+        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? "opamp.example.com/v1/opamp" : null, said.Log.Warn)!;
+        Assert.Equal("http://opamp.example.com/v1/opamp", server.Endpoint.OriginalString); // as the warning says
         Assert.Equal(
-            ["Warn: OTEL_OPAMP_ENDPOINT 'opamp.example.com/v1/opamp' has no scheme: name it in full, as https://host/v1/opamp or wss://host/v1/opamp"],
+            ["Warn: OTEL_OPAMP_ENDPOINT \"opamp.example.com/v1/opamp\" has no scheme, so it is taken as http://; name it in full, as " +
+             "https://host/v1/opamp or wss://host/v1/opamp"],
             said.Lines);
     }
 }

@@ -6,6 +6,7 @@ package dev.pydantic.opamp.javaagent;
 import com.google.protobuf.ByteString;
 import dev.pydantic.opamp.Notification;
 import dev.pydantic.opamp.OpampClient;
+import dev.pydantic.opamp.core.CoreProto;
 import dev.pydantic.opamp.sdk.SdkSettings;
 import dev.pydantic.opamp.sdk.SettingsProto;
 import io.opentelemetry.api.common.AttributeKey;
@@ -14,7 +15,6 @@ import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.sdk.autoconfigure.spi.ConfigProperties;
 import io.opentelemetry.sdk.resources.Resource;
 import java.io.IOException;
-import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -177,65 +177,151 @@ final class Extension {
   private volatile Reachability reachability;
 
   /**
-   * Where the server is, from otel.opamp.*; null when the extension is off. {@code stateLock} is the
-   * lock on the default state directory, held while the JVM runs (null for a named one).
+   * Where the server is, from otel.opamp.*, as the core's Setup decides it; null when the extension
+   * is off. {@code stateLock} is the lock on the default state directory, held while the JVM runs
+   * (null for a named one). {@code shown} is the endpoint as it is safe to log; {@code hints}, what
+   * to check when the server can't be reached.
    */
-  record Setup(String endpoint, Map<String, String> headers, Path stateDir, Duration heartbeat, FileLock stateLock) {
+  record Setup(String endpoint, Map<String, String> headers, Path stateDir, Duration heartbeat, FileLock stateLock,
+      String shown, CoreProto.SetupHints hints) {
+    /** Tests: a setup with the endpoint as the core shows it, and its hints. */
     Setup(String endpoint, Map<String, String> headers, Path stateDir, Duration heartbeat) {
-      this(endpoint, headers, stateDir, heartbeat, null);
+      this(endpoint, headers, stateDir, heartbeat, null, Extension.shown(endpoint, endpoint), hintsFor(endpoint));
     }
 
     static Setup from(ConfigProperties config) {
       return from(config, System.getenv(), System.getProperty("sun.java.command"));
     }
 
-    /** {@code env} for the user's state directory; {@code command} as sun.java.command, for the program. */
+    /**
+     * {@code env} for the user's state directory; {@code command} as sun.java.command, for the
+     * program. The rules are the core's (its Setup call), the same in every language; what is here
+     * is the I/O: reading the properties, taking a slot of the default state directory, and saying
+     * the warnings. A setting it can't use is never an error: the default, with a warning.
+     */
     static Setup from(ConfigProperties config, Map<String, String> env, String command) {
-      String endpoint = config.getString("otel.opamp.endpoint");
-      if (endpoint == null || endpoint.isBlank()) {
+      CoreProto.SetupStart.Builder start = CoreProto.SetupStart.newBuilder()
+          .setOs(os())
+          .setProgram(programName(command))
+          .setCwd(System.getProperty("user.dir", ""));
+      for (Map.Entry<String, String> v : PROPERTIES.entrySet()) {
+        String value;
+        try {
+          value = config.getString(v.getValue());
+        } catch (RuntimeException e) {
+          value = null; // one it can't read: as if not given
+        }
+        variable(start, v.getKey(), value);
+      }
+      for (String name : List.of("HOME", "XDG_STATE_HOME", "LOCALAPPDATA")) {
+        variable(start, name, env.get(name));
+      }
+      CoreProto.SetupStarted s;
+      try {
+        s = dev.pydantic.opamp.Setup.start(start.build());
+      } catch (dev.pydantic.opamp.Setup.Failed e) {
+        LOG.log(Level.SEVERE, "OpAMP: the core could not read the settings; the SDK runs unmanaged", e);
         return null;
       }
-      endpoint = endpoint.trim();
-      if (!endpoint.contains("://")) {
-        LOG.warning("OpAMP: otel.opamp.endpoint '" + where(endpoint) + "' has no scheme, so it is taken as "
-            + "http://; name it in full, as https://host/v1/opamp or wss://host/v1/opamp");
-        endpoint = "http://" + endpoint; // as the warning says: the client refuses it without one
+      for (String warning : s.getWarningsList()) {
+        LOG.warning("OpAMP: " + named(warning, false));
       }
-      String dir = config.getString("otel.opamp.state.dir");
-      dir = dir == null ? "" : dir.trim();
-      Path stateDir = null;
+      if (s.getOff()) {
+        return null;
+      }
+      Map<String, String> headers = new LinkedHashMap<>();
+      for (CoreProto.Header h : s.getHeadersList()) {
+        headers.put(h.getName(), h.getValue());
+      }
+      Path stateDir = s.getStateDir().isEmpty() ? null : Path.of(s.getStateDir());
       FileLock lock = null;
-      if (dir.equalsIgnoreCase("none")) {
-        // Turned off: each start is a new instance.
-      } else if (!dir.isEmpty()) {
-        stateDir = Path.of(dir);
-      } else if (!isUuid(resourceAttributes(config).get("service.instance.id"))) {
-        // A service.instance.id the application chose stays its choice: no default to override it.
-        // One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
-        Claimed claimed = defaultStateDir(config, env, command);
+      if (stateDir == null) {
+        Claimed claimed = slot(s.getDefaultSlotsList(), s.getAllSlotsTaken());
         if (claimed != null) {
           stateDir = claimed.dir();
           lock = claimed.lock();
         }
       }
-      return new Setup(endpoint, Extension.headers(config.getString("otel.opamp.headers", "")), stateDir,
-          heartbeat(config), lock);
+      return new Setup(s.getEndpoint(), headers, stateDir, Duration.ofMillis(s.getHeartbeatIntervalMs()), lock,
+          s.getShownEndpoint(), Extension.hints(s.getHints()));
     }
 
-    /** otel.opamp.heartbeat.interval; zero (the client's default) for one it can't read, with a warning. */
-    static Duration heartbeat(ConfigProperties config) {
-      try {
-        return config.getDuration("otel.opamp.heartbeat.interval", Duration.ZERO);
-      } catch (RuntimeException e) {
-        LOG.warning("OpAMP: otel.opamp.heartbeat.interval '" + config.getString("otel.opamp.heartbeat.interval", "")
-            + "' is not a duration (as 1500ms, 30s or 2m): using the default, 30s");
-        return Duration.ZERO;
+    private static void variable(CoreProto.SetupStart.Builder start, String name, String value) {
+      if (value != null && !value.isEmpty()) {
+        start.addEnv(CoreProto.Variable.newBuilder().setName(name).setValue(value));
       }
     }
   }
 
-  /** The processes of one program running at once that each keep their own identity. */
-  static final int SLOTS = 16;
+  /**
+   * The properties the core's Setup reads, by the variable it reads each as. A property is given as
+   * a system property or as its variable (the agent's ConfigProperties reads both).
+   */
+  private static final Map<String, String> PROPERTIES = orderedMap(
+      "OTEL_OPAMP_ENDPOINT", "otel.opamp.endpoint",
+      "OTEL_OPAMP_HEADERS", "otel.opamp.headers",
+      "OTEL_OPAMP_STATE_DIR", "otel.opamp.state.dir",
+      "OTEL_OPAMP_HEARTBEAT_INTERVAL", "otel.opamp.heartbeat.interval",
+      "OTEL_SERVICE_NAME", "otel.service.name",
+      "OTEL_RESOURCE_ATTRIBUTES", "otel.resource.attributes");
+
+  private static Map<String, String> orderedMap(String... kv) {
+    Map<String, String> m = new LinkedHashMap<>();
+    for (int i = 0; i < kv.length; i += 2) {
+      m.put(kv[i], kv[i + 1]);
+    }
+    return java.util.Collections.unmodifiableMap(m);
+  }
+
+  private static final java.util.regex.Pattern VARIABLE =
+      java.util.regex.Pattern.compile("\\bOTEL_OPAMP_(ENDPOINT|HEADERS|STATE_DIR|HEARTBEAT_INTERVAL)\\b");
+
+  /**
+   * The core's text, naming each OTEL_OPAMP_* variable as the agent's property: in a warning, the
+   * property (otel.opamp.endpoint); in a hint, both (otel.opamp.endpoint / OTEL_OPAMP_ENDPOINT),
+   * as either can give it.
+   */
+  static String named(String text, boolean both) {
+    return VARIABLE.matcher(text).replaceAll(m -> {
+      String property = PROPERTIES.get(m.group());
+      return java.util.regex.Matcher.quoteReplacement(both ? property + " / " + m.group() : property);
+    });
+  }
+
+  /** The core's hints, naming the properties. */
+  static CoreProto.SetupHints hints(CoreProto.SetupHints h) {
+    return CoreProto.SetupHints.newBuilder()
+        .setRefused(named(h.getRefused(), true))
+        .setNotFound(named(h.getNotFound(), true))
+        .setUnreachable(named(h.getUnreachable(), true))
+        .setError(named(h.getError(), true))
+        .build();
+  }
+
+  /** The hints for an endpoint and headers given as the properties. */
+  static CoreProto.SetupHints hintsFor(String endpoint) {
+    try {
+      return hints(dev.pydantic.opamp.Setup.start(CoreProto.SetupStart.newBuilder()
+          .addEnv(CoreProto.Variable.newBuilder().setName("OTEL_OPAMP_ENDPOINT").setValue(endpoint))
+          .addEnv(CoreProto.Variable.newBuilder().setName("OTEL_OPAMP_STATE_DIR").setValue("none"))
+          .build()).getHints());
+    } catch (dev.pydantic.opamp.Setup.Failed e) {
+      return CoreProto.SetupHints.getDefaultInstance();
+    }
+  }
+
+  /** This operating system, as Setup names it. */
+  private static CoreProto.SetupOs os() {
+    String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+    if (os.startsWith("windows")) {
+      return CoreProto.SetupOs.SETUP_OS_WINDOWS;
+    }
+    if (os.startsWith("mac")) {
+      return CoreProto.SetupOs.SETUP_OS_MACOS;
+    }
+    return CoreProto.SetupOs.SETUP_OS_UNIX;
+  }
+
   /**
    * The slots this JVM holds. A second channel on a held lock file is never opened: closing it
    * could drop the JVM's lock on the file (POSIX locks are the process's, not the channel's).
@@ -258,95 +344,28 @@ final class Extension {
     return name.isEmpty() ? "java" : name;
   }
 
-  /** otel.resource.attributes, values percent-decoded; empty when it can't be read. */
-  /** {@code given} (a service.instance.id; null: none) is a UUID, so it can be the instance UID. */
-  static boolean isUuid(String given) {
-    if (given == null) {
-      return false;
-    }
-    try {
-      UUID.fromString(given);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
-  }
-
-  private static Map<String, String> resourceAttributes(ConfigProperties config) {
-    Map<String, String> out = new LinkedHashMap<>();
-    String spec;
-    try {
-      spec = config.getString("otel.resource.attributes", "");
-    } catch (RuntimeException e) {
-      return out;
-    }
-    for (String pair : spec.split(",")) {
-      int eq = pair.indexOf('=');
-      if (eq < 0) {
-        continue;
-      }
-      String value = pair.substring(eq + 1).trim();
-      try {
-        value = URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8);
-      } catch (IllegalArgumentException e) {
-        // Not percent-encoded after all: as written.
-      }
-      out.put(pair.substring(0, eq).trim(), value);
-    }
-    return out;
-  }
-
   /**
-   * Without otel.opamp.state.dir: a state directory of the user's own, so an instance keeps its UID
-   * across restarts with no setup (docs/default-state-dir.md). One per program, service and working
-   * directory; a slot in it per JVM running at once, each held by a lock for the JVM's lifetime.
-   * Null where there's none to be had (no home, not writable, every slot taken): then each start is
-   * a new instance, as before. Never throws.
+   * The first of the default state directory's slots (docs/default-state-dir.md, as the core's
+   * Setup names them) this JVM can make and lock, and its lock, held for the JVM's lifetime; null
+   * where there's none to be had (not writable, every slot taken: {@code allTaken} is the line to
+   * say then): each start is then a new instance. Never throws.
    */
-  static Claimed defaultStateDir(ConfigProperties config, Map<String, String> env, String command) {
+  static Claimed slot(List<String> slots, String allTaken) {
+    if (slots.isEmpty()) {
+      return null;
+    }
     try {
-      String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-      String home = blankToNull(env.get("HOME"));
-      String base;
-      if (os.startsWith("windows")) {
-        base = blankToNull(env.get("LOCALAPPDATA"));
-      } else if (os.startsWith("mac")) {
-        base = home == null ? null : Path.of(home, "Library", "Application Support").toString();
-      } else {
-        base = blankToNull(env.get("XDG_STATE_HOME"));
-        if (base == null && home != null) {
-          base = Path.of(home, ".local", "state").toString();
-        }
-      }
-      if (base == null) {
-        return null;
-      }
-      Map<String, String> attrs = resourceAttributes(config);
-      String program = programName(command);
-      String service = config.getString("otel.service.name", "").trim();
-      if (service.isEmpty()) {
-        service = attrs.getOrDefault("service.name", "");
-      }
-      if (service.isEmpty()) {
-        service = program;
-      }
-      String cwd = System.getProperty("user.dir", "");
-      String key = String.join("\0", service, attrs.getOrDefault("service.namespace", ""), program, cwd);
-      byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.UTF_8));
-      String hash = java.util.HexFormat.of().formatHex(digest, 0, 4);
-      String name = service.replaceAll("[^A-Za-z0-9._-]+", "_");
-      name = name.isEmpty() ? "service" : name.substring(0, Math.min(64, name.length()));
-      Path dir = Path.of(base, "opamp", name + "-" + hash);
-      boolean posix = dir.getFileSystem().supportedFileAttributeViews().contains("posix");
+      Path first = Path.of(slots.get(0));
+      boolean posix = first.getFileSystem().supportedFileAttributeViews().contains("posix");
       FileAttribute<?>[] dirAttrs = posix
           ? new FileAttribute<?>[] {PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))}
           : new FileAttribute<?>[0];
       FileAttribute<?>[] fileAttrs = posix
           ? new FileAttribute<?>[] {PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))}
           : new FileAttribute<?>[0];
-      for (int slot = 1; slot <= SLOTS; slot++) {
-        Path d = dir.resolve(Integer.toString(slot));
-        Path lockFile = d.resolve("lock").toAbsolutePath();
+      for (String slot : slots) {
+        Path d = Path.of(slot);
+        Path lockFile = d.resolve(dev.pydantic.opamp.Setup.LOCK_FILE).toAbsolutePath();
         synchronized (HELD) {
           if (HELD.contains(lockFile)) {
             continue;
@@ -372,8 +391,7 @@ final class Extension {
           ch.close();
         }
       }
-      LOG.info("OpAMP: " + SLOTS + " processes of " + service + " already keep their identity here: this one is "
-          + "a new instance each start");
+      LOG.info("OpAMP: " + allTaken);
       return null;
     } catch (Exception e) {
       LOG.log(Level.FINE, "OpAMP: no state directory of its own (" + e + "): each start is a new instance");
@@ -386,47 +404,38 @@ final class Extension {
     if (setup != null && setup.stateLock() != null) {
       synchronized (HELD) {
         setup.stateLock().channel().close();
-        HELD.remove(setup.stateDir().resolve("lock").toAbsolutePath());
+        HELD.remove(setup.stateDir().resolve(dev.pydantic.opamp.Setup.LOCK_FILE).toAbsolutePath());
       }
     }
   }
 
-  private static String blankToNull(String s) {
-    return s == null || s.isBlank() ? null : s;
-  }
-
   /**
-   * The endpoint as it is safe to log: scheme://host:port as written, then the path; no user info,
-   * query or fragment. Cut by hand, never parsed, so it can't throw: a bad port or an unclosed IPv6
-   * bracket is logged as written.
+   * An endpoint as it is safe to log (no user info, query or fragment), as the core shows it;
+   * {@code otherwise} if the core can't say.
    */
-  static String where(String endpoint) {
-    String s = endpoint.split("[?#]", 2)[0];
-    int sep = s.indexOf("://");
-    if (sep < 0) {
-      return s.substring(s.lastIndexOf('@') + 1);
+  static String shown(String endpoint, String otherwise) {
+    try {
+      String shown = dev.pydantic.opamp.Setup.start(CoreProto.SetupStart.newBuilder()
+          .setCode(CoreProto.SetupInCode.newBuilder().setEndpoint(endpoint))
+          .build()).getShownEndpoint();
+      return shown.isEmpty() ? otherwise : shown;
+    } catch (dev.pydantic.opamp.Setup.Failed e) {
+      return otherwise;
     }
-    String rest = s.substring(sep + 3);
-    int slash = rest.indexOf('/');
-    String authority = slash < 0 ? rest : rest.substring(0, slash);
-    String path = slash < 0 ? "" : rest.substring(slash);
-    return s.substring(0, sep + 3) + authority.substring(authority.lastIndexOf('@') + 1) + path;
   }
 
-  /** What to check when the server can't be reached, by what went wrong. */
-  static String hint(Integer status) {
+  /** What to check when the server can't be reached, by what went wrong, as the core words it. */
+  static String hint(CoreProto.SetupHints hints, Integer status) {
     if (status == null) {
-      return "check otel.opamp.endpoint / OTEL_OPAMP_ENDPOINT and that the server is up";
+      return hints.getUnreachable();
     }
     if (status == 401 || status == 403) {
-      return "the server refused this agent's credentials: check otel.opamp.headers / OTEL_OPAMP_HEADERS "
-          + "(Authorization=Bearer <token>)";
+      return hints.getRefused();
     }
     if (status == 404) {
-      return "nothing serves OpAMP at that path: check otel.opamp.endpoint / OTEL_OPAMP_ENDPOINT "
-          + "(it usually ends in /v1/opamp)";
+      return hints.getNotFound();
     }
-    return "the server answered with an error";
+    return hints.getError();
   }
 
   /**
@@ -434,7 +443,7 @@ final class Extension {
    * when it's back: setup that works or doesn't is never silent. On the client's thread.
    */
   static final class Reachability {
-    /** The configured endpoint, as {@link #where} gives it. */
+    /** The configured endpoint, as it is safe to log. */
     private final String endpoint;
     /**
      * The endpoint the client uses now, as the client gives it (null, or null from it: the
@@ -443,20 +452,22 @@ final class Extension {
     volatile Supplier<String> inUse;
     private final String service;
     private final UUID uid;
+    private final CoreProto.SetupHints hints;
     private boolean ever;
     private boolean failing;
 
-    Reachability(String endpoint, String service, UUID uid) {
-      this.endpoint = where(endpoint);
+    Reachability(String shown, String service, UUID uid, CoreProto.SetupHints hints) {
+      this.endpoint = shown;
       this.service = service;
       this.uid = uid;
+      this.hints = hints;
     }
 
     /** The endpoint the client uses now, as it is safe to log. */
     String at() {
       Supplier<String> f = inUse;
       String e = f == null ? null : f.get();
-      return e == null || e.isEmpty() ? endpoint : where(e);
+      return e == null || e.isEmpty() ? endpoint : shown(e, endpoint);
     }
 
     synchronized void notified(Notification n) {
@@ -473,7 +484,7 @@ final class Extension {
       } else if (n instanceof Notification.ConnectFailed f) {
         if (!failing) {
           String why = f.detail() != null && !f.detail().isEmpty() ? f.detail() : "HTTP " + f.status();
-          LOG.warning("OpAMP: can't reach " + endpoint + " (" + why + "): " + hint(f.status())
+          LOG.warning("OpAMP: can't reach " + endpoint + " (" + why + "): " + hint(hints, f.status())
               + ". Retrying in the background; the SDK keeps its current settings meanwhile");
         } else {
           LOG.fine("OpAMP: still can't reach " + endpoint + ": " + f.detail());
@@ -481,31 +492,6 @@ final class Extension {
         failing = true;
       }
     }
-  }
-
-  /**
-   * {@code k=v,k2=v2}, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS ('+' is a plus, as in
-   * every other SDK). A value with an escape it can't decode is kept as written, with a warning that
-   * names the header (not the value: it may be a secret).
-   */
-  static Map<String, String> headers(String spec) {
-    Map<String, String> out = new LinkedHashMap<>();
-    for (String pair : spec.split(",")) {
-      int eq = pair.indexOf('=');
-      if (eq <= 0) {
-        continue;
-      }
-      String name = pair.substring(0, eq).trim();
-      String value = pair.substring(eq + 1).trim();
-      try {
-        out.put(name, URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8));
-      } catch (IllegalArgumentException e) {
-        LOG.warning("OpAMP: otel.opamp.headers: the value of '" + name + "' has a percent escape that can't be "
-            + "decoded: it is sent as written");
-        out.put(name, value);
-      }
-    }
-    return out;
   }
 
   /** Whether an endpoint is configured: without one the extension changes nothing. */
@@ -677,7 +663,8 @@ final class Extension {
       return null;
     }
     return "OpAMP: otel.opamp.endpoint is set, but the agent built its SDK without calling the extension's "
-        + "autoconfigure or declarative configuration hooks, so it won't connect to " + where(endpoint.trim())
+        + "autoconfigure or declarative configuration hooks, so it won't connect to "
+        + shown(endpoint.trim(), "the server it names")
         + " and the agent runs unmanaged";
   }
 
@@ -739,33 +726,65 @@ final class Extension {
    * service.instance.id given, the same at every start; else a new one.
    */
   private UUID identity(String given) {
-    Path file = setup.stateDir() == null ? null : setup.stateDir().resolve("instance-uid");
-    if (file != null) {
-      if (Files.exists(file)) {
-        try {
-          return UUID.fromString(Files.readString(file).trim());
-        } catch (IOException | IllegalArgumentException e) {
-          LOG.log(Level.WARNING, "OpAMP: saved instance UID unreadable, making a new one", e);
-        }
-      }
-      if (canSave) {
-        UUID made = uuidV7();
-        try {
-          write(file, made.toString().getBytes(StandardCharsets.UTF_8));
-          return made;
-        } catch (IOException e) {
-          LOG.log(Level.WARNING, "OpAMP: can't save the instance UID", e);
-        }
-      }
-    }
-    if (given != null) {
+    Path file = setup.stateDir() == null ? null : setup.stateDir().resolve(dev.pydantic.opamp.Setup.UID_FILE);
+    String saved = "";
+    if (file != null && Files.exists(file)) {
       try {
-        return UUID.fromString(given);
-      } catch (IllegalArgumentException e) {
-        // Not a UUID: make one.
+        saved = Files.readString(file);
+      } catch (IOException | RuntimeException e) {
+        LOG.log(Level.WARNING, "OpAMP: saved instance UID unreadable, making a new one", e);
       }
     }
-    return uuidV7();
+    byte[] entropy = new byte[16];
+    new SecureRandom().nextBytes(entropy);
+    // Only a UUID can be the instance UID; anything else (commas included) is not passed on.
+    String attributes = isUuid(given) ? "service.instance.id=" + given : "";
+    CoreProto.SetupIdentified got;
+    try {
+      got = dev.pydantic.opamp.Setup.identify(CoreProto.SetupIdentity.newBuilder()
+          .setStateDir(file != null)
+          .setSaved(saved)
+          .setResourceAttributes(attributes)
+          .setEntropy(ByteString.copyFrom(entropy))
+          .setUnixMs(System.currentTimeMillis())
+          .build());
+    } catch (dev.pydantic.opamp.Setup.Failed e) {
+      LOG.log(Level.SEVERE, "OpAMP: the core could not make an instance UID", e);
+      return UUID.randomUUID();
+    }
+    if (!saved.isEmpty() && got.getFrom() != CoreProto.SetupUidFrom.SETUP_UID_FROM_SAVED) {
+      LOG.warning("OpAMP: saved instance UID unreadable, making a new one");
+    }
+    if (got.getSave()) {
+      if (!canSave) {
+        return uuid(got.getUnsavedUid());
+      }
+      try {
+        write(file, got.getText().getBytes(StandardCharsets.UTF_8));
+      } catch (IOException e) {
+        LOG.log(Level.WARNING, "OpAMP: can't save the instance UID", e);
+        return uuid(got.getUnsavedUid());
+      }
+    }
+    return uuid(got.getInstanceUid());
+  }
+
+  /** {@code given} (a service.instance.id; null: none) is a UUID, so it can be the instance UID. */
+  static boolean isUuid(String given) {
+    if (given == null) {
+      return false;
+    }
+    try {
+      UUID.fromString(given);
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  private static UUID uuid(ByteString b) {
+    ByteBuffer buf = b.asReadOnlyByteBuffer();
+    return new UUID(buf.getLong(), buf.getLong());
   }
 
   /**
@@ -801,7 +820,7 @@ final class Extension {
     // Java mode, asked for by name (an HTTP client selects it too): the client's requests go
     // through the JDK's HTTP client, one of the agent's own that isn't traced.
     b.mode(OpampClient.Mode.JAVA).httpClient(untracedHttpClient());
-    reachability = new Reachability(s.endpoint(), resource.getAttribute(SERVICE_NAME), uid);
+    reachability = new Reachability(s.shown(), resource.getAttribute(SERVICE_NAME), uid, s.hints());
     reachability.inUse = () -> {
       OpampClient c = client.getNow(null);
       return c == null ? null : c.endpoint();
@@ -899,7 +918,7 @@ final class Extension {
       return;
     }
     try {
-      write(setup.stateDir().resolve("instance-uid"), named.toString().getBytes(StandardCharsets.UTF_8));
+      write(setup.stateDir().resolve(dev.pydantic.opamp.Setup.UID_FILE), named.toString().getBytes(StandardCharsets.UTF_8));
       LOG.info("OpAMP: the server named this instance " + named + "; service.instance.id stays " + uid
           + " until the next start");
     } catch (IOException e) {
@@ -1110,20 +1129,6 @@ final class Extension {
     } catch (IOException e) {
       // best effort
     }
-  }
-
-  /** A UUIDv7: the time in milliseconds, then random bits. */
-  static UUID uuidV7() {
-    byte[] b = new byte[16];
-    new SecureRandom().nextBytes(b);
-    long ms = System.currentTimeMillis();
-    for (int i = 0; i < 6; i++) {
-      b[i] = (byte) (ms >>> (40 - 8 * i));
-    }
-    b[6] = (byte) ((b[6] & 0x0f) | 0x70);
-    b[8] = (byte) ((b[8] & 0x3f) | 0x80);
-    ByteBuffer buf = ByteBuffer.wrap(b);
-    return new UUID(buf.getLong(), buf.getLong());
   }
 
   private static byte[] bytes(UUID u) {

@@ -28,7 +28,7 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased,
 import opamp_otel
 from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
 from kept import keep_applied
-from opamp_otel import Agent, Controls, Setup, disabled_instrumentations, duration_ms, headers
+from opamp_otel import Agent, Controls, Setup, disabled_instrumentations
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -107,9 +107,20 @@ def test_next_start_settings_become_the_instrumentations_switch():
     assert disabled_instrumentations(settings(policy()), "") is None
 
 
+def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> opamp_otel.Reachability:
+    """Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them."""
+    s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": endpoint, "OTEL_OPAMP_STATE_DIR": "none"})
+    return opamp_otel.Reachability(s.shown, service, uid, s.hints)
+
+
 def test_settings_read_as_the_sdk_reads_its_own():
-    assert headers("Authorization=Bearer%20a%20b, x=1=2,broken") == {"Authorization": "Bearer a b", "x": "1=2"}
-    assert [duration_ms(v) for v in ["1500", "500ms", "30s", "2m"]] == [1500, 500, 30_000, 120_000]
+    def env(**more):
+        return {"OTEL_OPAMP_ENDPOINT": "http://s", "OTEL_OPAMP_STATE_DIR": "none", **more}
+
+    assert Setup.from_env(env(OTEL_OPAMP_HEADERS="Authorization=Bearer%20a%20b, x=1=2,broken")).headers \
+        == {"Authorization": "Bearer a b", "x": "1=2"}
+    assert [Setup.from_env(env(OTEL_OPAMP_HEARTBEAT_INTERVAL=v)).heartbeat_ms for v in ["1500", "500ms", "30s", "2m"]] \
+        == [1500, 500, 30_000, 120_000]
     assert Setup.from_env({}) is None
     s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": " ws://s/v1/opamp ", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "1s"})
     assert (s.endpoint, s.state_dir, s.heartbeat_ms) == ("ws://s/v1/opamp", None, 1000)
@@ -117,19 +128,27 @@ def test_settings_read_as_the_sdk_reads_its_own():
 
 def test_a_bad_heartbeat_interval_warns_and_is_the_default(server, caplog):
     # As under opentelemetry-instrument, where an exception would skip all auto-instrumentation.
-    for bad in ["soon", "-5s", "1h", str(2**53)]:
+    for bad in ["soon", "-5s", "1h"]:
         caplog.clear()
         with caplog.at_level(logging.WARNING, logger="opamp_otel"):
             s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": bad})
         assert s.heartbeat_ms == 0
-        assert caplog.messages == [f"OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL {bad!r} is not a duration (as 1500, "
-                                   "500ms, 30s or 2m): using the default, 30s"]
-    # A bad percent escape in the headers is kept as written, with a warning naming the header.
+        assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{bad}" is not a duration (as 1500, '
+                                   "500ms, 30s or 2m): using the default"]
+    # Longer than a day: a day, the longest.
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="opamp_otel"):
-        assert headers("a=x%zzy,b=%,c=%e9,d=ok%20") == {"a": "x%zzy", "b": "%", "c": "%e9", "d": "ok "}
-    assert caplog.messages == [f"OpAMP: OTEL_OPAMP_HEADERS: the value of '{k}' has a percent escape that can't be "
-                               "decoded: it is sent as written" for k in "abc"]
+        s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": str(2**53)})
+    assert s.heartbeat_ms == 86_400_000
+    assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{2**53}" is more than a day: a day it is, the longest']
+    # A bad percent escape in the headers leaves that header out, with a warning naming it.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+        s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s", "OTEL_OPAMP_STATE_DIR": "none",
+                            "OTEL_OPAMP_HEADERS": "a=x%zzy,b=%,c=%e9,d=ok%21"})
+    assert s.headers == {"d": "ok!"}
+    assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEADERS: the value of "{k}" has a percent escape that can\'t be '
+                               "decoded, so it is left out" for k in "abc"]
     # And the application is still managed, at the default.
     agent = Agent()
     try:
@@ -844,7 +863,7 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
     # None of them usable but the endpoint: warned about, and the application runs, managed.
     ({"headers": "Authorization=Bearer code", "state_dir": 5, "heartbeat_interval": -1},
      {"OTEL_OPAMP_HEADERS": "X-Env=1"},
-     ["headers should map names", "state_dir should be a path", "heartbeat_interval -1 is not"]),
+     ["headers should map names", "state_dir should be a path", "heartbeat_interval (-1000 ms) is no interval"]),
 ])
 def test_configure_takes_the_server_in_code_end_to_end(tmp_path, given, variables, said):
     server = _Server()
@@ -1152,9 +1171,10 @@ def test_blank_in_code_is_not_given(tmp_path, caplog, option, blank):
      "OpAMP: endpoint should be a string, not bytes: this SDK is not managed"),
     # A string it can't use is still the endpoint (as the variable): the client says it can't reach it.
     ("endpoint", "ftp://code/v1/opamp", "ftp://code/v1/opamp",
-     "OpAMP: endpoint 'ftp://code/v1/opamp' is not http(s):// or ws(s)://, so the client can't reach it"),
+     'OpAMP: the endpoint given to configure() "ftp://code/v1/opamp" is not http(s):// or ws(s)://, so the '
+     "client can't reach it"),
     ("endpoint", "code:4320/v1/opamp", "http://code:4320/v1/opamp",
-     ("OpAMP: endpoint 'code:4320/v1/opamp' has no scheme, so it is taken as http://; name it in full, as "
+     ('OpAMP: the endpoint given to configure() "code:4320/v1/opamp" has no scheme, so it is taken as http://; name it in full, as '
       "https://host/v1/opamp or wss://host/v1/opamp")),
     *[("headers", bad, {}, "OpAMP: headers should map names to values, all strings: none are sent")
       for bad in ["Authorization=Bearer k", [("Authorization", "Bearer k")], {"Authorization": b"Bearer k"},
@@ -1162,11 +1182,12 @@ def test_blank_in_code_is_not_given(tmp_path, caplog, option, blank):
     ("state_dir", 4320, DEFAULT_DIR, "OpAMP: state_dir should be a path, not int: using the default"),
     ("state_dir", b"/srv/code", DEFAULT_DIR, "OpAMP: state_dir should be a path, not bytes: using the default"),
     *[("heartbeat_interval", bad, 0, (f"OpAMP: heartbeat_interval {bad!r} is not a positive duration: using the "
-                                      "default, 30s"))
-      for bad in [0, -1, 0.0, float("nan"), float("inf"), 2**53, True, timedelta(0), timedelta(days=-1), [5],
-                  b"5s", {"seconds": 5}]],
-    *[("heartbeat_interval", bad, 0, (f"OpAMP: heartbeat_interval {bad.strip()!r} is not a duration (as 1500, "
-                                      "500ms, 30s or 2m): using the default, 30s"))
+                                      "default"))
+      for bad in [float("nan"), float("inf"), True, [5], b"5s", {"seconds": 5}]],
+    *[("heartbeat_interval", bad, 0, f"OpAMP: heartbeat_interval ({ms} ms) is no interval: using the default")
+      for bad, ms in [(0, 0), (-1, -1000), (0.0, 0), (timedelta(0), 0), (timedelta(days=-1), -86_400_000)]],
+    *[("heartbeat_interval", bad, 0, (f'OpAMP: heartbeat_interval "{bad.strip()}" is not a duration (as 1500, '
+                                      "500ms, 30s or 2m): using the default"))
       for bad in ["soon", "-5s", "1.5s", "1h", " 30 seconds "]],
 ])
 def test_a_value_in_code_it_cannot_use_warns_and_is_the_default_never_raising(tmp_path, caplog, option, in_code,
@@ -1237,7 +1258,7 @@ def test_the_default_state_directory_gives_way(tmp_path):
     assert Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s", "XDG_STATE_HOME": str(tmp_path / "file"),
                            "HOME": str(tmp_path / "file"), "LOCALAPPDATA": str(tmp_path / "file")}).state_dir is None
     # Every slot taken: none.
-    held = [Setup.from_env(base) for _ in range(opamp_otel.SLOTS)]
+    held = [Setup.from_env(base) for _ in range(16)]
     assert all(h.state_dir is not None for h in held)
     assert Setup.from_env(base).state_dir is None
     for h in held:
@@ -1247,7 +1268,7 @@ def test_the_default_state_directory_gives_way(tmp_path):
 def test_connecting_failing_and_recovering_are_each_said_once(caplog):
     caplog.set_level(logging.DEBUG, logger="opamp_otel")
     uid = uuid.UUID(int=7)
-    r = opamp_otel.Reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid)
+    r = _reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid)
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
     r.notified(Notification("connected"))
@@ -1274,7 +1295,7 @@ def test_what_is_said_names_the_endpoint_in_use(caplog):
     uses now (logged without credentials), not the one configured."""
     caplog.set_level(logging.INFO, logger="opamp_otel")
     in_use: list[str | None] = [None]  # none yet: the configured one
-    r = opamp_otel.Reachability("https://a.example.com/v1/opamp")
+    r = _reachability("https://a.example.com/v1/opamp")
     r.in_use = lambda: in_use[0]
     r.notified(Notification("connected"))
     in_use[0] = "https://user:secret@b.example.com/v1/opamp?token=x"
@@ -1298,8 +1319,8 @@ def test_what_is_said_names_the_endpoint_in_use(caplog):
 def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, headers_from):
     setup = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://other/v1/opamp", "OTEL_OPAMP_HEADERS": "a=b",
                             "OTEL_OPAMP_STATE_DIR": "none"}, **given)
-    assert setup is not None and (setup.endpoint_from, setup.headers_from) == (endpoint_from, headers_from)
-    r = opamp_otel.Reachability(setup.endpoint, "", None, setup.endpoint_from, setup.headers_from)
+    assert setup is not None
+    r = opamp_otel.Reachability(setup.shown, "", None, setup.hints)
     caplog.clear()
     for status in (401, 404, None):
         r.notified(Notification("connect_failed", status=status))
@@ -1317,7 +1338,7 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     ("wss://k:s@[::1]:4320/v1/opamp#x", "wss://[::1]:4320/v1/opamp"),
 ])
 def test_a_malformed_endpoint_is_logged_not_raised(endpoint, logged):
-    assert opamp_otel.where(endpoint) == logged
+    assert opamp_otel.shown_endpoint(endpoint, "?") == logged
 
 
 def test_an_endpoint_without_a_scheme_or_with_one_the_client_cannot_speak_is_warned_about(caplog):
@@ -1329,7 +1350,7 @@ def test_an_endpoint_without_a_scheme_or_with_one_the_client_cannot_speak_is_war
     # A scheme the client doesn't speak: warned about at start, not only at each failed connect.
     caplog.clear()
     assert opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None
-    assert caplog.messages == ["OpAMP: OTEL_OPAMP_ENDPOINT 'ftp://opamp.example.com/v1/opamp' is not http(s):// or "
+    assert caplog.messages == ['OpAMP: OTEL_OPAMP_ENDPOINT "ftp://opamp.example.com/v1/opamp" is not http(s):// or '
                                "ws(s)://, so the client can't reach it"]
 
 

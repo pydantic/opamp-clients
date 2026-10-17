@@ -51,7 +51,7 @@ public class AgentTests
         var p = new Process { Env = { ["OTEL_OPAMP_HEARTBEAT_INTERVAL"] = "soon" } };
         var warned = new List<string>();
         Assert.Equal(TimeSpan.Zero, Server.FromEnv(n => p.Env.GetValueOrDefault(n), warned.Add)!.Heartbeat);
-        Assert.Equal(["OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable, using the default: not a duration: \"soon\""], warned);
+        Assert.Equal(["OTEL_OPAMP_HEARTBEAT_INTERVAL \"soon\" is not a duration (as 1500, 500ms, 30s or 2m): using the default"], warned);
         Assert.NotNull(p.Prepare()); // managed, at the client's default interval
     }
 
@@ -196,7 +196,7 @@ public class AgentTests
     {
         var dir = TempDir();
         var agent = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } }.Prepare()!;
-        var assigned = Uuid.NewV7();
+        var assigned = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
         agent.Notified(null!, new OpAmpNotification.InstanceUidChanged(assigned));
         Assert.NotEqual(Uuid.Format(assigned), agent.Uid); // this run's resource is built already
         agent.Stop(TimeSpan.Zero);
@@ -567,7 +567,7 @@ public class AgentTests
         string? Claimed(Process p, out FileStream? held)
         {
             var server = Server.FromEnv(n => p.Env.GetValueOrDefault(n), _ => { })!;
-            Assert.True(StateDirs.Claim(ref server, n => p.Env.GetValueOrDefault(n), Log.Sink, out held));
+            Assert.True(StateDirs.Claim(ref server, Log.Sink, out held));
             return server.StateDir;
         }
 
@@ -585,7 +585,7 @@ public class AgentTests
         Assert.Equal(Path.Combine(home, "mine"), Claimed(named, out var mine));
         mine!.Dispose();
         var padded = new Server(new Uri("http://127.0.0.1:1/v1/opamp"), new Dictionary<string, string>(), " " + Path.Combine(home, "mine") + " ", TimeSpan.Zero);
-        Assert.True(StateDirs.Claim(ref padded, _ => null, Log.Sink, out var trimmed));
+        Assert.True(StateDirs.Claim(ref padded, Log.Sink, out var trimmed));
         Assert.Equal(Path.Combine(home, "mine"), padded.StateDir); // the directory locked is the one used
         trimmed!.Dispose();
         // Nowhere to keep it: none, and no error.
@@ -595,7 +595,7 @@ public class AgentTests
         Assert.Null(Claimed(At(file), out _));
         // Every slot taken: none.
         var held = new List<FileStream>();
-        for (var i = 0; i < StateDirs.Slots; i++)
+        for (var i = 0; i < 16; i++)
         {
             Assert.NotNull(Claimed(At(home), out var l));
             held.Add(l!);

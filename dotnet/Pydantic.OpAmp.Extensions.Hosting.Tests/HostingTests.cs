@@ -913,7 +913,7 @@ public class HostingTests
     [InlineData("OpAmp:HeartbeatInterval", "soon", "OpAmp:HeartbeatInterval unreadable, using the default: not a duration: \"soon\"")]
     [InlineData("OpAmp:HeartbeatInterval", "1:x", "OpAmp:HeartbeatInterval unreadable, using the default: String '1:x' was not recognized as a valid TimeSpan.")]
     [InlineData("OpAmp:HeartbeatInterval", "-00:00:30", "OpAmp:HeartbeatInterval is negative, using the default: \"-00:00:30\"")]
-    [InlineData("OTEL_OPAMP_HEARTBEAT_INTERVAL", "soon", "OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable, using the default: not a duration: \"soon\"")]
+    [InlineData("OTEL_OPAMP_HEARTBEAT_INTERVAL", "soon", "OTEL_OPAMP_HEARTBEAT_INTERVAL \"soon\" is not a duration (as 1500, 500ms, 30s or 2m): using the default")]
     public async Task ABadHeartbeatIntervalIsTheDefault(string key, string value, string warning)
     {
         await using var server = new OpAmpServer();
@@ -932,7 +932,8 @@ public class HostingTests
 
     [Theory]
     [InlineData("OpAmp:Endpoint", "OpAmp:Endpoint is not a URL")]
-    [InlineData("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_ENDPOINT is not a URL (Invalid URI: The format of the URI could not be determined.)")]
+    // Taken as http:// (the core's rule, with its warning), it is still no URL.
+    [InlineData("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_ENDPOINT is not a URL (Invalid URI: ")]
     public async Task AnEndpointThatIsNotAUrlLeavesTheHostRunningUnmanaged(string key, string why)
     {
         var said = new Said();
@@ -943,7 +944,7 @@ public class HostingTests
         await host.StartAsync(Cancel); // the host runs
         Assert.Null(host.Services.GetRequiredService<OpAmpAgent>().Agent);
         Assert.False(Gated(Exporter(host)));
-        Assert.Contains($"Error: OpAMP: the client did not start; the SDK runs unmanaged: {why}", said.Lines);
+        Assert.Contains(said.Lines, l => l.StartsWith($"Error: OpAMP: the client did not start; the SDK runs unmanaged: {why}", StringComparison.Ordinal));
         await host.StopAsync(Cancel);
     }
 

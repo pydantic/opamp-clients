@@ -29,8 +29,9 @@ func TestServerFromEnv(t *testing.T) {
 		t.Fatal("a bad interval: the client's default")
 	}
 	// 307445735 minutes is more nanoseconds than an int64 holds: multiplied out, it wrapped to 26 s.
-	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "307445735m"})); s.heartbeat != 0 {
-		t.Fatalf("an interval out of range: the client's default, not %v", s.heartbeat)
+	// The core's rule: longer than a day is a day.
+	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "307445735m"})); s.heartbeat != 24*time.Hour {
+		t.Fatalf("an interval over a day: a day, not %v", s.heartbeat)
 	}
 }
 
@@ -204,27 +205,27 @@ func TestAnUnusableSettingWarnsAndIsTheDefault(t *testing.T) {
 		warning string
 	}{
 		{"an unreadable interval in the variable", map[string]string{"OTEL_OPAMP_HEARTBEAT_INTERVAL": "soon"}, nil,
-			"heartbeat", "0s", "OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable"},
+			"heartbeat", "0s", `OTEL_OPAMP_HEARTBEAT_INTERVAL "soon" is not a duration`},
 		{"a negative interval in the variable", map[string]string{"OTEL_OPAMP_HEARTBEAT_INTERVAL": "-5s"}, nil,
-			"heartbeat", "0s", "OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable"},
+			"heartbeat", "0s", `OTEL_OPAMP_HEARTBEAT_INTERVAL "-5s" is not a duration`},
 		{"an interval in hours in the variable", map[string]string{"OTEL_OPAMP_HEARTBEAT_INTERVAL": "1h"}, nil,
-			"heartbeat", "0s", "OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable"},
+			"heartbeat", "0s", `OTEL_OPAMP_HEARTBEAT_INTERVAL "1h" is not a duration`},
 		{"a negative interval in code", nil, []Option{WithHeartbeatInterval(-time.Second)},
-			"heartbeat", "0s", "WithHeartbeatInterval is negative"},
+			"heartbeat", "0s", "WithHeartbeatInterval (-1000 ms) is no interval"},
 		{"a negative interval in code over a good variable", map[string]string{"OTEL_OPAMP_HEARTBEAT_INTERVAL": "2m"},
-			[]Option{WithHeartbeatInterval(-time.Second)}, "heartbeat", "0s", "WithHeartbeatInterval is negative"},
+			[]Option{WithHeartbeatInterval(-time.Second)}, "heartbeat", "0s", "WithHeartbeatInterval (-1000 ms) is no interval"},
 		{"an unreadable interval in the variable under a good one in code", map[string]string{"OTEL_OPAMP_HEARTBEAT_INTERVAL": "soon"},
 			[]Option{WithHeartbeatInterval(time.Second)}, "heartbeat", "1s", ""},
 		{"a header name HTTP can't carry in the variable", map[string]string{"OTEL_OPAMP_HEADERS": "Bad Name=x,X-Ok=1"}, nil,
-			"headers", "X-Ok=1", "OTEL_OPAMP_HEADERS has a header HTTP can't carry"},
+			"headers", "X-Ok=1", `OTEL_OPAMP_HEADERS: "Bad Name" isn't a header HTTP can carry`},
 		{"a header value HTTP can't carry in the variable", map[string]string{"OTEL_OPAMP_HEADERS": "X-Bad=a%0D%0Ab,X-Ok=1"}, nil,
-			"headers", "X-Ok=1", "OTEL_OPAMP_HEADERS has a header HTTP can't carry"},
+			"headers", "X-Ok=1", `OTEL_OPAMP_HEADERS: "X-Bad" isn't a header HTTP can carry`},
 		{"a header value not percent-encoded in the variable", map[string]string{"OTEL_OPAMP_HEADERS": "X-Bad=100%,X-Ok=1"}, nil,
-			"headers", "X-Ok=1", "isn't percent-encoded"},
+			"headers", "X-Ok=1", "percent escape that can't be decoded"},
 		{"a header name HTTP can't carry in code", nil, []Option{WithHeaders(map[string]string{"Bad Name": "x", "X-Ok": "1"})},
-			"headers", "X-Ok=1", "WithHeaders has a header HTTP can't carry"},
+			"headers", "X-Ok=1", `WithHeaders: "Bad Name" isn't a header HTTP can carry`},
 		{"a header value HTTP can't carry in code", nil, []Option{WithHeaders(map[string]string{"X-Bad": "a\r\nb", "X-Ok": "1"})},
-			"headers", "X-Ok=1", "WithHeaders has a header HTTP can't carry"},
+			"headers", "X-Ok=1", `WithHeaders: "X-Bad" isn't a header HTTP can carry`},
 		{"an endpoint without a scheme in code", nil, []Option{WithEndpoint("opamp.example.com:4320/v1/opamp")},
 			"endpoint", "http://opamp.example.com:4320/v1/opamp", `WithEndpoint "opamp.example.com:4320/v1/opamp" has no scheme`},
 	} {
@@ -245,22 +246,6 @@ func TestAnUnusableSettingWarnsAndIsTheDefault(t *testing.T) {
 				t.Fatalf("want one warning about %q; said: %q", c.warning, *said)
 			}
 		})
-	}
-}
-
-func TestDuration(t *testing.T) {
-	for in, want := range map[string]time.Duration{"1500": 1500 * time.Millisecond, "500ms": 500 * time.Millisecond,
-		" 30s ": 30 * time.Second, "2m": 2 * time.Minute, "153722867m": 153722867 * time.Minute} {
-		if got, err := duration(in); err != nil || got != want {
-			t.Errorf("duration(%q) = %v, %v; want %v", in, got, err, want)
-		}
-	}
-	// The largest that fits is 153722867m (time.Duration is int64 nanoseconds); past it, out of range.
-	for _, in := range []string{"", "-1", "1h", "1.5s", "s", "153722868m", "307445735m", "9223372036855s",
-		"9223372036855ms", "99999999999999999999"} {
-		if _, err := duration(in); err == nil {
-			t.Errorf("duration(%q) should fail", in)
-		}
 	}
 }
 

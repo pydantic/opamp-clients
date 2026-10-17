@@ -117,15 +117,15 @@ func TestWithoutAStateDirectoryEverySettingIsStillCarriedOut(t *testing.T) {
 
 func TestTheInstanceUIDIsKeptOrTakenFromTheResource(t *testing.T) {
 	const given = "0190a3b2-7c4d-7e8f-9a0b-1c2d3e4f5a6b"
-	if u := identity("", "service.name=x, service.instance.id="+given); u.String() != given {
+	if u := identity("", "service.name=x, service.instance.id="+given, time.Now()); u.String() != given {
 		t.Fatalf("no state dir: the resource's UUID, got %s", u)
 	}
-	if u := identity("", "service.instance.id=pod-7"); u.Version() != 7 {
+	if u := identity("", "service.instance.id=pod-7", time.Now()); u.Version() != 7 {
 		t.Fatalf("not a UUID: a new UUIDv7, got %s", u)
 	}
 	dir := t.TempDir()
-	first := identity(dir, "service.instance.id="+given)
-	if first.String() == given || identity(dir, "") != first {
+	first := identity(dir, "service.instance.id="+given, time.Now())
+	if first.String() == given || identity(dir, "", time.Now()) != first {
 		t.Fatal("with a state dir: its own UID, kept")
 	}
 	// Issue #218: a state directory nothing can be saved in keeps no UID, so the resource's UUID
@@ -136,11 +136,11 @@ func TestTheInstanceUIDIsKeptOrTakenFromTheResource(t *testing.T) {
 	}
 	unsaved := filepath.Join(file, "state")
 	for range 2 {
-		if u := identity(unsaved, "service.instance.id="+given); u.String() != given {
+		if u := identity(unsaved, "service.instance.id="+given, time.Now()); u.String() != given {
 			t.Fatalf("a state dir it can't save in: the resource's UUID, got %s", u)
 		}
 	}
-	if u := identity(unsaved, ""); u.Version() != 7 {
+	if u := identity(unsaved, "", time.Now()); u.Version() != 7 {
 		t.Fatalf("a state dir it can't save in, nothing given: a new UUIDv7, got %s", u)
 	}
 }
@@ -534,7 +534,9 @@ func (h handlerFunc) WithGroup(string) slog.Handler                 { return h }
 func TestConnectingFailingAndRecoveringAreEachSaidOnce(t *testing.T) {
 	said := records(t)
 	uid := uuid.UUID{15: 7}
-	r := &reachability{endpoint: where("https://user:secret@opamp.example.com/v1/opamp?token=x#frag"), service: "checkout", uid: uid}
+	s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://user:secret@opamp.example.com/v1/opamp?token=x#frag",
+		"OTEL_OPAMP_STATE_DIR": "none"}))
+	r := &reachability{endpoint: s.shown, service: "checkout", uid: uid, hints: s.hints}
 	for _, n := range []opamp.Notification{
 		{Kind: opamp.ConnectFailed, Status: 401, Detail: "HTTP 401"},
 		{Kind: opamp.ConnectFailed, Status: 401, Detail: "HTTP 401"},
@@ -576,7 +578,7 @@ func TestTheWarningNamesTheOptionThatGaveTheServer(t *testing.T) {
 	} {
 		s := serverFromEnv(env(c.vars), c.opts...)
 		said := records(t)
-		r := &reachability{endpoint: where(s.endpoint), endpointFrom: s.endpointFrom, headersFrom: s.headersFrom}
+		r := &reachability{endpoint: s.shown, hints: s.hints}
 		r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 401})
 		r.notified(opamp.Notification{Kind: opamp.Connected})
 		r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 404})
@@ -593,7 +595,8 @@ func TestTheWarningNamesTheOptionThatGaveTheServer(t *testing.T) {
 
 func TestWithoutAServiceNameTheInstanceAloneIsNamed(t *testing.T) {
 	said := records(t)
-	r := &reachability{endpoint: "http://127.0.0.1:4320/v1/opamp"}
+	s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:4320/v1/opamp", "OTEL_OPAMP_STATE_DIR": "none"}))
+	r := &reachability{endpoint: s.shown, hints: s.hints}
 	r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Status: 404, Detail: ""})
 	r.notified(opamp.Notification{Kind: opamp.Connected})
 	if len(*said) != 2 || !strings.Contains((*said)[0], "(HTTP 404): nothing serves OpAMP at that path") ||
@@ -602,42 +605,19 @@ func TestWithoutAServiceNameTheInstanceAloneIsNamed(t *testing.T) {
 	}
 }
 
+// What is logged of an endpoint is the core's rule (no user info, query or fragment), and an
+// endpoint it can't parse is still logged, never an error.
 func TestTheEndpointIsLoggedWithoutCredentials(t *testing.T) {
 	for in, want := range map[string]string{
 		"https://user:secret@opamp.example.com:8443/v1/opamp?token=x#f": "https://opamp.example.com:8443/v1/opamp",
 		"wss://[::1]:4320/v1/opamp":                                     "wss://[::1]:4320/v1/opamp",
-		"user:secret@opamp.example.com:4320/v1/opamp?token=x":           "opamp.example.com:4320/v1/opamp",
 		"https://user:secret@opamp.example.com:notaport/v1/opamp?k=v":   "https://opamp.example.com:notaport/v1/opamp",
 		"https://[::1/v1/opamp?k=v":                                     "https://[::1/v1/opamp",
 		"https://opamp.example.com":                                     "https://opamp.example.com",
 	} {
-		if got := where(in); got != want {
-			t.Errorf("where(%q) = %q, want %q", in, got, want)
+		if got := shownEndpoint(in, "unused"); got != want {
+			t.Errorf("shownEndpoint(%q) = %q, want %q", in, got, want)
 		}
-	}
-	if hint(500, "", "") != "the server answered with an error" {
-		t.Error("another status: the server's error")
-	}
-}
-
-func TestAnEndpointWithoutASchemeIsWarnedAbout(t *testing.T) {
-	said := records(t)
-	s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "user:secret@opamp.example.com:4320/v1/opamp"}))
-	if s == nil {
-		t.Fatal("still on")
-	}
-	// Taken as http://, as the warning says: the client refuses an endpoint without a scheme.
-	if s.endpoint != "http://user:secret@opamp.example.com:4320/v1/opamp" {
-		t.Fatalf("endpoint %q", s.endpoint)
-	}
-	want := `WARN opamp: OTEL_OPAMP_ENDPOINT "opamp.example.com:4320/v1/opamp" has no scheme, so it is taken as http://; ` +
-		"name it in full, as https://host/v1/opamp or wss://host/v1/opamp"
-	if len(*said) != 1 || (*said)[0] != want {
-		t.Fatalf("said: %q", *said)
-	}
-	serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://opamp.example.com/v1/opamp"}))
-	if len(*said) != 1 {
-		t.Fatalf("a full endpoint: no warning; said: %q", *said)
 	}
 }
 
@@ -707,7 +687,7 @@ func TestSendMetricsIsRefusedWhenTheMetricsReaderIsAutoexportsOwn(t *testing.T) 
 func TestWhatIsSaidNamesTheEndpointInUse(t *testing.T) {
 	said := records(t)
 	inUse := "" // none yet: the configured one
-	r := &reachability{endpoint: where("https://a.example.com/v1/opamp"), inUse: func() string { return inUse }}
+	r := &reachability{endpoint: shownEndpoint("https://a.example.com/v1/opamp", ""), inUse: func() string { return inUse }}
 	r.notified(opamp.Notification{Kind: opamp.Connected})
 	inUse = "https://user:secret@b.example.com/v1/opamp?token=x"
 	r.notified(opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection refused"})

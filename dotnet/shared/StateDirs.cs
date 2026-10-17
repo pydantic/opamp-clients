@@ -2,28 +2,26 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
+using Pydantic.OpAmp.Client;
+using Pydantic.OpAmp.Core;
 
 namespace Pydantic.OpAmp.Otel;
 
 /// <summary>
 /// Where the agent keeps its state: the directory named (<c>OTEL_OPAMP_STATE_DIR</c>, or the hosting
 /// package's <c>OpAmp:StateDirectory</c>), none (<c>none</c>), or by default one of the user's own,
-/// so an instance keeps its UID across restarts with no setup (docs/default-state-dir.md).
+/// so an instance keeps its UID across restarts with no setup (docs/default-state-dir.md). Which,
+/// and the default one's slots, are the core's Setup call's to say; this takes the lock.
 /// </summary>
-internal static partial class StateDirs
+internal static class StateDirs
 {
-    /// <summary>Processes of one program on one host that each keep their own identity by default.</summary>
-    public const int Slots = 16;
-
     /// <summary>
     /// Settle <paramref name="server"/>'s state directory and take its lock (held while the process
     /// runs). False when a directory named is another process's, or can't be locked: the SDK runs
-    /// unmanaged. Without one named, the default, if there is one to be had; never an error.
+    /// unmanaged. Without one named, the first of the default one's slots it can have, if any;
+    /// never an error.
     /// </summary>
-    public static bool Claim(ref Server server, Func<string, string?> getenv, AgentLog log, out FileStream? stateLock)
+    public static bool Claim(ref Server server, AgentLog log, out FileStream? stateLock)
     {
         stateLock = null;
         var named = server.StateDir?.Trim();
@@ -41,14 +39,7 @@ internal static partial class StateDirs
             return stateLock is not null;
         }
 
-        // A service.instance.id the application chose stays its choice: no default to override it.
-        // One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
-        if (Uuid.Chosen(getenv("OTEL_RESOURCE_ATTRIBUTES")) is not null)
-        {
-            return true;
-        }
-
-        if (Default(getenv, log) is { } claimed)
+        if (Slot(server.DefaultSlots, server.AllSlotsTaken, log) is { } claimed)
         {
             server = server with { StateDir = claimed.Dir };
             stateLock = claimed.Lock;
@@ -58,60 +49,58 @@ internal static partial class StateDirs
     }
 
     /// <summary>
-    /// A state directory of the user's own: one per program, service and working directory; a slot
-    /// in it per process running at once, each held by a lock. Null where there's none to be had
-    /// (no home, not writable, every slot taken): then each start is a new instance, as before.
+    /// The default state directory, for <paramref name="program"/> in <paramref name="cwd"/> (null:
+    /// this process's), as the core's Setup names it, and the first of its slots this process can
+    /// have. Null where there's none to be had (no home, not writable, every slot taken): then each
+    /// start is a new instance, as before.
     /// </summary>
     public static (string Dir, FileStream Lock)? Default(Func<string, string?> getenv, AgentLog log, string? program = null, string? cwd = null)
     {
+        var start = Server.Start(getenv, program, cwd);
+        start.Code = new SetupInCode { Endpoint = "http://localhost" }; // any: the slots don't depend on it
         try
         {
-            var stateBase = Base(getenv);
-            if (string.IsNullOrEmpty(stateBase))
-            {
-                return null;
-            }
+            var s = OpAmpSetup.Start(start);
+            return Slot(s.DefaultSlots, s.AllSlotsTaken, log);
+        }
+        catch (CoreException)
+        {
+            return null;
+        }
+    }
 
-            program ??= ProgramName();
-            if (cwd is null)
-            {
-                try
-                {
-                    cwd = Environment.CurrentDirectory;
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    cwd = string.Empty;
-                }
-            }
+    /// <summary>
+    /// The first of <paramref name="slots"/> this process can make and lock, and its lock; null where
+    /// there's none to be had (not writable, every slot taken: <paramref name="allTaken"/> is the
+    /// line to say then). Never an error.
+    /// </summary>
+    public static (string Dir, FileStream Lock)? Slot(IReadOnlyList<string>? slots, string? allTaken, AgentLog log)
+    {
+        if (slots is not { Count: > 0 })
+        {
+            return null;
+        }
 
-            var attrs = Attributes(getenv);
-            var service = getenv("OTEL_SERVICE_NAME")?.Trim() is { Length: > 0 } s ? s
-                : attrs.GetValueOrDefault("service.name") is { Length: > 0 } a ? a : program;
-            var key = string.Join('\0', service, attrs.GetValueOrDefault("service.namespace") ?? string.Empty, program, cwd);
-            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..8].ToLowerInvariant();
-            var name = NotInName().Replace(service, "_");
-            name = name.Length > 64 ? name[..64] : name.Length == 0 ? "service" : name;
-            var home = Path.Combine(stateBase, "opamp", $"{name}-{hash}");
-            for (var slot = 1; slot <= Slots; slot++)
+        try
+        {
+            foreach (var dir in slots)
             {
-                var dir = Path.Combine(home, slot.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 try
                 {
                     return (dir, OpenLock(dir));
                 }
-                catch (IOException) when (Directory.Exists(dir) && File.Exists(Path.Combine(dir, "lock")))
+                catch (IOException) when (Directory.Exists(dir) && File.Exists(Path.Combine(dir, OpAmpSetup.LockFile)))
                 {
                     // Another process of it, running now, holds this slot.
                 }
             }
 
-            log.Info($"{Slots} processes of {service} already keep their identity here: this one is a new instance each start");
+            log.Info(allTaken ?? string.Empty);
             return null;
         }
         catch (Exception)
         {
-            // No home, a base that can't be written: each start is a new instance, as before.
+            // A base that can't be written: each start is a new instance, as before.
             return null;
         }
     }
@@ -134,7 +123,7 @@ internal static partial class StateDirs
             options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         }
 
-        return new FileStream(Path.Combine(dir, "lock"), options);
+        return new FileStream(Path.Combine(dir, OpAmpSetup.LockFile), options);
     }
 
     /// <summary>The program, as a name: the entry assembly's, else the process's.</summary>
@@ -155,41 +144,4 @@ internal static partial class StateDirs
             return "dotnet";
         }
     }
-
-    /// <summary>The user's state directory: <c>%LOCALAPPDATA%</c>, <c>~/Library/Application Support</c>, or XDG's.</summary>
-    private static string? Base(Func<string, string?> getenv)
-    {
-        static string? Set(string? v) => string.IsNullOrWhiteSpace(v) ? null : v;
-        if (OperatingSystem.IsWindows())
-        {
-            return Set(getenv("LOCALAPPDATA"));
-        }
-
-        var home = Set(getenv("HOME"));
-        if (OperatingSystem.IsMacOS())
-        {
-            return home is null ? null : Path.Combine(home, "Library", "Application Support");
-        }
-
-        return Set(getenv("XDG_STATE_HOME")) ?? (home is null ? null : Path.Combine(home, ".local", "state"));
-    }
-
-    /// <summary>OTEL_RESOURCE_ATTRIBUTES: <c>k=v,...</c>, values percent-decoded.</summary>
-    private static Dictionary<string, string> Attributes(Func<string, string?> getenv)
-    {
-        var attrs = new Dictionary<string, string>();
-        foreach (var kv in (getenv("OTEL_RESOURCE_ATTRIBUTES") ?? string.Empty).Split(','))
-        {
-            var eq = kv.IndexOf('=');
-            if (eq > 0)
-            {
-                attrs[kv[..eq].Trim()] = Uri.UnescapeDataString(kv[(eq + 1)..].Trim());
-            }
-        }
-
-        return attrs;
-    }
-
-    [GeneratedRegex("[^A-Za-z0-9._-]+")]
-    private static partial Regex NotInName();
 }

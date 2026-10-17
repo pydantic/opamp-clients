@@ -2,40 +2,165 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 using System.Text;
-using System.Text.RegularExpressions;
 using Google.Protobuf;
 using OpAmp.Proto.V1;
 using OpenTelemetry;
 using Pydantic.OpAmp.Client;
 using Pydantic.OpAmp.Client.Sdk;
+using Pydantic.OpAmp.Core;
 
 namespace Pydantic.OpAmp.Otel;
 
-/// <summary>Where the server is: OTEL_OPAMP_*, or the hosting package's options.</summary>
-internal sealed record Server(Uri Endpoint, IReadOnlyDictionary<string, string> Headers, string? StateDir, TimeSpan Heartbeat, SettingNames? Names = null)
+/// <summary>
+/// Where the server is: OTEL_OPAMP_*, or the hosting package's options, as the core's Setup decides
+/// it. <paramref name="Shown"/> is the endpoint as it is safe to log and <paramref name="Hints"/>
+/// what to check when the server can't be reached (null: as for OTEL_OPAMP_*);
+/// <paramref name="DefaultSlots"/> the default state directory's slots, when none is named.
+/// </summary>
+internal sealed record Server(
+    Uri Endpoint,
+    IReadOnlyDictionary<string, string> Headers,
+    string? StateDir,
+    TimeSpan Heartbeat,
+    string? Shown = null,
+    SetupHints? Hints = null,
+    IReadOnlyList<string>? DefaultSlots = null,
+    string? AllSlotsTaken = null)
 {
-    /// <summary>What these settings are called, for what the agent says.</summary>
-    public SettingNames Named => this.Names ?? SettingNames.Env;
+    /// <summary>The variables the core's Setup reads.</summary>
+    private static readonly string[] Variables =
+    [
+        "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL",
+        "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA",
+    ];
+
+    /// <summary>The variables that aren't OTEL_OPAMP_*: what the hosting package's settings don't replace.</summary>
+    private static readonly string[] Others = Variables.Where(v => !v.StartsWith("OTEL_OPAMP_", StringComparison.Ordinal)).ToArray();
+
+    /// <summary>The endpoint as it is safe to log.</summary>
+    public string ShownEndpoint => this.Shown ?? Reachability.Shown(this.Endpoint.OriginalString, this.Endpoint.OriginalString);
+
+    /// <summary>What to check when the server can't be reached.</summary>
+    public SetupHints Hinted => this.Hints ?? HintsFor(this.Endpoint.OriginalString);
 
     /// <summary>
-    /// Null when OTEL_OPAMP_ENDPOINT is unset: nothing is managed. A heartbeat interval it can't read
-    /// is the client's default, with a warning; an endpoint that isn't a URL throws.
+    /// Null when OTEL_OPAMP_ENDPOINT is unset: nothing is managed. The rules are the core's (its
+    /// Setup call), the same in every language; a setting it can't use is the default, with a
+    /// warning. An endpoint that isn't a URL throws.
     /// </summary>
-    public static Server? FromEnv(Func<string, string?> getenv, Action<string> warn)
+    public static Server? FromEnv(Func<string, string?> getenv, Action<string> warn) =>
+        FromCore(Start(getenv), warn);
+
+    /// <summary>
+    /// The hosting package's options, given in code (what the configuration and the variables said
+    /// is in them already): the endpoint, headers, state directory and interval, named as its
+    /// settings. Null: the core could not read them.
+    /// </summary>
+    public static Server? FromOptions(Uri endpoint, IDictionary<string, string> headers, string? stateDir, TimeSpan? heartbeat,
+        Func<string, string?> getenv, Action<string> warn, string endpointName, string headersName, string heartbeatName)
     {
-        var endpoint = getenv("OTEL_OPAMP_ENDPOINT")?.Trim();
-        if (string.IsNullOrEmpty(endpoint))
+        var start = Start(getenv, only: Others);
+        start.Code = new SetupInCode
+        {
+            Endpoint = endpoint.OriginalString,
+            HeadersGiven = true,
+            EndpointName = endpointName,
+            HeadersName = headersName,
+            HeartbeatName = heartbeatName,
+        };
+        start.Code.Headers.AddRange(headers.Select(h => new Pydantic.OpAmp.Core.Header { Name = h.Key, Value = h.Value }));
+        if (stateDir is not null)
+        {
+            start.Code.StateDir = stateDir;
+        }
+
+        if (heartbeat is { } h && h != TimeSpan.Zero)
+        {
+            start.Code.HeartbeatMs = (long)h.TotalMilliseconds;
+        }
+
+        return FromCore(start, warn);
+    }
+
+    /// <summary>The Setup call's start: the variables, this OS, the program and the working directory.</summary>
+    internal static SetupStart Start(Func<string, string?> getenv, string? program = null, string? cwd = null, string[]? only = null)
+    {
+        if (cwd is null)
+        {
+            try
+            {
+                cwd = Environment.CurrentDirectory;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                cwd = string.Empty;
+            }
+        }
+
+        var start = new SetupStart
+        {
+            Os = OperatingSystem.IsWindows() ? SetupOs.Windows : OperatingSystem.IsMacOS() ? SetupOs.Macos : SetupOs.Unix,
+            Program = program ?? StateDirs.ProgramName(),
+            Cwd = cwd,
+        };
+        foreach (var name in only ?? Variables)
+        {
+            if (getenv(name) is { Length: > 0 } value)
+            {
+                start.Env.Add(new Variable { Name = name, Value = value });
+            }
+        }
+
+        return start;
+    }
+
+    private static Server? FromCore(SetupStart start, Action<string> warn)
+    {
+        var s = OpAmpSetup.Start(start);
+        foreach (var w in s.Warnings)
+        {
+            warn(w);
+        }
+
+        if (s.Off)
         {
             return null;
         }
 
-        var stateDir = getenv("OTEL_OPAMP_STATE_DIR")?.Trim();
-        var heartbeat = getenv("OTEL_OPAMP_HEARTBEAT_INTERVAL")?.Trim();
+        var headers = new Dictionary<string, string>();
+        foreach (var h in s.Headers)
+        {
+            headers[h.Name] = h.Value;
+        }
+
         return new Server(
-            new Uri(endpoint),
-            Variables.Headers(getenv("OTEL_OPAMP_HEADERS") ?? string.Empty),
-            string.IsNullOrEmpty(stateDir) ? null : stateDir,
-            string.IsNullOrEmpty(heartbeat) ? TimeSpan.Zero : Variables.Interval("OTEL_OPAMP_HEARTBEAT_INTERVAL", heartbeat, warn) ?? TimeSpan.Zero);
+            new Uri(s.Endpoint),
+            headers,
+            s.StateDir.Length > 0 ? s.StateDir : null,
+            TimeSpan.FromMilliseconds(s.HeartbeatIntervalMs),
+            s.ShownEndpoint,
+            s.Hints,
+            s.DefaultSlots.ToList(),
+            s.AllSlotsTaken);
+    }
+
+    private static SetupHints HintsFor(string endpoint)
+    {
+        try
+        {
+            return OpAmpSetup.Start(new SetupStart
+            {
+                Env =
+                {
+                    new Variable { Name = "OTEL_OPAMP_ENDPOINT", Value = endpoint },
+                    new Variable { Name = "OTEL_OPAMP_STATE_DIR", Value = "none" },
+                },
+            }).Hints;
+        }
+        catch (CoreException)
+        {
+            return new SetupHints();
+        }
     }
 }
 
@@ -125,12 +250,6 @@ internal sealed class SdkAgent
         this.hostNow = hostNow;
         this.log = log;
         this.Controls = controls;
-        if (!server.Endpoint.OriginalString.Contains("://", StringComparison.Ordinal))
-        {
-            log.Warn($"{server.Named.Endpoint} '{Reachability.Where(server.Endpoint)}' has no scheme: name it in full, " +
-                     "as https://host/v1/opamp or wss://host/v1/opamp");
-        }
-
         // What the application's own settings say goes where the agent says the rest.
         controls.App.Info = log.Info;
         controls.App.Error = log.Error;
@@ -309,7 +428,7 @@ internal sealed class SdkAgent
             AvailableComponents = this.components,
         };
         var service = resource.FirstOrDefault(a => a.Key == "service.name").Value;
-        this.reachability = new Reachability(this.server.Endpoint, this.server.Named,
+        this.reachability = new Reachability(this.server.ShownEndpoint, this.server.Hinted,
             Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log)
         {
             InUse = () => Volatile.Read(ref this.client)?.Endpoint,
@@ -763,7 +882,7 @@ internal sealed class SdkAgent
 
         try
         {
-            Write(Path.Combine(dir, "instance-uid"), Encoding.ASCII.GetBytes(Uuid.Format(uid)));
+            Write(Path.Combine(dir, OpAmpSetup.UidFile), Encoding.ASCII.GetBytes(Uuid.Format(uid)));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -778,35 +897,52 @@ internal sealed class SdkAgent
     /// </summary>
     private string Identity()
     {
-        if (this.server.StateDir is { } dir)
+        var path = this.server.StateDir is { } dir ? Path.Combine(dir, OpAmpSetup.UidFile) : null;
+        var saved = string.Empty;
+        if (path is not null)
         {
-            var path = Path.Combine(dir, "instance-uid");
             try
             {
-                var saved = File.ReadAllText(path).Trim();
-                if (Uuid.Valid(saved))
-                {
-                    return saved.ToLowerInvariant();
-                }
+                saved = File.ReadAllText(path);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 // None saved yet.
             }
+        }
 
-            var made = Uuid.Format(Uuid.NewV7());
+        SetupIdentified got;
+        try
+        {
+            got = OpAmpSetup.Identify(new SetupIdentity
+            {
+                StateDir = path is not null,
+                Saved = saved,
+                ResourceAttributes = this.getenv("OTEL_RESOURCE_ATTRIBUTES") ?? string.Empty,
+                Entropy = ByteString.CopyFrom(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16)),
+                UnixMs = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            });
+        }
+        catch (CoreException e)
+        {
+            this.log.Error($"the core could not make an instance UID: {e.Message}");
+            return Uuid.Format(Guid.NewGuid().ToByteArray());
+        }
+
+        if (got.Save && path is not null)
+        {
             try
             {
-                Write(path, Encoding.ASCII.GetBytes(made));
-                return made;
+                Write(path, Encoding.ASCII.GetBytes(got.Text));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 this.log.Warn($"can't save the instance UID: {e.Message}");
+                return Uuid.Format(got.UnsavedUid.ToByteArray());
             }
         }
 
-        return Uuid.Chosen(this.getenv("OTEL_RESOURCE_ATTRIBUTES")) ?? Uuid.Format(Uuid.NewV7());
+        return Uuid.Format(got.InstanceUid.ToByteArray());
     }
 
     /// <summary>Replace the file, all or nothing: on disk before it takes the old one's place.</summary>
@@ -836,43 +972,8 @@ internal sealed class SdkAgent
 }
 
 /// <summary>UUIDs as OpAMP sends them: the 16 bytes in order (not <c>Guid.ToByteArray()</c>'s, which is mixed-endian).</summary>
-internal static partial class Uuid
+internal static class Uuid
 {
-    public static bool Valid(string s) => Pattern().IsMatch(s);
-
-    /// <summary>
-    /// The <c>service.instance.id</c> that <paramref name="resourceAttributes"/> (as
-    /// OTEL_RESOURCE_ATTRIBUTES) gives, if it is a UUID: the instance UID the application chose.
-    /// </summary>
-    public static string? Chosen(string? resourceAttributes)
-    {
-        foreach (var kv in (resourceAttributes ?? string.Empty).Split(','))
-        {
-            var eq = kv.IndexOf('=');
-            if (eq > 0 && kv[..eq].Trim() == "service.instance.id" && Uri.UnescapeDataString(kv[(eq + 1)..].Trim()) is var id && Valid(id))
-            {
-                return id.ToLowerInvariant();
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>A UUIDv7: the time in milliseconds, then random bits.</summary>
-    public static byte[] NewV7()
-    {
-        var uid = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
-        var ms = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        for (var i = 5; i >= 0; i--, ms >>= 8)
-        {
-            uid[i] = (byte)ms;
-        }
-
-        uid[6] = (byte)(0x70 | (uid[6] & 0x0f));
-        uid[8] = (byte)(0x80 | (uid[8] & 0x3f));
-        return uid;
-    }
-
     public static string Format(byte[] b)
     {
         var h = Convert.ToHexString(b).ToLowerInvariant();
@@ -880,7 +981,4 @@ internal static partial class Uuid
     }
 
     public static byte[] Bytes(string s) => Convert.FromHexString(s.Replace("-", string.Empty, StringComparison.Ordinal));
-
-    [GeneratedRegex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")]
-    private static partial Regex Pattern();
 }

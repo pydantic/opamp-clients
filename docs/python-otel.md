@@ -34,7 +34,9 @@ opentelemetry-instrument python app.py
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the package does nothing beyond the upstream distro's defaults. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
-| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; it never stops the application. |
+| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the application. |
+
+The core reads these (and the keyword arguments below), by the same rules in every language: the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
 
 It is a distro (`opentelemetry_distro`) and a configurator (`opentelemetry_configurator`), both
 named `opamp`. If another distro is installed too (`opentelemetry-distro`, say), pick this one
@@ -108,7 +110,7 @@ A value it can't use is warned about on the `opamp_otel` logger and is the defau
 it can't read is: an endpoint that isn't a string leaves the SDK unmanaged, headers that aren't
 all strings are none (the warning doesn't show them), a `state_dir` that isn't a path is the
 default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, NaN, `"soon"`) is
-30 s. An endpoint whose scheme the client doesn't speak (not `http(s)://` or `ws(s)://`) is warned
+30 s; one longer than a day is a day. An endpoint whose scheme the client doesn't speak (not `http(s)://` or `ws(s)://`) is warned
 about at start, as one without a scheme is. None of it raises. Its other keyword arguments are
 upstream's configurator's (`sampler`, which a remote rate replaces while one is set,
 `resource_attributes`, `span_processors`, and so on). Span or log record processors given here,

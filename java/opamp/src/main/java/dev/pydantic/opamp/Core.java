@@ -126,6 +126,42 @@ final class Core implements AutoCloseable {
     }
   }
 
+  /** The instance the Setup call runs on: one of its own, made on first use. Guarded by SETUP_LOCK. */
+  private static Instance setupInstance;
+  private static final Object SETUP_LOCK = new Object();
+
+  /**
+   * The core's Setup call ({@link Setup}): stateless, on an instance of its own (no client's), so
+   * any number of threads may call it. A trap drops the instance: the next call makes a new one.
+   */
+  static CoreProto.SetupReply setup(CoreProto.SetupCall call) {
+    byte[] data = call.toByteArray();
+    byte[] raw;
+    synchronized (SETUP_LOCK) {
+      try {
+        if (setupInstance == null) {
+          setupInstance = Instance.builder(module()).withMachineFactory(CoreModule::create).build();
+        }
+        Memory memory = setupInstance.memory();
+        int ptr = (int) setupInstance.export("alloc").apply(data.length)[0];
+        memory.write(ptr, data);
+        long packed = setupInstance.export("setup").apply(ptr, data.length)[0];
+        int outPtr = (int) (packed >>> 32);
+        int outLen = (int) (packed & 0xffffffffL);
+        raw = memory.readBytes(outPtr, outLen);
+        setupInstance.export("free").apply(outPtr, outLen);
+      } catch (RuntimeException e) {
+        setupInstance = null;
+        throw new CoreException("trap: " + e, e);
+      }
+    }
+    try {
+      return CoreProto.SetupReply.parseFrom(raw);
+    } catch (InvalidProtocolBufferException e) {
+      throw new CoreException("unreadable reply", e);
+    }
+  }
+
   /** What init returned: the instance UID in use, above all. */
   CoreProto.Output initOutput() {
     return initOutput;

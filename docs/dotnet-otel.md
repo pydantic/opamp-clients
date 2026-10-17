@@ -40,7 +40,9 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the plugin does nothing. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (readable by the application's user only). Without it, the plugin keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md); the program is the entry assembly's name), unless `OTEL_RESOURCE_ATTRIBUTES` has a `service.instance.id`; `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. One process per directory named here (below). |
-| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is the default, with a warning (`OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL unreadable, using the default: ...`). |
+| `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `500ms`, `30s`, `2m`. A value it can't read is the default, with a warning (`OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "soon" is not a duration (as 1500, 500ms, 30s or 2m): using the default`); longer than a day is a day. |
+
+The core reads these, by the same rules in every language: the endpoint (one without a scheme is taken as `http://`, with a warning), the headers (one whose escape can't be decoded, or that HTTP can't carry, is left out, with a warning), the interval, which state directory, and the instance UID kept there. The plugin keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
 
 The plugin is compiled against the exact OpenTelemetry versions automatic instrumentation 1.17
 ships, as upstream requires of plugins. Upstream tests plugins referenced by the application, as
@@ -346,7 +348,9 @@ variables above (`OTEL_OPAMP_ENDPOINT` and the rest); `WithOpAmp(o => ...)` wins
 no endpoint it changes nothing. Without a state directory named, it keeps one of the user's own
 by default, as the plugin does; `none` turns that off. A value it can't read never fails the host: a heartbeat interval
 it can't read, or a negative one, is the default, with a warning through the application's logger (`OpAMP:
-OpAmp:HeartbeatInterval unreadable, using the default: ...`); an endpoint that isn't a URL leaves
+OpAmp:HeartbeatInterval unreadable, using the default: ...`); the core's Setup call then decides from the
+settings as the plugin's does from the variables, naming `OpAmp:Endpoint`, `OpAmp:Headers` and
+`OpAmp:HeartbeatInterval` in what it says; an endpoint that isn't a URL leaves
 the application running unmanaged, with an error saying why (`OpAMP: the client did not start;
 the SDK runs unmanaged: OpAmp:Endpoint is not a URL`). It does what the plugin does, with the same code
 (`dotnet/shared`, compiled into both): one instance UID (kept in the state directory, and the

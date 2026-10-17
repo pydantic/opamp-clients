@@ -2,61 +2,45 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 using Pydantic.OpAmp.Client;
+using Pydantic.OpAmp.Core;
 
 namespace Pydantic.OpAmp.Otel;
 
 /// <summary>
-/// What the integration's settings are called, for what it says: OTEL_OPAMP_* for the plugin, the
-/// <c>OpAmp</c> section for the hosting package. <paramref name="Credentials"/> is the header
-/// setting with an example of the enrollment key in it.
-/// </summary>
-internal sealed record SettingNames(string Endpoint, string Credentials)
-{
-    public static readonly SettingNames Env = new("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS (Authorization=Bearer <token>)");
-}
-
-/// <summary>
 /// Says when the client connects, when it can't (once a run of failures, with what to check), and
 /// when it's back: setup that works or doesn't is never silent. Notifications come one at a time,
-/// on the client's loop.
+/// on the client's loop. <paramref name="shown"/> is the configured endpoint as it is safe to log,
+/// and <paramref name="hints"/> what to check, both as the core's Setup gives them: the hints name
+/// what gave the endpoint and the headers (OTEL_OPAMP_*, or the hosting package's settings).
 /// </summary>
-internal sealed class Reachability(Uri endpoint, SettingNames names, string service, string uid, AgentLog log)
+internal sealed class Reachability(string shown, SetupHints hints, string service, string uid, AgentLog log)
 {
-    private readonly string endpoint = Where(endpoint);
     private bool ever;
     private bool failing;
 
-    /// <summary>The endpoint as it is safe to log: no user info, query or fragment.</summary>
-    public static string Where(Uri endpoint) => Where(endpoint.OriginalString);
-
     /// <summary>
-    /// The same, from the text as written: scheme://host:port/path, never parsed further (a bad port
-    /// or an unclosed IPv6 bracket can't make it throw). Without a scheme, the text less its query,
-    /// fragment and anything up to the last '@'.
+    /// An endpoint as it is safe to log (no user info, query or fragment), as the core shows it;
+    /// <paramref name="otherwise"/> if the core can't say.
     /// </summary>
-    public static string Where(string endpoint)
+    public static string Shown(string endpoint, string otherwise)
     {
-        var s = endpoint.Trim().Split('?', 2)[0].Split('#', 2)[0];
-        var scheme = s.IndexOf("://", StringComparison.Ordinal);
-        if (scheme <= 0)
+        try
         {
-            return s[(s.LastIndexOf('@') + 1)..];
+            return OpAmpSetup.Start(new SetupStart { Code = new SetupInCode { Endpoint = endpoint } }).ShownEndpoint is { Length: > 0 } s ? s : otherwise;
         }
-
-        var rest = s[(scheme + 3)..];
-        var slash = rest.IndexOf('/');
-        var authority = slash < 0 ? rest : rest[..slash];
-        var path = slash < 0 ? string.Empty : rest[slash..];
-        return $"{s[..scheme]}://{authority[(authority.LastIndexOf('@') + 1)..]}{path}";
+        catch (CoreException)
+        {
+            return otherwise;
+        }
     }
 
-    /// <summary>What to check when the server can't be reached, by what went wrong.</summary>
-    public static string Hint(int? status, SettingNames names) => status switch
+    /// <summary>What to check when the server can't be reached, by what went wrong, as the core words it.</summary>
+    public static string Hint(SetupHints hints, int? status) => status switch
     {
-        401 or 403 => $"the server refused this agent's credentials: check {names.Credentials}",
-        404 => $"nothing serves OpAMP at that path: check {names.Endpoint} (it usually ends in /v1/opamp)",
-        null => $"check {names.Endpoint} and that the server is up",
-        _ => "the server answered with an error",
+        401 or 403 => hints.Refused,
+        404 => hints.NotFound,
+        null => hints.Unreachable,
+        _ => hints.Error,
     };
 
     /// <summary>
@@ -66,7 +50,7 @@ internal sealed class Reachability(Uri endpoint, SettingNames names, string serv
     public Func<string?>? InUse { get; init; }
 
     /// <summary>The endpoint the client uses now, as it is safe to log.</summary>
-    public string At() => this.InUse?.Invoke() is { Length: > 0 } e ? Where(e) : this.endpoint;
+    public string At() => this.InUse?.Invoke() is { Length: > 0 } e ? Shown(e, shown) : shown;
 
     public void Notified(OpAmpNotification n)
     {
@@ -91,7 +75,7 @@ internal sealed class Reachability(Uri endpoint, SettingNames names, string serv
                 if (!this.failing)
                 {
                     var why = string.IsNullOrEmpty(f.Detail) ? $"HTTP {f.Status}" : f.Detail;
-                    log.Warn($"can't reach {endpoint} ({why}): {Hint(f.Status, names)}. Retrying in the background; " +
+                    log.Warn($"can't reach {endpoint} ({why}): {Hint(hints, f.Status)}. Retrying in the background; " +
                              "the SDK keeps its current settings meanwhile");
                 }
                 else

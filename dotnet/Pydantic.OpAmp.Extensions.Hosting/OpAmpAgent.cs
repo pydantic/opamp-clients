@@ -23,9 +23,6 @@ namespace Pydantic.OpAmp.Extensions.Hosting;
 /// </summary>
 internal sealed class OpAmpAgent : IDisposable
 {
-    /// <summary>What the settings are called, for what the agent says: the configuration's names.</summary>
-    internal static readonly SettingNames Names = new("OpAmp:Endpoint", "OpAmp:Headers (Authorization=Bearer <token>)");
-
     private readonly Func<string, string?> getenv;
     private readonly Log log = new();
     private readonly bool gateable;
@@ -58,8 +55,11 @@ internal sealed class OpAmpAgent : IDisposable
         // exporter as it is, and none of the signals can be stopped.
         this.gateable = OtlpTls.TryFromEnv(this.getenv, this.log.Sink.Warn, out this.tls);
 
-        var server = new Server(o.Endpoint, new Dictionary<string, string>(o.Headers), o.StateDirectory, o.HeartbeatInterval ?? TimeSpan.Zero, Names);
-        if (!StateDirs.Claim(ref server, this.getenv, this.log.Sink, out var stateLock))
+        // What the configuration and the variables said is in the options already; the core's Setup
+        // decides from them, naming the configuration's settings in what it says.
+        var server = Server.FromOptions(o.Endpoint, o.Headers, o.StateDirectory, o.HeartbeatInterval, this.getenv, this.log.Sink.Warn,
+            "OpAmp:Endpoint", "OpAmp:Headers", "OpAmp:HeartbeatInterval");
+        if (server is null || !StateDirs.Claim(ref server, this.log.Sink, out var stateLock))
         {
             return;
         }

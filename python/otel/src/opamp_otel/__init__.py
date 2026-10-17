@@ -29,11 +29,10 @@ import asyncio
 import atexit
 import copy
 import dataclasses
-import hashlib
 import concurrent.futures.thread  # noqa: F401 - its exit hook is registered before ours (see _at_exit)
 import logging
+import math
 import os
-import re
 import secrets
 import selectors
 import shutil
@@ -46,9 +45,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2, save_state
+from opamp_client import Client, Config, CoreError, Notification, Status, anyvalue_pb2, opamp_pb2, save_state, setup
+
 from opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.instrumentation.distro import BaseDistro
 from opentelemetry.sdk._configuration import _OTelSDKConfigurator
@@ -91,49 +90,18 @@ _log.addHandler(_LastResort(logging.WARNING))
 _INSTANCE_ID = "service.instance.id"
 
 
-def headers(spec: str) -> dict[str, str]:
-    """``k=v,k2=v2``, values percent-decoded, as OTEL_EXPORTER_OTLP_HEADERS. A value with an escape
-    it can't decode is kept as written, with a warning that names the header (not the value: it
-    may be a secret)."""
-    out = {}
-    for pair in spec.split(","):
-        key, eq, value = pair.partition("=")
-        key, value = key.strip(), value.strip()
-        if not (eq and key):
-            continue
-        try:
-            if re.search(r"%(?![0-9A-Fa-f]{2})", value):
-                raise ValueError(value)
-            out[key] = unquote(value, errors="strict")
-        except ValueError:  # UnicodeDecodeError is one
-            _log.warning("OpAMP: OTEL_OPAMP_HEADERS: the value of %r has a percent escape that can't be decoded: "
-                         "it is sent as written", key)
-            out[key] = value
-    return out
+#: The variables the core's Setup reads (setup.SetupStart).
+_SETUP_VARIABLES = ("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL",
+                    "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA")
 
 
-def duration_ms(value: str) -> int:
-    """``1500`` (milliseconds, as the SDK's variables), or ``500ms``, ``30s``, ``2m``."""
-    m = re.fullmatch(r"\s*(\d+)\s*(ms|s|m)?\s*", value)
-    ms = int(m.group(1)) * {None: 1, "ms": 1, "s": 1000, "m": 60_000}[m.group(2)] if m else -1
-    if not 0 <= ms <= 2**53 - 1:  # as Node's safe integers
-        raise ValueError(f"not a duration: {value!r}")
-    return ms
-
-
-_headers = headers  # Setup.from_env's own headers argument shadows it
-
-
-def uuid7() -> uuid.UUID:
-    """A UUIDv7: the time in milliseconds, then random bits (uuid.uuid7 is Python 3.14)."""
-    b = bytearray(int(time.time() * 1000).to_bytes(6, "big") + secrets.token_bytes(10))
-    b[6] = (b[6] & 0x0F) | 0x70
-    b[8] = (b[8] & 0x3F) | 0x80
-    return uuid.UUID(bytes=bytes(b))
-
-
-#: Processes of one program on one host that each keep their own identity by default.
-SLOTS = 16
+def _setup_os() -> int:
+    """This operating system, as Setup names it."""
+    if sys.platform == "win32":
+        return setup.OS_WINDOWS
+    if sys.platform == "darwin":
+        return setup.OS_MACOS
+    return setup.OS_UNIX
 
 
 def program_name(argv=sys.argv) -> str:
@@ -160,95 +128,59 @@ def _lock(fd: int) -> bool:
         return False
 
 
-def default_state_dir(env=os.environ, argv=sys.argv) -> tuple[Path, int] | None:
-    """Without OTEL_OPAMP_STATE_DIR: a state directory of the user's own, so an instance keeps its
-    UID across restarts with no setup (docs/default-state-dir.md). One per program, service and
-    working directory; a slot in it per process running at once, each held by a lock. The directory
-    and its lock's descriptor, or None where there's none to be had (no home, not writable, every
-    slot taken): then each start is a new instance, as before."""
-    if sys.platform == "win32":
-        base = env.get("LOCALAPPDATA")
-    elif sys.platform == "darwin":
-        base = env.get("HOME") and str(Path(env["HOME"]) / "Library" / "Application Support")
-    else:
-        base = env.get("XDG_STATE_HOME") or (env.get("HOME") and str(Path(env["HOME"]) / ".local" / "state"))
-    if not base:
-        return None
-    attrs = dict(a.split("=", 1) for a in env.get("OTEL_RESOURCE_ATTRIBUTES", "").split(",") if "=" in a)
-    attrs = {k.strip(): unquote(v.strip()) for k, v in attrs.items()}
-    service = env.get("OTEL_SERVICE_NAME", "").strip() or attrs.get("service.name", "") or program_name(argv)
-    try:
-        cwd = os.getcwd()
-    except OSError:
-        cwd = ""
-    key = "\0".join([service, attrs.get("service.namespace", ""), program_name(argv), cwd])
-    name = re.sub(r"[^A-Za-z0-9._-]+", "_", service)[:64] or "service"
-    home = Path(base) / "opamp" / f"{name}-{hashlib.sha256(key.encode()).hexdigest()[:8]}"
-    for slot in range(1, SLOTS + 1):
-        d = home / str(slot)
+def slot(slots, all_taken: str) -> tuple[Path, int] | None:
+    """The first of the default state directory's slots (docs/default-state-dir.md, as the core's
+    Setup names them) this process can make and lock, and its lock's descriptor, held until the
+    process ends; None where there's none to be had (not writable, every slot taken: all_taken is
+    the line to say then): each start is then a new instance. Never an error."""
+    for name in slots:
+        d = Path(name)
         try:
             d.mkdir(mode=0o700, parents=True, exist_ok=True)
-            fd = os.open(d / "lock", os.O_RDWR | os.O_CREAT, 0o600)
+            fd = os.open(d / setup.LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
         except OSError as e:
             _log.debug("OpAMP: no state directory of its own (%s): each start is a new instance", e)
             return None
         if _lock(fd):
             return d, fd
         os.close(fd)
-    _log.info("OpAMP: %d processes of %s already keep their identity here: this one is a new instance "
-              "each start", SLOTS, service)
+    if slots:
+        _log.info("OpAMP: %s", all_taken)
     return None
 
 
-def chosen_uid(env) -> uuid.UUID | None:
-    """The service.instance.id OTEL_RESOURCE_ATTRIBUTES gives, if it is a UUID: the instance UID
-    the application chose. None otherwise: it isn't one, or there is none."""
-    for a in env.get("OTEL_RESOURCE_ATTRIBUTES", "").split(","):
-        key, _, value = a.partition("=")
-        if key.strip() == _INSTANCE_ID:
-            try:
-                return uuid.UUID(unquote(value.strip()))
-            except ValueError:
-                return None
-    return None
-
-
-def where(endpoint: str) -> str:
-    """The endpoint as it is safe to log: no user info, query or fragment."""
+def shown_endpoint(endpoint: str, otherwise: str) -> str:
+    """An endpoint as it is safe to log (no user info, query or fragment), as the core shows it;
+    ``otherwise`` if the core can't say."""
     try:
-        u = urlsplit(endpoint)
-    except ValueError:  # an unclosed IPv6 bracket
-        u = None
-    if u is None or not u.scheme or not u.netloc:
-        return endpoint.split("?", 1)[0].split("#", 1)[0].rsplit("@", 1)[-1]
-    # The host and port as written: parsing the port would raise on a bad one.
-    return f"{u.scheme}://{u.netloc.rsplit('@', 1)[-1]}{u.path}"
+        return setup.start(setup.SetupStart(code=setup.SetupInCode(endpoint=endpoint))).shown_endpoint or otherwise
+    except CoreError:
+        return otherwise
 
 
-def hint(status: int | None, endpoint_from: str = "OTEL_OPAMP_ENDPOINT",
-         headers_from: str = "OTEL_OPAMP_HEADERS") -> str:
-    """What to check when the server can't be reached, by what went wrong. It names what gave the
-    endpoint and the headers: the argument given in code, else the variable."""
+def hint(hints: setup.SetupHints, status: int | None) -> str:
+    """What to check when the server can't be reached, by what went wrong, as the core words it:
+    it names what gave the endpoint and the headers, the argument given in code or the variable."""
     if status in (401, 403):
-        return f"the server refused this agent's credentials: check {headers_from} (Authorization=Bearer <token>)"
+        return hints.refused
     if status == 404:
-        return f"nothing serves OpAMP at that path: check {endpoint_from} (it usually ends in /v1/opamp)"
+        return hints.not_found
     if status is None:
-        return f"check {endpoint_from} and that the server is up"
-    return "the server answered with an error"
+        return hints.unreachable
+    return hints.error
 
 
 class Reachability:
     """Says when the client connects, when it can't (once a run of failures, with what to check),
     and when it's back: setup that works or doesn't is never silent."""
 
-    def __init__(self, endpoint: str, service: str = "", uid: uuid.UUID | None = None,
-                 endpoint_from: str = "OTEL_OPAMP_ENDPOINT", headers_from: str = "OTEL_OPAMP_HEADERS") -> None:
-        self.endpoint = where(endpoint)  # the configured one
+    def __init__(self, shown: str, service: str = "", uid: uuid.UUID | None = None,
+                 hints: setup.SetupHints | None = None) -> None:
+        self.endpoint = shown  # the configured one, as it is safe to log
         #: The endpoint the client uses now, as the client gives it (None, or None from it: the
         #: configured one): after the server moved the agent, the one it moved it to.
         self.in_use: Callable[[], str | None] | None = None
-        self.endpoint_from, self.headers_from = endpoint_from, headers_from
+        self.hints = hints if hints is not None else setup.SetupHints()
         self.service = service
         self.uid = uid
         self.ever = False
@@ -257,7 +189,7 @@ class Reachability:
     def at(self) -> str:
         """The endpoint the client uses now, as it is safe to log."""
         e = self.in_use() if self.in_use is not None else None
-        return where(e) if e else self.endpoint
+        return shown_endpoint(e, self.endpoint) if e else self.endpoint
 
     def notified(self, n: Notification) -> None:
         endpoint = self.at()
@@ -272,8 +204,7 @@ class Reachability:
             if not self.failing:
                 why = n.detail or f"HTTP {n.status}"
                 _log.warning("OpAMP: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its "
-                             "current settings meanwhile", endpoint, why,
-                             hint(n.status, self.endpoint_from, self.headers_from))
+                             "current settings meanwhile", endpoint, why, hint(self.hints, n.status))
             else:
                 _log.debug("OpAMP: still can't reach %s: %s", endpoint, n.detail)
             self.failing = True
@@ -281,7 +212,8 @@ class Reachability:
 
 @dataclass
 class Setup:
-    """Where the server is, from OTEL_OPAMP_*; None when the package is off."""
+    """Where the server is, from OTEL_OPAMP_*, as the core's Setup decides it; None when the
+    package is off."""
 
     endpoint: str
     headers: dict[str, str] = field(default_factory=dict)
@@ -289,10 +221,11 @@ class Setup:
     heartbeat_ms: int = 0
     #: The lock on the default state directory, held while the process runs.
     state_lock: int | None = None
-    #: What gave the endpoint and the headers, the argument or the variable: the warning when the
-    #: server can't be reached names it.
-    endpoint_from: str = "OTEL_OPAMP_ENDPOINT"
-    headers_from: str = "OTEL_OPAMP_HEADERS"
+    #: The endpoint as it is safe to log.
+    shown: str = ""
+    #: What to check when the server can't be reached, naming what gave the endpoint and the
+    #: headers, the argument or the variable.
+    hints: setup.SetupHints = field(default_factory=setup.SetupHints)
 
     @staticmethod
     def from_env(env=os.environ, *, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
@@ -300,74 +233,81 @@ class Setup:
                  heartbeat_interval: timedelta | float | str | None = None) -> Setup | None:
         """The keyword arguments are what the application gave in code: each one given wins over
         its variable, and a blank one is not given. One it can't use is warned about and is the
-        default, as a variable it can't read is: it never stops the application."""
+        default, as a variable it can't read is: it never stops the application. The rules are the
+        core's (its Setup call), the same in every language; what is here is the I/O: reading the
+        variables, taking a slot of the default state directory, and saying the warnings."""
+        env = {name: env[name] for name in _SETUP_VARIABLES if env.get(name)}
+        code = setup.SetupInCode(endpoint_name="the endpoint given to configure()",
+                                 headers_name="the headers given to configure()", heartbeat_name="heartbeat_interval")
         if endpoint is not None and not isinstance(endpoint, str):
             _log.warning("OpAMP: endpoint should be a string, not %s: this SDK is not managed",
                          type(endpoint).__name__)
             return None
-        endpoint = (endpoint or "").strip() or None  # blank: not given
-        named = "OTEL_OPAMP_ENDPOINT" if endpoint is None else "endpoint"
-        endpoint = endpoint or env.get("OTEL_OPAMP_ENDPOINT", "").strip()
-        if not endpoint:
-            return None
-        scheme = endpoint.partition("://")[0].lower() if "://" in endpoint else None
-        if scheme is None:
-            _log.warning("OpAMP: %s %r has no scheme, so it is taken as http://; "
-                         "name it in full, as https://host/v1/opamp or wss://host/v1/opamp", named, where(endpoint))
-            endpoint = f"http://{endpoint}"  # as the warning says: the client refuses it without one
-        elif scheme not in ("http", "https", "ws", "wss"):
-            _log.warning("OpAMP: %s %r is not http(s):// or ws(s)://, so the client can't reach it",
-                         named, where(endpoint))
+        if endpoint is not None:
+            code.endpoint = endpoint
         if headers is not None and not (isinstance(headers, Mapping) and all(
                 isinstance(k, str) and isinstance(v, str) for k, v in headers.items())):
             # Not the values: they may be secrets.
             _log.warning("OpAMP: headers should map names to values, all strings: none are sent")
             headers = {}
-        setup = Setup(endpoint, dict(headers) if headers is not None else _headers(env.get("OTEL_OPAMP_HEADERS", "")),
-                      endpoint_from="OTEL_OPAMP_ENDPOINT" if named != "endpoint" else "the endpoint given to configure()",
-                      headers_from="OTEL_OPAMP_HEADERS" if headers is None else "the headers given to configure()")
-        heartbeat = env.get("OTEL_OPAMP_HEARTBEAT_INTERVAL", "").strip()
+        if headers is not None:
+            code.headers_given = True
+            code.headers.extend(setup.Header(name=k, value=v) for k, v in headers.items())
+        heartbeat_in_code = False
         if isinstance(heartbeat_interval, str):
-            # "30s", as the variable; blank: not given.
-            heartbeat, named_heartbeat = heartbeat_interval.strip() or heartbeat, "heartbeat_interval"
-            if heartbeat_interval.strip() == "":
-                named_heartbeat = "OTEL_OPAMP_HEARTBEAT_INTERVAL"
-            heartbeat_interval = None
-        else:
-            named_heartbeat = "OTEL_OPAMP_HEARTBEAT_INTERVAL"
-        if heartbeat_interval is not None:
+            # "30s", read as the variable is; blank: not given.
+            if heartbeat_interval.strip():
+                env["OTEL_OPAMP_HEARTBEAT_INTERVAL"] = heartbeat_interval
+                heartbeat_in_code = True
+        elif heartbeat_interval is not None:
             seconds = (heartbeat_interval.total_seconds() if isinstance(heartbeat_interval, timedelta)
                        else heartbeat_interval)
-            if (isinstance(seconds, (int, float)) and not isinstance(seconds, bool)
-                    and 0 < seconds * 1000 <= 2**53 - 1):  # NaN fails too
-                setup.heartbeat_ms = max(1, round(seconds * 1000))
+            if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and math.isfinite(seconds):
+                ms = seconds * 1000
+                # Less than a millisecond is one; more than the core takes is more than a day.
+                code.heartbeat_ms = max(1, round(min(ms, 2**53))) if ms > 0 else round(max(ms, -2**53))
             else:
-                _log.warning("OpAMP: heartbeat_interval %r is not a positive duration: using the default, 30s",
+                _log.warning("OpAMP: heartbeat_interval %r is not a positive duration: using the default",
                              heartbeat_interval)
-        elif heartbeat:
-            # One it can't read is the client's default: it warns, and holds nothing up.
-            try:
-                setup.heartbeat_ms = duration_ms(heartbeat)
-            except ValueError:
-                _log.warning("OpAMP: %s %r is not a duration (as 1500, 500ms, 30s or 2m): using the default, "
-                             "30s", named_heartbeat, heartbeat)
+                env.pop("OTEL_OPAMP_HEARTBEAT_INTERVAL", None)  # displaced, as a bad variable is the default
         given_dir = os.fspath(state_dir) if isinstance(state_dir, os.PathLike) else state_dir
-        state_dir_var = env.get("OTEL_OPAMP_STATE_DIR", "")
         if given_dir is not None and not isinstance(given_dir, str):
             _log.warning("OpAMP: state_dir should be a path, not %s: using the default", type(state_dir).__name__)
-            given_dir, state_dir_var = None, ""
-        state_dir = (given_dir or "").strip() or state_dir_var.strip()
-        if state_dir.lower() == "none":
-            pass
-        elif state_dir:
-            setup.state_dir = Path(state_dir)
-        elif chosen_uid(env) is None:
-            # A service.instance.id the application chose stays its choice: no default to override
-            # it. One that isn't a UUID can't be the instance UID: it is replaced, by a UID kept here.
-            claimed = default_state_dir(env)
+            env.pop("OTEL_OPAMP_STATE_DIR", None)
+        elif given_dir is not None:
+            code.state_dir = given_dir
+        try:
+            cwd = os.getcwd()
+        except OSError:
+            cwd = ""
+        start = setup.SetupStart(env=[setup.Variable(name=k, value=v) for k, v in env.items()], os=_setup_os(),
+                                 program=program_name(), cwd=cwd, code=code)
+        try:
+            started = setup.start(start)
+        except CoreError as e:
+            _log.error("OpAMP: the core could not read the settings; the SDK runs unmanaged: %s", e)
+            return None
+        for warning in started.warnings:
+            if heartbeat_in_code and warning.startswith("OTEL_OPAMP_HEARTBEAT_INTERVAL "):
+                # The string given in code, read as the variable: named as given.
+                warning = "heartbeat_interval" + warning[len("OTEL_OPAMP_HEARTBEAT_INTERVAL"):]
+            _log.warning("OpAMP: %s", warning)
+        if started.off:
+            return None
+        scheme = started.endpoint.partition("://")[0].lower()
+        if scheme not in ("http", "https", "ws", "wss"):
+            named = "OTEL_OPAMP_ENDPOINT" if not (endpoint or "").strip() else code.endpoint_name
+            _log.warning('OpAMP: %s "%s" is not http(s):// or ws(s)://, so the client can\'t reach it',
+                         named, started.shown_endpoint)
+        out = Setup(started.endpoint, {h.name: h.value for h in started.headers},
+                    heartbeat_ms=started.heartbeat_interval_ms, shown=started.shown_endpoint, hints=started.hints)
+        if started.state_dir:
+            out.state_dir = Path(started.state_dir)
+        else:
+            claimed = slot(started.default_slots, started.all_slots_taken)
             if claimed is not None:
-                setup.state_dir, setup.state_lock = claimed
-        return setup
+                out.state_dir, out.state_lock = claimed
+        return out
 
 
 @dataclass(frozen=True)
@@ -1083,20 +1023,29 @@ class Agent:
         state directory; else a new one, saved there; else, where none can be kept (no state
         directory, or one it can't be saved in), a UUID service.instance.id given in
         OTEL_RESOURCE_ATTRIBUTES, which is the same at every start; else a new one."""
-        path = self.setup.state_dir / "instance-uid" if self.setup and self.setup.state_dir else None
+        directory = self.setup.state_dir if self.setup else None
+        path = directory / setup.UID_FILE if directory is not None else None
+        saved = ""
         if path is not None:
             try:
-                return uuid.UUID(path.read_text().strip())
-            except (OSError, ValueError):
+                saved = path.read_text()
+            except (OSError, ValueError):  # UnicodeDecodeError is one
                 pass
-            made = uuid7()
+        identity = setup.SetupIdentity(state_dir=path is not None, saved=saved,
+                                       resource_attributes=env.get("OTEL_RESOURCE_ATTRIBUTES", ""),
+                                       entropy=secrets.token_bytes(16), unix_ms=int(time.time() * 1000))
+        try:
+            got = setup.identify(identity)
+        except CoreError as e:
+            _log.error("OpAMP: the core could not make an instance UID: %s", e)
+            return uuid.uuid4()
+        if got.save and path is not None:
             try:
-                save_state(str(path), str(made).encode())
-                return made
+                save_state(str(path), got.text.encode())
             except OSError as e:
                 _log.warning("OpAMP: can't save the instance UID: %s", e)
-        chosen = chosen_uid(env)
-        return chosen if chosen is not None else uuid7()
+                return uuid.UUID(bytes=got.unsaved_uid)
+        return uuid.UUID(bytes=got.instance_uid)
 
     def _endpoint_in_use(self) -> str | None:
         """The endpoint the client uses now, if a client runs. (The client is read once: a stop
@@ -1144,8 +1093,8 @@ class Agent:
                         # Python mode, asked for by name: the client's requests go through aiohttp,
                         # which is what the suppressed context below keeps out of the traces.
                         mode="python")
-        self.reachability = Reachability(s.endpoint, str(resource.attributes.get("service.name", "")), self.uid,
-                                         s.endpoint_from, s.headers_from)
+        self.reachability = Reachability(s.shown, str(resource.attributes.get("service.name", "")), self.uid,
+                                         s.hints)
         self.reachability.in_use = self._endpoint_in_use
         with self._lock:
             first = self._export_health()  # the first report is always sent: with the agent's first message
@@ -1388,7 +1337,7 @@ class Agent:
         self.uid = uid
         if self.setup is not None and self.setup.state_dir is not None:
             try:
-                save_state(str(self.setup.state_dir / "instance-uid"), str(uid).encode())
+                save_state(str(self.setup.state_dir / setup.UID_FILE), str(uid).encode())
             except OSError as e:
                 _log.warning("OpAMP: can't save the instance UID the server assigned: %s", e)
         _log.info("OpAMP: the server named this instance %s; service.instance.id changes at the next start", uid)
