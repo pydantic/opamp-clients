@@ -61,7 +61,7 @@ message is `uid_kept_across_crash`'s to judge.
 | `converges_when_quiet` | at the end of every quiet stretch, the server holds the application's latest status, even after a restart that lost it |
 | `alive_when_quiet` | once quiet, the client talks to the server at least every two heartbeat intervals |
 | `no_storm` | connections plus messages stay under 40 in any 10 s, however the server misbehaves |
-| `calm_when_quiet` | once quiet, about one message per heartbeat interval (at most two, and three more, in each window's checked part), however the server answers: one that asks for the full state in every answer gets no message per round trip (#81) |
+| `calm_when_quiet` | once quiet, about one message per heartbeat interval (at most two, and three more, in each window's checked part), however the server answers: one that asks for the full state in every answer gets no message per round trip |
 | `resources_bounded` | memory, open files and threads in the last third of the run are not far above the first (below); a JVM's memory is judged as the heap after a GC and its non-heap memory, a .NET client's as the GC heap live after a forced GC and its non-GC memory |
 | `server_config_converges` | (Rust server) at the end of every quiet stretch, the server knows the agent runs the config it wanted |
 | `uid_kept_across_crash` | after a crash, the client's first message carries the instance UID its last one did, or one the server assigned it since: never a new one, nor one it had given up for an assigned one |
