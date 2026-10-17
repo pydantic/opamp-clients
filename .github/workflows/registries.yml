@@ -214,6 +214,7 @@ jobs:
             echo "::notice::NuGet not enabled (SDK_REGISTRIES): nothing uploaded"; exit 0
           fi
           [ -n "$NUGET_API_KEY" ] || { echo "::error::the nuget environment has no NUGET_API_KEY"; exit 1; }
-          for pkg in sdk/native/nuget/*.Core.Native.*.nupkg sdk/native/nuget/*.Client.*.nupkg sdk/sdk/nuget/*.nupkg; do
+          for pkg in sdk/native/nuget/*.Core.Native.*.nupkg sdk/native/nuget/*.Client.*.nupkg \
+            sdk/native/nuget/*.Extensions.Hosting.*.nupkg sdk/sdk/nuget/*.nupkg; do
             dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
           done

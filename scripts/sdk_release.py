@@ -32,9 +32,13 @@ VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 PYPROJECTS = ["python/pyproject.toml", "python/core/pyproject.toml", "python/otel/pyproject.toml"]
 PACKAGE_JSONS = ["node/opamp/package.json", "node/otel/package.json"]
 POMS = ["java/opamp/pom.xml", "java/opamp-javaagent/pom.xml"]
+# The jars a pom builds beside its main one, by classifier: the agent extension's app-settings jar
+# is what applications compile against (dev.pydantic.opamp.AppSettings).
+CLASSIFIERS = {"java/opamp-javaagent/pom.xml": ["app-settings"]}
 CSPROJS = ["dotnet/Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj",
            "dotnet/Pydantic.OpAmp.Core.Native/Pydantic.OpAmp.Core.Native.csproj",
-           "dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj"]
+           "dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj",
+           "dotnet/Pydantic.OpAmp.Extensions.Hosting/Pydantic.OpAmp.Extensions.Hosting.csproj"]
 
 # What a package of ours must never hold: the cores' Rust sources and manifests.
 SOURCE = (".rs", "Cargo.toml", "Cargo.lock")
@@ -92,7 +96,7 @@ def run(cmd: list[str], cwd: Path) -> None:
 
 def pack() -> None:
     """The libraries native_dist.py doesn't make, into dist/sdk: the Python otel wheel, the npm
-    tarballs, the Maven jars (with their poms) and the .NET plugin."""
+    tarballs, the Maven jars (with their poms and the app-settings jar) and the .NET plugin."""
     for sub in ("wheels", "npm", "maven", "nuget"):
         (DIST / sub).mkdir(parents=True, exist_ok=True)
     run([sys.executable, "-m", "pip", "wheel", "--quiet", "--no-deps", "-w", str(DIST / "wheels"), "python/otel"], ROOT)
@@ -108,8 +112,10 @@ def pack() -> None:
         if found is None:
             sys.exit(f"sdk_release.py: {rel}: no artifactId and version")
         name = f"{found[1]}-{found[2]}"
-        # The jar Maven publishes, beside its pom (the shaded one, for the agent extension).
-        (DIST / "maven" / f"{name}.jar").write_bytes(((ROOT / rel).parent / "target" / f"{name}.jar").read_bytes())
+        # The jar Maven publishes, beside its pom (the shaded one, for the agent extension), and
+        # its classified ones.
+        for jar in [f"{name}.jar", *(f"{name}-{c}.jar" for c in CLASSIFIERS.get(rel, []))]:
+            (DIST / "maven" / jar).write_bytes(((ROOT / rel).parent / "target" / jar).read_bytes())
         (DIST / "maven" / f"{name}.pom").write_text(pom)
     run(["dotnet", "pack", CSPROJS[2], "-c", "Release", "--nologo", "-p:IsPackable=true", "-o", str(DIST / "nuget")],
         ROOT)
@@ -130,7 +136,7 @@ def check(dist: Path = DIST, native: Path = NATIVE) -> list[str]:
             "npm tarballs": list(dist.glob("npm/*.tgz")),
             "Maven jars": list(dist.glob("maven/*.jar")),
             "NuGet packages": [*native.glob("nuget/*.nupkg"), *dist.glob("nuget/*.nupkg")]}
-    minimum = {"PyPI wheels": 3, "npm tarballs": 2, "Maven jars": 2, "NuGet packages": 3}
+    minimum = {"PyPI wheels": 3, "npm tarballs": 2, "Maven jars": 3, "NuGet packages": 4}
     problems = [f"{len(got)} {kind}, not at least {minimum[kind]}" for kind, got in want.items()
                 if len(got) < minimum[kind]]
     problems += [f"{p.name}: a source distribution" for p in [*native.glob("wheels/*.tar.gz"), *dist.glob("wheels/*.tar.gz")]]
