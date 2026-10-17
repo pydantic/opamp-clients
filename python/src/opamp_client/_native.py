@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The shared core and the SDK settings layer, compiled (a native library), through their C
 interface: protobuf bytes in and out, as their WebAssembly modules take and answer them.
 

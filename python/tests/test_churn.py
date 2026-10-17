@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """A client started and stopped again and again in one process leaves nothing behind: an agent
 that reconfigures its client runs for months, starting a new one each time. Each test churns
 clients through one way of stopping, in both modes and over both transports, then counts what the

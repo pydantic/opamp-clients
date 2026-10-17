@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Makes the certificates TransportTest uses, once (they last a century): a CA, a server
 # certificate it signed (127.0.0.1 and localhost), a client certificate it signed, and a second CA

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Properties of the client around the core, over random plans (Hypothesis): the application's
 calls, some made from inside the notification callback (so they reach the client while it is
 still carrying out the step that called back), others from the event loop, over either

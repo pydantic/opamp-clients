@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """A seeded asyncio event loop for schedule-exploring tests, and an in-memory network.
 
 ``SeededLoop`` is a selector event loop whose

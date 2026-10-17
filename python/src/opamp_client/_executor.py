@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Carries out the core's effects with aiohttp and reports what happened as inputs, each naming
 the effect it belongs to. It decides nothing about OpAMP and keeps no time of its own: the core
 builds every request and reads every response, gives each effect its deadline, and cancels what

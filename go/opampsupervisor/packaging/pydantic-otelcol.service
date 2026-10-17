@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # The bundled collector on its own, unmanaged: pydantic-otelcol-configure writes its config and
 # encrypted token below. It and the Supervisor (which runs the same collector, managed) conflict.

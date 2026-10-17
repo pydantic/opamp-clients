@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # The crash scenarios on a real file system that loses what wasn't flushed: builds the image
 # of this directory (LazyFS and one toolchain per runtime), checks that a container may mount FUSE,

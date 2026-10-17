@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The shell's async edges under fast-check's scheduler: every platform call the client makes
 // (fetch, the WebSocket, the TCP sockets of Rust mode, and the file functions) goes to a fake whose

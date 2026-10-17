@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The client's file operations (src/files.ts), in both modes: journaled into the core tap as the
 // tap checker expects (its file records), off the event loop, and never on a file left by another

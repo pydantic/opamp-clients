@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Makes the certificates the TLS tests use (checked in; test only, valid for 100 years):
 #   ca.pem             the CA the client is told to trust

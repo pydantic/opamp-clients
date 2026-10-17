@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The file operations the client carries out for its core: a save's recipe and a download's
 file go through a `Files`, the real file system by default; with the core tap on, a `Journal`
 wraps it and records each operation that succeeded in the tap (kind 5, the checker's

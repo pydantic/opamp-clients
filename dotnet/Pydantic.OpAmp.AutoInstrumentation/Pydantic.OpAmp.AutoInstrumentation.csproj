@@ -11,6 +11,7 @@
     <Description>A plugin for OpenTelemetry .NET automatic instrumentation: the SDK under an OpAMP server</Description>
     <IsPackable>false</IsPackable>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>

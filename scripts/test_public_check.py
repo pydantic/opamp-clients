@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """scripts/public_check.py's rules."""
 from __future__ import annotations
 

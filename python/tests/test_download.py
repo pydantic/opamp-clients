@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Package downloads: every response written and hashed, whatever its status; no redirect
 followed, a redirect's Location resolved by urllib.parse; nothing left when one fails or is
 cancelled."""

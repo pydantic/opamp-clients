@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for collector_release.py: the pins it finds, the disagreements it refuses, and the newest
 contrib tag it reads. These tests need no network.
 

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """A .NET client's memory, as resources_bounded judges it.
 
 A container's memory is a poor measure of a .NET process's. The runtime sizes gen0's budget from

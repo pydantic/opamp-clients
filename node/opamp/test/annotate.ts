@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // A failing test that says, on a line of its own, how to replay it: a GitHub Actions error
 // annotation (`::error title=...::...`), which the run's summary shows without its log. The long

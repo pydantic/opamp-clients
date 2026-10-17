@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The native core for Linux, for a .NET build that runs in Docker: the conformance suite's .NET
 driver, examples/dotnet-otel.
 

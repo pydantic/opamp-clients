@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The settings that match telemetry, debug mode and export health, on the package's real sampler,
 gates and agent: the shared vectors (testdata/sdk-settings) run through them, then each
 setting's edge cases from docs/sdk-settings.md."""

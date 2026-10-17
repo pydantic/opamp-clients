@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Controls under fire: one thread puts a seeded run of settings documents in force as fast as it
 can while worker threads emit spans (roots and children, with attributes, events and links) and
 log records through the real SDK pipeline (batch processors, the package's gates, in-memory

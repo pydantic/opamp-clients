@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """A key of the agent's own (docs/connection-settings.md): with a state directory the agent says it
 takes OpAMP connection settings, takes the key the server offers, says APPLIED on it, and keeps it
 for the next start; without one it says nothing of the kind."""

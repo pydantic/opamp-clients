@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """What a client of ours sent and read over WebSocket, in its own order, from its core tap.
 
 The server's log says when it read a message and wrote an answer; under a slow proxy that says

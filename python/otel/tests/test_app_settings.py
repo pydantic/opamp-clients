@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The application's own settings (docs/app-settings.md): what ``opamp_otel.app_settings`` gives the
 application to read, on its own and through the agent and the layer, with the shared vectors
 (testdata/sdk-settings/custom.json)."""

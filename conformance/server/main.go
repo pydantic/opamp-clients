@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Command server is the reference OpAMP server for the conformance suite. It speaks plain HTTP
 // and WebSocket on /v1/opamp, applies the faults of a scenario, and writes every frame and

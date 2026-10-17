@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The adversary's raw server (adversary.raw.ts) by itself: it does what its first line says, and
 // tells what it saw of a connection. The

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The upstream Collector release that the collector extension and the Supervisor are forked from.
 
     scripts/collector_release.py pins       # every pin names one release (offline)

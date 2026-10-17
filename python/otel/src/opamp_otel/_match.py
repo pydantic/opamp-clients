@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The matchers the settings that match telemetry run, once per span or log record: too often to
 call into the SDK settings layer, so each language has its own, held to the layer's reference
 matchers (the SDK settings core's rules) by the shared test vectors

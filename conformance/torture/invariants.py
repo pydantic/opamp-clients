@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """What must hold across a whole torture run, however hostile the network and the server.
 
 The conformance checks (runner/checks.py) look at one fault at a time. These look at hours of

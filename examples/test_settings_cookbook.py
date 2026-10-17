@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The policies in examples/settings against their README and the controls' table: each file is a
 whole Logfire SDK policy (the first four controls alone where it overrides only those), the README names
 each and shows it as it is, and between them the files override every control.

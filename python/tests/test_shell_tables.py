@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The shells' shared tables (tests/shell-tables at the repository root): the URLs the core
 accepts, read and sent alike by this client's HTTP stack; the proxy the environment names for a
 destination; and the TLS settings an application can give. Where this client differs from the

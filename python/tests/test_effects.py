@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Effects end when the core says: each kind of cancel drops what it names at once and nothing
 more about it is reported; a close is reported when its handshake is done; stop returns when the
 core says it has stopped."""

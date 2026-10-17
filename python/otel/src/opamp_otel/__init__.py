@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """OpenTelemetry auto-instrumentation under an OpAMP server.
 
 Installed next to ``opentelemetry-instrument``, this package puts the SDK it sets up under the

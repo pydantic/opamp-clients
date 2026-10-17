@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Rust mode's byte-stream glue (src/opamp_client/_streams.py) over random plans (Hypothesis),
 on fake transports so every cut is the plan's: the peer's bytes arrive in pieces cut anywhere
 (some before the core has heard the stream is open, or its TLS up), the core's writes are split

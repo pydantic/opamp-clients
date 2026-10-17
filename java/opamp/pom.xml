@@ -12,7 +12,8 @@
   <url>https://github.com/pydantic/opamp-clients</url>
   <licenses>
     <license>
-      <name>All rights reserved</name>
+      <name>MIT License</name>
+      <url>https://opensource.org/license/mit</url>
     </license>
   </licenses>
 

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Servers for the TLS and proxy tests: an OpAMP server (plain or TLS, over HTTP and WebSocket)
 that records how each message arrived, an HTTP proxy and a SOCKS5 proxy, both logging what they
 were asked for."""

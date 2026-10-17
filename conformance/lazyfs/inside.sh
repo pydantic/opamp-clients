@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # In the LazyFS container (run.sh): the repository (mounted read-only at /src) copied to /work,
 # the drivers built natively, and the crash scenarios run with every state file on a LazyFS mount

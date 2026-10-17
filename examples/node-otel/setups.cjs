@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The setups check_truth runs app.cjs and app.mjs under (examples/integrations.py): what an
 // application does beside the SDK the register built, named in EXAMPLE_SETUP (comma-separated).

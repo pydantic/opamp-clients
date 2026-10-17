@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Stops the Supervisor before an upgrade replaces its files; postinstall starts it again.
 launchctl bootout system/dev.pydantic.opamp-supervisor 2>/dev/null || true

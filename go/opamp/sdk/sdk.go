@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Package sdk decides what an OpenTelemetry SDK does with the settings an OpAMP server sends it,
 // the same way in every language: the SDK settings layer (a WebAssembly module, checked in

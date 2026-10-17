@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // How the client reaches the server: the TLS it trusts and presents, and the proxy it goes
 // through. One Transport is built from one set of options, and gives an undici dispatcher (for

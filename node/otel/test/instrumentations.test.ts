@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Upstream's instrumentations, switched while they run: http and undici (fetch) as
 // getNodeAutoInstrumentations loads them, in this process, on an SDK tracer provider, switched by

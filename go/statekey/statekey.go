@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Package statekey encrypts an OpAMP client's state file (opamp.Config.StateSealer) under a key
 // the operating system keeps: the state holds the credentials a server issued, and this keeps

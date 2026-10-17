@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Runs the upstream Python OpAMP client (opentelemetry-opamp-client) under the conformance driver
 contract (conformance/DRIVERS.md). HTTP only: the client has no WebSocket transport.
 

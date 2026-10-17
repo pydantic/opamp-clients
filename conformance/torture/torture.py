@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Torture one OpAMP client for a long time, on a seeded schedule of faults, and check it held up.
 
     uv run --no-project --with psutil conformance/torture/torture.py --client go-core --transport ws

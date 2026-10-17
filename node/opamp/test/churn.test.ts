@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Lifecycle churn: an agent that reconfigures its client stops it and starts another, again and
 // again, in one process. Whatever a start leaves behind when its client stops (a core instance, a

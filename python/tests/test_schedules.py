@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The shell's schedules: a Hypothesis state machine driving one client, in Python mode
 (aiohttp, faked: tests/_sched_world.py) and in Rust mode (the core's own HTTP and WebSocket, over
 the in-memory network), on a seeded event loop (tests/_sched_loop.py) whose task order comes from

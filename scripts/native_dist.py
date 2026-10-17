@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The native core for every platform it ships to: the libraries the .NET package carries, and the
 Python wheels (pydantic-opamp-core, one per platform holding just the library, and
 pydantic-opamp-client, pure Python), on one Linux x64 machine, then checked and run where they will

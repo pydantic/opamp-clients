@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Rust mode's sockets and files (src/streams.ts): download files written off the event loop, in
 // order, hashed over exactly what was written, answered once (or not at all after a discard or a

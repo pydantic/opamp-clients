@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The Atheris targets (tests/fuzz/fuzz_*.py) on their seeds and on every input kept under
 tests/fuzz/crashes/<target>/: what a fuzzer found once is run with every pytest (scripts/py_fuzz.sh
 runs the targets under libFuzzer)."""

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Publishes a Supervisor release as a GitHub Release on its tag: for Linux, macOS and Windows on
 # amd64 and arm64, an archive of the Supervisor and the bundled collector (packaging/archive.sh),

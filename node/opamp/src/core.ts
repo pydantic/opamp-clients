@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The shared OpAMP client core (a WebAssembly module, core/opamp_core.wasm), run in Node's
 // own WebAssembly engine: nothing native to install. Each Core is one module instance, holding

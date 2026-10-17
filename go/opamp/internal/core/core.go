@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Package core runs the shared OpAMP client core (a WebAssembly module, checked in beside this
 // package) in wazero, a WebAssembly runtime written in pure Go: no cgo, nothing to

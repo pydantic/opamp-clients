@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for native_dist.py: what its check refuses (the cores' sources anywhere, a binary in the
 client, a core wheel holding anything but its library), and the core's wheels it writes.
 

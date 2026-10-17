@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Python mode's own CONNECT and SOCKS5 client (``_transport._ProxyConnector``: Rust mode uses
 the core's, proved) against a fake proxy whose answers Hypothesis writes:
 split anywhere, too long, cut short and then closed, reset or left hanging, malformed (a status

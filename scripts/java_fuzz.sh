@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Jazzer (libFuzzer for the JVM) on the Java client's own code around the core: each target in
 # java/opamp/src/test/java (ClientFuzz, CoreFuzz), one after another, for SECONDS each. A target's

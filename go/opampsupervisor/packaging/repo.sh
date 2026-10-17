@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Adds the packages build.sh made (dist/*.deb, dist/*.rpm) to an apt and a yum repository in
 # REPO_DIR, and signs both with the OpenPGP key in SIGNING_KEY_FILE (armored, secret):

@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Helpers for the tests of the client's file operations (files.test.ts, files.properties.test.ts):
 // a disk that fails or is slow (FileOps around the real one), the core tap decoded, the tap

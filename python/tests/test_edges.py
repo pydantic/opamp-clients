@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Edges of the client's own layer, around the core: headers the application gives that can't be
 sent as given, stop awaited from another thread's event loop, calls after the loop has closed,
 and a state file whose directory isn't there. Each is held the same in both modes."""

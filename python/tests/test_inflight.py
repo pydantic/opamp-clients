@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """InFlight's invariants over seeded random interleavings of starts, results, late connections,
 cancels and close: a result after its cancel is dropped, an effect's last word is delivered once, a
 connection ready after its cancel is dropped at once, nothing starts after close, and close is

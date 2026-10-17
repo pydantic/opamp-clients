@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Fuzz target (Atheris): the Python client's own code around the core, fed by a server whose every
 answer is the fuzzer's and an application whose callback calls the client as the fuzzer says.
 

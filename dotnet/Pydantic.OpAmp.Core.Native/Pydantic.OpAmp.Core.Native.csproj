@@ -13,6 +13,7 @@
     <Version>0.3.0</Version>
     <Description>The shared OpAMP client core for Pydantic.OpAmp.Client, compiled for each platform</Description>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>

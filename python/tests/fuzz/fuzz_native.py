@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Fuzz target (Atheris): the C interface's buffer handling (opamp_client._native and
 opamp_client._core), with any bytes on both sides of it.
 

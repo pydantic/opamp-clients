@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for the checks: every check must pass at least one trace and fail at least one.
 
 A check that cannot fail is as useless as a vacuous TLA+ property, so test_every_check_can_fail

@@ -1,6 +1,6 @@
 <!--
-  Copyright (c) 2026 Bill Easton. All rights reserved.
-  SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+  Copyright (c) 2026 Pydantic Services Inc.
+  SPDX-License-Identifier: MIT
 
   The Windows installer (WiX 5): the Supervisor, the collector it runs and pydantic-opamp-enroll.ps1
   in Program Files\pydantic-opamp, and the pydantic-opamp-supervisor service, run as LocalSystem.

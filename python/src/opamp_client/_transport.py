@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """How the client reaches the server: TLS and a proxy, as the application configures them. The
 core knows nothing of either. Every request, WebSocket and package download goes through a
 connector made here from one `Transport` (an SSL context and a proxy route)."""

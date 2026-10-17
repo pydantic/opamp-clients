@@ -7,7 +7,7 @@ name = "pydantic-opamp-core"
 version = "0.1.0"
 description = "The shared OpAMP client core for pydantic-opamp-client, compiled"
 readme = "README.md"
-license = "LicenseRef-All-Rights-Reserved"
+license = "MIT"
 requires-python = ">=3.11"
 
 [build-system]

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The adversary (testdata/core/opamp_core_adversary.wasm): a hostile core, loaded in place of the real
 one, that hands the client effect sequences the real core never makes and checks every input the
 client feeds back against spec/shell-contract.md. This is the harness and the local server the

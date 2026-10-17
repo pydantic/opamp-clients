@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for redact_mutants.py: the mutants as written, and how one is put in.
 
     python3 -m unittest scripts/test_redact_mutants.py

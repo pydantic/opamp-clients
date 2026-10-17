@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The inventory (docs/node-otel.md#inventory): what the package lists of what it built, as the
 // layer's available components. The names are the ones deactivate_instrumentations takes, and

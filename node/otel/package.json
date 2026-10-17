@@ -2,7 +2,7 @@
   "name": "@pydantic/opamp-otel",
   "version": "0.1.0",
   "description": "OpenTelemetry auto-instrumentation for Node.js under an OpAMP server: node --import @pydantic/opamp-otel/register, and the SDK takes its settings (sampling, what to send and which instrumentations are on, while it runs) from the server",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",

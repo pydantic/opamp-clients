@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The newer settings (docs/node-otel.md#the-settings-that-match-telemetry), each through this
 // package's own sampler and gates: the shared test vectors (testdata/sdk-settings) the

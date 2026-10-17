@@ -3,7 +3,7 @@ name = "pydantic-opamp-client"
 version = "0.1.0"
 description = "An OpAMP client for Python (asyncio), on the shared OpAMP core (Rust, natively)"
 readme = "README.md"
-license = "LicenseRef-All-Rights-Reserved"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.12",  # client middlewares
