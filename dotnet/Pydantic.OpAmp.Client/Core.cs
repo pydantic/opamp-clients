@@ -140,7 +140,7 @@ internal sealed class CoreTap : IDisposable
     /// <summary>
     /// <paramref name="name"/> to append to. It holds the Config's headers and the credentials
     /// saved, so a new file is the user's only (0600, or a list of the user alone), as the state
-    /// file is; one already there is kept as it is.
+    /// file is; one already there is narrowed to 0600 (on Windows it keeps its list).
     /// </summary>
     private static FileStream Append(string name)
     {
@@ -151,7 +151,7 @@ internal sealed class CoreTap : IDisposable
                 StateFile.UserOnlyFile(StateFile.CurrentUser()));
         }
 
-        return new FileStream(name, new FileStreamOptions
+        var stream = new FileStream(name, new FileStreamOptions
         {
             Mode = FileMode.Append,
             Access = FileAccess.Write,
@@ -159,6 +159,8 @@ internal sealed class CoreTap : IDisposable
             BufferSize = 0,
             UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
         });
+        File.SetUnixFileMode(stream.SafeFileHandle, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        return stream;
     }
 
     /// <summary>Append one record: <paramref name="kind"/>, the length, the time, <paramref name="bytes"/>.</summary>

@@ -161,6 +161,18 @@ class CoreTest {
   }
 
   @Test
+  void aTapAlreadyThereIsNarrowedToTheUsersOnly(@TempDir Path dir) throws Exception {
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        dir.getFileSystem().supportedFileAttributeViews().contains("posix"));
+    Path file = dir.resolve("core.tap");
+    Files.write(file, new byte[0]);
+    Files.setPosixFilePermissions(file, java.nio.file.attribute.PosixFilePermissions.fromString("rw-r--r--"));
+    Core.Tap.append(file).close();
+    assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(
+        Files.getPosixFilePermissions(file)));
+  }
+
+  @Test
   void withoutTheVariableThereIsNoTap(@TempDir Path dir) throws Exception {
     CoreProto.Config config = CoreProto.Config.newBuilder().setInstanceUid(uid(7)).setEndpoint("http://server/v1/opamp").build();
     for (String unset : new String[] {null, ""}) {

@@ -1095,7 +1095,7 @@ def key_in_code(variable: str) -> Callable[[str], dict[str, str]]:
     environment that gives it `token`, with OTEL_OPAMP_HEADERS set to the other token (the wrong
     one for the right, and the right one for the wrong), which the code wins over."""
     def key(token: str) -> dict[str, str]:
-        return {variable: token} | key_from_env("example" if token == "wrong" else "wrong")
+        return {variable: token} | key_from_env("example-enrollment-key" if token == "wrong" else "wrong")
     return key
 
 
@@ -1111,7 +1111,7 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
     target_.mkdir(parents=True, exist_ok=True)
     state = Path(tempfile.mkdtemp(prefix="state-setup-", dir=target_))
     state.chmod(0o777)
-    scenario_ = {"server": {"enrollment_key": "example"}}
+    scenario_ = {"server": {"enrollment_key": "example-enrollment-key"}}
     env = env or {}
     ok = True
 
@@ -1138,7 +1138,7 @@ def check_setup(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seco
             return sum(e["event"] == "a2s" for e in events) > 5 and bool(spans(events))
 
         six, again = run_and_restart(launch, scenario_, state, "run6", seconds, listen, target_, until=keyed,
-                                     again=accepted, settle=MARGIN, env=env | key("example"))
+                                     again=accepted, settle=MARGIN, env=env | key("example-enrollment-key"))
         print(f"run 6: {sum(e['event'] == 'a2s' for e in six)} messages, {len(rejected(six))} refused, "
               f"key {'confirmed' if promoted(six) else 'not confirmed'}; the next start: "
               f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")
@@ -1201,7 +1201,7 @@ def check_rotation(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", s
     target_.mkdir(parents=True, exist_ok=True)
     state = Path(tempfile.mkdtemp(prefix="state-rotation-", dir=target_))
     state.chmod(0o777)
-    scenario_ = {"server": {"enrollment_key": "example", "after_promotion": ["rotate", "move"], "move_host": host}}
+    scenario_ = {"server": {"enrollment_key": "example-enrollment-key", "after_promotion": ["rotate", "move"], "move_host": host}}
     env = env or {}
     ok = True
 
@@ -1221,7 +1221,7 @@ def check_rotation(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", s
             return sum(e["event"] == "a2s" for e in events) > 5 and bool(spans(events))
 
         nine, again = run_and_restart(launch, scenario_, state, "rotation", seconds, listen, target_, until=moved,
-                                      again=accepted, settle=MARGIN, env=env | key("example"))
+                                      again=accepted, settle=MARGIN, env=env | key("example-enrollment-key"))
         print(f"the rotation run: {sum(e['event'] == 'key_promoted' for e in nine)} keys confirmed, "
               f"{len(connections(nine, 'second'))} connections to the second listener; the next start: "
               f"{sum(e['event'] == 'a2s' for e in again)} messages, {len(rejected(again))} refused")

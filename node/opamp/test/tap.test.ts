@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -37,6 +37,9 @@ test("the core tap records every crossing, a file per core", () => {
   new Core(config).close();
   assert.equal(existsSync(path), false);
 
+  // A tap file already there, readable by others: it is narrowed to the user's only.
+  writeFileSync(path, "");
+  chmodSync(path, 0o644);
   process.env.OPAMP_CORE_TAP = path;
   try {
     const core = new Core(config);

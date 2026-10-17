@@ -20,7 +20,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.Channels;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -233,12 +235,19 @@ final class Core implements AutoCloseable {
       }
     }
 
-    /** {@code path} to append to: made the user's only if new, as it was if not. */
-    private static OutputStream append(Path path) throws IOException {
+    /**
+     * {@code path} to append to, the user's only: made so if new, and narrowed to 0600 if already
+     * there (where the file system has POSIX permissions).
+     */
+    static OutputStream append(Path path) throws IOException {
       try {
         return Channels.newOutputStream(StateFile.createPrivate(path));
       } catch (FileAlreadyExistsException e) {
-        return new FileOutputStream(path.toFile(), true);
+        FileOutputStream out = new FileOutputStream(path.toFile(), true);
+        if (path.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+          Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
+        }
+        return out;
       }
     }
 

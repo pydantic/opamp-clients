@@ -5,7 +5,7 @@
 // own WebAssembly engine: nothing native to install. Each Core is one module instance, holding
 // one client's state.
 
-import { closeSync, openSync, readFileSync, writeSync } from "node:fs";
+import { closeSync, fchmodSync, openSync, readFileSync, writeSync } from "node:fs";
 
 import "./utf8.js";
 
@@ -65,9 +65,12 @@ class Tap {
       path = n === 0 ? base! : `${base}.${process.pid}.${n}`;
     }
     try {
-      // It holds the Config's headers (the enrollment key) and what is saved: a new file is the
-      // user's only, as the state file is.
-      return new Tap(openSync(path, "a", 0o600));
+      // It holds the Config's headers (the enrollment key) and what is saved: the file is the
+      // user's only, as the state file is, whether new or already there (open's mode is for a new
+      // file only).
+      const fd = openSync(path, "a", 0o600);
+      if (process.platform !== "win32") fchmodSync(fd, 0o600);
+      return new Tap(fd);
     } catch (e) {
       console.error(`OPAMP_CORE_TAP: can't open ${path}: ${String(e)}`);
       return undefined;
