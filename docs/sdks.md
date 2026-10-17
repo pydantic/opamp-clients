@@ -96,10 +96,10 @@ with the reason, and a missing key counts too: a default of 0 would silently sto
 
 Running the examples turned these up:
 
-- **A client can stop on its own**: a bug, in the client or in your callback. You hear `Stopped` with the
-  error at once, and `stop` returns or throws it too. Don't ignore it: nothing keeps a Node
-  process alive once the client has stopped, so it would exit 0 unmanaged. The examples print
-  it and exit 1.
+- **A client can stop on its own**: a bug, in the client or in your callback. You hear `Stopped`
+  with the error at once, and `stop` returns or throws it too. Don't ignore it: nothing keeps a
+  Node process alive once the client has stopped, so it would exit 0 unmanaged. The examples
+  print it and exit 1.
 - **Notifications arrive on the client's thread or task.** Keep the callback quick. It may ask
   for `stop`, but must not wait for it: the client stops once the callback has returned. Go's
   `Stop` called in the callback returns at once ([sdk-contract.md](sdk-contract.md)). The Go
@@ -121,10 +121,11 @@ Running the examples turned these up:
 
 ## Rust mode and platform mode
 
-Each of the five SDKs (Go, Node.js, Python, Java, .NET) can reach the server two ways. In **Rust mode** the shared module speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, and
-the language only opens TCP connections, starts TLS with its own library and moves the bytes, so
-the bytes on the wire are the same from every language. In **platform mode** the language's own
-HTTP and WebSocket stack carries out the core's requests.
+Each of the five SDKs (Go, Node.js, Python, Java, .NET) can reach the server two ways. In **Rust
+mode** the core speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, and the language only opens
+TCP connections, starts TLS with its own library and moves the bytes, so the bytes on the wire are
+the same from every language. In **platform mode** the language's own HTTP and WebSocket stack
+carries out the core's requests.
 
 The client runs in **Rust mode** unless the application asks for **platform mode**: by naming it
 in the mode option, or by handing the client an HTTP client of its own, where the SDK takes one
