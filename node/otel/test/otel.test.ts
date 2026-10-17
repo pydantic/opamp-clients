@@ -65,12 +65,12 @@ const text = (s: string) => new TextEncoder().encode(s);
 const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv({})).settings;
 // Every setting (docs/sdk-settings.md), and those a host built from `env` doesn't declare.
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
-  "deactivate_instrumentations", "drop_attributes", "mask_attributes", "opamp_polling_interval", "sampling_rate",
+  "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
   "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level", "send_logs_level_by_scope",
   "send_logs_per_second", "send_metrics", "send_traces"];
 const undeclared = (env: NodeJS.ProcessEnv) => {
   const host = hostFromEnv(env);
-  return SETTINGS.filter((k) => !host.live!.includes(k) && !host.nextStart!.includes(k));
+  return SETTINGS.filter((k) => !host.live!.includes(k));
 };
 const LOG_GATE = ["debug_send_logs_level", "drop_attributes", "mask_attributes", "send_logs", "send_logs_level",
   "send_logs_level_by_scope", "send_logs_per_second"];
@@ -389,12 +389,9 @@ test("a signal whose exporter NodeSDK builds, ungated, isn't carried out: a poli
   assert.deepEqual(effective(ungated), {});
 });
 
-test("without a state directory a next-start change is failed; live ones are fine", () => {
+test("without a state directory every setting is still carried out: none waits for the next start", () => {
   const agent = new Agent();
   agent.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp" });
-  const s = agent.remoteConfig(config(policy({ polling_interval: { milliseconds: 10_000 } })));
-  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
-  assert.equal(s.errorMessage, "polling_interval: takes effect at the next start, which needs somewhere to keep state");
   assert.equal(agent.remoteConfig(config(policy({ head_sampling: { ratio: 0.5 } }))).status,
     RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   // Instrumentations are switched while the application runs: nothing to keep for a restart.

@@ -46,7 +46,7 @@ func effective(t *testing.T, e *protobufs.EffectiveConfig) string {
 
 // The controls of a policy in order: it must send the first two, and may leave out the others.
 var controls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
-	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval"}
+	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations"}
 
 const allLocal = `{"traces":{"mode":"local"},"metrics":{"mode":"local"},"logs":{"mode":"local"}}`
 
@@ -224,7 +224,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 	}
 	defer l.Close(ctx)
 	all := "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,trace_rate_limit," +
-		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,polling_interval"
+		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations"
 	for _, c := range []struct {
 		name     string
 		host     *settingspb.Host
@@ -255,7 +255,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 var declaring = &settingspb.Host{Live: []string{"debug_sampling_rate", "debug_send_logs_level", "debug_until",
 	"drop_attributes", "mask_attributes", "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs",
 	"send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"},
-	NextStart: []string{"deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"}}
+	NextStart: []string{"deactivate_all_instrumentations", "deactivate_instrumentations"}}
 
 // everySetting is declaring with the application's own settings (custom) too.
 var everySetting = &settingspb.Host{Live: append(slices.Clone(declaring.Live), "custom"), NextStart: declaring.NextStart}
@@ -288,20 +288,20 @@ func TestTheSaveTheLayerAsksForDecidesTheAnswer(t *testing.T) {
 	if err != nil || status(d) != applied {
 		t.Fatalf("live, nowhere: %v %v", d, err)
 	}
-	minute := every("polling_interval", override(`"milliseconds":60000`))
-	d, err = l.Decide(ctx, config(minute), current, current, declaring, nil)
+	redis := every("instrumentations", override(`"disabled":["redis"]`))
+	d, err = l.Decide(ctx, config(redis), current, current, declaring, nil)
 	if err != nil || d.GetStatus().GetErrorMessage() !=
-		"polling_interval: takes effect at the next start, which needs somewhere to keep state" {
+		"instrumentations: takes effect at the next start, which needs somewhere to keep state" {
 		t.Fatalf("next start, nowhere: %v %v", d, err)
 	}
 	var kept [][]byte
-	d, err = l.Decide(ctx, config(minute), current, current, declaring, func(doc []byte) error {
+	d, err = l.Decide(ctx, config(redis), current, current, declaring, func(doc []byte) error {
 		kept = append(kept, doc)
 		return nil
 	})
 	if err != nil || status(d) != applied ||
-		!slices.Equal(d.GetPendingRestart(), []string{"opamp_polling_interval"}) || len(kept) != 1 ||
-		string(kept[0]) != minute {
+		!slices.Equal(d.GetPendingRestart(), []string{"deactivate_instrumentations"}) || len(kept) != 1 ||
+		string(kept[0]) != redis {
 		t.Fatalf("next start, saved: %v %v %q", d, err, kept)
 	}
 	// A refused config asks for no save.

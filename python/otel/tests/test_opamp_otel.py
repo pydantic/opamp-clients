@@ -179,7 +179,7 @@ def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carr
     ours = described(server, True, tmp_path / "ours")
     assert ours["logfire.opamp.config_format"] == V1
     assert {"head_sampling", "signal_exports.traces", "sampling_rules", "debug", "app_settings",
-            "instrumentations", "polling_interval"} <= set(ours["logfire.opamp.supported_controls"])
+            "instrumentations"} <= set(ours["logfire.opamp.supported_controls"])
     # Under another configurator the sampler and the gates are not this package's.
     other = described(server, False, tmp_path / "other")["logfire.opamp.supported_controls"]
     assert "head_sampling" not in other and "signal_exports.traces" not in other
@@ -188,10 +188,10 @@ def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carr
 
 def test_a_next_start_change_is_applied_where_the_client_keeps_state_and_refused_where_none_is(tmp_path):
     agent, _ = prepared(tmp_path)
-    minute = policy(polling_interval={"milliseconds": 60_000})
-    assert agent.remote_config(config(minute)).status == APPLIED
+    urllib = policy(instrumentations={"disabled": ["urllib"]})
+    assert agent.remote_config(config(urllib)).status == APPLIED
     agent, _ = prepared("none")
-    s = agent.remote_config(config(minute))
+    s = agent.remote_config(config(urllib))
     assert s.status == FAILED and "needs somewhere to keep state" in s.error_message
 
 
@@ -707,8 +707,7 @@ def test_with_a_configuration_file_the_instance_is_managed_but_no_exporter_is_ou
     assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
     assert switch.status == APPLIED
     assert list(agent.host.live) == ["custom"]  # the application's own settings only
-    assert list(agent.host.next_start) == ["opamp_polling_interval", "deactivate_instrumentations",
-                                           "deactivate_all_instrumentations"]
+    assert list(agent.host.next_start) == ["deactivate_instrumentations", "deactivate_all_instrumentations"]
     assert effective(agent) == {}  # the switch is pending the next start, which reads it
 
 
@@ -912,7 +911,7 @@ def test_in_code_the_instrumentation_switches_are_refused(tmp_path):
     assert s.error_message == "instrumentations: all_disabled: this SDK cannot apply the requested override"
     assert effective(agent) == {}
     host = opamp_otel.sdk_host(["otlp"], configured=False, auto_instrumented=False)
-    assert (list(host.live), list(host.next_start)) == (["custom", "send_metrics"], ["opamp_polling_interval"])
+    assert (list(host.live), list(host.next_start)) == (["custom", "send_metrics"], [])
 
 
 def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_settings_arent_carried_out(tmp_path):

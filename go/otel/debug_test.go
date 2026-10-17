@@ -164,6 +164,13 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 		if slices.ContainsFunc(c.Steps, func(s step) bool { return s.Save == "failed" }) {
 			continue
 		}
+		// A next-start change is another SDK's case: this one carries every setting out at once,
+		// the instrumentation switches too, so nothing it applies waits for a restart.
+		if slices.ContainsFunc(c.Steps, func(s step) bool {
+			return strings.Contains(s.Document, `"instrumentations":{"mode":"override"`)
+		}) {
+			continue
+		}
 		t.Run(c.Name, func(t *testing.T) {
 			dir, ft := t.TempDir(), newFakeTime(0)
 			ft.set(c.Steps[0].Now)

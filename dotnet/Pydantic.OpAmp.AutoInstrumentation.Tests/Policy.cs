@@ -28,7 +28,7 @@ internal static class Policy
     private static readonly string[] Controls =
     [
         "head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
-        "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval",
+        "attribute_redaction", "debug", "app_settings", "instrumentations",
     ];
 
     /// <summary>The short policy with every control local: the SDK's own settings.</summary>

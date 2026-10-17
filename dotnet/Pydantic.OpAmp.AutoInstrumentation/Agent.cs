@@ -293,7 +293,7 @@ internal sealed class Agent
         var ungated = providersBuilt ? this.Ungated() : [];
         bool Gated(Signal s) => this.gated.Contains(s) && !ungated.Contains(s);
         bool Covered(Signal s) => Gated(s) || (!ungated.Contains(s) && this.ExportsNothing(s));
-        var h = new Host { NextStart = { "opamp_polling_interval" } };
+        var h = new Host();
         if (!this.fileConfig)
         {
             // Read as the application starts, from the instrumentation variables.

@@ -90,8 +90,7 @@ Traces carry on.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -137,8 +136,7 @@ connected. Thus the next policy can turn it all back on.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "override", "disabled": ["jdbc", "kafka-clients"]},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "override", "disabled": ["jdbc", "kafka-clients"]}
 }
 ```
 
@@ -176,38 +174,11 @@ answers the policy FAILED and nothing changes.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "override", "all_disabled": true},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "override", "all_disabled": true}
 }
 ```
 
 No instrumentation runs from the next start. In Go, Node.js and Rust, none runs from now.
-
-## Check in less often: `poll-less-often.json`
-
-```json
-{
-  "schema": "logfire-sdk-policy/v1",
-  "head_sampling": {"mode": "local"},
-  "signal_exports": {
-    "traces": {"mode": "local"},
-    "metrics": {"mode": "local"},
-    "logs": {"mode": "local"}
-  },
-  "sampling_rules": {"mode": "local"},
-  "trace_rate_limit": {"mode": "local"},
-  "log_levels": {"mode": "local"},
-  "log_rate_limit": {"mode": "local"},
-  "attribute_redaction": {"mode": "local"},
-  "debug": {"mode": "local"},
-  "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "override", "milliseconds": 300000}
-}
-```
-
-The agent checks in every 5 minutes from the next start, whatever `OTEL_OPAMP_HEARTBEAT_INTERVAL`
-says. The interval is from 1000 ms to 86400000 ms (24 h).
 
 ## Skip health checks, keep every checkout: `skip-health-checks.json`
 
@@ -227,8 +198,7 @@ says. The interval is from 1000 ms to 86400000 ms (24 h).
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -258,8 +228,7 @@ differs by instrumentation. For example, an HTTP client span starts without its 
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -290,8 +259,7 @@ the policy ([where each setting applies](../../docs/sdk-settings.md#where-each-s
   "attribute_redaction": {"mode": "override", "mask": ["user.email", "enduser.id"], "drop": ["*password*", "*token*", "http.request.header.authorization"]},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -320,8 +288,7 @@ refuses the policy
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -348,8 +315,7 @@ buckets.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "override", "until": "2026-10-14T12:30:00Z", "sampling_ratio": 1, "log_level": "debug"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 
@@ -377,8 +343,7 @@ but a later time does. Every integration ends it on a timer of its own, server o
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "override", "values": {"checkout.new_flow": "on", "example.log_level": "debug"}},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }
 ```
 

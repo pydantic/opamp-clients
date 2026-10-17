@@ -32,8 +32,7 @@ var (
 func FuzzSettingsLayer(f *testing.F) {
 	f.Add([]byte(v1("signal_exports", logsOff)), []byte(v1("head_sampling", override(`"ratio":0.25`))), "application/json", byte(1))
 	f.Add([]byte(`not json`), []byte(v1("head_sampling", override(`"ratio":"x"`))), "application/json", byte(0))
-	f.Add([]byte{}, []byte(every("instrumentations", override(`"disabled":["otelhttp","grpc"]`),
-		"polling_interval", override(`"milliseconds":30000`))), "", byte(3))
+	f.Add([]byte{}, []byte(every("instrumentations", override(`"disabled":["otelhttp","grpc"]`))), "", byte(3))
 	f.Add([]byte(every("instrumentations", override(`"all_disabled":true`))), []byte(`{}`), "text/yaml", byte(7))
 	f.Add([]byte(`{"schema":"logfire-sdk-policy/v1","head_sampling":{"mode":"override","ratio":1e309}}`),
 		[]byte(every("signal_exports", `{"traces":{"mode":"override","enabled":true},"metrics":{"mode":"override","enabled":"maybe"},"logs":{"mode":"local"}}`)),
@@ -51,7 +50,7 @@ func FuzzSettingsLayer(f *testing.F) {
 		if flags&4 != 0 {
 			// Neither deactivate_all_instrumentations nor send_metrics declared.
 			host.Live = slices.DeleteFunc(slices.Clone(host.Live), func(k string) bool { return k == "send_metrics" })
-			host.NextStart = []string{"deactivate_instrumentations", "opamp_polling_interval"}
+			host.NextStart = []string{"deactivate_instrumentations"}
 		}
 		// flags&1: the host keeps state; flags&8: its save fails.
 		var asked []byte

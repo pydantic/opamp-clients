@@ -332,9 +332,8 @@ type Settings struct {
 	SamplingTracesPerSecond *float64 `protobuf:"fixed64,14,opt,name=sampling_traces_per_second,json=samplingTracesPerSecond,proto3,oneof" json:"sampling_traces_per_second,omitempty"`
 	SendLogsPerSecond       *float64 `protobuf:"fixed64,15,opt,name=send_logs_per_second,json=sendLogsPerSecond,proto3,oneof" json:"send_logs_per_second,omitempty"`
 	// Next start: how the SDK starts.
-	DeactivateInstrumentations    *Names  `protobuf:"bytes,5,opt,name=deactivate_instrumentations,json=deactivateInstrumentations,proto3" json:"deactivate_instrumentations,omitempty"` // unset: none
-	DeactivateAllInstrumentations *bool   `protobuf:"varint,6,opt,name=deactivate_all_instrumentations,json=deactivateAllInstrumentations,proto3,oneof" json:"deactivate_all_instrumentations,omitempty"`
-	OpampPollingIntervalMs        *uint64 `protobuf:"varint,7,opt,name=opamp_polling_interval_ms,json=opampPollingIntervalMs,proto3,oneof" json:"opamp_polling_interval_ms,omitempty"`
+	DeactivateInstrumentations    *Names `protobuf:"bytes,5,opt,name=deactivate_instrumentations,json=deactivateInstrumentations,proto3" json:"deactivate_instrumentations,omitempty"` // unset: none
+	DeactivateAllInstrumentations *bool  `protobuf:"varint,6,opt,name=deactivate_all_instrumentations,json=deactivateAllInstrumentations,proto3,oneof" json:"deactivate_all_instrumentations,omitempty"`
 	// custom: the application's own settings, key to value, which the SDK doesn't read but hands
 	// to the application (docs/app-settings.md): its readers see this map, whole, from the moment
 	// it is put in force. Keys are ASCII letters, digits, `.`, `_` and `-` (starting with a letter
@@ -464,13 +463,6 @@ func (x *Settings) GetDeactivateAllInstrumentations() bool {
 		return *x.DeactivateAllInstrumentations
 	}
 	return false
-}
-
-func (x *Settings) GetOpampPollingIntervalMs() uint64 {
-	if x != nil && x.OpampPollingIntervalMs != nil {
-		return *x.OpampPollingIntervalMs
-	}
-	return 0
 }
 
 func (x *Settings) GetCustom() map[string]string {
@@ -2838,7 +2830,7 @@ var File_opamp_sdk_v1_settings_proto protoreflect.FileDescriptor
 
 const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\xf6\b\n" +
+	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\xb9\b\n" +
 	"\bSettings\x12(\n" +
 	"\rsampling_rate\x18\x01 \x01(\x01H\x00R\fsamplingRate\x88\x01\x01\x12$\n" +
 	"\vsend_traces\x18\x02 \x01(\bH\x01R\n" +
@@ -2854,8 +2846,7 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x1asampling_traces_per_second\x18\x0e \x01(\x01H\x05R\x17samplingTracesPerSecond\x88\x01\x01\x124\n" +
 	"\x14send_logs_per_second\x18\x0f \x01(\x01H\x06R\x11sendLogsPerSecond\x88\x01\x01\x12T\n" +
 	"\x1bdeactivate_instrumentations\x18\x05 \x01(\v2\x13.opamp.sdk.v1.NamesR\x1adeactivateInstrumentations\x12K\n" +
-	"\x1fdeactivate_all_instrumentations\x18\x06 \x01(\bH\aR\x1ddeactivateAllInstrumentations\x88\x01\x01\x12>\n" +
-	"\x19opamp_polling_interval_ms\x18\a \x01(\x04H\bR\x16opampPollingIntervalMs\x88\x01\x01\x12:\n" +
+	"\x1fdeactivate_all_instrumentations\x18\x06 \x01(\bH\aR\x1ddeactivateAllInstrumentations\x88\x01\x01\x12:\n" +
 	"\x06custom\x18\x10 \x03(\v2\".opamp.sdk.v1.Settings.CustomEntryR\x06custom\x1a9\n" +
 	"\vCustomEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -2868,8 +2859,7 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x17_send_logs_min_severityB\x1d\n" +
 	"\x1b_sampling_traces_per_secondB\x17\n" +
 	"\x15_send_logs_per_secondB\"\n" +
-	" _deactivate_all_instrumentationsB\x1c\n" +
-	"\x1a_opamp_polling_interval_msJ\x04\b\b\x10\tJ\x04\b\x11\x10\x12\"\xab\x02\n" +
+	" _deactivate_all_instrumentationsJ\x04\b\b\x10\tJ\x04\b\x11\x10\x12J\x04\b\a\x10\bR\x19opamp_polling_interval_ms\"\xab\x02\n" +
 	"\fSamplingRule\x12\x12\n" +
 	"\x04rate\x18\x01 \x01(\x01R\x04rate\x12\x17\n" +
 	"\x04name\x18\x02 \x01(\tH\x00R\x04name\x88\x01\x01\x12/\n" +

@@ -69,8 +69,7 @@ final class Extension {
       "debug_until", "debug_sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_level",
       "send_logs_level_by_scope", "send_logs_per_second", "debug_send_logs_level", "drop_attributes",
       "mask_attributes");
-  static final List<String> NEXT_START = List.of("deactivate_instrumentations", "deactivate_all_instrumentations",
-      "opamp_polling_interval");
+  static final List<String> NEXT_START = List.of("deactivate_instrumentations", "deactivate_all_instrumentations");
   /** What each signal's gate holds: carried out only where every exporter of the signal is gated. */
   static final Map<String, List<String>> GATED = Map.of(
       "traces", List.of("send_traces", "drop_attributes", "mask_attributes"),
@@ -789,9 +788,7 @@ final class Extension {
     OpampClient.Config.Builder b = OpampClient.Config.builder(s.endpoint(), bytes(uid))
         .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE);
     s.headers().forEach(b::header);
-    SettingsProto.Settings atStart = loaded.getSettings();
-    Duration heartbeat = atStart.hasOpampPollingIntervalMs()
-        ? Duration.ofMillis(atStart.getOpampPollingIntervalMs()) : s.heartbeat();
+    Duration heartbeat = s.heartbeat();
     if (!heartbeat.isZero()) {
       b.heartbeatInterval(heartbeat);
     }

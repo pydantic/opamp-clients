@@ -45,7 +45,7 @@ const declaring = {
     "send_metrics",
     "send_traces",
   ],
-  nextStart: ["deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"],
+  nextStart: ["deactivate_all_instrumentations", "deactivate_instrumentations"],
 };
 const now = 1_791_979_200_000n; // 2026-10-14T12:00:00Z
 
@@ -97,10 +97,10 @@ function described(desc: AgentDescription): Record<string, unknown> {
 
 test("the description names the policy format and the controls the host carries out", () => {
   const layer = new SdkSettings();
-  const host = { live: ["sampling_rate", "send_logs", "custom"], nextStart: ["opamp_polling_interval"] };
+  const host = { live: ["sampling_rate", "send_logs", "custom"], nextStart: ["deactivate_instrumentations"] };
   assert.deepEqual(described(layer.describe([], host, now)), {
     "logfire.opamp.config_format": V1,
-    "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings", "polling_interval"],
+    "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings", "instrumentations"],
   });
   // Every setting declared: every control. No host: none.
   const every = described(layer.describe([], declaring, now))["logfire.opamp.supported_controls"] as string[];
@@ -309,19 +309,19 @@ test("the save the layer asks for decides the answer (#215: decide, then commit)
   // Nowhere to keep state: a live change is applied, a next-start one refused.
   const live = layer.decide(quarter, current, current, declaring);
   assert.equal(live.status?.status, APPLIED);
-  const minute = policy({ polling_interval: { milliseconds: 60_000 } });
-  const later = layer.decide(config(minute), current, current, declaring);
+  const redis = policy({ instrumentations: { disabled: ["redis"] } });
+  const later = layer.decide(config(redis), current, current, declaring);
   assert.equal(
     later.status?.errorMessage,
-    "polling_interval: takes effect at the next start, which needs somewhere to keep state",
+    "instrumentations: takes effect at the next start, which needs somewhere to keep state",
   );
   const kept: Uint8Array[] = [];
-  const saved = layer.decide(config(minute), current, current, declaring, 0n, (doc) => {
+  const saved = layer.decide(config(redis), current, current, declaring, 0n, (doc) => {
     kept.push(doc);
   });
   assert.equal(saved.status?.status, APPLIED);
-  assert.deepEqual(saved.pendingRestart, ["opamp_polling_interval"]);
-  assert.deepEqual(kept, [text(minute)]);
+  assert.deepEqual(saved.pendingRestart, ["deactivate_instrumentations"]);
+  assert.deepEqual(kept, [text(redis)]);
 });
 
 test("a string that starts with U+FEFF comes back from the layer as it was sent", () => {

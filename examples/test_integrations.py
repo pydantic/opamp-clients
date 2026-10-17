@@ -215,12 +215,12 @@ def in_force(overrides: dict[str, dict]) -> dict:
     return {POLICY_FILE: json.loads(policy(overrides, every=True))}
 
 
-def fourth(every: float = 3.0, spans: bool = False) -> Log:
+def fourth(spans: bool = False) -> Log:
     log = Log()
     t = 0.5
     while t < 20:
         log.a2s(t)
-        t += every
+        t += 1.0
     log.pings(1, 20)
     if spans:
         log.span(10)
@@ -873,8 +873,11 @@ class SignalsRestart(unittest.TestCase):
     def test_a_good_run_passes(self):
         self.assertEqual(failed(judge_signals_restart(fourth().events)), [])
 
-    def test_the_environment_interval_fails(self):
-        self.assertNotEqual(failed(judge_signals_restart(fourth(every=1).events)), [])
+    def test_no_requests_fail(self):
+        log = Log()
+        log.a2s(0.5).a2s(20, disconnect=True)
+        self.assertIn("every instrumentation switched off at the next start: no spans",
+                      failed(judge_signals_restart(log.events)))
 
     def test_spans_fail(self):
         self.assertIn("every instrumentation switched off at the next start: no spans",

@@ -53,7 +53,6 @@ to end:
 | `trace_rate_limit`, `log_rate_limit` | at 1: no more than about a span and a log record a second, of some five requests a second |
 | the effective config | after `head_sampling` 0.25, the agent reports that policy, every control listed, as the only file; after the log level is added, that policy |
 | export health (no control) | the agent's health carries `exporters`, a child per signal, the application's own `healthy` kept; it counts trace exports that succeeded and log records dropped on purpose |
-| `polling_interval` | at the next start the agent checks in at the offered interval, not its environment's |
 | `instrumentations` `all_disabled` | at the next start, no spans while the application makes requests |
 
 An integration that cannot carry out a control refuses the whole policy: the agent answers

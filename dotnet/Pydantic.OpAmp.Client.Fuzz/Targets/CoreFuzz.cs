@@ -209,7 +209,7 @@ internal static class CoreFuzz
                             resource.Add(new KeyValue { Key = r.Text(16), Value = new AnyValue { StringValue = r.Text(32) } });
                         }
 
-                        var host = r.Bit() ? new Sdk.Host { Live = { "sampling_rate", "send_logs" }, NextStart = { "opamp_polling_interval" } } : null;
+                        var host = r.Bit() ? new Sdk.Host { Live = { "sampling_rate", "send_logs" }, NextStart = { "deactivate_instrumentations" } } : null;
                         Layer.Value.Describe(resource, host, r.Bit() ? 1_791_979_200_000UL : 0);
                         break;
                     }

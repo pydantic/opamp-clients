@@ -95,7 +95,9 @@ switch instrumentations off).
 | `debug` | `until`, an RFC 3339 time at most 24 h ahead of the instance's clock: debug mode until then. Optionally `sampling_ratio` (as `ratio`, 1 if left out) and `log_level` (as `level`, `debug` if left out). See [debug mode](#debug-mode). | at once, until `until` |
 | `app_settings` | `values`, an object of at most 128 of the application's own keys to strings, numbers or booleans: not the SDK's, handed to the application to read. See [app-settings.md](app-settings.md). | at once |
 | `instrumentations` | `disabled`, an array of instrumentation names. `all_disabled`, `true` or `false`. At least one of the two. | at the next start |
-| `polling_interval` | `milliseconds`, an integer from 1000 to 86400000 | at the next start |
+
+The policy has no control for how often the SDK checks in: the server's OpAMP heartbeat offer
+(`OpAMPConnectionSettings.heartbeat_interval_seconds`) sets that, at once.
 
 A glob is `*` and literal characters only. An array or object that a field takes cannot be empty.
 A string is taken as sent: a name, a pattern, a level or a time with spaces round it is refused.
@@ -117,7 +119,6 @@ that it carries out by these names ([the host](#the-host), and the inventory in
 | `debug` `until`, `sampling_ratio`, `log_level` | `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` |
 | `app_settings` `values` | `custom` |
 | `instrumentations` `disabled`, `all_disabled` | `deactivate_instrumentations`, `deactivate_all_instrumentations` |
-| `polling_interval` `milliseconds` | `opamp_polling_interval` |
 
 Controls that take effect **at once** are carried out while the SDK runs: a sampler and exporters
 that can be swapped (with the limits in [where each setting applies](#where-each-setting-applies)).
@@ -128,13 +129,13 @@ exports. The log level drops the log records below it at export in the same way,
 record on. The records are still made. A record with no severity (SeverityNumber 0, unspecified)
 cannot be judged, so it is exported whatever the level.
 
-The next-start controls decide how the SDK starts. Most SDKs cannot remove an instrumentation
-from a running process. Go and Node.js can, because an instrumentation's tracer comes from a
-provider that the integration hands out. Thus each of them switches instrumentations off at once
-([the host](#the-host)). The SDK keeps a next-start control and puts it in force at the next
+The next-start control, `instrumentations`, decides how the SDK starts. Most SDKs cannot remove
+an instrumentation from a running process. Go and Node.js can, because an instrumentation's tracer
+comes from a provider that the integration hands out. Thus each of them switches instrumentations off at once
+([the host](#the-host)). Elsewhere the SDK keeps the control and puts it in force at the next
 start. That needs somewhere to keep state (a state directory). Without one, a policy that changes
-a next-start control is refused (`polling_interval: takes effect at the next start, which needs
-somewhere to keep state`). A policy that changes only live controls is fine.
+it is refused (`instrumentations: takes effect at the next start, which needs somewhere to keep
+state`). A policy that changes only live controls is fine.
 
 The log level filters the application's exported log records, nothing more. **No integration
 changes the SDK's own log level**, or the level of its own diagnostic logging.
@@ -379,7 +380,6 @@ reaches the telemetry that goes through them, and nothing else.
 | [export health](#export-health) (no control) | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ |
 | `signal_exports.metrics` | at once, `otlp` only ¹ | at once ¹ | at once, push only ¹ | at once ¹ | at once ¹ | at once, Prometheus too |
 | `instrumentations` | next start | at once ² | at once ⁴ | next start | refused | next start |
-| `polling_interval` | next start | next start | next start | next start | next start | next start |
 | `app_settings` ([app-settings.md](app-settings.md)) | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application |
 
 ¹ Only for the exporters the integration builds: OTLP and console (and Java's Prometheus reader).
@@ -513,7 +513,7 @@ Each language's binding runs the two steps, so the integration makes one call.
 - A next-start control shows local until the restart, because the SDK started with its own value.
   A server that compares the effective config with what it sent sees the change pending, which it
   is. The decision also lists the settings pending a restart (`pending_restart`, for example
-  `opamp_polling_interval`).
+  `deactivate_instrumentations`).
 - A refused policy changes nothing, so the effective config still reports the policy in force
   before it. A restart reports the policy in force again.
 - The layer builds the effective config (`Load`, `Commit` and `Refresh` each return the whole of
@@ -530,7 +530,7 @@ them, the layer adds two attributes for the server:
 - `logfire.opamp.supported_controls`: the controls that this host carries out, in the order
   `head_sampling`, `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs`,
   `sampling_rules`, `trace_rate_limit`, `log_levels`, `log_rate_limit`, `attribute_redaction`,
-  `debug`, `app_settings`, `instrumentations`, `polling_interval`. A control is listed when the
+  `debug`, `app_settings`, `instrumentations`. A control is listed when the
   host declares the settings behind it ([the host](#the-host)). `debug` is listed only with a
   clock (`now_unix_ms` not 0). With no host, the list is empty.
 
@@ -594,8 +594,8 @@ own.
   it needs no state directory. The Go and Node.js integrations list
   `deactivate_instrumentations` and `deactivate_all_instrumentations` here.
 - `next_start`: the next-start settings that it carries out at the next start
-  (`deactivate_instrumentations`, `deactivate_all_instrumentations`, `opamp_polling_interval`).
-  A live setting cannot be listed here.
+  (`deactivate_instrumentations`, `deactivate_all_instrumentations`). A live setting cannot be
+  listed here.
 - A setting in neither is not carried out. A policy that overrides its control is refused with
   `<control>: this SDK cannot apply the requested override`, or
   `<control>: <field>: this SDK cannot apply the requested override` where the control has

@@ -13,6 +13,5 @@
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "override", "until": "2026-10-14T12:30:00Z", "sampling_ratio": 1, "log_level": "debug"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "local"}
 }

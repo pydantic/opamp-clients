@@ -842,8 +842,8 @@ def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrum
     record processor the application passed in (`span_processors`, `log_processors`): that one
     exports past the gate. send_metrics where every metric exporter (`metrics_exporters`, as
     named) is gated, unless a declarative configuration file (`config_file`) built them. The
-    polling interval at the next start always; the instrumentation switches only under
-    opentelemetry-instrument (`auto_instrumented`). The application's own settings (custom)
+    instrumentation switches, at the next start, only under opentelemetry-instrument
+    (`auto_instrumented`). The application's own settings (custom)
     always: the application reads them, whoever built the SDK."""
     live: list[str] = [APP_SETTINGS]
     if configured:
@@ -856,8 +856,7 @@ def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrum
             live += REDACTION
     if not config_file and _every_metric_exporter_gated(metrics_exporters):
         live.append("send_metrics")
-    next_start = ["opamp_polling_interval", *(INSTRUMENTATIONS if auto_instrumented else ())]
-    return settings_pb2.Host(live=live, next_start=next_start)
+    return settings_pb2.Host(live=live, next_start=INSTRUMENTATIONS if auto_instrumented else ())
 
 
 def _undeclared(host: settings_pb2.Host) -> list[str]:
@@ -1134,11 +1133,9 @@ class Agent:
         loop = _loop_thread("opamp")
         self._loop = loop
         s = self.setup
-        at_start = self.loaded.settings
-        heartbeat = at_start.opamp_polling_interval_ms if at_start.HasField("opamp_polling_interval_ms") else s.heartbeat_ms
         config = Config(endpoint=s.endpoint, instance_uid=self.uid.bytes,
                         capabilities=opamp_pb2.AgentCapabilities_AcceptsRemoteConfig,
-                        heartbeat_interval_ms=heartbeat, headers=s.headers,
+                        heartbeat_interval_ms=s.heartbeat_ms, headers=s.headers,
                         state_file=str(s.state_dir / "opamp-state") if s.state_dir else None,
                         # A key of its own, offered by the server: taken with a state directory
                         # (state_file) and kept there; without one the client neither declares

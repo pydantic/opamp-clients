@@ -1092,8 +1092,7 @@ def test_the_first_message_carries_export_health(tmp_path):
 def test_the_package_declares_every_setting_it_carries_out():
     every = opamp_otel.sdk_host(["otlp"])
     assert sorted(every.live) == LIVE
-    assert sorted(every.next_start) == ["deactivate_all_instrumentations", "deactivate_instrumentations",
-                                        "opamp_polling_interval"]
+    assert sorted(every.next_start) == ["deactivate_all_instrumentations", "deactivate_instrumentations"]
     # Metrics play no part in the rest.
     assert sorted(opamp_otel.sdk_host(["console"]).live) == [k for k in LIVE if k != "send_metrics"]
     # Another configurator's SDK: only the gated metric exporter, which the variable still names,

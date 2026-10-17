@@ -26,7 +26,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
           string.Concat(
             "ChtvcGFtcC9zZGsvdjEvc2V0dGluZ3MucHJvdG8SDG9wYW1wLnNkay52MRoX",
             "b3BhbXAvdjEvYW55dmFsdWUucHJvdG8aFG9wYW1wL3YxL29wYW1wLnByb3Rv",
-            "ItkGCghTZXR0aW5ncxIaCg1zYW1wbGluZ19yYXRlGAEgASgBSACIAQESGAoL",
+            "IrQGCghTZXR0aW5ncxIaCg1zYW1wbGluZ19yYXRlGAEgASgBSACIAQESGAoL",
             "c2VuZF90cmFjZXMYAiABKAhIAYgBARIZCgxzZW5kX21ldHJpY3MYAyABKAhI",
             "AogBARIWCglzZW5kX2xvZ3MYBCABKAhIA4gBARIjChZzZW5kX2xvZ3NfbWlu",
             "X3NldmVyaXR5GAkgASgNSASIAQESMgoOc2FtcGxpbmdfcnVsZXMYCiADKAsy",
@@ -37,128 +37,127 @@ namespace Pydantic.OpAmp.Client.Sdk {
             "c2VuZF9sb2dzX3Blcl9zZWNvbmQYDyABKAFIBogBARI4ChtkZWFjdGl2YXRl",
             "X2luc3RydW1lbnRhdGlvbnMYBSABKAsyEy5vcGFtcC5zZGsudjEuTmFtZXMS",
             "LAofZGVhY3RpdmF0ZV9hbGxfaW5zdHJ1bWVudGF0aW9ucxgGIAEoCEgHiAEB",
-            "EiYKGW9wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXMYByABKARICIgBARIyCgZj",
-            "dXN0b20YECADKAsyIi5vcGFtcC5zZGsudjEuU2V0dGluZ3MuQ3VzdG9tRW50",
-            "cnkaLQoLQ3VzdG9tRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJ",
-            "OgI4AUIQCg5fc2FtcGxpbmdfcmF0ZUIOCgxfc2VuZF90cmFjZXNCDwoNX3Nl",
-            "bmRfbWV0cmljc0IMCgpfc2VuZF9sb2dzQhkKF19zZW5kX2xvZ3NfbWluX3Nl",
-            "dmVyaXR5Qh0KG19zYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZEIXChVfc2Vu",
-            "ZF9sb2dzX3Blcl9zZWNvbmRCIgogX2RlYWN0aXZhdGVfYWxsX2luc3RydW1l",
-            "bnRhdGlvbnNCHAoaX29wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXNKBAgIEAlK",
-            "BAgREBIi+wEKDFNhbXBsaW5nUnVsZRIMCgRyYXRlGAEgASgBEhEKBG5hbWUY",
-            "AiABKAlIAIgBARIpCgRraW5kGAMgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5L",
-            "aW5kSAGIAQESEQoEcGF0aBgEIAEoCUgCiAEBEj4KCmF0dHJpYnV0ZXMYBSAD",
-            "KAsyKi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlLkF0dHJpYnV0ZXNFbnRy",
-            "eRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIg",
-            "ASgJOgI4AUIHCgVfbmFtZUIHCgVfa2luZEIHCgVfcGF0aCIzCgpTY29wZUxl",
-            "dmVsEg8KB3BhdHRlcm4YASABKAkSFAoMbWluX3NldmVyaXR5GAIgASgNIhYK",
-            "BU5hbWVzEg0KBW5hbWVzGAEgAygJIi4KBEhvc3QSDAoEbGl2ZRgBIAMoCRIS",
-            "CgpuZXh0X3N0YXJ0GAMgAygJSgQIAhADIoMBCgRMb2FkEhIKBXNhdmVkGAEg",
-            "ASgMSACIAQESIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMK",
-            "C25vd191bml4X21zGAMgASgEEhcKCmNvcmVfc3RhdGUYBCABKAxIAYgBAUII",
-            "CgZfc2F2ZWRCDQoLX2NvcmVfc3RhdGUipAEKBkxvYWRlZBIoCghzZXR0aW5n",
-            "cxgBIAEoCzIWLm9wYW1wLnNkay52MS5TZXR0aW5ncxIPCgdjdXJyZW50GAIg",
-            "ASgMEjIKCWVmZmVjdGl2ZRgDIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVj",
-            "dGl2ZUNvbmZpZxIPCgd3YXJuaW5nGAQgASgJEhoKEnJlZnJlc2hfYXRfdW5p",
-            "eF9tcxgFIAEoBCKbAQoGRGVjaWRlEjEKBmNvbmZpZxgBIAEoCzIhLm9wYW1w",
-            "LnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnEg8KB2N1cnJlbnQYAiABKAwS",
-            "EAoIYXRfc3RhcnQYAyABKAwSIAoEaG9zdBgFIAEoCzISLm9wYW1wLnNkay52",
-            "MS5Ib3N0EhMKC25vd191bml4X21zGAYgASgESgQIBBAFIiIKBFBsYW4SEQoE",
-            "c2F2ZRgBIAEoDEgAiAEBQgcKBV9zYXZlIqYBCgZDb21taXQSJAoGZGVjaWRl",
-            "GAEgASgLMhQub3BhbXAuc2RrLnYxLkRlY2lkZRIpCgVzYXZlZBgCIAEoDjIa",
-            "Lm9wYW1wLnNkay52MS5Db21taXQuU2F2ZWQSDQoFZXJyb3IYAyABKAkiPAoF",
-            "U2F2ZWQSEQoNU0FWRURfTk9XSEVSRRAAEg4KClNBVkVEX0RPTkUQARIQCgxT",
-            "QVZFRF9GQUlMRUQQAiLlAQoIRGVjaXNpb24SMgoGc3RhdHVzGAEgASgLMiIu",
-            "b3BhbXAucHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzEiUKBWFwcGx5GAIg",
-            "ASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAyABKAwS",
-            "MgoJZWZmZWN0aXZlGAUgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZl",
-            "Q29uZmlnEhcKD3BlbmRpbmdfcmVzdGFydBgGIAMoCRIaChJyZWZyZXNoX2F0",
-            "X3VuaXhfbXMYByABKARKBAgEEAUiYwoHUmVmcmVzaBIPCgdjdXJyZW50GAEg",
-            "ASgMEhAKCGF0X3N0YXJ0GAIgASgMEiAKBGhvc3QYAyABKAsyEi5vcGFtcC5z",
-            "ZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgEIAEoBCKWAQoJUmVmcmVzaGVk",
-            "EigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEjIK",
-            "CWVmZmVjdGl2ZRgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNv",
-            "bmZpZxIaChJyZWZyZXNoX2F0X3VuaXhfbXMYAyABKAQSDwoHd2FybmluZxgE",
-            "IAEoCSKhAQoGSGVhbHRoEioKBmNvdW50cxgBIAEoCzIaLm9wYW1wLnNkay52",
-            "MS5FeHBvcnRDb3VudHMSLAoIcHJldmlvdXMYAiABKAsyGi5vcGFtcC5zZGsu",
-            "djEuSGVhbHRoUmVwb3J0EhMKC25vd191bml4X21zGAMgASgEEigKCHNldHRp",
-            "bmdzGAQgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzIpEBCgxFeHBvcnRD",
-            "b3VudHMSKgoGdHJhY2VzGAEgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENv",
-            "dW50cxIrCgdtZXRyaWNzGAIgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENv",
-            "dW50cxIoCgRsb2dzGAMgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50",
-            "cyKRAQoMU2lnbmFsQ291bnRzEhIKCmV4cG9ydHNfb2sYASABKAQSFgoOZXhw",
-            "b3J0c19mYWlsZWQYAiABKAQSFAoMaXRlbXNfZmFpbGVkGAMgASgEEhYKDml0",
-            "ZW1zX2ZpbHRlcmVkGAQgASgEEhMKC2xhc3RfZmFpbGVkGAUgASgIEhIKCmxh",
-            "c3RfZXJyb3IYBiABKAkiZgoMSGVhbHRoUmVwb3J0EgwKBHNlbmQYASABKAgS",
-            "MgoJZXhwb3J0ZXJzGAIgASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9uZW50",
-            "SGVhbHRoEhQKDHNlbnRfdW5peF9tcxgDIAEoBCJtCghEZXNjcmliZRIqCghy",
-            "ZXNvdXJjZRgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiAKBGhv",
-            "c3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgD",
-            "IAEoBCJvCgpDb21wb25lbnRzEioKCWludmVudG9yeRgBIAEoCzIXLm9wYW1w",
-            "LnNkay52MS5JbnZlbnRvcnkSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52",
-            "MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEIswBCglJbnZlbnRvcnkSEwoL",
-            "aW50ZWdyYXRpb24YASABKAkSGwoTaW50ZWdyYXRpb25fdmVyc2lvbhgCIAEo",
-            "CRIUCgxzZGtfbGFuZ3VhZ2UYAyABKAkSEwoLc2RrX3ZlcnNpb24YBCABKAkS",
-            "NwoQaW5zdHJ1bWVudGF0aW9ucxgFIAMoCzIdLm9wYW1wLnNkay52MS5JbnN0",
-            "cnVtZW50YXRpb24SKQoJZXhwb3J0ZXJzGAYgAygLMhYub3BhbXAuc2RrLnYx",
-            "LkV4cG9ydGVyIjAKD0luc3RydW1lbnRhdGlvbhIMCgRuYW1lGAEgASgJEg8K",
-            "B3ZlcnNpb24YAiABKAkiNwoIRXhwb3J0ZXISDgoGc2lnbmFsGAEgASgJEgwK",
-            "BG5hbWUYAiABKAkSDQoFZ2F0ZWQYAyABKAgiggIKCEV2YWx1YXRlEhAKCHNl",
-            "dHRpbmdzGAEgASgMEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9z",
-            "dBITCgtub3dfdW5peF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAu",
-            "c2RrLnYxLlNwYW5TdGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52",
-            "MS5Mb2dSZWNvcmRIABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2Rr",
-            "LnYxLkF0dHJpYnV0ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEu",
-            "Q2FwUnVuSABCBwoFaW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIb",
-            "Lm9wYW1wLnNkay52MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIW",
-            "Lm9wYW1wLnNkay52MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAAS",
-            "CAoETE9HUxABImEKCENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVu",
-            "dBgCIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEo",
-            "CBIPCgdyZWNvcmRzGAQgASgEIjoKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRl",
-            "cxgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlIiwKCUxvZ1JlY29y",
-            "ZBINCgVzY29wZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoDSKTAQoJU3BhblN0",
-            "YXJ0EgwKBG5hbWUYASABKAkSJAoEa2luZBgCIAEoDjIWLm9wYW1wLnNkay52",
-            "MS5TcGFuS2luZBIsCgphdHRyaWJ1dGVzGAMgAygLMhgub3BhbXAucHJvdG8u",
-            "djEuS2V5VmFsdWUSJAoGcGFyZW50GAQgASgOMhQub3BhbXAuc2RrLnYxLlBh",
-            "cmVudCKiAQoJRXZhbHVhdGVkEg8KB3JlZnVzZWQYASABKAkSLAoIc2FtcGxp",
-            "bmcYAiABKAsyGi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5nEhEKBGtlcHQY",
-            "AyABKAhIAIgBARIqCghyZWRhY3RlZBgEIAMoCzIYLm9wYW1wLnByb3RvLnYx",
-            "LktleVZhbHVlEg4KBnBhc3NlZBgFIAMoBEIHCgVfa2VwdCKyAQoMU3BhblNh",
-            "bXBsaW5nEisKA2hvdxgBIAEoDjIeLm9wYW1wLnNkay52MS5TcGFuU2FtcGxp",
-            "bmcuSG93EhYKDnBhcmVudF9zYW1wbGVkGAIgASgIEgwKBHJhdGUYAyABKAES",
-            "EQoEcnVsZRgEIAEoDUgAiAEBIjMKA0hvdxIRCg1GT0xMT1dfUEFSRU5UEAAS",
-            "CAoEUkFURRABEg8KC0FQUF9TQU1QTEVSEAJCBwoFX3J1bGUi3wIKB1JlcXVl",
-            "c3QSIgoEbG9hZBgBIAEoCzISLm9wYW1wLnNkay52MS5Mb2FkSAASJgoGZGVj",
-            "aWRlGAIgASgLMhQub3BhbXAuc2RrLnYxLkRlY2lkZUgAEioKCGRlc2NyaWJl",
-            "GAMgASgLMhYub3BhbXAuc2RrLnYxLkRlc2NyaWJlSAASKgoIZXZhbHVhdGUY",
-            "BCABKAsyFi5vcGFtcC5zZGsudjEuRXZhbHVhdGVIABIoCgdyZWZyZXNoGAUg",
-            "ASgLMhUub3BhbXAuc2RrLnYxLlJlZnJlc2hIABImCgZoZWFsdGgYBiABKAsy",
-            "FC5vcGFtcC5zZGsudjEuSGVhbHRoSAASLgoKY29tcG9uZW50cxgHIAEoCzIY",
-            "Lm9wYW1wLnNkay52MS5Db21wb25lbnRzSAASJgoGY29tbWl0GAggASgLMhQu",
-            "b3BhbXAuc2RrLnYxLkNvbW1pdEgAQgYKBGNhbGwiqQMKBVJlcGx5EiYKBmxv",
-            "YWRlZBgBIAEoCzIULm9wYW1wLnNkay52MS5Mb2FkZWRIABIqCghkZWNpc2lv",
-            "bhgCIAEoCzIWLm9wYW1wLnNkay52MS5EZWNpc2lvbkgAEjcKC2Rlc2NyaXB0",
-            "aW9uGAMgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlvbkgA",
-            "Eg8KBWVycm9yGAQgASgJSAASLAoJZXZhbHVhdGVkGAUgASgLMhcub3BhbXAu",
-            "c2RrLnYxLkV2YWx1YXRlZEgAEiwKCXJlZnJlc2hlZBgGIAEoCzIXLm9wYW1w",
-            "LnNkay52MS5SZWZyZXNoZWRIABIzCg1oZWFsdGhfcmVwb3J0GAcgASgLMhou",
-            "b3BhbXAuc2RrLnYxLkhlYWx0aFJlcG9ydEgAEkMKFGF2YWlsYWJsZV9jb21w",
-            "b25lbnRzGAggASgLMiMub3BhbXAucHJvdG8udjEuQXZhaWxhYmxlQ29tcG9u",
-            "ZW50c0gAEiIKBHBsYW4YCSABKAsyEi5vcGFtcC5zZGsudjEuUGxhbkgAQggK",
-            "BnJlc3VsdCqZAQoIU3BhbktpbmQSGQoVU1BBTl9LSU5EX1VOU1BFQ0lGSUVE",
-            "EAASFgoSU1BBTl9LSU5EX0lOVEVSTkFMEAESFAoQU1BBTl9LSU5EX1NFUlZF",
-            "UhACEhQKEFNQQU5fS0lORF9DTElFTlQQAxIWChJTUEFOX0tJTkRfUFJPRFVD",
-            "RVIQBBIWChJTUEFOX0tJTkRfQ09OU1VNRVIQBSqHAQoGUGFyZW50Eg8KC1BB",
-            "UkVOVF9OT05FEAASGAoUUEFSRU5UX0xPQ0FMX1NBTVBMRUQQARIaChZQQVJF",
-            "TlRfTE9DQUxfVU5TQU1QTEVEEAISGQoVUEFSRU5UX1JFTU9URV9TQU1QTEVE",
-            "EAMSGwoXUEFSRU5UX1JFTU9URV9VTlNBTVBMRUQQBEJ+ChZkZXYucHlkYW50",
-            "aWMub3BhbXAuc2RrQg1TZXR0aW5nc1Byb3RvWjlnaXRodWIuY29tL3B5ZGFu",
-            "dGljL29wYW1wLWNsaWVudHMvZ28vb3BhbXAvc2RrL3NldHRpbmdzcGKqAhlQ",
-            "eWRhbnRpYy5PcEFtcC5DbGllbnQuU2RrYgZwcm90bzM="));
+            "EjIKBmN1c3RvbRgQIAMoCzIiLm9wYW1wLnNkay52MS5TZXR0aW5ncy5DdXN0",
+            "b21FbnRyeRotCgtDdXN0b21FbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUY",
+            "AiABKAk6AjgBQhAKDl9zYW1wbGluZ19yYXRlQg4KDF9zZW5kX3RyYWNlc0IP",
+            "Cg1fc2VuZF9tZXRyaWNzQgwKCl9zZW5kX2xvZ3NCGQoXX3NlbmRfbG9nc19t",
+            "aW5fc2V2ZXJpdHlCHQobX3NhbXBsaW5nX3RyYWNlc19wZXJfc2Vjb25kQhcK",
+            "FV9zZW5kX2xvZ3NfcGVyX3NlY29uZEIiCiBfZGVhY3RpdmF0ZV9hbGxfaW5z",
+            "dHJ1bWVudGF0aW9uc0oECAgQCUoECBEQEkoECAcQCFIZb3BhbXBfcG9sbGlu",
+            "Z19pbnRlcnZhbF9tcyL7AQoMU2FtcGxpbmdSdWxlEgwKBHJhdGUYASABKAES",
+            "EQoEbmFtZRgCIAEoCUgAiAEBEikKBGtpbmQYAyABKA4yFi5vcGFtcC5zZGsu",
+            "djEuU3BhbktpbmRIAYgBARIRCgRwYXRoGAQgASgJSAKIAQESPgoKYXR0cmli",
+            "dXRlcxgFIAMoCzIqLm9wYW1wLnNkay52MS5TYW1wbGluZ1J1bGUuQXR0cmli",
+            "dXRlc0VudHJ5GjEKD0F0dHJpYnV0ZXNFbnRyeRILCgNrZXkYASABKAkSDQoF",
+            "dmFsdWUYAiABKAk6AjgBQgcKBV9uYW1lQgcKBV9raW5kQgcKBV9wYXRoIjMK",
+            "ClNjb3BlTGV2ZWwSDwoHcGF0dGVybhgBIAEoCRIUCgxtaW5fc2V2ZXJpdHkY",
+            "AiABKA0iFgoFTmFtZXMSDQoFbmFtZXMYASADKAkiLgoESG9zdBIMCgRsaXZl",
+            "GAEgAygJEhIKCm5leHRfc3RhcnQYAyADKAlKBAgCEAMigwEKBExvYWQSEgoF",
+            "c2F2ZWQYASABKAxIAIgBARIgCgRob3N0GAIgASgLMhIub3BhbXAuc2RrLnYx",
+            "Lkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQSFwoKY29yZV9zdGF0ZRgEIAEo",
+            "DEgBiAEBQggKBl9zYXZlZEINCgtfY29yZV9zdGF0ZSKkAQoGTG9hZGVkEigK",
+            "CHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEg8KB2N1",
+            "cnJlbnQYAiABKAwSMgoJZWZmZWN0aXZlGAMgASgLMh8ub3BhbXAucHJvdG8u",
+            "djEuRWZmZWN0aXZlQ29uZmlnEg8KB3dhcm5pbmcYBCABKAkSGgoScmVmcmVz",
+            "aF9hdF91bml4X21zGAUgASgEIpsBCgZEZWNpZGUSMQoGY29uZmlnGAEgASgL",
+            "MiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25maWcSDwoHY3VycmVu",
+            "dBgCIAEoDBIQCghhdF9zdGFydBgDIAEoDBIgCgRob3N0GAUgASgLMhIub3Bh",
+            "bXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYBiABKARKBAgEEAUiIgoE",
+            "UGxhbhIRCgRzYXZlGAEgASgMSACIAQFCBwoFX3NhdmUipgEKBkNvbW1pdBIk",
+            "CgZkZWNpZGUYASABKAsyFC5vcGFtcC5zZGsudjEuRGVjaWRlEikKBXNhdmVk",
+            "GAIgASgOMhoub3BhbXAuc2RrLnYxLkNvbW1pdC5TYXZlZBINCgVlcnJvchgD",
+            "IAEoCSI8CgVTYXZlZBIRCg1TQVZFRF9OT1dIRVJFEAASDgoKU0FWRURfRE9O",
+            "RRABEhAKDFNBVkVEX0ZBSUxFRBACIuUBCghEZWNpc2lvbhIyCgZzdGF0dXMY",
+            "ASABKAsyIi5vcGFtcC5wcm90by52MS5SZW1vdGVDb25maWdTdGF0dXMSJQoF",
+            "YXBwbHkYAiABKAsyFi5vcGFtcC5zZGsudjEuU2V0dGluZ3MSDwoHY3VycmVu",
+            "dBgDIAEoDBIyCgllZmZlY3RpdmUYBSABKAsyHy5vcGFtcC5wcm90by52MS5F",
+            "ZmZlY3RpdmVDb25maWcSFwoPcGVuZGluZ19yZXN0YXJ0GAYgAygJEhoKEnJl",
+            "ZnJlc2hfYXRfdW5peF9tcxgHIAEoBEoECAQQBSJjCgdSZWZyZXNoEg8KB2N1",
+            "cnJlbnQYASABKAwSEAoIYXRfc3RhcnQYAiABKAwSIAoEaG9zdBgDIAEoCzIS",
+            "Lm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAQgASgEIpYBCglS",
+            "ZWZyZXNoZWQSKAoIc2V0dGluZ3MYASABKAsyFi5vcGFtcC5zZGsudjEuU2V0",
+            "dGluZ3MSMgoJZWZmZWN0aXZlGAIgASgLMh8ub3BhbXAucHJvdG8udjEuRWZm",
+            "ZWN0aXZlQ29uZmlnEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgDIAEoBBIPCgd3",
+            "YXJuaW5nGAQgASgJIqEBCgZIZWFsdGgSKgoGY291bnRzGAEgASgLMhoub3Bh",
+            "bXAuc2RrLnYxLkV4cG9ydENvdW50cxIsCghwcmV2aW91cxgCIAEoCzIaLm9w",
+            "YW1wLnNkay52MS5IZWFsdGhSZXBvcnQSEwoLbm93X3VuaXhfbXMYAyABKAQS",
+            "KAoIc2V0dGluZ3MYBCABKAsyFi5vcGFtcC5zZGsudjEuU2V0dGluZ3MikQEK",
+            "DEV4cG9ydENvdW50cxIqCgZ0cmFjZXMYASABKAsyGi5vcGFtcC5zZGsudjEu",
+            "U2lnbmFsQ291bnRzEisKB21ldHJpY3MYAiABKAsyGi5vcGFtcC5zZGsudjEu",
+            "U2lnbmFsQ291bnRzEigKBGxvZ3MYAyABKAsyGi5vcGFtcC5zZGsudjEuU2ln",
+            "bmFsQ291bnRzIpEBCgxTaWduYWxDb3VudHMSEgoKZXhwb3J0c19vaxgBIAEo",
+            "BBIWCg5leHBvcnRzX2ZhaWxlZBgCIAEoBBIUCgxpdGVtc19mYWlsZWQYAyAB",
+            "KAQSFgoOaXRlbXNfZmlsdGVyZWQYBCABKAQSEwoLbGFzdF9mYWlsZWQYBSAB",
+            "KAgSEgoKbGFzdF9lcnJvchgGIAEoCSJmCgxIZWFsdGhSZXBvcnQSDAoEc2Vu",
+            "ZBgBIAEoCBIyCglleHBvcnRlcnMYAiABKAsyHy5vcGFtcC5wcm90by52MS5D",
+            "b21wb25lbnRIZWFsdGgSFAoMc2VudF91bml4X21zGAMgASgEIm0KCERlc2Ny",
+            "aWJlEioKCHJlc291cmNlGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFs",
+            "dWUSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191",
+            "bml4X21zGAMgASgEIm8KCkNvbXBvbmVudHMSKgoJaW52ZW50b3J5GAEgASgL",
+            "Mhcub3BhbXAuc2RrLnYxLkludmVudG9yeRIgCgRob3N0GAIgASgLMhIub3Bh",
+            "bXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQizAEKCUludmVu",
+            "dG9yeRITCgtpbnRlZ3JhdGlvbhgBIAEoCRIbChNpbnRlZ3JhdGlvbl92ZXJz",
+            "aW9uGAIgASgJEhQKDHNka19sYW5ndWFnZRgDIAEoCRITCgtzZGtfdmVyc2lv",
+            "bhgEIAEoCRI3ChBpbnN0cnVtZW50YXRpb25zGAUgAygLMh0ub3BhbXAuc2Rr",
+            "LnYxLkluc3RydW1lbnRhdGlvbhIpCglleHBvcnRlcnMYBiADKAsyFi5vcGFt",
+            "cC5zZGsudjEuRXhwb3J0ZXIiMAoPSW5zdHJ1bWVudGF0aW9uEgwKBG5hbWUY",
+            "ASABKAkSDwoHdmVyc2lvbhgCIAEoCSI3CghFeHBvcnRlchIOCgZzaWduYWwY",
+            "ASABKAkSDAoEbmFtZRgCIAEoCRINCgVnYXRlZBgDIAEoCCKCAgoIRXZhbHVh",
+            "dGUSEAoIc2V0dGluZ3MYASABKAwSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNk",
+            "ay52MS5Ib3N0EhMKC25vd191bml4X21zGAcgASgEEicKBHNwYW4YAyABKAsy",
+            "Fy5vcGFtcC5zZGsudjEuU3BhblN0YXJ0SAASJgoDbG9nGAQgASgLMhcub3Bh",
+            "bXAuc2RrLnYxLkxvZ1JlY29yZEgAEi4KCmF0dHJpYnV0ZXMYBSABKAsyGC5v",
+            "cGFtcC5zZGsudjEuQXR0cmlidXRlc0gAEiMKA2NhcBgGIAEoCzIULm9wYW1w",
+            "LnNkay52MS5DYXBSdW5IAEIHCgVpbnB1dCJ9CgZDYXBSdW4SKwoGc2lnbmFs",
+            "GAEgASgOMhsub3BhbXAuc2RrLnYxLkNhcFJ1bi5TaWduYWwSJgoGZXZlbnRz",
+            "GAIgAygLMhYub3BhbXAuc2RrLnYxLkNhcEV2ZW50Ih4KBlNpZ25hbBIKCgZU",
+            "UkFDRVMQABIICgRMT0dTEAEiYQoIQ2FwRXZlbnQSDQoFYXRfbnMYASABKAQS",
+            "JAoGcGFyZW50GAIgASgOMhQub3BhbXAuc2RrLnYxLlBhcmVudBIPCgdzYW1w",
+            "bGVkGAMgASgIEg8KB3JlY29yZHMYBCABKAQiOgoKQXR0cmlidXRlcxIsCgph",
+            "dHRyaWJ1dGVzGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUiLAoJ",
+            "TG9nUmVjb3JkEg0KBXNjb3BlGAEgASgJEhAKCHNldmVyaXR5GAIgASgNIpMB",
+            "CglTcGFuU3RhcnQSDAoEbmFtZRgBIAEoCRIkCgRraW5kGAIgASgOMhYub3Bh",
+            "bXAuc2RrLnYxLlNwYW5LaW5kEiwKCmF0dHJpYnV0ZXMYAyADKAsyGC5vcGFt",
+            "cC5wcm90by52MS5LZXlWYWx1ZRIkCgZwYXJlbnQYBCABKA4yFC5vcGFtcC5z",
+            "ZGsudjEuUGFyZW50IqIBCglFdmFsdWF0ZWQSDwoHcmVmdXNlZBgBIAEoCRIs",
+            "CghzYW1wbGluZxgCIAEoCzIaLm9wYW1wLnNkay52MS5TcGFuU2FtcGxpbmcS",
+            "EQoEa2VwdBgDIAEoCEgAiAEBEioKCHJlZGFjdGVkGAQgAygLMhgub3BhbXAu",
+            "cHJvdG8udjEuS2V5VmFsdWUSDgoGcGFzc2VkGAUgAygEQgcKBV9rZXB0IrIB",
+            "CgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3BhbXAuc2RrLnYxLlNw",
+            "YW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQYAiABKAgSDAoEcmF0",
+            "ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93EhEKDUZPTExPV19Q",
+            "QVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQAkIHCgVfcnVsZSLf",
+            "AgoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAuc2RrLnYxLkxvYWRI",
+            "ABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEuRGVjaWRlSAASKgoI",
+            "ZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVzY3JpYmVIABIqCghl",
+            "dmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFsdWF0ZUgAEigKB3Jl",
+            "ZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVzaEgAEiYKBmhlYWx0",
+            "aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIuCgpjb21wb25lbnRz",
+            "GAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNIABImCgZjb21taXQY",
+            "CCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SABCBgoEY2FsbCKpAwoFUmVw",
+            "bHkSJgoGbG9hZGVkGAEgASgLMhQub3BhbXAuc2RrLnYxLkxvYWRlZEgAEioK",
+            "CGRlY2lzaW9uGAIgASgLMhYub3BhbXAuc2RrLnYxLkRlY2lzaW9uSAASNwoL",
+            "ZGVzY3JpcHRpb24YAyABKAsyIC5vcGFtcC5wcm90by52MS5BZ2VudERlc2Ny",
+            "aXB0aW9uSAASDwoFZXJyb3IYBCABKAlIABIsCglldmFsdWF0ZWQYBSABKAsy",
+            "Fy5vcGFtcC5zZGsudjEuRXZhbHVhdGVkSAASLAoJcmVmcmVzaGVkGAYgASgL",
+            "Mhcub3BhbXAuc2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhlYWx0aF9yZXBvcnQY",
+            "ByABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0SAASQwoUYXZhaWxh",
+            "YmxlX2NvbXBvbmVudHMYCCABKAsyIy5vcGFtcC5wcm90by52MS5BdmFpbGFi",
+            "bGVDb21wb25lbnRzSAASIgoEcGxhbhgJIAEoCzISLm9wYW1wLnNkay52MS5Q",
+            "bGFuSABCCAoGcmVzdWx0KpkBCghTcGFuS2luZBIZChVTUEFOX0tJTkRfVU5T",
+            "UEVDSUZJRUQQABIWChJTUEFOX0tJTkRfSU5URVJOQUwQARIUChBTUEFOX0tJ",
+            "TkRfU0VSVkVSEAISFAoQU1BBTl9LSU5EX0NMSUVOVBADEhYKElNQQU5fS0lO",
+            "RF9QUk9EVUNFUhAEEhYKElNQQU5fS0lORF9DT05TVU1FUhAFKocBCgZQYXJl",
+            "bnQSDwoLUEFSRU5UX05PTkUQABIYChRQQVJFTlRfTE9DQUxfU0FNUExFRBAB",
+            "EhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBMRUQQAhIZChVQQVJFTlRfUkVNT1RF",
+            "X1NBTVBMRUQQAxIbChdQQVJFTlRfUkVNT1RFX1VOU0FNUExFRBAEQn4KFmRl",
+            "di5weWRhbnRpYy5vcGFtcC5zZGtCDVNldHRpbmdzUHJvdG9aOWdpdGh1Yi5j",
+            "b20vcHlkYW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFtcC9zZGsvc2V0dGlu",
+            "Z3NwYqoCGVB5ZGFudGljLk9wQW1wLkNsaWVudC5TZGtiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.AnyvalueReflection.Descriptor, global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Client.Sdk.SpanKind), typeof(global::Pydantic.OpAmp.Client.Sdk.Parent), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Settings), global::Pydantic.OpAmp.Client.Sdk.Settings.Parser, new[]{ "SamplingRate", "SendTraces", "SendMetrics", "SendLogs", "SendLogsMinSeverity", "SamplingRules", "SendLogsScopeLevels", "DropAttributes", "MaskAttributes", "SamplingTracesPerSecond", "SendLogsPerSecond", "DeactivateInstrumentations", "DeactivateAllInstrumentations", "OpampPollingIntervalMs", "Custom" }, new[]{ "SamplingRate", "SendTraces", "SendMetrics", "SendLogs", "SendLogsMinSeverity", "SamplingTracesPerSecond", "SendLogsPerSecond", "DeactivateAllInstrumentations", "OpampPollingIntervalMs" }, null, null, new pbr::GeneratedClrTypeInfo[] { null, }),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Settings), global::Pydantic.OpAmp.Client.Sdk.Settings.Parser, new[]{ "SamplingRate", "SendTraces", "SendMetrics", "SendLogs", "SendLogsMinSeverity", "SamplingRules", "SendLogsScopeLevels", "DropAttributes", "MaskAttributes", "SamplingTracesPerSecond", "SendLogsPerSecond", "DeactivateInstrumentations", "DeactivateAllInstrumentations", "Custom" }, new[]{ "SamplingRate", "SendTraces", "SendMetrics", "SendLogs", "SendLogsMinSeverity", "SamplingTracesPerSecond", "SendLogsPerSecond", "DeactivateAllInstrumentations" }, null, null, new pbr::GeneratedClrTypeInfo[] { null, }),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.SamplingRule), global::Pydantic.OpAmp.Client.Sdk.SamplingRule.Parser, new[]{ "Rate", "Name", "Kind", "Path", "Attributes" }, new[]{ "Name", "Kind", "Path" }, null, null, new pbr::GeneratedClrTypeInfo[] { null, }),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.ScopeLevel), global::Pydantic.OpAmp.Client.Sdk.ScopeLevel.Parser, new[]{ "Pattern", "MinSeverity" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Names), global::Pydantic.OpAmp.Client.Sdk.Names.Parser, new[]{ "Names_" }, null, null, null, null),
@@ -277,7 +276,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       sendLogsPerSecond_ = other.sendLogsPerSecond_;
       deactivateInstrumentations_ = other.deactivateInstrumentations_ != null ? other.deactivateInstrumentations_.Clone() : null;
       deactivateAllInstrumentations_ = other.deactivateAllInstrumentations_;
-      opampPollingIntervalMs_ = other.opampPollingIntervalMs_;
       custom_ = other.custom_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
@@ -416,9 +414,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public uint SendLogsMinSeverity {
-      get { if ((_hasBits0 & 64) != 0) { return sendLogsMinSeverity_; } else { return SendLogsMinSeverityDefaultValue; } }
+      get { if ((_hasBits0 & 32) != 0) { return sendLogsMinSeverity_; } else { return SendLogsMinSeverityDefaultValue; } }
       set {
-        _hasBits0 |= 64;
+        _hasBits0 |= 32;
         sendLogsMinSeverity_ = value;
       }
     }
@@ -426,13 +424,13 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasSendLogsMinSeverity {
-      get { return (_hasBits0 & 64) != 0; }
+      get { return (_hasBits0 & 32) != 0; }
     }
     /// <summary>Clears the value of the "send_logs_min_severity" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearSendLogsMinSeverity() {
-      _hasBits0 &= ~64;
+      _hasBits0 &= ~32;
     }
 
     /// <summary>Field number for the "sampling_rules" field.</summary>
@@ -511,9 +509,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public double SamplingTracesPerSecond {
-      get { if ((_hasBits0 & 128) != 0) { return samplingTracesPerSecond_; } else { return SamplingTracesPerSecondDefaultValue; } }
+      get { if ((_hasBits0 & 64) != 0) { return samplingTracesPerSecond_; } else { return SamplingTracesPerSecondDefaultValue; } }
       set {
-        _hasBits0 |= 128;
+        _hasBits0 |= 64;
         samplingTracesPerSecond_ = value;
       }
     }
@@ -521,13 +519,13 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasSamplingTracesPerSecond {
-      get { return (_hasBits0 & 128) != 0; }
+      get { return (_hasBits0 & 64) != 0; }
     }
     /// <summary>Clears the value of the "sampling_traces_per_second" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearSamplingTracesPerSecond() {
-      _hasBits0 &= ~128;
+      _hasBits0 &= ~64;
     }
 
     /// <summary>Field number for the "send_logs_per_second" field.</summary>
@@ -538,9 +536,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public double SendLogsPerSecond {
-      get { if ((_hasBits0 & 256) != 0) { return sendLogsPerSecond_; } else { return SendLogsPerSecondDefaultValue; } }
+      get { if ((_hasBits0 & 128) != 0) { return sendLogsPerSecond_; } else { return SendLogsPerSecondDefaultValue; } }
       set {
-        _hasBits0 |= 256;
+        _hasBits0 |= 128;
         sendLogsPerSecond_ = value;
       }
     }
@@ -548,13 +546,13 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public bool HasSendLogsPerSecond {
-      get { return (_hasBits0 & 256) != 0; }
+      get { return (_hasBits0 & 128) != 0; }
     }
     /// <summary>Clears the value of the "send_logs_per_second" field</summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearSendLogsPerSecond() {
-      _hasBits0 &= ~256;
+      _hasBits0 &= ~128;
     }
 
     /// <summary>Field number for the "deactivate_instrumentations" field.</summary>
@@ -597,33 +595,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public void ClearDeactivateAllInstrumentations() {
       _hasBits0 &= ~16;
-    }
-
-    /// <summary>Field number for the "opamp_polling_interval_ms" field.</summary>
-    public const int OpampPollingIntervalMsFieldNumber = 7;
-    private readonly static ulong OpampPollingIntervalMsDefaultValue = 0UL;
-
-    private ulong opampPollingIntervalMs_;
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public ulong OpampPollingIntervalMs {
-      get { if ((_hasBits0 & 32) != 0) { return opampPollingIntervalMs_; } else { return OpampPollingIntervalMsDefaultValue; } }
-      set {
-        _hasBits0 |= 32;
-        opampPollingIntervalMs_ = value;
-      }
-    }
-    /// <summary>Gets whether the "opamp_polling_interval_ms" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasOpampPollingIntervalMs {
-      get { return (_hasBits0 & 32) != 0; }
-    }
-    /// <summary>Clears the value of the "opamp_polling_interval_ms" field</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearOpampPollingIntervalMs() {
-      _hasBits0 &= ~32;
     }
 
     /// <summary>Field number for the "custom" field.</summary>
@@ -672,7 +643,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (!pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.Equals(SendLogsPerSecond, other.SendLogsPerSecond)) return false;
       if (!object.Equals(DeactivateInstrumentations, other.DeactivateInstrumentations)) return false;
       if (DeactivateAllInstrumentations != other.DeactivateAllInstrumentations) return false;
-      if (OpampPollingIntervalMs != other.OpampPollingIntervalMs) return false;
       if (!Custom.Equals(other.Custom)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -694,7 +664,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (HasSendLogsPerSecond) hash ^= pbc::ProtobufEqualityComparers.BitwiseDoubleEqualityComparer.GetHashCode(SendLogsPerSecond);
       if (deactivateInstrumentations_ != null) hash ^= DeactivateInstrumentations.GetHashCode();
       if (HasDeactivateAllInstrumentations) hash ^= DeactivateAllInstrumentations.GetHashCode();
-      if (HasOpampPollingIntervalMs) hash ^= OpampPollingIntervalMs.GetHashCode();
       hash ^= Custom.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -737,10 +706,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (HasDeactivateAllInstrumentations) {
         output.WriteRawTag(48);
         output.WriteBool(DeactivateAllInstrumentations);
-      }
-      if (HasOpampPollingIntervalMs) {
-        output.WriteRawTag(56);
-        output.WriteUInt64(OpampPollingIntervalMs);
       }
       if (HasSendLogsMinSeverity) {
         output.WriteRawTag(72);
@@ -792,10 +757,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (HasDeactivateAllInstrumentations) {
         output.WriteRawTag(48);
         output.WriteBool(DeactivateAllInstrumentations);
-      }
-      if (HasOpampPollingIntervalMs) {
-        output.WriteRawTag(56);
-        output.WriteUInt64(OpampPollingIntervalMs);
       }
       if (HasSendLogsMinSeverity) {
         output.WriteRawTag(72);
@@ -855,9 +816,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (HasDeactivateAllInstrumentations) {
         size += 1 + 1;
       }
-      if (HasOpampPollingIntervalMs) {
-        size += 1 + pb::CodedOutputStream.ComputeUInt64Size(OpampPollingIntervalMs);
-      }
       size += custom_.CalculateSize(_map_custom_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -905,9 +863,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (other.HasDeactivateAllInstrumentations) {
         DeactivateAllInstrumentations = other.DeactivateAllInstrumentations;
       }
-      if (other.HasOpampPollingIntervalMs) {
-        OpampPollingIntervalMs = other.OpampPollingIntervalMs;
-      }
       custom_.MergeFrom(other.custom_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -953,10 +908,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
           }
           case 48: {
             DeactivateAllInstrumentations = input.ReadBool();
-            break;
-          }
-          case 56: {
-            OpampPollingIntervalMs = input.ReadUInt64();
             break;
           }
           case 72: {
@@ -1035,10 +986,6 @@ namespace Pydantic.OpAmp.Client.Sdk {
           }
           case 48: {
             DeactivateAllInstrumentations = input.ReadBool();
-            break;
-          }
-          case 56: {
-            OpampPollingIntervalMs = input.ReadUInt64();
             break;
           }
           case 72: {

@@ -91,13 +91,13 @@ internal sealed class OpAmpAgent : IDisposable
     /// names its instrumentations in code); the sampling rate only while the live sampler can be the
     /// tracer provider's; a signal's sending only while every exporter it has can be gated
     /// (<see cref="Exporters"/>, read from the built providers each time: a processor the application
-    /// adds to one later is found); the polling interval at the next start.
+    /// adds to one later is found). Nothing waits for the next start.
     /// </summary>
     public Host HostNow(bool providersBuilt)
     {
         // Before the providers are built, an exporter not yet seen may still be gated.
         var ungated = providersBuilt ? this.Ungated() : [];
-        var h = new Host { NextStart = { "opamp_polling_interval" } };
+        var h = new Host();
         if (this.gateable)
         {
             foreach (var signal in Enum.GetValues<Signal>().Where(s => !ungated.Contains(s)))

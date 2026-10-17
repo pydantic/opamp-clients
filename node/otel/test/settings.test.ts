@@ -733,9 +733,12 @@ interface DebugCase {
 // saving.json's cases whose save fails are the layer's: here the client keeps the config applied,
 // and its save failing holds APPLIED back rather than refusing the config (the client's tests).
 test("vectors: debug.json and saving.json, step by step through the agent: decide, a restart, the timer's refresh", () => {
-  const cases = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")]
+  const all = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")]
     .filter((k) => !k.steps.some((s) => s.save === "failed"));
-  assert.ok(cases.length >= 13);
+  assert.ok(all.length >= 13);
+  // A next-start change is another SDK's case: this one carries every setting out at once, the
+  // instrumentation switches too, so nothing it applies waits for a restart.
+  const cases = all.filter((k) => !k.steps.some((s) => s.document?.includes('"instrumentations":{"mode":"override"')));
   for (const k of cases) {
     const nowhere = k.steps.some((s) => s.save === "nowhere");
     const dir = nowhere ? undefined : mkdtempSync(join(tmpdir(), "opamp-debug-"));

@@ -95,7 +95,7 @@ public class HostingTests
     [Fact]
     public async Task TheServersSettingsAreCarriedOutAndAnswered()
     {
-        var body = Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""), ("polling_interval", """{"milliseconds":5000}"""));
+        var body = Policy.Of(("head_sampling", """{"ratio":0.25}"""), ("signal_exports.logs", """{"enabled":false}"""));
         await using var server = new OpAmpServer(Kit.Config(body));
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:StateDirectory"] = Kit.TempDir(), ["OpAmp:HeartbeatInterval"] = "100ms" });
         b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s")).WithOpAmp();
@@ -109,11 +109,10 @@ public class HostingTests
         await Kit.Until(() => server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s &&
                                                        s.LastRemoteConfigHash.ToStringUtf8() == body), "the remote config answered APPLIED");
         Assert.False(agent.Controls.SendLogs);
-        // In force, as reported: the controls it carries out now, not the polling interval of its next start.
+        // In force, as reported: every control it carries out, at once.
         await Kit.Until(() => server.Messages.Any(m => Effective(m).Contains("signal_exports.logs")), "the effective config reported");
         var effective = server.Messages.Select(Effective).Last(e => e.Length > 0);
         Assert.Contains("head_sampling", effective);
-        Assert.DoesNotContain("polling_interval", effective);
         await host.StopAsync(Cancel);
     }
 

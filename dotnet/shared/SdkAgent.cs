@@ -281,9 +281,7 @@ internal sealed class SdkAgent
             Endpoint = this.server.Endpoint,
             InstanceUid = Uuid.Bytes(this.Uid),
             Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig,
-            HeartbeatInterval = this.atStart.Settings.HasOpampPollingIntervalMs
-                ? TimeSpan.FromMilliseconds(this.atStart.Settings.OpampPollingIntervalMs)
-                : this.server.Heartbeat,
+            HeartbeatInterval = this.server.Heartbeat,
             Headers = this.server.Headers,
             StateFile = this.server.StateDir is { } dir ? Path.Combine(dir, "opamp-state") : null,
             // A key of its own, offered by the server: taken with a state directory (StateFile)

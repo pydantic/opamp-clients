@@ -263,7 +263,7 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     # newer settings aren't declared, and with a console metric exporter nothing stops metrics.
     # The application's own settings are handed on whoever built the SDK.
     assert set(parts(theirs.components)["settings"]) == {
-        "custom", "deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"}
+        "custom", "deactivate_all_instrumentations", "deactivate_instrumentations"}
     # The first message of each carries them in full, its hash set by the client.
     sent = [m.available_components for m in server.got if m.HasField("available_components")]
     full = _full(server)

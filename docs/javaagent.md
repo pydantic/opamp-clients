@@ -152,7 +152,6 @@ query string or a fragment. An endpoint without a scheme gets a warning at start
   | `log_levels` (`scopes`), `attribute_redaction`, `sampling_rules`, `trace_rate_limit`, `log_rate_limit`, `debug` | at once. See [the settings that match telemetry](#the-settings-that-match-telemetry). |
   | `instrumentations` (`disabled`) | at the next start, `otel.instrumentation.<name>.enabled=false`. Names are the agent's: `jdbc`, `spring-webmvc` (every version) or `spring-webmvc-6.0` (one), `java-http-client`, and so on. `_` reads as `-`. |
   | `instrumentations` (`all_disabled`) | at the next start, `otel.instrumentation.common.default-enabled=false`. The application's own spans, metrics and logs (through the OpenTelemetry API) stop too. |
-  | `polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
   | `app_settings` | at once, to the application ([below](#the-applications-own-settings)). |
 
   A policy that overrides a control this agent does not carry out is refused whole (FAILED), and

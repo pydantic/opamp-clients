@@ -20,7 +20,6 @@ const MORE_CONTROLS = [
   "debug",
   "app_settings",
   "instrumentations",
-  "polling_interval",
 ] as const;
 
 type Fields = Record<string, unknown>;
@@ -37,7 +36,6 @@ export interface Overrides {
   debug?: Fields;
   app_settings?: Fields;
   instrumentations?: Fields;
-  polling_interval?: Fields;
 }
 
 /**

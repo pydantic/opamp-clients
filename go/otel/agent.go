@@ -33,14 +33,14 @@ import (
 // Setup builds (the sampler wraps whichever one OTEL_TRACES_SAMPLER names, and every span and log
 // exporter it builds goes through a gate), send_metrics only where the metrics reader is built
 // around a gated exporter, the instrumentation switches at once too (a switched-off
-// instrumentation's tracer starts no span from then on), and the polling interval at the next
-// start. A global provider the application sets in place of Setup's narrows it (agent.host).
+// instrumentation's tracer starts no span from then on), so nothing waits for the next start. A
+// global provider the application sets in place of Setup's narrows it (agent.host).
 func (s *server) host() *settingspb.Host {
 	live := append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations"}, carried...)
 	if !s.metricsUngated {
 		live = append(live, "send_metrics")
 	}
-	return &settingspb.Host{Live: live, NextStart: []string{"opamp_polling_interval"}}
+	return &settingspb.Host{Live: live}
 }
 
 // carried are the live settings this package carries out whatever it built: those of its sampler,
@@ -270,9 +270,6 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		// through net/http, on a transport of its own that no instrumentation wraps.
 		Mode:       opamp.ModeGo,
 		HTTPClient: untraced(),
-	}
-	if ms := a.atStart.GetSettings().OpampPollingIntervalMs; ms != nil {
-		cfg.HeartbeatInterval = time.Duration(*ms) * time.Millisecond
 	}
 	if a.server.stateDir != "" {
 		cfg.StateFile = filepath.Join(a.server.stateDir, "opamp-state")

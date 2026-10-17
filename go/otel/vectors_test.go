@@ -66,7 +66,7 @@ const policyFile = "logfire-sdk-policy.json"
 
 // The controls of a policy in order: it must send the first two, and may leave out the others.
 var policyControls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
-	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval"}
+	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations"}
 
 // exportsLocal is a signal_exports control that leaves every export as the SDK has it.
 const exportsLocal = `{"traces":{"mode":"local"},"metrics":{"mode":"local"},"logs":{"mode":"local"}}`

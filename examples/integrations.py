@@ -54,13 +54,12 @@ Run 3, the policies, in the order the server offers them:
   8. head_sampling 1, attribute_redaction drop URL.FULL and Http.Url (keys match ignoring case),
      trace_rate_limit 1, log_rate_limit 1: APPLIED; spans arrive, none named by a URL or
      [REDACTED]; about a span and a log record a second, of some five requests a second;
-  9. polling_interval 3000 ms, instrumentations all_disabled: APPLIED.
+  9. instrumentations all_disabled: APPLIED.
   Throughout, export health: the agent's health carries component_health_map["exporters"], a
   child each for traces, metrics and logs, the application's own `healthy` true in every report;
   a report counts trace exports that succeeded, and log records dropped on purpose (by the level,
   the logs export off or the cap).
-Run 4, the next start: the agent checks in every 3 s, not every second as its environment says,
-and no spans although the application makes requests.
+Run 4, the next start: no spans although the application makes requests.
 
 check_setup runs two more (and run 6's next start) against a server that requires a bearer token
 (an enrollment key):
@@ -146,8 +145,6 @@ Launch = Callable[[str, str, Path, str, dict[str, str]], Callable[[], None]]
 # What check_signals adds to the application's environment: every signal exported, and often.
 SIGNALS = {"OTEL_METRICS_EXPORTER": "otlp", "OTEL_LOGS_EXPORTER": "otlp", "OTEL_METRIC_EXPORT_INTERVAL": "500",
            "OTEL_BLRP_SCHEDULE_DELAY": "500"}
-# The polling interval run 3 offers, against the 1 s the environment asks for.
-POLLING = 3.0
 # How far ahead of its offer run 3's debug until is, in seconds.
 DEBUG = 10
 # AcceptsOpAMPConnectionSettings and ReportsConnectionSettingsStatus: what an agent declares for the
@@ -224,7 +221,7 @@ POLICY_V1 = "logfire-sdk-policy/v1"
 _SIGNALS = ("traces", "metrics", "logs")
 # The controls a policy may leave out (as local).
 _MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
-                "app_settings", "instrumentations", "polling_interval")
+                "app_settings", "instrumentations")
 
 
 def policy(overrides: dict[str, dict], every: bool | None = None) -> str:
@@ -298,8 +295,7 @@ def signals_scenario(gap: int = 25) -> dict:
         offer(1 + 7 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["url.full", "http.url"]}}),
         offer(1 + 8 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"drop": ["URL.FULL", "Http.Url"]},
                             "trace_rate_limit": {"traces_per_second": 1}, "log_rate_limit": {"records_per_second": 1}}),
-        offer(1 + 9 * gap, {"polling_interval": {"milliseconds": int(POLLING * 1000)},
-                            "instrumentations": {"all_disabled": True}}),
+        offer(1 + 9 * gap, {"instrumentations": {"all_disabled": True}}),
     ]}}
 
 
@@ -806,12 +802,8 @@ def judge_health(three: list[dict]) -> list[tuple[str, bool]]:
 def judge_signals_restart(four: list[dict]) -> list[tuple[str, bool]]:
     """Run 4's checks: (what, whether it holds)."""
     a2s = [e for e in four if e["event"] == "a2s" and not e["disconnect"]]
-    gaps = sorted(b["t"] - a["t"] for a, b in itertools.pairwise(a2s))
-    median = gaps[len(gaps) // 2] if gaps else 0
     requests = pings(four, a2s[0]["t"]) if a2s else []
     return [
-        (f"polling_interval in force at the next start: every {POLLING:g} s ({len(gaps)} gaps, median "
-         f"{median:.1f} s)", len(gaps) >= 3 and POLLING - 0.5 <= median <= POLLING + 1.5),
         (f"the application made requests while the agent was connected ({len(requests)})",
          len(requests) > REQUESTS),
         ("every instrumentation switched off at the next start: no spans",

@@ -19,7 +19,7 @@ FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
 LIVE = ["custom", "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
         "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
         "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
-NEXT_START = ["deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval"]
+NEXT_START = ["deactivate_all_instrumentations", "deactivate_instrumentations"]
 NOW = 1_791_979_200_000  # 2026-10-14T12:00:00Z
 
 
@@ -72,12 +72,12 @@ def test_the_description_names_the_policy_formats_and_the_controls_the_host_carr
     from opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
-    host = settings_pb2.Host(live=["sampling_rate", "send_logs", "custom"], next_start=["opamp_polling_interval"])
+    host = settings_pb2.Host(live=["sampling_rate", "send_logs", "custom"], next_start=["deactivate_instrumentations"])
     got = described(layer.describe([], host, NOW))
     assert got == {
         "logfire.opamp.config_format": V1,
         "logfire.opamp.supported_controls": ["head_sampling", "signal_exports.logs", "app_settings",
-                                             "polling_interval"],
+                                             "instrumentations"],
     }
     # Every setting declared: every control. No host: none.
     every = described(layer.describe([], declaring(), NOW))["logfire.opamp.supported_controls"]
@@ -154,14 +154,14 @@ def test_the_save_the_layer_asks_for_decides_the_answer() -> None:
     # Nowhere to keep state: a live change is applied, a next-start one refused.
     live = layer.decide(config(quarter), current, current, declaring())
     assert live.status.status == APPLIED
-    minute = policy(polling_interval={"milliseconds": 60_000})
-    later = layer.decide(config(minute), current, current, declaring())
-    assert later.status.error_message == ("polling_interval: takes effect at the next start, which needs "
+    redis = policy(instrumentations={"disabled": ["redis"]})
+    later = layer.decide(config(redis), current, current, declaring())
+    assert later.status.error_message == ("instrumentations: takes effect at the next start, which needs "
                                           "somewhere to keep state")
     kept: list[bytes] = []
-    saved = layer.decide(config(minute), current, current, declaring(), save=kept.append)
-    assert saved.status.status == APPLIED and list(saved.pending_restart) == ["opamp_polling_interval"]
-    assert kept == [minute]
+    saved = layer.decide(config(redis), current, current, declaring(), save=kept.append)
+    assert saved.status.status == APPLIED and list(saved.pending_restart) == ["deactivate_instrumentations"]
+    assert kept == [redis]
 
 
 def test_a_log_level_arrives_as_the_lowest_severity_number_to_export() -> None:

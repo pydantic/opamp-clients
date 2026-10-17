@@ -569,17 +569,6 @@ public final class SettingsProto {
     boolean getDeactivateAllInstrumentations();
 
     /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return Whether the opampPollingIntervalMs field is set.
-     */
-    boolean hasOpampPollingIntervalMs();
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return The opampPollingIntervalMs.
-     */
-    long getOpampPollingIntervalMs();
-
-    /**
      * <pre>
      * custom: the application's own settings, key to value, which the SDK doesn't read but hands
      * to the application (docs/app-settings.md): its readers see this map, whole, from the moment
@@ -1687,40 +1676,6 @@ java.lang.String defaultValue);
     private void clearDeactivateAllInstrumentations() {
       bitField0_ = (bitField0_ & ~0x00000100);
       deactivateAllInstrumentations_ = false;
-    }
-
-    public static final int OPAMP_POLLING_INTERVAL_MS_FIELD_NUMBER = 7;
-    private long opampPollingIntervalMs_;
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return Whether the opampPollingIntervalMs field is set.
-     */
-    @java.lang.Override
-    public boolean hasOpampPollingIntervalMs() {
-      return ((bitField0_ & 0x00000200) != 0);
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @return The opampPollingIntervalMs.
-     */
-    @java.lang.Override
-    public long getOpampPollingIntervalMs() {
-      return opampPollingIntervalMs_;
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     * @param value The opampPollingIntervalMs to set.
-     */
-    private void setOpampPollingIntervalMs(long value) {
-      bitField0_ |= 0x00000200;
-      opampPollingIntervalMs_ = value;
-    }
-    /**
-     * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-     */
-    private void clearOpampPollingIntervalMs() {
-      bitField0_ = (bitField0_ & ~0x00000200);
-      opampPollingIntervalMs_ = 0L;
     }
 
     public static final int CUSTOM_FIELD_NUMBER = 16;
@@ -3010,42 +2965,6 @@ java.lang.String defaultValue) {
         return this;
       }
 
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return Whether the opampPollingIntervalMs field is set.
-       */
-      @java.lang.Override
-      public boolean hasOpampPollingIntervalMs() {
-        return instance.hasOpampPollingIntervalMs();
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return The opampPollingIntervalMs.
-       */
-      @java.lang.Override
-      public long getOpampPollingIntervalMs() {
-        return instance.getOpampPollingIntervalMs();
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @param value The opampPollingIntervalMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setOpampPollingIntervalMs(long value) {
-        copyOnWrite();
-        instance.setOpampPollingIntervalMs(value);
-        return this;
-      }
-      /**
-       * <code>optional uint64 opamp_polling_interval_ms = 7;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearOpampPollingIntervalMs() {
-        copyOnWrite();
-        instance.clearOpampPollingIntervalMs();
-        return this;
-      }
-
       @java.lang.Override
 
       public int getCustomCount() {
@@ -3225,7 +3144,6 @@ java.lang.String defaultValue) {
               "sendLogs_",
               "deactivateInstrumentations_",
               "deactivateAllInstrumentations_",
-              "opampPollingIntervalMs_",
               "sendLogsMinSeverity_",
               "samplingRules_",
               dev.pydantic.opamp.sdk.SettingsProto.SamplingRule.class,
@@ -3239,10 +3157,10 @@ java.lang.String defaultValue) {
               CustomDefaultEntryHolder.defaultEntry,
             };
             java.lang.String info =
-                "\u0000\u000f\u0000\u0001\u0001\u0010\u000f\u0001\u0004\u0000\u0001\u1000\u0000\u0002" +
+                "\u0000\u000e\u0000\u0001\u0001\u0010\u000e\u0001\u0004\u0000\u0001\u1000\u0000\u0002" +
                 "\u1007\u0001\u0003\u1007\u0002\u0004\u1007\u0003\u0005\u1009\u0007\u0006\u1007\b" +
-                "\u0007\u1003\t\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0005" +
-                "\u000f\u1000\u0006\u00102";
+                "\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0005\u000f\u1000" +
+                "\u0006\u00102";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

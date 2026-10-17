@@ -118,13 +118,13 @@ class SdkSettingsTest {
     // Nowhere to keep state: a live change is applied, a next-start one refused.
     SettingsProto.Decision live = layer.decide(config(quarter), current, current, DECLARING, 0, null);
     assertEquals(APPLIED, live.getStatus().getStatus());
-    String minute = every("polling_interval", override("\"milliseconds\":60000"));
-    SettingsProto.Decision later = layer.decide(config(minute), current, current, DECLARING, 0, null);
-    assertEquals("polling_interval: takes effect at the next start, which needs somewhere to keep state",
+    String redis = every("instrumentations", override("\"disabled\":[\"redis\"]"));
+    SettingsProto.Decision later = layer.decide(config(redis), current, current, DECLARING, 0, null);
+    assertEquals("instrumentations: takes effect at the next start, which needs somewhere to keep state",
         later.getStatus().getErrorMessage());
-    SettingsProto.Decision saved = layer.decide(config(minute), current, current, DECLARING, 0, KEEP);
+    SettingsProto.Decision saved = layer.decide(config(redis), current, current, DECLARING, 0, KEEP);
     assertEquals(APPLIED, saved.getStatus().getStatus());
-    assertEquals(List.of("opamp_polling_interval"), saved.getPendingRestartList());
+    assertEquals(List.of("deactivate_instrumentations"), saved.getPendingRestartList());
   }
 
   /** A non-identifying attribute of the description: a string as itself, an array joined by commas. */
@@ -155,8 +155,7 @@ class SdkSettingsTest {
     assertEquals(1, desc.getIdentifyingAttributesCount());
     assertEquals("h", attribute(desc, "host.name"));
     String every = "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
-        + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,"
-        + "polling_interval";
+        + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations";
     record Case(SettingsProto.Host host, long now, String controls) {}
     for (Case c : List.of(
         new Case(EVERY, NOW, every),
@@ -189,8 +188,7 @@ class SdkSettingsTest {
       "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
       "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
       "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"))
-      .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations",
-          "opamp_polling_interval")).build();
+      .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations")).build();
   /** {@link #DECLARING} with the application's own settings ({@code custom}) too. */
   static final SettingsProto.Host EVERY = DECLARING.toBuilder().addLive("custom").build();
   static final long NOW = 1_791_979_200_000L; // 2026-10-14T12:00:00Z

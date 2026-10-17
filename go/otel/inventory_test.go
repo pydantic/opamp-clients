@@ -160,8 +160,7 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 	// The settings: those of the host Load and Decide are given, without send_metrics.
 	settings := listed(c.GetComponents()["settings"])
 	if _, ok := settings["send_metrics"]; ok || settings["send_traces"]["applies"] != "at once" ||
-		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" ||
-		settings["opamp_polling_interval"]["applies"] != "next start" {
+		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" {
 		t.Fatalf("settings %v", settings)
 	}
 	ref, err := testLayer(t).Components(context.Background(), &settingspb.Inventory{}, sdk.agent.server.host(), vectorNow)
@@ -263,8 +262,8 @@ func TestAnInventoryOfNothing(t *testing.T) {
 		len(c.GetComponents()["exporters"].GetSubComponentMap()) != 0 || len(listed(c.GetComponents()["settings"])) == 0 {
 		t.Fatalf("components %v", c)
 	}
-	// Without a state directory a next-start setting can't be kept: still listed, as the layer says.
-	if listed(c.GetComponents()["settings"])["opamp_polling_interval"]["applies"] != "next start" {
+	// Without a state directory every setting is still carried out at once, as the layer says.
+	if listed(c.GetComponents()["settings"])["deactivate_instrumentations"]["applies"] != "at once" {
 		t.Fatalf("settings %v", listed(c.GetComponents()["settings"]))
 	}
 }

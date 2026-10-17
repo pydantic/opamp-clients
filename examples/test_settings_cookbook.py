@@ -27,7 +27,7 @@ SIGNALS = ("traces", "metrics", "logs")
 # The controls every policy sends, then every control.
 V1_CONTROLS = ("head_sampling", "signal_exports")
 ALL_CONTROLS = V1_CONTROLS + ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
-                             "attribute_redaction", "debug", "app_settings", "instrumentations", "polling_interval")
+                             "attribute_redaction", "debug", "app_settings", "instrumentations")
 # The controls every policy sends, a signal's export as `signal_exports.logs`.
 V1_OVERRIDES = {"head_sampling", *(f"signal_exports.{s}" for s in SIGNALS)}
 
@@ -65,7 +65,7 @@ class SettingsCookbook(unittest.TestCase):
         self.live, self.next_start = controls()
 
     def test_the_table_reads(self) -> None:
-        self.assertEqual(self.next_start, {"instrumentations", "polling_interval"})
+        self.assertEqual(self.next_start, {"instrumentations"})
         self.assertEqual(self.live | self.next_start, V1_OVERRIDES | set(ALL_CONTROLS[2:]))
 
     def test_each_file_is_a_whole_policy(self) -> None:

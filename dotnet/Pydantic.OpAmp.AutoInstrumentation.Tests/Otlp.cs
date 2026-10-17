@@ -318,7 +318,7 @@ internal static class Vectors
             "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
             "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces",
         },
-        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval" },
+        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations" },
     };
 
     /// <summary>A vectors file's cases.</summary>

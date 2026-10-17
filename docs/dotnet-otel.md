@@ -82,7 +82,6 @@ not conflict with the ones automatic instrumentation ships.
   | `log_levels` `level` | at once, at the OTLP logs exporter's gate: each export goes out without its log records below the level (a record with no severity is kept), and one with none left is answered with success without leaving. Local: every severity. |
   | `instrumentations` `disabled` | at the next start, `OTEL_DOTNET_AUTO_{TRACES,METRICS,LOGS}_<NAME>_INSTRUMENTATION_ENABLED=false`. Names are upstream's, lowercase: `httpclient`, `aspnetcore`, `sqlclient`, and so on. Upstream's have no punctuation, so `.`, `-` and `_` are dropped: `http_client` and `asp-net-core` are `httpclient` and `aspnetcore`. |
   | `instrumentations` `all_disabled` | at the next start, every instrumentation's variable set to false (one set to true would otherwise win). |
-  | `polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
 
   The newer controls (rules, per-scope levels, redaction, rate caps, debug mode) and export
   health are [below](#the-newer-settings). No control changes the SDK's own log level.

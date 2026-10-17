@@ -39,7 +39,7 @@ node --import @pydantic/opamp-otel/register app.js
 |---|---|
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it (or with `OTEL_SDK_DISABLED=true`), this is upstream's `register`. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and a policy that changes the one control that takes effect at the next start (`polling_interval`) is refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; it never stops the application. |
 
 ### In code
@@ -120,7 +120,6 @@ process running.
   | `debug` | until a time, another sampling ratio and log level, then back on its own ([below](#debug-mode)). |
   | `instrumentations` (`disabled`) | from then on, the named instrumentations' tracers start no span, and their metrics and log records are not exported ([below](#switching-instrumentations-off)). Names are upstream's short ones: `http`, `express`, `pg`, and so on. `http`, `net` and `dns` all trace an outgoing HTTP request. |
   | `instrumentations` (`all_disabled`) | the same, for every instrumentation the package loaded. The application's own tracers are not switched. |
-  | `polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
   | `app_settings` | to the application, at once. See [the application's own settings](#the-applications-own-settings). |
 
   A policy that overrides a control this process does not carry out is refused whole (FAILED),

@@ -8,19 +8,19 @@
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "80548bff74b08edf72580755e7afd515ef659b62c4de49c574b3f66aad059a07",
+      "sha256": "9af7a1631eaaed7ed374ef299e7f221e18541995dc4deb68e03824389db89d56",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
-      "sha256": "0b39212f7a35350229aa19ee6ccc60be06f0529391c317b1258e4b5abaa948fa",
+      "sha256": "d1a0c7be3021fac2e7276d448e6135d7f455d859578d50f62b43159bdb558fea",
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "fc17aef91c8bd95e118c82b84f33287c749cd36409b2f235b38aecf7cefa47f3",
+      "sha256": "5e49ab19b544a10a965115b7dfd254a27b88bad9e0f81cee987731b7e88615b5",
       "kind": "wasm"
     },
     "native-linux-x64-libopamp_native.so": {
-      "sha256": "7906b70e85a5a64f315fbce23fd72fb93e9b76ba302f4b6cfce4f897f1f45455",
+      "sha256": "b114606b0041a64a7a567c19d525db917fd113e6c049bdcff43affd2adaa72d2",
       "kind": "native",
       "target": "linux-x64",
       "lib": "libopamp_native.so"
@@ -28,22 +28,22 @@
   },
   "tree": {
     "proto/opamp/core/v1/core.proto": "3a48913ac6dbf495823c94d64c4166de47cca00125c48c26394e3ae8583d9a30",
-    "proto/opamp/sdk/v1/settings.proto": "3138d1381b38c0ae7e35b6a85a49c8713e4545317c3c5a46db465e0b808b736d",
+    "proto/opamp/sdk/v1/settings.proto": "75b82c1309dd281a18628e10a77fd421d7c6f085340aa25fa8198d50d66ec436",
     "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
     "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
     "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",
     "spec/shell-contract.md": "5f268cb444e9897e7f51f6bebafcfb84d437a73e453b107375a4b8c0bbc5e4e5",
-    "testdata/sdk-settings/caps.json": "d05b93b3caa3084f2561fc0b247c844cfc17da1134e35bf7b5758f8ddd7c91a7",
-    "testdata/sdk-settings/components.json": "791fc31c1efde3811afb250d26fe8929559329d0610ea288b459d47f3e800fb8",
-    "testdata/sdk-settings/custom.json": "af9bb965340dd8620bb0617feedcf615b4726ca3873f7e6e02f0e15207b29dca",
-    "testdata/sdk-settings/debug.json": "719f1c027f6fcf2c15d07957935eceea9b754766e0a1ddb36fec81baa17e566d",
-    "testdata/sdk-settings/health.json": "16ab2b0b579a96f433297f7e41a446f309c3280e60dd09c25b7561cef451f16b",
-    "testdata/sdk-settings/logs.json": "f0337dbdfed96441135408b16286b5a4c666697e38c4c21a3cc31a62e8848501",
-    "testdata/sdk-settings/redact.json": "dd604a1ff42c6b568e51836ac6a91b23118453483356ce16f869b59dcaa3de89",
-    "testdata/sdk-settings/sampling.json": "589b6b0dd45b7beedc97c250fbf14aa0edd10b67af5e56fe0efdcf7490ab8b50",
-    "testdata/sdk-settings/saving.json": "3abdd5e8af2ad450645d47c8fa7d633b0cc1a909b91e8e7174dbdb34b6f4bae7",
-    "testdata/sdk-settings/settings.json": "15ab0879d34efd073812546f0903103c5565d8ef98893e68797b88ab18d3e217",
-    "testdata/sdk-settings/start.json": "fc001f2649ffb30ecaaa7ea2390c42b589e246ec0a07eb26d351b343ce93651e",
+    "testdata/sdk-settings/caps.json": "c6d267fbb8690a6720d811033579fd61bfc4bf846c00a44f70c870a971013005",
+    "testdata/sdk-settings/components.json": "12759e0879f57dca2a89b8dca31ba02afb107267e73ff8be2c2bdd685275bca5",
+    "testdata/sdk-settings/custom.json": "695d4289d9438bc6ac12ab435b6fdcfaf6645e31a36133ecd2468d0f7b5d0664",
+    "testdata/sdk-settings/debug.json": "224a22d51761497aa686b04bd4ebd0264e936e0759105b9560498eb4997bd3ba",
+    "testdata/sdk-settings/health.json": "6c7898984f5fe9d6ec0a252c8cba8d40819aea12343f4660f6d2f7aedb90c825",
+    "testdata/sdk-settings/logs.json": "39fd1e1bb054b41ccb59fa46ed6ed3b21eb342f545b24b122fad288ad6179586",
+    "testdata/sdk-settings/redact.json": "c20bfce5846f57acc011e8ca7ab7549418c9398fbda2586fc1026df1e68b2ae7",
+    "testdata/sdk-settings/sampling.json": "60368f29da891a74e6e086a8e3ed1715bd44317680672d703bf6509f0a6eaf4f",
+    "testdata/sdk-settings/saving.json": "5cdcf282c997feee30e003d0cd265b9e55e106b5eb44fe0616a19364387d9097",
+    "testdata/sdk-settings/settings.json": "da8ea7310fb78dafebfcf4d3b219d3f22adb60130cb94f1923666ee23e9e50a0",
+    "testdata/sdk-settings/start.json": "8d4831986ae1f3f1850eef114fbfe71999cb343f06a261cb310fa509f6318294",
     "tests/shell-tables/README.md": "242fd669e7ecb3ed2964802a63d24d14f4f62ac363968ce1958435a9c27b9d63",
     "tests/shell-tables/proxy.json": "caef7e46b5f17e52b3994b81327267d18075cc61c7450030c5fe5641674e0691",
     "tests/shell-tables/tls.json": "5aee89823ec096a37f28764d4cb2bb2fa213db883f088434b0d79de500f94daf",

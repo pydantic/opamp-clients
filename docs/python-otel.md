@@ -163,7 +163,6 @@ other override above that a process cannot carry out.
   | `signal_exports.metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook). `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, which can stop. Only the name `otlp` does this. With no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them, and a policy that overrides the control is refused ([the host](sdk-settings.md#the-host)). The same holds with `otlp` beside another exporter (`otlp,prometheus`), because only the OTLP one could stop. |
   | `instrumentations` (`disabled`) | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
   | `instrumentations` (`all_disabled`) | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
-  | `polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
   | `app_settings` | live, to the application. See [the application's own settings](#the-applications-own-settings). |
 
   A policy that overrides a control this process does not carry out is refused whole (FAILED),

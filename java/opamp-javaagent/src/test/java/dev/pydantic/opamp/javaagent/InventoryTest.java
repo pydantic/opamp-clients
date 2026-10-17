@@ -50,7 +50,7 @@ class InventoryTest {
         "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces")) {
       m.put(k, "at once");
     }
-    for (String k : List.of("deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval")) {
+    for (String k : List.of("deactivate_all_instrumentations", "deactivate_instrumentations")) {
       m.put(k, "next start");
     }
     return m;

@@ -65,7 +65,7 @@ public class SdkSettingsTests
             {
                 "head_sampling", "signal_exports.traces", "signal_exports.metrics", "signal_exports.logs", "sampling_rules",
                 "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
-                "instrumentations", "polling_interval",
+                "instrumentations",
             },
             Strings(all["logfire.opamp.supported_controls"]));
 
@@ -132,13 +132,13 @@ public class SdkSettingsTests
         // Nowhere to keep state: a live change is applied, a next-start one refused.
         var live = layer.Decide(Config(Policy.HeadSampling(0.25)), current, current, Declaring());
         Assert.Equal(RemoteConfigStatuses.Applied, live.Status.Status);
-        var polling = Policy.Of(("polling_interval", """{"milliseconds":60000}"""));
-        var later = layer.Decide(Config(polling), current, current, Declaring());
+        var redis = Policy.Of(("instrumentations", """{"disabled":["redis"]}"""));
+        var later = layer.Decide(Config(redis), current, current, Declaring());
         Assert.Equal(RemoteConfigStatuses.Failed, later.Status.Status);
-        Assert.Equal("polling_interval: takes effect at the next start, which needs somewhere to keep state", later.Status.ErrorMessage);
-        var saved = layer.Decide(Config(polling), current, current, Declaring(), save: Keep);
+        Assert.Equal("instrumentations: takes effect at the next start, which needs somewhere to keep state", later.Status.ErrorMessage);
+        var saved = layer.Decide(Config(redis), current, current, Declaring(), save: Keep);
         Assert.Equal(RemoteConfigStatuses.Applied, saved.Status.Status);
-        Assert.Equal(new[] { "opamp_polling_interval" }, saved.PendingRestart);
+        Assert.Equal(new[] { "deactivate_instrumentations" }, saved.PendingRestart);
     }
 
     // An override that the host does not carry out refuses the whole policy, and nothing changes.
@@ -194,7 +194,7 @@ public class SdkSettingsTests
             "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
             "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces",
         },
-        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval" },
+        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations" },
     };
 
     private const ulong Now = 1_791_979_200_000; // 2026-10-14T12:00:00Z

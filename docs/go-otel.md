@@ -41,7 +41,7 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 |---|---|
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it, `Setup` builds the same SDK, unmanaged. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. A header HTTP can't carry warns and is left out. |
-| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and a control that takes effect at the next start (`polling_interval`) is refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
+| `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is the default, with a warning. |
 
 ### In code
@@ -117,9 +117,9 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   carries out (`logfire.opamp.supported_controls`).
 - **Takes settings** from the Logfire SDK policy, the remote config's only file
   (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
-  override. **Every control but the polling interval takes effect at once**, for the SDK `Setup`
-  builds. An application that keeps its own SDK setup is not managed. One that sets a global
-  provider of its own after `Setup` has that signal's controls set aside
+  override. **Every control takes effect at once**, for the SDK `Setup` builds. An application
+  that keeps its own SDK setup is not managed. One that sets a global provider of its own after
+  `Setup` has that signal's controls set aside
   ([below](#where-the-server-cant-reach)):
 
   | Control | How |
@@ -135,7 +135,6 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   | `debug` | until that time, the debug ratio and level take the place of the ratio, the rules and the levels. A timer ends it, with or without the server ([below](#debug-mode)). |
   | `instrumentations` (`disabled`) | from then on, the named instrumentations' tracers start no span, and their metrics and log records are not exported. |
   | `instrumentations` (`all_disabled`) | the same, for every instrumentation. |
-  | `polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
   | `app_settings` | at once, to the application ([below](#the-applications-own-settings)). |
 
   A policy that overrides a control this process does not carry out is refused whole (FAILED), and

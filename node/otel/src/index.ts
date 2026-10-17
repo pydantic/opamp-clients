@@ -1289,8 +1289,8 @@ export function builds(signal: Signal, env: NodeJS.ProcessEnv = process.env): bo
  * host"). The layer refuses an override of any setting not named, and sets it aside in a policy in
  * force. The host always names the sampler's settings and the instrumentation switches, at once
  * (instrumentations are switched while the application runs). It names a signal's sending, and
- * what its gate holds, only where this package builds every one of its exporters (`builds`). It
- * names the polling interval at the next start. `own`: the signals the application registered a
+ * what its gate holds, only where this package builds every one of its exporters (`builds`).
+ * Nothing waits for the next start. `own`: the signals the application registered a
  * global provider of its own for (watchProviders). Their telemetry goes past the gate, and for
  * traces past the sampler, so those settings aren't declared.
  */
@@ -1314,7 +1314,7 @@ export function hostFromEnv(env: NodeJS.ProcessEnv = process.env, own: ReadonlyS
   }
   // Redaction is of spans and log records alike: only where both pass through this package.
   if (spansGated && logsGated) live.push("drop_attributes", "mask_attributes");
-  return { live, nextStart: ["opamp_polling_interval"] };
+  return { live };
 }
 
 /** A signal the OpenTelemetry API holds one global provider for. */
@@ -1797,8 +1797,7 @@ export class Agent {
     const uid = this.uid;
     // Stopped first (a SIGTERM while the resource was being detected): don't start at all.
     if (!s || !layer || !uid || this.#stopping) return;
-    const atStart = this.loaded?.settings;
-    const heartbeat = atStart?.opampPollingIntervalMs !== undefined ? Number(atStart.opampPollingIntervalMs) : s.heartbeatMs;
+    const heartbeat = s.heartbeatMs;
     this.reachability = new Reachability(s.endpoint, String(resource.attributes["service.name"] ?? ""), uid,
       s.endpointFrom, s.headersFrom);
     this.reachability.inUse = () => this.client?.endpoint;

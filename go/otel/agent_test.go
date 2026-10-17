@@ -106,16 +106,12 @@ func TestAnUnusableConfigChangesNothing(t *testing.T) {
 	}
 }
 
-func TestWithoutAStateDirectoryOnlyTheNextStartSettingsAreRefused(t *testing.T) {
+// Every setting this package carries out takes effect at once, so none needs a state directory.
+func TestWithoutAStateDirectoryEverySettingIsStillCarriedOut(t *testing.T) {
 	a := newTestAgent(t, "")
-	if st := a.remoteConfig(context.Background(), remote(every("instrumentations", override(`"disabled":["otelhttp"]`)))); st.GetStatus() != applied {
+	st := a.remoteConfig(context.Background(), remote(every("instrumentations", override(`"disabled":["otelhttp"]`))))
+	if st.GetStatus() != applied || !a.controls.Off(otelhttp) {
 		t.Fatalf("a live switch needs no saving: %v", st)
-	}
-	st := a.remoteConfig(context.Background(), remote(every("instrumentations", override(`"disabled":["otelhttp"]`),
-		"polling_interval", override(`"milliseconds":10000`))))
-	if st.GetStatus() != failed_ || !a.controls.Off(otelhttp) ||
-		st.GetErrorMessage() != "polling_interval: takes effect at the next start, which needs somewhere to keep state" {
-		t.Fatalf("the polling interval takes effect at the next start, which can't be kept: %v", st)
 	}
 }
 
@@ -481,7 +477,7 @@ func TestTheDescriptionNamesThePolicyAndTheControls(t *testing.T) {
 	want := map[string]string{
 		"logfire.opamp.config_format": "logfire-sdk-policy/v1",
 		"logfire.opamp.supported_controls": "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs," +
-			"sampling_rules,trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,polling_interval",
+			"sampling_rules,trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations",
 	}
 	for k, w := range want {
 		if attrs[k] != w {
@@ -657,7 +653,7 @@ func TestTheHostDeclaresEverySettingThisPackageCarriesOut(t *testing.T) {
 		seen[k] = true
 	}
 	if len(seen) != 17 || !seen["send_metrics"] || !seen["deactivate_instrumentations"] || !seen["custom"] ||
-		len(h.GetNextStart()) != 1 || h.GetNextStart()[0] != "opamp_polling_interval" {
+		len(h.GetNextStart()) != 0 {
 		t.Fatalf("live %v, next start %v", h.GetLive(), h.GetNextStart())
 	}
 	for _, k := range (&server{metricsUngated: true}).host().GetLive() {

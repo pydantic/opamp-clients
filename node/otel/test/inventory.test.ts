@@ -88,7 +88,6 @@ test("a typical setup: the package, the SDK, each instrumentation by its short n
   assert.equal(c.settings.send_traces, "at once");
   assert.equal(c.settings.deactivate_instrumentations, "at once");
   assert.equal(c.settings.debug_until, "at once");
-  assert.equal(c.settings.opamp_polling_interval, "next start");
 });
 
 test("every instrumentation getNodeAutoInstrumentations loads is listed, with its version, and switched off by that name", () => {

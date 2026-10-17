@@ -36,8 +36,7 @@ final class Vectors {
       "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes", "sampling_rate", "sampling_rules",
       "sampling_traces_per_second", "send_logs", "send_logs_level", "send_logs_level_by_scope",
       "send_logs_per_second", "send_metrics", "send_traces"))
-      .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations",
-          "opamp_polling_interval")).build();
+      .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations")).build();
   /** 2026-10-14T12:00:00Z: the vectors' clock where a case gives none. */
   static final long NOW = 1_791_979_200_000L;
 
@@ -88,7 +87,7 @@ final class Vectors {
   /** The controls of a policy in order: it must send the first two, and may leave out the rest (as local). */
   static final List<String> CONTROLS = List.of("head_sampling", "signal_exports", "sampling_rules",
       "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
-      "instrumentations", "polling_interval");
+      "instrumentations");
 
   /** A policy of the first two controls: {@code set} holds pairs of a control's name and its JSON value; the rest local. */
   static String v1(String... set) {

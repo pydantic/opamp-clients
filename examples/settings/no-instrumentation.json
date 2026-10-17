@@ -13,6 +13,5 @@
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "override", "all_disabled": true},
-  "polling_interval": {"mode": "local"}
+  "instrumentations": {"mode": "override", "all_disabled": true}
 }
