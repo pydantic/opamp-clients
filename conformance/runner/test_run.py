@@ -8,6 +8,7 @@ timed against the core's backoff.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 import tempfile
@@ -48,9 +49,11 @@ class LazyFSClients(unittest.TestCase):
 
 
 class CoreRoot(unittest.TestCase):
-    def test_unset_the_core_is_looked_for_at_the_root(self):
+    def test_unset_the_root_is_used_and_has_no_sources(self):
         self.assertEqual(run.core_root({}), run.ROOT)
         self.assertEqual(run.core_root({"OPAMP_CORE_ROOT": ""}), run.ROOT)
+        if not os.environ.get("OPAMP_CORE_ROOT"):
+            self.assertFalse(run.CORE_SOURCE)
 
     def test_a_checkout_with_the_core_s_sources_is_where_they_are(self):
         with tempfile.TemporaryDirectory() as tmp:

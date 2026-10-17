@@ -1,10 +1,10 @@
 # Conformance suite
 
 Every client runs the same scenarios against the same reference server, and the recorded
-traces are checked against the spec. Where the core's sources are (a Cargo.toml at the root),
-the same clients also run against the Rust server built from them (`--server rust`), which checks
-the server as well. `OPAMP_CORE_ROOT` names a checkout with the core's sources elsewhere: the
-runner then builds what comes from them there and runs it from its `target/`.
+traces are checked against the spec. With `OPAMP_CORE_ROOT` naming a checkout with the core's
+sources, the same clients also run against the Rust server built from them (`--server rust`),
+which checks the server as well: the runner builds what comes from them there and runs it from its
+`target/`.
 
 - `server/`: the reference server, in Go. It speaks plain HTTP and WebSocket directly
   (not through opamp-go's server) so that it can send a Close frame and wait for the answer,
@@ -13,7 +13,7 @@ runner then builds what comes from them there and runs it from its `target/`.
   scenario's times (`at_s`, `window_s`, a hold's `from_s`) count from the driver's first request
   (`first_contact` in the log), not from the server's start: a driver in a container that starts
   seconds late meets the faults at the same point of its run as one in process.
-- The Rust reference server, built from the core's sources where they are. It takes the Go
+- The Rust reference server, built from the core's sources (`OPAMP_CORE_ROOT`). It takes the Go
   server's flags and writes the same log, plus a `core` event for each decision it
   makes. It injects no faults: it is here to be tested, not to test.
 - `drivers/`: one small program per client, all following [DRIVERS.md](DRIVERS.md).
@@ -32,8 +32,7 @@ python3 conformance/runner/run.py                         # everything
 python3 conformance/runner/run.py --client go,java        # some clients
 python3 conformance/runner/run.py --scenario close-frame  # some scenarios
 python3 conformance/runner/run.py --list                  # clients, scenarios and checks
-python3 conformance/runner/run.py --server rust           # every client against the Rust server (where it is built)
-OPAMP_CORE_ROOT=../core python3 conformance/runner/run.py --server rust   # the same, the core's sources in ../core
+OPAMP_CORE_ROOT=../core python3 conformance/runner/run.py --server rust   # every client against the Rust server, the core's sources in ../core
 python3 conformance/runner/run.py --jobs 4                # four runs at once (CI's setting)
 python3 -m unittest conformance/runner/test_checks.py     # the checks' own tests
 ```

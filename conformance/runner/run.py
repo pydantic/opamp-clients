@@ -11,9 +11,9 @@
     conformance/runner/run.py --jobs 4                 # up to four runs at once
 
 The scenarios run against the Go server (conformance/server) unless --server rust picks the Rust
-reference server, which is built from the core's sources and so is there only where they are (a
-Cargo.toml at the root, or at OPAMP_CORE_ROOT: a checkout with the core's sources, where what comes
-from them is built and runs from its target/). A scenario lists the servers it runs on under
+reference server, which is built from the core's sources and so is there only where they are
+(OPAMP_CORE_ROOT: a checkout with the core's sources, where what comes from them is built and runs
+from its target/). A scenario lists the servers it runs on under
 "servers" (default: go); only the Go server injects faults, serves TLS or runs a proxy. A client
 whose clients.toml table says `source = true` is built from those sources too, and is left out
 where they aren't.
@@ -77,8 +77,9 @@ BIN = OUT / "bin"
 
 
 def core_root(env: dict[str, str] = os.environ) -> Path:
-    """Where the core's sources would be: OPAMP_CORE_ROOT if set (a checkout with the core's
-    sources), else the root. What is built from them is built there, and runs from its target/."""
+    """Where the core's sources are: OPAMP_CORE_ROOT if set (a checkout with the core's sources),
+    else the root, which has none. What is built from them is built there, and runs from its
+    target/."""
     given = env.get("OPAMP_CORE_ROOT")
     if not given:
         return ROOT
@@ -89,10 +90,10 @@ def core_root(env: dict[str, str] = os.environ) -> Path:
 
 
 CORE_ROOT = core_root()
-# Whether the core's sources are here (a Cargo.toml at CORE_ROOT): what is built from them (the
-# Rust server, the clients marked `source`, opamp-tap) runs only then; elsewhere opamp-tap is the
-# one the core's release carries (scripts/fetch_core.py fetch puts it in the root's target/).
-CORE_SOURCE = (CORE_ROOT / "Cargo.toml").exists()
+# Whether the core's sources are here (OPAMP_CORE_ROOT): what is built from them (the Rust server,
+# the clients marked `source`, opamp-tap) runs only then; elsewhere opamp-tap is the one the core's
+# release carries (scripts/fetch_core.py fetch puts it in the root's target/).
+CORE_SOURCE = CORE_ROOT != ROOT
 TAP_CHECKER = (CORE_ROOT if CORE_SOURCE else ROOT) / "target" / "release" / "opamp-tap"
 
 

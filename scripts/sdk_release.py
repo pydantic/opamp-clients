@@ -9,8 +9,7 @@ its registry, and checked before anything is uploaded.
     scripts/sdk_release.py check          # dist/sdk and dist/native: all there, no cores' sources
 
 The native core's wheels and NuGet packages come from scripts/native_dist.py (build, pack) first.
-Go needs nothing packed (the module proxy serves the go/vX.Y.Z tag). Rust isn't published: the
-client crate builds the core from source, which must not ship.
+Go needs nothing packed (the module proxy serves the go/vX.Y.Z tag).
 """
 from __future__ import annotations
 
