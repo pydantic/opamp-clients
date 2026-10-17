@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Run an example against the conformance suite's reference server, which offers a good remote
 config, then a bad one, and tells the example to send its traces to the server's own OTLP/HTTP
 receiver with a token; print what the server saw.

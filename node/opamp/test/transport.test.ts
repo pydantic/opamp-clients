@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // TLS, client certificates and proxies, over plain HTTP, WebSocket and package downloads. The
 // certificates are test/fixtures (make.sh); the proxies are small ones written here, an HTTP

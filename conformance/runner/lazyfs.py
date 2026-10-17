@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """LazyFS (https://github.com/dsrhaslab/lazyfs), a FUSE file system that keeps what isn't flushed
 in a cache of its own: the runner's real crashes of a machine (run.py --lazyfs; the container in
 conformance/lazyfs/ has it).

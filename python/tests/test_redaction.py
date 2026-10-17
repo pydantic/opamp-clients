@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Noninterference of secrets, as the core's own redaction tests check it:
 two configurations that differ only in their secrets' values, each as long in both, look the same
 from outside. What an application logs of them, their repr, is the same text. The secrets: the

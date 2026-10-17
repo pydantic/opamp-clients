@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The live settings flipped as fast as they come, while the application keeps emitting: one
 // applier puts a seeded sequence of documents in force through the agent (rules that overlap and

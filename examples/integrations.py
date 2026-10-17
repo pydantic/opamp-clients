@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The end-to-end check every SDK integration passes (examples/<integration>/try.py).
 
 An instrumented application runs against the reference OpAMP server for these checks: built from

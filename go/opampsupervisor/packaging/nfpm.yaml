@@ -15,9 +15,9 @@ description: |
   unmanaged with pydantic-otelcol-configure.
 vendor: Pydantic
 homepage: https://github.com/pydantic/opamp-clients
-# The shared core (go/opamp and its embedded WebAssembly) is all rights reserved; the files
-# derived from OpenTelemetry's Supervisor and opamp extension keep Apache-2.0.
-license: LicenseRef-All-Rights-Reserved AND Apache-2.0
+# Our files are MIT; the files derived from OpenTelemetry's Supervisor and opamp extension keep
+# Apache-2.0.
+license: MIT AND Apache-2.0
 depends:
   # systemd-creds and LoadCredentialEncrypted=.
   - systemd (>= 250)

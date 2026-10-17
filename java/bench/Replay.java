@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Replays a recording of a module's inputs (node/opamp/bench/download.mjs) in Chicory, the runtime
 // java/opamp uses: the same init and steps, so the same work, and reports the time spent in the

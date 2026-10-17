@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """A core run as a WebAssembly module in wasmtime (a dev dependency, not one of the package's),
 behind the interface the client runs the native core through. The modules beside the package's
 sources (src/opamp_client/opamp_core.wasm, opamp_sdk_settings.wasm, not in the wheel) are the

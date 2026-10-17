@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // app.mjs with the OpAMP server given in code, from the application's own settings (here its own
 // variables; a config file is as good), not OTEL_OPAMP_*:

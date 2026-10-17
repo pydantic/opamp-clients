@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """What an OpenTelemetry SDK does with the settings an OpAMP server sends it, decided the same way
 in every language: the SDK settings layer, run natively
 (opamp_client._native). It keeps nothing between calls; the caller keeps the settings documents

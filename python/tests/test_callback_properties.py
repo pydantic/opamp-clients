@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The callback contract (spec/shell-contract.md, RULE-SHELL-01 to -03 and -07), as a model test:
 random runs of a Hypothesis state machine against the real core and a local server. Each
 step is one of: start (over HTTP or WebSocket, with a state file holding a saved remote config or

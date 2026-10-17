@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Protobuf strings, decoded exactly. @bufbuild/protobuf (2.15 and 2.16 alike) decodes every string
 // field with a default `new TextDecoder()`, which drops a leading U+FEFF: a pattern, header value

@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // `node --import @pydantic/opamp-otel/register app.js`: upstream's auto-instrumentation register,
 // under the OpAMP server named by OTEL_OPAMP_ENDPOINT (docs/node-otel.md).

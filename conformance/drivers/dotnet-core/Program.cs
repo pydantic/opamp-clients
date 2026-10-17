@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Runs our .NET client (dotnet/Pydantic.OpAmp.Client: the shared core in Wasmtime) under the
 // conformance driver contract (conformance/DRIVERS.md). OPAMP_DOTNET_MODE=rust runs it in Rust mode

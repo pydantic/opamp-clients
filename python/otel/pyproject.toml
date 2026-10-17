@@ -3,7 +3,7 @@ name = "pydantic-opamp-otel"
 version = "0.1.0"
 description = "OpenTelemetry auto-instrumentation under an OpAMP server: install it, and opentelemetry-instrument takes its SDK settings (sampling, what to send, which instrumentations run) from the server"
 readme = "README.md"
-license = "LicenseRef-All-Rights-Reserved"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic-opamp-client",

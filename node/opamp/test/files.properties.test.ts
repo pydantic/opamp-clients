@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // A disk that fails (fast-check): a client in either mode saves remote configs (and downloads a
 // package) while one operation of one of its saves fails (EIO), writes half and then fails

@@ -11,6 +11,7 @@
     <Description>An OpenTelemetry .NET SDK set up in code (services.AddOpenTelemetry()) under an OpAMP server, in one call: .WithOpAmp()</Description>
     <IsPackable>false</IsPackable>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The callback contract (spec/shell-contract.md), as a model test over random runs
 // (fast-check's fc.commands with asyncModelRun), against the real core and a local server: start,

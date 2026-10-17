@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """An application with no OpenTelemetry code at all: an HTTP request every 200 ms, and a log line
 for each. Run under ``opentelemetry-instrument``, its urllib instrumentation traces the requests
 (and measures them), the logging handler exports the lines; pydantic-opamp-otel puts the SDK

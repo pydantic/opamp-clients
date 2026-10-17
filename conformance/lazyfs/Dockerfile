@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # The crash scenarios on a real file system that loses what wasn't flushed: LazyFS (FUSE), and
 # what builds and runs one driver per runtime natively (Rust, Go, Node.js, Python, Java, .NET), so

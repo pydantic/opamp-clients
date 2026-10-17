@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Checks over a recorded run. Each reads the merged event log and returns a Result.
 
 A check names the requirements it covers and its level. A failed MUST check fails the

@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for the differential runs' allowlist (shells.py) and the runner's crash helpers (run.py).
 
     python3 -m unittest conformance/differential/test_shells.py

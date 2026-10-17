@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Publishes the packages build.sh made (dist/*.deb, dist/*.rpm) to the apt and yum repositories in
 # a bucket, with `gcloud storage`: GCS (gs://, with Google credentials such as the workflow's

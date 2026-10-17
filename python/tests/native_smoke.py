@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Smoke test of an installed wheel (scripts/native_dist.py smoke): the native core loads, starts a
 session and answers as it should, and so does the SDK settings layer. Not a pytest module: it runs
 in a bare interpreter in each platform's container, with nothing but the wheel installed."""

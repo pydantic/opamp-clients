@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The adversary's harness: the client run on the adversary module, a hostile stand-in
 // for the core that hands the shell effect sequences the real core never makes, and checks what

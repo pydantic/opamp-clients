@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # SharpFuzz (libFuzzer for .NET) on the .NET client's own code around the core: each target in
 # dotnet/Pydantic.OpAmp.Client.Fuzz/Targets (ClientFuzz, CoreFuzz), one after another, for SECONDS

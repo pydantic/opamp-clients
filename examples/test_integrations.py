@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for the end-to-end checks every SDK integration passes (examples/integrations.py): each
 check passes a good run and fails a bad one, and none passes for want of anything to look at.
 

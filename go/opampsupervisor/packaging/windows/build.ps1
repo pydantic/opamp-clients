@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Builds the Windows installer into packaging\dist, on Windows: the bundled collector (ocb,
 # ..\collector.yaml), the Supervisor, then an .msi (pydantic-opamp-supervisor.wxs, WiX 5):

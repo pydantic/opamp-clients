@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // The application's own settings (docs/app-settings.md): appSettings on its own, then through the
 // layer and the agent: the shared vectors (testdata/sdk-settings/custom.json), reads

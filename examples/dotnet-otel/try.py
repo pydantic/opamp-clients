@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """OpenTelemetry .NET automatic instrumentation with our plugin, against the reference server.
 
     python3 examples/dotnet-otel/try.py            # builds and runs in Docker

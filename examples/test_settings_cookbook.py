@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The settings documents in examples/settings against their README and the settings' table: the
 README names each and shows it as it is, the one document with keys that are no setting shows what
 an instance reports of them, and between them the documents use every setting.

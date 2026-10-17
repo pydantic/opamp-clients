@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The shared OpAMP client core, run natively: the native library
 (pydantic-opamp-core's, through opamp_client._native), which takes and answers the same bytes as
 the WebAssembly module the other languages run. Each Core is one session, holding one client's

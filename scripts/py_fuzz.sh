@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Atheris (libFuzzer for Python) on the Python client's own code around the core: each target in
 # python/tests/fuzz/ (fuzz_*.py), one after another, for SECONDS each. A target's corpus starts

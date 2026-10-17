@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Tests for how resources_bounded judges a JVM's memory (jvm_memory.py).
 
     python3 -m unittest conformance/torture/test_jvm_memory.py

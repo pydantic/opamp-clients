@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """app.py's application, with its SDK set up in code: opamp_otel.configure() in place of
 ``opentelemetry-instrument``, and the OpAMP server given there, from the application's own
 settings (here its own variables) rather than the OTEL_OPAMP_* ones.

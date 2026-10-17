@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The native core (opamp_client._native) is held to the WebAssembly module it replaced: for runs
 of configs and inputs, plausible and not, every reply is the module's, byte for byte. The module is
 what the conformance suite, the taps and the other SDKs check, so this carries their checks over to

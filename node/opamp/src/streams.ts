@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Rust mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 // and this carries out only what needs the platform: TCP connections, TLS on them (Node's, with

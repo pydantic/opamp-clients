@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // An application traced with otelhttp, set up with opampotel.Setup: an HTTP request every
 // 200 ms to the URL it is given, and a log line for each, until SIGTERM or Ctrl-C. It traces

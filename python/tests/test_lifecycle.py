@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The client's lifetime around what it starts: stop during a WebSocket handshake, a save that
 takes long, calls from another thread. Each of these failed before the client carried out the
 core's cancels, saved beside the loop and marshalled calls onto it."""

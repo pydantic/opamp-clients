@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The inventory (docs/available-components.md): what the package lists of the SDK it built, under
 the names and the host the rest of it uses, and that the client sends it."""
 

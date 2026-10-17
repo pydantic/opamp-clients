@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The file operations of saves and download files: journaled in the core tap (kind 5) and
 held to what the checker (opamp-tap's file records) asks of them; and, through the seam that
 stands in for the file system (``_files.Files``), faults injected into them: an error, a write

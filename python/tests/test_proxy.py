@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Proxies as the application configures them: HTTP (CONNECT for every connection, to an http://
 or https:// proxy) and SOCKS5, with credentials, over both transports, for downloads too."""
 

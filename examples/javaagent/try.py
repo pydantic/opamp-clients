@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The upstream OpenTelemetry Java agent with our extension, against the reference server.
 
     python3 examples/javaagent/try.py            # builds with Maven and runs the JVM in Docker

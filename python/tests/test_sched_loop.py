@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """The seeded loop (tests/_sched_loop.py) runs the real thing (the risk: aiohttp makes tasks,
 handles and threads of its own, and the loop must own them all): a real client, over a real
 aiohttp session in Python mode and asyncio's own connections in Rust mode, against a real local

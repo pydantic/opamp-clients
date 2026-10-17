@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Fetch the OpAMP client core, compiled, from a release in pydantic/opamp-clients, and put it where
 the clients load it. Its lock, opamp-core.lock.json, is at this repository's root.
 

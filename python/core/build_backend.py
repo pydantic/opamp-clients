@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """Build pydantic-opamp-core: a wheel holding opamp_core/<the native library> and nothing else.
 
 A PEP 517 backend for building from the repository (uv sync builds one for this machine from the

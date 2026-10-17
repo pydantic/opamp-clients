@@ -1,5 +1,5 @@
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 """What the fuzz targets beside this file share: a reader of the fuzzer's bytes, the server that
 answers from them (any bytes, or a ServerToAgent built from them and then perhaps damaged), and
 the application whose callback calls the client as they say.

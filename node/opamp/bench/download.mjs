@@ -1,5 +1,5 @@
-// Copyright (c) 2026 Bill Easton. All rights reserved.
-// SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+// Copyright (c) 2026 Pydantic Services Inc.
+// SPDX-License-Identifier: MIT
 
 // Download throughput: a local OpAMP server (plain HTTP) offers one package whose file is
 // BENCH_MB megabytes, served with Content-Length or chunked; the client downloads it in the mode

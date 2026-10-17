@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Go's native fuzzing of the Go client's own code around the core (go/opamp, its core package and
 # the SDK settings layer): every Fuzz test, one after another, for SECONDS each. A crash fails the

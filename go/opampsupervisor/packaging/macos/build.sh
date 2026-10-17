@@ -1,6 +1,6 @@
 #!/bin/sh
-# Copyright (c) 2026 Bill Easton. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
 #
 # Builds the macOS package into packaging/dist, on a Mac: the bundled collector (ocb,
 # ../collector.yaml), the Supervisor, then a .pkg installing them under /opt/pydantic-opamp with
