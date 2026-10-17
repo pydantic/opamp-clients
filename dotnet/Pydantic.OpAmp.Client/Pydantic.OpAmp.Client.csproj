@@ -35,15 +35,8 @@
     <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('Windows'))">opamp_native.dll</OpAmpNativeName>
     <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('OSX'))">libopamp_native.dylib</OpAmpNativeName>
     <OpAmpNativeName Condition="'$(OpAmpNativeName)' == ''">libopamp_native.so</OpAmpNativeName>
-    <!-- Built only where the core's source is (a Cargo.toml at the root); otherwise the library is
-         the one scripts/fetch_core.py put in target/release. -->
-    <OpAmpBuildNative Condition="'$(OpAmpNativeLib)' == '' and '$(OpAmpCorePackage)' == '' and Exists('$(OpAmpRepoRoot)Cargo.toml')">true</OpAmpBuildNative>
     <OpAmpNativeLib Condition="'$(OpAmpNativeLib)' == '' and '$(OpAmpCorePackage)' == ''">$(OpAmpRepoRoot)target/release/$(OpAmpNativeName)</OpAmpNativeLib>
   </PropertyGroup>
-
-  <Target Name="BuildOpAmpNative" BeforeTargets="BeforeBuild" Condition="'$(OpAmpBuildNative)' == 'true'">
-    <Exec Command="cargo build --release --locked -p opamp-native" WorkingDirectory="$(OpAmpRepoRoot)" />
-  </Target>
 
   <ItemGroup Condition="'$(OpAmpNativeLib)' != ''">
     <None Include="$(OpAmpNativeLib)" Link="$([System.IO.Path]::GetFileName('$(OpAmpNativeLib)'))" CopyToOutputDirectory="PreserveNewest" Pack="false" />
