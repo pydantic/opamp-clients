@@ -24,7 +24,13 @@ public sealed interface Notification {
    * Own telemetry and other connection settings, all of them; answer with {@link
    * OpampClient#setConnectionSettingsStatus}.
    */
-  record ConnectionSettings(Opamp.ConnectionSettingsOffers settings) implements Notification {}
+  record ConnectionSettings(Opamp.ConnectionSettingsOffers settings) implements Notification {
+    /** The offers, but no header's value, private key or URL's password. */
+    @Override
+    public String toString() {
+      return "ConnectionSettings[settings=" + Redacted.offers(settings) + "]";
+    }
+  }
 
   /** A custom message from the server, for a custom capability the agent declared. */
   record CustomMessage(Opamp.CustomMessage message) implements Notification {}
@@ -40,7 +46,13 @@ public sealed interface Notification {
    * file at {@code path}; checking the signature is the application's job. Answer with {@link
    * OpampClient#packageInstalled}; the client deletes the file after the answer.
    */
-  record InstallPackage(String name, Opamp.PackageAvailable pkg, java.nio.file.Path path) implements Notification {}
+  record InstallPackage(String name, Opamp.PackageAvailable pkg, java.nio.file.Path path) implements Notification {
+    /** Every member, but the download's headers without their values and its URL without a password. */
+    @Override
+    public String toString() {
+      return "InstallPackage[name=" + name + ", pkg=" + Redacted.pkg(pkg) + ", path=" + path + "]";
+    }
+  }
 
   /** Remove package {@code name}, no longer offered; answer with {@link OpampClient#packageRemoved}. */
   record RemovePackage(String name) implements Notification {}
