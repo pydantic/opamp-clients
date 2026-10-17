@@ -7,7 +7,8 @@ five run one core ([how-it-works.md](how-it-works.md)), so they keep one contrac
 differs, this page says how.
 
 This is the application's view. The precise rules, what tests each and the breaks known today are
-in [spec/shell-contract.md](../spec/shell-contract.md) (RULE-SHELL-01 to -03, -07 and -10).
+in `spec/shell-contract.md` (RULE-SHELL-01 to -03, -07 and -10), which `scripts/fetch_core.py
+fetch` puts in place with the core.
 
 ## The callback
 
@@ -104,20 +105,6 @@ deadlocks; Go's `Stop`, which waits, doesn't wait when called there.
 whatever the client was doing (RULE-SHELL-07), but for its callback: one running when stop is
 asked for is waited for, and the stop timeout runs from its return.
 
-## What changed
-
-For the changelog of each SDK:
-
-- Go, Java and .NET hold notifications until `start` returns, as Python and Node.js did. Nothing
-  is lost, but an application that saw a notification before `start` returned now sees it after.
-- Go recovers a panic in the callback, and ends the client with it, instead of the process dying.
-- Java catches any `Throwable` from the callback, not only `RuntimeException` (an `Error` used to
-  skip the rest of the step and stop the timer, unreported).
-- Python's methods may be called from other threads (they used not to be safe).
-- The Go and .NET OpenTelemetry integrations (`go/otel`, `Pydantic.OpAmp.AutoInstrumentation`)
-  no longer queue answers until `start` returns: they answer through the client their callback
-  is given.
-
 ## Secrets
 
 What an SDK prints of the options it is given never holds a secret: the headers' values sent to
@@ -137,12 +124,6 @@ each as long in both, print the same text.
 
 The client core's own types are held to the same rule.
 
-## What changed since
-
-- Go's `Stop` may be called from the callback: there it asks for the stop and returns at once,
-  and the client stops once the callback has returned. It used to wait for the client, which was
-  waiting for the callback: it never returned (or returned the context's error).
-
 ## How it is checked
 
 - A callback model test in each SDK, in its own property framework, with a printed seed that replays
@@ -155,10 +136,11 @@ The client core's own types are held to the same rule.
   call, and stop from outside or from the callback, and checks the rules above after every step.
 - Secrets: a noninterference test in each SDK whose options types print what they hold (Python
   `python/tests/test_redaction.py`, Go `go/opamp/redact_test.go`, .NET
-  `dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs`) and the core's
-  (`secrets_change_nothing_shown`): random secrets of one length, two runs, the same text. Each
+  `dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs`) and the core's own noninterference
+  test: random secrets of one length, two runs, the same text. Each
   redaction dropped in turn must fail its test (each SDK's, by `scripts/redact_mutants.py`).
-- The schedule tests and the adversary of [spec/shell-contract.md](../spec/shell-contract.md).
+- The schedule tests and the adversary of `spec/shell-contract.md` (put in place by
+  `scripts/fetch_core.py fetch`).
 - The conformance scenario `callback-throws` checks it in every SDK from outside. The driver's
   callback throws (raises, panics) on the first remote config; the check `callback_failure_stops`
   then asks for one `fatal` carrying that error, nothing heard by the application after it, and
