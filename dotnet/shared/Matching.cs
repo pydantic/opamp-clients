@@ -59,10 +59,10 @@ internal sealed class LogLevels(uint floor, IReadOnlyList<ScopeLevel> scopes)
 
 /// <summary>
 /// A rate cap's token bucket (sampling_traces_per_second, send_logs_per_second), the algorithm
-/// every language runs (testdata/caps.json pins it): full at its first take; refilled at
-/// <see cref="PerSecond"/> tokens a second on a monotonic clock, up to <c>max(n, 1)</c> (a burst
-/// of a second, at least one); a take of n gets the whole tokens there are, up to n. In doubles, in
-/// that order. Thread-safe.
+/// every language runs (testdata/sdk-settings/caps.json pins it): full at its first take;
+/// refilled at <see cref="PerSecond"/> tokens a second on a monotonic clock, up to
+/// <c>max(n, 1)</c> (a burst of a second, at least one); a take of n gets the whole tokens there
+/// are, up to n. In doubles, in that order. Thread-safe.
 /// </summary>
 internal sealed class TokenBucket(double perSecond, Func<long> nanos)
 {
