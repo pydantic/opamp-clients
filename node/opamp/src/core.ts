@@ -65,7 +65,9 @@ class Tap {
       path = n === 0 ? base! : `${base}.${process.pid}.${n}`;
     }
     try {
-      return new Tap(openSync(path, "a"));
+      // It holds the Config's headers (the enrollment key) and what is saved: a new file is the
+      // user's only, as the state file is.
+      return new Tap(openSync(path, "a", 0o600));
     } catch (e) {
       console.error(`OPAMP_CORE_TAP: can't open ${path}: ${String(e)}`);
       return undefined;

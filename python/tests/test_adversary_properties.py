@@ -36,6 +36,7 @@ import pytest
 import trustme
 from _adversary_raw import RawServer
 from _adversary_raw import body as raw_body
+from _wasm import WasmCore
 from aiohttp import WSMsgType, web
 
 from opamp_client import TLS, Client, Config, Notification, Status, opamp_pb2 as pb
@@ -372,7 +373,7 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
         # with a raw server, the stream effects too, and TLS on them under the batch's CA.
         client = Client.start(Config(mode=mode, endpoint=endpoint, instance_uid=seed.to_bytes(16, "big"), state_file=state_file,
                                      tls=TLS(ca_pem=ca) if ca is not None else None),
-                              Status(), notify, _core_module=wasm)
+                              Status(), notify, _core_engine=WasmCore(wasm))
         returned = True
         # To name the seed of an unhandled exception.
         _SEEDS.update({id(client): seed, id(client._x): seed, id(client._streams): seed})

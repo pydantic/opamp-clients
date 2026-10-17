@@ -31,7 +31,8 @@ restarts with no configuration ([default-state-dir.md](../../docs/default-state-
 The server can also send the application settings of its own (a feature flag, a limit). The
 application reads them with `dev.pydantic.opamp.AppSettings`, from the second jar the build makes,
 `target/opamp-javaagent-extension-0.1.0-SNAPSHOT-app-settings.jar`, which it compiles against and
-runs with; without the agent every read is its default:
+runs with; without the agent every read is its default. A release publishes it beside the
+extension, as `dev.pydantic:opamp-javaagent-extension` with the classifier `app-settings`:
 
 ```java
 if (AppSettings.get("checkout.new_flow", "off").equals("on")) { ... }

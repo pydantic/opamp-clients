@@ -62,7 +62,8 @@ and the core is told the status and, for a redirect, the `Location` resolved wit
 `new Uri(requested, location)` and its origin: the core decides whether to follow it.
 
 Set `OPAMP_CORE_TAP=<path>` to record every call into the core (for `opamp-tap`): the first
-core in the process writes `<path>`, each later one `<path>.<pid>.<n>`.
+core in the process writes `<path>`, each later one `<path>.<pid>.<n>`. A tap holds the headers
+sent (the enrollment key) and the credentials saved, so a new one is the user's only.
 
 The native core comes in its own package, `Pydantic.OpAmp.Core.Native`, which this one depends
 on: the library alone for Linux (glibc and musl, so Alpine too), macOS and Windows, on x64 and

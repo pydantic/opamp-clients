@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -45,6 +45,7 @@ test("the core tap records every crossing, a file per core", () => {
     const got = records(path);
     assert.deepEqual(got.map(([k]) => k), [1, 2, 3, 4]);
     assert.equal(fromBinary(StepSchema, got[2]![1]).nowMs, 5n);
+    if (process.platform !== "win32") assert.equal(statSync(path).mode & 0o777, 0o600, "the user's only");
     // A second core in this process writes a file of its own.
     new Core(config).close();
     assert.deepEqual(records(`${path}.${process.pid}.1`).map(([k]) => k), [1, 2]);
