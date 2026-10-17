@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LicenseRef-All-Rights-Reserved
 
 // The client's file operations (src/files.ts), in both modes: journaled into the core tap as the
-// tap checker expects (its file records), off the event loop (known bug S4), and never on a
-// file left by another client or a crashed run (S3, a download's file made new).
+// tap checker expects (its file records), off the event loop, and never on a file left by another
+// client or a crashed run (a download's file made new).
 
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -120,8 +120,8 @@ for (const mode of MODES) {
     checked(t, tap);
   });
 
-  // Known bug S3, its second half: a download given up on at stop never touches the file of the
-  // download of the same id a client started next on the state file makes.
+  // A download given up on at stop never touches the file of the download of the same id a client
+  // started next on the state file makes.
   // covers: RULE-SHELL-07
   test(`${mode} mode: a download held at stop doesn't touch the next client's file of the same id`, async () => {
     const file = Buffer.from("the package, version 1");
@@ -271,11 +271,11 @@ for (const mode of MODES) {
   });
 }
 
-// Known bug S4: saves are off the event loop. A slow save holds up neither heartbeats nor stop, and a
+// Saves are off the event loop. A slow save holds up neither heartbeats nor stop, and a
 // client started next on the state file waits for it, and starts from what it saved.
 // covers: RULE-SHELL-07, RULE-SHELL-09
 for (const mode of MODES) {
-  test(`${mode} mode: S4, a slow save holds up neither heartbeats nor stop; the next client waits for it`, async () => {
+  test(`${mode} mode: a slow save holds up neither heartbeats nor stop; the next client waits for it`, async () => {
     const server = await opampServer({});
     const state = join(dir("s4"), "state.bin");
     let gate: () => void = () => {};

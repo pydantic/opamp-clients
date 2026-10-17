@@ -57,7 +57,7 @@ MODES = ["python", "rust"]
 # failing, the bug is fixed: take it off).
 KNOWN: dict[str, dict[str, tuple[str, str, str]]] = {
     # None open in either mode. Taken off:
-    # - stop_while_opening (S1) and ws_hold_past_timeout (S2) were the duties of a shell
+    # - stop_while_opening and ws_hold_past_timeout were the duties of a shell
     #   that doesn't carry out cancel: the adversary no longer has them. Their counterparts (a
     #   cancel while connecting, stop at any point) run in the main batch and in
     #   test_cancels_are_honoured; test_lifecycle.py and test_effects.py test them.
@@ -320,7 +320,7 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
         client: Client | None = None
 
         def call_outside() -> None:
-            # From another thread: the client carries it out on the loop (known bug S8).
+            # From another thread: the client carries it out on the loop.
             client.set_health(pb.ComponentHealth(healthy=True, status="outside"))  # type: ignore[union-attr]
 
         async def stop_outside() -> None:
