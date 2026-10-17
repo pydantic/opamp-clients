@@ -89,9 +89,22 @@ agent:
   refuses the capability. See the specification's
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
 
-Every file keeps upstream's license header (Apache-2.0, [LICENSE](LICENSE)); the import paths
-were rewritten to this module's. The files changed beyond that say what changed in their header,
-and the new ones (`supervisor/coreclient.go` and the tests beside it) are this repository's.
+Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
+paths were rewritten to this module's. The files changed beyond that say what changed in their
+header. These files are new, and are this repository's:
+
+- `supervisor/coreclient.go`, `agent_update.go`, `sealed_storage.go`, `telemetry_env.go`,
+  `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests beside them
+  (with `supervisor/remote_config_refusal_test.go` and `supervisor/config/core_test.go`);
+- `e2e_packages_test.go` and `e2e_policy_test.go`, and their configs in `testdata/`
+  (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
+  `supervisor_packages.yaml` and `supervisor_policy.yaml`);
+- everything under `packaging/`.
+
+Upstream's `supervisor/packages.go` (and its test config `supervisor_packages_cap.yaml`) is
+removed: installing packages is `agent_update.go`'s. So are upstream's `Makefile`, `Dockerfile` and
+`metadata.yaml`, which need contrib's build: `internal/metadata`, `generated_package_test.go` and
+`documentation.md` are checked in as upstream's mdatagen wrote them.
 
 ## Upstream's README
 
