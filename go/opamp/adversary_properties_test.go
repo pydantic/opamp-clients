@@ -675,16 +675,39 @@ func runAdversary(srv *advServer, host string, wasm []byte, dir string, seed uin
 		h.mu.Unlock()
 	}
 
-	// After stop: connections closed within advSettle, nothing new, no download changing.
+	// After stop: connections closed within advSettle, nothing new, and no download changing
+	// once the disk work stop left finishing has ended. A file's write or sync still in flight
+	// when stop's bound runs out finishes after stop returns, and a download's file stop gave up
+	// on is deleted then (fileWork: the next client on the state file waits for it), so a slow
+	// disk, not the shell, decides when that is. Nothing may change the downloads after it.
 	downloads := downloadsDir(stateFile)
-	before := advListing(downloads)
+	type advSettled struct {
+		at      time.Time
+		listing map[string]string
+	}
+	settled := make(chan advSettled, 1)
+	go func() {
+		workOn(stateFile).settle()
+		settled <- advSettled{time.Now(), advListing(downloads)}
+	}()
 	deadline := stopped.at.Add(advSettle)
 	for time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	markErr := <-stopped.marked
 	open, _, _ := srv.counts(run)
-	after := advListing(downloads)
+	var before, after map[string]string
+	select {
+	case done := <-settled:
+		for time.Since(done.at) < advSettle {
+			time.Sleep(50 * time.Millisecond)
+		}
+		before, after = done.listing, advListing(downloads)
+	case <-time.After(advStopBound):
+		h.mu.Lock()
+		h.fail("RULE-SHELL-07: the disk work stop left (a save, a download's file) still under way %v after stop returned", advSettle+advStopBound)
+		h.mu.Unlock()
+	}
 	if h.raw != nil {
 		// The streams: every connection gone, and none made after stop returned.
 		if err := <-stopped.rawMarked; err != nil {
@@ -715,7 +738,7 @@ func runAdversary(srv *advServer, host string, wasm []byte, dir string, seed uin
 		fail("%s", late)
 	}
 	if !maps.Equal(before, after) {
-		fail("RULE-SHELL-07: the downloads changed after stop returned: %v, then %v", before, after)
+		fail("RULE-SHELL-07: the downloads changed after the disk work stop left had ended: %v, then %v", before, after)
 	}
 	if h.stopped != 1 {
 		fail("RULE-SHELL-02: stopped %d times", h.stopped)
