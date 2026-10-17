@@ -1,13 +1,16 @@
 # The packages
 
-Releases are archives for now, not installers: each `go/opampsupervisor/vX.Y.Z` tag gets a
-[GitHub Release](https://github.com/pydantic/opamp-clients/releases) with the Supervisor and the
-collector for Linux, macOS and Windows on amd64 and arm64 (see [Releases](#releases)). The
-installers below are built and tested in CI but not published yet.
+Each `go/opampsupervisor/vX.Y.Z` tag gets a
+[GitHub Release](https://github.com/pydantic/opamp-clients/releases) with portable archives and
+native installers for Linux, macOS and Windows on amd64 and arm64 (see [Releases](#releases)).
 
-There are three: a deb and an rpm for Linux, a [.pkg for macOS](#macos), and an
-[.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run, and
-enrolls with one command.
+The installers are a deb and an rpm for Linux, a [.pkg for macOS](#macos), and an
+[.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run.
+The enrollment helper enrolls it with one command.
+
+The release installers are unsigned. The macOS package is not notarized. GitHub build
+provenance and the checksums verify their source and contents, but do not replace platform
+code signing. `SHA256SUMS` covers the archives. `SHA256SUMS.installers` covers the installers.
 
 ## Linux
 
@@ -19,6 +22,12 @@ OpAMP:
   repository's opamp extension;
 - a systemd unit;
 - `pydantic-opamp-enroll`.
+
+Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.1.0_amd64.deb`.
+On RHEL or Fedora, install the unsigned local rpm with
+`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.1.0-1.x86_64.rpm`.
+The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
 
 Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
 install it from there. `$REPO_URL` is where it's served:
@@ -145,14 +154,21 @@ VERSION=0.1.0 GOOS=darwin GOARCH=arm64 go/opampsupervisor/packaging/archive.sh
 
 The [Release workflow](../../../.github/workflows/release.yml) runs it for each
 `go/opampsupervisor/vX.Y.Z` tag, for linux, darwin and windows on amd64 and arm64, and publishes
-the six archives as the tag's GitHub Release, with `SHA256SUMS` and a build provenance attestation
-for each. It needs no secrets. Run it by hand, with the version, for a tag already pushed: GitHub
-sends no push event when more than three tags are pushed at once.
+the six archives and eight installers as the tag's GitHub Release. Each file has a build
+provenance attestation. `SHA256SUMS` covers the six archives, and `SHA256SUMS.installers` covers
+the eight installers. The installers build on a matching OS and architecture. All source comes
+from the release tag. The workflow needs no signing secrets.
+
+Run it by hand, with the version, for a tag already pushed. GitHub sends no push event when
+more than three tags are pushed at once. Select `installers-only` to add installers to an
+existing release. This mode keeps its archives and `SHA256SUMS`. A rerun replaces the installer
+assets and their checksums.
 
 Check a download with either:
 
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS.installers
 gh attestation verify pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
 ```
 
