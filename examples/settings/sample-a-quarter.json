@@ -1,1 +1,9 @@
-{"sampling_rate": "0.25"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "override", "ratio": 0.25},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  }
+}

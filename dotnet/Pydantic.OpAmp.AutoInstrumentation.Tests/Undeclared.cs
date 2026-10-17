@@ -5,7 +5,7 @@ using Pydantic.OpAmp.Client.Sdk;
 
 namespace Pydantic.OpAmp.Otel;
 
-/// <summary>What the tests ask of a host: the settings it leaves out, which the layer sets aside.</summary>
+/// <summary>What the tests ask of a host: the settings it leaves out. The layer refuses a policy that overrides one.</summary>
 internal static class HostTestExtensions
 {
     /// <summary>

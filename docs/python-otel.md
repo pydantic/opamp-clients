@@ -43,9 +43,10 @@ defaults every signal's exporter to OTLP (`OTEL_TRACES_EXPORTER=otlp` and so on,
 `OTEL_EXPORTER_OTLP_PROTOCOL` says otherwise).
 
 If another configurator builds the SDK all the same, the instance still joins the fleet, but the
-sampler and the trace and log exporters aren't the package's: `sampling_rate`, `send_traces` and
-`send_logs` are ignored rather than answered as done ([the host](sdk-settings.md#the-host)), the
-package logs a warning, and `service.instance.id` is whatever that configurator gives.
+sampler and the trace and log exporters are not the package's. A policy that overrides
+`head_sampling`, `signal_exports.traces` or `signal_exports.logs` is then refused (FAILED), not
+answered as done ([the host](sdk-settings.md#the-host)). The package logs a warning, and
+`service.instance.id` is whatever that configurator gives.
 
 ### Is it working?
 
@@ -111,18 +112,19 @@ default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, 
 about at start, as one without a scheme is. None of it raises. Its other keyword arguments are
 upstream's configurator's (`sampler`, which a remote rate replaces while one is set,
 `resource_attributes`, `span_processors`, and so on). Span or log record processors given here,
-or added to the providers later, aren't the package's: they export past its gates. So the gates'
-settings are set aside from then on, and the effective config names them
+or added to the providers later, are not the package's: they export past its gates, and the
+`signal_exports` controls do not stop them. So the package no longer carries out that signal's
+gate controls from then on. A policy that overrides one is refused, and in a policy already in
+force each such override is set aside, reported `local` in the effective config
 ([the host](sdk-settings.md#the-host)). Call it once, before the application's instrumentors.
 
 [examples/python-otel/in_code.py](../examples/python-otel/in_code.py) is a whole application set
 up this way, the server taken from its own variables; `examples/python-otel/try.py` runs it
 against the reference server with no `OTEL_OPAMP_*` variable set.
 
-What it can't carry out: the instrumentation switches (`deactivate_instrumentations`,
-`deactivate_all_instrumentations`), since it instruments nothing and the application names its
-instrumentors in code. They are ignored rather than answered as done, like the rest above that a
-process can't carry out.
+What it cannot carry out: the `instrumentations` control, because it instruments nothing and the
+application names its instrumentors in code. A policy that overrides it is refused, like every
+other override above that a process cannot carry out.
 
 ## What it does
 
@@ -145,34 +147,36 @@ process can't carry out.
   interval to check in at (the server's heartbeat interval), which holds until the next start.
   Without a state directory a restart would lose the key, so the agent doesn't say it takes one.
 - **Describes itself** from the SDK's resource: `service.name`, `service.namespace` and
-  `service.instance.id` identify it; the rest describes it.
-- **Takes settings** from the remote config's `elastic` entry:
+  `service.instance.id` identify it, and the rest describes it. The description also names the
+  policy format the package reads (`logfire.opamp.config_format`)
+  and the controls this process carries out (`logfire.opamp.supported_controls`).
+- **Takes settings** from the Logfire SDK policy, the remote config's only file
+  (`logfire-sdk-policy.json`). Each control is `{"mode": "local"}`, the SDK's own value, or an
+  override:
 
-  | Setting | How |
+  | Control | How |
   |---|---|
-  | `sampling_rate` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`); a span whose parent was sampled, here or by the caller, is sampled at any rate, 0 included. Left out: the configured sampler. |
-  | `send_traces`, `send_logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors: `false` drops what would be exported. Processors passed to `configure()` or added later aren't stopped, so then the setting is set aside, not answered as done. |
-  | `send_logs_level` | live, at the same gated log exporters: a record below the level's SeverityNumber is dropped at its next export, one with no severity (0) is kept, and left out every record goes. |
-  | `sampling_rules`, `send_logs_level_by_scope`, `drop_attributes`, `mask_attributes`, `sampling_traces_per_second`, `send_logs_per_second`, `debug_until` (with `debug_sampling_rate`, `debug_send_logs_level`) | live, in the same sampler and gates: see [the newer settings](#the-newer-settings). |
-  | `send_metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook): `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, stoppable. Only the name `otlp` is: with no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them and the setting is ignored rather than answered as done ([the host](sdk-settings.md#the-host)). Nor with `otlp` beside another (`otlp,prometheus`): only the OTLP one could stop, so the setting is ignored too. |
-  | `deactivate_instrumentations` | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
-  | `deactivate_all_instrumentations` | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
-  | `opamp_polling_interval` | at the next start, the interval it checks in at, until the server offers one. |
+  | `head_sampling` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the configured sampler. |
+  | `signal_exports.traces`, `signal_exports.logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors. `enabled: false` drops what would be exported. Processors passed to `configure()` or added later are not stopped, so then the control is set aside, not answered as done. |
+  | `log_levels` (`level`) | live, at the same gated log exporters. A record below the level's SeverityNumber is dropped at its next export, and one with no severity (0) is kept. Local: every record goes. |
+  | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the newer settings](#the-newer-settings). |
+  | `signal_exports.metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook). `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, which can stop. Only the name `otlp` does this. With no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them, and a policy that overrides the control is refused ([the host](sdk-settings.md#the-host)). The same holds with `otlp` beside another exporter (`otlp,prometheus`), because only the OTLP one could stop. |
+  | `instrumentations` (`disabled`) | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
+  | `instrumentations` (`all_disabled`) | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
+  | `app_settings` | live, to the application. See [the application's own settings](#the-applications-own-settings). |
 
-  `logging_level` and `infer_spans` (EDOT settings) aren't carried out, so the server can't change a
-  log level; the package logs them at `info`, which the default level hides.
+  A policy that overrides a control this process does not carry out is refused whole (FAILED),
+  and the error names the control. A field the policy format does not know is refused too.
 
-  With declarative configuration (`OTEL_CONFIG_FILE`), the file builds the SDK: the instance
+  With declarative configuration (`OTEL_CONFIG_FILE`), the file builds the SDK. The instance
   joins the fleet (the configurator starts the client, as upstream skips its OpAMP hook) and the
-  instrumentation switches work, but the sampler and exporters are the file's, so
-  `sampling_rate` and the `send_*` settings are ignored rather than answered as done, and the
-  package warns.
+  `instrumentations` control works. But the sampler and exporters are the file's, so a policy
+  that overrides `head_sampling` or `signal_exports` is refused, and the package warns.
 - **Doesn't trace itself.** The OpAMP client runs with instrumentation suppressed, so its requests
   (and its goodbye) never show up as the application's spans, whichever HTTP instrumentations are
   installed.
-- **Answers** each remote config APPLIED or FAILED, and reports the settings in force as its
-  effective config, with the settings it set aside or didn't know named beside them in an
-  `elastic.set_aside` entry ([sdk-settings.md](sdk-settings.md#the-answer)).
+- **Answers** each remote config APPLIED or FAILED, and reports the policy in force as its
+  effective config, one `logfire-sdk-policy.json` file ([sdk-settings.md](sdk-settings.md#the-answer)).
 - **Says goodbye** (`agent_disconnect`) when the process exits: once the main thread is done,
   before the SDK flushes, and while host names can still be resolved (with threading's exit hooks,
   which run before `atexit`'s). The client runs on a thread of its own, so the application needs
@@ -194,25 +198,28 @@ package only carries them out on the Python SDK.
 
 Each is carried out in the package's live sampler and gated exporters, so only where its
 configurator built the SDK: there the package declares them to the layer ([the
-host](sdk-settings.md#the-host)). Under another configurator, or `OTEL_CONFIG_FILE`, it doesn't,
-and they are set aside: named as not carried out, never reported in force. The rules for each are
-[sdk-settings.md](sdk-settings.md#settings-that-match-telemetry)'s; what follows is where they
-apply in Python. Each config below is the remote config's `elastic` entry, ready to send.
+host](sdk-settings.md#the-host)). Under another configurator, or `OTEL_CONFIG_FILE`, it does not,
+and a policy that overrides one is refused. The rules for each are
+[sdk-settings.md](sdk-settings.md#settings-that-match-telemetry)'s. What follows is where they
+apply in Python. Each example below shows the
+controls a policy (`logfire-sdk-policy/v1`) overrides. Every control left out of an example is
+local.
 `examples/python-otel/try.py` checks each one against the reference server and its sink.
 
 ### Sampling rules
 
 ```json
-{"sampling_rate": "0.25",
- "sampling_rules": [{"rate": 0, "kind": "server", "path": "/health*"},
-                    {"rate": 0, "kind": "client", "attributes": {"url.full": "*/health"}},
-                    {"rate": 1, "name": "checkout *"}]}
+{"head_sampling": {"mode": "override", "ratio": 0.25},
+ "sampling_rules": {"mode": "override",
+                    "rules": [{"rate": 0, "kind": "server", "path": "/health*"},
+                              {"rate": 0, "kind": "client", "attributes": {"url.full": "*/health"}},
+                              {"rate": 1, "name": "checkout *"}]}}
 ```
 
 No traces of health checks, served or made, every `checkout ...` trace, and a quarter of the
 rest. In the live sampler (`opamp_otel.LiveSampler`), for a span with no parent only: the first
 rule that matches sets the rate, applied by the SDK's `TraceIdRatioBased`; with none,
-`sampling_rate`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
+`head_sampling`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
 parent follows it. What a rule sees is what the instrumentation passes when it starts the span:
 
 - ASGI and WSGI servers (and Flask, Django, FastAPI over them) start with `http.target`, the path
@@ -227,19 +234,21 @@ parent follows it. What a rule sees is what the instrumentation passes when it s
 ### Log levels per logger
 
 ```json
-{"send_logs_level": "warn", "send_logs_level_by_scope": "myapp.db*=debug, urllib3*=error, noisy.lib=off"}
+{"log_levels": {"mode": "override", "level": "warn",
+                "scopes": {"myapp.db*": "debug", "urllib3*": "error", "noisy.lib": "off"}}}
 ```
 
-At the log gate, beside `send_logs_level`. A record's scope is the Python logger it was logged on:
+At the log gate, beside `level`. A record's scope is the Python logger it was logged on:
 the logging handler exports each record under its logger's name (`myapp.db.pool`). So
-`myapp.db*` covers `myapp.db` and every logger under it, and `noisy.lib=off` drops all of that
+`myapp.db*` covers `myapp.db` and every logger under it, and `noisy.lib` at `off` drops all of that
 logger's records, even those with no severity. Only what is exported is filtered: the logger's
 own level still decides what is logged at all, and the package never changes it.
 
 ### Redaction
 
 ```json
-{"drop_attributes": "http.request.header.authorization, *password*", "mask_attributes": "enduser.id, user.email"}
+{"attribute_redaction": {"mode": "override", "drop": ["http.request.header.authorization", "*password*"],
+                         "mask": ["enduser.id", "user.email"]}}
 ```
 
 At the span and log gates, after the levels and the cap: span attributes, span event attributes,
@@ -253,7 +262,9 @@ bodies are left alone.
 ### Rate caps
 
 ```json
-{"sampling_rate": "1", "sampling_traces_per_second": "50", "send_logs_per_second": "200"}
+{"head_sampling": {"mode": "override", "ratio": 1},
+ "trace_rate_limit": {"mode": "override", "traces_per_second": 50},
+ "log_rate_limit": {"mode": "override", "records_per_second": 200}}
 ```
 
 Traces: in the live sampler, after the rules and the rate; a new trace, or one a caller sampled,
@@ -267,8 +278,9 @@ it stricter.
 ### Debug mode
 
 ```json
-{"sampling_rate": "0.05", "send_logs_level": "warn",
- "debug_until": "2026-10-14T15:30:00Z", "debug_sampling_rate": "1", "debug_send_logs_level": "debug"}
+{"head_sampling": {"mode": "override", "ratio": 0.05},
+ "log_levels": {"mode": "override", "level": "warn"},
+ "debug": {"mode": "override", "until": "2026-10-14T15:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
 Send your own time, at most 24 h ahead. The layer folds debug mode into the settings it hands
@@ -282,7 +294,7 @@ still in debug mode.
 
 No setting: always on. Each gate counts its exports after the exporter's own retries (a
 `FAILURE` result, or an exception with its text), the items in failed exports, and what it drops
-on purpose (`send_*` false, a level, a cap). The OTLP metric exporter is counted by data point,
+on purpose (a signal's exports off, a level, a cap). The OTLP metric exporter is counted by data point,
 and only when it is the gated one (`otlp`). The agent's health goes with its first message and is
 looked at again every 30 s, on the same timer: sent at once when a signal starts or stops
 failing, at most a minute apart while only the counters move. `healthy` stays true (the
@@ -294,8 +306,9 @@ shows the master's exports only.
 
 ## The application's own settings
 
-The server may send the application settings of its own in `custom` (a feature flag, a
-verbosity), which the package hands on rather than reads ([app-settings.md](app-settings.md)):
+The server may send the application settings of its own in the policy's `app_settings` control
+(a feature flag, a verbosity), which the package hands on rather than reads
+([app-settings.md](app-settings.md)):
 
 ```python
 from opamp_otel import app_settings
@@ -308,8 +321,8 @@ unsubscribe = app_settings.on_change(lambda settings, changed: print("changed:",
 `get(key, default)` is the value in force or the default, never an error; `get_bool`, `get_int`
 and `get_float` read one typed; `snapshot()` is every value in force. A callback gets the map in
 force and the keys that changed, once per change, on the OpAMP client's thread; one that raises
-is logged and the client goes on. Every integration path declares `custom`, whoever built the
-SDK, and a forked worker follows its parent's values. With a state directory the values in force
+is logged and the client goes on. Every integration path carries out `app_settings`, whoever
+built the SDK, and a forked worker follows its parent's values. With a state directory the values in force
 are saved and loaded again at the next start, before the application's code runs.
 
 ## Inventory
@@ -321,7 +334,7 @@ components, in the shape every language sends
 - `sdk`: `pydantic-opamp-otel` and its version, `python`, and the `opentelemetry-sdk` version.
 - `instrumentations`: every instrumentation `opentelemetry-instrument` can run, switched off or
   not, under its entry point's name (`flask`, `requests`, `aiohttp-client`), which is the name
-  `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`, and so `deactivate_instrumentations`, takes. Each has
+  `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`, and so the `instrumentations` control, takes. Each has
   its distribution's version. One whose library isn't installed is left out, as
   `opentelemetry-instrument` skips it. Under `configure()` the list is the same, though nothing
   there reads the switch.
@@ -330,15 +343,16 @@ components, in the shape every language sends
   `otlp_proto_http` and the package's gated `opamp` are all `otlp`; `console`, `prometheus`,
   `zipkin`), or by its type when no entry point names it (`InMemorySpanExporter`). `gated` is
   whether the package's gate wraps it (the trace and log exporters its configurator built, and the
-  OTLP metric exporter) and the host declares its signal's `send_*` setting. An exporter another
+  OTLP metric exporter) and the host declares its signal's exports. An exporter another
   configurator or `OTEL_CONFIG_FILE` built, every trace exporter when a span processor given to
   `configure()` or added to the provider later exports past the gate (and every log exporter,
-  likewise for a log record processor), and every metric exporter when one beside `otlp` makes `send_metrics` ignored: each
-  is `gated: false`, as the settings left undeclared say. An exporter set to `none` isn't listed.
+  likewise for a log record processor), and every metric exporter when one beside `otlp` keeps
+  the metrics from stopping: each is `gated: false`, as the settings left undeclared say. An
+  exporter set to `none` is not listed.
 - `settings`: the settings this process carries out, from the same host its decisions use.
 
-It is sent once, and again only if a processor added to a provider later makes a signal's
-settings set aside.
+It is sent once, and again only if a processor added to a provider later takes a signal's
+controls out of the package's hands.
 
 ## How it is checked
 
@@ -346,10 +360,10 @@ settings set aside.
   - the controls change sampling and each signal's exports on a real SDK;
   - the next-start settings become the instrumentation switch;
   - the answers, saving and reporting follow the layer;
-  - settings another configurator's SDK can't carry out are ignored, not answered as done;
+  - a policy that overrides what another configurator's SDK cannot carry out is refused;
   - `configure()` sets an SDK up from the variables under the server (spans stop when the server
     says so, the metric exporter is the gated one, one UID), is the SDK's own setup without an
-    endpoint, and ignores the instrumentation switches;
+    endpoint, and refuses the instrumentation switches;
   - each of `configure()`'s server arguments, given in code, as a variable, both (code wins) or
     neither (the default); the forms each takes; blank as not given; and each value it can't use
     warned about and the default, never raised. End to end, the headers, state directory and

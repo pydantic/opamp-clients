@@ -97,6 +97,105 @@ func (StatusField) EnumDescriptor() ([]byte, []int) {
 	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{0}
 }
 
+// The operating system, for where the user's state directory is.
+type SetupOs int32
+
+const (
+	SetupOs_SETUP_OS_UNIX    SetupOs = 0 // Linux and every other Unix: $XDG_STATE_HOME, else $HOME/.local/state
+	SetupOs_SETUP_OS_MACOS   SetupOs = 1 // $HOME/Library/Application Support
+	SetupOs_SETUP_OS_WINDOWS SetupOs = 2 // %LOCALAPPDATA%, and \ between the parts of a path
+)
+
+// Enum value maps for SetupOs.
+var (
+	SetupOs_name = map[int32]string{
+		0: "SETUP_OS_UNIX",
+		1: "SETUP_OS_MACOS",
+		2: "SETUP_OS_WINDOWS",
+	}
+	SetupOs_value = map[string]int32{
+		"SETUP_OS_UNIX":    0,
+		"SETUP_OS_MACOS":   1,
+		"SETUP_OS_WINDOWS": 2,
+	}
+)
+
+func (x SetupOs) Enum() *SetupOs {
+	p := new(SetupOs)
+	*p = x
+	return p
+}
+
+func (x SetupOs) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SetupOs) Descriptor() protoreflect.EnumDescriptor {
+	return file_opamp_core_v1_core_proto_enumTypes[1].Descriptor()
+}
+
+func (SetupOs) Type() protoreflect.EnumType {
+	return &file_opamp_core_v1_core_proto_enumTypes[1]
+}
+
+func (x SetupOs) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SetupOs.Descriptor instead.
+func (SetupOs) EnumDescriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{1}
+}
+
+type SetupUidFrom int32
+
+const (
+	SetupUidFrom_SETUP_UID_FROM_MADE  SetupUidFrom = 0 // a new UUIDv7, of entropy and unix_ms
+	SetupUidFrom_SETUP_UID_FROM_SAVED SetupUidFrom = 1 // the state directory's instance-uid file
+	SetupUidFrom_SETUP_UID_FROM_GIVEN SetupUidFrom = 2 // a UUID service.instance.id in OTEL_RESOURCE_ATTRIBUTES
+)
+
+// Enum value maps for SetupUidFrom.
+var (
+	SetupUidFrom_name = map[int32]string{
+		0: "SETUP_UID_FROM_MADE",
+		1: "SETUP_UID_FROM_SAVED",
+		2: "SETUP_UID_FROM_GIVEN",
+	}
+	SetupUidFrom_value = map[string]int32{
+		"SETUP_UID_FROM_MADE":  0,
+		"SETUP_UID_FROM_SAVED": 1,
+		"SETUP_UID_FROM_GIVEN": 2,
+	}
+)
+
+func (x SetupUidFrom) Enum() *SetupUidFrom {
+	p := new(SetupUidFrom)
+	*p = x
+	return p
+}
+
+func (x SetupUidFrom) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SetupUidFrom) Descriptor() protoreflect.EnumDescriptor {
+	return file_opamp_core_v1_core_proto_enumTypes[2].Descriptor()
+}
+
+func (SetupUidFrom) Type() protoreflect.EnumType {
+	return &file_opamp_core_v1_core_proto_enumTypes[2]
+}
+
+func (x SetupUidFrom) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SetupUidFrom.Descriptor instead.
+func (SetupUidFrom) EnumDescriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{2}
+}
+
 // Zero means "the default" for every number.
 // The core takes the transport from the endpoint's scheme (http and https plain HTTP, ws and wss
 // WebSocket), keeps every effect's time and ends it itself (the client carries out cancel), and
@@ -734,6 +833,7 @@ type Input struct {
 	//	*Input_StreamSpliced
 	//	*Input_DownloadResponse
 	//	*Input_SetAuthHeaders
+	//	*Input_Abort
 	Kind          isInput_Kind `protobuf_oneof:"kind"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1082,6 +1182,15 @@ func (x *Input) GetSetAuthHeaders() *Headers {
 	return nil
 }
 
+func (x *Input) GetAbort() *Empty {
+	if x != nil {
+		if x, ok := x.Kind.(*Input_Abort); ok {
+			return x.Abort
+		}
+	}
+	return nil
+}
+
 type isInput_Kind interface {
 	isInput_Kind()
 }
@@ -1226,6 +1335,13 @@ type Input_SetAuthHeaders struct {
 	SetAuthHeaders *Headers `protobuf:"bytes,34,opt,name=set_auth_headers,json=setAuthHeaders,proto3,oneof"`
 }
 
+type Input_Abort struct {
+	// A callback failed (RULE-SHELL-02): end at once, as after stop without the goodbye. The core
+	// cancels everything it waits on, a save too, and the open connection (cancel: drop it, no
+	// Close), says stopped in the same step unless it had, and does nothing in any step after.
+	Abort *Empty `protobuf:"bytes,35,opt,name=abort,proto3,oneof"`
+}
+
 func (*Input_Start) isInput_Kind() {}
 
 func (*Input_SetDescription) isInput_Kind() {}
@@ -1293,6 +1409,8 @@ func (*Input_StreamSpliced) isInput_Kind() {}
 func (*Input_DownloadResponse) isInput_Kind() {}
 
 func (*Input_SetAuthHeaders) isInput_Kind() {}
+
+func (*Input_Abort) isInput_Kind() {}
 
 // The proxy the platform's convention picks for a URL. A SOCKS5 proxy (socks5:// or socks5h://)
 // resolves the server's name, unless resolve_locally.
@@ -3910,6 +4028,783 @@ func (x *StatusTooLarge) GetName() string {
 	return ""
 }
 
+type SetupCall struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Call:
+	//
+	//	*SetupCall_Start
+	//	*SetupCall_Identity
+	Call          isSetupCall_Call `protobuf_oneof:"call"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupCall) Reset() {
+	*x = SetupCall{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupCall) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupCall) ProtoMessage() {}
+
+func (x *SetupCall) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupCall.ProtoReflect.Descriptor instead.
+func (*SetupCall) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *SetupCall) GetCall() isSetupCall_Call {
+	if x != nil {
+		return x.Call
+	}
+	return nil
+}
+
+func (x *SetupCall) GetStart() *SetupStart {
+	if x != nil {
+		if x, ok := x.Call.(*SetupCall_Start); ok {
+			return x.Start
+		}
+	}
+	return nil
+}
+
+func (x *SetupCall) GetIdentity() *SetupIdentity {
+	if x != nil {
+		if x, ok := x.Call.(*SetupCall_Identity); ok {
+			return x.Identity
+		}
+	}
+	return nil
+}
+
+type isSetupCall_Call interface {
+	isSetupCall_Call()
+}
+
+type SetupCall_Start struct {
+	Start *SetupStart `protobuf:"bytes,1,opt,name=start,proto3,oneof"`
+}
+
+type SetupCall_Identity struct {
+	Identity *SetupIdentity `protobuf:"bytes,2,opt,name=identity,proto3,oneof"`
+}
+
+func (*SetupCall_Start) isSetupCall_Call() {}
+
+func (*SetupCall_Identity) isSetupCall_Call() {}
+
+type SetupReply struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Result:
+	//
+	//	*SetupReply_Started
+	//	*SetupReply_Identified
+	//	*SetupReply_Error
+	Result        isSetupReply_Result `protobuf_oneof:"result"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupReply) Reset() {
+	*x = SetupReply{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupReply) ProtoMessage() {}
+
+func (x *SetupReply) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupReply.ProtoReflect.Descriptor instead.
+func (*SetupReply) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *SetupReply) GetResult() isSetupReply_Result {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+func (x *SetupReply) GetStarted() *SetupStarted {
+	if x != nil {
+		if x, ok := x.Result.(*SetupReply_Started); ok {
+			return x.Started
+		}
+	}
+	return nil
+}
+
+func (x *SetupReply) GetIdentified() *SetupIdentified {
+	if x != nil {
+		if x, ok := x.Result.(*SetupReply_Identified); ok {
+			return x.Identified
+		}
+	}
+	return nil
+}
+
+func (x *SetupReply) GetError() string {
+	if x != nil {
+		if x, ok := x.Result.(*SetupReply_Error); ok {
+			return x.Error
+		}
+	}
+	return ""
+}
+
+type isSetupReply_Result interface {
+	isSetupReply_Result()
+}
+
+type SetupReply_Started struct {
+	Started *SetupStarted `protobuf:"bytes,1,opt,name=started,proto3,oneof"`
+}
+
+type SetupReply_Identified struct {
+	Identified *SetupIdentified `protobuf:"bytes,2,opt,name=identified,proto3,oneof"`
+}
+
+type SetupReply_Error struct {
+	Error string `protobuf:"bytes,3,opt,name=error,proto3,oneof"` // an unusable call: a bug in the integration
+}
+
+func (*SetupReply_Started) isSetupReply_Result() {}
+
+func (*SetupReply_Identified) isSetupReply_Result() {}
+
+func (*SetupReply_Error) isSetupReply_Result() {}
+
+// A variable of the environment.
+type Variable struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Variable) Reset() {
+	*x = Variable{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Variable) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Variable) ProtoMessage() {}
+
+func (x *Variable) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Variable.ProtoReflect.Descriptor instead.
+func (*Variable) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *Variable) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Variable) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+// Where the server is and how to reach it, from the environment and what the code gives.
+type SetupStart struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
+	// OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
+	// OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+	Env           []*Variable  `protobuf:"bytes,1,rep,name=env,proto3" json:"env,omitempty"`
+	Os            SetupOs      `protobuf:"varint,2,opt,name=os,proto3,enum=opamp.core.v1.SetupOs" json:"os,omitempty"`
+	Program       string       `protobuf:"bytes,3,opt,name=program,proto3" json:"program,omitempty"` // the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
+	Cwd           string       `protobuf:"bytes,4,opt,name=cwd,proto3" json:"cwd,omitempty"`         // the working directory; empty where it can't be had
+	Code          *SetupInCode `protobuf:"bytes,5,opt,name=code,proto3" json:"code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupStart) Reset() {
+	*x = SetupStart{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupStart) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupStart) ProtoMessage() {}
+
+func (x *SetupStart) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupStart.ProtoReflect.Descriptor instead.
+func (*SetupStart) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *SetupStart) GetEnv() []*Variable {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *SetupStart) GetOs() SetupOs {
+	if x != nil {
+		return x.Os
+	}
+	return SetupOs_SETUP_OS_UNIX
+}
+
+func (x *SetupStart) GetProgram() string {
+	if x != nil {
+		return x.Program
+	}
+	return ""
+}
+
+func (x *SetupStart) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+func (x *SetupStart) GetCode() *SetupInCode {
+	if x != nil {
+		return x.Code
+	}
+	return nil
+}
+
+// What the application gives in code: each part given wins over its variable. A warning names
+// the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
+// "the endpoint given in code".
+type SetupInCode struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Endpoint      *string                `protobuf:"bytes,1,opt,name=endpoint,proto3,oneof" json:"endpoint,omitempty"`                        // blank: as if not given
+	HeadersGiven  bool                   `protobuf:"varint,2,opt,name=headers_given,json=headersGiven,proto3" json:"headers_given,omitempty"` // true: these headers, in place of OTEL_OPAMP_HEADERS (not merged)
+	Headers       []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`
+	StateDir      *string                `protobuf:"bytes,4,opt,name=state_dir,json=stateDir,proto3,oneof" json:"state_dir,omitempty"`             // as OTEL_OPAMP_STATE_DIR: a directory, or "none"; blank: not given
+	HeartbeatMs   *int64                 `protobuf:"zigzag64,5,opt,name=heartbeat_ms,json=heartbeatMs,proto3,oneof" json:"heartbeat_ms,omitempty"` // 0 or less: no interval (the default, with a warning)
+	EndpointName  string                 `protobuf:"bytes,6,opt,name=endpoint_name,json=endpointName,proto3" json:"endpoint_name,omitempty"`
+	HeadersName   string                 `protobuf:"bytes,7,opt,name=headers_name,json=headersName,proto3" json:"headers_name,omitempty"`
+	HeartbeatName string                 `protobuf:"bytes,8,opt,name=heartbeat_name,json=heartbeatName,proto3" json:"heartbeat_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupInCode) Reset() {
+	*x = SetupInCode{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupInCode) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupInCode) ProtoMessage() {}
+
+func (x *SetupInCode) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupInCode.ProtoReflect.Descriptor instead.
+func (*SetupInCode) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *SetupInCode) GetEndpoint() string {
+	if x != nil && x.Endpoint != nil {
+		return *x.Endpoint
+	}
+	return ""
+}
+
+func (x *SetupInCode) GetHeadersGiven() bool {
+	if x != nil {
+		return x.HeadersGiven
+	}
+	return false
+}
+
+func (x *SetupInCode) GetHeaders() []*Header {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *SetupInCode) GetStateDir() string {
+	if x != nil && x.StateDir != nil {
+		return *x.StateDir
+	}
+	return ""
+}
+
+func (x *SetupInCode) GetHeartbeatMs() int64 {
+	if x != nil && x.HeartbeatMs != nil {
+		return *x.HeartbeatMs
+	}
+	return 0
+}
+
+func (x *SetupInCode) GetEndpointName() string {
+	if x != nil {
+		return x.EndpointName
+	}
+	return ""
+}
+
+func (x *SetupInCode) GetHeadersName() string {
+	if x != nil {
+		return x.HeadersName
+	}
+	return ""
+}
+
+func (x *SetupInCode) GetHeartbeatName() string {
+	if x != nil {
+		return x.HeartbeatName
+	}
+	return ""
+}
+
+type SetupStarted struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Off                 bool                   `protobuf:"varint,1,opt,name=off,proto3" json:"off,omitempty"`                                                              // no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+	Endpoint            string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                                                     // with a scheme (http:// added, with a warning, where it had none)
+	Headers             []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`                                                       // those the core's header rule takes; the rest left out, with a warning
+	HeartbeatIntervalMs uint64                 `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"` // 0: the client's default; at most a day
+	StateDir            string                 `protobuf:"bytes,5,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"`                                     // a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+	// No state directory named, and none turned off: the default one's slots, in order. The
+	// integration takes the first it can make (readable by the user only, with its parents) and
+	// whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
+	// empty: no state directory (each start is a new instance).
+	DefaultSlots  []string    `protobuf:"bytes,6,rep,name=default_slots,json=defaultSlots,proto3" json:"default_slots,omitempty"`
+	AllSlotsTaken string      `protobuf:"bytes,7,opt,name=all_slots_taken,json=allSlotsTaken,proto3" json:"all_slots_taken,omitempty"` // the line to say (at INFO) when every slot is taken
+	Service       string      `protobuf:"bytes,8,opt,name=service,proto3" json:"service,omitempty"`                                    // the service the slots' directory is named for, as it is safe to log
+	ShownEndpoint string      `protobuf:"bytes,9,opt,name=shown_endpoint,json=shownEndpoint,proto3" json:"shown_endpoint,omitempty"`   // the endpoint as it is safe to log: no user info, query or fragment
+	Hints         *SetupHints `protobuf:"bytes,10,opt,name=hints,proto3" json:"hints,omitempty"`
+	Warnings      []string    `protobuf:"bytes,11,rep,name=warnings,proto3" json:"warnings,omitempty"` // to say, at WARN, in order
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupStarted) Reset() {
+	*x = SetupStarted{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupStarted) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupStarted) ProtoMessage() {}
+
+func (x *SetupStarted) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupStarted.ProtoReflect.Descriptor instead.
+func (*SetupStarted) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *SetupStarted) GetOff() bool {
+	if x != nil {
+		return x.Off
+	}
+	return false
+}
+
+func (x *SetupStarted) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *SetupStarted) GetHeaders() []*Header {
+	if x != nil {
+		return x.Headers
+	}
+	return nil
+}
+
+func (x *SetupStarted) GetHeartbeatIntervalMs() uint64 {
+	if x != nil {
+		return x.HeartbeatIntervalMs
+	}
+	return 0
+}
+
+func (x *SetupStarted) GetStateDir() string {
+	if x != nil {
+		return x.StateDir
+	}
+	return ""
+}
+
+func (x *SetupStarted) GetDefaultSlots() []string {
+	if x != nil {
+		return x.DefaultSlots
+	}
+	return nil
+}
+
+func (x *SetupStarted) GetAllSlotsTaken() string {
+	if x != nil {
+		return x.AllSlotsTaken
+	}
+	return ""
+}
+
+func (x *SetupStarted) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *SetupStarted) GetShownEndpoint() string {
+	if x != nil {
+		return x.ShownEndpoint
+	}
+	return ""
+}
+
+func (x *SetupStarted) GetHints() *SetupHints {
+	if x != nil {
+		return x.Hints
+	}
+	return nil
+}
+
+func (x *SetupStarted) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
+// What to check when the server can't be reached, by what went wrong; each names what gave the
+// endpoint or the headers (the variable, or the code).
+type SetupHints struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refused       string                 `protobuf:"bytes,1,opt,name=refused,proto3" json:"refused,omitempty"`                   // HTTP 401 or 403
+	NotFound      string                 `protobuf:"bytes,2,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"` // HTTP 404
+	Unreachable   string                 `protobuf:"bytes,3,opt,name=unreachable,proto3" json:"unreachable,omitempty"`           // no HTTP status: no connection
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`                       // any other status
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupHints) Reset() {
+	*x = SetupHints{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupHints) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupHints) ProtoMessage() {}
+
+func (x *SetupHints) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupHints.ProtoReflect.Descriptor instead.
+func (*SetupHints) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *SetupHints) GetRefused() string {
+	if x != nil {
+		return x.Refused
+	}
+	return ""
+}
+
+func (x *SetupHints) GetNotFound() string {
+	if x != nil {
+		return x.NotFound
+	}
+	return ""
+}
+
+func (x *SetupHints) GetUnreachable() string {
+	if x != nil {
+		return x.Unreachable
+	}
+	return ""
+}
+
+func (x *SetupHints) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// The instance UID, once the state directory is known (and locked).
+type SetupIdentity struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	StateDir           bool                   `protobuf:"varint,1,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"`                              // a state directory is in use
+	Saved              string                 `protobuf:"bytes,2,opt,name=saved,proto3" json:"saved,omitempty"`                                                     // its instance-uid file's text; empty: none, or unreadable
+	ResourceAttributes string                 `protobuf:"bytes,3,opt,name=resource_attributes,json=resourceAttributes,proto3" json:"resource_attributes,omitempty"` // OTEL_RESOURCE_ATTRIBUTES (a UUID service.instance.id in it is the UID given)
+	Entropy            []byte                 `protobuf:"bytes,4,opt,name=entropy,proto3" json:"entropy,omitempty"`                                                 // at least 10 bytes from the platform's CSPRNG
+	UnixMs             uint64                 `protobuf:"varint,5,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"`                                    // the wall clock
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetupIdentity) Reset() {
+	*x = SetupIdentity{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupIdentity) ProtoMessage() {}
+
+func (x *SetupIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupIdentity.ProtoReflect.Descriptor instead.
+func (*SetupIdentity) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *SetupIdentity) GetStateDir() bool {
+	if x != nil {
+		return x.StateDir
+	}
+	return false
+}
+
+func (x *SetupIdentity) GetSaved() string {
+	if x != nil {
+		return x.Saved
+	}
+	return ""
+}
+
+func (x *SetupIdentity) GetResourceAttributes() string {
+	if x != nil {
+		return x.ResourceAttributes
+	}
+	return ""
+}
+
+func (x *SetupIdentity) GetEntropy() []byte {
+	if x != nil {
+		return x.Entropy
+	}
+	return nil
+}
+
+func (x *SetupIdentity) GetUnixMs() uint64 {
+	if x != nil {
+		return x.UnixMs
+	}
+	return 0
+}
+
+type SetupIdentified struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	InstanceUid []byte                 `protobuf:"bytes,1,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // 16 bytes
+	From        SetupUidFrom           `protobuf:"varint,2,opt,name=from,proto3,enum=opamp.core.v1.SetupUidFrom" json:"from,omitempty"`
+	// Write `text` to the instance-uid file (whole: a new file, then renamed over it). If that
+	// fails, say so (at WARN) and use `unsaved_uid` instead.
+	Save          bool         `protobuf:"varint,3,opt,name=save,proto3" json:"save,omitempty"`
+	Text          string       `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"` // instance_uid, as the file holds it: lower-case, hyphenated
+	UnsavedUid    []byte       `protobuf:"bytes,5,opt,name=unsaved_uid,json=unsavedUid,proto3" json:"unsaved_uid,omitempty"`
+	UnsavedFrom   SetupUidFrom `protobuf:"varint,6,opt,name=unsaved_from,json=unsavedFrom,proto3,enum=opamp.core.v1.SetupUidFrom" json:"unsaved_from,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetupIdentified) Reset() {
+	*x = SetupIdentified{}
+	mi := &file_opamp_core_v1_core_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetupIdentified) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetupIdentified) ProtoMessage() {}
+
+func (x *SetupIdentified) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_core_v1_core_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetupIdentified.ProtoReflect.Descriptor instead.
+func (*SetupIdentified) Descriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *SetupIdentified) GetInstanceUid() []byte {
+	if x != nil {
+		return x.InstanceUid
+	}
+	return nil
+}
+
+func (x *SetupIdentified) GetFrom() SetupUidFrom {
+	if x != nil {
+		return x.From
+	}
+	return SetupUidFrom_SETUP_UID_FROM_MADE
+}
+
+func (x *SetupIdentified) GetSave() bool {
+	if x != nil {
+		return x.Save
+	}
+	return false
+}
+
+func (x *SetupIdentified) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *SetupIdentified) GetUnsavedUid() []byte {
+	if x != nil {
+		return x.UnsavedUid
+	}
+	return nil
+}
+
+func (x *SetupIdentified) GetUnsavedFrom() SetupUidFrom {
+	if x != nil {
+		return x.UnsavedFrom
+	}
+	return SetupUidFrom_SETUP_UID_FROM_MADE
+}
+
 var File_opamp_core_v1_core_proto protoreflect.FileDescriptor
 
 const file_opamp_core_v1_core_proto_rawDesc = "" +
@@ -3963,7 +4858,7 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\aheaders\x18\x01 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\"\a\n" +
 	"\x05Empty\" \n" +
 	"\x06Detail\x12\x16\n" +
-	"\x06detail\x18\x01 \x01(\tR\x06detail\"\xe3\x11\n" +
+	"\x06detail\x18\x01 \x01(\tR\x06detail\"\x91\x12\n" +
 	"\x05Input\x12,\n" +
 	"\x05start\x18\x01 \x01(\v2\x14.opamp.core.v1.EmptyH\x00R\x05start\x12K\n" +
 	"\x0fset_description\x18\x02 \x01(\v2 .opamp.proto.v1.AgentDescriptionH\x00R\x0esetDescription\x12@\n" +
@@ -4006,7 +4901,8 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\rstream_failed\x18\x1f \x01(\v2\x15.opamp.core.v1.FailedH\x00R\fstreamFailed\x12:\n" +
 	"\x0estream_spliced\x18  \x01(\v2\x11.opamp.core.v1.IdH\x00R\rstreamSpliced\x12N\n" +
 	"\x11download_response\x18! \x01(\v2\x1f.opamp.core.v1.DownloadResponseH\x00R\x10downloadResponse\x12B\n" +
-	"\x10set_auth_headers\x18\" \x01(\v2\x16.opamp.core.v1.HeadersH\x00R\x0esetAuthHeadersB\x06\n" +
+	"\x10set_auth_headers\x18\" \x01(\v2\x16.opamp.core.v1.HeadersH\x00R\x0esetAuthHeaders\x12,\n" +
+	"\x05abort\x18# \x01(\v2\x14.opamp.core.v1.EmptyH\x00R\x05abortB\x06\n" +
 	"\x04kind\"\x8d\x01\n" +
 	"\vProxyAnswer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x14\n" +
@@ -4192,7 +5088,75 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\x0eStatusTooLarge\x120\n" +
 	"\x05field\x18\x01 \x01(\x0e2\x1a.opamp.core.v1.StatusFieldR\x05field\x12\x14\n" +
 	"\x05bytes\x18\x02 \x01(\x04R\x05bytes\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name*\xab\x02\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\"\x82\x01\n" +
+	"\tSetupCall\x121\n" +
+	"\x05start\x18\x01 \x01(\v2\x19.opamp.core.v1.SetupStartH\x00R\x05start\x12:\n" +
+	"\bidentity\x18\x02 \x01(\v2\x1c.opamp.core.v1.SetupIdentityH\x00R\bidentityB\x06\n" +
+	"\x04call\"\xa9\x01\n" +
+	"\n" +
+	"SetupReply\x127\n" +
+	"\astarted\x18\x01 \x01(\v2\x1b.opamp.core.v1.SetupStartedH\x00R\astarted\x12@\n" +
+	"\n" +
+	"identified\x18\x02 \x01(\v2\x1e.opamp.core.v1.SetupIdentifiedH\x00R\n" +
+	"identified\x12\x16\n" +
+	"\x05error\x18\x03 \x01(\tH\x00R\x05errorB\b\n" +
+	"\x06result\"4\n" +
+	"\bVariable\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xbb\x01\n" +
+	"\n" +
+	"SetupStart\x12)\n" +
+	"\x03env\x18\x01 \x03(\v2\x17.opamp.core.v1.VariableR\x03env\x12&\n" +
+	"\x02os\x18\x02 \x01(\x0e2\x16.opamp.core.v1.SetupOsR\x02os\x12\x18\n" +
+	"\aprogram\x18\x03 \x01(\tR\aprogram\x12\x10\n" +
+	"\x03cwd\x18\x04 \x01(\tR\x03cwd\x12.\n" +
+	"\x04code\x18\x05 \x01(\v2\x1a.opamp.core.v1.SetupInCodeR\x04code\"\xe9\x02\n" +
+	"\vSetupInCode\x12\x1f\n" +
+	"\bendpoint\x18\x01 \x01(\tH\x00R\bendpoint\x88\x01\x01\x12#\n" +
+	"\rheaders_given\x18\x02 \x01(\bR\fheadersGiven\x12/\n" +
+	"\aheaders\x18\x03 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\x12 \n" +
+	"\tstate_dir\x18\x04 \x01(\tH\x01R\bstateDir\x88\x01\x01\x12&\n" +
+	"\fheartbeat_ms\x18\x05 \x01(\x12H\x02R\vheartbeatMs\x88\x01\x01\x12#\n" +
+	"\rendpoint_name\x18\x06 \x01(\tR\fendpointName\x12!\n" +
+	"\fheaders_name\x18\a \x01(\tR\vheadersName\x12%\n" +
+	"\x0eheartbeat_name\x18\b \x01(\tR\rheartbeatNameB\v\n" +
+	"\t_endpointB\f\n" +
+	"\n" +
+	"_state_dirB\x0f\n" +
+	"\r_heartbeat_ms\"\x99\x03\n" +
+	"\fSetupStarted\x12\x10\n" +
+	"\x03off\x18\x01 \x01(\bR\x03off\x12\x1a\n" +
+	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12/\n" +
+	"\aheaders\x18\x03 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\x122\n" +
+	"\x15heartbeat_interval_ms\x18\x04 \x01(\x04R\x13heartbeatIntervalMs\x12\x1b\n" +
+	"\tstate_dir\x18\x05 \x01(\tR\bstateDir\x12#\n" +
+	"\rdefault_slots\x18\x06 \x03(\tR\fdefaultSlots\x12&\n" +
+	"\x0fall_slots_taken\x18\a \x01(\tR\rallSlotsTaken\x12\x18\n" +
+	"\aservice\x18\b \x01(\tR\aservice\x12%\n" +
+	"\x0eshown_endpoint\x18\t \x01(\tR\rshownEndpoint\x12/\n" +
+	"\x05hints\x18\n" +
+	" \x01(\v2\x19.opamp.core.v1.SetupHintsR\x05hints\x12\x1a\n" +
+	"\bwarnings\x18\v \x03(\tR\bwarnings\"{\n" +
+	"\n" +
+	"SetupHints\x12\x18\n" +
+	"\arefused\x18\x01 \x01(\tR\arefused\x12\x1b\n" +
+	"\tnot_found\x18\x02 \x01(\tR\bnotFound\x12 \n" +
+	"\vunreachable\x18\x03 \x01(\tR\vunreachable\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xa6\x01\n" +
+	"\rSetupIdentity\x12\x1b\n" +
+	"\tstate_dir\x18\x01 \x01(\bR\bstateDir\x12\x14\n" +
+	"\x05saved\x18\x02 \x01(\tR\x05saved\x12/\n" +
+	"\x13resource_attributes\x18\x03 \x01(\tR\x12resourceAttributes\x12\x18\n" +
+	"\aentropy\x18\x04 \x01(\fR\aentropy\x12\x17\n" +
+	"\aunix_ms\x18\x05 \x01(\x04R\x06unixMs\"\xee\x01\n" +
+	"\x0fSetupIdentified\x12!\n" +
+	"\finstance_uid\x18\x01 \x01(\fR\vinstanceUid\x12/\n" +
+	"\x04from\x18\x02 \x01(\x0e2\x1b.opamp.core.v1.SetupUidFromR\x04from\x12\x12\n" +
+	"\x04save\x18\x03 \x01(\bR\x04save\x12\x12\n" +
+	"\x04text\x18\x04 \x01(\tR\x04text\x12\x1f\n" +
+	"\vunsaved_uid\x18\x05 \x01(\fR\n" +
+	"unsavedUid\x12>\n" +
+	"\funsaved_from\x18\x06 \x01(\x0e2\x1b.opamp.core.v1.SetupUidFromR\vunsavedFrom*\xab\x02\n" +
 	"\vStatusField\x12\x1c\n" +
 	"\x18STATUS_FIELD_DESCRIPTION\x10\x00\x12\x17\n" +
 	"\x13STATUS_FIELD_HEALTH\x10\x01\x12!\n" +
@@ -4201,7 +5165,15 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"'STATUS_FIELD_CONNECTION_SETTINGS_STATUS\x10\x04\x12%\n" +
 	"!STATUS_FIELD_AVAILABLE_COMPONENTS\x10\x05\x12$\n" +
 	" STATUS_FIELD_CUSTOM_CAPABILITIES\x10\x06\x12!\n" +
-	"\x1dSTATUS_FIELD_PACKAGE_STATUSES\x10\aBv\n" +
+	"\x1dSTATUS_FIELD_PACKAGE_STATUSES\x10\a*F\n" +
+	"\aSetupOs\x12\x11\n" +
+	"\rSETUP_OS_UNIX\x10\x00\x12\x12\n" +
+	"\x0eSETUP_OS_MACOS\x10\x01\x12\x14\n" +
+	"\x10SETUP_OS_WINDOWS\x10\x02*[\n" +
+	"\fSetupUidFrom\x12\x17\n" +
+	"\x13SETUP_UID_FROM_MADE\x10\x00\x12\x18\n" +
+	"\x14SETUP_UID_FROM_SAVED\x10\x01\x12\x18\n" +
+	"\x14SETUP_UID_FROM_GIVEN\x10\x02Bv\n" +
 	"\x17dev.pydantic.opamp.coreB\tCoreProtoZ:github.com/pydantic/opamp-clients/go/opamp/internal/corepb\xaa\x02\x13Pydantic.OpAmp.Coreb\x06proto3"
 
 var (
@@ -4216,156 +5188,180 @@ func file_opamp_core_v1_core_proto_rawDescGZIP() []byte {
 	return file_opamp_core_v1_core_proto_rawDescData
 }
 
-var file_opamp_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_opamp_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_opamp_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_opamp_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 50)
 var file_opamp_core_v1_core_proto_goTypes = []any{
 	(StatusField)(0),                           // 0: opamp.core.v1.StatusField
-	(*Config)(nil),                             // 1: opamp.core.v1.Config
-	(*ProxyChoice)(nil),                        // 2: opamp.core.v1.ProxyChoice
-	(*Origin)(nil),                             // 3: opamp.core.v1.Origin
-	(*Header)(nil),                             // 4: opamp.core.v1.Header
-	(*Headers)(nil),                            // 5: opamp.core.v1.Headers
-	(*Empty)(nil),                              // 6: opamp.core.v1.Empty
-	(*Detail)(nil),                             // 7: opamp.core.v1.Detail
-	(*Input)(nil),                              // 8: opamp.core.v1.Input
-	(*ProxyAnswer)(nil),                        // 9: opamp.core.v1.ProxyAnswer
-	(*StreamResolved)(nil),                     // 10: opamp.core.v1.StreamResolved
-	(*Name)(nil),                               // 11: opamp.core.v1.Name
-	(*PackageInstalled)(nil),                   // 12: opamp.core.v1.PackageInstalled
-	(*Downloaded)(nil),                         // 13: opamp.core.v1.Downloaded
-	(*DownloadResponse)(nil),                   // 14: opamp.core.v1.DownloadResponse
-	(*Id)(nil),                                 // 15: opamp.core.v1.Id
-	(*Failed)(nil),                             // 16: opamp.core.v1.Failed
-	(*HttpResponse)(nil),                       // 17: opamp.core.v1.HttpResponse
-	(*WsFailed)(nil),                           // 18: opamp.core.v1.WsFailed
-	(*WsMessage)(nil),                          // 19: opamp.core.v1.WsMessage
-	(*WsClosed)(nil),                           // 20: opamp.core.v1.WsClosed
-	(*Step)(nil),                               // 21: opamp.core.v1.Step
-	(*Reply)(nil),                              // 22: opamp.core.v1.Reply
-	(*Output)(nil),                             // 23: opamp.core.v1.Output
-	(*Limits)(nil),                             // 24: opamp.core.v1.Limits
-	(*Effect)(nil),                             // 25: opamp.core.v1.Effect
-	(*StreamClose)(nil),                        // 26: opamp.core.v1.StreamClose
-	(*Url)(nil),                                // 27: opamp.core.v1.Url
-	(*StreamName)(nil),                         // 28: opamp.core.v1.StreamName
-	(*StreamSplice)(nil),                       // 29: opamp.core.v1.StreamSplice
-	(*StreamOpen)(nil),                         // 30: opamp.core.v1.StreamOpen
-	(*Download)(nil),                           // 31: opamp.core.v1.Download
-	(*Store)(nil),                              // 32: opamp.core.v1.Store
-	(*HttpRequest)(nil),                        // 33: opamp.core.v1.HttpRequest
-	(*WsOpen)(nil),                             // 34: opamp.core.v1.WsOpen
-	(*Notification)(nil),                       // 35: opamp.core.v1.Notification
-	(*SaveStalled)(nil),                        // 36: opamp.core.v1.SaveStalled
-	(*InstallPackage)(nil),                     // 37: opamp.core.v1.InstallPackage
-	(*CustomMessageNotSent)(nil),               // 38: opamp.core.v1.CustomMessageNotSent
-	(*NotifyConnectFailed)(nil),                // 39: opamp.core.v1.NotifyConnectFailed
-	(*ErrorResponse)(nil),                      // 40: opamp.core.v1.ErrorResponse
-	(*StatusTooLarge)(nil),                     // 41: opamp.core.v1.StatusTooLarge
-	(*protobufs.AgentDescription)(nil),         // 42: opamp.proto.v1.AgentDescription
-	(*protobufs.ComponentHealth)(nil),          // 43: opamp.proto.v1.ComponentHealth
-	(*protobufs.EffectiveConfig)(nil),          // 44: opamp.proto.v1.EffectiveConfig
-	(*protobufs.RemoteConfigStatus)(nil),       // 45: opamp.proto.v1.RemoteConfigStatus
-	(*protobufs.ConnectionSettingsStatus)(nil), // 46: opamp.proto.v1.ConnectionSettingsStatus
-	(*protobufs.AvailableComponents)(nil),      // 47: opamp.proto.v1.AvailableComponents
-	(*protobufs.CustomCapabilities)(nil),       // 48: opamp.proto.v1.CustomCapabilities
-	(*protobufs.CustomMessage)(nil),            // 49: opamp.proto.v1.CustomMessage
-	(*protobufs.AgentRemoteConfig)(nil),        // 50: opamp.proto.v1.AgentRemoteConfig
-	(*protobufs.ServerToAgentCommand)(nil),     // 51: opamp.proto.v1.ServerToAgentCommand
-	(*protobufs.ConnectionSettingsOffers)(nil), // 52: opamp.proto.v1.ConnectionSettingsOffers
-	(*protobufs.PackageAvailable)(nil),         // 53: opamp.proto.v1.PackageAvailable
+	(SetupOs)(0),                               // 1: opamp.core.v1.SetupOs
+	(SetupUidFrom)(0),                          // 2: opamp.core.v1.SetupUidFrom
+	(*Config)(nil),                             // 3: opamp.core.v1.Config
+	(*ProxyChoice)(nil),                        // 4: opamp.core.v1.ProxyChoice
+	(*Origin)(nil),                             // 5: opamp.core.v1.Origin
+	(*Header)(nil),                             // 6: opamp.core.v1.Header
+	(*Headers)(nil),                            // 7: opamp.core.v1.Headers
+	(*Empty)(nil),                              // 8: opamp.core.v1.Empty
+	(*Detail)(nil),                             // 9: opamp.core.v1.Detail
+	(*Input)(nil),                              // 10: opamp.core.v1.Input
+	(*ProxyAnswer)(nil),                        // 11: opamp.core.v1.ProxyAnswer
+	(*StreamResolved)(nil),                     // 12: opamp.core.v1.StreamResolved
+	(*Name)(nil),                               // 13: opamp.core.v1.Name
+	(*PackageInstalled)(nil),                   // 14: opamp.core.v1.PackageInstalled
+	(*Downloaded)(nil),                         // 15: opamp.core.v1.Downloaded
+	(*DownloadResponse)(nil),                   // 16: opamp.core.v1.DownloadResponse
+	(*Id)(nil),                                 // 17: opamp.core.v1.Id
+	(*Failed)(nil),                             // 18: opamp.core.v1.Failed
+	(*HttpResponse)(nil),                       // 19: opamp.core.v1.HttpResponse
+	(*WsFailed)(nil),                           // 20: opamp.core.v1.WsFailed
+	(*WsMessage)(nil),                          // 21: opamp.core.v1.WsMessage
+	(*WsClosed)(nil),                           // 22: opamp.core.v1.WsClosed
+	(*Step)(nil),                               // 23: opamp.core.v1.Step
+	(*Reply)(nil),                              // 24: opamp.core.v1.Reply
+	(*Output)(nil),                             // 25: opamp.core.v1.Output
+	(*Limits)(nil),                             // 26: opamp.core.v1.Limits
+	(*Effect)(nil),                             // 27: opamp.core.v1.Effect
+	(*StreamClose)(nil),                        // 28: opamp.core.v1.StreamClose
+	(*Url)(nil),                                // 29: opamp.core.v1.Url
+	(*StreamName)(nil),                         // 30: opamp.core.v1.StreamName
+	(*StreamSplice)(nil),                       // 31: opamp.core.v1.StreamSplice
+	(*StreamOpen)(nil),                         // 32: opamp.core.v1.StreamOpen
+	(*Download)(nil),                           // 33: opamp.core.v1.Download
+	(*Store)(nil),                              // 34: opamp.core.v1.Store
+	(*HttpRequest)(nil),                        // 35: opamp.core.v1.HttpRequest
+	(*WsOpen)(nil),                             // 36: opamp.core.v1.WsOpen
+	(*Notification)(nil),                       // 37: opamp.core.v1.Notification
+	(*SaveStalled)(nil),                        // 38: opamp.core.v1.SaveStalled
+	(*InstallPackage)(nil),                     // 39: opamp.core.v1.InstallPackage
+	(*CustomMessageNotSent)(nil),               // 40: opamp.core.v1.CustomMessageNotSent
+	(*NotifyConnectFailed)(nil),                // 41: opamp.core.v1.NotifyConnectFailed
+	(*ErrorResponse)(nil),                      // 42: opamp.core.v1.ErrorResponse
+	(*StatusTooLarge)(nil),                     // 43: opamp.core.v1.StatusTooLarge
+	(*SetupCall)(nil),                          // 44: opamp.core.v1.SetupCall
+	(*SetupReply)(nil),                         // 45: opamp.core.v1.SetupReply
+	(*Variable)(nil),                           // 46: opamp.core.v1.Variable
+	(*SetupStart)(nil),                         // 47: opamp.core.v1.SetupStart
+	(*SetupInCode)(nil),                        // 48: opamp.core.v1.SetupInCode
+	(*SetupStarted)(nil),                       // 49: opamp.core.v1.SetupStarted
+	(*SetupHints)(nil),                         // 50: opamp.core.v1.SetupHints
+	(*SetupIdentity)(nil),                      // 51: opamp.core.v1.SetupIdentity
+	(*SetupIdentified)(nil),                    // 52: opamp.core.v1.SetupIdentified
+	(*protobufs.AgentDescription)(nil),         // 53: opamp.proto.v1.AgentDescription
+	(*protobufs.ComponentHealth)(nil),          // 54: opamp.proto.v1.ComponentHealth
+	(*protobufs.EffectiveConfig)(nil),          // 55: opamp.proto.v1.EffectiveConfig
+	(*protobufs.RemoteConfigStatus)(nil),       // 56: opamp.proto.v1.RemoteConfigStatus
+	(*protobufs.ConnectionSettingsStatus)(nil), // 57: opamp.proto.v1.ConnectionSettingsStatus
+	(*protobufs.AvailableComponents)(nil),      // 58: opamp.proto.v1.AvailableComponents
+	(*protobufs.CustomCapabilities)(nil),       // 59: opamp.proto.v1.CustomCapabilities
+	(*protobufs.CustomMessage)(nil),            // 60: opamp.proto.v1.CustomMessage
+	(*protobufs.AgentRemoteConfig)(nil),        // 61: opamp.proto.v1.AgentRemoteConfig
+	(*protobufs.ServerToAgentCommand)(nil),     // 62: opamp.proto.v1.ServerToAgentCommand
+	(*protobufs.ConnectionSettingsOffers)(nil), // 63: opamp.proto.v1.ConnectionSettingsOffers
+	(*protobufs.PackageAvailable)(nil),         // 64: opamp.proto.v1.PackageAvailable
 }
 var file_opamp_core_v1_core_proto_depIdxs = []int32{
-	4,  // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
-	2,  // 1: opamp.core.v1.Config.proxy:type_name -> opamp.core.v1.ProxyChoice
-	4,  // 2: opamp.core.v1.ProxyChoice.headers:type_name -> opamp.core.v1.Header
-	4,  // 3: opamp.core.v1.ProxyChoice.environment:type_name -> opamp.core.v1.Header
-	4,  // 4: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
-	6,  // 5: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
-	42, // 6: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
-	43, // 7: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
-	44, // 8: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
-	45, // 9: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
-	6,  // 10: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
-	6,  // 11: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
-	17, // 12: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
-	16, // 13: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
-	15, // 14: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
-	18, // 15: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
-	19, // 16: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
-	20, // 17: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
-	16, // 18: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
-	15, // 19: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
-	16, // 20: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
-	46, // 21: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
-	47, // 22: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
-	48, // 23: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	49, // 24: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
-	12, // 25: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
-	11, // 26: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.Name
-	13, // 27: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
-	16, // 28: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
-	9,  // 29: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
-	10, // 30: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
-	15, // 31: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
-	15, // 32: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
-	19, // 33: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
-	15, // 34: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
-	16, // 35: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
-	15, // 36: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
-	14, // 37: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
-	5,  // 38: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
-	4,  // 39: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
-	3,  // 40: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
-	4,  // 41: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
-	4,  // 42: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
-	8,  // 43: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
-	23, // 44: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
-	25, // 45: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
-	24, // 46: opamp.core.v1.Output.limits:type_name -> opamp.core.v1.Limits
-	33, // 47: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
-	34, // 48: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
-	19, // 49: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
-	15, // 50: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
-	35, // 51: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
-	32, // 52: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
-	31, // 53: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
-	15, // 54: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
-	15, // 55: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
-	27, // 56: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
-	28, // 57: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
-	30, // 58: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
-	28, // 59: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
-	19, // 60: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
-	26, // 61: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
-	19, // 62: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
-	15, // 63: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
-	29, // 64: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
-	4,  // 65: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
-	4,  // 66: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
-	4,  // 67: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
-	6,  // 68: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
-	39, // 69: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
-	40, // 70: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
-	50, // 71: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	51, // 72: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
-	41, // 73: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
-	7,  // 74: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
-	6,  // 75: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
-	52, // 76: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
-	49, // 77: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
-	48, // 78: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	38, // 79: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
-	37, // 80: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
-	11, // 81: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
-	36, // 82: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
-	53, // 83: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
-	49, // 84: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
-	0,  // 85: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
-	86, // [86:86] is the sub-list for method output_type
-	86, // [86:86] is the sub-list for method input_type
-	86, // [86:86] is the sub-list for extension type_name
-	86, // [86:86] is the sub-list for extension extendee
-	0,  // [0:86] is the sub-list for field type_name
+	6,  // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
+	4,  // 1: opamp.core.v1.Config.proxy:type_name -> opamp.core.v1.ProxyChoice
+	6,  // 2: opamp.core.v1.ProxyChoice.headers:type_name -> opamp.core.v1.Header
+	6,  // 3: opamp.core.v1.ProxyChoice.environment:type_name -> opamp.core.v1.Header
+	6,  // 4: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
+	8,  // 5: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
+	53, // 6: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
+	54, // 7: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
+	55, // 8: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
+	56, // 9: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
+	8,  // 10: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
+	8,  // 11: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
+	19, // 12: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
+	18, // 13: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
+	17, // 14: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
+	20, // 15: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
+	21, // 16: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
+	22, // 17: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
+	18, // 18: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
+	17, // 19: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
+	18, // 20: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
+	57, // 21: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
+	58, // 22: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
+	59, // 23: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	60, // 24: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
+	14, // 25: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
+	13, // 26: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.Name
+	15, // 27: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
+	18, // 28: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
+	11, // 29: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
+	12, // 30: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
+	17, // 31: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
+	17, // 32: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
+	21, // 33: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
+	17, // 34: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
+	18, // 35: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
+	17, // 36: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
+	16, // 37: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
+	7,  // 38: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
+	8,  // 39: opamp.core.v1.Input.abort:type_name -> opamp.core.v1.Empty
+	6,  // 40: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
+	5,  // 41: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
+	6,  // 42: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
+	6,  // 43: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
+	10, // 44: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
+	25, // 45: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
+	27, // 46: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
+	26, // 47: opamp.core.v1.Output.limits:type_name -> opamp.core.v1.Limits
+	35, // 48: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
+	36, // 49: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
+	21, // 50: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
+	17, // 51: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
+	37, // 52: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
+	34, // 53: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
+	33, // 54: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
+	17, // 55: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
+	17, // 56: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
+	29, // 57: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
+	30, // 58: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
+	32, // 59: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
+	30, // 60: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
+	21, // 61: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
+	28, // 62: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
+	21, // 63: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
+	17, // 64: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
+	31, // 65: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
+	6,  // 66: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
+	6,  // 67: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
+	6,  // 68: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
+	8,  // 69: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
+	41, // 70: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
+	42, // 71: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
+	61, // 72: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	62, // 73: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
+	43, // 74: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
+	9,  // 75: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
+	8,  // 76: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
+	63, // 77: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
+	60, // 78: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
+	59, // 79: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	40, // 80: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
+	39, // 81: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
+	13, // 82: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
+	38, // 83: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
+	64, // 84: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
+	60, // 85: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
+	0,  // 86: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
+	47, // 87: opamp.core.v1.SetupCall.start:type_name -> opamp.core.v1.SetupStart
+	51, // 88: opamp.core.v1.SetupCall.identity:type_name -> opamp.core.v1.SetupIdentity
+	49, // 89: opamp.core.v1.SetupReply.started:type_name -> opamp.core.v1.SetupStarted
+	52, // 90: opamp.core.v1.SetupReply.identified:type_name -> opamp.core.v1.SetupIdentified
+	46, // 91: opamp.core.v1.SetupStart.env:type_name -> opamp.core.v1.Variable
+	1,  // 92: opamp.core.v1.SetupStart.os:type_name -> opamp.core.v1.SetupOs
+	48, // 93: opamp.core.v1.SetupStart.code:type_name -> opamp.core.v1.SetupInCode
+	6,  // 94: opamp.core.v1.SetupInCode.headers:type_name -> opamp.core.v1.Header
+	6,  // 95: opamp.core.v1.SetupStarted.headers:type_name -> opamp.core.v1.Header
+	50, // 96: opamp.core.v1.SetupStarted.hints:type_name -> opamp.core.v1.SetupHints
+	2,  // 97: opamp.core.v1.SetupIdentified.from:type_name -> opamp.core.v1.SetupUidFrom
+	2,  // 98: opamp.core.v1.SetupIdentified.unsaved_from:type_name -> opamp.core.v1.SetupUidFrom
+	99, // [99:99] is the sub-list for method output_type
+	99, // [99:99] is the sub-list for method input_type
+	99, // [99:99] is the sub-list for extension type_name
+	99, // [99:99] is the sub-list for extension extendee
+	0,  // [0:99] is the sub-list for field type_name
 }
 
 func init() { file_opamp_core_v1_core_proto_init() }
@@ -4408,6 +5404,7 @@ func file_opamp_core_v1_core_proto_init() {
 		(*Input_StreamSpliced)(nil),
 		(*Input_DownloadResponse)(nil),
 		(*Input_SetAuthHeaders)(nil),
+		(*Input_Abort)(nil),
 	}
 	file_opamp_core_v1_core_proto_msgTypes[17].OneofWrappers = []any{}
 	file_opamp_core_v1_core_proto_msgTypes[22].OneofWrappers = []any{}
@@ -4451,13 +5448,23 @@ func file_opamp_core_v1_core_proto_init() {
 		(*Notification_SaveStalled)(nil),
 	}
 	file_opamp_core_v1_core_proto_msgTypes[38].OneofWrappers = []any{}
+	file_opamp_core_v1_core_proto_msgTypes[41].OneofWrappers = []any{
+		(*SetupCall_Start)(nil),
+		(*SetupCall_Identity)(nil),
+	}
+	file_opamp_core_v1_core_proto_msgTypes[42].OneofWrappers = []any{
+		(*SetupReply_Started)(nil),
+		(*SetupReply_Identified)(nil),
+		(*SetupReply_Error)(nil),
+	}
+	file_opamp_core_v1_core_proto_msgTypes[45].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_opamp_core_v1_core_proto_rawDesc), len(file_opamp_core_v1_core_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   41,
+			NumEnums:      3,
+			NumMessages:   50,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

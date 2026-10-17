@@ -91,13 +91,13 @@ internal sealed class OpAmpAgent : IDisposable
     /// names its instrumentations in code); the sampling rate only while the live sampler can be the
     /// tracer provider's; a signal's sending only while every exporter it has can be gated
     /// (<see cref="Exporters"/>, read from the built providers each time: a processor the application
-    /// adds to one later is found); the polling interval at the next start.
+    /// adds to one later is found). Nothing waits for the next start.
     /// </summary>
     public Host HostNow(bool providersBuilt)
     {
         // Before the providers are built, an exporter not yet seen may still be gated.
         var ungated = providersBuilt ? this.Ungated() : [];
-        var h = new Host { NextStart = { "opamp_polling_interval" } };
+        var h = new Host();
         if (this.gateable)
         {
             foreach (var signal in Enum.GetValues<Signal>().Where(s => !ungated.Contains(s)))
@@ -130,8 +130,8 @@ internal sealed class OpAmpAgent : IDisposable
         }
 
         // Debug mode: the layer folds it into the settings it hands over, and SdkAgent's timer
-        // ends it. Its rate and level are set aside, as sampling_rate and send_logs_level are, where
-        // those aren't declared.
+        // ends it. Where sampling_rate or send_logs_level is not declared, the layer refuses a
+        // policy that overrides the debug rate or level, as it refuses one that overrides those.
         h.Live.Add("debug_until");
         h.Live.Add("debug_sampling_rate");
         h.Live.Add("debug_send_logs_level");
@@ -212,8 +212,9 @@ internal sealed class OpAmpAgent : IDisposable
             this.log.Sink.Warn("the tracer provider's sampler was set after WithOpAmp(): sampling_rate is not carried out. Call WithOpAmp() last.");
         }
 
-        // Which signals go to an exporter the gate isn't in front of is known now: their send_* is
-        // ignored. The providers are read again before each decision, and on the health timer.
+        // Which signals go to an exporter the gate isn't in front of is known now. The host does not
+        // declare their send_*, so the layer refuses a policy that overrides it, and sets it aside in
+        // one in force. The providers are read again before each decision, and on the health timer.
         this.built = (tracing, metrics, logs);
         foreach (var signal in this.Ungated())
         {

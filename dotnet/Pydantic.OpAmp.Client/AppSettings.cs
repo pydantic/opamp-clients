@@ -10,9 +10,9 @@ using System.Text.RegularExpressions;
 namespace Pydantic.OpAmp;
 
 /// <summary>
-/// The application's own settings, as the OpAMP server sends them (docs/app-settings.md): the
-/// <c>custom</c> map of the remote config's <c>elastic</c> entry, keys to text values, which the
-/// SDK doesn't read but hands on for the application to read here.
+/// The application's own settings, as the OpAMP server sends them (docs/app-settings.md). They are
+/// the <c>values</c> of the Logfire SDK policy's <c>app_settings</c> control, keys to text values.
+/// The SDK does not read them. It hands them on for the application to read here.
 /// </summary>
 /// <remarks>
 /// The integration fills it: the automatic instrumentation plugin

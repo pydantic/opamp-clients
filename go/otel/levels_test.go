@@ -5,6 +5,7 @@ package opampotel
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"slices"
@@ -52,26 +53,57 @@ func TestScopeLevelsChangeLiveAndRevert(t *testing.T) {
 		}
 		return exported(sink)
 	}
-	every := "com.acme.db:5 com.acme.db:13 com.acme.dbpool:5 com.acme.dbpool:13 noisy.lib:5 noisy.lib:13 app:5 app:13"
-	if got := all(); got != every {
+	everyRecord := "com.acme.db:5 com.acme.db:13 com.acme.dbpool:5 com.acme.dbpool:13 noisy.lib:5 noisy.lib:13 app:5 app:13"
+	if got := all(); got != everyRecord {
 		t.Fatalf("nothing set: %s", got)
 	}
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn","send_logs_level_by_scope":"com.acme.db*=debug, noisy.lib=off"}`), 0))
+	c.Apply(settingsOf(t, []byte(levelsPolicy("warn", "com.acme.db*=debug", "noisy.lib=off")), 0))
 	if got, want := all(), "com.acme.db:5 com.acme.db:13 com.acme.dbpool:5 com.acme.dbpool:13 app:13"; got != want {
 		t.Fatalf("levels per scope: %s, want %s", got, want)
 	}
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn","send_logs_level_by_scope":"app=error"}`), 0))
+	c.Apply(settingsOf(t, []byte(levelsPolicy("warn", "app=error")), 0))
 	if got, want := all(), "com.acme.db:13 com.acme.dbpool:13 noisy.lib:13"; got != want {
 		t.Fatalf("changed: %s, want %s", got, want)
 	}
-	c.Apply(settingsOf(t, []byte(`{"send_logs_level":"warn"}`), 0))
+	c.Apply(settingsOf(t, []byte(levelsPolicy("warn")), 0))
 	if got, want := all(), "com.acme.db:13 com.acme.dbpool:13 noisy.lib:13 app:13"; got != want {
 		t.Fatalf("levels per scope left out: %s, want the global level's %s", got, want)
 	}
-	c.Apply(settingsOf(t, []byte(`{}`), 0))
-	if got := all(); got != every {
+	c.Apply(settingsOf(t, []byte(every()), 0))
+	if got := all(); got != everyRecord {
 		t.Fatalf("everything left out: %s, want every record", got)
 	}
+}
+
+// levelsPolicy is a policy whose log_levels control is the given level and scope entries, each
+// "pattern=level"; with neither, the control is local.
+func levelsPolicy(level string, entries ...string) string {
+	return every("log_levels", logLevelsControl(level, entries...))
+}
+
+// levelsPolicyOff is levelsPolicy with no level, the given scope entries and the log export off.
+func levelsPolicyOff(entries ...string) string {
+	return every("signal_exports", exports("", "", "off"), "log_levels", logLevelsControl("", entries...))
+}
+
+func logLevelsControl(level string, entries ...string) string {
+	if level == "" && len(entries) == 0 {
+		return `{"mode":"local"}`
+	}
+	var fields []string
+	if level != "" {
+		fields = append(fields, `"level":"`+level+`"`)
+	}
+	if len(entries) > 0 {
+		var scopes []string
+		for _, e := range entries {
+			pattern, lv, _ := strings.Cut(e, "=")
+			key, _ := json.Marshal(pattern)
+			scopes = append(scopes, string(key)+`:"`+lv+`"`)
+		}
+		fields = append(fields, `"scopes":{`+strings.Join(scopes, ",")+`}`)
+	}
+	return override(strings.Join(fields, ","))
 }
 
 // The spec's edge cases, through the gate.
@@ -81,20 +113,20 @@ func TestScopeLevelEdgeCases(t *testing.T) {
 		sev              log.Severity
 		kept             bool
 	}{
-		{"exact beats prefix", `{"send_logs_level_by_scope":"a.b*=error,a.b=debug"}`, "a.b", log.SeverityDebug, true},
-		{"the longer prefix wins", `{"send_logs_level_by_scope":"a*=debug,a.b*=error"}`, "a.b.c", log.SeverityWarn, false},
-		{"the shorter prefix where the longer doesn't match", `{"send_logs_level_by_scope":"a*=debug,a.b*=error"}`, "a.c", log.SeverityDebug, true},
-		{"the empty scope: * matches it", `{"send_logs_level_by_scope":"*=error"}`, "", log.SeverityWarn, false},
-		{"the empty scope: only *", `{"send_logs_level_by_scope":"a*=off"}`, "", log.SeverityWarn, true},
-		{"severity 0 under fatal is kept", `{"send_logs_level_by_scope":"app=fatal"}`, "app", 0, true},
-		{"severity 0 under off is dropped", `{"send_logs_level_by_scope":"app=off"}`, "app", 0, false},
-		{"off drops fatal too", `{"send_logs_level_by_scope":"app=off"}`, "app", log.SeverityFatal4, false},
-		{"a scope entry without send_logs_level", `{"send_logs_level_by_scope":"app=error"}`, "app", log.SeverityWarn, false},
-		{"other scopes without send_logs_level: every record", `{"send_logs_level_by_scope":"app=error"}`, "other", log.SeverityTrace, true},
-		{"a scope's level lower than the global one", `{"send_logs_level":"error","send_logs_level_by_scope":"app=trace"}`, "app", log.SeverityTrace, true},
-		{"send_logs false overrides every level", `{"send_logs":"false","send_logs_level_by_scope":"app=trace"}`, "app", log.SeverityFatal, false},
-		{"scope names match case-sensitively", `{"send_logs_level_by_scope":"App=off"}`, "app", log.SeverityInfo, true},
-		{"a prefix is by characters, not dotted segments", `{"send_logs_level_by_scope":"com.acme*=off"}`, "com.acmesoft", log.SeverityInfo, false},
+		{"exact beats prefix", levelsPolicy("", "a.b*=error", "a.b=debug"), "a.b", log.SeverityDebug, true},
+		{"the longer prefix wins", levelsPolicy("", "a*=debug", "a.b*=error"), "a.b.c", log.SeverityWarn, false},
+		{"the shorter prefix where the longer does not match", levelsPolicy("", "a*=debug", "a.b*=error"), "a.c", log.SeverityDebug, true},
+		{"the empty scope: * matches it", levelsPolicy("", "*=error"), "", log.SeverityWarn, false},
+		{"the empty scope: only *", levelsPolicy("", "a*=off"), "", log.SeverityWarn, true},
+		{"severity 0 under fatal is kept", levelsPolicy("", "app=fatal"), "app", 0, true},
+		{"severity 0 under off is dropped", levelsPolicy("", "app=off"), "app", 0, false},
+		{"off drops fatal too", levelsPolicy("", "app=off"), "app", log.SeverityFatal4, false},
+		{"a scope entry without send_logs_level", levelsPolicy("", "app=error"), "app", log.SeverityWarn, false},
+		{"other scopes without send_logs_level: every record", levelsPolicy("", "app=error"), "other", log.SeverityTrace, true},
+		{"a scope's level lower than the global one", levelsPolicy("error", "app=trace"), "app", log.SeverityTrace, true},
+		{"send_logs false overrides every level", levelsPolicyOff("app=trace"), "app", log.SeverityFatal, false},
+		{"scope names match case-sensitively", levelsPolicy("", "App=off"), "app", log.SeverityInfo, true},
+		{"a prefix is by characters, not dotted segments", levelsPolicy("", "com.acme*=off"), "com.acmesoft", log.SeverityInfo, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			controls := NewControls()
@@ -108,24 +140,32 @@ func TestScopeLevelEdgeCases(t *testing.T) {
 	}
 }
 
-// A host that can't carry out send_logs_level can't carry out the levels per scope either: the
-// layer ignores both, and the gate keeps every record.
-func TestScopeLevelsAreIgnoredWhereTheLevelIs(t *testing.T) {
+// A host that cannot carry out send_logs_level cannot carry out the levels per scope either: the
+// layer refuses a policy that overrides them, sets them aside in a saved policy (reported local),
+// and the gate keeps every record.
+func TestScopeLevelsAreRefusedWhereTheLevelIs(t *testing.T) {
 	host := goHost()
 	host.Live = slices.DeleteFunc(host.Live, func(k string) bool { return k == "send_logs_level" })
-	loaded, err := testLayer(t).LoadAt(context.Background(), []byte(`{"send_logs_level_by_scope":"app=off"}`), host, vectorNow)
+	doc := levelsPolicy("", "app=off")
+	d, err := testLayer(t).DecideAt(context.Background(), remote(doc), nil, nil, host, vectorNow, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fmt.Sprint(loaded.GetSettings().GetUnsupported()) != "[send_logs_level_by_scope]" {
-		t.Fatalf("unsupported %v", loaded.GetSettings().GetUnsupported())
+	if d.GetStatus().GetStatus() != failed_ || d.GetApply() != nil ||
+		d.GetStatus().GetErrorMessage() != "log_levels: scopes: this SDK cannot apply the requested override" {
+		t.Fatalf("decided %v", d)
+	}
+	loaded, err := testLayer(t).LoadAt(context.Background(), []byte(doc), host, vectorNow)
+	effective := string(loaded.GetEffective().GetConfigMap().GetConfigMap()[policyFile].GetBody())
+	if err != nil || loaded.GetWarning() != "" || !strings.Contains(effective, `"log_levels":{"mode":"local"}`) {
+		t.Fatalf("loaded %v %v: a saved policy's levels this host cannot apply should be set aside", loaded, err)
 	}
 	c := NewControls()
 	c.Apply(loaded.GetSettings())
 	sink := &recordSink{}
 	emit(gatedLogs(c, sink), "app", log.SeverityInfo)
 	if len(sink.take()) != 1 {
-		t.Fatal("an ignored level dropped a record")
+		t.Fatal("a refused level dropped a record")
 	}
 }
 
@@ -156,13 +196,11 @@ func TestScopeLevelsMatchTheLayers(t *testing.T) {
 			seen[p] = true
 			entries = append(entries, p+"="+levels[r.IntN(len(levels))])
 		}
-		doc := fmt.Sprintf(`{"send_logs_level_by_scope":%q}`, strings.Join(entries, ","))
+		level := ""
 		if r.IntN(2) == 0 {
-			doc = fmt.Sprintf(`{"send_logs_level":%q,"send_logs_level_by_scope":%q}`, levels[r.IntN(6)], strings.Join(entries, ","))
+			level = levels[r.IntN(6)]
 		}
-		if len(entries) == 0 {
-			doc = `{}`
-		}
+		doc := levelsPolicy(level, entries...)
 		scope, sev := word(), r.IntN(25)
 		want, err := testLayer(t).Evaluate(context.Background(), &settingspb.Evaluate{Settings: []byte(doc), Host: goHost(),
 			NowUnixMs: vectorNow, Input: &settingspb.Evaluate_Log{Log: &settingspb.LogRecord{Scope: scope, Severity: uint32(sev)}}})

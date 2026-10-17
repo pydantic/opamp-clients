@@ -36,7 +36,6 @@ OPAMP_PROP_RUNS=<n> runs n seeds per profile (default 1), for a longer nightly r
 
 from __future__ import annotations
 
-import json
 import os
 import random
 import sys
@@ -57,13 +56,14 @@ from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 from opentelemetry.trace import Link, NonRecordingSpan, SpanContext, SpanKind, TraceFlags
 
 import opamp_otel
+from _policy import SIGNALS, config_map, policy
 from opamp_otel import Controls
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z: the clock the documents are decided at (debug_until is against it).
 NOW = 1_791_979_200_000
-#: What the SDK declares, as a real agent does: a setting the host leaves out is set aside, never applied.
+#: What the SDK declares, as a real agent does: a policy that overrides a setting the host leaves out is refused.
 HOST = opamp_otel.sdk_host(["otlp"])
 #: How long the applier flips, in seconds, per run.
 FLIPPING = 0.6
@@ -83,8 +83,8 @@ def _own_state_home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("HOME", str(home))
 
 
-#: Seeds that once failed, run every time. 311230235 and 69531056 (quiet): send_logs wasn't declared by the old
-#: hand-written HOST, so it was set aside and logs flowed in a run where every document turned them off.
+#: Seeds that once failed, run every time. 311230235 and 69531056 (quiet): an older hand-written HOST did not
+#: declare send_logs. Thus the SDK did not apply it, and logs flowed in a run where every document turned them off.
 FOUND = {"free": [], "redacted": [], "quiet": [311230235, 69531056], "switched": []}
 
 
@@ -227,19 +227,53 @@ def final_document(rng: random.Random, profile: str) -> dict:
     return doc
 
 
+def policy_of(doc: dict) -> bytes:
+    """The policy a server sends for a generated document. The generator names each setting as
+    Settings does, with its value as text. The policy carries each one in its control."""
+    o: dict = {}
+    if "sampling_rate" in doc:
+        o["head_sampling"] = {"ratio": float(doc["sampling_rate"])}
+    signals = {s: {"enabled": doc[f"send_{s}"] == "true"} for s in SIGNALS if f"send_{s}" in doc}
+    if signals:
+        o["signal_exports"] = signals
+    if "sampling_rules" in doc:
+        o["sampling_rules"] = {"rules": doc["sampling_rules"]}
+    if "sampling_traces_per_second" in doc:
+        o["trace_rate_limit"] = {"traces_per_second": float(doc["sampling_traces_per_second"])}
+    if "send_logs_per_second" in doc:
+        o["log_rate_limit"] = {"records_per_second": float(doc["send_logs_per_second"])}
+    levels = {}
+    if "send_logs_level" in doc:
+        levels["level"] = doc["send_logs_level"]
+    if "send_logs_level_by_scope" in doc:
+        levels["scopes"] = dict(entry.split("=") for entry in doc["send_logs_level_by_scope"].split(","))
+    if levels:
+        o["log_levels"] = levels
+    redaction = {k: doc[f"{k}_attributes"].split(",") for k in ("drop", "mask") if f"{k}_attributes" in doc}
+    if redaction:
+        o["attribute_redaction"] = redaction
+    if "debug_until" in doc:
+        debug = {"until": doc["debug_until"]}
+        if "debug_sampling_rate" in doc:
+            debug["sampling_ratio"] = float(doc["debug_sampling_rate"])
+        if "debug_send_logs_level" in doc:
+            debug["log_level"] = doc["debug_send_logs_level"]
+        o["debug"] = debug
+    return policy(**o).encode()
+
+
 def typed(doc: dict) -> settings_pb2.Settings:
     """The settings as the layer hands them to the package, for a server's document."""
-    body = json.dumps(doc).encode()
-    m = opamp_pb2.AgentConfigMap()
-    m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=body, content_type="application/json"))
-    d = LAYER.decide(opamp_pb2.AgentRemoteConfig(config=m, config_hash=body), b"{}", b"{}", HOST, NOW)
+    body = policy_of(doc)
+    local = policy().encode()
+    d = LAYER.decide(opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body), local, local, HOST, NOW)
     assert d.status.status == APPLIED, (doc, d.status.error_message)
     return d.apply
 
 
 def evaluate(doc: dict, **input_) -> settings_pb2.Evaluated:
     """The layer's reference matchers on one input under `doc`."""
-    e = settings_pb2.Evaluate(settings=json.dumps(doc).encode(), host=HOST, now_unix_ms=NOW, **input_)
+    e = settings_pb2.Evaluate(settings=policy_of(doc), host=HOST, now_unix_ms=NOW, **input_)
     return LAYER._call(settings_pb2.Request(evaluate=e)).evaluated
 
 

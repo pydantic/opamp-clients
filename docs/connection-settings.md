@@ -154,7 +154,7 @@ other connection's endpoint and a proxy's URL ("a URL, host:port or some other d
 specifier") need only hold no control character and be at most 8000 octets. Package downloads
 are checked the same way ([packages.md](packages.md)).
 
-**Heartbeat intervals.** The core takes any interval the server offers, but at most a day (as for the polling interval in an SDK's settings): 2^64 - 1 seconds is a day.
+**Heartbeat intervals.** The core takes any interval the server offers, but at most a day: 2^64 - 1 seconds is a day.
 So no deadline the core hands a client is more than a day away, which Node's 32-bit `setTimeout`
 and .NET's `TimeSpan` can hold, and a server that meant "rarely" still hears from the agent. An
 offer of 0 turns heartbeats off over WebSocket and keeps the configured polling interval over
@@ -244,8 +244,7 @@ enrollment key in `OTEL_OPAMP_HEADERS`, or in code) are the configured settings:
 the endpoint, discards the saved ones. Headers come from the configuration alone: no integration
 has a callback that would overwrite the ones the server issued (the collector extension and the
 supervisor refuse an auth extension with `accepts_opamp_connection_settings` for that reason). The offer's heartbeat interval holds
-until the next start, over the SDK's own (`OTEL_OPAMP_HEARTBEAT_INTERVAL`,
-`opamp_polling_interval`). Each integration's unit tests take a key from a server that offers
+until the next start, over the SDK's own (`OTEL_OPAMP_HEARTBEAT_INTERVAL`). Each integration's unit tests take a key from a server that offers
 one, and `check_setup` (`examples/integrations.py`) takes one from the reference server and comes
 back with it at the next start, in every language.
 

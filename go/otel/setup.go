@@ -8,7 +8,7 @@
 // providers, and puts it under the server OTEL_OPAMP_ENDPOINT (or WithEndpoint) names: a sampler
 // and exporters the server's settings change while the application runs, instrumentations it can
 // switch off, one instance UID. Go instrumentation takes its tracers from the global provider, so
-// every setting but the polling interval takes effect at once, the instrumentation switches too.
+// every setting takes effect at once, the instrumentation switches too.
 //
 // What the settings mean, what to answer and what to report is the SDK settings layer's
 // (github.com/pydantic/opamp-clients/go/opamp/sdk), the same in every language; this package
@@ -179,7 +179,7 @@ func (s *SDK) metrics(ctx context.Context, getenv func(string) string) error {
 	opts := []sdkmetric.Option{sdkmetric.WithResource(s.Resource)}
 	if reader != nil {
 		opts = append(opts, sdkmetric.WithReader(reader))
-		// Gated as the host says: an exporter metricsGated says isn't makes send_metrics unsupported.
+		// Gated as the host says: an exporter that metricsGated says is not gated leaves send_metrics undeclared.
 		s.built("metrics", metricsExporter(getenv), s.Controls != nil && metricsGated(getenv))
 	}
 	mp := sdkmetric.NewMeterProvider(opts...)

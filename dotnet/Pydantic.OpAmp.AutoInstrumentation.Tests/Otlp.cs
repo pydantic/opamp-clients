@@ -302,7 +302,7 @@ internal sealed class Sink : HttpMessageHandler
 
 /// <summary>
 /// The shared test vectors (testdata/sdk-settings), and the settings the layer makes of a
-/// vector's document for a host that declares every newer setting.
+/// vector's policy for a host that declares every setting.
 /// </summary>
 internal static class Vectors
 {
@@ -318,7 +318,7 @@ internal static class Vectors
             "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
             "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces",
         },
-        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations", "opamp_polling_interval" },
+        NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations" },
     };
 
     /// <summary>A vectors file's cases.</summary>
@@ -345,16 +345,10 @@ internal static class Vectors
     /// <summary>A case's clock: its <c>now_unix_ms</c>, else <see cref="Now"/>.</summary>
     public static ulong NowOf(JsonElement c) => c.TryGetProperty("now_unix_ms", out var n) ? n.GetUInt64() : Now;
 
-    public static AgentRemoteConfig Config(string body) => new()
-    {
-        ConfigHash = ByteString.CopyFromUtf8(body),
-        Config = new AgentConfigMap
-        {
-            ConfigMap = { ["elastic"] = new AgentConfigObject { Body = ByteString.CopyFromUtf8(body), ContentType = "application/json" } },
-        },
-    };
+    /// <summary>A remote config whose only file is the policy <paramref name="document"/>.</summary>
+    public static AgentRemoteConfig Config(string document) => Pydantic.OpAmp.Tests.Policy.Config(document);
 
-    /// <summary>The settings a settings document puts in force, as the layer decides them at <paramref name="now"/>.</summary>
+    /// <summary>The settings a policy puts in force, as the layer decides them at <paramref name="now"/>.</summary>
     public static Settings Settings(string document, ulong now = Now)
     {
         using var layer = new SdkSettings();
@@ -363,7 +357,7 @@ internal static class Vectors
         return d.Apply;
     }
 
-    /// <summary>A vector's settings document, as the layer decides it.</summary>
+    /// <summary>A vector's policy, as the layer decides it.</summary>
     public static Settings Settings(JsonElement c) => Settings(c.GetProperty("settings").GetRawText(), NowOf(c));
 
     /// <summary>A vector's attribute: a key and one of string, int, bool, double or array (of strings).</summary>

@@ -21,9 +21,9 @@ namespace Pydantic.OpAmp.Tests;
 internal static class Kept
 {
     private const string Before =
-        "a core state saved before the core kept the config applied: the document kept before carries over";
+        "a core state saved before the core kept the config applied: the policy kept before carries over";
 
-    /// <summary>A client state whose config applied has <paramref name="document"/> as its settings entry.</summary>
+    /// <summary>A client state whose config applied has <paramref name="document"/> as its only file, the policy.</summary>
     public static byte[] CoreState(string document)
     {
         var dir = AppContext.BaseDirectory;
@@ -42,7 +42,7 @@ internal static class Kept
             {
                 ConfigMap =
                 {
-                    ["elastic"] = new AgentConfigObject
+                    [Policy.File] = new AgentConfigObject
                     {
                         Body = ByteString.CopyFrom(Encoding.UTF8.GetBytes(document)),
                         ContentType = "application/json",
@@ -61,7 +61,7 @@ internal static class Kept
         return out_.ToArray();
     }
 
-    /// <summary>Leave in <paramref name="dir"/> what the client would after a config with <paramref name="document"/> was applied.</summary>
+    /// <summary>Leave in <paramref name="dir"/> what the client would after a config with the policy <paramref name="document"/> was applied.</summary>
     public static void KeepApplied(string dir, string document) =>
         File.WriteAllBytes(Path.Combine(dir, "opamp-state"), CoreState(document));
 }

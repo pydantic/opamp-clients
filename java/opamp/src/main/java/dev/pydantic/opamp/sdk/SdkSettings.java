@@ -47,10 +47,10 @@ public final class SdkSettings {
 
   /**
    * As {@link #load(byte[])}, for {@code host}: the settings the SDK carries out, at once or at the
-   * next start; one it leaves out is set aside, never in force ({@code null}: none carried out; see
-   * docs/sdk-settings.md#the-host). At {@code nowUnixMs}, the wall clock in milliseconds since the
-   * Unix epoch, which debug mode is decided by (0: none, and debug mode is ignored). A host naming
-   * what is no setting throws {@link IllegalArgumentException}.
+   * next start ({@code null}: none carried out; see docs/sdk-settings.md#the-host). At {@code
+   * nowUnixMs}, the wall clock in milliseconds since the Unix epoch, which debug mode is decided by
+   * (0: none, and the SDK does not carry out debug mode). A host naming what is no setting throws
+   * {@link IllegalArgumentException}.
    */
   public SettingsProto.Loaded load(byte[] saved, SettingsProto.Host host, long nowUnixMs) {
     return loadFrom(null, saved, host, nowUnixMs);
@@ -98,7 +98,7 @@ public final class SdkSettings {
    * <p>The layer decides what to keep for the next start; {@code save} keeps it, and throws if it
    * can't; the layer then answers from how that went: a config whose save failed is refused, saying
    * why. {@code null}: the SDK keeps no state across restarts, so a config that changes a next-start
-   * setting is refused.
+   * setting is refused. A policy that overrides a control the host does not carry out is refused too.
    */
   public SettingsProto.Decision decide(Opamp.AgentRemoteConfig config, ByteString current, ByteString atStart,
       SettingsProto.Host host, long nowUnixMs, Saver save) {
@@ -154,10 +154,18 @@ public final class SdkSettings {
     return call(SettingsProto.Request.newBuilder().setHealth(h).build()).getHealthReport();
   }
 
-  /** The agent description, from the SDK's resource attributes. */
-  public Opamp.AgentDescription describe(List<Anyvalue.KeyValue> resource) {
-    return call(SettingsProto.Request.newBuilder()
-        .setDescribe(SettingsProto.Describe.newBuilder().addAllResource(resource)).build()).getDescription();
+  /**
+   * The agent description, from the SDK's resource attributes. It adds the policy format the layer
+   * reads and the controls {@code host} carries out at {@code nowUnixMs} (as for load), so that a
+   * server knows which overrides this SDK can apply.
+   */
+  public Opamp.AgentDescription describe(List<Anyvalue.KeyValue> resource, SettingsProto.Host host, long nowUnixMs) {
+    SettingsProto.Describe.Builder d = SettingsProto.Describe.newBuilder().addAllResource(resource)
+        .setNowUnixMs(nowUnixMs);
+    if (host != null) {
+      d.setHost(host);
+    }
+    return call(SettingsProto.Request.newBuilder().setDescribe(d).build()).getDescription();
   }
 
   /**

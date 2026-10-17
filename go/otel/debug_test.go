@@ -144,8 +144,7 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 			Error        string          `json:"error"`
 			SamplingRate json.RawMessage `json:"sampling_rate"`
 			RefreshAt    *uint64         `json:"refresh_at_unix_ms"`
-			Effective    json.RawMessage `json:"effective"`
-			SetAside     json.RawMessage `json:"set_aside"`
+			Effective    *string         `json:"effective"`
 		} `json:"want"`
 	}
 	type vectors struct {
@@ -163,6 +162,13 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 	}
 	for _, c := range append(v.Cases, saving.Cases...) {
 		if slices.ContainsFunc(c.Steps, func(s step) bool { return s.Save == "failed" }) {
+			continue
+		}
+		// A next-start change is another SDK's case: this one carries every setting out at once,
+		// the instrumentation switches too, so nothing it applies waits for a restart.
+		if slices.ContainsFunc(c.Steps, func(s step) bool {
+			return strings.Contains(s.Document, `"instrumentations":{"mode":"override"`)
+		}) {
 			continue
 		}
 		t.Run(c.Name, func(t *testing.T) {
@@ -197,7 +203,7 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 					t.Fatalf("call %q", s.Call)
 				}
 				a.mu.Lock()
-				rate, refreshAt, effective, setAside := a.controls.Sampler.rate, a.refreshAt, effectiveBody(a), setAsideBody(a)
+				rate, refreshAt, effective := a.controls.Sampler.rate, a.refreshAt, effectiveBody(a)
 				a.mu.Unlock()
 				w := s.Want
 				if w.Status != "" {
@@ -223,11 +229,8 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 						t.Fatalf("step %d: %d timers armed for a refresh at %d", i, timers, refreshAt)
 					}
 				}
-				if w.Effective != nil && !sameJSON(t, effective, w.Effective) {
-					t.Fatalf("step %d: effective %s, want %s", i, effective, w.Effective)
-				}
-				if w.SetAside != nil && !sameJSON(t, setAside, w.SetAside) {
-					t.Fatalf("step %d: set aside %s, want %s", i, setAside, w.SetAside)
+				if w.Effective != nil && effective != *w.Effective {
+					t.Fatalf("step %d: effective %s, want %s", i, effective, *w.Effective)
 				}
 				if s.Call == "refresh" && refreshAt == 0 && len(rep.effective) == reported && i > 0 &&
 					c.Steps[i-1].Call != "refresh" {
@@ -238,15 +241,20 @@ func TestTheDebugAndSavingVectors(t *testing.T) {
 	}
 }
 
+// debugWindow is a policy with the head sampling ratio and debug mode until the given time.
+func debugWindow(ratio, until string) string {
+	return every("head_sampling", override(`"ratio":`+ratio), "debug", override(`"until":"`+until+`"`))
+}
+
 // A timer armed before a newer decision is nothing when it goes off: that decision armed its own.
 func TestAStaleTimerIsNothing(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, rep := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0.1","debug_until":"2026-10-14T12:10:00Z"}`))
+	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:10:00Z")))
 	a.mu.Lock()
 	stale := a.gen
 	a.mu.Unlock()
-	a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0.1","debug_until":"2026-10-14T12:20:00Z"}`))
+	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:20:00Z")))
 	ft.mu.Lock()
 	ft.at = time.UnixMilli(int64(vectorNow + 10*60_000)) // the first window's end, no timer run
 	ft.mu.Unlock()
@@ -255,7 +263,7 @@ func TestAStaleTimerIsNothing(t *testing.T) {
 		t.Fatal("the stale timer ended the newer window")
 	}
 	ft.set(vectorNow + 20*60_000)
-	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != 1 || effectiveBody(a) != `{"sampling_rate":"0.1"}` {
+	if *a.controls.Sampler.rate != 0.1 || len(rep.effective) != 1 || effectiveBody(a) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
 		t.Fatalf("the newer window's end: rate %v, %d reports", *a.controls.Sampler.rate, len(rep.effective))
 	}
 }
@@ -265,7 +273,7 @@ func TestAStaleTimerIsNothing(t *testing.T) {
 func TestTheEndIsOnTheTimersDeadline(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, _ := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0.1","debug_until":"2026-10-14T12:10:00Z"}`))
+	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:10:00Z")))
 	a.mu.Lock()
 	a.refresh(time.UnixMilli(int64(vectorNow + 60_000))) // the wall clock says nine minutes are left
 	refreshAt := a.refreshAt
@@ -279,7 +287,7 @@ func TestTheEndIsOnTheTimersDeadline(t *testing.T) {
 func TestStopStopsTheTimer(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, _ := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(`{"debug_until":"2026-10-14T12:10:00Z"}`))
+	a.remoteConfig(context.Background(), remote(every("debug", override(`"until":"2026-10-14T12:10:00Z"`))))
 	if ft.pending() != 1 {
 		t.Fatalf("%d timers", ft.pending())
 	}
@@ -299,20 +307,20 @@ func TestADebugWindowEndsOnItsOwn(t *testing.T) {
 	}
 	defer a.stop(context.Background())
 	until := time.Now().Add(1500 * time.Millisecond).UTC().Format("2006-01-02T15:04:05.000Z07:00")
-	if st := a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0","debug_until":"`+until+`"}`)); st.GetStatus() != applied {
+	if st := a.remoteConfig(context.Background(), remote(debugWindow("0.5", until))); st.GetStatus() != applied {
 		t.Fatal(st)
 	}
 	rate := func() float64 { a.mu.Lock(); defer a.mu.Unlock(); return *a.controls.Sampler.rate }
 	if rate() != 1 {
 		t.Fatalf("in debug mode: rate %v, want 1", rate())
 	}
-	for deadline := time.Now().Add(10 * time.Second); rate() != 0; {
+	for deadline := time.Now().Add(10 * time.Second); rate() != 0.5; {
 		if time.Now().After(deadline) {
 			t.Fatal("debug mode didn't end")
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if got := func() string { a.mu.Lock(); defer a.mu.Unlock(); return effectiveBody(a) }(); got != `{"sampling_rate":"0"}` {
+	if got := func() string { a.mu.Lock(); defer a.mu.Unlock(); return effectiveBody(a) }(); got != sorted(t, every("head_sampling", override(`"ratio":0.5`))) {
 		t.Fatalf("effective %s", got)
 	}
 }
@@ -323,18 +331,18 @@ func TestADebugWindowEndsOnItsOwn(t *testing.T) {
 func TestAFailedConfigAfterDebugUntilEndsDebugMode(t *testing.T) {
 	ft := newFakeTime(vectorNow)
 	a, rep := timedAgent(t, t.TempDir(), ft)
-	a.remoteConfig(context.Background(), remote(`{"sampling_rate":"0.1","debug_until":"2026-10-14T12:10:00Z"}`))
+	a.remoteConfig(context.Background(), remote(debugWindow("0.1", "2026-10-14T12:10:00Z")))
 	ft.mu.Lock()
 	ft.at = time.UnixMilli(int64(vectorNow + 25*60_000)) // past the end, no timer run
 	ft.mu.Unlock()
-	st := a.remoteConfig(context.Background(), remote(`{"sampling_rate":"7"}`))
+	st := a.remoteConfig(context.Background(), remote(v1("head_sampling", override(`"ratio":7`))))
 	if st.GetStatus() != failed_ {
 		t.Fatalf("status %v", st.GetStatus())
 	}
 	a.mu.Lock()
 	rate, refreshAt, eff := *a.controls.Sampler.rate, a.refreshAt, effectiveBody(a)
 	a.mu.Unlock()
-	if rate != 0.1 || refreshAt != 0 || eff != `{"sampling_rate":"0.1"}` || len(rep.effective) != 1 {
+	if rate != 0.1 || refreshAt != 0 || eff != sorted(t, every("head_sampling", override(`"ratio":0.1`))) || len(rep.effective) != 1 {
 		t.Fatalf("debug mode is still in force: rate %v, refresh at %d, effective %s, %d reports", rate, refreshAt, eff,
 			len(rep.effective))
 	}

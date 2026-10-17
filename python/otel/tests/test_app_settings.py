@@ -17,6 +17,7 @@ from opamp_client import opamp_pb2
 from opamp_client.sdk import SdkSettings, settings_pb2
 
 import opamp_otel
+from _policy import FILE, config_map, overrides, policy
 from kept import keep_applied
 from opamp_otel import Agent, app_settings
 from opamp_otel.app_settings import AppSettings
@@ -46,10 +47,12 @@ class Told:
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
-    m = opamp_pb2.AgentConfigMap()
-    if body is not None:
-        m.config_map["elastic"].CopyFrom(opamp_pb2.AgentConfigObject(body=body.encode(), content_type="application/json"))
-    return opamp_pb2.AgentRemoteConfig(config=m, config_hash=(body or "").encode())
+    return opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=(body or "").encode())
+
+
+def values(values: dict, **controls) -> str:
+    """A policy whose app_settings control sends `values`, with other controls overridden as given."""
+    return policy(app_settings={"values": values}, **controls)
 
 
 def prepared(tmp_path=None, **extra) -> Agent:
@@ -62,7 +65,8 @@ def prepared(tmp_path=None, **extra) -> Agent:
 
 
 def effective(agent: Agent) -> dict:
-    return json.loads(agent.effective.config_map.config_map["elastic"].body)
+    """The controls the agent's effective config reports overridden."""
+    return overrides(agent.effective)
 
 
 # --- reading -------------------------------------------------------------------------------------
@@ -290,7 +294,7 @@ def test_the_shared_vectors_reach_the_application_as_the_layer_decides(case):
     host = opamp_otel.sdk_host(["otlp"])
     if "host" in case:
         host = settings_pb2.Host(live=case["host"].get("live", []), next_start=case["host"].get("next_start", []))
-    d = LAYER.decide(config(case["document"]), b"{}", b"{}", host)
+    d = LAYER.decide(config(case["document"]), policy().encode(), policy().encode(), host)
     if "refused" in case:
         assert (d.status.status, d.status.error_message) == (FAILED, case["refused"])
         assert not d.HasField("apply")
@@ -299,19 +303,20 @@ def test_the_shared_vectors_reach_the_application_as_the_layer_decides(case):
     agent = Agent(app=AppSettings())
     agent.controls.apply(d.apply)
     assert dict(agent.controls.app.snapshot()) == case["custom"]
-    assert json.loads(d.effective.config_map.config_map["elastic"].body) == case["effective"]
+    assert d.effective.config_map.config_map[FILE].body.decode() == case["effective"]
 
 
 def test_a_config_puts_the_values_in_force_and_the_effective_config_reports_them(tmp_path):
     agent = prepared(tmp_path)
     app, told = agent.controls.app, Told()
     app.on_change(told)
-    s = agent.remote_config(config('{"sampling_rate":"0.5","custom":{"checkout.new_flow":"on","limit":25}}'))
+    s = agent.remote_config(config(values({"checkout.new_flow": "on", "limit": 25}, head_sampling={"ratio": 0.5})))
     assert s.status == APPLIED
     assert app.get("checkout.new_flow", "off") == "on"
     assert app.get_int("limit", 0) == 25
     assert agent.controls.sampler._rate == 0.5  # the SDK's settings beside them
-    assert effective(agent) == {"sampling_rate": "0.5", "custom": '{"checkout.new_flow":"on","limit":"25"}'}
+    assert effective(agent) == {"head_sampling": {"ratio": 0.5},
+                                "app_settings": {"values": {"checkout.new_flow": "on", "limit": "25"}}}
     assert told.calls == [({"checkout.new_flow": "on", "limit": "25"}, frozenset({"checkout.new_flow", "limit"}))]
 
 
@@ -319,11 +324,11 @@ def test_the_same_values_sent_again_or_another_way_tell_nothing(tmp_path):
     agent = prepared(tmp_path)
     told = Told()
     agent.controls.app.on_change(told)
-    agent.remote_config(config('{"custom":{"a":"1","b":"2"}}'))
-    # A new config (another hash) whose map is the same: in a string, keys in another order,
-    # another SDK setting beside it.
-    assert agent.remote_config(config('{"custom":"{\\"b\\":\\"2\\",\\"a\\":1}"}')).status == APPLIED
-    assert agent.remote_config(config('{"custom":{"a":"1","b":"2"},"sampling_rate":"1"}')).status == APPLIED
+    agent.remote_config(config(values({"a": "1", "b": "2"})))
+    # A new config (another hash) whose map is the same: keys in another order, a number for its
+    # text, another SDK setting beside it.
+    assert agent.remote_config(config(values({"b": "2", "a": 1}))).status == APPLIED
+    assert agent.remote_config(config(values({"a": "1", "b": "2"}, head_sampling={"ratio": 1}))).status == APPLIED
     assert len(told.calls) == 1
 
 
@@ -331,31 +336,37 @@ def test_a_wrong_custom_entry_fails_the_config_and_nothing_changes(tmp_path):
     agent = prepared(tmp_path)
     told = Told()
     agent.controls.app.on_change(told)
-    agent.remote_config(config('{"custom":{"a":"1"},"sampling_rate":"0.5"}'))
-    for body, why in (('{"custom":{"a":"2","b":["x"]},"sampling_rate":"1"}', "custom.b: values must be"),
-                      ('{"custom":{"a b":"2"}}', 'custom: "a b" is not a key'),
-                      ('{"custom":{"a":"2","a":"3"}}', "custom.a: sent more than once"),
-                      ('{"custom":{"a":"' + "x" * 4097 + '"}}', "custom.a: 4097 bytes, at most 4096")):
+    agent.remote_config(config(values({"a": "1"}, head_sampling={"ratio": 0.5})))
+    twice = values({"a": "2", "b": "3"}).replace('"b":"3"', '"a":"3"')
+    for body, why in ((values({"a": "2", "b": ["x"]}, head_sampling={"ratio": 1}), "app_settings: values must be"),
+                      (values({"a b": "2"}), 'app_settings: values: "a b" is not a key'),
+                      (twice, "app_settings: values.a: sent more than once"),
+                      (values({"a": "x" * 4097}), "app_settings: values.a: 4097 bytes, at most 4096")):
         s = agent.remote_config(config(body))
         assert s.status == FAILED and s.error_message.startswith(why), s.error_message
     assert agent.controls.app.get("a") == "1"
     assert agent.controls.sampler._rate == 0.5
-    assert effective(agent) == {"custom": '{"a":"1"}', "sampling_rate": "0.5"}
+    assert effective(agent) == {"app_settings": {"values": {"a": "1"}}, "head_sampling": {"ratio": 0.5}}
     assert len(told.calls) == 1
     assert not (tmp_path / "sdk-settings.json").exists()  # the client keeps the config applied
 
 
-def test_a_config_without_custom_puts_every_key_back_to_its_default(tmp_path):
+def test_app_settings_left_local_put_every_key_back_to_its_default(tmp_path):
     agent = prepared(tmp_path)
     told = Told()
     agent.controls.app.on_change(told)
-    agent.remote_config(config('{"custom":{"a":"1"}}'))
-    agent.remote_config(config('{"sampling_rate":"1"}'))
+    agent.remote_config(config(values({"a": "1"})))
+    agent.remote_config(config(policy(head_sampling={"ratio": 1}, every=True)))
     assert agent.controls.app.get("a", "default") == "default"
     assert told.calls[-1] == ({}, frozenset({"a"}))
-    agent.remote_config(config('{"custom":{"a":"1"}}'))
-    agent.remote_config(config(None))  # a remote config with no settings entry at all
+    agent.remote_config(config(values({"a": "1"})))
+    agent.remote_config(config(policy()))  # version 1, which has no app_settings control
     assert agent.controls.app.get("a", "default") == "default"
+    # A remote config with no policy at all is refused, and the values stay.
+    agent.remote_config(config(values({"a": "1"})))
+    s = agent.remote_config(config(None))
+    assert s.status == FAILED and s.error_message.startswith("config_map:")
+    assert agent.controls.app.get("a", "default") == "1"
 
 
 def test_a_callback_that_raises_does_not_break_the_answer(tmp_path, caplog):
@@ -366,32 +377,33 @@ def test_a_callback_that_raises_does_not_break_the_answer(tmp_path, caplog):
 
     agent.controls.app.on_change(broken)
     with caplog.at_level(logging.ERROR, logger="opamp_otel"):
-        s = agent.remote_config(config('{"custom":{"a":"1"}}'))
+        s = agent.remote_config(config(values({"a": "1"})))
     assert s.status == APPLIED
     assert agent.controls.app.get("a") == "1"
-    assert effective(agent) == {"custom": '{"a":"1"}'}
+    assert effective(agent) == {"app_settings": {"values": {"a": "1"}}}
     assert any("broken" in r.getMessage() for r in caplog.records)
 
 
 def test_values_survive_a_restart_with_a_state_directory(tmp_path):
     agent = prepared(tmp_path)
-    assert agent.remote_config(config('{"custom":{"checkout.new_flow":"on"}}')).status == APPLIED
-    keep_applied(tmp_path, b'{"custom":{"checkout.new_flow":"on"}}')  # as the client does, before APPLIED goes out
+    doc = values({"checkout.new_flow": "on"})
+    assert agent.remote_config(config(doc)).status == APPLIED
+    keep_applied(tmp_path, doc.encode())  # as the client does, before APPLIED goes out
     again = prepared(tmp_path)  # the next start: before any config arrives
     assert again.controls.app.get("checkout.new_flow", "off") == "on"
-    assert effective(again) == {"custom": '{"checkout.new_flow":"on"}'}
+    assert effective(again) == {"app_settings": {"values": {"checkout.new_flow": "on"}}}
 
 
 def test_without_a_state_directory_a_restart_starts_from_the_defaults(tmp_path):
     agent = prepared(OTEL_OPAMP_STATE_DIR="none")
-    assert agent.remote_config(config('{"custom":{"a":"1"}}')).status == APPLIED  # live: no state needed
+    assert agent.remote_config(config(values({"a": "1"}))).status == APPLIED  # live: no state needed
     assert agent.controls.app.get("a") == "1"
     assert prepared(OTEL_OPAMP_STATE_DIR="none").controls.app.get("a", "default") == "default"
 
 
 def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path):
-    assert prepared(tmp_path).remote_config(config('{"custom":{"a":"1"}}')).status == APPLIED
-    keep_applied(tmp_path, b'{"custom":{"a":"1"}}')
+    assert prepared(tmp_path).remote_config(config(values({"a": "1"}))).status == APPLIED
+    keep_applied(tmp_path, values({"a": "1"}).encode())
     app, told = AppSettings(), Told()
     app.on_change(told)
     agent = Agent(app=app)
@@ -402,10 +414,14 @@ def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path)
 def test_under_another_configurator_the_application_still_reads_its_settings(tmp_path):
     agent = prepared(tmp_path)
     agent.host = opamp_otel.sdk_host(["otlp"], configured=False)
-    s = agent.remote_config(config('{"custom":{"a":"1"},"sampling_rate":"0.5"}'))
+    # The rate is not this package's to carry out here: a policy that overrides it is refused.
+    s = agent.remote_config(config(values({"a": "1"}, head_sampling={"ratio": 0.5})))
+    assert s.status == FAILED
+    assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
+    s = agent.remote_config(config(values({"a": "1"})))
     assert s.status == APPLIED
     assert agent.controls.app.get("a") == "1"
-    assert effective(agent) == {"custom": '{"a":"1"}'}  # sampling_rate isn't this package's to carry out
+    assert effective(agent) == {"app_settings": {"values": {"a": "1"}}}
 
 
 def test_a_forked_worker_follows_the_application_settings_its_parent_is_given(tmp_path):

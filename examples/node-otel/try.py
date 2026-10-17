@@ -18,18 +18,18 @@ Then check_settings, Node.js's own for now: the settings that match telemetry
 (docs/node-otel.md#the-settings-that-match-telemetry), against the reference server, with app.cjs
 exporting OTLP/JSON to a sink here that reads every attribute (EXAMPLE_SETTINGS=1: a span of its
 own around each request, a health check beside it, three loggers).
-Run 7, two documents:
-  1. sampling_rules (rate 0 for client requests whose url.full has /health), send_logs_level warn with
-     send_logs_level_by_scope app=info, noisy=off, drop_attributes http.request.header.*,
-     mask_attributes user.email: APPLIED; no /health span, /ping and checkout spans traced; the
-     authorization header dropped and the e-mail masked on spans and log records; app's INFO records
-     exported, none of noisy's, and other's INFO dropped by the global level;
-  2. sampling_rate 1, sampling_traces_per_second 1, send_logs_per_second 2: APPLIED; about a trace
-     a second, about two log records a second, where the application makes ten and fifteen.
+Run 7, two policies:
+  1. sampling_rules (rate 0 for client requests whose url.full has /health), log_levels level warn
+     with scopes app info and noisy off, attribute_redaction drop http.request.header.* and mask
+     user.email: APPLIED; no /health span, /ping and checkout spans traced; the authorization
+     header dropped and the e-mail masked on spans and log records; app's INFO records exported,
+     none of noisy's, and other's INFO dropped by the global level;
+  2. head_sampling 1, trace_rate_limit 1, log_rate_limit 2: APPLIED; about a trace a second, about
+     two log records a second, where the application makes ten and fifteen.
 Run 8, debug mode and export health:
-  1. sampling_rate 0, send_logs_level error, debug_until some 20 s ahead, debug_send_logs_level
-     info: APPLIED; spans and INFO records exported in the window. The server is then stopped;
-     once the window is over, neither is exported: the end comes without the server;
+  1. head_sampling 0, log_levels level error, debug until some 20 s ahead with log_level info:
+     APPLIED; spans and INFO records exported in the window. The server is then stopped; once the
+     window is over, neither is exported: the end comes without the server;
   2. the sink refuses traces (HTTP 400) and the server comes back: the agent sends its health
      again, and says the traces exporter is failing.
 
@@ -54,8 +54,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth,  # noqa: E402
-                          key_in_code, main, read_log, server_binary, statuses, stop_group, target, opamp_url)
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, key_in_code, main,  # noqa: E402
+                          offer, read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
 TARGET = target("node-otel")
@@ -195,12 +195,11 @@ class Server:
     """The reference server, on a port of its own choosing or the one given, with a scenario of
     offers; its log read as it goes."""
 
-    def __init__(self, name: str, offers: list[dict], listen: str = "127.0.0.1:0"):
+    def __init__(self, name: str, offers: list[tuple[int, dict]], listen: str = "127.0.0.1:0"):
+        """`offers`: (message, overrides) pairs, each offered as a policy (integrations.offer())."""
         self.log = TARGET / f"{name}.jsonl"
         scenario = TARGET / f"{name}-scenario.json"
-        scenario.write_text(json.dumps({"server": {"faults": [
-            {"on_message": n, "action": "offer_config", "config_key": "elastic", "body": json.dumps(body),
-             "content_type": "application/json"} for n, body in offers]}}))
+        scenario.write_text(json.dumps({"server": {"faults": [offer(n, overrides) for n, overrides in offers]}}))
         self.process = subprocess.Popen([str(TARGET / "server"), "-listen", listen, "-scenario", str(scenario),
                                          "-log", str(self.log)], stdout=subprocess.PIPE, text=True)
         listening = json.loads(self.process.stdout.readline())
@@ -278,11 +277,12 @@ def check_settings() -> bool:
     state = Path(tempfile.mkdtemp(prefix="state-settings-", dir=TARGET))
     # Run 7: the rules, levels per scope and redaction; then the caps.
     sink = Sink()
-    first = {"sampling_rate": "1",
-             "sampling_rules": [{"rate": 0, "kind": "client", "attributes": {"url.full": "*/health*"}}],
-             "send_logs_level": "warn", "send_logs_level_by_scope": "app=info, noisy=off",
-             "drop_attributes": "http.request.header.*", "mask_attributes": "user.email"}
-    caps = {"sampling_rate": "1", "sampling_traces_per_second": "1", "send_logs_per_second": "2"}
+    first = {"head_sampling": {"ratio": 1},
+             "sampling_rules": {"rules": [{"rate": 0, "kind": "client", "attributes": {"url.full": "*/health*"}}]},
+             "log_levels": {"level": "warn", "scopes": {"app": "info", "noisy": "off"}},
+             "attribute_redaction": {"drop": ["http.request.header.*"], "mask": ["user.email"]}}
+    caps = {"head_sampling": {"ratio": 1}, "trace_rate_limit": {"traces_per_second": 1},
+            "log_rate_limit": {"records_per_second": 2}}
     server = Server("run7", [(1, first), (16, caps)])
     app, _ = settings_app(sink, server.port, state, "run7")
     try:
@@ -308,16 +308,16 @@ def check_settings() -> bool:
                len(made) > 5 and not any("/health" in url(s) for s in one))
         expect("sampling_rules: the requests to /ping still traced", any("/ping" in url(s) for s in one))
         checkout = [s for s in one if s["name"] == "checkout cart"]
-        expect(f"drop_attributes: no span keeps the authorization header ({len(checkout)} checkout spans)",
+        expect(f"attribute_redaction drop: no span keeps the authorization header ({len(checkout)} checkout spans)",
                bool(checkout) and not any("http.request.header.authorization" in s["attributes"] for s in one))
-        expect("mask_attributes: the e-mail masked on spans, other attributes kept",
+        expect("attribute_redaction mask: the e-mail masked on spans, other attributes kept",
                all(s["attributes"].get("user.email") == "[REDACTED]" and s["attributes"].get("tenant.id") == "acme"
                    for s in checkout))
         logs = between(sink.logs, t1 + SETTLE, one_end)
         scopes = {r["scope"] for r in logs}
-        expect(f"send_logs_level_by_scope: app's INFO records exported, none of noisy's, and other's INFO "
+        expect(f"log_levels scopes: app's INFO records exported, none of noisy's, and other's INFO "
                f"dropped by the global level (scopes {sorted(scopes)})", scopes == {"app"})
-        expect("drop/mask on log records too",
+        expect("attribute_redaction on log records too",
                all(r["attributes"].get("user.email") == "[REDACTED]"
                    and "http.request.header.authorization" not in r["attributes"] for r in logs))
         span_window = between(sink.spans, t2 + SETTLE, end)
@@ -325,18 +325,18 @@ def check_settings() -> bool:
         seconds = end - (t2 + SETTLE)
         before = {s["trace"] for s in one if not s["parent"]}
         rate_before = len(before) / max(t2 - t1 - SETTLE, 1)
-        expect(f"sampling_traces_per_second 1: {len(roots)} traces in {seconds:.0f} s "
+        expect(f"trace_rate_limit 1: {len(roots)} traces in {seconds:.0f} s "
                f"(before: {rate_before:.1f} a second)",
                rate_before > 3 and 0 < len(roots) <= seconds + 3)
         records = between(sink.logs, t2 + SETTLE, end)
-        expect(f"send_logs_per_second 2: {len(records)} records in {seconds:.0f} s",
+        expect(f"log_rate_limit 2: {len(records)} records in {seconds:.0f} s",
                0 < len(records) <= 2 * seconds + 4)
 
     # Run 8: debug mode, ending with the server stopped; then export health.
     sink = Sink()
     until = datetime.now(UTC) + timedelta(seconds=20)
-    debug = {"sampling_rate": "0", "send_logs_level": "error", "debug_until": until.strftime("%Y-%m-%dT%H:%M:%SZ"),
-             "debug_send_logs_level": "info"}
+    debug = {"head_sampling": {"ratio": 0}, "log_levels": {"level": "error"},
+             "debug": {"until": until.strftime("%Y-%m-%dT%H:%M:%SZ"), "log_level": "info"}}
     server = Server("run8a", [(1, debug)])
     port = server.port
     app, stderr = settings_app(sink, port, state, "run8")
@@ -349,7 +349,7 @@ def check_settings() -> bool:
         left = ends - time.monotonic()
         print(f"run 8: debug mode answered {st}; the server stopped, {left:.0f} s of the window left")
         expect("debug mode answered APPLIED", st == ["APPLIED"])
-        expect("debug mode: spans and INFO records in the window, though sampling_rate is 0 and the level error",
+        expect("debug mode: spans and INFO records in the window, though head_sampling is 0 and the level error",
                bool(between(sink.spans, t1 + 1)) and any(r["severity"] == 9 for r in between(sink.logs, t1 + 1)))
         time.sleep(max(0.0, ends - time.monotonic()) + 6)
         after = ends + SETTLE
@@ -358,7 +358,7 @@ def check_settings() -> bool:
                not between(sink.spans, after) and not any(r["severity"] < 17 for r in between(sink.logs, after)))
         # Export health: traces refused, with sampling back on for something to refuse.
         sink.refuse.add("traces")
-        server = Server("run8b", [(1, {"sampling_rate": "1"})], listen=f"127.0.0.1:{port}")
+        server = Server("run8b", [(1, {"head_sampling": {"ratio": 1}})], listen=f"127.0.0.1:{port}")
         failing = wait(lambda: "export health: failing" in stderr.read_text(errors="replace"), 75)
         time.sleep(3)
         health = [e for e in server.events() if e["event"] == "a2s" and "health" in e["fields"]]

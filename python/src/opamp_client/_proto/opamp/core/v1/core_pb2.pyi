@@ -18,6 +18,18 @@ class StatusField(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     STATUS_FIELD_AVAILABLE_COMPONENTS: _ClassVar[StatusField]
     STATUS_FIELD_CUSTOM_CAPABILITIES: _ClassVar[StatusField]
     STATUS_FIELD_PACKAGE_STATUSES: _ClassVar[StatusField]
+
+class SetupOs(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SETUP_OS_UNIX: _ClassVar[SetupOs]
+    SETUP_OS_MACOS: _ClassVar[SetupOs]
+    SETUP_OS_WINDOWS: _ClassVar[SetupOs]
+
+class SetupUidFrom(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SETUP_UID_FROM_MADE: _ClassVar[SetupUidFrom]
+    SETUP_UID_FROM_SAVED: _ClassVar[SetupUidFrom]
+    SETUP_UID_FROM_GIVEN: _ClassVar[SetupUidFrom]
 STATUS_FIELD_DESCRIPTION: StatusField
 STATUS_FIELD_HEALTH: StatusField
 STATUS_FIELD_EFFECTIVE_CONFIG: StatusField
@@ -26,6 +38,12 @@ STATUS_FIELD_CONNECTION_SETTINGS_STATUS: StatusField
 STATUS_FIELD_AVAILABLE_COMPONENTS: StatusField
 STATUS_FIELD_CUSTOM_CAPABILITIES: StatusField
 STATUS_FIELD_PACKAGE_STATUSES: StatusField
+SETUP_OS_UNIX: SetupOs
+SETUP_OS_MACOS: SetupOs
+SETUP_OS_WINDOWS: SetupOs
+SETUP_UID_FROM_MADE: SetupUidFrom
+SETUP_UID_FROM_SAVED: SetupUidFrom
+SETUP_UID_FROM_GIVEN: SetupUidFrom
 
 class Config(_message.Message):
     __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy")
@@ -134,7 +152,7 @@ class Detail(_message.Message):
     def __init__(self, detail: _Optional[str] = ...) -> None: ...
 
 class Input(_message.Message):
-    __slots__ = ("start", "set_description", "set_health", "set_effective_config", "set_remote_config_status", "stop", "timer", "http_response", "http_failed", "ws_opened", "ws_failed", "ws_message", "ws_closed", "ws_lost", "stored", "store_failed", "set_connection_settings_status", "set_available_components", "set_custom_capabilities", "send_custom_message", "package_installed", "package_removed", "downloaded", "download_failed", "proxy_answer", "stream_resolved", "stream_opened", "stream_tls_ready", "stream_data", "stream_eof", "stream_failed", "stream_spliced", "download_response", "set_auth_headers")
+    __slots__ = ("start", "set_description", "set_health", "set_effective_config", "set_remote_config_status", "stop", "timer", "http_response", "http_failed", "ws_opened", "ws_failed", "ws_message", "ws_closed", "ws_lost", "stored", "store_failed", "set_connection_settings_status", "set_available_components", "set_custom_capabilities", "send_custom_message", "package_installed", "package_removed", "downloaded", "download_failed", "proxy_answer", "stream_resolved", "stream_opened", "stream_tls_ready", "stream_data", "stream_eof", "stream_failed", "stream_spliced", "download_response", "set_auth_headers", "abort")
     START_FIELD_NUMBER: _ClassVar[int]
     SET_DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     SET_HEALTH_FIELD_NUMBER: _ClassVar[int]
@@ -169,6 +187,7 @@ class Input(_message.Message):
     STREAM_SPLICED_FIELD_NUMBER: _ClassVar[int]
     DOWNLOAD_RESPONSE_FIELD_NUMBER: _ClassVar[int]
     SET_AUTH_HEADERS_FIELD_NUMBER: _ClassVar[int]
+    ABORT_FIELD_NUMBER: _ClassVar[int]
     start: Empty
     set_description: _opamp_pb2.AgentDescription
     set_health: _opamp_pb2.ComponentHealth
@@ -203,7 +222,8 @@ class Input(_message.Message):
     stream_spliced: Id
     download_response: DownloadResponse
     set_auth_headers: Headers
-    def __init__(self, start: _Optional[_Union[Empty, _Mapping]] = ..., set_description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., set_health: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., set_effective_config: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., set_remote_config_status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., stop: _Optional[_Union[Empty, _Mapping]] = ..., timer: _Optional[_Union[Empty, _Mapping]] = ..., http_response: _Optional[_Union[HttpResponse, _Mapping]] = ..., http_failed: _Optional[_Union[Failed, _Mapping]] = ..., ws_opened: _Optional[_Union[Id, _Mapping]] = ..., ws_failed: _Optional[_Union[WsFailed, _Mapping]] = ..., ws_message: _Optional[_Union[WsMessage, _Mapping]] = ..., ws_closed: _Optional[_Union[WsClosed, _Mapping]] = ..., ws_lost: _Optional[_Union[Failed, _Mapping]] = ..., stored: _Optional[_Union[Id, _Mapping]] = ..., store_failed: _Optional[_Union[Failed, _Mapping]] = ..., set_connection_settings_status: _Optional[_Union[_opamp_pb2.ConnectionSettingsStatus, _Mapping]] = ..., set_available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., set_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., send_custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., package_installed: _Optional[_Union[PackageInstalled, _Mapping]] = ..., package_removed: _Optional[_Union[Name, _Mapping]] = ..., downloaded: _Optional[_Union[Downloaded, _Mapping]] = ..., download_failed: _Optional[_Union[Failed, _Mapping]] = ..., proxy_answer: _Optional[_Union[ProxyAnswer, _Mapping]] = ..., stream_resolved: _Optional[_Union[StreamResolved, _Mapping]] = ..., stream_opened: _Optional[_Union[Id, _Mapping]] = ..., stream_tls_ready: _Optional[_Union[Id, _Mapping]] = ..., stream_data: _Optional[_Union[WsMessage, _Mapping]] = ..., stream_eof: _Optional[_Union[Id, _Mapping]] = ..., stream_failed: _Optional[_Union[Failed, _Mapping]] = ..., stream_spliced: _Optional[_Union[Id, _Mapping]] = ..., download_response: _Optional[_Union[DownloadResponse, _Mapping]] = ..., set_auth_headers: _Optional[_Union[Headers, _Mapping]] = ...) -> None: ...
+    abort: Empty
+    def __init__(self, start: _Optional[_Union[Empty, _Mapping]] = ..., set_description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., set_health: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., set_effective_config: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., set_remote_config_status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., stop: _Optional[_Union[Empty, _Mapping]] = ..., timer: _Optional[_Union[Empty, _Mapping]] = ..., http_response: _Optional[_Union[HttpResponse, _Mapping]] = ..., http_failed: _Optional[_Union[Failed, _Mapping]] = ..., ws_opened: _Optional[_Union[Id, _Mapping]] = ..., ws_failed: _Optional[_Union[WsFailed, _Mapping]] = ..., ws_message: _Optional[_Union[WsMessage, _Mapping]] = ..., ws_closed: _Optional[_Union[WsClosed, _Mapping]] = ..., ws_lost: _Optional[_Union[Failed, _Mapping]] = ..., stored: _Optional[_Union[Id, _Mapping]] = ..., store_failed: _Optional[_Union[Failed, _Mapping]] = ..., set_connection_settings_status: _Optional[_Union[_opamp_pb2.ConnectionSettingsStatus, _Mapping]] = ..., set_available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., set_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., send_custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., package_installed: _Optional[_Union[PackageInstalled, _Mapping]] = ..., package_removed: _Optional[_Union[Name, _Mapping]] = ..., downloaded: _Optional[_Union[Downloaded, _Mapping]] = ..., download_failed: _Optional[_Union[Failed, _Mapping]] = ..., proxy_answer: _Optional[_Union[ProxyAnswer, _Mapping]] = ..., stream_resolved: _Optional[_Union[StreamResolved, _Mapping]] = ..., stream_opened: _Optional[_Union[Id, _Mapping]] = ..., stream_tls_ready: _Optional[_Union[Id, _Mapping]] = ..., stream_data: _Optional[_Union[WsMessage, _Mapping]] = ..., stream_eof: _Optional[_Union[Id, _Mapping]] = ..., stream_failed: _Optional[_Union[Failed, _Mapping]] = ..., stream_spliced: _Optional[_Union[Id, _Mapping]] = ..., download_response: _Optional[_Union[DownloadResponse, _Mapping]] = ..., set_auth_headers: _Optional[_Union[Headers, _Mapping]] = ..., abort: _Optional[_Union[Empty, _Mapping]] = ...) -> None: ...
 
 class ProxyAnswer(_message.Message):
     __slots__ = ("id", "proxy", "headers", "resolve_locally")
@@ -606,3 +626,130 @@ class StatusTooLarge(_message.Message):
     bytes: int
     name: str
     def __init__(self, field: _Optional[_Union[StatusField, str]] = ..., bytes: _Optional[int] = ..., name: _Optional[str] = ...) -> None: ...
+
+class SetupCall(_message.Message):
+    __slots__ = ("start", "identity")
+    START_FIELD_NUMBER: _ClassVar[int]
+    IDENTITY_FIELD_NUMBER: _ClassVar[int]
+    start: SetupStart
+    identity: SetupIdentity
+    def __init__(self, start: _Optional[_Union[SetupStart, _Mapping]] = ..., identity: _Optional[_Union[SetupIdentity, _Mapping]] = ...) -> None: ...
+
+class SetupReply(_message.Message):
+    __slots__ = ("started", "identified", "error")
+    STARTED_FIELD_NUMBER: _ClassVar[int]
+    IDENTIFIED_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    started: SetupStarted
+    identified: SetupIdentified
+    error: str
+    def __init__(self, started: _Optional[_Union[SetupStarted, _Mapping]] = ..., identified: _Optional[_Union[SetupIdentified, _Mapping]] = ..., error: _Optional[str] = ...) -> None: ...
+
+class Variable(_message.Message):
+    __slots__ = ("name", "value")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    value: str
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+
+class SetupStart(_message.Message):
+    __slots__ = ("env", "os", "program", "cwd", "code")
+    ENV_FIELD_NUMBER: _ClassVar[int]
+    OS_FIELD_NUMBER: _ClassVar[int]
+    PROGRAM_FIELD_NUMBER: _ClassVar[int]
+    CWD_FIELD_NUMBER: _ClassVar[int]
+    CODE_FIELD_NUMBER: _ClassVar[int]
+    env: _containers.RepeatedCompositeFieldContainer[Variable]
+    os: SetupOs
+    program: str
+    cwd: str
+    code: SetupInCode
+    def __init__(self, env: _Optional[_Iterable[_Union[Variable, _Mapping]]] = ..., os: _Optional[_Union[SetupOs, str]] = ..., program: _Optional[str] = ..., cwd: _Optional[str] = ..., code: _Optional[_Union[SetupInCode, _Mapping]] = ...) -> None: ...
+
+class SetupInCode(_message.Message):
+    __slots__ = ("endpoint", "headers_given", "headers", "state_dir", "heartbeat_ms", "endpoint_name", "headers_name", "heartbeat_name")
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_GIVEN_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    STATE_DIR_FIELD_NUMBER: _ClassVar[int]
+    HEARTBEAT_MS_FIELD_NUMBER: _ClassVar[int]
+    ENDPOINT_NAME_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_NAME_FIELD_NUMBER: _ClassVar[int]
+    HEARTBEAT_NAME_FIELD_NUMBER: _ClassVar[int]
+    endpoint: str
+    headers_given: bool
+    headers: _containers.RepeatedCompositeFieldContainer[Header]
+    state_dir: str
+    heartbeat_ms: int
+    endpoint_name: str
+    headers_name: str
+    heartbeat_name: str
+    def __init__(self, endpoint: _Optional[str] = ..., headers_given: bool = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., state_dir: _Optional[str] = ..., heartbeat_ms: _Optional[int] = ..., endpoint_name: _Optional[str] = ..., headers_name: _Optional[str] = ..., heartbeat_name: _Optional[str] = ...) -> None: ...
+
+class SetupStarted(_message.Message):
+    __slots__ = ("off", "endpoint", "headers", "heartbeat_interval_ms", "state_dir", "default_slots", "all_slots_taken", "service", "shown_endpoint", "hints", "warnings")
+    OFF_FIELD_NUMBER: _ClassVar[int]
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
+    STATE_DIR_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_SLOTS_FIELD_NUMBER: _ClassVar[int]
+    ALL_SLOTS_TAKEN_FIELD_NUMBER: _ClassVar[int]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    SHOWN_ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    HINTS_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    off: bool
+    endpoint: str
+    headers: _containers.RepeatedCompositeFieldContainer[Header]
+    heartbeat_interval_ms: int
+    state_dir: str
+    default_slots: _containers.RepeatedScalarFieldContainer[str]
+    all_slots_taken: str
+    service: str
+    shown_endpoint: str
+    hints: SetupHints
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, off: bool = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., heartbeat_interval_ms: _Optional[int] = ..., state_dir: _Optional[str] = ..., default_slots: _Optional[_Iterable[str]] = ..., all_slots_taken: _Optional[str] = ..., service: _Optional[str] = ..., shown_endpoint: _Optional[str] = ..., hints: _Optional[_Union[SetupHints, _Mapping]] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class SetupHints(_message.Message):
+    __slots__ = ("refused", "not_found", "unreachable", "error")
+    REFUSED_FIELD_NUMBER: _ClassVar[int]
+    NOT_FOUND_FIELD_NUMBER: _ClassVar[int]
+    UNREACHABLE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    refused: str
+    not_found: str
+    unreachable: str
+    error: str
+    def __init__(self, refused: _Optional[str] = ..., not_found: _Optional[str] = ..., unreachable: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
+
+class SetupIdentity(_message.Message):
+    __slots__ = ("state_dir", "saved", "resource_attributes", "entropy", "unix_ms")
+    STATE_DIR_FIELD_NUMBER: _ClassVar[int]
+    SAVED_FIELD_NUMBER: _ClassVar[int]
+    RESOURCE_ATTRIBUTES_FIELD_NUMBER: _ClassVar[int]
+    ENTROPY_FIELD_NUMBER: _ClassVar[int]
+    UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    state_dir: bool
+    saved: str
+    resource_attributes: str
+    entropy: bytes
+    unix_ms: int
+    def __init__(self, state_dir: bool = ..., saved: _Optional[str] = ..., resource_attributes: _Optional[str] = ..., entropy: _Optional[bytes] = ..., unix_ms: _Optional[int] = ...) -> None: ...
+
+class SetupIdentified(_message.Message):
+    __slots__ = ("instance_uid", "save", "text", "unsaved_uid", "unsaved_from")
+    INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
+    FROM_FIELD_NUMBER: _ClassVar[int]
+    SAVE_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    UNSAVED_UID_FIELD_NUMBER: _ClassVar[int]
+    UNSAVED_FROM_FIELD_NUMBER: _ClassVar[int]
+    instance_uid: bytes
+    save: bool
+    text: str
+    unsaved_uid: bytes
+    unsaved_from: SetupUidFrom
+    def __init__(self, instance_uid: _Optional[bytes] = ..., save: bool = ..., text: _Optional[str] = ..., unsaved_uid: _Optional[bytes] = ..., unsaved_from: _Optional[_Union[SetupUidFrom, str]] = ..., **kwargs) -> None: ...

@@ -71,7 +71,7 @@ import org.junit.jupiter.api.Test;
  * drops is only ever {@code [REDACTED]}; every attribute list exported is the redaction of one
  * document of the run that sends its signal, never half of one and half of another, and a span's
  * lists all of the same one (the gate redacts a whole span at once); a child of a span sampled
- * here is sampled, whatever the cap; and with send_logs false in every document, no record is
+ * here is sampled, whatever the cap; and with the logs export off in every document, no record is
  * exported. Then a final document is applied, and
  * all that is emitted after it is exactly what that document says, caps included (the clock is
  * frozen far ahead, so each bucket is full and stays as the emissions leave it).
@@ -176,49 +176,65 @@ class ControlsTortureTest {
         null, null);
 
     String json() {
-      List<String> f = new ArrayList<>();
+      List<String> set = new ArrayList<>();
+      List<String> redaction = new ArrayList<>();
       if (!drop.isEmpty()) {
-        f.add("\"drop_attributes\":\"" + String.join(",", drop) + "\"");
+        redaction.add("\"drop\":" + strings(drop));
       }
       if (!mask.isEmpty()) {
-        f.add("\"mask_attributes\":\"" + String.join(",", mask) + "\"");
+        redaction.add("\"mask\":" + strings(mask));
+      }
+      if (!redaction.isEmpty()) {
+        set.addAll(List.of("attribute_redaction", Vectors.override(String.join(",", redaction))));
       }
       if (!rules.isEmpty()) {
-        f.add("\"sampling_rules\":[" + rules.stream().map(Rule::json).collect(Collectors.joining(",")) + "]");
+        set.addAll(List.of("sampling_rules", Vectors.override(
+            "\"rules\":[" + rules.stream().map(Rule::json).collect(Collectors.joining(",")) + "]")));
       }
       if (rate != null) {
-        f.add("\"sampling_rate\":\"" + rate + "\"");
+        set.addAll(List.of("head_sampling", Vectors.override("\"ratio\":" + rate)));
       }
-      if (sendTraces != null) {
-        f.add("\"send_traces\":\"" + sendTraces + "\"");
+      if (sendTraces != null || sendLogs != null) {
+        set.addAll(List.of("signal_exports", Vectors.exports(signal(sendTraces), "", signal(sendLogs))));
       }
-      if (sendLogs != null) {
-        f.add("\"send_logs\":\"" + sendLogs + "\"");
-      }
+      List<String> levels = new ArrayList<>();
       if (level != null) {
-        f.add("\"send_logs_level\":\"" + levelName(level) + "\"");
+        levels.add("\"level\":\"" + levelName(level) + "\"");
       }
       if (!byScope.isEmpty()) {
-        f.add("\"send_logs_level_by_scope\":\"" + byScope.entrySet().stream()
-            .map(e -> e.getKey() + "=" + levelName(e.getValue())).collect(Collectors.joining(",")) + "\"");
+        levels.add("\"scopes\":{" + byScope.entrySet().stream()
+            .map(e -> "\"" + e.getKey() + "\":\"" + levelName(e.getValue()) + "\"").collect(Collectors.joining(",")) + "}");
+      }
+      if (!levels.isEmpty()) {
+        set.addAll(List.of("log_levels", Vectors.override(String.join(",", levels))));
       }
       if (traceCap != null) {
-        f.add("\"sampling_traces_per_second\":\"" + traceCap + "\"");
+        set.addAll(List.of("trace_rate_limit", Vectors.override("\"traces_per_second\":" + traceCap)));
       }
       if (logCap != null) {
-        f.add("\"send_logs_per_second\":\"" + logCap + "\"");
+        set.addAll(List.of("log_rate_limit", Vectors.override("\"records_per_second\":" + logCap)));
       }
       if (debug != 0) {
         // The layer decides debug mode at Vectors.NOW (12:00Z): an hour on, or an hour gone.
-        f.add("\"debug_until\":\"" + (debug == 1 ? "2026-10-14T13:00:00Z" : "2026-10-14T11:00:00Z") + "\"");
+        List<String> d = new ArrayList<>(List.of(
+            "\"until\":\"" + (debug == 1 ? "2026-10-14T13:00:00Z" : "2026-10-14T11:00:00Z") + "\""));
         if (debugRate != null) {
-          f.add("\"debug_sampling_rate\":\"" + debugRate + "\"");
+          d.add("\"sampling_ratio\":" + debugRate);
         }
         if (debugLevel != null) {
-          f.add("\"debug_send_logs_level\":\"" + levelName(debugLevel) + "\"");
+          d.add("\"log_level\":\"" + levelName(debugLevel) + "\"");
         }
+        set.addAll(List.of("debug", Vectors.override(String.join(",", d))));
       }
-      return "{" + String.join(",", f) + "}";
+      return Vectors.every(set.toArray(String[]::new));
+    }
+
+    private static String strings(List<String> values) {
+      return values.stream().map(v -> "\"" + v + "\"").collect(Collectors.joining(",", "[", "]"));
+    }
+
+    private static String signal(Boolean on) {
+      return on == null ? "" : on ? "on" : "off";
     }
 
     /** What happens to each of {@link #ATTRS}' keys on export. */
@@ -315,8 +331,8 @@ class ControlsTortureTest {
 
   /**
    * A document at random. {@code exact}: rates 0 or 1 only, for the final one. A pinned run's
-   * documents all drop and mask the pinned patterns, but for a {@code dark} one: send_traces and
-   * send_logs false, and no redaction at all; a logs-off run's all say send_logs false.
+   * documents all drop and mask the pinned patterns, but for a {@code dark} one: the traces and
+   * logs exports off, and no redaction at all. A logs-off run's documents all switch the logs export off.
    */
   static Doc doc(SplittableRandom r, boolean pinned, boolean logsOff, boolean dark, boolean exact) {
     if (dark) {
@@ -670,7 +686,7 @@ class ControlsTortureTest {
       }
     }
     if (plan.logsOff() && !logs.isEmpty()) {
-      wrong.add(logs.size() + " log records exported, with send_logs false in every document");
+      wrong.add(logs.size() + " log records exported, with the logs export off in every document");
     }
     assertEquals(List.of(), wrong.stream().distinct().limit(20).toList());
   }

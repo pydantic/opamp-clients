@@ -1,1 +1,17 @@
-{"sampling_rate": "0.05", "send_logs_level": "warn", "debug_until": "2026-10-14T12:30:00Z", "debug_sampling_rate": "1", "debug_send_logs_level": "debug"}
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "override", "ratio": 0.05},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "override", "level": "warn"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "override", "until": "2026-10-14T12:30:00Z", "sampling_ratio": 1, "log_level": "debug"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"}
+}
