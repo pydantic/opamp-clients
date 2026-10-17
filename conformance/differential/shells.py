@@ -34,12 +34,12 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 OUT = ROOT / "conformance" / "out"
 ALLOWED = HERE / "shells.toml"
-# Where the core's sources would be: OPAMP_CORE_ROOT (a checkout with them) if set, as in
-# conformance/runner/run.py, else the root.
+# Where the core's sources are: OPAMP_CORE_ROOT (a checkout with them) if set, as in
+# conformance/runner/run.py, else the root, which has none.
 CORE_ROOT = Path(os.environ["OPAMP_CORE_ROOT"]).resolve() if os.environ.get("OPAMP_CORE_ROOT") else ROOT
-# The client the others are compared with: the Rust client where the core's sources are (a
-# Cargo.toml at CORE_ROOT) to build it from, and go-core where they aren't.
-CORE_SOURCE = (CORE_ROOT / "Cargo.toml").exists()
+# The client the others are compared with: the Rust client where the core's sources are to build it
+# from, and go-core where they aren't.
+CORE_SOURCE = CORE_ROOT != ROOT
 # opamp-tap: built from those sources, or the one scripts/fetch_core.py fetch put in the root's target/.
 TAP = (CORE_ROOT if CORE_SOURCE else ROOT) / "target" / "release" / "opamp-tap"
 REFERENCE = "rust" if CORE_SOURCE else "go-core"

@@ -59,8 +59,8 @@ func (s *authServer) authorizations() []string {
 
 // AuthHeader's headers go with every request and upgrade, over the configured header of the same
 // name and with the other configured ones, in both modes over both transports; a new token goes
-// with the next request or connection. (They used to be Go mode's alone, applied by rewriting
-// what the core had chosen: issue #218's E-F2.)
+// with the next request or connection. The client hands them to the core (SetAuthHeaders), which
+// sends them as it sends any header.
 func TestAuthHeaderGoesWithEveryAttempt(t *testing.T) {
 	for _, mode := range []Mode{ModeGo, ModeRust} {
 		for _, ws := range []bool{false, true} {

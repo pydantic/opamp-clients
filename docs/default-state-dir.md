@@ -37,7 +37,7 @@ then `opamp/<service>-<hash>/<slot>`:
 - `<slot>` is `1` to `16`. A process takes the first slot whose `lock` file it can lock (the
   operating system's lock, without waiting; held until the process ends, never inherited by a
   process it starts). So the processes of a program running at once each keep their own identity,
-  and a restarted one takes back the slot it had (the lowest free one). Go, Node.js and Rust also
+  and a restarted one takes back the slot it had (the lowest free one). Go and Node.js also
   let it go when the SDK is shut down, so an SDK set up again in the same process takes the same
   slot, and the same identity, back.
 

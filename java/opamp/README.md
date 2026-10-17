@@ -91,7 +91,8 @@ an HTTP proxy is a CONNECT tunnel (`http://` endpoints too), with the URL's cred
 the server's name, unless `proxyResolveLocally(true)`.
 
 With no proxy configured, the client takes the proxy from the environment by the rule every SDK
-follows in Rust mode (`tests/shell-tables/README.md`, "Rust mode's proxy rule"): `HTTP_PROXY` for
+follows in Rust mode (`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+`scripts/fetch_core.py fetch`): `HTTP_PROXY` for
 `http://` and `ws://`, `HTTPS_PROXY` for `https://` and `wss://`, `ALL_PROXY` for either when its
 own is unset (upper case first, an empty value unset); `NO_PROXY` lists names (`example.com`
 covers its subdomains, `*` every name), addresses and CIDR networks (`10.0.0.0/8`), never
@@ -195,4 +196,4 @@ sets their scenarios.
 The conformance suite runs this client through `conformance/drivers/java-core`, in both modes:
 `java-core` (Java mode) and `java-core-rust` (Rust mode, `OPAMP_JAVA_MODE=rust`).
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are [the shell contract](../../spec/shell-contract.md) (it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.

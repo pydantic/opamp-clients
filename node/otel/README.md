@@ -10,9 +10,9 @@ application, then start the application with it in place of upstream's `register
 server's address and enrollment key:
 
 ```bash
-OPAMP=/path/to/opamp   # this repository
-(cd $OPAMP/node/opamp && npm ci && npm run build) && (cd $OPAMP/node/otel && npm ci && npm run build)
-npm install $OPAMP/node/otel   # in the application's directory
+OPAMP_CLIENTS=/path/to/opamp-clients   # this repository
+(cd $OPAMP_CLIENTS/node/opamp && npm ci && npm run build) && (cd $OPAMP_CLIENTS/node/otel && npm ci && npm run build)
+npm install $OPAMP_CLIENTS/node/otel   # in the application's directory
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \

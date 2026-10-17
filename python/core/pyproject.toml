@@ -1,8 +1,7 @@
 # The shared OpAMP client core, compiled: the native library alone, no Python code
 # and no source. The client (pydantic-opamp-client, ..) loads it through its C interface. One
 # wheel per platform serves every Python; CI builds them (scripts/native_dist.py), and uv builds
-# one for this machine from the repository (build_backend.py: the fetched library, or cargo's
-# where the core's source is).
+# one for this machine from the repository (build_backend.py: the fetched library).
 [project]
 name = "pydantic-opamp-core"
 version = "0.1.0"
@@ -17,9 +16,5 @@ build-backend = "build_backend"
 backend-path = ["."]
 
 [tool.uv]
-# Rebuild the wheel when what it is made from changes, not only this file: the fetched core's lock,
-# or, where the core's source is, that source.
-cache-keys = [{ file = "pyproject.toml" }, { file = "build_backend.py" }, { file = "../../opamp-core.lock.json" },
-              { file = "../../Cargo.toml" },
-              { file = "../../Cargo.lock" }, { file = "../../rust/**/*.rs" }, { file = "../../rust/**/Cargo.toml" },
-              { file = "../../proto/**/*.proto" }, { file = "../../spec/proto/**/*.proto" }]
+# Rebuild the wheel when what it is made from changes, not only this file: the fetched core's lock.
+cache-keys = [{ file = "pyproject.toml" }, { file = "build_backend.py" }, { file = "../../opamp-core.lock.json" }]

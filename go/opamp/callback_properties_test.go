@@ -905,7 +905,7 @@ func TestCallbackModelPanicStopsTheClient(t *testing.T) {
 		var exit *exec.ExitError
 		switch {
 		case err == nil:
-			t.Fatalf("#87 looks fixed: a panic in the callback no longer kills the process (OPAMP_MODEL_SEED=%d, run %d, plan %v). "+
+			t.Fatalf("looks fixed: a panic in the callback no longer kills the process (OPAMP_MODEL_SEED=%d, run %d, plan %v). "+
 				"Set panicKillsProcess to false.", seed, i, plan)
 		case errors.As(err, &exit) && strings.Contains(string(out), "panic: "+modelPanic):
 			t.Logf("expected failure (RULE-SHELL-02): the callback's panic killed the process (OPAMP_MODEL_SEED=%d, run %d)", seed, i)

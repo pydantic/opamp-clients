@@ -9,8 +9,8 @@
 # core source. Each registry uploads only once the variable SDK_REGISTRIES names it ("pypi npm
 # maven nuget"); until then its job says what it would have published. Go needs no upload (the
 # module proxy serves the go/vX.Y.Z tag). What each registry needs set up first:
-# docs/sdk-registries.md. The native core's libraries are built from the core's sources where they
-# are (a Cargo.toml at the root), else taken from the core's release that opamp-core.lock.json pins.
+# docs/sdk-registries.md. The native core's libraries are the core's release that
+# opamp-core.lock.json pins.
 name: Registries
 
 on:
@@ -52,8 +52,6 @@ jobs:
             echo "::error::$version isn't a version like 0.2.0"; exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        if: ${{ hashFiles('Cargo.toml') != '' }}
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
@@ -71,26 +69,7 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
           dotnet-version: "8.0.x"
-      - uses: taiki-e/install-action@9983c65e42da123ff25d1f78505eb6de315aa172 # v2.87.20
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        with:
-          tool: cargo-zigbuild@0.23.4,cargo-xwin@0.23.1
-      - name: The targets and zig
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        run: |
-          rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
-            x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc aarch64-pc-windows-msvc
-          # zig 0.14: glibc 2.17, so the libraries run on any distribution since (scripts/native_dist.py).
-          python3 -m pip install --quiet ziglang==0.14.1
-          mkdir -p "$RUNNER_TEMP/zig" && printf '#!/bin/sh\nexec python3 -m ziglang "$@"\n' > "$RUNNER_TEMP/zig/zig"
-          chmod +x "$RUNNER_TEMP/zig/zig" && echo "$RUNNER_TEMP/zig" >> "$GITHUB_PATH"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: ${{ hashFiles('Cargo.toml') != '' }}
-        with:
-          path: ~/.cache/cargo-xwin
-          key: cargo-xwin-0.23.1-${{ runner.os }}
-      - name: The core's release, every platform's library (without the core's sources)
-        if: ${{ hashFiles('Cargo.toml') == '' }}
+      - name: The core's release, every platform's library
         run: python3 scripts/fetch_core.py fetch --all-platforms
       - name: twine and file
         run: |

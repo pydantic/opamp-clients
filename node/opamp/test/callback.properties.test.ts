@@ -144,7 +144,7 @@ class OpampServer {
       m = create(ServerToAgentSchema, { connectionSettings: { opamp: { heartbeatIntervalSeconds: BigInt(n) } } });
     }
     // Pushed on the client's connection: open, and carrying its messages (not one left open
-    // after stop, S1).
+    // after stop).
     const conn = [...this.conns].find(([c, carried]) => carried > 0 && c.readyState === c.OPEN)?.[0];
     if (conn) {
       m.instanceUid = UID;
@@ -439,7 +439,7 @@ class World {
     assert.equal(life.notes.length, told, "no callback after stop");
     assert.equal(this.server.got.length, heard, "nothing sent after stop returned (RULE-SHELL-07)");
     for (let i = 0; i < 100 && this.server.conns.size > 0; i++) await sleep(10);
-    assert.equal(this.server.conns.size, 0, `every connection closed at stop (RULE-SHELL-07, S1): ${life.what}`);
+    assert.equal(this.server.conns.size, 0, `every connection closed at stop (RULE-SHELL-07): ${life.what}`);
     const msgs = this.server.got.slice(life.since);
     const bye = msgs.findIndex((m) => m.agentDisconnect !== undefined);
     assert.ok(bye === -1 || bye === msgs.length - 1, "nothing after the goodbye");
@@ -605,11 +605,11 @@ for (const mode of MODES) {
   });
 }
 
-// Known bug S1, fixed: stopped before its first step has run, the client is still connecting; the
-// connection that opens after stop is closed at once.
+// Stopped before its first step has run, the client is still connecting; the connection that opens
+// after stop is closed at once.
 for (const mode of MODES) {
   // covers: RULE-SHELL-07
-  test(`${mode} mode: S1: a WebSocket that opens after stop is closed at once`, async () => {
+  test(`${mode} mode: a WebSocket that opens after stop is closed at once`, async () => {
     const world = new World(mode, true, () => {});
     await world.server.listen();
     try {

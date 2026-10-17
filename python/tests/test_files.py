@@ -635,7 +635,7 @@ def test_a_fault_in_a_download_file_is_survived_and_no_partial_file_is_handed_ov
     asyncio.run(run())
 
 
-# S4 for downloads: a slow disk under a download's file holds up neither heartbeats nor the loop.
+# Downloads: a slow disk under a download's file holds up neither heartbeats nor the loop.
 
 @pytest.mark.parametrize("op", ["mkdir", "create", "write", "sync", "remove"])
 @pytest.mark.parametrize("mode", MODES)
@@ -678,7 +678,7 @@ def test_a_slow_download_file_holds_up_neither_heartbeats_nor_the_loop(mode: str
     asyncio.run(run())
 
 
-# S4 at start: deleting the downloads a run before left holds up neither start nor the loop, and
+# At start: deleting the downloads a run before left holds up neither start nor the loop, and
 # no download makes its file before it is over.
 
 @pytest.mark.parametrize("mode", MODES)
@@ -812,7 +812,7 @@ def test_a_download_file_being_flushed_as_the_core_stops_is_gone_when_stop_retur
     assert took < 0.1 + STOP_GRACE_S + 0.5, f"{mode} mode: stop took {took:.2f} s"
 
 
-# Known bug S3: a client restarted on the same state file mid-download.
+# A client restarted on the same state file mid-download.
 
 @pytest.mark.parametrize("mode", MODES)
 def test_a_download_does_not_outlive_stop_into_the_next_clients_file(mode: str, tmp_path) -> None:

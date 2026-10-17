@@ -415,7 +415,7 @@ export class Executor {
     this.#track(done);
   }
 
-  /** Give up on everything under way (S1, S3; the core has cancelled it all already when it
+  /** Give up on everything under way (the core has cancelled it all already when it
    * stopped): once it is over, nothing of it is left (a download given up on has closed and
    * deleted its file, and a discarded one is deleted: a client started next on the same state
    * file may use the same ids), or `boundMs` has passed (a disk that has stopped answering holds
@@ -521,7 +521,7 @@ export class Executor {
     });
     socket.on("open", () => {
       const e = this.#f.get(id);
-      // Opened after its cancel (or shutdown): closed at once, and nothing said of it (S1).
+      // Opened after its cancel (or shutdown): closed at once, and nothing said of it.
       if (e === undefined) return void socket.terminate();
       e.ws = socket;
       this.used = o.url;
