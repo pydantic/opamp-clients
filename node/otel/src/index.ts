@@ -469,8 +469,9 @@ const ENDPOINT_IN_CODE = "the endpoint given to register()";
 const HEADERS_IN_CODE = "the headers given to register()";
 
 /** The variables the core's Setup reads. */
-const SETUP_VARIABLES = ["OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
-  "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA"];
+const SETUP_VARIABLES = ["OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED", "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS",
+  "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME",
+  "XDG_STATE_HOME", "LOCALAPPDATA"];
 
 let coreWarned = false;
 
@@ -494,8 +495,8 @@ function coreLoads(unavailable: string | undefined): boolean {
  */
 export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options = {}): Setup | undefined {
   const options = given(code);
-  // No SDK, nothing to manage: not an agent in the fleet either.
-  if (env.OTEL_SDK_DISABLED?.trim().toLowerCase() === "true") return undefined;
+  // OTEL_OPAMP_DISABLED and OTEL_SDK_DISABLED are the core's to read (Setup). A core that can't be
+  // loaded can't read them: then the SDK runs unmanaged whatever they say, and says why.
   if (!coreLoads(coreUnavailable())) return undefined;
   let heartbeatMs: bigint | undefined;
   const ms = options.heartbeatIntervalMs;
@@ -539,7 +540,11 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
     return undefined;
   }
   for (const w of s.warnings) say.warn(`OpAMP: ${w}`);
-  if (s.off) return undefined;
+  if (s.off) {
+    // Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+    if (s.offReason) say.warn(`OpAMP: ${s.offReason}`);
+    return undefined;
+  }
   // The settings layer only once there is a server: an application without one never loads it.
   if (!coreLoads(settingsUnavailable())) return undefined;
   const setup: Setup = {

@@ -53,13 +53,19 @@ internal sealed class OpAmpAgent : IDisposable
             this.log.Sink.Warn(w);
         }
 
-        if (o.Endpoint is null)
+        if (o.Endpoint is null && o.UnusableEndpoint is { } why)
         {
-            if (o.UnusableEndpoint is { } why)
-            {
-                this.log.Sink.Error($"the client did not start; the SDK runs unmanaged: {why}");
-            }
+            this.log.Sink.Error($"the client did not start; the SDK runs unmanaged: {why}");
+            return;
+        }
 
+        // What the configuration and the variables said is in the options already; the core's Setup
+        // decides from them, naming the configuration's settings in what it says. OTEL_OPAMP_DISABLED
+        // and OTEL_SDK_DISABLED beat them all (the core says so, once); no endpoint: nothing to say.
+        var server = Server.FromOptions(o.Endpoint, o.Headers, o.StateDirectory, o.HeartbeatInterval, this.getenv, this.log.Sink.Warn,
+            "OpAmp:Endpoint", "OpAmp:Headers", "OpAmp:HeartbeatInterval");
+        if (server is null)
+        {
             return;
         }
 
@@ -67,12 +73,7 @@ internal sealed class OpAmpAgent : IDisposable
         // which a gate (ours) replaces: the gate's carries them. Files it can't use leave every
         // exporter as it is, and none of the signals can be stopped.
         this.gateable = OtlpTls.TryFromEnv(this.getenv, this.log.Sink.Warn, out this.tls);
-
-        // What the configuration and the variables said is in the options already; the core's Setup
-        // decides from them, naming the configuration's settings in what it says.
-        var server = Server.FromOptions(o.Endpoint, o.Headers, o.StateDirectory, o.HeartbeatInterval, this.getenv, this.log.Sink.Warn,
-            "OpAmp:Endpoint", "OpAmp:Headers", "OpAmp:HeartbeatInterval");
-        if (server is null || !StateDirs.Claim(ref server, this.log.Sink, out var stateLock))
+        if (!StateDirs.Claim(ref server, this.log.Sink, out var stateLock))
         {
             return;
         }

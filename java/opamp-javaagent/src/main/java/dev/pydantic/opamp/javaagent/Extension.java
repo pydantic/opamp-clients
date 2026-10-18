@@ -236,6 +236,10 @@ final class Extension {
         LOG.warning("OpAMP: " + named(warning, false));
       }
       if (s.getOff()) {
+        // Turned off by a property (said once, here); off for want of an endpoint says nothing.
+        if (!s.getOffReason().isEmpty()) {
+          LOG.warning("OpAMP: " + s.getOffReason());
+        }
         return null;
       }
       Map<String, String> headers = new LinkedHashMap<>();
@@ -267,6 +271,8 @@ final class Extension {
    * a system property or as its variable (the agent's ConfigProperties reads both).
    */
   private static final Map<String, String> PROPERTIES = orderedMap(
+      "OTEL_OPAMP_DISABLED", "otel.opamp.disabled",
+      "OTEL_SDK_DISABLED", "otel.sdk.disabled",
       "OTEL_OPAMP_ENDPOINT", "otel.opamp.endpoint",
       "OTEL_OPAMP_HEADERS", "otel.opamp.headers",
       "OTEL_OPAMP_STATE_DIR", "otel.opamp.state.dir",

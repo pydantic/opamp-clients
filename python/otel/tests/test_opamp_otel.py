@@ -1412,3 +1412,35 @@ def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_
     assert len(said) == 1, run.stderr
     assert said[0].startswith("OpAMP: the core can't be loaded on ") and "; the SDK runs unmanaged: " in said[0]
     assert reason in said[0], said
+
+
+_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _OFF, ids=[c["id"] for c in _OFF])
+def test_the_off_switch_table_through_configure(case):
+    """tests/shell-tables/off.json, each case through configure() in a process given its
+    environment: off, no client starts and the reason is said once, at WARNING; on, the client
+    starts and the server hears from it. Every endpoint of a case is the test server."""
+    server = _Server()
+    local = lambda v: server.endpoint if v.startswith(("http://", "https://")) else v  # noqa: E731
+    endpoint = None if case["code_endpoint"] is None else local(case["code_endpoint"])
+    child = textwrap.dedent(f"""
+        import logging, sys
+        logging.basicConfig(stream=sys.stdout, format="%(levelname)s %(message)s")
+        import pydantic_opamp_otel
+        pydantic_opamp_otel.configure(endpoint={endpoint!r})
+        print("client", pydantic_opamp_otel.AGENT.client is not None)
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env(OTEL_OPAMP_STATE_DIR="none", OTEL_TRACES_EXPORTER="none",
+                                            OTEL_METRICS_EXPORTER="none", OTEL_LOGS_EXPORTER="none",
+                                            **{k: local(v) for k, v in case["env"].items()}))
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    assert f"client {not case['off']}" in run.stdout, run.stdout + run.stderr
+    assert bool(server.got) is not case["off"], server.got
+    said = [line for line in run.stdout.splitlines() if "OpAMP: off" in line]
+    assert said == ([f"WARNING OpAMP: {case['reason']}"] if case["reason"] else []), run.stdout

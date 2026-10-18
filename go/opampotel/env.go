@@ -88,9 +88,9 @@ func WithHeartbeatInterval(d time.Duration) Option {
 }
 
 // setupVariables are the variables the core's Setup reads.
-var setupVariables = []string{"OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
-	"OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME",
-	"LOCALAPPDATA"}
+var setupVariables = []string{"OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED", "OTEL_OPAMP_ENDPOINT",
+	"OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME",
+	"OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA"}
 
 // setupOS is this operating system, as Setup names it.
 func setupOS() opamp.SetupOs {
@@ -178,6 +178,10 @@ func serverFromEnv(getenv func(string) string, opts ...Option) *server {
 		slog.Warn("opamp: " + w)
 	}
 	if s.GetOff() {
+		// Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+		if r := s.GetOffReason(); r != "" {
+			slog.Warn("opamp: " + r)
+		}
 		return nil
 	}
 	// The settings layer only once there is a server: an application without one never loads it.

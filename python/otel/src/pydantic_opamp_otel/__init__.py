@@ -92,8 +92,9 @@ _INSTANCE_ID = "service.instance.id"
 
 
 #: The variables the core's Setup reads (setup.SetupStart).
-_SETUP_VARIABLES = ("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL",
-                    "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA")
+_SETUP_VARIABLES = ("OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED", "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS",
+                    "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME",
+                    "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA")
 
 
 _core_warned = False
@@ -310,6 +311,9 @@ class Setup:
                 warning = "heartbeat_interval" + warning[len("OTEL_OPAMP_HEARTBEAT_INTERVAL"):]
             _log.warning("OpAMP: %s", warning)
         if started.off:
+            # Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+            if started.off_reason:
+                _log.warning("OpAMP: %s", started.off_reason)
             return None
         scheme = started.endpoint.partition("://")[0].lower()
         if scheme not in ("http", "https", "ws", "wss"):
