@@ -221,24 +221,25 @@ service:
 	}
 }
 
-func TestEnrollPreparedInstance(t *testing.T) {
+// The Supervisor makes and saves its own instance UID, so enrollment names none. The server's
+// exporter credential for logfire/otlp reaches the Collector as LOGFIRE_TOKEN.
+func TestEnrollBindsTheExporterCredential(t *testing.T) {
 	e := newEnrollment(t)
-	uid := "f0cff0a3-08e5-4c49-96ce-1366b14525ed"
-	out, err := e.run(t, "bootstrap-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp/enroll", "--instance-id", uid, "--accept-packages", "--no-start")
+	out, err := e.run(t, "bootstrap-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--no-start")
 	require.NoError(t, err, out)
 	cfg := e.read(t, "supervisor.yaml")
-	assert.Contains(t, cfg, "instance_id: \""+uid+"\"")
-	assertPackages(t, e.loadEnrolled(t), true, "otelcol")
+	assert.NotContains(t, cfg, "instance_id")
 	assert.Contains(t, cfg, "accepts_other_connection_settings: true")
-	assert.Contains(t, cfg, "logfire/otlp: LOGFIRE_TOKEN")
 	assert.NotContains(t, cfg, "bootstrap-token")
 	assert.NotContains(t, out, "bootstrap-token")
-	other := newEnrollment(t)
-	out, err = other.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/enroll", "--instance-id", "invalid")
-	require.Error(t, err)
-	assert.Contains(t, out, "needs a UUID")
-	_, err = os.Stat(filepath.Join(other.root, "etc"))
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	loaded := e.loadEnrolled(t)
+	assertPackages(t, loaded, true, "otelcol")
+	assert.Empty(t, loaded.Agent.InstanceID)
+	assert.Equal(t, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, loaded.Agent.ConnectionEnv)
+	assert.True(t, loaded.Capabilities.AcceptsOtherConnectionSettings)
+	out, err = newEnrollment(t).run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp", "--instance-id", "f0cff0a3-08e5-4c49-96ce-1366b14525ed")
+	require.Error(t, err, "enrollment no longer takes an instance UID")
+	assert.NotContains(t, out, "bootstrap-token")
 }
 
 // Enrolling again replaces the token but keeps the state key: a new key couldn't open the

@@ -19,7 +19,6 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                              [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
-  --instance-id UUID      the Collector instance ID prepared during enrollment
   --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
   --token-file PATH        where to read the enrollment token (default: standard input)
   --ca-file PATH           a CA bundle to trust for the server, in place of the system's
@@ -73,7 +72,6 @@ unit=pydantic-opamp-supervisor.service
 endpoint=
 exporter_endpoints=
 log_paths=
-instance_id=
 token_file=-
 ca_file=
 plaintext=
@@ -83,7 +81,6 @@ telemetry_stdin=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
-	--instance-id) [ $# -ge 2 ] || usage; instance_id=$2; shift 2 ;;
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
 	--telemetry-token-stdin) telemetry_stdin=yes; shift ;;
 	--ca-file) [ $# -ge 2 ] || usage; ca_file=$2; shift 2 ;;
@@ -97,12 +94,6 @@ while [ $# -gt 0 ]; do
 done
 
 [ -n "$endpoint" ] || usage
-if [ -n "$instance_id" ]; then
- printf '%s' "$instance_id" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' || fail "--instance-id needs a UUID"
-fi
-instance_config=
-[ -z "$instance_id" ] || instance_config="  instance_id: \"$instance_id\""
-
 case $endpoint in
 wss://* | https://*) ;;
 ws://* | http://*) [ -n "$plaintext" ] || fail "$endpoint isn't encrypted; pass --plaintext to use it anyway" ;;
@@ -259,7 +250,6 @@ capabilities:
   reports_available_components: true$accepts_packages
 
 agent:
-$instance_config
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
   executable: /usr/lib/pydantic-opamp/otelcol
