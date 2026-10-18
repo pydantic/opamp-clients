@@ -46,6 +46,10 @@ func TestMain(m *testing.M) {
 		<-sigCh
 		time.Sleep(2 * time.Second)
 		os.Exit(0)
+	case "exit-soon":
+		// A Collector that runs a little while, then crashes.
+		time.Sleep(time.Second)
+		os.Exit(3)
 	case "fake-collector":
 		// A Collector whose opamp extension connects to the Supervisor's local server as the
 		// config the Supervisor wrote says (localserver_test.go).

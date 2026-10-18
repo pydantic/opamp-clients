@@ -542,7 +542,9 @@ func TestRestartAgentClearsPassthroughShutdownLogsBeforeRestart(t *testing.T) {
 }
 
 func TestComposeAgentConfigFilesBranches(t *testing.T) {
-	t.Run("ignores unreadable and invalid local configs", func(t *testing.T) {
+	// Changed here: a local config that can't be read or merged fails the compose, so the
+	// remote config is FAILED rather than run without it. Both were left out.
+	t.Run("fails on an unreadable or invalid local config", func(t *testing.T) {
 		validCfg := filepath.Join(t.TempDir(), "valid.yaml")
 		require.NoError(t, os.WriteFile(validCfg, []byte(`
 service:
@@ -555,31 +557,32 @@ service:
 
 		invalidCfg := filepath.Join(t.TempDir(), "invalid.yaml")
 		require.NoError(t, os.WriteFile(invalidCfg, []byte("service: ["), 0o600))
+		missingCfg := filepath.Join(t.TempDir(), "missing.yaml")
 
 		agentDesc := &atomic.Value{}
 		agentDesc.Store(&protobufs.AgentDescription{})
 
-		s := Supervisor{
-			telemetrySettings: newNopTelemetrySettings(),
-			config: config.Supervisor{
-				Agent: config.Agent{
-					ConfigFiles: []string{
-						filepath.Join(t.TempDir(), "missing.yaml"),
-						invalidCfg,
-						validCfg,
-					},
-				},
-			},
-			agentDescription: agentDesc,
-			persistentState:  &persistentState{},
-			cfgState:         &atomic.Value{},
-			pidProvider:      staticPIDProvider(1234),
+		compose := func(files ...string) ([]byte, error) {
+			s := Supervisor{
+				telemetrySettings: newNopTelemetrySettings(),
+				config:            config.Supervisor{Agent: config.Agent{ConfigFiles: files}},
+				agentDescription:  agentDesc,
+				persistentState:   &persistentState{},
+				cfgState:          &atomic.Value{},
+				pidProvider:       staticPIDProvider(1234),
+			}
+			return s.composeAgentConfigFiles(nil, s.config.Agent.ConfigFiles)
 		}
 
-		got, err := s.composeAgentConfigFiles(nil, s.config.Agent.ConfigFiles)
+		got, err := compose(validCfg)
 		require.NoError(t, err)
 		assert.Contains(t, string(got), "service.name")
 		assert.Contains(t, string(got), "svc")
+
+		_, err = compose(missingCfg, validCfg)
+		require.ErrorContains(t, err, "could not read local config file "+missingCfg)
+		_, err = compose(invalidCfg, validCfg)
+		require.ErrorContains(t, err, "local config file "+invalidCfg)
 	})
 
 	t.Run("invalid special config returns error", func(t *testing.T) {
@@ -1598,13 +1601,15 @@ service:
 			RemoteConfig: remoteConfig,
 		})
 
-		fileContent, err := os.ReadFile(filepath.Join(configStorageDir, lastRecvRemoteConfigFile))
-		require.NoError(t, err)
-		assert.Contains(t, string(fileContent), testConfigMessage)
+		// Changed here: a config that doesn't compose isn't saved as the last received one, which
+		// the next start would run.
+		_, err = os.Stat(filepath.Join(configStorageDir, lastRecvRemoteConfigFile))
+		require.ErrorIs(t, err, os.ErrNotExist)
+		assert.Nil(t, s.remoteConfig.Load())
 		assert.Nil(t, s.cfgState.Load())
 		assert.True(t, remoteConfigStatusUpdated)
 	})
-	t.Run("RemoteConfig - Report applied status if config is not changed", func(t *testing.T) {
+	t.Run("RemoteConfig - an unchanged config goes to the agent loop for the running config's outcome", func(t *testing.T) {
 		const initialConfigMessage = `receivers:
   debug:
   exporters:
@@ -1699,6 +1704,7 @@ service:
 				},
 			},
 			hasNewConfig:                   make(chan struct{}, 1),
+			configRetargets:                make(chan struct{}, 1),
 			persistentState:                startingPersistentState,
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
@@ -1727,8 +1733,11 @@ service:
 			RemoteConfig: remoteConfig,
 		})
 
-		// assert the remote config status callback was called
-		assert.True(t, remoteConfigStatusUpdated)
+		// Changed here: not reported APPLIED at once. The agent loop reports the running
+		// config's outcome about it (TestUnchangedRemoteConfigGetsTheRunningConfigsOutcome).
+		assert.False(t, remoteConfigStatusUpdated)
+		assert.Len(t, s.configRetargets, 1)
+		assert.True(t, proto.Equal(remoteConfig, s.cfgState.Load().(*configState).remote))
 
 		// assert the config file and stored data are updated
 		fileContent, err := os.ReadFile(filepath.Join(configStorageDir, lastRecvRemoteConfigFile))
@@ -2504,7 +2513,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 	})
 }
 
-func TestSupervisor_saveAndReportConfigStatus(t *testing.T) {
+func TestSupervisor_reportApply(t *testing.T) {
 	remoteConfig := &protobufs.AgentRemoteConfig{
 		Config: &protobufs.AgentConfigMap{
 			ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2515,127 +2524,76 @@ func TestSupervisor_saveAndReportConfigStatus(t *testing.T) {
 		},
 		ConfigHash: []byte("working-hash"),
 	}
-
-	persistentState, err := loadOrCreatePersistentState(
-		filepath.Join(t.TempDir(), persistentStateFileName),
-		"018fee23-4a51-7303-a441-73faed7d9deb",
-		zap.NewNop(),
-	)
-	require.NoError(t, err)
-
-	var reportedStatus *protobufs.RemoteConfigStatus
-	s := Supervisor{
-		telemetrySettings: newNopTelemetrySettings(),
-		config: config.Supervisor{
-			Agent: config.Agent{
-				AutomaticConfigRollback: true,
+	newSupervisor := func(t *testing.T) (*Supervisor, *[]*protobufs.RemoteConfigStatus) {
+		persistentState, err := loadOrCreatePersistentState(
+			filepath.Join(t.TempDir(), persistentStateFileName),
+			"018fee23-4a51-7303-a441-73faed7d9deb",
+			zap.NewNop(),
+		)
+		require.NoError(t, err)
+		var reported []*protobufs.RemoteConfigStatus
+		s := &Supervisor{
+			telemetrySettings: newNopTelemetrySettings(),
+			config: config.Supervisor{
+				Agent:        config.Agent{AutomaticConfigRollback: true},
+				Capabilities: config.Capabilities{AcceptsRemoteConfig: true},
+				Storage:      config.Storage{Directory: filepath.Dir(persistentState.configPath)},
 			},
-			Capabilities: config.Capabilities{
-				AcceptsRemoteConfig: true,
-			},
-			Storage: config.Storage{
-				Directory: filepath.Dir(persistentState.configPath),
-			},
-		},
-		persistentState: persistentState,
-		opampClient: &mockOpAMPClient{
-			setHealthFunc: func(*protobufs.ComponentHealth) {},
-			setRemoteConfigStatusFunc: func(rcs *protobufs.RemoteConfigStatus) error {
-				reportedStatus = rcs
-				return nil
-			},
-		},
-	}
-	s.remoteConfig.Store(remoteConfig)
-
-	s.saveAndReportConfigStatus(protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, "")
-
-	lastWorkingConfigBytes, err := os.ReadFile(filepath.Join(s.config.Storage.Directory, lastWorkingRemoteConfigFile))
-	require.NoError(t, err)
-
-	lastWorkingConfig := &protobufs.AgentRemoteConfig{}
-	require.NoError(t, proto.Unmarshal(lastWorkingConfigBytes, lastWorkingConfig))
-	require.True(t, proto.Equal(remoteConfig, lastWorkingConfig))
-	require.True(t, proto.Equal(remoteConfig, s.lastWorkingRemoteConfig.Load()))
-
-	require.NotNil(t, reportedStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, reportedStatus.Status)
-	require.Equal(t, remoteConfig.ConfigHash, reportedStatus.LastRemoteConfigHash)
-
-	lastRemoteConfigStatus := s.persistentState.GetLastRemoteConfigStatus()
-	require.NotNil(t, lastRemoteConfigStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, lastRemoteConfigStatus.Status)
-	require.Equal(t, remoteConfig.ConfigHash, lastRemoteConfigStatus.LastRemoteConfigHash)
-}
-
-func TestSupervisor_reportLastWorkingRemoteConfigStatus(t *testing.T) {
-	workingRemoteConfig := &protobufs.AgentRemoteConfig{
-		Config: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigObject{
-				"": {
-					Body: []byte("receivers:\n  debug/working: null\n"),
+			persistentState: persistentState,
+			opampClient: &mockOpAMPClient{
+				setHealthFunc: func(*protobufs.ComponentHealth) {},
+				setRemoteConfigStatusFunc: func(rcs *protobufs.RemoteConfigStatus) error {
+					reported = append(reported, rcs)
+					return nil
 				},
 			},
-		},
-		ConfigHash: []byte("working-hash"),
+		}
+		return s, &reported
 	}
-	failedHash := []byte("failed-hash")
 
-	persistentState, err := loadOrCreatePersistentState(
-		filepath.Join(t.TempDir(), persistentStateFileName),
-		"018fee23-4a51-7303-a441-73faed7d9deb",
-		zap.NewNop(),
-	)
-	require.NoError(t, err)
-	require.NoError(t, persistentState.SetLastRemoteConfigStatus(&protobufs.RemoteConfigStatus{
-		LastRemoteConfigHash: failedHash,
-		Status:               protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED,
-		ErrorMessage:         "boom",
-	}))
+	// An APPLIED config is reported, saved as the last working one, and persisted.
+	t.Run("applied", func(t *testing.T) {
+		s, reported := newSupervisor(t)
+		apply := &configApply{config: remoteConfig}
+		require.False(t, s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, "", true))
 
-	var reportedStatus *protobufs.RemoteConfigStatus
-	s := Supervisor{
-		telemetrySettings: newNopTelemetrySettings(),
-		config: config.Supervisor{
-			Capabilities: config.Capabilities{
-				AcceptsRemoteConfig: true,
-			},
-		},
-		persistentState: persistentState,
-		opampClient: &mockOpAMPClient{
-			setRemoteConfigStatusFunc: func(rcs *protobufs.RemoteConfigStatus) error {
-				reportedStatus = rcs
-				return nil
-			},
-		},
-	}
-	s.lastWorkingRemoteConfig.Store(workingRemoteConfig)
+		lastWorkingConfigBytes, err := os.ReadFile(filepath.Join(s.config.Storage.Directory, lastWorkingRemoteConfigFile))
+		require.NoError(t, err)
+		lastWorkingConfig := &protobufs.AgentRemoteConfig{}
+		require.NoError(t, proto.Unmarshal(lastWorkingConfigBytes, lastWorkingConfig))
+		require.True(t, proto.Equal(remoteConfig, lastWorkingConfig))
+		require.True(t, proto.Equal(remoteConfig, s.lastWorkingRemoteConfig.Load()))
 
-	s.reportLastWorkingRemoteConfigStatus(protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, "")
+		require.Len(t, *reported, 1)
+		require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, (*reported)[0].Status)
+		require.Equal(t, remoteConfig.ConfigHash, (*reported)[0].LastRemoteConfigHash)
+		last := s.persistentState.GetLastRemoteConfigStatus()
+		require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, last.Status)
+		require.Equal(t, remoteConfig.ConfigHash, last.LastRemoteConfigHash)
+		require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, apply.status)
+	})
 
-	require.NotNil(t, reportedStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, reportedStatus.Status)
-	require.Equal(t, workingRemoteConfig.ConfigHash, reportedStatus.LastRemoteConfigHash)
-
-	lastRemoteConfigStatus := s.persistentState.GetLastRemoteConfigStatus()
-	require.NotNil(t, lastRemoteConfigStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, lastRemoteConfigStatus.Status)
-	require.Equal(t, failedHash, lastRemoteConfigStatus.LastRemoteConfigHash)
-	require.Equal(t, "boom", lastRemoteConfigStatus.ErrorMessage)
-
-	reportedStatus = nil
-	s.reportLastWorkingRemoteConfigStatus(protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, "Config apply timeout exceeded")
-
-	require.NotNil(t, reportedStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, reportedStatus.Status)
-	require.Equal(t, workingRemoteConfig.ConfigHash, reportedStatus.LastRemoteConfigHash)
-	require.Equal(t, "Config apply timeout exceeded", reportedStatus.ErrorMessage)
-
-	lastRemoteConfigStatus = s.persistentState.GetLastRemoteConfigStatus()
-	require.NotNil(t, lastRemoteConfigStatus)
-	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, lastRemoteConfigStatus.Status)
-	require.Equal(t, failedHash, lastRemoteConfigStatus.LastRemoteConfigHash)
-	require.Equal(t, "boom", lastRemoteConfigStatus.ErrorMessage)
+	// The restored last working config's outcomes aren't reported (the core drops statuses about
+	// any config but the latest), and the failed config's status stays persisted: the next start
+	// runs the last working config again.
+	t.Run("rollback", func(t *testing.T) {
+		s, reported := newSupervisor(t)
+		failed := &protobufs.RemoteConfigStatus{
+			LastRemoteConfigHash: []byte("failed-hash"),
+			Status:               protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED,
+			ErrorMessage:         "boom",
+		}
+		require.NoError(t, s.persistentState.SetLastRemoteConfigStatus(failed))
+		apply := &configApply{config: remoteConfig, rollback: true}
+		for _, status := range []protobufs.RemoteConfigStatuses{
+			protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
+			protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED,
+		} {
+			require.False(t, s.reportApply(apply, status, "Config apply timeout exceeded", true), "the last working config isn't restored over itself")
+		}
+		require.Empty(t, *reported)
+		require.True(t, proto.Equal(failed, s.persistentState.GetLastRemoteConfigStatus()))
+	})
 }
 
 func TestSupervisor_setAgentDescription(t *testing.T) {
@@ -2904,10 +2862,11 @@ func TestSupervisor_setupOwnTelemetry(t *testing.T) {
 
 		s.agentDescription = agentDesc
 
-		configChanged := s.setupOwnTelemetry(t.Context(), &protobufs.ConnectionSettingsOffers{OwnMetrics: &protobufs.TelemetryConnectionSettings{
+		configChanged, err := s.setupOwnTelemetry(t.Context(), &protobufs.ConnectionSettingsOffers{OwnMetrics: &protobufs.TelemetryConnectionSettings{
 			DestinationEndpoint: "",
 		}})
 
+		require.NoError(t, err)
 		assert.True(t, configChanged)
 		assert.Empty(t, s.agentConfigOwnTelemetrySection.Load().(string))
 	})
@@ -2944,7 +2903,7 @@ func TestSupervisor_setupOwnTelemetry(t *testing.T) {
 
 		require.NoError(t, err)
 
-		configChanged := s.setupOwnTelemetry(t.Context(), &protobufs.ConnectionSettingsOffers{OwnMetrics: &protobufs.TelemetryConnectionSettings{
+		configChanged, err := s.setupOwnTelemetry(t.Context(), &protobufs.ConnectionSettingsOffers{OwnMetrics: &protobufs.TelemetryConnectionSettings{
 			DestinationEndpoint: "http://127.0.0.1:4318",
 			Headers: &protobufs.Headers{
 				Headers: []*protobufs.Header{
@@ -4167,7 +4126,7 @@ func TestSupervisor_healthSurvivesOpAMPClientReplacement(t *testing.T) {
 
 		// The agent reported healthy, as handleAgentOpAMPMessage relays it: cached, then published.
 		healthy := &protobufs.ComponentHealth{Healthy: true}
-		s.lastHealthFromClient.Store(healthy)
+		s.lastHealthFromClient.Store(&agentHealth{ComponentHealth: healthy})
 		require.NoError(t, s.SetHealth(healthy))
 		require.EqualValues(t, 1, readHealthStatus(t, reader), "precondition: health published as healthy")
 
@@ -4184,7 +4143,7 @@ func TestSupervisor_healthSurvivesOpAMPClientReplacement(t *testing.T) {
 
 		// The agent reported healthy...
 		healthy := &protobufs.ComponentHealth{Healthy: true}
-		s.lastHealthFromClient.Store(healthy)
+		s.lastHealthFromClient.Store(&agentHealth{ComponentHealth: healthy})
 		require.NoError(t, s.SetHealth(healthy))
 		require.EqualValues(t, 1, readHealthStatus(t, reader))
 

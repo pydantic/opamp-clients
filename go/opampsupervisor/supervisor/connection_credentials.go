@@ -44,7 +44,22 @@ func connectionCredentials(bindings map[string]string, settings map[string]*prot
 	return env, nil
 }
 
-func (s *Supervisor) receiveConnectionCredentials(hash []byte, settings map[string]*protobufs.OtherConnectionSettings) {
+// connectionSettingsError is why connection settings weren't applied, in words that name none of
+// their values: it is the status's error message.
+type connectionSettingsError string
+
+func (e connectionSettingsError) Error() string { return string(e) }
+
+// errSettingsNotRunning: the collector didn't run healthy with its config with the settings.
+const errSettingsNotRunning connectionSettingsError = "The Collector didn't run with the offered settings."
+
+// receiveConnectionCredentials gives the collector the offered credentials, unless the rest of
+// the offer (ownErr) failed.
+func (s *Supervisor) receiveConnectionCredentials(hash []byte, settings map[string]*protobufs.OtherConnectionSettings, ownErr error) {
+	if ownErr != nil {
+		s.reportConnectionSettings(hash, ownErr)
+		return
+	}
 	env, err := connectionCredentials(s.config.Agent.ConnectionEnv, settings)
 	if err != nil {
 		s.reportConnectionSettings(hash, err)
@@ -68,6 +83,10 @@ func (s *Supervisor) reportConnectionSettings(hash []byte, err error) {
 	if err != nil {
 		status.Status = protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_FAILED
 		status.ErrorMessage = "The Supervisor could not apply the connection credentials."
+		var named connectionSettingsError
+		if errors.As(err, &named) {
+			status.ErrorMessage = named.Error()
+		}
 	}
 	_ = s.opampClient.SetConnectionSettingsStatus(status)
 }

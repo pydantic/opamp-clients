@@ -79,6 +79,8 @@ func (s *Supervisor) redactLocalServerTokenInConfig(cfg *protobufs.EffectiveConf
 type localConnection struct {
 	mu   sync.Mutex
 	conn serverTypes.Connection
+	// n counts the connections claimed; the one held is the n-th.
+	n uint64
 }
 
 // busy says whether a collector is connected.
@@ -96,6 +98,7 @@ func (l *localConnection) claim(conn serverTypes.Connection) bool {
 		return false
 	}
 	l.conn = conn
+	l.n++
 	return true
 }
 
@@ -113,6 +116,23 @@ func (l *localConnection) holds(conn serverTypes.Connection) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.conn != nil && l.conn == conn
+}
+
+// held is which connection conn is (its count, from 1), while it is the collector's.
+func (l *localConnection) held(conn serverTypes.Connection) (uint64, bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.conn == nil || l.conn != conn {
+		return 0, false
+	}
+	return l.n, true
+}
+
+// count is how many connections have been claimed: a later one has a higher count.
+func (l *localConnection) count() uint64 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.n
 }
 
 // current is the collector's connection, or nil.

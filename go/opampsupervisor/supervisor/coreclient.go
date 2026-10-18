@@ -211,10 +211,10 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			OwnLogsConnSettings:            offers.GetOwnLogs(),
 			OtherConnSettings:              offers.GetOtherConnections(),
 		})
-		// The Supervisor has written them into the collector's config (it restarts the collector
-		// with it), and reports no outcome of its own: the core needs the answer to hand over
-		// the next.
-		if len(offers.GetOtherConnections()) == 0 {
+		// Changed here: the Supervisor answers for the settings it takes, once the collector runs
+		// with them or they fail. The others (the opamp part, which the core applies) need an
+		// answer all the same: the core needs it to hand over the next.
+		if len(offers.GetOtherConnections()) == 0 && offers.GetOwnMetrics() == nil && offers.GetOwnTraces() == nil && offers.GetOwnLogs() == nil {
 			cl.SetConnectionSettingsStatus(&protobufs.ConnectionSettingsStatus{
 				LastConnectionSettingsHash: offers.GetHash(),
 				Status:                     protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED,
@@ -248,7 +248,13 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			cl.PackageRemoved(name)
 			break
 		}
-		go c.installPackage(agentInstall{name: name, remove: true, done: func(error) {
+		go c.installPackage(agentInstall{name: name, remove: true, done: func(err error) {
+			// Changed here: not if it is still there. The core keeps it among the installed
+			// packages, and asks again at the next start.
+			if err != nil {
+				c.logger.Error("The collector the OpAMP server stopped offering is still installed", zap.Error(err))
+				return
+			}
 			cl.PackageRemoved(name)
 		}})
 	case opamp.CustomMessageNotSent:

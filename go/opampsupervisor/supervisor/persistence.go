@@ -4,7 +4,8 @@
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: a state file
 // with no instance ID (empty, null or {}) is replaced by a new one instead of crashing the
 // Supervisor or giving it the all-zero UID, the file is replaced atomically, and the instance ID
-// can be read from another goroutine (instanceID).
+// can be read from another goroutine (instanceID), and the remote config status set and read
+// from several (the agent loop and the client's).
 
 package supervisor
 
@@ -32,6 +33,8 @@ type persistentState struct {
 	logger     *zap.Logger `yaml:"-"`
 	// idMu guards InstanceID for instanceID, which is read off the goroutine that sets it.
 	idMu sync.RWMutex
+	// mu guards LastRemoteConfigStatus and the file's writes.
+	mu sync.Mutex
 }
 
 // RemoteConfigStatus is a custom struct that is used to marshal/unmarshal the remote config status.
@@ -46,6 +49,8 @@ type RemoteConfigStatus struct {
 }
 
 func (p *persistentState) SetInstanceID(id uuid.UUID) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.idMu.Lock()
 	p.InstanceID = id
 	p.idMu.Unlock()
@@ -60,6 +65,8 @@ func (p *persistentState) instanceID() uuid.UUID {
 }
 
 func (p *persistentState) SetLastRemoteConfigStatus(status *protobufs.RemoteConfigStatus) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.LastRemoteConfigStatus = &RemoteConfigStatus{
 		Status:               status.Status,
 		LastRemoteConfigHash: hex.EncodeToString(status.LastRemoteConfigHash),
@@ -69,6 +76,8 @@ func (p *persistentState) SetLastRemoteConfigStatus(status *protobufs.RemoteConf
 }
 
 func (p *persistentState) GetLastRemoteConfigStatus() *protobufs.RemoteConfigStatus {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if p.LastRemoteConfigStatus == nil {
 		return nil
 	}
