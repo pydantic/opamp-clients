@@ -14,7 +14,7 @@ Configure `storage: file_storage` on file and event log receivers to keep their 
 restarts. Enable the extension under `service.extensions`. macOS unified logs do not have a saved
 cursor. Bound their startup history with `max_log_age`.
 
-These components are in source for the next package build. Version 0.1.0 does not include the
+The packages include these components from version 0.2.0. Version 0.1.0 did not include the
 Windows and macOS log receivers or the file storage extension.
 
 The release installers are unsigned. The macOS package is not notarized. GitHub build
@@ -33,9 +33,9 @@ OpAMP:
 - `pydantic-opamp-enroll`.
 
 Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
-install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.1.0_amd64.deb`.
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.2.0_amd64.deb`.
 On RHEL or Fedora, install the unsigned local rpm with
-`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.1.0-1.x86_64.rpm`.
+`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.2.0-1.x86_64.rpm`.
 The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
 
 Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
@@ -201,7 +201,7 @@ more than three tags are pushed at once. Select `installers-only` to add install
 existing release. This mode keeps its archives and `SHA256SUMS`. A rerun replaces the installer
 assets and their checksums.
 
-From the release after 0.1.0, each archive is also signed with Cosign (keyless, from the
+From version 0.2.0, each archive is also signed with Cosign (keyless, from the
 workflow's GitHub identity), as
 `<archive>.sigstore.json`: what a Supervisor that accepts packages checks before it installs a
 collector the server offers.
@@ -211,11 +211,11 @@ Check a download with either:
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS.installers
-gh attestation verify pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
-cosign verify-blob --bundle pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz.sigstore.json \
+gh attestation verify pydantic-opamp-supervisor_0.2.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+cosign verify-blob --bundle pydantic-opamp-supervisor_0.2.0_linux_amd64.tar.gz.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@' \
-  pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz
+  pydantic-opamp-supervisor_0.2.0_linux_amd64.tar.gz
 ```
 
 ## macOS
@@ -228,7 +228,7 @@ The `.pkg` installs everything under `/opt/pydantic-opamp`:
   root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`.
 
 ```sh
-sudo installer -pkg pydantic-opamp-supervisor-0.1.0-darwin-arm64.pkg -target /
+sudo installer -pkg pydantic-opamp-supervisor-0.2.0-darwin-arm64.pkg -target /
 echo "$ENROLLMENT_TOKEN" | sudo /opt/pydantic-opamp/bin/pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -254,7 +254,7 @@ runs as LocalSystem, logs to the Application event log, and stays stopped until 
 administrator:
 
 ```powershell
-msiexec /i pydantic-opamp-supervisor-0.1.0-windows-amd64.msi /qn
+msiexec /i pydantic-opamp-supervisor-0.2.0-windows-amd64.msi /qn
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
