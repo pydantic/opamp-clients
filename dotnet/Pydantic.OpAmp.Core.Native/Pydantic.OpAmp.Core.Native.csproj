@@ -13,13 +13,21 @@
     <Version>0.3.0</Version>
     <Description>The shared OpAMP client core for Pydantic.OpAmp.Client, compiled for each platform</Description>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- The core's own license, not MIT: NuGet's license expressions take only SPDX's listed
+         licenses (no LicenseRef-), so the package names its license file instead. -->
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <IsPackable>false</IsPackable>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <!-- NU5128: no lib/ for its framework, on purpose: it holds native libraries only. -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>
   </PropertyGroup>
+
+  <!-- The core's license and notices, beside this file (scripts/fetch_core.py fetch copies them
+       here, and check holds them to the lock), at the package's root. -->
+  <ItemGroup>
+    <None Include="LICENSE.txt;THIRD_PARTY_NOTICES.txt" Pack="true" PackagePath="" />
+  </ItemGroup>
 
   <ItemGroup Condition="'$(OpAmpNativeRuntimes)' != ''">
     <None Include="$(OpAmpNativeRuntimes)/**/*" Pack="true" PackagePath="runtimes" />

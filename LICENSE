@@ -19,3 +19,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The compiled OpAMP core in this repository and in the packages built from it is not under the MIT
+License above: the WebAssembly modules (opamp_core.wasm, opamp_sdk_settings.wasm,
+opamp_core_adversary.wasm), the native libraries (libopamp_native.so, libopamp_native.dylib,
+opamp_native.dll) and the opamp-tap tool are under the Pydantic OpAMP Core Binary License, in
+licenses/core/LICENSE.txt, with the notices of the third-party components they include in
+licenses/core/THIRD_PARTY_NOTICES.txt. A copy of both goes beside the core in each package that
+carries it.

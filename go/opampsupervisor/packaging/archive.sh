@@ -25,6 +25,9 @@ cp "dist/otelcol/otelcol$exe" "$work/otelcol$exe"
 (cd .. && go build -trimpath -ldflags "-s -w" -o "packaging/$work/opampsupervisor$exe" .)
 cp ../../../LICENSE "$work/LICENSE"
 cp ../LICENSE "$work/LICENSE.Apache-2.0"
+# The compiled core both binaries carry keeps its own license, with its third-party notices beside it.
+mkdir -p "$work/licenses/core"
+cp ../../../licenses/core/LICENSE.txt ../../../licenses/core/THIRD_PARTY_NOTICES.txt "$work/licenses/core/"
 cat >"$work/README.txt" <<EOF
 pydantic OpAMP Supervisor $VERSION ($GOOS/$GOARCH)
 
@@ -35,6 +38,10 @@ Run the Supervisor with a config that names this collector as agent.executable:
   ./opampsupervisor$exe --config supervisor.yaml
 Or run the collector on its own, with the opamp extension in its config:
   ./otelcol$exe --config otelcol.yaml
+
+Licenses: LICENSE (MIT) and LICENSE.Apache-2.0 (the files derived from OpenTelemetry's, and the
+collector's OpenTelemetry components); the compiled OpAMP core in both binaries is under
+licenses/core/LICENSE.txt, with its third-party notices in licenses/core/THIRD_PARTY_NOTICES.txt.
 
 Docs: https://github.com/pydantic/opamp-clients/blob/main/docs/collector.md
 EOF

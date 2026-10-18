@@ -15,6 +15,12 @@
       <name>MIT License</name>
       <url>https://opensource.org/license/mit</url>
     </license>
+    <!-- The compiled core it carries (its WebAssembly modules, compiled to JVM classes): not MIT, but its own license. -->
+    <license>
+      <name>Pydantic OpAMP Core Binary License</name>
+      <url>https://github.com/pydantic/opamp-clients/blob/main/licenses/core/LICENSE.txt</url>
+      <comments>LicenseRef-Pydantic-OpAMP-Core-Binary; in the jar at META-INF/opamp-core/, with THIRD_PARTY_NOTICES.txt</comments>
+    </license>
   </licenses>
   <developers>
     <developer>
@@ -101,6 +107,21 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- The core's license and notices, beside the modules (scripts/fetch_core.py fetch copies
+           them there, and check holds them to the lock), in the jar at META-INF/opamp-core/. -->
+      <resource>
+        <directory>src/main/wasm</directory>
+        <targetPath>META-INF/opamp-core</targetPath>
+        <includes>
+          <include>LICENSE.txt</include>
+          <include>THIRD_PARTY_NOTICES.txt</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <!-- The two WebAssembly modules, compiled to JVM classes at build time: the JVM runs and
            optimises them as it does any Java code, rather than Chicory interpreting each

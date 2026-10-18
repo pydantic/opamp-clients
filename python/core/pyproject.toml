@@ -7,7 +7,10 @@ name = "pydantic-opamp-core"
 version = "0.1.0"
 description = "The shared OpAMP client core for pydantic-opamp-client, compiled"
 readme = "README.md"
-license = "MIT"
+# The library is the core, under its own license (LICENSE.txt, with THIRD_PARTY_NOTICES.txt: both
+# copied here by scripts/fetch_core.py fetch, which check holds to the lock).
+license = "MIT AND LicenseRef-Pydantic-OpAMP-Core-Binary"
+license-files = ["LICENSE.txt", "THIRD_PARTY_NOTICES.txt"]
 requires-python = ">=3.11"
 
 [build-system]

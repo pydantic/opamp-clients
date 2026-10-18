@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Build pydantic-opamp-core: a wheel holding pydantic_opamp_core/<the native library> and nothing else.
+"""Build pydantic-opamp-core: a wheel holding pydantic_opamp_core/<the native library>, and the core's
+license and notices, and nothing else.
 
 A PEP 517 backend for building from the repository (uv sync builds one for this machine from the
 library scripts/fetch_core.py fetched); scripts/native_dist.py calls wheel() with each platform's library and tag. There is no source
@@ -33,18 +34,23 @@ def lib_name(platform: str = sys.platform) -> str:
 
 
 def wheel(lib: Path, tag: str, out: Path) -> Path:
-    """Write the wheel for one platform: lib as pydantic_opamp_core/<lib's name>, tagged py3-none-<tag>."""
+    """Write the wheel for one platform: lib as pydantic_opamp_core/<lib's name>, tagged py3-none-<tag>,
+    with the license files (the core's license and notices) in .dist-info/licenses/."""
     p = _project()
     dist = p["name"].replace("-", "_")
     info = f"{dist}-{p['version']}.dist-info"
+    if missing := [f for f in p["license-files"] if not (HERE / f).is_file()]:
+        sys.exit(f"{', '.join(missing)} missing from {HERE}: run scripts/fetch_core.py fetch")
     files = {
         f"pydantic_opamp_core/{lib.name}": lib.read_bytes(),
         f"{info}/METADATA": (f"Metadata-Version: 2.4\nName: {p['name']}\nVersion: {p['version']}\n"
                              f"Summary: {p['description']}\nLicense-Expression: {p['license']}\n"
+                             + "".join(f"License-File: {f}\n" for f in p["license-files"]) +
                              f"Requires-Python: {p['requires-python']}\n"
                              f"Description-Content-Type: text/markdown\n\n{(HERE / p['readme']).read_text()}").encode(),
         f"{info}/WHEEL": (f"Wheel-Version: 1.0\nGenerator: pydantic-opamp-core\nRoot-Is-Purelib: false\n"
                           f"Tag: py3-none-{tag}\n").encode(),
+        **{f"{info}/licenses/{f}": (HERE / f).read_bytes() for f in p["license-files"]},
     }
     record = [f"{n},sha256={base64.urlsafe_b64encode(hashlib.sha256(b).digest()).rstrip(b'=').decode()},{len(b)}"
               for n, b in files.items()]

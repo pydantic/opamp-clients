@@ -27,6 +27,8 @@ install -m 0755 macos/pydantic-opamp-enroll "$bin/"
 install -m 0644 macos/dev.pydantic.opamp-supervisor.plist "$stage/root/Library/LaunchDaemons/"
 install -m 0644 ../../../LICENSE "$doc/LICENSE"
 install -m 0644 ../LICENSE "$doc/LICENSE.Apache-2.0"
+mkdir -p "$doc/licenses/core"
+install -m 0644 ../../../licenses/core/LICENSE.txt ../../../licenses/core/THIRD_PARTY_NOTICES.txt "$doc/licenses/core/"
 
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
 	codesign --force --options runtime --timestamp --sign "$CODESIGN_IDENTITY" "$bin/opampsupervisor" "$bin/otelcol"
