@@ -2771,13 +2771,17 @@ type mockOpAMPClient struct {
 	updateEffectiveConfigFunc func(ctx context.Context) error
 	setRemoteConfigStatusFunc func(rcs *protobufs.RemoteConfigStatus) error
 	setHealthFunc             func(health *protobufs.ComponentHealth)
+	setConnectionStatusFunc   func(status *protobufs.ConnectionSettingsStatus)
 }
 
 func (mockOpAMPClient) SetCapabilities(*protobufs.AgentCapabilities) error {
 	return nil
 }
 
-func (mockOpAMPClient) SetConnectionSettingsStatus(*protobufs.ConnectionSettingsStatus) error {
+func (m mockOpAMPClient) SetConnectionSettingsStatus(status *protobufs.ConnectionSettingsStatus) error {
+	if m.setConnectionStatusFunc != nil {
+		m.setConnectionStatusFunc(status)
+	}
 	return nil
 }
 

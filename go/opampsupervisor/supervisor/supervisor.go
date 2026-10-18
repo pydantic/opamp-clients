@@ -2101,9 +2101,19 @@ func (s *Supervisor) runAgentProcess() {
 	configApplyTimeoutTimer := time.NewTimer(0)
 	configApplyTimeoutTimer.Stop()
 
+	// The credentials the running Collector was last restarted with for a connection update.
+	var startedEnv map[string]string
+
 	for {
 		select {
 		case update := <-s.connectionUpdates:
+			if startedEnv != nil && maps.Equal(startedEnv, update.env) && s.commander.IsRunning() {
+				// An offer that changed only other settings, or repeated these credentials: the
+				// running Collector already has them.
+				s.reportConnectionSettings(update.hash, nil)
+				continue
+			}
+			startedEnv = nil
 			applying := configApplyTimeoutTimer.Stop()
 			if !applying {
 				select {
@@ -2120,6 +2130,8 @@ func (s *Supervisor) runAgentProcess() {
 			}
 			if err != nil {
 				restartTimer.Reset(5 * time.Second)
+			} else {
+				startedEnv = update.env
 			}
 			s.reportConnectionSettings(update.hash, err)
 		case req := <-s.agentInstalls:

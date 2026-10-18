@@ -17,6 +17,7 @@ import (
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/commander"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/telemetry"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.uber.org/zap"
@@ -228,4 +229,58 @@ func TestConnectionUpdateRestartsConfigApplyWindow(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("the restarted unhealthy Collector lost its config deadline")
 	}
+}
+
+func TestConnectionUpdateWithUnchangedCredentialsKeepsCollectorRunning(t *testing.T) {
+	s := newComposeMergedConfigTestSupervisor(t, os.Args[0], false)
+	metrics, err := telemetry.NewMetrics(metricnoop.NewMeterProvider())
+	require.NoError(t, err)
+	s.metrics = metrics
+	s.doneChan = make(chan struct{})
+	s.connectionUpdates = make(chan connectionUpdate, 1)
+	applied := make(chan string, 4)
+	s.opampClient = &mockOpAMPClient{
+		setHealthFunc: func(*protobufs.ComponentHealth) {},
+		setConnectionStatusFunc: func(status *protobufs.ConnectionSettingsStatus) {
+			assert.Equal(t, protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED, status.Status)
+			applied <- string(status.LastConnectionSettingsHash)
+		},
+	}
+	_, err = s.composeMergedConfig(nil)
+	require.NoError(t, err)
+	core, observed := observer.New(zap.DebugLevel)
+	agent := s.config.Agent
+	agent.Env = map[string]string{supervisorRestartHelperEnv: "sleep"}
+	s.commander, err = commander.NewCommander(zap.New(core), filepath.Join(t.TempDir(), "collector.log"), agent)
+	require.NoError(t, err)
+	stopped := make(chan struct{})
+	go func() { defer close(stopped); s.runAgentProcess() }()
+	t.Cleanup(func() {
+		close(s.doneChan)
+		select {
+		case <-stopped:
+		case <-time.After(15 * time.Second):
+			t.Error("the Collector loop did not stop")
+		}
+	})
+	started := func() int { return observed.FilterMessage(commander.AgentStartedLogMsg).Len() }
+	update := func(hash, token string) string {
+		s.connectionUpdates <- connectionUpdate{hash: []byte(hash), env: map[string]string{"LOGFIRE_TOKEN": token}}
+		select {
+		case got := <-applied:
+			return got
+		case <-time.After(5 * time.Second):
+			t.Fatalf("no status for %s", hash)
+			return ""
+		}
+	}
+
+	require.Equal(t, "first", update("first", "ingest-1"))
+	require.Equal(t, 1, started())
+	// A later offer (another OpAMP credential, or a rename's repeated offer) carrying the same
+	// exporter credential is applied without restarting the Collector.
+	require.Equal(t, "same-credential", update("same-credential", "ingest-1"))
+	require.Equal(t, 1, started())
+	require.Equal(t, "rotated", update("rotated", "ingest-2"))
+	require.Equal(t, 2, started())
 }

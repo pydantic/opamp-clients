@@ -10,7 +10,10 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 )
 
-type connectionUpdate struct{ hash []byte }
+type connectionUpdate struct {
+	hash []byte
+	env  map[string]string
+}
 
 // connectionCredentials accepts only explicitly configured variable bindings. Errors contain no headers.
 func connectionCredentials(bindings map[string]string, settings map[string]*protobufs.OtherConnectionSettings) (map[string]string, error) {
@@ -49,7 +52,7 @@ func (s *Supervisor) receiveConnectionCredentials(hash []byte, settings map[stri
 	}
 	// The client's saved settings own persistence. Every subsequent child reads this immutable snapshot.
 	s.connectionEnv.Store(&env)
-	update := connectionUpdate{hash: append([]byte(nil), hash...)}
+	update := connectionUpdate{hash: append([]byte(nil), hash...), env: env}
 	select {
 	case <-s.connectionUpdates:
 	default:
