@@ -233,11 +233,14 @@ $tls
 capabilities:
   accepts_remote_config: true
   accepts_opamp_connection_settings: true
+  accepts_other_connection_settings: true
   reports_effective_config: true
   reports_health: true
   reports_available_components: true$accepts_packages
 
 agent:
+  connection_env:
+    logfire/otlp: LOGFIRE_TOKEN
   executable: /opt/pydantic-opamp/bin/otelcol
 $agent_env
 

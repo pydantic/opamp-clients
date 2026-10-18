@@ -165,11 +165,14 @@ $tls
 capabilities:
   accepts_remote_config: true
   accepts_opamp_connection_settings: true
+  accepts_other_connection_settings: true
   reports_effective_config: true
   reports_health: true
   reports_available_components: true$acceptsPackages
 
 agent:
+  connection_env:
+    logfire/otlp: LOGFIRE_TOKEN
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
 $agentEnv
 

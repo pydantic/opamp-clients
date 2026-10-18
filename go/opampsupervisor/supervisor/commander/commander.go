@@ -65,7 +65,26 @@ type Commander struct {
 	minAgeForShutdownSignal time.Duration
 	startedAt               time.Time
 	// executable overrides cfg.Executable once set: an update the Supervisor installed.
-	executable atomic.Pointer[string]
+	executable          atomic.Pointer[string]
+	environmentProvider func() map[string]string
+}
+
+// SetEnvironmentProvider supplies connection credentials for each child process. Set it before Start.
+func (c *Commander) SetEnvironmentProvider(provider func() map[string]string) {
+	c.environmentProvider = provider
+}
+
+func (c *Commander) environment() []string {
+	env := make(map[string]string, len(c.cfg.Env))
+	for name, value := range c.cfg.Env {
+		env[name] = value
+	}
+	if c.environmentProvider != nil {
+		for name, value := range c.environmentProvider() {
+			env[name] = value
+		}
+	}
+	return envVarMapToEnvMapSlice(env)
 }
 
 func NewCommander(logger *zap.Logger, logFilePath string, cfg config.Agent, args ...string) (*Commander, error) {
@@ -117,7 +136,7 @@ func (c *Commander) Start(ctx context.Context) error {
 	args := slices.Concat(c.args, c.cfg.Arguments)
 
 	c.cmd = exec.CommandContext(ctx, c.Executable(), args...) // #nosec G204
-	c.cmd.Env = envVarMapToEnvMapSlice(c.cfg.Env)
+	c.cmd.Env = c.environment()
 	c.cmd.SysProcAttr = sysProcAttrs()
 
 	// PassthroughLogging changes how collector start up happens
@@ -149,7 +168,7 @@ func (c *Commander) ValidateConfig(ctx context.Context, configPath string, addit
 	args := slices.Concat([]string{"validate", "--config", configPath}, additionalArgs, c.cfg.Arguments)
 
 	cmd := exec.CommandContext(ctx, c.Executable(), args...) // #nosec G204
-	cmd.Env = envVarMapToEnvMapSlice(c.cfg.Env)
+	cmd.Env = c.environment()
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -350,7 +369,7 @@ func (c *Commander) StartOneShot() ([]byte, []byte, error) {
 	ctx := context.Background()
 
 	cmd := exec.CommandContext(ctx, c.Executable(), c.args...) // #nosec G204
-	cmd.Env = envVarMapToEnvMapSlice(c.cfg.Env)
+	cmd.Env = c.environment()
 	cmd.SysProcAttr = sysProcAttrs()
 	// grab cmd pipes
 	stdoutPipe, err := cmd.StdoutPipe()

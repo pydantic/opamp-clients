@@ -92,6 +92,8 @@ func TestWinEnrollAcceptsPackages(t *testing.T) {
 	loaded, err := config.Load(path)
 	require.NoError(t, err)
 	assertPackages(t, loaded, true, "otelcol.exe")
+	assert.Empty(t, loaded.Agent.InstanceID, "the Supervisor makes its own instance UID")
+	assert.Equal(t, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, loaded.Agent.ConnectionEnv)
 	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
 }
 
