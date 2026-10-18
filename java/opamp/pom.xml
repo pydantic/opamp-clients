@@ -16,6 +16,19 @@
       <url>https://opensource.org/license/mit</url>
     </license>
   </licenses>
+  <developers>
+    <developer>
+      <id>pydantic</id>
+      <name>Pydantic</name>
+      <organization>Pydantic Services Inc.</organization>
+      <organizationUrl>https://pydantic.dev</organizationUrl>
+    </developer>
+  </developers>
+  <scm>
+    <connection>scm:git:https://github.com/pydantic/opamp-clients.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/pydantic/opamp-clients.git</developerConnection>
+    <url>https://github.com/pydantic/opamp-clients</url>
+  </scm>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
@@ -161,6 +174,45 @@
   </build>
 
   <profiles>
+    <!-- What Maven Central takes beside the jar (scripts/sdk_release.py pack: -Prelease): its
+         sources and its javadoc. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.3.1</version>
+            <executions>
+              <execution>
+                <id>sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.2</version>
+            <configuration>
+              <doclint>none</doclint>
+              <quiet>true</quiet>
+            </configuration>
+            <executions>
+              <execution>
+                <id>javadoc</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Jazzer, for scripts/java_fuzz.sh: its driver on the test classpath (the targets are test
          classes, ClientFuzz and CoreFuzz; FuzzInputsTest runs their seeds and findings without it). -->
     <profile>

@@ -4,13 +4,16 @@
 # Publishes an SDK release to the public registries: PyPI (the client, its native core per
 # platform, otel), npm (the client, otel), Maven Central (the client, the Java agent extension)
 # and NuGet (the client, its native core, the automatic instrumentation plugin). Runs on an
-# sdk/vX.Y.Z tag, or by hand; on a PR that changes it, as a dry run at 0.0.0.
+# sdk/vX.Y.Z tag on main, and only there: by hand it runs for such a tag alone (Use workflow from:
+# the tag), never for a branch. On a PR that changes it, as a dry run at 0.0.0.
 # Every package is built, stamped with the version (scripts/sdk_release.py) and checked to hold no
-# core source. Each registry uploads only once the variable SDK_REGISTRIES names it ("pypi npm
-# maven nuget"); until then its job says what it would have published. Go needs no upload (the
-# module proxy serves the go/vX.Y.Z tag). What each registry needs set up first:
-# docs/sdk-registries.md. The native core's libraries are the core's release that
-# opamp-core.lock.json pins.
+# core source, in a job that holds no credentials. Each registry uploads from a job in its own
+# environment (pypi, npm, maven, nuget), and only once the variable SDK_REGISTRIES names it ("pypi
+# npm maven nuget"); until then its job says what it would have published. A rerun is safe: what
+# a registry already has is skipped, and in each registry what pins another package goes up after
+# it (the core, then the client, then what is built on the client). Go needs no upload (the module
+# proxy serves the go/vX.Y.Z tag). What each registry needs set up first: docs/sdk-registries.md.
+# The native core's libraries are the core's release that opamp-core.lock.json pins.
 name: Registries
 
 on:
@@ -18,12 +21,10 @@ on:
     tags: ["sdk/v*"]
   pull_request:
     paths: [.github/workflows/registries.yml, scripts/sdk_release.py, scripts/native_dist.py, scripts/fetch_core.py,
-            opamp-core.lock.json]
+            java/opamp/pom.xml, java/opamp-javaagent/pom.xml, opamp-core.lock.json]
+  # By hand, for a tag already pushed (Use workflow from: sdk/vX.Y.Z): the fix when a push of more
+  # than three tags fired no event. The build refuses any other ref.
   workflow_dispatch:
-    inputs:
-      version:
-        description: The version to publish, e.g. 0.2.0
-        required: true
 
 permissions:
   contents: read
@@ -41,15 +42,27 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: The version, from the tag
+        with:
+          fetch-depth: 0 # main's history, to check the tag is on it
+      - name: The version, from the tag (an sdk/vX.Y.Z tag on main, nothing else)
         id: version
         env:
-          VERSION: ${{ github.event_name == 'pull_request' && '0.0.0' || inputs.version || github.ref_name }}
+          EVENT: ${{ github.event_name }}
         run: |
-          version=${VERSION#sdk/v}
+          if [ "$EVENT" = pull_request ]; then
+            echo "version=0.0.0" >>"$GITHUB_OUTPUT"; exit 0
+          fi
+          if [[ $GITHUB_REF != refs/tags/sdk/v* ]]; then
+            echo "::error::$GITHUB_REF isn't an sdk/vX.Y.Z tag: a release runs from its tag alone"; exit 1
+          fi
+          version=${GITHUB_REF#refs/tags/sdk/v}
           # Releases alone: registries keep every version for good.
           if [[ ! $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::$version isn't a version like 0.2.0"; exit 1
+          fi
+          # What was reviewed: the tag's commit is on main.
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::sdk/v$version ($GITHUB_SHA) isn't on main"; exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -82,7 +95,7 @@ jobs:
           python3 scripts/native_dist.py build
           python3 scripts/native_dist.py pack
           python3 scripts/native_dist.py check
-      - name: The rest (otel wheel, npm tarballs, Maven jars, the .NET plugin)
+      - name: The rest (otel wheel, npm tarballs, Maven jars with sources and javadoc, the .NET plugin)
         run: python3 scripts/sdk_release.py pack
       - name: All there, valid for their registries, and none carries the cores' sources
         run: |
@@ -106,19 +119,44 @@ jobs:
     environment: ${{ github.event_name != 'pull_request' && 'pypi' || '' }}
     permissions:
       id-token: write # trusted publishing: PyPI takes this workflow's OIDC token, no secret
+    env:
+      PUBLISH: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/sdk/v') && contains(vars.SDK_REGISTRIES, 'pypi') }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: sdk
           path: sdk
-      - name: The wheels
-        run: mkdir upload && find sdk -name '*.whl' -exec cp {} upload/ \; && ls upload
+      # The client pins the core exactly, and otel the client: each goes up after what it pins, so
+      # no moment has a client on PyPI that pip can't install.
+      - name: The wheels, by what each pins
+        run: |
+          mkdir -p upload/core upload/client upload/otel
+          find sdk -name 'pydantic_opamp_core-*.whl' -exec cp {} upload/core/ \;
+          find sdk -name 'pydantic_opamp_client-*.whl' -exec cp {} upload/client/ \;
+          find sdk -name 'pydantic_opamp_otel-*.whl' -exec cp {} upload/otel/ \;
+          ls -R upload
+          for d in core client otel; do
+            [ -n "$(ls upload/$d)" ] || { echo "::error::no $d wheel"; exit 1; }
+          done
+      # skip-existing: a rerun after a partial upload skips the files PyPI already has.
       - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
-        if: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'pypi') }}
+        if: env.PUBLISH == 'true'
         with:
-          packages-dir: upload
-      - if: ${{ github.event_name == 'pull_request' || !contains(vars.SDK_REGISTRIES, 'pypi') }}
-        run: echo "::notice::PyPI not enabled (SDK_REGISTRIES), nothing uploaded"
+          packages-dir: upload/core
+          skip-existing: true
+      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+        if: env.PUBLISH == 'true'
+        with:
+          packages-dir: upload/client
+          skip-existing: true
+      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+        if: env.PUBLISH == 'true'
+        with:
+          packages-dir: upload/otel
+          skip-existing: true
+      - if: env.PUBLISH != 'true'
+        run: |
+          echo "::notice::PyPI not enabled (SDK_REGISTRIES), or not a release tag: nothing uploaded"
 
   npm:
     name: npm
@@ -139,35 +177,105 @@ jobs:
           path: sdk
       - name: The tarballs, the client before what depends on it
         env:
-          PUBLISH: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'npm') }}
+          PUBLISH: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/sdk/v') && contains(vars.SDK_REGISTRIES, 'npm') }}
         run: |
+          # Trusted publishing needs npm 11.5.1 or later.
+          if ! printf '11.5.1\n%s\n' "$(npm --version)" | sort -V -C; then
+            echo "::error::npm $(npm --version) can't publish with OIDC: 11.5.1 or later needed"; exit 1
+          fi
           for tgz in sdk/sdk/npm/*-opamp-client-*.tgz sdk/sdk/npm/*-opamp-otel-*.tgz; do
-            if [ "$PUBLISH" = true ]; then
-              npm publish --provenance --access public "$tgz"
-            else
+            [ -f "$tgz" ] || { echo "::error::no $tgz"; exit 1; }
+            spec=$(tar -xzOf "$tgz" package/package.json | python3 -c 'import json, sys; p = json.load(sys.stdin); print(p["name"] + "@" + p["version"])')
+            if [ "$PUBLISH" != true ]; then
               npm publish --dry-run --access public "$tgz"
+            # A rerun: what npm already has is skipped (npm refuses a version twice).
+            elif [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
+              echo "::notice::$spec is on npm already, skipped"
+            else
+              npm publish --provenance --access public "$tgz"
             fi
           done
-          [ "$PUBLISH" = true ] || echo "::notice::npm not enabled (SDK_REGISTRIES): dry run only"
+          [ "$PUBLISH" = true ] || echo "::notice::npm not enabled (SDK_REGISTRIES), or not a release tag: dry run only"
 
+  # One bundle for the Central Portal: both artifacts, with their sources and javadoc jars, every
+  # file signed and checksummed. Central publishes a bundle whole or not at all, so the client and
+  # the extension that shades it never go up apart.
   maven:
     name: Maven Central
     needs: build
     runs-on: ubuntu-24.04
+    # A pull request's dry run uploads nothing and needs no approval or secret.
+    environment: ${{ github.event_name != 'pull_request' && 'maven' || '' }}
+    env:
+      PUBLISH: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/sdk/v') && contains(vars.SDK_REGISTRIES, 'maven') }}
+      VERSION: ${{ needs.build.outputs.version }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: sdk
           path: sdk
-      - name: The jars and their poms
+      - name: The bundle (signed when publishing)
+        env:
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: |
           ls sdk/sdk/maven
-          # Central also wants sources and javadoc jars, every file signed, and a verified
-          # namespace: docs/sdk-registries.md. Until those exist there is nothing to upload to.
-          if ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'maven') }}; then
-            echo "::error::Maven Central publishing isn't wired up yet (docs/sdk-registries.md)"; exit 1
+          if [ "$PUBLISH" != true ]; then
+            python3 scripts/sdk_release.py bundle --unsigned sdk/sdk/maven central-bundle.zip
+            echo "::notice::Maven Central not enabled (SDK_REGISTRIES), or not a release tag: nothing uploaded"
+            exit 0
           fi
-          echo "::notice::Maven Central not enabled (SDK_REGISTRIES): nothing uploaded"
+          [ -n "$MAVEN_GPG_PRIVATE_KEY" ] || { echo "::error::the maven environment has no MAVEN_GPG_PRIVATE_KEY"; exit 1; }
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          printf '%s\n' "$MAVEN_GPG_PRIVATE_KEY" | gpg --batch --quiet --import
+          python3 scripts/sdk_release.py bundle sdk/sdk/maven central-bundle.zip
+      - name: Upload to the Central Portal, unless Central has this version already
+        if: env.PUBLISH == 'true'
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          [ -n "$MAVEN_CENTRAL_USERNAME" ] && [ -n "$MAVEN_CENTRAL_PASSWORD" ] ||
+            { echo "::error::the maven environment has no MAVEN_CENTRAL_USERNAME and MAVEN_CENTRAL_PASSWORD"; exit 1; }
+          auth="Authorization: Bearer $(printf '%s:%s' "$MAVEN_CENTRAL_USERNAME" "$MAVEN_CENTRAL_PASSWORD" | base64 -w0)"
+          api=https://central.sonatype.com/api/v1/publisher
+          # A rerun: the bundle is published whole, so either every artifact is there or none is.
+          have=0 want=0
+          for pom in sdk/sdk/maven/*.pom; do
+            artifact=$(basename "$pom" "-$VERSION.pom")
+            want=$((want + 1))
+            code=$(curl -sS --retry 3 -o published.json -w '%{http_code}' -H "$auth" \
+              "$api/published?namespace=dev.pydantic&name=$artifact&version=$VERSION")
+            case $code in
+              200) published=$(python3 -c 'import json; print(json.load(open("published.json"))["published"])') ;;
+              404) published=False ;; # a component Central has never seen
+              *) echo "::error::Central answered $code for $artifact: $(cat published.json)"; exit 1 ;;
+            esac
+            if [ "$published" = True ]; then have=$((have + 1)); fi
+          done
+          if [ "$have" = "$want" ]; then
+            echo "::notice::dev.pydantic $VERSION is on Maven Central already, skipped"; exit 0
+          elif [ "$have" != 0 ]; then
+            echo "::error::$have of $want artifacts at $VERSION are on Central: see docs/sdk-registries.md"; exit 1
+          fi
+          id=$(curl -sSf -X POST -H "$auth" -F "bundle=@central-bundle.zip" \
+            "$api/upload?publishingType=AUTOMATIC&name=opamp-clients-$VERSION")
+          echo "deployment $id"
+          # Validation takes minutes; once PUBLISHING, Central has taken it (repo1 follows in ~30 min).
+          for _ in $(seq 120); do
+            status=$(curl -sSf -X POST -H "$auth" "$api/status?id=$id")
+            state=$(printf '%s' "$status" | python3 -c 'import json, sys; print(json.load(sys.stdin)["deploymentState"])')
+            case $state in
+              PUBLISHING|PUBLISHED) echo "::notice::deployment $id: $state"; exit 0 ;;
+              FAILED) echo "::error::deployment $id failed: $status"; exit 1 ;;
+            esac
+            sleep 15
+          done
+          echo "::error::deployment $id still $state after 30 minutes: see the Central Portal"; exit 1
 
   nuget:
     name: NuGet
@@ -175,6 +283,10 @@ jobs:
     runs-on: ubuntu-24.04
     # A pull request's dry run uploads nothing and needs no approval or secret.
     environment: ${{ github.event_name != 'pull_request' && 'nuget' || '' }}
+    permissions:
+      id-token: write # trusted publishing: nuget.org trades this workflow's OIDC token for a key that lasts an hour
+    env:
+      PUBLISH: ${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/sdk/v') && contains(vars.SDK_REGISTRIES, 'nuget') }}
     steps:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
@@ -183,17 +295,29 @@ jobs:
         with:
           name: sdk
           path: sdk
-      - name: The packages, the core before what depends on it
-        env:
-          PUBLISH: ${{ github.event_name != 'pull_request' && contains(vars.SDK_REGISTRIES, 'nuget') }}
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      - run: ls sdk/native/nuget sdk/sdk/nuget
+      - if: env.PUBLISH != 'true'
         run: |
-          ls sdk/native/nuget sdk/sdk/nuget
-          if [ "$PUBLISH" != true ]; then
-            echo "::notice::NuGet not enabled (SDK_REGISTRIES): nothing uploaded"; exit 0
-          fi
-          [ -n "$NUGET_API_KEY" ] || { echo "::error::the nuget environment has no NUGET_API_KEY"; exit 1; }
+          echo "::notice::NuGet not enabled (SDK_REGISTRIES), or not a release tag: nothing uploaded"
+      - name: The nuget.org account the trusted publishing policy belongs to
+        if: env.PUBLISH == 'true'
+        env:
+          NUGET_USER: ${{ vars.NUGET_USER }}
+        run: '[ -n "$NUGET_USER" ] || { echo "::error::the nuget environment has no variable NUGET_USER"; exit 1; }'
+      - name: A short-lived API key (trusted publishing)
+        id: login
+        if: env.PUBLISH == 'true'
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
+      # --skip-duplicate: a rerun after a partial push skips what nuget.org already has.
+      - name: The packages, the core before what depends on it
+        if: env.PUBLISH == 'true'
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: |
           for pkg in sdk/native/nuget/*.Core.Native.*.nupkg sdk/native/nuget/*.Client.*.nupkg \
             sdk/native/nuget/*.Extensions.Hosting.*.nupkg sdk/sdk/nuget/*.nupkg; do
-            dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+            [ -f "$pkg" ] || { echo "::error::no $pkg"; exit 1; }
+            dotnet nuget push "$pkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
           done
