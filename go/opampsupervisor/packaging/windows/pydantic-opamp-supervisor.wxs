@@ -16,7 +16,11 @@
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="pydantic-opamp" />
+      <Directory Id="INSTALLFOLDER" Name="pydantic-opamp">
+        <Directory Id="LICENSES" Name="licenses">
+          <Directory Id="CORELICENSES" Name="core" />
+        </Directory>
+      </Directory>
     </StandardDirectory>
 
     <ComponentGroup Id="Supervisor" Directory="INSTALLFOLDER">
@@ -44,6 +48,13 @@
       </Component>
       <Component>
         <File Source="..\..\LICENSE" Name="LICENSE.Apache-2.0.txt" KeyPath="yes" />
+      </Component>
+      <!-- The compiled core both executables carry: its own license, and its notices beside it. -->
+      <Component Directory="CORELICENSES">
+        <File Source="..\..\..\..\licenses\core\LICENSE.txt" KeyPath="yes" />
+      </Component>
+      <Component Directory="CORELICENSES">
+        <File Source="..\..\..\..\licenses\core\THIRD_PARTY_NOTICES.txt" KeyPath="yes" />
       </Component>
     </ComponentGroup>
 

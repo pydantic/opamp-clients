@@ -16,6 +16,12 @@
       <name>MIT License</name>
       <url>https://opensource.org/license/mit</url>
     </license>
+    <!-- The compiled core it carries (in the client's classes, shaded in): not MIT, but its own license. -->
+    <license>
+      <name>Pydantic OpAMP Core Binary License</name>
+      <url>https://github.com/pydantic/opamp-clients/blob/main/licenses/core/LICENSE.txt</url>
+      <comments>LicenseRef-Pydantic-OpAMP-Core-Binary; in the jar at META-INF/opamp-core/, with THIRD_PARTY_NOTICES.txt</comments>
+    </license>
   </licenses>
   <developers>
     <developer>

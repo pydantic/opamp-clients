@@ -2,7 +2,7 @@
   "name": "@pydantic/opamp-client",
   "version": "0.1.0",
   "description": "An OpAMP client for Node.js, on the shared OpAMP core (Rust, as WebAssembly)",
-  "license": "MIT",
+  "license": "(MIT AND LicenseRef-Pydantic-OpAMP-Core-Binary)",
   "private": true,
   "repository": {
     "type": "git",
@@ -26,7 +26,9 @@
   "files": [
     "dist/src",
     "core/opamp_core.wasm",
-    "core/opamp_sdk_settings.wasm"
+    "core/opamp_sdk_settings.wasm",
+    "core/LICENSE.txt",
+    "core/THIRD_PARTY_NOTICES.txt"
   ],
   "scripts": {
     "build": "tsc -p .",

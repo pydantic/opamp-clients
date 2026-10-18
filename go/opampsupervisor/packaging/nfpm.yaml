@@ -16,8 +16,8 @@ description: |
 vendor: Pydantic
 homepage: https://github.com/pydantic/opamp-clients
 # Our files are MIT; the files derived from OpenTelemetry's Supervisor and opamp extension keep
-# Apache-2.0.
-license: MIT AND Apache-2.0
+# Apache-2.0; the compiled core both binaries carry keeps its own license (licenses/core/).
+license: MIT AND Apache-2.0 AND LicenseRef-Pydantic-OpAMP-Core-Binary
 depends:
   # systemd-creds and LoadCredentialEncrypted=.
   - systemd (>= 250)
@@ -54,6 +54,12 @@ contents:
     file_info: {mode: 0644}
   - src: ../LICENSE
     dst: /usr/share/doc/pydantic-opamp-supervisor/LICENSE.Apache-2.0
+    file_info: {mode: 0644}
+  - src: ../../../licenses/core/LICENSE.txt
+    dst: /usr/share/doc/pydantic-opamp-supervisor/licenses/core/LICENSE.txt
+    file_info: {mode: 0644}
+  - src: ../../../licenses/core/THIRD_PARTY_NOTICES.txt
+    dst: /usr/share/doc/pydantic-opamp-supervisor/licenses/core/THIRD_PARTY_NOTICES.txt
     file_info: {mode: 0644}
   - dst: /etc/pydantic-opamp
     type: dir

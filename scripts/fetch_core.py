@@ -69,7 +69,17 @@ MODULES = {
 }
 # The tree's files land at their own paths, which must be under these: the .proto files (the -I
 # paths the type generators use), the contract the clients are held to, and the shells' tables.
-TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "testdata/sdk-settings/", "spec/shell-contract.md")
+TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "testdata/sdk-settings/", "spec/shell-contract.md",
+               "licenses/core/")
+# The core's own license and its third-party notices, from the tree: at licenses/core/ (which the
+# root LICENSE names), and a copy of the pair beside each module copy a package or Go module ships,
+# and in each native package's directory, so they travel inside it (go:embed's directories, npm's
+# files, the jar's resources, the core wheel's and NuGet package's license files). The modules
+# beside Python's and .NET's client sources aren't shipped (the tests' oracle), nor is the
+# adversary: licenses/core/ covers them in the repository.
+LICENSES = ("licenses/core/LICENSE.txt", "licenses/core/THIRD_PARTY_NOTICES.txt")
+LICENSE_COPIES = ("go/opamp/internal/core", "go/opamp/sdksettings", "node/opamp/core", "java/opamp/src/main/wasm",
+                  "python/core", "dotnet/Pydantic.OpAmp.Core.Native")
 # The machine's own library goes where the .NET project and Python's build backend look for it
 # (target/release); every platform's, with --all-platforms, where packaging does.
 HOST_LIB_DIR = "target/release"
@@ -212,13 +222,26 @@ def lock(version: str, repo: str, directory: Path | None) -> dict:
     for name in (*MODULES, TREE_TAR):
         if name not in files:
             raise Refused(f"{name}: not in the release")
+    got = tree(source.get(TREE_TAR))
+    unlicensed(got, version)
     return {
         "source": repo,
         "version": version,
         "commit": manifest["commit"],
         "files": files,
-        "tree": {n: sha256(d) for n, d in sorted(tree(source.get(TREE_TAR)).items())},
+        "tree": {n: sha256(d) for n, d in sorted(got.items())},
     }
+
+
+def license_copies() -> dict[str, list[str]]:
+    """Each of the tree's license files, and the paths its copies go to."""
+    return {name: [f"{d}/{name.rsplit('/', 1)[1]}" for d in LICENSE_COPIES] for name in LICENSES}
+
+
+def unlicensed(names: Mapping[str, object], version: str) -> None:
+    """Refuse a tree without the core's license and notices: the packages can't ship it without them."""
+    if missing := [n for n in LICENSES if n not in names]:
+        raise Refused(f"{TREE_TAR}: no {', '.join(missing)} in {version}")
 
 
 def verified(source: Source, name: str, want: str) -> bytes:
@@ -254,8 +277,12 @@ def fetch(pinned: dict, directory: Path | None, all_platforms: bool, rid: str) -
     got = tree(verified(source, TREE_TAR, files[TREE_TAR]["sha256"]))
     if {n: sha256(d) for n, d in got.items()} != pinned["tree"]:
         raise Refused(f"{TREE_TAR}: its files aren't the ones {LOCK} pins")
+    unlicensed(got, pinned["version"])
     for name, data in got.items():
         write(name, data)
+    for name, dests in license_copies().items():
+        for d in dests:
+            write(d, got[name])
     for rel in stale(pinned):
         (ROOT / rel).unlink()
         print(f"- {rel}")
@@ -276,8 +303,8 @@ def fetch(pinned: dict, directory: Path | None, all_platforms: bool, rid: str) -
 
 
 def check(pinned: dict, rid: str) -> list[str]:
-    """What in the tree isn't what the lock pins: the modules and the tree's files (and no other
-    file under its directories), and any native
+    """What in the tree isn't what the lock pins: the modules, the tree's files (and no other file
+    under its directories) and the license copies, and any native
     library or tool fetch put in place (none is checked in, so one that is absent is not a problem)."""
     problems = []
     for name, f in pinned["files"].items():
@@ -304,6 +331,11 @@ def check(pinned: dict, rid: str) -> list[str]:
         path = ROOT / name
         if not path.is_file() or sha256(path.read_bytes()) != want:
             problems.append(f"{name}: not the one {pinned['version']} has")
+    for name, dests in license_copies().items():
+        for d in dests:
+            path = ROOT / d
+            if not path.is_file() or sha256(path.read_bytes()) != pinned["tree"].get(name):
+                problems.append(f"{d}: not {name} of {pinned['version']}")
     problems += [f"{rel}: not in {pinned['version']} (fetch removes it)" for rel in stale(pinned)]
     return problems
 

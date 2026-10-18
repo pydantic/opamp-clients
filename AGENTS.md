@@ -23,3 +23,10 @@ The clients load the core compiled, from a `core/vX.Y.Z` release of this reposit
 `check` verifies it. Moving to a new core is one PR holding the lock, the module copies checked in
 beside each client and the types regenerated from it: `fetch_core.py lock <version>`, `fetch`,
 then `scripts/gen_core.py` and `scripts/gen_sdk_settings.py`.
+
+The compiled core isn't MIT: it has its own license, `licenses/core/LICENSE.txt`, with
+`THIRD_PARTY_NOTICES.txt` beside it. Both come in the release's tree, and `fetch` puts a copy beside
+the core in each package that ships it (`fetch_core.py`'s `LICENSE_COPIES`); `check` holds every
+copy to the lock. A package that carries the core ships both files, and its metadata names the
+core's license as well as MIT (`sdk_release.py check` and `native_dist.py check` refuse one that
+doesn't).

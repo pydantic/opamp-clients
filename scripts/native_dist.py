@@ -110,12 +110,14 @@ def file_says(path: Path) -> str:
 
 
 BINARY = (".so", ".dylib", ".dll", ".pyd", ".wasm")
+# What goes with the core wherever it is shipped: its license, and the notices beside it.
+CORE_LICENSE = ("LICENSE.txt", "THIRD_PARTY_NOTICES.txt")
 
 
 def check() -> None:
     """Each library, in the runtimes and in its core wheel, is the format and machine its target
-    says; every target has both; the client's wheel is Python alone; and nothing carries the
-    cores' sources."""
+    says; every target has both, with the core's license and notices; the client's wheel is
+    Python alone; and nothing carries the cores' sources."""
     import zipfile
 
     problems = []
@@ -137,6 +139,9 @@ def check() -> None:
             if libs != [f"pydantic_opamp_core/{t.lib}"]:
                 problems.append(f"{found[0].name}: holds {libs}, not pydantic_opamp_core/{t.lib} alone")
                 continue
+            licenses = {n.split("/", 2)[2] for n in z.namelist() if n.split("/")[0].endswith(".dist-info")
+                        and n.split("/")[1] == "licenses"}
+            problems += [f"{found[0].name}: lacks .dist-info/licenses/{f}" for f in CORE_LICENSE if f not in licenses]
             if not all(m in (says := file_says(Path(z.extract(libs[0], d)))) for m in t.magic):
                 problems.append(f"{found[0].name}: {libs[0]} is {says!r}, not {t.magic}")
     clients = [w for w in wheels if w.name.startswith("pydantic_opamp_client-")]
@@ -145,17 +150,21 @@ def check() -> None:
     for w in clients:
         with zipfile.ZipFile(w) as z:
             problems += [f"{w.name}: ships {n}" for n in z.namelist() if n.endswith(BINARY)]
-    # .NET the same way: the core's package holds every target's library and nothing else; the
-    # client's holds no binary but its assembly, and asks for that core package.
+    # .NET the same way: the core's package holds every target's library, with the core's license
+    # (its license file) and notices, and nothing else; the client's holds no binary but its
+    # assembly, and asks for that core package.
     for name in ("Pydantic.OpAmp.Core.Native", "Pydantic.OpAmp.Client", "Pydantic.OpAmp.Extensions.Hosting"):
         if (n := len(list((DIST / "nuget").glob(f"{name}.*.nupkg")))) != 1:
             problems.append(f"{n} {name} packages, not 1")
     for p in (DIST / "nuget").glob("Pydantic.OpAmp.Core.Native.*.nupkg"):
         with zipfile.ZipFile(p) as z:
             got = sorted(n for n in z.namelist() if not nuget_meta(n))
-        want = sorted(f"runtimes/{t.rid}/native/{t.lib}" for t in TARGETS)
+            spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
+        want = sorted([*CORE_LICENSE, *(f"runtimes/{t.rid}/native/{t.lib}" for t in TARGETS)])
         if got != want:
             problems.append(f"{p.name}: holds {got}, not {want}")
+        if f'<license type="file">{CORE_LICENSE[0]}</license>' not in spec:
+            problems.append(f"{p.name}: its license isn't {CORE_LICENSE[0]}")
     for p in (DIST / "nuget").glob("Pydantic.OpAmp.Client.*.nupkg"):
         with zipfile.ZipFile(p) as z:
             problems += [f"{p.name}: ships {n}" for n in z.namelist() if n.startswith("runtimes/") or (n.endswith(BINARY) and not n.startswith("lib/"))]

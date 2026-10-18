@@ -65,8 +65,10 @@ class CompiledOnly(unittest.TestCase):
             for m in extra:
                 z.writestr(m, "")
 
-    def packages(self, *client_extra: str, core: tuple[str, ...] = ("runtimes/linux-x64/native/libopamp_native.so",),
-                 depends: str | None = None, assembly: str = "lib/net8.0/Pydantic.OpAmp.Client.dll",
+    def packages(self, *client_extra: str, core: tuple[str, ...] = ("runtimes/linux-x64/native/libopamp_native.so",
+                                                                     *nd.CORE_LICENSE),
+                 core_license: str = '<license type="file">LICENSE.txt</license>', depends: str | None = None,
+                 assembly: str = "lib/net8.0/Pydantic.OpAmp.Client.dll",
                  hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.xml"),
                  hosting_depends: str = "Pydantic.OpAmp.Client") -> None:
         nuspec = f'<dependency id="Pydantic.OpAmp.Core.Native" version="{depends or f"[{nd.core_version()}]"}" />'
@@ -78,8 +80,10 @@ class CompiledOnly(unittest.TestCase):
             z.writestr("Pydantic.OpAmp.Extensions.Hosting.nuspec", f'<dependency id="{hosting_depends}" version="0.1.0" />')
             for m in hosting:
                 z.writestr(m, "")
-        self.archive("nuget/Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "Pydantic.OpAmp.Core.Native.nuspec",
-                     "[Content_Types].xml", "_rels/.rels", "package/services/metadata/core-properties/x.psmdcp", *core)
+        with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "w") as z:
+            z.writestr("Pydantic.OpAmp.Core.Native.nuspec", core_license)
+            for m in ("[Content_Types].xml", "_rels/.rels", "package/services/metadata/core-properties/x.psmdcp", *core):
+                z.writestr(m, "")
 
     def test_binaries_alone_pass(self) -> None:
         self.core_wheel()
@@ -113,8 +117,29 @@ class CompiledOnly(unittest.TestCase):
         self.core_wheel()
         lib = "runtimes/linux-x64/native/libopamp_native.so"
         for core in ((), (lib, "lib/net8.0/x.dll"), (lib, "content/x.txt"), (lib, "x.txt"), (lib, "contentFiles/any/any/x.rs")):
+            self.packages(core=(*core, *nd.CORE_LICENSE))
+            self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: holds", self.problems())
+
+    # The core goes nowhere without its license and the notices beside it.
+    def test_a_core_package_without_the_cores_license_fails(self) -> None:
+        self.core_wheel()
+        lib = "runtimes/linux-x64/native/libopamp_native.so"
+        for core in ((lib,), (lib, "LICENSE.txt"), (lib, "THIRD_PARTY_NOTICES.txt")):
             self.packages(core=core)
             self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: holds", self.problems())
+        self.packages(core_license="<license type=\"expression\">MIT</license>")
+        self.assertIn("Pydantic.OpAmp.Core.Native.0.1.0.nupkg: its license isn't LICENSE.txt", self.problems())
+
+    def test_a_core_wheel_without_the_cores_license_fails(self) -> None:
+        self.packages()
+        lib = self.dist / "runtimes" / "linux-x64" / "native" / "libopamp_native.so"
+        lib.parent.mkdir(parents=True)
+        lib.write_bytes(b"\x7fELF")
+        nd.TARGETS = [t for t in nd.TARGETS_ALL if t.rid == "linux-x64"]
+        name = f"pydantic_opamp_core-0.1.0-py3-none-{nd.TARGETS[0].plat}.whl"
+        self.archive(f"wheels/{name}", "pydantic_opamp_core/libopamp_native.so",
+                     "pydantic_opamp_core-0.1.0.dist-info/licenses/LICENSE.txt")
+        self.assertIn(f"{name}: lacks .dist-info/licenses/THIRD_PARTY_NOTICES.txt", self.problems())
 
     def test_the_hosting_package_is_its_assembly_on_the_client_package(self) -> None:
         self.core_wheel()
@@ -151,8 +176,8 @@ class CompiledOnly(unittest.TestCase):
         self.assertIn("ships src/lib.rs", self.problems())
 
     def test_a_crate_manifest_in_the_package_fails(self) -> None:
-        self.archive("nuget/Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "runtimes/linux-x64/native/libopamp_native.so",
-                     "core/Cargo.toml")
+        self.archive("nuget/Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "Pydantic.OpAmp.Core.Native.nuspec",
+                     "runtimes/linux-x64/native/libopamp_native.so", "core/Cargo.toml")
         self.assertIn("ships core/Cargo.toml", self.problems())
 
 
@@ -173,7 +198,23 @@ class CoreWheel(unittest.TestCase):
                 want = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
                 self.assertEqual((digest, int(size)), (f"sha256={want}", len(data)), name)
         self.assertEqual(names, ["pydantic_opamp_core/libopamp_native.so", *(f"pydantic_opamp_core-0.1.0.dist-info/{f}"
-                                                                     for f in ("METADATA", "WHEEL", "RECORD"))])
+                                                                     for f in ("METADATA", "WHEEL", "licenses/LICENSE.txt",
+                                                                               "licenses/THIRD_PARTY_NOTICES.txt", "RECORD"))])
+        with zipfile.ZipFile(path) as z:
+            for f in nd.CORE_LICENSE:
+                self.assertEqual(z.read(f"pydantic_opamp_core-0.1.0.dist-info/licenses/{f}"),
+                                 (nd.build_backend.HERE / f).read_bytes())
+
+    # PEP 639: the expression, and each license file the wheel holds, named in its metadata.
+    def test_the_metadata_names_the_license_and_its_files(self) -> None:
+        d = Path(tempfile.mkdtemp())
+        (d / "libopamp_native.so").write_bytes(b"compiled")
+        path = nd.build_backend.wheel(d / "libopamp_native.so", "musllinux_1_2_aarch64", d / "out")
+        with zipfile.ZipFile(path) as z:
+            head = z.read("pydantic_opamp_core-0.1.0.dist-info/METADATA").decode().partition("\n\n")[0].splitlines()
+        self.assertIn("License-Expression: MIT AND LicenseRef-Pydantic-OpAMP-Core-Binary", head)
+        self.assertEqual([h for h in head if h.startswith("License-File:")],
+                         ["License-File: LICENSE.txt", "License-File: THIRD_PARTY_NOTICES.txt"])
 
     # PyPI shows the description; `twine check --strict` (the Registries workflow) refuses a wheel without one.
     def test_the_metadata_carries_the_readme(self) -> None:

@@ -55,6 +55,12 @@ CSPROJS = ["dotnet/Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj",
 
 # What a package of ours must never hold: the cores' Rust sources and manifests.
 SOURCE = (".rs", "Cargo.toml", "Cargo.lock")
+# What carrying the compiled core looks like in a package: a module, a native library, or the Java
+# client's classes compiled from the module. A package that carries it holds the core's license and
+# its notices, side by side (scripts/fetch_core.py puts them beside each package's core).
+CORE = {"opamp_core.wasm", "opamp_sdk_settings.wasm", "libopamp_native.so", "libopamp_native.dylib",
+        "opamp_native.dll", "CoreModule.class", "SdkSettingsModule.class"}
+CORE_LICENSE = ("LICENSE.txt", "THIRD_PARTY_NOTICES.txt")
 
 
 def sub_once(pattern: str, repl: str, text: str, where: str) -> str:
@@ -213,9 +219,18 @@ def members(path: Path) -> list[str]:
         return z.namelist()
 
 
+def unlicensed(names: list[str]) -> bool:
+    """Whether a package's members carry the core without its license and notices beside each other."""
+    if not any(n.rsplit("/", 1)[-1] in CORE for n in names):
+        return False
+    dirs = [{n.rpartition("/")[0] for n in names if n.rsplit("/", 1)[-1] == f} for f in CORE_LICENSE]
+    return not set.intersection(*dirs)
+
+
 def check(dist: Path = DIST, native: Path = NATIVE) -> list[str]:
-    """What's wrong with the release in dist and native: a registry missing its packages, or a
-    package holding the cores' sources (or, for Python, being a source distribution)."""
+    """What's wrong with the release in dist and native: a registry missing its packages, a
+    package holding the cores' sources (or, for Python, being a source distribution), or one
+    carrying the core without its license and notices."""
     want = {"PyPI wheels": [*native.glob("wheels/*.whl"), *dist.glob("wheels/*.whl")],
             "npm tarballs": list(dist.glob("npm/*.tgz")),
             "Maven poms": list(dist.glob("maven/*.pom")),
@@ -229,6 +244,8 @@ def check(dist: Path = DIST, native: Path = NATIVE) -> list[str]:
     problems += [f"{p.name}: a source distribution" for p in [*native.glob("wheels/*.tar.gz"), *dist.glob("wheels/*.tar.gz")]]
     for p in sorted(p for kind, got in want.items() if kind != "Maven poms" for p in got):
         problems += [f"{p.name}: ships {n}" for n in members(p) if n.endswith(SOURCE)]
+        if unlicensed(members(p)):
+            problems.append(f"{p.name}: carries the core without {' and '.join(CORE_LICENSE)}")
     return problems
 
 
@@ -256,7 +273,8 @@ def main() -> None:
             print(line, file=sys.stderr)
         if problems:
             sys.exit(1)
-        print("every registry's packages are there, and none carries the cores' sources")
+        print("every registry's packages are there, none carries the cores' sources, and each carrying the core"
+              " has its license")
 
 
 if __name__ == "__main__":

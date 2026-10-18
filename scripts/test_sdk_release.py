@@ -148,7 +148,8 @@ class Check(unittest.TestCase):
             write_zip(self.native / "wheels" / name, ["m.py"])
         write_zip(self.dist / "wheels" / "otel.whl", ["m.py"])
         for name in ("client.tgz", "otel.tgz"):
-            write_tgz(self.dist / "npm" / name, ["package/index.js", "package/core/opamp_core.wasm"])
+            write_tgz(self.dist / "npm" / name, ["package/index.js", "package/core/opamp_core.wasm",
+                                                 "package/core/LICENSE.txt", "package/core/THIRD_PARTY_NOTICES.txt"])
         write_maven(self.dist / "maven")
         for name in ("core.nupkg", "client.nupkg", "hosting.nupkg"):
             write_zip(self.native / "nuget" / name, ["lib/a.dll"])
@@ -161,6 +162,19 @@ class Check(unittest.TestCase):
         write_tgz(self.dist / "npm" / "otel.tgz", ["package/index.js", "package/src/lib.rs"])
         write_zip(self.dist / "maven" / "ext-1.2.3.jar", ["Cargo.toml"])
         self.assertEqual(["ext-1.2.3.jar: ships Cargo.toml", "otel.tgz: ships package/src/lib.rs"],
+                         sdk_release.check(self.dist, self.native))
+
+    # Each package carrying the core, in whatever form, has the core's license and notices together.
+    def test_a_package_carrying_the_core_without_its_license_fails(self) -> None:
+        write_tgz(self.dist / "npm" / "client.tgz", ["package/core/opamp_core.wasm", "package/core/LICENSE.txt"])
+        write_zip(self.dist / "maven" / "client-1.2.3.jar", ["dev/pydantic/opamp/core/CoreModule.class"])
+        write_zip(self.native / "nuget" / "core.nupkg", ["runtimes/linux-x64/native/libopamp_native.so",
+                                                         "LICENSE.txt", "x/THIRD_PARTY_NOTICES.txt"])
+        write_zip(self.native / "wheels" / "core-linux.whl", ["pydantic_opamp_core/libopamp_native.so",
+                                                              "c.dist-info/licenses/LICENSE.txt",
+                                                              "c.dist-info/licenses/THIRD_PARTY_NOTICES.txt"])
+        self.assertEqual([f"{n}: carries the core without LICENSE.txt and THIRD_PARTY_NOTICES.txt"
+                          for n in ("core.nupkg", "client-1.2.3.jar", "client.tgz")],
                          sdk_release.check(self.dist, self.native))
 
     def test_a_source_distribution_fails(self) -> None:

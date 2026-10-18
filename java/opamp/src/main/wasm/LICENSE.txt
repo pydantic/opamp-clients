@@ -1,0 +1,48 @@
+Pydantic OpAMP Core Binary License
+
+Copyright (c) 2026 Pydantic Services Inc. All rights reserved.
+
+This license covers the compiled OpAMP core that Pydantic publishes: the WebAssembly modules
+(opamp_core.wasm, opamp_sdk_settings.wasm, opamp_core_adversary.wasm), the native libraries
+(libopamp_native.so, libopamp_native.dylib, opamp_native.dll) and the opamp-tap tool (together,
+the "Binaries"). It does not cover the rest of a package the Binaries ship in, which keeps its
+own license (for the OpAMP SDKs, the MIT License), or the third-party components the Binaries
+include, listed in THIRD_PARTY_NOTICES.txt beside this file, which keep theirs.
+
+1. Grant. Pydantic Services Inc. ("Pydantic") grants you a worldwide, royalty-free,
+   non-exclusive license to:
+   a. use and run the Binaries, for any purpose, with any OpAMP server, whether Pydantic's or
+      anyone else's; and
+   b. copy and redistribute the Binaries, unmodified, as part of software that uses them
+      (an application, a library, a container image, an installer or a package), and copy and
+      redistribute, unmodified, the packages Pydantic publishes them in (for example through a
+      mirror, cache or internal registry), provided this license and THIRD_PARTY_NOTICES.txt go
+      with them.
+
+2. Restrictions. You may not:
+   a. modify the Binaries, or distribute a modified copy;
+   b. reverse engineer, decompile or disassemble the Binaries, except to the extent that
+      applicable law expressly permits it despite this restriction;
+   c. distribute the Binaries on their own, as a product or service in themselves, other than as
+      section 1.b allows; or
+   d. remove or alter this license, the copyright notice, or THIRD_PARTY_NOTICES.txt.
+
+3. Source code. This license grants no right to the source code of the Binaries, which Pydantic
+   does not publish.
+
+4. Ownership. Pydantic and its licensors keep all rights not expressly granted here. No other
+   right or license is granted, by implication, estoppel or otherwise, including to Pydantic's
+   trademarks.
+
+5. Termination. If you breach this license, your rights under it end automatically. Sections 3
+   to 7 survive.
+
+6. No warranty. THE BINARIES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING WITHOUT LIMITATION THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+   PARTICULAR PURPOSE, TITLE AND NON-INFRINGEMENT.
+
+7. Limitation of liability. IN NO EVENT SHALL PYDANTIC OR ITS LICENSORS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE BINARIES OR THE USE OF OR OTHER DEALINGS IN THE BINARIES.
+
+SPDX-License-Identifier: LicenseRef-Pydantic-OpAMP-Core-Binary
