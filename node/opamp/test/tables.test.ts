@@ -4,13 +4,13 @@
 // The shells' shared tables (tests/shell-tables/ at the repository root), as this client
 // reads them, in both modes:
 // - urls.json: every URL the core accepts is taken by the URL type this shell parses with (WHATWG
-//   URL: undici's fetch and the ws package parse with it in Node mode, and Rust mode's proxy choice
-//   does), read alike, and sent as exactly its target: in Node mode through the Executor (undici's
-//   fetch, the ws package), in Rust mode through the core over the shell's sockets.
-// - proxy.json: the proxy chosen from the environment: in Node mode by Node's convention (Transport's
-//   connector and ws options), with the differences listed below; in Rust mode (the core, told
+//   URL: undici's fetch and the ws package parse with it in platform mode, and core mode's proxy choice
+//   does), read alike, and sent as exactly its target: in platform mode through the Executor (undici's
+//   fetch, the ws package), in core mode through the core over the shell's sockets.
+// - proxy.json: the proxy chosen from the environment: in platform mode by Node's convention (Transport's
+//   connector and ws options), with the differences listed below; in core mode (the core, told
 //   the environment's variables) by the shared rule, exactly (tests/shell-tables/README.md).
-// - tls.json: the TLS settings taken or refused (a Transport is built from them; Rust mode's TLS
+// - tls.json: the TLS settings taken or refused (a Transport is built from them; core mode's TLS
 //   on a stream is the same Transport's).
 // Where this client differs from a table, by Node's convention, the case is listed below with the
 // reason: the test fails if it stops differing.
@@ -28,7 +28,7 @@ import { Executor } from "../src/executor.js";
 import { ConfigSchema, EffectSchema, type Input, InputSchema } from "../src/gen/opamp/core/v1/core_pb.js";
 import { Client } from "../src/index.js";
 import { Core } from "../src/core.js";
-import { type RustProxyChoice, type TlsOptions, type TlsVersion, Transport } from "../src/transport.js";
+import { type CoreProxyChoice, type TlsOptions, type TlsVersion, Transport } from "../src/transport.js";
 
 const TABLES = fileURLToPath(new URL("../../../../tests/shell-tables/", import.meta.url));
 const table = <T>(name: string): T => JSON.parse(readFileSync(TABLES + name, "utf8")) as T;
@@ -59,7 +59,7 @@ const DEFAULT_PORT: Record<string, number> = { "http:": 80, "ws:": 80, "https:":
 /** A host as WHATWG URL writes it: names in lower case, addresses in their canonical form. */
 const canonicalHost = (host: string): string => new URL(`http://${host}/`).hostname;
 
-/** How WHATWG URL (the URL type undici's fetch, ws and Rust mode's shell parse with) reads `url`:
+/** How WHATWG URL (the URL type undici's fetch, ws and core mode's shell parse with) reads `url`:
  * host, port (the scheme's default when none), path, and query (null when there is no `?`). */
 function read(url: string): { host: string; port: number; path: string; query: string | null } {
   const u = new URL(url);
@@ -108,17 +108,17 @@ test("urls.json: WHATWG URL takes every URL the core accepts, and reads it alike
     if (JSON.stringify(got) !== JSON.stringify(want)) {
       wrong.push(`${e.url}: read as ${JSON.stringify(got)}, the core as ${JSON.stringify(want)}`);
     }
-    // Rust mode: the shell's proxy choice parses it too.
+    // Core mode: the shell's proxy choice parses it too.
     try {
       new Transport({ proxy: false }).proxyFor(e.url);
     } catch (err) {
-      wrong.push(`${e.url}: Rust mode's proxyFor refused it: ${(err as Error).message}`);
+      wrong.push(`${e.url}: core mode's proxyFor refused it: ${(err as Error).message}`);
     }
   }
   assert.deepEqual(wrong, []);
 });
 
-test("urls.json, Node mode: fetch and ws send each URL's exact target", async () => {
+test("urls.json, platform mode: fetch and ws send each URL's exact target", async () => {
   const server = await targets();
   const transport = new Transport({ proxy: false });
   const wrong: string[] = [];
@@ -150,7 +150,7 @@ test("urls.json, Node mode: fetch and ws send each URL's exact target", async ()
   assert.deepEqual(wrong, []);
 });
 
-test("urls.json, Rust mode: the core sends each URL's exact target over the shell's sockets", async () => {
+test("urls.json, core mode: the core sends each URL's exact target over the shell's sockets", async () => {
   const server = await targets();
   const wrong: string[] = [];
   try {
@@ -158,7 +158,7 @@ test("urls.json, Rust mode: the core sends each URL's exact target over the shel
       const ws = e.scheme === "ws" || e.scheme === "wss";
       const endpoint = `${ws ? "ws" : "http"}://127.0.0.1:${server.port}${e.target}`;
       const before = server.seen.length;
-      const client = Client.start({ endpoint, mode: "rust", proxy: false, heartbeatIntervalMs: 60_000, instanceUid: new Uint8Array(16).fill(1) }, {});
+      const client = Client.start({ endpoint, mode: "core", proxy: false, heartbeatIntervalMs: 60_000, instanceUid: new Uint8Array(16).fill(1) }, {});
       try {
         await until(`a request for ${endpoint}`, () => server.seen.length > before);
       } finally {
@@ -214,7 +214,7 @@ function route(proxy: string): string {
   return `${scheme}://${u.hostname}:${port}`;
 }
 
-test("proxy.json, Node mode: the proxy chosen from the environment, by Node's convention", () => {
+test("proxy.json, platform mode: the proxy chosen from the environment, by Node's convention", () => {
   const cases = table<{ cases: ProxyCase[] }>("proxy.json").cases;
   assert.ok(cases.length > 30);
   const wrong: string[] = [];
@@ -241,10 +241,10 @@ test("proxy.json, Node mode: the proxy chosen from the environment, by Node's co
   assert.deepEqual(wrong, []);
 });
 
-/** Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+/** Where core mode's core connects first for `url` when told `choice`: the proxy as the table
  * writes a route (scheme://host:port, without credentials), or null for directly. The core picks
  * it itself: it asks no proxy_query. */
-function coreRoute(choice: RustProxyChoice, url: string): string | null {
+function coreRoute(choice: CoreProxyChoice, url: string): string | null {
   const core = new Core(
     create(ConfigSchema, { instanceUid: new Uint8Array(16), endpoint: url, streams: true, entropy: new Uint8Array(32), proxy: choice }),
   );
@@ -273,30 +273,30 @@ function coreRoute(choice: RustProxyChoice, url: string): string | null {
   }
 }
 
-// Rust mode: the client hands the core the environment's variables (Config.proxy) and the core
+// Core mode: the client hands the core the environment's variables (Config.proxy) and the core
 // picks by the shared rule: each case through this client's reading of the environment and the
 // core it ships, exactly as the table says.
 // covers: RULE-PROXY-02
-test("proxy.json, Rust mode: the proxy chosen from the environment, exactly as the table says", () => {
+test("proxy.json, core mode: the proxy chosen from the environment, exactly as the table says", () => {
   const cases = table<{ cases: ProxyCase[] }>("proxy.json").cases;
   const wrong: string[] = [];
   for (const c of cases) {
-    // Rust mode's rule reads the environment whatever Node is told: no NODE_USE_ENV_PROXY.
-    const choice = new Transport({}, { env: { ...c.env }, execArgv: [] }, true).rustProxyChoice();
+    // Core mode's rule reads the environment whatever Node is told: no NODE_USE_ENV_PROXY.
+    const choice = new Transport({}, { env: { ...c.env }, execArgv: [] }, true).coreProxyChoice();
     const got = coreRoute(choice, c.url);
     if (got !== c.proxy) wrong.push(`${c.id}: ${got}, the table says ${c.proxy} (${c.why})`);
   }
   assert.deepEqual(wrong, []);
 });
 
-// What Rust mode tells the core: the configured proxy and no variables; none with `false`;
+// What core mode tells the core: the configured proxy and no variables; none with `false`;
 // otherwise each variable the rule reads that is set, even empty, by its own name. A proxy_query
 // (only a core that wasn't told asks) hears the configured proxy or none.
 // covers: RULE-PROXY-02
-test("Rust mode tells the core its proxy", () => {
+test("core mode tells the core its proxy", () => {
   const env = { env: { HTTP_PROXY: "http://env:1", no_proxy: "", REQUEST_METHOD: "GET", OTHER: "x" }, execArgv: [] };
   const configured = new Transport({ proxy: { url: "http://u:p%40ss@configured:8080", headers: { "X-A": "1" } } }, env, true);
-  assert.deepEqual(configured.rustProxyChoice(), {
+  assert.deepEqual(configured.coreProxyChoice(), {
     direct: false,
     url: "http://u:p%40ss@configured:8080",
     headers: [{ name: "X-A", value: "1" }],
@@ -305,10 +305,10 @@ test("Rust mode tells the core its proxy", () => {
   });
   assert.equal(configured.proxyFor("http://x/")?.url, "http://u:p%40ss@configured:8080");
   const direct = new Transport({ proxy: false }, env, true);
-  assert.deepEqual(direct.rustProxyChoice(), { direct: true, url: "", headers: [], resolveLocally: false, environment: [] });
+  assert.deepEqual(direct.coreProxyChoice(), { direct: true, url: "", headers: [], resolveLocally: false, environment: [] });
   assert.equal(direct.proxyFor("http://x/"), undefined);
   const fromEnv = new Transport({ proxy: { resolveLocally: true } }, env, true);
-  assert.deepEqual(fromEnv.rustProxyChoice(), {
+  assert.deepEqual(fromEnv.coreProxyChoice(), {
     direct: false,
     url: "",
     headers: [],
@@ -321,10 +321,10 @@ test("Rust mode tells the core its proxy", () => {
   });
   assert.equal(fromEnv.proxyFor("http://x/"), undefined);
   // The core reads them by the rule: CGI, so none.
-  assert.equal(coreRoute(fromEnv.rustProxyChoice(), "http://example.com/"), null);
+  assert.equal(coreRoute(fromEnv.coreProxyChoice(), "http://example.com/"), null);
 });
 // httpoxy: under CGI the environment's proxies are ignored, but a proxy the application configured
-// still applies (in both modes: Node mode's connector and Rust mode's proxy_query answers).
+// still applies (in both modes: platform mode's connector and core mode's proxy_query answers).
 test("under CGI: no proxy from the environment, a configured one still", () => {
   const env = { REQUEST_METHOD: "GET", HTTP_PROXY: "http://web-proxy:3128", HTTPS_PROXY: "http://secure-proxy:3129", NODE_USE_ENV_PROXY: "1" };
   const platform = { env, execArgv: [] };
@@ -334,18 +334,19 @@ test("under CGI: no proxy from the environment, a configured one still", () => {
     assert.equal(new Transport({ proxy: { resolveLocally: false } }, platform).proxyFor(url), undefined, url);
     assert.equal(new Transport({ proxy: { url: "http://configured:8080" } }, platform).proxyFor(url)?.url, "http://configured:8080", url);
     assert.equal(new Transport({ proxy: { url: "http://configured:8080" } }, platform, true).proxyFor(url)?.url, "http://configured:8080", url);
-    // Node mode: the WebSocket goes through it too (ws options with a tunnel, not a direct TLS).
+    // Platform mode: the WebSocket goes through it too (ws options with a tunnel, not a direct
+    // TLS).
     assert.ok(new Transport({ proxy: { url: "http://configured:8080" } }, platform).ws(url).createConnection, url);
     assert.equal(new Transport({}, platform).ws(url).createConnection, undefined, url);
   }
 });
 
-test("Node mode takes proxies from the environment only when Node is told to; Rust mode always", () => {
+test("platform mode takes proxies from the environment only when Node is told to; core mode always", () => {
   const env = { HTTP_PROXY: "http://web-proxy:3128", HTTPS_PROXY: "http://secure-proxy:3129" };
   for (const url of ["http://example.com/", "https://example.com/"]) {
     assert.equal(new Transport({}, { env, execArgv: [] }).proxyFor(url), undefined, url);
-    // Rust mode hands the core the variables, and the core picks.
-    assert.notEqual(coreRoute(new Transport({}, { env, execArgv: [] }, true).rustProxyChoice(), url), null, url);
+    // Core mode hands the core the variables, and the core picks.
+    assert.notEqual(coreRoute(new Transport({}, { env, execArgv: [] }, true).coreProxyChoice(), url), null, url);
   }
 });
 

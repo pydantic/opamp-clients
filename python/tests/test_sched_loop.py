@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """The seeded loop (tests/_sched_loop.py) runs the real thing (the risk: aiohttp makes tasks,
 handles and threads of its own, and the loop must own them all): a real client, over a real
-aiohttp session in Python mode and asyncio's own connections in Rust mode, against a real local
+aiohttp session in platform mode and asyncio's own connections in core mode, against a real local
 server, with saves to a real state file, under shuffled task order and a virtual clock. Then the
 loop's own promises: virtual time moves only when nothing can run, never past a thread at work;
 threads' results arrive in submission order; and a seed is a schedule."""

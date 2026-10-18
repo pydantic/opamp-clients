@@ -38,7 +38,7 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
-	"github.com/pydantic/opamp-clients/go/otel"
+	"github.com/pydantic/opamp-clients/go/opampotel"
 )
 
 var (

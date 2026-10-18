@@ -14,8 +14,8 @@ import stat
 import pytest
 from aiohttp import web
 
-from opamp_client._executor import Executor, downloads_dir, location
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._executor import Executor, downloads_dir, location
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 BODY = b"package" * 100
 

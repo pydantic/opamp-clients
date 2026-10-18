@@ -15,9 +15,10 @@ namespace Pydantic.OpAmp.Client.Tests;
 public class EdgeTests
 {
     // Headers the core refuses in both modes, and why: it checks every header list it sends by the
-    // rule an offered header meets, in both modes. .NET mode sent a value's CR LF as it was (the
-    // server read a second header, "Injected"), sent a Host of the caller's in place of its own and
-    // a Connection beside the upgrade's, and dropped a name that isn't a token without a word.
+    // rule an offered header meets, in both modes. Platform mode sent a value's CR LF as it was
+    // (the server read a second header, "Injected"), sent a Host of the caller's in place of its
+    // own and a Connection beside the upgrade's, and dropped a name that isn't a token without a
+    // word.
     public static TheoryData<OpAmpMode, string, string, string, string> Refused()
     {
         const string Value = "the value of header 1 (X) holds a control or non-ASCII character, or a space at either end";
@@ -40,7 +41,7 @@ public class EdgeTests
             ("X", "caf\u00e9", Value),
         };
         var data = new TheoryData<OpAmpMode, string, string, string, string>();
-        foreach (var mode in new[] { OpAmpMode.DotNet, OpAmpMode.Rust })
+        foreach (var mode in new[] { OpAmpMode.Platform, OpAmpMode.Core })
         {
             foreach (var transport in new[] { "http", "ws" })
             {
@@ -78,10 +79,10 @@ public class EdgeTests
     }
 
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task HeadersThatPassTheCheckReachTheServer(OpAmpMode mode, string transport)
     {
         var heads = new ConcurrentQueue<Dictionary<string, string>>();
@@ -107,7 +108,7 @@ public class EdgeTests
     public static TheoryData<OpAmpMode, string> Negatives()
     {
         var data = new TheoryData<OpAmpMode, string>();
-        foreach (var mode in new[] { OpAmpMode.DotNet, OpAmpMode.Rust })
+        foreach (var mode in new[] { OpAmpMode.Platform, OpAmpMode.Core })
         {
             foreach (var name in new[] { "HeartbeatInterval", "RequestTimeout", "ConnectTimeout", "StopTimeout", "VerifyTimeout", "DownloadTimeout", "MaxSendBytes", "MaxReceiveBytes" })
             {
@@ -153,8 +154,8 @@ public class EdgeTests
     }
 
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task ZeroAndTheLargestTimesAndSizesAreTaken(OpAmpMode mode)
     {
         using var server = new TestServer();
@@ -174,10 +175,10 @@ public class EdgeTests
     // An application on a single-threaded synchronization context (a UI thread, classic ASP.NET)
     // that waits for stop synchronously: nothing of the client's needs that thread back.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task StopWaitedForSynchronouslyOnASingleThreadedContextDoesNotDeadlock(OpAmpMode mode, string transport)
     {
         using var server = new TestServer();
@@ -212,8 +213,8 @@ public class EdgeTests
     // As Python's client: a file not there yet in a directory that is, is a first start; no
     // directory for it is a setting that can't work.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task AStateFileInADirectoryThatIsntThereIsAnErrorAtStart(OpAmpMode mode)
     {
         var dir = Directory.CreateTempSubdirectory().FullName;

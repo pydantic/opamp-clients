@@ -14,7 +14,7 @@ description: >
 
 - **One PR, every integration.** A setting ships with code, a runnable example and thorough tests
   in each integration in the same PR: Python (`python/otel`), Node.js (`node/otel`), Go
-  (`go/otel`), the Java agent extension (`java/opamp-javaagent`), the .NET plugin
+  (`go/opampotel`), the Java agent extension (`java/opamp-javaagent`), the .NET plugin
   (`dotnet/Pydantic.OpAmp.AutoInstrumentation`) and .NET `WithOpAmp()`
   (`dotnet/Pydantic.OpAmp.Extensions.Hosting`). Those are the six integrations of
   [docs/sdk-settings.md](../../../docs/sdk-settings.md#where-each-setting-applies). Some docs
@@ -100,9 +100,9 @@ processor, provider or sampler (`check_truth`'s setups), the integration narrows
 
 | Integration | Where the host is built | Carries it out |
 |---|---|---|
-| Python | `python/otel/src/opamp_otel/__init__.py` (`settings_pb2.Host(live=..., next_start=...)`, `LOG_GATE`) | same file, `_match.py` |
+| Python | `python/otel/src/pydantic_opamp_otel/__init__.py` (`settings_pb2.Host(live=..., next_start=...)`, `LOG_GATE`) | same file, `_match.py` |
 | Node.js | `node/otel/src/index.ts` (`hostFromEnv`) | same file |
-| Go | `go/otel/agent.go` (`host()`, `carried`) | `go/otel/controls.go`, `caps.go`, `levels.go`, `redact.go`, `match.go` |
+| Go | `go/opampotel/agent.go` (`host()`, `carried`) | `go/opampotel/controls.go`, `caps.go`, `levels.go`, `redact.go`, `match.go` |
 | Java agent | `java/opamp-javaagent/.../javaagent/Extension.java` (`LIVE`, `NEXT_START`) | `Controls.java`, `LiveSampler.java`, `Redaction.java`, `TokenBucket.java` |
 | .NET plugin | `dotnet/Pydantic.OpAmp.AutoInstrumentation/Agent.cs` (`new Host { ... }`) | `dotnet/shared/Controls.cs`, `Sampling.cs`, `Matching.cs`, `OtlpRewriter.cs` |
 | .NET `WithOpAmp` | `dotnet/Pydantic.OpAmp.Extensions.Hosting/OpAmpAgent.cs`, `dotnet/shared/SdkAgent.cs` | `dotnet/shared/` |
@@ -134,14 +134,14 @@ git show --stat 2a14a08   # #21: every integration declares only what reaches th
 4. **Tests in each integration**, each a test that fails without the change:
    - applied and in force; `local` puts the SDK's own value back; an override the host can't
      carry out is FAILED with the prefix above; the effective config reports it;
-   - the shared vectors still pass (`go/otel/vectors_test.go`, Java `VectorsTest`,
+   - the shared vectors still pass (`go/opampotel/vectors_test.go`, Java `VectorsTest`,
      `AgreesWithLayerTest`, and each wrapper's settings test);
-   - the inventory lists it where declared (`go/otel/inventory_test.go`, `InventoryTest.java`,
+   - the inventory lists it where declared (`go/opampotel/inventory_test.go`, `InventoryTest.java`,
      `node/otel/test/inventory.test.ts`, `python/otel/tests/test_inventory.py`, .NET
      `InventoryTests.cs`);
    - the **torture test** flips it under load. Add the control to each one's document generator
      (Python's `change()` in `python/otel/tests/test_concurrency.py`): Go
-     `TestSettingsFlippedWhileTelemetryFlows` (`go/otel/torture_test.go`), Node
+     `TestSettingsFlippedWhileTelemetryFlows` (`go/opampotel/torture_test.go`), Node
      `node/otel/test/settings.torture.test.ts`, Java `ControlsTortureTest`, .NET
      `ConcurrencyTests.cs`.
 5. **Cookbook.** Add `examples/settings/<use>.json` (a whole policy) and a README section that
@@ -169,9 +169,9 @@ python3 -m unittest examples/test_integrations.py examples/test_settings_cookboo
 (cd python && uv run --python 3.13 pytest -q tests/test_sdk_settings.py)                # 35 tests, <1 s
 (cd python/otel && uv run --python 3.13 pytest -q)                                      # 506 tests, ~1 min
 (cd python/otel && uv run --python 3.13 pytest -q tests/test_concurrency.py)            # torture, ~5 s
-(cd go && go test -count=1 ./opamp/sdk/)
-(cd go/otel && go vet ./... && go test -race ./...)                                     # own module, ~1.5 min
-(cd go/otel && go test -race -count=1 -run TestSettingsFlippedWhileTelemetryFlows .)
+(cd go && go test -count=1 ./opamp/sdksettings/)
+(cd go/opampotel && go vet ./... && go test -race ./...)                                     # own module, ~1.5 min
+(cd go/opampotel && go test -race -count=1 -run TestSettingsFlippedWhileTelemetryFlows .)
 (cd node/opamp && npm ci --no-audit --no-fund && npm run build)                         # node/otel needs it
 (cd node/otel && npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/settings.test.js)
 mvn -q -B -DskipTests install -f java/opamp/pom.xml                                     # ~1 min, first
@@ -195,7 +195,7 @@ and which you could not. Java and .NET checks use Docker, or a local runtime wit
   regenerates into the tree. Run `git status` after it.
 - `proto/`, `spec/` and `testdata/sdk-settings/` are the core's, fetched and gitignored. A change
   there is a core change, never a hand edit.
-- `go/otel` is its own module: run its tests from `go/otel`, not `go/`.
+- `go/opampotel` is its own module: run its tests from `go/opampotel`, not `go/`.
 - `node/otel` loads the built `node/opamp`: `npm run build` there first, or tests fail on imports.
 - The Java agent tests need the client installed into the local Maven repository first
   (`mvn -q -B -DskipTests install -f java/opamp/pom.xml`).

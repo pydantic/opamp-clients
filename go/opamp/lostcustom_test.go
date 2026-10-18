@@ -27,7 +27,7 @@ import (
 //
 // covers: RULE-CLIENT-10
 func TestACustomMessageOnALostConnectionGoesAgain(t *testing.T) {
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { customMessageOnALostConnectionGoesAgain(t, mode) })
 	}
 }

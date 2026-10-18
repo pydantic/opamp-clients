@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 GO_MODULE = "github.com/pydantic/opamp-clients/go"
 NODE = ROOT / "node" / "opamp"
 PROTOS = ["opamp/v1/opamp.proto", "opamp/v1/anyvalue.proto", "opamp/core/v1/core.proto"]
-PY = "python/src/opamp_client/_proto"
+PY = "python/src/pydantic_opamp_client/_proto"
 # protoc 31.1 (protobuf 6.31.1), from grpcio-tools.
 PY_PROTOC = ["uvx", "--quiet", "--from", "grpcio-tools==1.75.0", "python", "-m", "grpc_tools.protoc"]
 PY_PACKAGES = ["", "/opamp", "/opamp/v1", "/opamp/core", "/opamp/core/v1"]

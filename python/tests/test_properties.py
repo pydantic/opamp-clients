@@ -15,7 +15,7 @@ from _servers import MODES
 from aiohttp import WSMsgType, web
 from hypothesis import given, settings, strategies as st
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 
 def expected_sequence(got) -> list[int]:

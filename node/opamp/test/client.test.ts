@@ -64,7 +64,7 @@ test("HTTP: reports, then says goodbye after the request in flight", async () =>
   const notes: Notification[] = [];
   const client = Client.start(
     { endpoint: `http://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 50,
-      headers: { Authorization: "Bearer t" }, mode: "node" },
+      headers: { Authorization: "Bearer t" }, mode: "platform" },
     { description },
     (n) => notes.push(n),
   );
@@ -87,7 +87,7 @@ test("HTTP: reports, then says goodbye after the request in flight", async () =>
   assert.equal(notes.at(-1)?.kind, "stopped");
 });
 
-test("endpoint: where the latest request went, once one has an outcome; undefined in Rust mode", async () => {
+test("endpoint: where the latest request went, once one has an outcome; undefined in core mode", async () => {
   const server = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     res.setHeader("Content-Type", "application/x-protobuf");
@@ -96,7 +96,7 @@ test("endpoint: where the latest request went, once one has an outcome; undefine
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/opamp`;
   try {
-    for (const mode of ["node", "rust"] as const) {
+    for (const mode of ["platform", "core"] as const) {
       const seen: (string | undefined)[] = [];
       const client: Client = Client.start({ endpoint, instanceUid: UID, heartbeatIntervalMs: 50, mode }, { description },
         (n) => void (n.kind === "connected" && seen.push(client.endpoint)));
@@ -104,7 +104,7 @@ test("endpoint: where the latest request went, once one has an outcome; undefine
       const deadline = Date.now() + 10_000;
       while (seen.length === 0 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
       await client.stop();
-      assert.deepEqual(seen, [mode === "node" ? endpoint : undefined], mode);
+      assert.deepEqual(seen, [mode === "platform" ? endpoint : undefined], mode);
     }
   } finally {
     server.close();
@@ -133,7 +133,7 @@ test("WebSocket: reports, answers a Close frame, reconnects, says goodbye", asyn
   });
   const notes: Notification[] = [];
   const client = Client.start(
-    { endpoint: `ws://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, mode: "node" },
+    { endpoint: `ws://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, mode: "platform" },
     { description },
     (n) => notes.push(n),
   );
@@ -161,7 +161,7 @@ test("WebSocket: reports, answers a Close frame, reconnects, says goodbye", asyn
 // that is running the callback, before the event loop can deliver anything else (the connection's
 // opening included), so the first message says APPLIED, and none says APPLYING.
 // covers: RULE-SHELL-10
-for (const mode of ["node", "rust"] as const) {
+for (const mode of ["platform", "core"] as const) {
   test(`a config answered in the callback at a restart is never reported APPLYING (${mode} mode)`, async () => {
     const APPLIED = 1;
     const APPLYING = 2;
@@ -196,7 +196,7 @@ for (const mode of ["node", "rust"] as const) {
         (n) => {
           // Answered before the callback returns. (Never before start has returned: the client is there.)
           if (n.kind === "remoteConfig") {
-            client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.config.configHash, status: APPLIED }));
+            client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash, status: APPLIED }));
           }
         },
       );
@@ -276,7 +276,7 @@ test("a send that crosses the server's Close: the connection ends with the Close
 
 /** Run a program that starts a client at `endpoint` in `mode` (undefined: the default) and does
  * nothing else: whether it exits by itself (in 10 s). */
-async function exitsAlone(endpoint: string, mode: "node" | "rust" | undefined): Promise<boolean> {
+async function exitsAlone(endpoint: string, mode: "platform" | "core" | undefined): Promise<boolean> {
   const index = new URL("../src/index.js", import.meta.url).href;
   const child = spawn(process.execPath, [
     "--input-type=module",
@@ -305,8 +305,8 @@ test("the client doesn't keep Node.js running: a program whose work is done exit
   wss.on("connection", (ws) => ws.on("message", () => messages++));
   const ws = (wss.address() as AddressInfo).port;
   try {
-    // In each mode, and with none named (the default, Rust mode).
-    for (const mode of ["node", "rust", undefined] as const) {
+    // In each mode, and with none named (the default, core mode).
+    for (const mode of ["platform", "core", undefined] as const) {
       const how = mode ?? "the default mode";
       polls = messages = 0;
       assert.equal(await exitsAlone(`http://127.0.0.1:${http}/v1/opamp`, mode), true, `over HTTP (${how})`);
@@ -330,7 +330,7 @@ test("the client doesn't keep Node.js running: a program whose work is done exit
 // covers: RULE-SHELL-02
 test("an async callback that rejects stops the client, not the process", async () => {
   const index = new URL("../src/index.js", import.meta.url).href;
-  for (const mode of ["node", "rust"] as const) {
+  for (const mode of ["platform", "core"] as const) {
     const child = spawn(process.execPath, [
       "--input-type=module",
       "-e",
@@ -362,7 +362,7 @@ test("an async callback that rejects stops the client, not the process", async (
 /** Run a program that starts a client at `endpoint` in `mode`, and half a second later ends by
  * awaiting stop(), with nothing else of its own going on: whether stop() returned before the
  * program exited. */
-async function stopsBeforeItExits(endpoint: string, mode: "node" | "rust" | undefined): Promise<boolean> {
+async function stopsBeforeItExits(endpoint: string, mode: "platform" | "core" | undefined): Promise<boolean> {
   const index = new URL("../src/index.js", import.meta.url).href;
   const child = spawn(process.execPath, [
     "--input-type=module",
@@ -381,7 +381,7 @@ async function stopsBeforeItExits(endpoint: string, mode: "node" | "rust" | unde
 
 // The other half of not keeping Node.js running: stop() is the application's work, and holds the
 // program until the client has stopped, so the server hears the goodbye. (The client's sockets
-// don't hold it: in Rust mode a program that ended by awaiting stop() would exit mid-stop.)
+// don't hold it: in core mode a program that ended by awaiting stop() would exit mid-stop.)
 test("stop() keeps Node.js running until the client has stopped: the goodbye is sent", async () => {
   let goodbyes = 0;
   const server = createServer(async (req, res) => {
@@ -402,7 +402,7 @@ test("stop() keeps Node.js running until the client has stopped: the goodbye is 
   );
   const ws = (wss.address() as AddressInfo).port;
   try {
-    for (const mode of ["node", "rust", undefined] as const) {
+    for (const mode of ["platform", "core", undefined] as const) {
       const how = mode ?? "the default mode";
       for (const endpoint of [`http://127.0.0.1:${http}/v1/opamp`, `ws://127.0.0.1:${ws}/v1/opamp`]) {
         goodbyes = 0;
@@ -432,7 +432,7 @@ test("maxSendBytes reaches the core: a description too large for it is left out"
   });
   const notes: Notification[] = [];
   const client = Client.start(
-    { endpoint: `http://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, maxSendBytes: 1024, mode: "node" },
+    { endpoint: `http://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, maxSendBytes: 1024, mode: "platform" },
     { description: big },
     (n) => notes.push(n),
   );

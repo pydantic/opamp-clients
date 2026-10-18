@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: MIT
 
 // The shell's async edges under fast-check's scheduler: every platform call the client makes
-// (fetch, the WebSocket, the TCP sockets of Rust mode, and the file functions) goes to a fake whose
+// (fetch, the WebSocket, the TCP sockets of core mode, and the file functions) goes to a fake whose
 // every completion and event is a task of fc.scheduler(), so a run picks the order in which
 // requests are answered, handshakes end, messages and closes arrive, writes complete and stop
 // lands. Nothing real is between the client and its fakes: no socket, no file, no timer (node:test's
 // mock timers, and the client's clock from them), so a seed and a path replay a run exactly.
 //
 // A run (fc.scheduledModelRun over fc.commands) starts one client, real core included, over HTTP or
-// WebSocket, in "node" mode (the executor: fetch and ws) or "rust" mode (streams.ts: TCP sockets
-// and download files; the fake server then speaks HTTP/1.1 and WebSocket framing itself). Its
-// commands are application calls, from outside and from inside the callback; the server's offers
-// (remote config, custom message, heartbeat interval, package); the server closing, dropping or
-// corrupting the connection; time passing; a callback that throws; stop, from outside or from the
-// callback. Between commands the scheduler resolves what it likes. The server's answers come from
-// lists the run draws (a request answered, refused or failed; a handshake accepted, refused or
+// WebSocket, in "platform" mode (the executor: fetch and ws) or "core" mode (streams.ts: TCP
+// sockets and download files; the fake server then speaks HTTP/1.1 and WebSocket framing itself).
+// Its commands are application calls, from outside and from inside the callback; the server's
+// offers (remote config, custom message, heartbeat interval, package); the server closing, dropping
+// or corrupting the connection; time passing; a callback that throws; stop, from outside or from
+// the callback. Between commands the scheduler resolves what it likes. The server's answers come
+// from lists the run draws (a request answered, refused or failed; a handshake accepted, refused or
 // failed; a download whole, missing, corrupt or cut; a send or a save that fails).
 //
 // The model is spec/shell-contract.md. At the core's boundary (Core.step, wrapped) every input is
@@ -99,7 +99,7 @@ type Connected = "ok" | "refused";
 type Written = "ok" | "full";
 
 interface Setup {
-  mode: "node" | "rust";
+  mode: "platform" | "core";
   ws: boolean;
   /** The server's answers, each list taken in turn (and round again). */
   posts: Post[];
@@ -109,11 +109,11 @@ interface Setup {
   saves: Saved[];
   connects: Connected[];
   writes: Written[];
-  /** Rust mode: the most bytes a socket hands over at once. */
+  /** Core mode: the most bytes a socket hands over at once. */
   chunk: number;
   /** The most bytes a file write takes at once (short writes). */
   fileWrite: number;
-  /** Node mode: the server never answers our Close frame (the core's cancel of the closing
+  /** Platform mode: the server never answers our Close frame (the core's cancel of the closing
    * handshake ends it). */
   deaf: boolean;
   /** Every file write hangs for STALL_MS of (mocked) time: a disk that stops answering. Only the
@@ -130,7 +130,7 @@ const STALL_MS = 60_000;
 const lists = <T>(...xs: T[]) => fc.array(fc.constantFrom(...xs), { minLength: 1, maxLength: 6 });
 
 const setupArb: fc.Arbitrary<Setup> = fc.record({
-  mode: fc.constantFrom("node", "rust"),
+  mode: fc.constantFrom("platform", "core"),
   ws: fc.boolean(),
   posts: lists<Post>("ok", "ok", "ok", "500", "fail"),
   upgrades: lists<Upgrade>("accept", "accept", "accept", "refuse", "fail"),
@@ -468,7 +468,7 @@ class Server {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Node mode: fetch and ws.
+// Platform mode: fetch and ws.
 
 /** The ws package's WebSocket, as far as the executor uses it, with ws's own state machine
  * (CONNECTING, OPEN, CLOSING, CLOSED) and event order: an error is followed by close; close comes
@@ -738,7 +738,7 @@ function fakeFetch(w: World): ExecutorPlatform["fetch"] {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Rust mode: TCP sockets carrying HTTP/1.1 and WebSocket, spoken by the core.
+// Core mode: TCP sockets carrying HTTP/1.1 and WebSocket, spoken by the core.
 
 /** A net.Socket, as streams.ts uses it: connect, data, end, error and close events in order,
  * paused data held back, write, end, destroy. */
@@ -1149,9 +1149,9 @@ class Book {
       case "stored":
       case "storeFailed": {
         const id = idOf(k.value);
-        const rust = this.w.setup.mode === "rust";
+        const coreMode = this.w.setup.mode === "core";
         const kinds =
-          k.case.startsWith("http") ? ["httpRequest"] : k.case.startsWith("download") ? [rust ? "downloadDone" : "download"] : ["store"];
+          k.case.startsWith("http") ? ["httpRequest"] : k.case.startsWith("download") ? [coreMode ? "downloadDone" : "download"] : ["store"];
         const e = this.#answer(k.case.startsWith("download") ? "dl" : "fx", id, what, kinds);
         if (!e) return;
         if (e.phase !== "waiting") this.#bad(`${what}: answered already`, "RULE-SHELL-04");
@@ -1360,11 +1360,11 @@ class Life {
       const client = this.client;
       if (client === undefined) throw new Error("the callback has no client handle");
       if (n.kind === "remoteConfig") {
-        client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.config.configHash, status: 1 }));
+        client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash, status: 1 }));
       } else if (n.kind === "installPackage") {
-        client.packageInstalled(n.name, n.package.hash);
+        client.packageInstalled(n.packageName, n.package.hash);
       } else if (n.kind === "removePackage") {
-        client.packageRemoved(n.name);
+        client.packageRemoved(n.packageName);
       }
       for (const a of this.inside.splice(0)) {
         if (a === "call") this.w.call();
@@ -1405,10 +1405,10 @@ class Life {
     }
     const increasing = (xs: number[], what: string) =>
       xs.forEach((x, i) => i === 0 || assert.ok(x > xs[i - 1]!, `${what} in order: ${log()}`));
-    increasing(this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.config.configHash[0]!] : [])), "remote configs");
-    increasing(this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.message.data[0]!] : [])), "custom messages");
+    increasing(this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.remoteConfig.configHash[0]!] : [])), "remote configs");
+    increasing(this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.customMessage.data[0]!] : [])), "custom messages");
     increasing(
-      this.notes.flatMap((n) => (n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.message.data))] : [])),
+      this.notes.flatMap((n) => (n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.customMessage.data))] : [])),
       "refused custom messages",
     );
   }
@@ -1872,7 +1872,7 @@ function property(replayPath?: string) {
 test("a WebSocket whose write fails ends once (seed 1)", async () => {
   await fc.assert(property("Cf:B"), { seed: 1, path: "2:1:1:1:1:2:2:2" });
   const setup: Setup = {
-    mode: "node",
+    mode: "platform",
     ws: true,
     posts: ["ok"],
     upgrades: ["accept"],
@@ -1923,7 +1923,7 @@ test("a WebSocket whose write fails ends once (seed 1)", async () => {
 test("nothing of a download is left once shutdown is over (seed 1)", async () => {
   await fc.assert(property("MMFAJ:V"), { seed: 1, path: "81:0:0:0:0:0:0:0:0:0:0:0:2:2:10" });
   const setup: Setup = {
-    mode: "node",
+    mode: "platform",
     ws: false,
     posts: ["ok"],
     upgrades: ["accept"],
@@ -1987,13 +1987,13 @@ test("stopped is told last within an output (seed 2)", async () => {
 
 // Asked of every shell (Go and Python fixed it): all of stop takes one stop_timeout, measured from
 // stop(). Node's stop doesn't wait for a save (one under way ends whole, after); but once the core had
-// stopped, the client waited for every download file's write in flight without any bound (rust
-// mode's Streams.shutdown, and node mode's aborted downloads): a disk that stops answering held
+// stopped, the client waited for every download file's write in flight without any bound (core
+// mode's Streams.shutdown, and platform mode's aborted downloads): a disk that stops answering held
 // stop for as long. A run here stalls every file write, and stops while a package downloads.
 // covers: RULE-SHELL-07
 test("stop is bounded though a file write hangs", async () => {
   await fc.assert(
-    fc.asyncProperty(schedulerArb, fc.constantFrom<"node" | "rust">("node", "rust"), fc.boolean(), fc.nat(40), async (seed, mode, ws, steps) => {
+    fc.asyncProperty(schedulerArb, fc.constantFrom<"platform" | "core">("platform", "core"), fc.boolean(), fc.nat(40), async (seed, mode, ws, steps) => {
       const s = scheduler(seed);
       const setup: Setup = {
         mode,

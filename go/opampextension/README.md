@@ -2,7 +2,7 @@
 
 The Collector's `opamp` extension with the client underneath replaced: upstream's
 [`opampextension`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/opampextension)
-runs on opamp-go; this one runs on [`go/opamp`](../opamp), the shared core in Go mode (net/http
+runs on opamp-go; this one runs on [`go/opamp`](../opamp), the shared core in platform mode (net/http
 and gorilla/websocket carry the requests, so the Collector's TLS settings, the environment's
 proxies and HTTP auth extensions apply as they do to its other clients). The component type, the
 config and the custom-message API (`opampcustommessages`) are upstream's: a collector built with

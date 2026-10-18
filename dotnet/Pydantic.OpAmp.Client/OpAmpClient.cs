@@ -77,11 +77,11 @@ public sealed record OpAmpClientOptions
     /// <c>http://</c>, <c>https://</c>, <c>socks5://</c> or <c>socks5h://</c>, with credentials as
     /// <c>user:password@</c>. With <c>socks5://</c> and <c>socks5h://</c> alike the proxy resolves
     /// the server's host name (unlike curl, where <c>socks5://</c> resolves it locally), unless
-    /// <see cref="ProxyUseLocalResolver"/>. <c>socks4://</c>, <c>socks4a://</c> and any other
+    /// <see cref="ProxyResolveLocally"/>. <c>socks4://</c>, <c>socks4a://</c> and any other
     /// scheme are errors. Default: the proxy the environment names (<c>HTTP_PROXY</c>,
-    /// <c>HTTPS_PROXY</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>), by the rule every SDK's Rust mode
-    /// shares (tests/shell-tables/README.md, "Rust mode's proxy rule"); none under CGI
-    /// (<c>REQUEST_METHOD</c> set: httpoxy). In <see cref="OpAmpMode.DotNet"/> the default is the
+    /// <c>HTTPS_PROXY</c>, <c>ALL_PROXY</c>, <c>NO_PROXY</c>), by the rule every SDK's core mode
+    /// shares (tests/shell-tables/README.md, its proxy rule); none under CGI
+    /// (<c>REQUEST_METHOD</c> set: httpoxy). In <see cref="OpAmpMode.Platform"/> the default is the
     /// system's proxy settings instead (<see cref="System.Net.Http.HttpClient.DefaultProxy"/>: the
     /// environment's, or Windows' and macOS's own), held to the same schemes where the client can
     /// see them; under CGI a direct connection, unless the application set
@@ -93,22 +93,22 @@ public sealed record OpAmpClientOptions
     /// <summary>
     /// Resolve the server's host name on the client and give a SOCKS5 proxy an address, instead of
     /// the proxy resolving it (a SOCKS5 proxy the environment names too). Default false. With an
-    /// HTTP proxy it is an error: an HTTP proxy is always given the name. It is Rust mode's: in
-    /// <see cref="OpAmpMode.DotNet"/> it is an error (.NET's SOCKS5 always sends the name).
+    /// HTTP proxy it is an error: an HTTP proxy is always given the name. It is core mode's: in
+    /// <see cref="OpAmpMode.Platform"/> it is an error (.NET's SOCKS5 always sends the name).
     /// </summary>
-    public bool ProxyUseLocalResolver { get; init; }
+    public bool ProxyResolveLocally { get; init; }
 
     /// <summary>
     /// Connect directly, with no proxy, not even the environment's (or, in
-    /// <see cref="OpAmpMode.DotNet"/>, the system's). Not with <see cref="Proxy"/>.
+    /// <see cref="OpAmpMode.Platform"/>, the system's). Not with <see cref="Proxy"/>.
     /// </summary>
     public bool DirectConnection { get; init; }
 
     /// <summary>
     /// Your own HttpClient, instead of <see cref="Tls"/>, <see cref="Proxy"/> and
     /// <see cref="DirectConnection"/> (setting any of them with it is an error). Setting it selects
-    /// <see cref="OpAmpMode.DotNet"/>: only .NET's stack can use it (with <see cref="Mode"/> set to
-    /// <see cref="OpAmpMode.Rust"/> it is an error). It carries everything: requests, the WebSocket
+    /// <see cref="OpAmpMode.Platform"/>: only .NET's stack can use it (with <see cref="Mode"/> set to
+    /// <see cref="OpAmpMode.Core"/> it is an error). It carries everything: requests, the WebSocket
     /// upgrade and package downloads. Build it on a handler that doesn't follow redirects or
     /// decompress (<c>AllowAutoRedirect = false</c>, the default decompression): a 3xx goes to the
     /// core as it is, which decides what it means, and the core asks for no compression. The
@@ -168,22 +168,22 @@ public sealed record OpAmpClientOptions
     public TimeProvider? TimeProvider { get; init; }
 
     /// <summary>
-    /// Who speaks HTTP and WebSocket. <see cref="OpAmpMode.Rust"/>: the shared core itself
-    /// (HTTP/1.1, WebSocket, CONNECT and SOCKS5), over the client's own TCP
-    /// connections and SslStream with <see cref="Tls"/>; .NET only opens connections, starts TLS,
-    /// answers which proxy to use and writes package files. <see cref="OpAmpMode.DotNet"/>: .NET's
-    /// HttpClient and ClientWebSocket. Default (null): Rust mode, unless <see cref="HttpClient"/>
-    /// is set, which only .NET mode can use. An option only one mode honours is never ignored: it
+    /// Who speaks HTTP and WebSocket. <see cref="OpAmpMode.Core"/>: the shared core itself
+    /// (HTTP/1.1, WebSocket, CONNECT and SOCKS5), over the client's own TCP connections and
+    /// SslStream with <see cref="Tls"/>; .NET only opens connections, starts TLS, answers which
+    /// proxy to use and writes package files. <see cref="OpAmpMode.Platform"/>: .NET's HttpClient
+    /// and ClientWebSocket. Default (null): core mode, unless <see cref="HttpClient"/> is set,
+    /// which only platform mode can use. An option only one mode honours is never ignored: it
     /// selects that mode, or <c>Start</c> throws with what to set instead.
     /// </summary>
     public OpAmpMode? Mode { get; init; }
 
     /// <summary>
-    /// Rust mode: package files go from the socket to the file without passing through the core,
-    /// where the response says how long the body is. Default true. It is Rust mode's: false in
-    /// <see cref="OpAmpMode.DotNet"/> is an error.
+    /// Core mode: package files go from the socket to the file without passing through the core,
+    /// where the response says how long the body is. Default true. It is core mode's: false in
+    /// <see cref="OpAmpMode.Platform"/> is an error.
     /// </summary>
-    public bool RustSplice { get; init; } = true;
+    public bool SpliceDownloads { get; init; } = true;
 
     /// <summary>
     /// What ToString prints: every member, but not the headers' values or a password in
@@ -203,7 +203,7 @@ public sealed record OpAmpClientOptions
         (nameof(this.MaxReceiveBytes), this.MaxReceiveBytes),
         (nameof(this.Tls), this.Tls),
         (nameof(this.Proxy), Redacted.Url(this.Proxy)),
-        (nameof(this.ProxyUseLocalResolver), this.ProxyUseLocalResolver),
+        (nameof(this.ProxyResolveLocally), this.ProxyResolveLocally),
         (nameof(this.DirectConnection), this.DirectConnection),
         (nameof(this.HttpClient), this.HttpClient),
         (nameof(this.StateFile), this.StateFile),
@@ -215,21 +215,21 @@ public sealed record OpAmpClientOptions
         (nameof(this.DownloadTimeout), this.DownloadTimeout),
         (nameof(this.TimeProvider), this.TimeProvider),
         (nameof(this.Mode), this.Mode),
-        (nameof(this.RustSplice), this.RustSplice));
+        (nameof(this.SpliceDownloads), this.SpliceDownloads));
 }
 
 /// <summary>Who speaks HTTP and WebSocket: <see cref="OpAmpClientOptions.Mode"/>.</summary>
 public enum OpAmpMode
 {
+    /// <summary>The shared core itself, over .NET's sockets and SslStream (the default).</summary>
+    Core,
+
     /// <summary>
     /// .NET's HttpClient and ClientWebSocket: for an application that brings its own HttpClient
     /// (<see cref="OpAmpClientOptions.HttpClient"/>, which selects it too) or needs .NET's own
     /// stack (the system's proxy settings).
     /// </summary>
-    DotNet,
-
-    /// <summary>The shared core itself, over .NET's sockets and SslStream (the default).</summary>
-    Rust,
+    Platform,
 }
 
 /// <summary>The agent's status as the client starts. The first message reports it in full.</summary>
@@ -361,8 +361,8 @@ public abstract record OpAmpNotification
 /// Everything OpAMP (what to send and when, backoff, heartbeats, full reports, instance UIDs,
 /// agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After, size
 /// limits) is the shared core, run natively (a native library). By default
-/// (<see cref="OpAmpMode.Rust"/>) the core speaks HTTP and WebSocket itself too, over .NET's
-/// sockets and SslStream; in <see cref="OpAmpMode.DotNet"/> this class carries out the core's
+/// (<see cref="OpAmpMode.Core"/>) the core speaks HTTP and WebSocket itself too, over .NET's
+/// sockets and SslStream; in <see cref="OpAmpMode.Platform"/> this class carries out the core's
 /// requests with HttpClient and ClientWebSocket instead. Either way it feeds back what happened, so
 /// it behaves exactly like the other languages' clients on the same core. Everything runs on one loop
 /// of its own; the methods may be called from any thread, the callback's included. What the callback
@@ -409,25 +409,26 @@ public sealed class OpAmpClient
         this.started0 = this.time.GetTimestamp();
         this.stepped = seams?.Stepped;
         var files = seams?.Files ?? FileOps.Real;
-        var rust = options.Mode switch
+        var coreMode = options.Mode switch
         {
-            // None named: Rust mode, unless the application brought its own HttpClient, which only
-            // .NET mode can use.
+            // None named: core mode, unless the application brought its own HttpClient, which only
+            // platform mode can use.
             null => options.HttpClient is null,
-            OpAmpMode.DotNet => false,
-            OpAmpMode.Rust => true,
-            _ => throw new ArgumentException($"Mode is Rust or DotNet, not {options.Mode}", nameof(options)),
+            OpAmpMode.Platform => false,
+            OpAmpMode.Core => true,
+            _ => throw new ArgumentException($"Mode is Core or Platform, not {options.Mode}", nameof(options)),
         };
-        if (!rust && !options.RustSplice)
+        if (!coreMode && !options.SpliceDownloads)
         {
             // Nothing one mode alone honours is ignored.
-            throw new ArgumentException("RustSplice is Rust mode's (HttpClient writes package files itself): leave it true, or run in Rust mode (no HttpClient, and Mode unset or Rust)", nameof(options));
+            throw new ArgumentException("SpliceDownloads is core mode's (HttpClient writes package files itself): leave it true, or run in core mode (no HttpClient, and Mode unset or Core)", nameof(options));
         }
 
-        // First: bad TLS or proxy settings throw here. In Rust mode the platform's transport carries
-        // only what a core that isn't the real one hands over (the real core asks for streams).
-        this.transport = seams?.Transport ?? (rust
-            ? ClientTransport.Create(CheckRust(options).Tls, options.Proxy, direct: options.Proxy is null)
+        // First: bad TLS or proxy settings throw here. In core mode the platform's transport
+        // carries only what a core that isn't the real one hands over (the real core asks for
+        // streams).
+        this.transport = seams?.Transport ?? (coreMode
+            ? ClientTransport.Create(CheckCore(options).Tls, options.Proxy, direct: options.Proxy is null)
             : ClientTransport.Create(options));
         // The transport is the endpoint's scheme, as the core reads it: whichever effects come
         // (requests or a connection) are carried out.
@@ -456,10 +457,10 @@ public sealed class OpAmpClient
             RequestInstanceUid = options.RequestInstanceUid,
             MaxPackageBytes = options.MaxPackageBytes,
             DownloadTimeoutMs = Ms(options.DownloadTimeout),
-            Streams = rust,
-            SpliceDownloads = rust && options.RustSplice,
-            // Rust mode: the core picks each connection's proxy from this.
-            Proxy = rust ? RustProxyChoice(options, seams?.Environment ?? Environment.GetEnvironmentVariable) : null,
+            Streams = coreMode,
+            SpliceDownloads = coreMode && options.SpliceDownloads,
+            // Core mode: the core picks each connection's proxy from this.
+            Proxy = coreMode ? CoreProxyChoice(options, seams?.Environment ?? Environment.GetEnvironmentVariable) : null,
         };
         if (options.StateFile is { } stateFile)
         {
@@ -488,7 +489,7 @@ public sealed class OpAmpClient
         this.instanceUid = this.core.Initial.InstanceUid.ToByteArray();
         this.notify = notify ?? (_ => { });
         this.executor = new Executor(this.transport, this.Enqueue, options.StateFile, this.time, files);
-        if (rust)
+        if (coreMode)
         {
             this.streams = new Streams(
                 this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), _ => ProxyAnswerFor(options), seams?.Net, this.time);
@@ -591,7 +592,7 @@ public sealed class OpAmpClient
     /// <summary>
     /// The endpoint the client uses now: where its latest OpAMP request or WebSocket connection went,
     /// which after the server moved the agent (an offer of connection settings) is the offered one,
-    /// or the configured one again once an offer failed. Null before any outcome, and in Rust mode,
+    /// or the configured one again once an offer failed. Null before any outcome, and in core mode,
     /// where the core makes the requests itself (the configured one is all there is to name then).
     /// The URL is as the core gave it: redact it before logging.
     /// </summary>
@@ -603,10 +604,10 @@ public sealed class OpAmpClient
     /// <summary>Effects' work still running (requests, connections, downloads, saves): for tests.</summary>
     internal int Working => this.executor.InFlight.Working + (this.streams?.In.Working ?? 0);
 
-    /// <summary>Rust mode's streams open, connecting or lingering: for tests.</summary>
+    /// <summary>Core mode's streams open, connecting or lingering: for tests.</summary>
     internal int LiveStreams => this.streams?.Live ?? 0;
 
-    /// <summary>Rust mode's work that waits on the network or the clock: for tests.</summary>
+    /// <summary>Core mode's work that waits on the network or the clock: for tests.</summary>
     internal int StreamsParked => this.streams?.Parked ?? 0;
 
     /// <summary>Change the agent description.</summary>
@@ -679,12 +680,12 @@ public sealed class OpAmpClient
     /// <summary>A size for the core: a negative one is refused at start, as a negative time is.</summary>
     private static ulong Bytes(long n) => unchecked((ulong)n);
 
-    /// <summary>Rust mode: what can't apply there is an error, at start.</summary>
-    private static OpAmpClientOptions CheckRust(OpAmpClientOptions o)
+    /// <summary>Core mode: what can't apply there is an error, at start.</summary>
+    private static OpAmpClientOptions CheckCore(OpAmpClientOptions o)
     {
         if (o.HttpClient is not null)
         {
-            throw new ArgumentException("HttpClient can't be used in Rust mode: the core speaks HTTP itself, over the client's own connections (set Tls and Proxy instead, or leave Mode unset: an HttpClient selects .NET mode)", nameof(o));
+            throw new ArgumentException("HttpClient can't be used in core mode: the core speaks HTTP itself, over the client's own connections (set Tls and Proxy instead, or leave Mode unset: an HttpClient selects platform mode)", nameof(o));
         }
 
         if (o.Proxy is not null && o.DirectConnection)
@@ -700,9 +701,9 @@ public sealed class OpAmpClient
                 throw new ArgumentException("Proxy is an http://, https://, socks5:// or socks5h:// URL", nameof(o));
             }
 
-            if (o.ProxyUseLocalResolver && scheme is "http" or "https")
+            if (o.ProxyResolveLocally && scheme is "http" or "https")
             {
-                throw new ArgumentException("ProxyUseLocalResolver can't be honoured: an HTTP proxy is given the server's host name (CONNECT host:port) and resolves it itself", nameof(o));
+                throw new ArgumentException("ProxyResolveLocally can't be honoured: an HTTP proxy is given the server's host name (CONNECT host:port) and resolves it itself", nameof(o));
             }
         }
 
@@ -710,20 +711,20 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
-    /// The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+    /// The variables core mode's proxy rule reads (tests/shell-tables/README.md, "core mode's proxy
     /// rule"). The core applies the rule; the client only reads them, once.
     /// </summary>
-    internal static readonly string[] RustProxyVariables =
+    internal static readonly string[] CoreProxyVariables =
     [
         "REQUEST_METHOD", "HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy",
     ];
 
     /// <summary>
-    /// What Rust mode tells the core about proxies, once (Config.proxy): none if DirectConnection;
+    /// What core mode tells the core about proxies, once (Config.proxy): none if DirectConnection;
     /// the configured proxy (with its credentials), if any; else the environment's variables, from
     /// which the core picks each connection's proxy by the shared rule.
     /// </summary>
-    internal static ProxyChoice RustProxyChoice(OpAmpClientOptions o, Func<string, string?> env)
+    internal static ProxyChoice CoreProxyChoice(OpAmpClientOptions o, Func<string, string?> env)
     {
         if (o.DirectConnection)
         {
@@ -732,11 +733,11 @@ public sealed class OpAmpClient
 
         if (o.Proxy is { } p)
         {
-            return new ProxyChoice { Url = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver };
+            return new ProxyChoice { Url = p.OriginalString.Trim(), ResolveLocally = o.ProxyResolveLocally };
         }
 
-        var choice = new ProxyChoice { ResolveLocally = o.ProxyUseLocalResolver };
-        foreach (var name in RustProxyVariables)
+        var choice = new ProxyChoice { ResolveLocally = o.ProxyResolveLocally };
+        foreach (var name in CoreProxyVariables)
         {
             if (env(name) is { } value)
             {
@@ -748,13 +749,13 @@ public sealed class OpAmpClient
     }
 
     /// <summary>
-    /// Rust mode's answer to the core's proxy question, which the core asks only when it wasn't
-    /// told (<see cref="RustProxyChoice"/>): the configured proxy (with its credentials), or none.
+    /// Core mode's answer to the core's proxy question, which the core asks only when it wasn't
+    /// told (<see cref="CoreProxyChoice"/>): the configured proxy (with its credentials), or none.
     /// The environment's rule is the core's.
     /// </summary>
     internal static ProxyAnswer ProxyAnswerFor(OpAmpClientOptions o) =>
         !o.DirectConnection && o.Proxy is { } p
-            ? new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyUseLocalResolver }
+            ? new ProxyAnswer { Proxy = p.OriginalString.Trim(), ResolveLocally = o.ProxyResolveLocally }
             : new ProxyAnswer();
 
     private OpAmpNotification? FromCore(Notification n) => n.KindCase switch
@@ -952,7 +953,7 @@ public sealed class OpAmpClient
                 }
                 else if (this.streams?.Run(effect) != true)
                 {
-                    // Rust mode: what isn't a stream's or a download file's (a save, a cancel, a
+                    // Core mode: what isn't a stream's or a download file's (a save, a cancel, a
                     // platform effect from a core that isn't the real one) is the executor's.
                     this.executor.Run(effect);
                 }
@@ -1059,8 +1060,8 @@ public sealed class OpAmpClient
         // The core has waited for the goodbye and the closing handshake and cancelled the rest:
         // release everything (anything left, after an error), and let the cancelled work finish,
         // within what is left of the stop timeout (but a short grace to unwind; all of it when the
-        // client stopped on its own): nothing the client started runs on after stop.
-        // Rust mode: the core has closed every stream by now (what is left after an error is reset).
+        // client stopped on its own): nothing the client started runs on after stop. Core mode: the
+        // core has closed every stream by now (what is left after an error is reset).
         var bound = this.DrainBound();
         await Task.WhenAll(this.executor.ReleaseAsync(bound), this.streams?.ShutdownAsync(bound) ?? Task.CompletedTask).ConfigureAwait(false);
         this.transport.Dispose();
@@ -1097,9 +1098,9 @@ internal sealed record Seams
     /// <summary>Its own core tap's path, instead of OPAMP_CORE_TAP's.</summary>
     public string? Tap { get; init; }
 
-    /// <summary>Rust mode: the network (connects, TLS, resolution) instead of .NET's.</summary>
+    /// <summary>Core mode: the network (connects, TLS, resolution) instead of .NET's.</summary>
     public StreamsNet? Net { get; init; }
 
-    /// <summary>Rust mode: the environment the proxy rule reads, instead of the process's.</summary>
+    /// <summary>Core mode: the environment the proxy rule reads, instead of the process's.</summary>
     public Func<string, string?>? Environment { get; init; }
 }

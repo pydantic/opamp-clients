@@ -5,11 +5,12 @@
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { beforeEach, test } from "node:test";
 
 import {
@@ -549,3 +550,70 @@ test("a move nobody answers is FAILED, and the agent carries on where it was wit
     s.close();
   }
 });
+
+/**
+ * A copy of the client package whose core is `spoil`ed (a module removed or replaced), and the
+ * `--import` that has the package resolve to it: as an installation missing or holding a broken
+ * module would. Removed at the test's end.
+ */
+function spoiledCore(t: { after: (fn: () => void) => void }, spoil: (core: string) => void): string {
+  const real = realpathSync(fileURLToPath(new URL("../../node_modules/@pydantic/opamp-client/", import.meta.url)));
+  const copy = mkdtempSync(join(tmpdir(), "opamp-core-copy-"));
+  t.after(() => rmSync(copy, { recursive: true, force: true }));
+  for (const part of ["package.json", "dist", "core"]) cpSync(join(real, part), join(copy, part), { recursive: true });
+  symlinkSync(join(real, "node_modules"), join(copy, "node_modules"));
+  spoil(join(copy, "core"));
+  const at = pathToFileURL(`${copy}/`).href;
+  writeFileSync(join(copy, "hooks.mjs"), `
+    const to = { "@pydantic/opamp-client": "dist/src/index.js", "@pydantic/opamp-client/sdk": "dist/src/sdk.js" };
+    export async function resolve(specifier, context, next) {
+      return specifier in to ? { url: new URL(to[specifier], ${JSON.stringify(at)}).href, shortCircuit: true } : next(specifier, context);
+    }`);
+  writeFileSync(join(copy, "use.mjs"), `import { register } from "node:module"; register(${JSON.stringify(`${at}hooks.mjs`)});`);
+  return join(copy, "use.mjs");
+}
+
+// A module that compiles but can't be instantiated: it asks for an import nobody gives.
+const NEEDS_AN_IMPORT = Uint8Array.from([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 1, 4, 1, 0x60, 0, 0, 2, 7, 1, 1, 0x6d, 1, 0x66, 0, 0]);
+
+const SERVER = "http://127.0.0.1:9/v1/opamp";
+
+for (const [what, spoil, endpoint] of [
+  ["the client core's module is missing", (core: string) => rmSync(join(core, "opamp_core.wasm")), SERVER],
+  ["the client core's module is not a module", (core: string) => writeFileSync(join(core, "opamp_core.wasm"), "not a module"), SERVER],
+  ["the SDK settings module is not a module", (core: string) => writeFileSync(join(core, "opamp_sdk_settings.wasm"), "not a module"), SERVER],
+  ["the SDK settings module can't be instantiated", (core: string) => writeFileSync(join(core, "opamp_sdk_settings.wasm"), NEEDS_AN_IMPORT), SERVER],
+  // Without a server the settings layer is never loaded: nothing to say.
+  ["the SDK settings module is not a module, with no server", (core: string) => writeFileSync(join(core, "opamp_sdk_settings.wasm"), "not a module"), undefined],
+] as const) {
+  test(`${what}: register returns, the SDK runs unmanaged${endpoint === undefined ? "" : ", and it is said once"}`, async (t) => {
+    const use = spoiledCore(t, spoil);
+    const child = spawn(process.execPath, ["--import", use, "--input-type=module", "-e", `
+      import { trace } from "@opentelemetry/api";
+      import { AGENT, register, setupFromEnv } from ${JSON.stringify(INDEX)};
+      const options = ${JSON.stringify(endpoint === undefined ? {} : { endpoint })};
+      const { shutdown } = register(options);
+      setupFromEnv(process.env, options);  // set up again: not said again
+      trace.getTracer("app").startActiveSpan("work", (span) => span.end());
+      if (AGENT.on) throw new Error("managed");
+      await shutdown();`], {
+      env: {
+        ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith("OTEL_"))),
+        OTEL_TRACES_EXPORTER: "console",
+        OTEL_METRICS_EXPORTER: "none",
+        OTEL_LOGS_EXPORTER: "none",
+      },
+    });
+    let out = "";
+    child.stdout.on("data", (d: Buffer) => (out += d.toString()));
+    child.stderr.on("data", (d: Buffer) => (out += d.toString()));
+    const timer = setTimeout(() => child.kill("SIGKILL"), 15_000);
+    const code = await new Promise<number | null>((r) => child.once("exit", (c) => r(c)));
+    clearTimeout(timer);
+    assert.equal(code, 0, out);
+    assert.match(out, /name: 'work'/, "the SDK exported the application's span");
+    const said = out.split("\n").filter((l) => l.includes("OpAMP"));
+    assert.equal(said.length, endpoint === undefined ? 0 : 1, out);
+    if (endpoint !== undefined) assert.match(said[0]!, new RegExp(`^OpAMP: the core can't be loaded on ${process.platform}-${process.arch}; the SDK runs unmanaged: \\S`));
+  });
+}

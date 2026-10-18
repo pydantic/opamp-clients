@@ -9,6 +9,7 @@ import { test } from "node:test";
 
 import {
   CoreError,
+  coreUnavailable,
   create,
   identifySetup,
   SetupIdentitySchema,
@@ -17,6 +18,12 @@ import {
   SetupVariableSchema,
   startSetup,
 } from "../src/index.js";
+import { settingsUnavailable } from "../src/sdk.js";
+
+test("the core in place loads: nothing is unavailable", () => {
+  assert.equal(coreUnavailable(), undefined);
+  assert.equal(settingsUnavailable(), undefined);
+});
 
 test("Setup is the core's call", () => {
   assert.equal(startSetup(create(SetupStartSchema)).off, true);

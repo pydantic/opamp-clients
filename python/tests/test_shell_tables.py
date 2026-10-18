@@ -20,11 +20,11 @@ from urllib.parse import urlsplit
 import pytest
 import yarl
 
-from opamp_client._executor import Executor
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._core import Core
-from opamp_client._streams import proxy_choice
-from opamp_client._transport import TLS, Proxy, Transport
+from pydantic_opamp_client._executor import Executor
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._streams import proxy_choice
+from pydantic_opamp_client._transport import TLS, Proxy, Transport
 
 TABLES = next(p / "tests" / "shell-tables" for p in Path(__file__).resolve().parents
               if (p / "tests" / "shell-tables").is_dir())
@@ -47,8 +47,8 @@ def same_host(got: str | None, want: str) -> bool:
         return got == want
 
 
-def test_python_mode_reads_every_url_alike() -> None:
-    """Python mode hands each URL to aiohttp as a yarl.URL taken as it is written (encoded=True,
+def test_platform_mode_reads_every_url_alike() -> None:
+    """Platform mode hands each URL to aiohttp as a yarl.URL taken as it is written (encoded=True,
     the executor's _url): requests, WebSocket upgrades and downloads alike."""
     wrong = []
     for u in URLS:
@@ -59,8 +59,8 @@ def test_python_mode_reads_every_url_alike() -> None:
     assert not wrong
 
 
-def test_rust_mode_picks_the_proxy_for_every_url_by_its_host_and_port() -> None:
-    """Rust mode's core reads the URL itself; the shell reads only its scheme, host and port, to
+def test_core_mode_picks_the_proxy_for_every_url_by_its_host_and_port() -> None:
+    """Core mode's core reads the URL itself; the shell reads only its scheme, host and port, to
     pick the proxy (Transport.proxy_for, by urllib.parse.urlsplit)."""
     wrong = []
     for u in URLS:
@@ -97,7 +97,7 @@ async def _raw_server(seen: list[str], status: bytes) -> tuple[asyncio.Server, i
 
 
 @pytest.mark.parametrize("how", ["http_request", "download", "ws_open"])
-def test_python_mode_sends_every_urls_request_target_exactly(how: str, tmp_path) -> None:
+def test_platform_mode_sends_every_urls_request_target_exactly(how: str, tmp_path) -> None:
     async def run() -> None:
         seen: list[str] = []
         server, port = await _raw_server(seen, b"400 Bad Request" if how == "ws_open" else b"200 OK")
@@ -161,8 +161,8 @@ PROXY_DIFFERENCES = {
 
 
 @pytest.mark.parametrize("case", PROXY, ids=[c["id"] for c in PROXY])
-def test_the_proxy_the_environment_names_python_mode(case: dict) -> None:
-    """Python mode: the connector's Transport.route, by urllib's convention, with the differences
+def test_the_proxy_the_environment_names_platform_mode(case: dict) -> None:
+    """Platform mode: the connector's Transport.route, by urllib's convention, with the differences
     above; the environment is given to it (no other variable: the process's own are left
     alone)."""
     try:
@@ -176,7 +176,7 @@ def test_the_proxy_the_environment_names_python_mode(case: dict) -> None:
 
 
 def _core_route(choice: corepb.ProxyChoice, url: str) -> str | None:
-    """Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+    """Where core mode's core connects first for `url` when told `choice`: the proxy as the table
     writes a route (scheme://host:port, credentials left out), or None for directly. The core
     picks it itself: it asks no proxy_query."""
     core = Core(corepb.Config(instance_uid=bytes(16), endpoint=url, streams=True, entropy=bytes(32), proxy=choice))
@@ -208,29 +208,29 @@ def _core_route(choice: corepb.ProxyChoice, url: str) -> str | None:
 
 # covers: RULE-PROXY-02
 @pytest.mark.parametrize("case", PROXY, ids=[c["id"] for c in PROXY])
-def test_the_proxy_the_environment_names_rust_mode(case: dict) -> None:
-    """Rust mode: the client hands the core the environment's variables (Config.proxy) and the
+def test_the_proxy_the_environment_names_core_mode(case: dict) -> None:
+    """Core mode: the client hands the core the environment's variables (Config.proxy) and the
     core picks by the shared rule, exactly as the table says (tests/shell-tables/README.md): no
     differences. Through this client's reading of the environment and the core it ships."""
-    choice = proxy_choice(Transport(rust=True, _environ=case["env"]))
+    choice = proxy_choice(Transport(core_mode=True, _environ=case["env"]))
     assert _core_route(choice, case["url"]) == case["proxy"], case["why"]
 
 
 # covers: RULE-PROXY-02
-def test_rust_mode_tells_the_core_its_proxy() -> None:
-    """What Rust mode tells the core: the configured proxy and no variables; none with
+def test_core_mode_tells_the_core_its_proxy() -> None:
+    """What core mode tells the core: the configured proxy and no variables; none with
     Proxy.DIRECT; otherwise each variable the rule reads that is set, even empty, by its own name.
     A proxy_query (only a core that wasn't told asks) hears the configured proxy or none."""
     env = {"HTTP_PROXY": "http://env:1", "no_proxy": "", "REQUEST_METHOD": "GET", "OTHER": "x"}
-    configured = Transport(proxy=Proxy("http://u:p%40ss@configured:8080", headers={"X-A": "1"}), rust=True, _environ=env)
+    configured = Transport(proxy=Proxy("http://u:p%40ss@configured:8080", headers={"X-A": "1"}), core_mode=True, _environ=env)
     assert proxy_choice(configured) == corepb.ProxyChoice(url="http://u:p%40ss@configured:8080",
                                                           headers=[corepb.Header(name="X-A", value="1")])
     answer = configured.proxy_for("http://x/")
     assert answer is not None and answer.url == "http://u:p%40ss@configured:8080"
-    direct = Transport(proxy=Proxy.DIRECT, rust=True, _environ=env)
+    direct = Transport(proxy=Proxy.DIRECT, core_mode=True, _environ=env)
     assert proxy_choice(direct) == corepb.ProxyChoice(direct=True)
     assert direct.proxy_for("http://x/") is None
-    from_env = Transport(rust=True, _environ=env)
+    from_env = Transport(core_mode=True, _environ=env)
     assert proxy_choice(from_env) == corepb.ProxyChoice(environment=[
         corepb.Header(name="REQUEST_METHOD", value="GET"), corepb.Header(name="HTTP_PROXY", value="http://env:1"),
         corepb.Header(name="no_proxy", value="")])
@@ -238,7 +238,7 @@ def test_rust_mode_tells_the_core_its_proxy() -> None:
     # The core reads them by the rule: CGI, so none.
     assert _core_route(proxy_choice(from_env), "http://example.com/") is None
     # A value the core can't use is its to refuse (the connection fails): no error here.
-    assert proxy_choice(Transport(rust=True, _environ={"HTTP_PROXY": "ftp://x"})).environment[0].value == "ftp://x"
+    assert proxy_choice(Transport(core_mode=True, _environ={"HTTP_PROXY": "ftp://x"})).environment[0].value == "ftp://x"
 
 
 # TLS.
@@ -280,7 +280,7 @@ def test_an_encrypted_key_without_its_password_is_refused_not_asked_for() -> Non
     """With no key_password, OpenSSL would ask for the pass phrase on the terminal, or read it from
     standard input: the client must refuse the key instead, whatever is there to read."""
     case = next(c for c in TLS_CASES if c["id"] == "client-key-encrypted")
-    code = (f"from opamp_client._transport import TLS\n"
+    code = (f"from pydantic_opamp_client._transport import TLS\n"
             f"TLS(cert_file={str(TABLES / case['cert'])!r}, key_file={str(TABLES / case['key'])!r}).context()\n")
     # tls/gen.sh's pass phrase, there to be read.
     r = subprocess.run([sys.executable, "-c", code], input="secret\n", capture_output=True, text=True, timeout=60)

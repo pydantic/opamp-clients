@@ -88,13 +88,13 @@ func main() {
 	if n, err := strconv.ParseUint(os.Getenv("DRIVER_MAX_SEND_BYTES"), 10, 64); err == nil {
 		cfg.MaxSendBytes = n
 	}
-	// The mode is always asked for by name, never left to the client's default: go-core is Go
-	// mode (net/http and gorilla), go-core-rust (OPAMP_GO_MODE=rust) Rust mode, where the core
-	// speaks HTTP and WebSocket itself over Go's connections and crypto/tls.
-	rust := os.Getenv("OPAMP_GO_MODE") == "rust"
-	cfg.Mode = opamp.ModeGo
-	if rust {
-		cfg.Mode = opamp.ModeRust
+	// The mode is always asked for by name, never left to the client's default: go-core is core
+	// mode, where the core speaks HTTP and WebSocket itself over Go's connections and crypto/tls;
+	// go-core-platform (OPAMP_GO_MODE=platform) platform mode (net/http and gorilla).
+	platform := os.Getenv("OPAMP_GO_MODE") == "platform"
+	cfg.Mode = opamp.ModeCore
+	if platform {
+		cfg.Mode = opamp.ModePlatform
 	}
 	if token := os.Getenv("DRIVER_TOKEN"); token != "" {
 		cfg.Header = http.Header{"Authorization": {"Bearer " + token}}
@@ -156,8 +156,8 @@ func main() {
 	}
 	uid := client.InstanceUID()
 	name := "opamp-go-core (ours)"
-	if rust {
-		name = "opamp-go-core (ours, rust mode)"
+	if platform {
+		name = "opamp-go-core (ours, platform mode)"
 	}
 	emit("started", map[string]any{"uid": hex.EncodeToString(uid[:]), "client": name})
 	close(said)

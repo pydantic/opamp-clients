@@ -3,7 +3,7 @@
 A downstream fork of upstream's
 [`opampsupervisor`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/cmd/opampsupervisor)
 at `cmd/opampsupervisor/v0.163.0`, with its OpAMP client replaced: upstream's runs on opamp-go;
-this one runs on [`go/opamp`](../opamp), the shared core in Go mode (net/http and
+this one runs on [`go/opamp`](../opamp), the shared core in platform mode (net/http and
 gorilla/websocket, so the configured TLS settings and the environment's proxies apply as before).
 It supervises any vendor's collector, as upstream's does: the collector needs the `opamp`
 extension, upstream's or [ours](../opampextension). The config is upstream's; what differs is
@@ -17,6 +17,11 @@ extension and a systemd unit, and enrolls the host in one step:
 ```sh
 echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
+
+It writes a remote config policy: the server's configs may use the components a Logfire config
+needs, send only to the OpAMP server's host (or the `--exporter-endpoint`s given), read no file
+(or only the `--log-path`s given), and reference no `${env:...}` or `${file:...}`
+([what the server can do](packaging/README.md#what-the-server-can-do-to-this-host)).
 
 The [macOS .pkg](packaging/README.md#macos) and the [Windows .msi](packaging/README.md#windows)
 do the same with a LaunchDaemon and a Windows service.
@@ -43,6 +48,12 @@ storage:
   state_key: auto
 agent:
   executable: /usr/bin/otelcol-contrib
+  remote_config_policy:
+    allowed_components:
+      receivers: [otlp, hostmetrics]
+      processors: [batch]
+      exporters: [otlphttp]
+    allowed_exporter_endpoints: ["https://logfire-us.pydantic.dev"]
 ```
 
 ## What changes
@@ -51,7 +62,7 @@ agent:
   server may issue new OpAMP connection settings (per-agent credentials replacing an enrollment
   token, say). The core tries them, keeps them only once the server has accepted a connection
   with them, goes back to the old ones otherwise, and keeps them in
-  `<storage.directory>/opamp-client.state` (0600), so a restarted Supervisor connects with the
+  `<storage.directory>/opamp-state` (0600), so a restarted Supervisor connects with the
   issued credentials, not the ones in its config
   ([docs/connection-settings.md](../../docs/connection-settings.md)). Upstream's kept them in
   memory only, and "verified" them by restarting its client. The state file also keeps the
@@ -72,10 +83,17 @@ agent:
 - **An `auth` extension runs on every HTTP request, and at every WebSocket upgrade** (a
   refreshed token is used from the next one). It can't be combined with
   `accepts_opamp_connection_settings`, since it would overwrite the headers the server issued.
-- **The remote config can be limited** (`agent.remote_config_policy`): to the component types
-  listed for each kind, and the confmap providers listed, so a server can't point a `filelog`
-  receiver at any file the collector reads or `${file:...}` a secret into an exporter. A config
-  refused is FAILED and never runs. Upstream has no limit.
+- **The remote config can be limited** (`agent.remote_config_policy`), and the packages limit
+  it: to the component types listed for each kind and the confmap providers listed; the
+  exporters (and the collector's own telemetry) to the endpoints listed, with no proxy or TLS
+  setting of their own; and `filelog` receivers to the paths listed. So a server can't point a
+  `filelog` receiver at any file the collector reads, `${file:...}` a secret into an exporter,
+  or send what it collects anywhere. A config refused is FAILED, with the reason, and never
+  runs. The policy is read with confmap, as the config is merged (a `receivers::filelog` key is a
+  receiver). Without a policy the Supervisor says at start that the remote config is
+  unrestricted. Upstream has no limit. What the packaged policy allows, how to widen it on the
+  host, and what a server can still do:
+  [packaging/README.md](packaging/README.md#what-the-server-can-do-to-this-host).
 - **Remote config statuses are about the last config received.** After an automatic rollback
   (`automatic_config_rollback`) the server keeps the FAILED status of the config that failed;
   upstream's also reported the restored one APPLIED, under that config's hash. The effective
@@ -270,7 +288,7 @@ By default, the supervisor will use `/var/lib/otelcol/supervisor` on posix syste
 
 This directory will be created on supervisor startup if it does not exist.
 
-(Changed here: it also holds `opamp-client.state`, the OpAMP client's state, with any connection
+(Changed here: it also holds `opamp-state`, the OpAMP client's state, with any connection
 settings the server issued. It is written readable by the Supervisor's user only, and sealed with
 `storage.state_key` if set.)
 

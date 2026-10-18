@@ -393,7 +393,8 @@ CASES: dict[str, tuple[list[Log], list[Log]]] = {
          # Number 0 again: the first reply was lost, then one was an error (RULE-CLIENT-20).
          Log().send(FULL).send(FULL, seq=0).respond(error="BAD_REQUEST").send(FULL, seq=0).respond()
               .send(seq=1).respond(),
-         # Over WebSocket a message may cross the first answer (java-core status-change-ws, under load).
+         # Over WebSocket a message may cross the first answer (java-core-platform status-change-ws,
+         # under load).
          Log("ws").send(FULL).respond().send(seq=0).respond().send(seq=1).respond()],
         [clean().send(seq=1).respond(), Log().send(FULL, seq=0).send(seq=5),
          Log().send(FULL).respond().send(seq=0).respond(),
@@ -531,13 +532,13 @@ CASES: dict[str, tuple[list[Log], list[Log]]] = {
          # next message uses the newer UID (torture, node ws).
          Log("ws").send(FULL).respond(assign_uid=UID2).send(uid=UID).respond(assign_uid=UID3).at(102).send(uid=UID3),
          # Assigned in reply to a goodbye: the client closed that conversation as it said goodbye
-         # (torture, go-core ws).
+         # (torture, go-core-platform ws).
          Log("ws").send(FULL).respond(assign_uid=UID2).at(102).send(uid=UID2).respond()
                   .send(uid=UID2, disconnect=True).respond(assign_uid=UID3)
                   .server("close_frame_received", conn=1, answers_server_close=False)
                   .at(104).server("ws_open", conn=2).send(FULL, conn=2, uid=UID2),
          # The goodbye crossed the reply that assigned a UID: the client said goodbye before it
-         # could read it, and its next run keeps the UID it had (torture, python-core ws).
+         # could read it, and its next run keeps the UID it had (torture, python-core-platform ws).
          Log("ws").send(FULL).respond(assign_uid=UID2).send(uid=UID2).respond()
                   .send(uid=UID2).send(uid=UID2, disconnect=True).server("s2a", msg=3, http_status=200, assign_uid=UID3)
                   .at(104).server("ws_open", conn=2).send(FULL, conn=2, uid=UID2)],
@@ -594,7 +595,7 @@ CASES: dict[str, tuple[list[Log], list[Log]]] = {
         [Log().send(FULL, payload="big").respond(http_status=413).send(["health"], payload="small"),
          Log().send(FULL, payload="big").respond(http_status=413).send().respond(report_full_state=True)
               .send(FULL, payload="big"),
-         # Torture seed 20260929 (node-rust, ws): a status change put the client one message ahead
+         # Torture seed 20260929 (node-core, ws): a status change put the client one message ahead
          # of the server's asks, so the answer to the second ask crossed the rejection of the answer
          # to the first.
          Log("ws").send(FULL).respond().send().respond(report_full_state=True)

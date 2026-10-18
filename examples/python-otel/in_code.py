@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""app.py's application, with its SDK set up in code: opamp_otel.configure() in place of
+"""app.py's application, with its SDK set up in code: pydantic_opamp_otel.configure() in place of
 ``opentelemetry-instrument``, and the OpAMP server given there, from the application's own
 settings (here its own variables) rather than the OTEL_OPAMP_* ones.
 
@@ -16,10 +16,10 @@ import sys
 import time
 import urllib.request
 
-import opamp_otel
+import pydantic_opamp_otel
 from opentelemetry.instrumentation.urllib import URLLibInstrumentor
 
-opamp_otel.configure(
+pydantic_opamp_otel.configure(
     endpoint=os.environ["CHECKOUT_OPAMP_URL"],
     headers={"Authorization": f"Bearer {os.environ['CHECKOUT_OPAMP_KEY']}"},  # sent as given, not %-decoded
     state_dir=os.environ.get("CHECKOUT_STATE_DIR"),  # unset: a directory of the user's own

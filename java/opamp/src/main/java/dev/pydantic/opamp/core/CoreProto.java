@@ -583,7 +583,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -592,7 +592,7 @@ public final class CoreProto {
     java.lang.String getUserAgent();
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1431,7 +1431,7 @@ public final class CoreProto {
     private java.lang.String userAgent_;
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1443,7 +1443,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1456,7 +1456,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1471,7 +1471,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1482,7 +1482,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "opamp-clients"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -2792,7 +2792,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "opamp-clients"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -2804,7 +2804,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "opamp-clients"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -2817,7 +2817,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "opamp-clients"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -2832,7 +2832,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "opamp-clients"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -2845,7 +2845,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "opamp-clients"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -35506,9 +35506,10 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35517,9 +35518,10 @@ public final class CoreProto {
         getEnvList();
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35527,9 +35529,10 @@ public final class CoreProto {
     dev.pydantic.opamp.core.CoreProto.Variable getEnv(int index);
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35620,9 +35623,10 @@ public final class CoreProto {
     private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.core.CoreProto.Variable> env_;
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35633,9 +35637,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35646,9 +35651,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35659,9 +35665,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35672,9 +35679,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35693,9 +35701,10 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35709,9 +35718,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35724,9 +35734,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35740,9 +35751,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35755,9 +35767,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -35767,9 +35780,10 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-     * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-     * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+     * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+     * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+     * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+     * given twice: the last.
      * </pre>
      *
      * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36109,9 +36123,10 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36123,9 +36138,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36135,9 +36151,10 @@ public final class CoreProto {
         return instance.getEnvCount();
       }/**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36148,9 +36165,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36163,9 +36181,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36179,9 +36198,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36193,9 +36213,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36208,9 +36229,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36223,9 +36245,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36239,9 +36262,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36254,9 +36278,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36268,9 +36293,10 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-       * OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-       * OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+       * The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+       * OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+       * OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+       * given twice: the last.
        * </pre>
        *
        * <code>repeated .opamp.core.v1.Variable env = 1;</code>
@@ -36737,7 +36763,8 @@ public final class CoreProto {
   }
   /**
    * <pre>
-   * What the application gives in code: each part given wins over its variable. A warning names
+   * What the application gives in code: each part given wins over its variable (but nothing wins
+   * over OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED, which turn the integration off). A warning names
    * the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
    * "the endpoint given in code".
    * </pre>
@@ -37332,7 +37359,8 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * What the application gives in code: each part given wins over its variable. A warning names
+     * What the application gives in code: each part given wins over its variable (but nothing wins
+     * over OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED, which turn the integration off). A warning names
      * the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
      * "the endpoint given in code".
      * </pre>
@@ -37943,13 +37971,37 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+     * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+     * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
      * </pre>
      *
      * <code>bool off = 1;</code>
      * @return The off.
      */
     boolean getOff();
+
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @return The offReason.
+     */
+    java.lang.String getOffReason();
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @return The bytes for offReason.
+     */
+    com.google.protobuf.ByteString
+        getOffReasonBytes();
 
     /**
      * <pre>
@@ -38201,6 +38253,7 @@ public final class CoreProto {
       // @@protoc_insertion_point(message_implements:opamp.core.v1.SetupStarted)
       SetupStartedOrBuilder {
     private SetupStarted() {
+      offReason_ = "";
       endpoint_ = "";
       headers_ = emptyProtobufList();
       stateDir_ = "";
@@ -38215,7 +38268,9 @@ public final class CoreProto {
     private boolean off_;
     /**
      * <pre>
-     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+     * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+     * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
      * </pre>
      *
      * <code>bool off = 1;</code>
@@ -38227,7 +38282,9 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+     * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+     * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
      * </pre>
      *
      * <code>bool off = 1;</code>
@@ -38239,7 +38296,9 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+     * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+     * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+     * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
      * </pre>
      *
      * <code>bool off = 1;</code>
@@ -38247,6 +38306,79 @@ public final class CoreProto {
     private void clearOff() {
 
       off_ = false;
+    }
+
+    public static final int OFF_REASON_FIELD_NUMBER = 12;
+    private java.lang.String offReason_;
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @return The offReason.
+     */
+    @java.lang.Override
+    public java.lang.String getOffReason() {
+      return offReason_;
+    }
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @return The bytes for offReason.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getOffReasonBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(offReason_);
+    }
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @param value The offReason to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setOffReason(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      offReason_ = value;
+    }
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     */
+    private void clearOffReason() {
+
+      offReason_ = getDefaultInstance().getOffReason();
+    }
+    /**
+     * <pre>
+     * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+     * empty when it is off for want of an endpoint (not configured: nothing to say).
+     * </pre>
+     *
+     * <code>string off_reason = 12;</code>
+     * @param value The bytes for offReason to set.
+     */
+    private void setOffReasonBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      offReason_ = value.toStringUtf8();
+
     }
 
     public static final int ENDPOINT_FIELD_NUMBER = 2;
@@ -39204,7 +39336,9 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+       * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+       * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
        * </pre>
        *
        * <code>bool off = 1;</code>
@@ -39216,7 +39350,9 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+       * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+       * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
        * </pre>
        *
        * <code>bool off = 1;</code>
@@ -39230,7 +39366,9 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+       * The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+       * Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+       * closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
        * </pre>
        *
        * <code>bool off = 1;</code>
@@ -39239,6 +39377,80 @@ public final class CoreProto {
       public Builder clearOff() {
         copyOnWrite();
         instance.clearOff();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+       * empty when it is off for want of an endpoint (not configured: nothing to say).
+       * </pre>
+       *
+       * <code>string off_reason = 12;</code>
+       * @return The offReason.
+       */
+      @java.lang.Override
+      public java.lang.String getOffReason() {
+        return instance.getOffReason();
+      }
+      /**
+       * <pre>
+       * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+       * empty when it is off for want of an endpoint (not configured: nothing to say).
+       * </pre>
+       *
+       * <code>string off_reason = 12;</code>
+       * @return The bytes for offReason.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getOffReasonBytes() {
+        return instance.getOffReasonBytes();
+      }
+      /**
+       * <pre>
+       * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+       * empty when it is off for want of an endpoint (not configured: nothing to say).
+       * </pre>
+       *
+       * <code>string off_reason = 12;</code>
+       * @param value The offReason to set.
+       * @return This builder for chaining.
+       */
+      public Builder setOffReason(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setOffReason(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+       * empty when it is off for want of an endpoint (not configured: nothing to say).
+       * </pre>
+       *
+       * <code>string off_reason = 12;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearOffReason() {
+        copyOnWrite();
+        instance.clearOffReason();
+        return this;
+      }
+      /**
+       * <pre>
+       * With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+       * empty when it is off for want of an endpoint (not configured: nothing to say).
+       * </pre>
+       *
+       * <code>string off_reason = 12;</code>
+       * @param value The bytes for offReason to set.
+       * @return This builder for chaining.
+       */
+      public Builder setOffReasonBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setOffReasonBytes(value);
         return this;
       }
 
@@ -40136,11 +40348,12 @@ public final class CoreProto {
               "shownEndpoint_",
               "hints_",
               "warnings_",
+              "offReason_",
             };
             java.lang.String info =
-                "\u0000\u000b\u0000\u0001\u0001\u000b\u000b\u0000\u0003\u0000\u0001\u0007\u0002\u0208" +
-                "\u0003\u001b\u0004\u0003\u0005\u0208\u0006\u021a\u0007\u0208\b\u0208\t\u0208\n\u1009" +
-                "\u0000\u000b\u021a";
+                "\u0000\f\u0000\u0001\u0001\f\f\u0000\u0003\u0000\u0001\u0007\u0002\u0208\u0003\u001b" +
+                "\u0004\u0003\u0005\u0208\u0006\u021a\u0007\u0208\b\u0208\t\u0208\n\u1009\u0000\u000b" +
+                "\u021a\f\u0208";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

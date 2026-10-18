@@ -8,7 +8,7 @@ namespace Pydantic.OpAmp.Client;
 /// <summary>
 /// An input on its way to the core: from the application (<see cref="Of"/> null), or the result of
 /// effect <see cref="Of"/>; <see cref="Final"/> if it ends that effect. <see cref="Registry"/>: the
-/// registry <see cref="Of"/> is in (null: the executor's; Rust mode's streams have their own, their
+/// registry <see cref="Of"/> is in (null: the executor's; core mode's streams have their own, their
 /// ids being the shell's, not the core's). <see cref="Ack"/>, if given, is completed once the loop
 /// has stepped with it and carried out the step's effects, or dropped it. <see cref="Turn"/>: one
 /// of the application's calls, in the queue to mark its turn (the call itself waits in the calls'

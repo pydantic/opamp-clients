@@ -4,7 +4,7 @@
 """Differential runs of the SDKs: each scenario's core taps, client against client.
 
     conformance/differential/shells.py                 # every scenario and transport in conformance/out
-    conformance/differential/shells.py --scenario packages --client go-core,java-core
+    conformance/differential/shells.py --scenario packages --client go-core-platform,java-core-platform
     conformance/differential/shells.py --strict        # exit 1 on a difference shells.toml doesn't allow
 
 Every SDK runs the same core, so on one scenario what each tells its core, and what the core decides,
@@ -38,11 +38,11 @@ ALLOWED = HERE / "shells.toml"
 # conformance/runner/run.py, else the root, which has none.
 CORE_ROOT = Path(os.environ["OPAMP_CORE_ROOT"]).resolve() if os.environ.get("OPAMP_CORE_ROOT") else ROOT
 # The client the others are compared with: the Rust client where the core's sources are to build it
-# from, and go-core where they aren't.
+# from, and go-core-platform where they aren't.
 CORE_SOURCE = CORE_ROOT != ROOT
 # opamp-tap: built from those sources, or the one scripts/fetch_core.py fetch put in the root's target/.
 TAP = (CORE_ROOT if CORE_SOURCE else ROOT) / "target" / "release" / "opamp-tap"
-REFERENCE = "rust" if CORE_SOURCE else "go-core"
+REFERENCE = "rust" if CORE_SOURCE else "go-core-platform"
 
 
 def _packages(line: str) -> tuple[str, frozenset[str]] | None:

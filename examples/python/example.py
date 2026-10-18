@@ -8,7 +8,7 @@ import signal
 import sys
 import uuid
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource

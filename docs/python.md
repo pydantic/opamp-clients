@@ -27,7 +27,7 @@ pip install ./python/core ./python        # the core's wheel for this machine, t
 import asyncio
 import os
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
 
 
 async def main() -> None:
@@ -69,15 +69,15 @@ first message reports it in full.
 
 ## Options
 
-`Config` and `Status` are dataclasses. Every option is in `python/src/opamp_client/_client.py`.
+`Config` and `Status` are dataclasses. Every option is in `python/src/pydantic_opamp_client/_client.py`.
 
 | What | Option | More |
 |---|---|---|
 | Endpoint | `Config.endpoint`: `http(s)://` polls, `ws(s)://` keeps one connection open | |
 | Headers | `Config.headers`, sent with every request and WebSocket upgrade | |
-| TLS | `Config.tls`: a `TLS` (`ca_file` or `ca_pem`, `system_cas`, `cert_file` and `key_file` or `cert_pem` and `key_pem`, `key_password`, `min_version`, `max_version`), or an `ssl.SSLContext` used as it is | [README](../python/README.md#tls-and-proxies) |
+| TLS | `Config.tls`: a `TLS` (`ca_file` or `ca_pem`, `include_system_cas`, `cert_file` and `key_file` or `cert_pem` and `key_pem`, `key_password`, `min_version`, `max_version`), or an `ssl.SSLContext` used as it is | [README](../python/README.md#tls-and-proxies) |
 | Proxy | `Config.proxy`: a `Proxy(url, headers=..., resolve_locally=...)` or just its URL; `Proxy.DIRECT` for none. Without one, the environment's | [README](../python/README.md#tls-and-proxies) |
-| Who speaks HTTP | `Config.mode`: `"rust"` (the default) or `"python"` (aiohttp) | [sdks.md](sdks.md#rust-mode-and-platform-mode) |
+| Who speaks HTTP | `Config.mode`: `"core"` (the default) or `"platform"` (aiohttp) | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `Config.state_file`: kept across restarts, written 0600 | [state-file.md](state-file.md) |
 | Instance UID | `Config.instance_uid` (16 bytes), or `None` for one the core makes; `Config.request_instance_uid` to have the server assign it; `client.instance_uid` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `Config.capabilities` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -135,11 +135,11 @@ uv run pytest
 ```
 
 The conformance suite runs this client in both modes: `python3 conformance/runner/run.py --client
-python-core,python-core-rust` ([conformance/README.md](../conformance/README.md)).
+python-core-platform,python-core` ([conformance/README.md](../conformance/README.md)).
 
 ## OpenTelemetry
 
 To put an OpenTelemetry SDK under a server without writing code, use `pydantic-opamp-otel`:
 [python-otel.md](python-otel.md). To wire this client to an SDK by hand, see [sdks.md](sdks.md)
-and [examples/python](../examples/python/example.py). `opamp_client.sdk` runs the shared SDK
+and [examples/python](../examples/python/example.py). `pydantic_opamp_client.sdk` runs the shared SDK
 settings layer ([sdk-settings.md](sdk-settings.md)).

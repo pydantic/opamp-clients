@@ -14,7 +14,7 @@ test("an effect this client doesn't know stops it, and says why at once", async 
   // A newer core: its effect has a kind this client has no case for.
   t.mock.method(Core.prototype, "step", () => create(OutputSchema, { effects: [create(EffectSchema)] }));
   const notes: Notification[] = [];
-  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "node" }, {}, (n) =>
+  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "platform" }, {}, (n) =>
     notes.push(n),
   );
   // It failed while starting: the application hears once start has returned, without stop().
@@ -28,7 +28,7 @@ test("an effect this client doesn't know stops it, and says why at once", async 
 
 test("a callback that throws stops the client, which says so once", async () => {
   const notes: Notification[] = [];
-  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "node" }, {}, (n) => {
+  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "platform" }, {}, (n) => {
     notes.push(n);
     throw new Error("the application's bug");
   });
@@ -49,7 +49,7 @@ test("a callback that throws stops the client, which says so once", async () => 
 
 test("a callback that throws undefined stops the client, and says so (RULE-SHELL-02)", async () => {
   const notes: Notification[] = [];
-  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "node" }, {}, (n) => {
+  const client = Client.start({ endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(1), mode: "platform" }, {}, (n) => {
     notes.push(n);
     // JavaScript lets anyone throw anything, undefined included.
     throw undefined;

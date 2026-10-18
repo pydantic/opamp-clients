@@ -18,9 +18,9 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// core accepts is taken by the executor's URL type, read alike and sent as exactly its target;
 /// the environment's proxies route as the table says; every TLS setting is taken or refused as it
 /// says. Where .NET's convention differs, the case is listed below with the reason, and the test
-/// fails if the behaviour changes. In Rust mode (the core sends the requests itself, over .NET's
+/// fails if the behaviour changes. In core mode (the core sends the requests itself, over .NET's
 /// streams) every URL is sent as its target by the core, the proxy is the table's with no
-/// difference at all (tests/shell-tables/README.md, "Rust mode's proxy rule"), and the TLS settings
+/// difference at all (tests/shell-tables/README.md, its proxy rule), and the TLS settings
 /// are taken or refused as in platform mode. The tables are found at OPAMP_SHELL_TABLES (a Docker
 /// run that mounts only dotnet/ mounts them there), or else at tests/shell-tables above the tests.
 /// </summary>
@@ -29,8 +29,8 @@ public class ShellTablesTests
     /// <summary>
     /// Proxy cases where platform mode's choice (HttpClient.DefaultProxy, read from the environment
     /// by HttpEnvironmentProxy, held to the schemes the client takes) differs from the reference:
-    /// what .NET picks ("refused": the client refuses the configuration at start), and why. Rust
-    /// mode has none (<see cref="RustModesProxyIsTheTablesExactly"/>).
+    /// what .NET picks ("refused": the client refuses the configuration at start), and why. Core
+    /// mode has none (<see cref="CoreModesProxyIsTheTablesExactly"/>).
     /// </summary>
     private static readonly Dictionary<string, (string? Proxy, string Why)> ProxyDifferences = new()
     {
@@ -175,10 +175,10 @@ public class ShellTablesTests
         await loop.X.ReleaseAsync(TimeSpan.FromSeconds(5));
     }
 
-    // Every URL the core accepts, in Rust mode: a client on it sends exactly its target, over its
+    // Every URL the core accepts, in core mode: a client on it sends exactly its target, over its
     // own stream (the core writes the request; .NET only carries its bytes).
     [Fact]
-    public async Task RustModeSendsEveryUrlAsItsTarget()
+    public async Task CoreModeSendsEveryUrlAsItsTarget()
     {
         var targets = new ConcurrentQueue<string>();
         using var server = new RawServer(async c =>
@@ -210,7 +210,7 @@ public class ShellTablesTests
                 new OpAmpClientOptions
                 {
                     Endpoint = new Uri(endpoint),
-                    Mode = OpAmpMode.Rust,
+                    Mode = OpAmpMode.Core,
                     DirectConnection = true,
                     HeartbeatInterval = TimeSpan.FromMinutes(1),
                     InstanceUid = Enumerable.Repeat((byte)1, 16).ToArray(),
@@ -240,12 +240,12 @@ public class ShellTablesTests
         Assert.True(wrong.Count == 0, $"{wrong.Count} of {urls.Count}:\n{string.Join('\n', wrong)}");
     }
 
-    // Rust mode's proxy: the table's, exactly, with no known difference. The client hands the core
+    // Core mode's proxy: the table's, exactly, with no known difference. The client hands the core
     // the environment's variables (Config.proxy) and the core picks by the shared rule: each case
     // through this client's reading of the environment (injected) and the core it ships.
     // covers: RULE-PROXY-02
     [Fact]
-    public void RustModesProxyIsTheTablesExactly()
+    public void CoreModesProxyIsTheTablesExactly()
     {
         var cases = Table("proxy.json").GetProperty("cases").EnumerateArray().ToList();
         Assert.True(cases.Count > 30);
@@ -254,7 +254,7 @@ public class ShellTablesTests
         {
             var env = c.GetProperty("env").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString()!);
             var url = Str(c, "url")!;
-            var choice = OpAmpClient.RustProxyChoice(new OpAmpClientOptions { Endpoint = new Uri(url), Mode = OpAmpMode.Rust }, n => env.GetValueOrDefault(n));
+            var choice = OpAmpClient.CoreProxyChoice(new OpAmpClientOptions { Endpoint = new Uri(url), Mode = OpAmpMode.Core }, n => env.GetValueOrDefault(n));
             var got = CoreRoute(choice, url);
             if (got != Str(c, "proxy"))
             {
@@ -265,12 +265,12 @@ public class ShellTablesTests
         Assert.True(wrong.Count == 0, string.Join('\n', wrong));
     }
 
-    // What Rust mode tells the core: the configured proxy and no variables; none with
+    // What core mode tells the core: the configured proxy and no variables; none with
     // DirectConnection; otherwise each variable the rule reads that is set, even empty, by its own
     // name. A proxy question (only a core that wasn't told asks) hears the configured proxy or none.
     // covers: RULE-PROXY-02
     [Fact]
-    public void RustModeTellsTheCoreItsProxy()
+    public void CoreModeTellsTheCoreItsProxy()
     {
         Func<string, string?> env = n => n switch
         {
@@ -278,15 +278,15 @@ public class ShellTablesTests
         };
         var configured = new OpAmpClientOptions
         {
-            Endpoint = new Uri("http://x/"), Mode = OpAmpMode.Rust, Proxy = new Uri("socks5://u:p%40ss@configured:1080"), ProxyUseLocalResolver = true,
+            Endpoint = new Uri("http://x/"), Mode = OpAmpMode.Core, Proxy = new Uri("socks5://u:p%40ss@configured:1080"), ProxyResolveLocally = true,
         };
-        Assert.Equal(new ProxyChoice { Url = "socks5://u:p%40ss@configured:1080", ResolveLocally = true }, OpAmpClient.RustProxyChoice(configured, env));
+        Assert.Equal(new ProxyChoice { Url = "socks5://u:p%40ss@configured:1080", ResolveLocally = true }, OpAmpClient.CoreProxyChoice(configured, env));
         Assert.Equal(("socks5://u:p%40ss@configured:1080", true), (OpAmpClient.ProxyAnswerFor(configured).Proxy, OpAmpClient.ProxyAnswerFor(configured).ResolveLocally));
         var direct = configured with { Proxy = null, DirectConnection = true };
-        Assert.Equal(new ProxyChoice { Direct = true }, OpAmpClient.RustProxyChoice(direct, env));
+        Assert.Equal(new ProxyChoice { Direct = true }, OpAmpClient.CoreProxyChoice(direct, env));
         Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(direct).Proxy);
         var fromEnv = configured with { Proxy = null };
-        var choice = OpAmpClient.RustProxyChoice(fromEnv, env);
+        var choice = OpAmpClient.CoreProxyChoice(fromEnv, env);
         Assert.Equal(["REQUEST_METHOD=GET", "HTTP_PROXY=http://env:1", "no_proxy="], choice.Environment.Select(h => $"{h.Name}={h.Value}").ToArray());
         Assert.True(choice.ResolveLocally);
         Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(fromEnv).Proxy);
@@ -295,7 +295,7 @@ public class ShellTablesTests
         Assert.Null(CoreRoute(choice, "http://example.com/"));
     }
 
-    // Where Rust mode's core connects first for `url` when told `choice`: the proxy as the table
+    // Where core mode's core connects first for `url` when told `choice`: the proxy as the table
     // writes a route (scheme://host:port, credentials left out), or null for directly. The core
     // picks it itself: it asks no proxy question.
     private static string? CoreRoute(ProxyChoice choice, string url)
@@ -336,10 +336,10 @@ public class ShellTablesTests
         return $"{scheme}://{(open.Host.Contains(':') ? $"[{open.Host}]" : open.Host)}:{open.Port}";
     }
 
-    // Each TLS setting, in Rust mode: the client starts with it (Rust mode's SslStream takes the
+    // Each TLS setting, in core mode: the client starts with it (core mode's SslStream takes the
     // same settings), or refuses it at once, as the table says.
     [Fact]
-    public async Task RustModeTakesOrRefusesEveryTlsSettingAsTheTableSays()
+    public async Task CoreModeTakesOrRefusesEveryTlsSettingAsTheTableSays()
     {
         string? Read(JsonElement c, string name) => Str(c, name) is { } p ? File.ReadAllText(Path.Combine(Dir(), p)) : null;
         var wrong = new List<string>();
@@ -360,7 +360,7 @@ public class ShellTablesTests
                         new OpAmpClientOptions
                         {
                             Endpoint = new Uri("https://127.0.0.1:1/v1/opamp"),
-                            Mode = OpAmpMode.Rust,
+                            Mode = OpAmpMode.Core,
                             DirectConnection = true,
                             StopTimeout = TimeSpan.FromSeconds(1),
                             Tls = new OpAmpTlsOptions { CaPem = Read(c, "ca"), ClientCertPem = Read(c, "cert"), ClientKeyPem = Read(c, "key"), MinVersion = min, MaxVersion = max },

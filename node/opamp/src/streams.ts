@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// Rust mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
+// Core mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 // and this carries out only what needs the platform: TCP connections, TLS on them (Node's, with
 // the operator's CAs, certificate and versions), name resolution (only for a SOCKS5 proxy with
 // proxy.resolveLocally: otherwise the proxy resolves), the proxy Node's convention picks for a
@@ -48,7 +48,7 @@ import type { Transport } from "./transport.js";
 
 type Deliver = (input: Input) => void;
 
-/** What Rust mode does its network work with: Node's sockets and name resolution. A test
+/** What core mode does its network work with: Node's sockets and name resolution. A test
  * replaces them (TEST_PLATFORM, executor.ts) to choose when each one completes. Its files go
  * through FileOps (files.ts, TEST_FILE_OPS). */
 export interface StreamsPlatform {
@@ -150,7 +150,7 @@ export class Streams {
     this.#ops = ops;
   }
 
-  /** Carry out `e` if it is one of Rust mode's; false if it isn't. */
+  /** Carry out `e` if it is one of core mode's; false if it isn't. */
   do(e: Effect): boolean {
     const k = e.kind;
     switch (k.case) {
@@ -331,8 +331,8 @@ export class Streams {
 
   /** Whether `s` keeps Node.js running. A stream does while it is being opened and until the
    * peer's first bytes arrive on it; after that it is a connection kept open, which, like the
-   * client's timers, doesn't hold a program whose own work is done (see Config: Node mode lets go
-   * of an open WebSocket and of an idle connection the same way). The sockets under a TLS socket
+   * client's timers, doesn't hold a program whose own work is done (see Config: platform mode lets
+   * go of an open WebSocket and of an idle connection the same way). The sockets under a TLS socket
    * follow it. */
   #keepsRunning(s: net.Socket, on: boolean): void {
     for (let x: net.Socket | undefined = s; x; x = this.#under.get(x)) {

@@ -6,17 +6,17 @@ client feeds back against spec/shell-contract.md. This is the harness and the lo
 adversary expects: one client per seed, several at once, each against this server, whose every
 URL's query says what to do; the adversary reports through the client's own callback.
 
-Each test runs in both modes (``MODES``). In Rust mode the client tells the core it speaks streams,
+Each test runs in both modes (``MODES``). In core mode the client tells the core it speaks streams,
 and each run has a raw server of its own (_adversary_raw.py: ``raw=PORT`` and ``tls=NAME`` in the
 endpoint's query), which the adversary opens streams to: it hands the client the stream effects
 (stream_open, stream_write, stream_start_tls, stream_splice, download_data, ...), which
-src/opamp_client/_streams.py carries out, and the platform's as well (http_request, ws_open,
-download), which Rust mode's client passes on to the executor, as a core's saves are: Rust mode's
+src/pydantic_opamp_client/_streams.py carries out, and the platform's as well (http_request, ws_open,
+download), which core mode's client passes on to the executor, as a core's saves are: core mode's
 wiring (Streams is offered every effect first), its stop and its shutdown, with both kinds under
-way. Go's harness (go/opamp/adversary_properties_test.go) runs Rust mode the same way.
+way. Go's harness (go/opamp/adversary_properties_test.go) runs core mode the same way.
 
 Seeds ``OPAMP_ADVERSARY_BASE`` (1) to base + ``OPAMP_ADVERSARY_SEEDS`` (24) - 1, in each mode;
-``OPAMP_ADVERSARY_SEED=S`` replays one (``-k python`` or ``-k rust`` picks the mode, and
+``OPAMP_ADVERSARY_SEED=S`` replays one (``-k platform`` or ``-k core`` picks the mode, and
 ``OPAMP_ADVERSARY_FOCUS`` the production in focus in the main run, if the seed ran with one: the
 replay line of a failed seed says both); ``OPAMP_ADVERSARY_WASM`` overrides the module's path."""
 
@@ -39,7 +39,7 @@ from _adversary_raw import body as raw_body
 from _wasm import WasmCore
 from aiohttp import WSMsgType, web
 
-from opamp_client import TLS, Client, Config, Notification, Status, opamp_pb2 as pb
+from pydantic_opamp_client import TLS, Client, Config, Notification, Status, opamp_pb2 as pb
 
 PREFIX = "opamp-adversary"
 STOP_DEADLINE = 15.0  # stop must return within this
@@ -50,8 +50,8 @@ AT_ONCE = 4
 # it fails the seed, and doesn't hang it.
 MARKER_DEADLINE = 30.0
 
-# The modes every test runs in: Python mode (aiohttp), and Rust mode (the default).
-MODES = ["python", "rust"]
+# The modes every test runs in: platform mode (aiohttp), and core mode (the default).
+MODES = ["platform", "core"]
 
 # The productions that trigger a bug this client is known to have, in each mode: the main run
 # leaves them out, and test_known_bugs_still_fail checks that each still fails (when one stops
@@ -64,14 +64,14 @@ KNOWN: dict[str, dict[str, tuple[str, str, str]]] = {
     #   test_cancels_are_honoured; test_lifecycle.py and test_effects.py test them.
     # - headers_odd, limit_huge and limit_zero are fixed: test_fixed_bugs_stay_fixed, and
     #   test_effects.py's test_what_aiohttp_refuses_still_ends_the_effect.
-    "python": {},
-    "rust": {},
+    "platform": {},
+    "core": {},
 }
 
 # The cancel productions (RULE-SHELL-06), in every run's grammar.
 CANCELS = ["cancel_download", "cancel_http", "cancel_http_done", "cancel_store", "cancel_twice",
            "cancel_ws_closing", "cancel_ws_opening", "stop_cancel"]
-# And those of the streams and their files, in Rust mode's.
+# And those of the streams and their files, in core mode's.
 STREAM_CANCELS = ["cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening",
                   "cancel_stream_resolving"]
 
@@ -295,7 +295,7 @@ async def run_seed(server: AdversaryServer, wasm: bytes, seed: int, *, mode: str
                    focus: str | None = None, steps: int | None = None, raw: RawServer | None = None,
                    ca: bytes | None = None) -> SeedResult:
     """One client, in `mode`, against the adversary with `seed`, checked as the README's harness says.
-    `raw`: the run's raw server, which the adversary opens streams to (Rust mode), and `ca` the CA
+    `raw`: the run's raw server, which the adversary opens streams to (core mode), and `ca` the CA
     of its certificate. `steps`: the script's length, if not the adversary's own (30; 45 with
     streams)."""
     result = SeedResult(seed)
@@ -517,8 +517,8 @@ async def run_batch(seeds: list[int], **kw) -> list[SeedResult]:
 
     async def one(seed: int) -> None:
         async with gate:
-            # In Rust mode the run has a raw server of its own, for its streams.
-            raw = await RawServer(certs.server).start() if kw["mode"] == "rust" else None
+            # In core mode the run has a raw server of its own, for its streams.
+            raw = await RawServer(certs.server).start() if kw["mode"] == "core" else None
             try:
                 r = await run_seed(server, wasm, seed, raw=raw, ca=certs.ca if raw is not None else None, **kw)
             finally:
@@ -561,7 +561,7 @@ def test_the_client_keeps_the_shell_contract_against_the_adversary(mode: str) ->
     used = set().union(*(r.used() for r in results))
     enabled = set().union(*(r.enabled() for r in results))
     # A production is drawn at random, and runs only if the run's timing leaves it room, so one can
-    # miss a batch by chance (with Rust mode's streams the grammar is half as large again): each
+    # miss a batch by chance (with core mode's streams the grammar is half as large again): each
     # missed one runs in focus, on two seeds past the batch's, as in Java's, Node's and Go's
     # harnesses.
     last = seeds[-1]
@@ -752,7 +752,7 @@ def test_known_bugs_still_fail(mode: str, production: str) -> None:
 
 # covers: RULE-SHELL-06
 @pytest.mark.parametrize("mode, production", [(mode, p) for mode in MODES
-                                              for p in CANCELS + (STREAM_CANCELS if mode == "rust" else [])])
+                                              for p in CANCELS + (STREAM_CANCELS if mode == "core" else [])])
 def test_cancels_are_honoured(mode: str, production: str) -> None:
     results = asyncio.run(run_batch([1, 2], mode=mode, off=sorted(KNOWN[mode]), focus=production, steps=10))
     for r in results:

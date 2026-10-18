@@ -22,8 +22,8 @@ the [`steward`](../steward/SKILL.md) skill.
 
 | Release file | Placed at (`MODULES`, `TREE_PLACES` in `scripts/fetch_core.py`) |
 |---|---|
-| `opamp_core.wasm` | `go/opamp/internal/core/`, `node/opamp/core/`, `python/src/opamp_client/`, `java/opamp/src/main/wasm/`, `dotnet/Pydantic.OpAmp.Client/` (checked in) |
-| `opamp_sdk_settings.wasm` | `go/opamp/sdk/` and the same four other places (checked in) |
+| `opamp_core.wasm` | `go/opamp/internal/core/`, `node/opamp/core/`, `python/src/pydantic_opamp_client/`, `java/opamp/src/main/wasm/`, `dotnet/Pydantic.OpAmp.Client/` (checked in) |
+| `opamp_sdk_settings.wasm` | `go/opamp/sdksettings/` and the same four other places (checked in) |
 | `opamp_core_adversary.wasm` | `testdata/core/` (checked in; never shipped) |
 | `native-<rid>-<lib>` | this machine's in `target/release/`; with `--all-platforms` every one in `dist/native/runtimes/<rid>/native/` |
 | `tool-linux-x64-opamp-tap` | `target/release/opamp-tap` |
@@ -67,7 +67,7 @@ lock plus everything the lock deterministically produces, and nothing hand-writt
 - `opamp-core.lock.json`;
 - the module copies `fetch` rewrites (the ten `.wasm` files above plus `testdata/core/opamp_core_adversary.wasm`);
 - regenerated types when the `.proto` files changed: `go/opamp/internal/corepb/`,
-  `go/opamp/sdk/settingspb/`, `node/opamp/src/gen/`, `python/src/opamp_client/_proto/`,
+  `go/opamp/sdksettings/settingspb/`, `node/opamp/src/gen/`, `python/src/pydantic_opamp_client/_proto/`,
   `java/opamp/src/main/java/` (`CoreProto.java`, `SettingsProto.java`), `dotnet/Pydantic.OpAmp.Client/Generated/`.
   CI's `core` job runs `gen_core.py --check` and `gen_sdk_settings.py --check` on the locked
   release, so a bump that changes protos and omits these is red.
@@ -95,7 +95,7 @@ All after `fetch` (each SDK loads the fetched core). Representative runs, with t
 | SDK | Command | Notes |
 |---|---|---|
 | Go | `cd go && go test ./opamp/ -run Adversary -count=1` | ~1m45 incl. module downloads; CI: `go test -race` per shard |
-| Go integration | `cd go/otel && go vet ./... && go test -race ./...` (as CI runs it) | its own module: run from `go/otel` |
+| Go integration | `cd go/opampotel && go vet ./... && go test -race ./...` (as CI runs it) | its own module: run from `go/opampotel` |
 | Python | `cd python && uv run --python 3.13 pytest -q tests/test_adversary_properties.py tests/test_sdk_settings.py` | 66 passed, 1 skipped, ~4 min |
 | Node.js | `cd node/opamp && npm ci && npm exec -- tsc -p . && node --test dist/test/adversary*.test.js` | 8 pass, ~3.5 min; full: `npm test` |
 | Java | `cd java/opamp && mvn -q -B package -Dtest=AdversaryRawTest -Dsurefire.failIfNoSpecifiedTests=false` | ~70 s |

@@ -816,7 +816,7 @@ func (sc *schedCase) afterStop(rt *rapid.T, res stopResult) {
 	if _, stopped, _, _ := sc.m.snapshot(); stopped != 1 {
 		sc.fail(rt, "RULE-SHELL-02: Stop returned with stopped seen %d times: %v", stopped, kinds(sc.notes()))
 	}
-	// The application's transport (Go mode): its idle connections are its own to close.
+	// The application's transport (platform mode): its idle connections are its own to close.
 	closeIdle(sc.tr)
 	synctest.Wait()
 	if n := sc.net.openClientEnds(); n > 0 {
@@ -1027,13 +1027,13 @@ func (sc *schedCase) teardown() {
 	}
 }
 
-// onPipes points cfg at the pipe network n: in Go mode through an *http.Transport over it, as an
-// application passes in Config.HTTPClient (returned: its idle connections are the application's
-// to close); in Rust mode through the streams' dialer (Config.streamNet), the core's own HTTP/1.1
+// onPipes points cfg at the pipe network n: in platform mode through an *http.Transport over it, as
+// an application passes in Config.HTTPClient (returned: its idle connections are the application's
+// to close); in core mode through the streams' dialer (Config.streamNet), the core's own HTTP/1.1
 // and WebSocket meeting the server's net/http and gorilla over the pipes.
 func onPipes(cfg *Config, mode Mode, n *pipeNet) *http.Transport {
 	cfg.Mode = mode
-	if mode == ModeRust {
+	if mode == ModeCore {
 		cfg.Proxy = Proxy{Direct: true}
 		cfg.streamNet = &streamPlatform{dial: n.DialContext}
 		return nil
@@ -1456,7 +1456,7 @@ func checkTap(dir string) error {
 		return err
 	}
 	effects := map[uint64]*tapEffect{}
-	strs := map[uint64]*tapStream{} // Rust mode's streams, by the shell's ids
+	strs := map[uint64]*tapStream{} // Core mode's streams, by the shell's ids
 	stopped := false
 	step := 0
 	for len(b) > 0 {
@@ -1491,7 +1491,7 @@ func checkTap(dir string) error {
 					if t := effects[k.Cancel.Id]; t != nil && t.state != tapEnded {
 						t.state = tapCancelled
 					}
-				// Rust mode: a download is the shell's (its file the client's), named first by its
+				// Core mode: a download is the shell's (its file the client's), named first by its
 				// data, a splice into it, or its end.
 				case *corepb.Effect_DownloadData:
 					tapDownload(effects, k.DownloadData.Id)
@@ -1614,7 +1614,7 @@ func tapSteps(dir string) (inputs []*corepb.Input, notified []int, err error) {
 // from inside the callback, reached the core before anything the client took in after the step
 // that called the callback. Between that step and the call the core is fed only the application's
 // calls (those queued ahead of it), and what the shell knew at once about an effect of that step
-// (Rust mode's answer to a proxy query). A call that never reached the core (the client stopped
+// (core mode's answer to a proxy query). A call that never reached the core (the client stopped
 // first) still lets nothing else in.
 func checkCallbackCalls(dir string, calls []cbCall) error {
 	inputs, notified, err := tapSteps(dir)
@@ -1646,14 +1646,14 @@ func checkCallbackCalls(dir string, calls []cbCall) error {
 	return nil
 }
 
-// tapDownload notes download id, named by Rust mode's file effects, if it is new.
+// tapDownload notes download id, named by core mode's file effects, if it is new.
 func tapDownload(effects map[uint64]*tapEffect, id uint64) {
 	if effects[id] == nil {
 		effects[id] = &tapEffect{what: "download"}
 	}
 }
 
-// tapStream is one of Rust mode's streams, as the tap shows it.
+// tapStream is one of core mode's streams, as the tap shows it.
 type tapStream struct {
 	queried, tls, splices int  // proxy_query, stream_start_tls and stream_splice asked, not answered
 	resolving             bool // stream_resolve asked, not answered
@@ -1669,7 +1669,7 @@ func tapStreamOf(strs map[uint64]*tapStream, id uint64) *tapStream {
 	return strs[id]
 }
 
-// tapStreamInput applies one input to Rust mode's streams: an error if the client may not feed it
+// tapStreamInput applies one input to core mode's streams: an error if the client may not feed it
 // (an answer to nothing asked, anything about a stream after its close or its failure).
 func tapStreamInput(strs map[uint64]*tapStream, in *corepb.Input) error {
 	var id uint64
@@ -1936,18 +1936,18 @@ func schedFlags(t *testing.T) uint64 {
 	return seed
 }
 
-func TestSchedules(t *testing.T) { testSchedules(t, ModeGo, "TestSchedules") }
+func TestSchedules(t *testing.T) { testSchedules(t, ModePlatform, "TestSchedules") }
 
-// TestSchedulesRustMode: the same, in Rust mode. The core speaks HTTP/1.1 and WebSocket itself
+// TestSchedulesCoreMode: the same, in core mode. The core speaks HTTP/1.1 and WebSocket itself
 // over the pipes (its streams' dialer is the pipe network's), so its own HTTP and WebSocket meet
 // the server's net/http and gorilla under the schedules rapid picks; the same rules are checked
 // after every step, and nothing is left when Stop returns. The tap check covers the stream
 // effects too (checkTap: each stream input names a stream the core opened and hasn't closed).
-func TestSchedulesRustMode(t *testing.T) { testSchedules(t, ModeRust, "TestSchedulesRustMode") }
+func TestSchedulesCoreMode(t *testing.T) { testSchedules(t, ModeCore, "TestSchedulesCoreMode") }
 
 func modeName(m Mode) string {
 	if m == "" {
-		return string(ModeRust)
+		return string(ModeCore)
 	}
 	return string(m)
 }
@@ -2014,7 +2014,7 @@ func TestScheduleVirtualTime(t *testing.T) {
 			})}
 			go func() { _ = hs.Serve(n) }()
 			tr := n.transport()
-			c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID,
+			c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID,
 				HeartbeatInterval: 30 * time.Second, HTTPClient: &http.Client{Transport: tr}}, Status{}, nil)
 			if err != nil {
 				t.Fatal(err)
@@ -2060,7 +2060,7 @@ func TestScheduleVirtualTime(t *testing.T) {
 //
 // covers: RULE-SHELL-01
 func TestScheduleStoppedIsTheLastNotification(t *testing.T) {
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { stoppedIsTheLastNotification(t, mode) })
 	}
 }
@@ -2108,8 +2108,8 @@ func stoppedIsTheLastNotification(t *testing.T, mode Mode) {
 // to the application again, in the step that starts connecting, and reports it APPLYING until the
 // application answers. Here something else is waiting for the client's goroutine by the time the
 // callback has answered, so both are there when the callback returns:
-//   - the connection: the callback waits for the bubble to settle first, so in Go mode the
-//     connection is open and its report queued (in Rust mode the core has not asked for its stream
+//   - the connection: the callback waits for the bubble to settle first, so in platform mode the
+//     connection is open and its report queued (in core mode the core has not asked for its stream
 //     yet: nothing of it can be waiting, and this passed before the rule was kept);
 //   - a timer: the callback takes an hour (of the bubble's time), so the client's timer is due.
 //
@@ -2120,7 +2120,7 @@ func stoppedIsTheLastNotification(t *testing.T, mode Mode) {
 //
 // covers: RULE-SHELL-10
 func TestScheduleTheCallbacksAnswerComesFirst(t *testing.T) {
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode)+"/the connection", func(t *testing.T) { theCallbacksAnswerComesFirst(t, mode, synctest.Wait) })
 		t.Run(modeName(mode)+"/a timer", func(t *testing.T) {
 			theCallbacksAnswerComesFirst(t, mode, func() { time.Sleep(time.Hour) })
@@ -2246,7 +2246,7 @@ func TestScheduleStopBoundWithASlowSave(t *testing.T) {
 	old := beforeSave
 	beforeSave = schedBeforeSave
 	t.Cleanup(func() { beforeSave = old })
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { stopBoundWithASlowSave(t, mode) })
 	}
 }
@@ -2301,7 +2301,7 @@ func TestSchedulePanicClosesEveryConnection(t *testing.T) {
 	old := beforeSave
 	beforeSave = schedBeforeSave
 	t.Cleanup(func() { beforeSave = old })
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { panicClosesEveryConnection(t, mode) })
 	}
 }

@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Rust mode's streams and files (src/opamp_client/_streams.py): download files written off the
+"""Core mode's streams and files (src/pydantic_opamp_client/_streams.py): download files written off the
 event loop, in order, hashed over exactly what was written, answered once (or not at all after a
 discard or a cancel); backpressure both ways; and the in-flight registry: a close or a shutdown
 ends what it names, a stream that connects (or finishes its TLS handshake) after its close is
@@ -21,13 +21,13 @@ import trustme
 from _servers import HttpProxy, OpampServer, Socks5Proxy
 from aiohttp import web
 
-from opamp_client import TLS, Client, Config, Notification, Proxy, Status
-from opamp_client import _streams
-from opamp_client import opamp_pb2 as pb
-from opamp_client._executor import download_path, downloads_dir
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._streams import Streams, proxy_choice
-from opamp_client._transport import Transport
+from pydantic_opamp_client import TLS, Client, Config, Notification, Proxy, Status
+from pydantic_opamp_client import _streams
+from pydantic_opamp_client import opamp_pb2 as pb
+from pydantic_opamp_client._executor import download_path, downloads_dir
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._streams import Streams, proxy_choice
+from pydantic_opamp_client._transport import Transport
 
 
 async def until(what: str, done: Callable[[], bool], seconds: float = 20) -> None:
@@ -489,7 +489,7 @@ def test_a_stream_the_shell_closes_on_hearing_its_splice_done_says_nothing_more(
 def test_a_splice_asked_for_on_hearing_the_last_one_done_takes_the_bytes_already_read(tmp_path) -> None:
     """What the shell asks in answer to an input about a stream applies to the very next bytes:
     those read in one piece with a splice's last are the next splice's, not stream_data. (The
-    adversary's stream_splice_chain found them handed over: splice_leak, seed 1 in Rust mode.)"""
+    adversary's stream_splice_chain found them handed over: splice_leak, seed 1 in core mode.)"""
     sent = bytes(i % 251 for i in range(1000))
 
     async def run() -> None:
@@ -711,10 +711,10 @@ def test_proxy_queries_answer_with_the_proxy_as_given(tmp_path, monkeypatch) -> 
                                                           headers=[corepb.Header(name="X-T", value="1")])
         # The environment's is the core's to pick (it was told the variables): asked, none.
         monkeypatch.setenv("HTTPS_PROXY", "proxy.test:3128")
-        s = Streams(got.append, Transport(rust=True), None)
+        s = Streams(got.append, Transport(core_mode=True), None)
         s.do(corepb.Effect(proxy_query=corepb.Url(id=6, url="https://opamp.test/v1/opamp")))
         assert got[-1].proxy_answer == corepb.ProxyAnswer(id=6)
-        assert not s.do(corepb.Effect(store=corepb.Store(id=1))), "not Rust mode's"
+        assert not s.do(corepb.Effect(store=corepb.Store(id=1))), "not core mode's"
 
     asyncio.run(run())
 
@@ -727,7 +727,7 @@ def test_a_proxy_from_the_environment_that_isnt_utf8_still_reaches_the_core(monk
     async def run() -> None:
         got: list[corepb.Input] = []
         monkeypatch.setenv("HTTPS_PROXY", "http://us\udce9r:pw@proxy.test:3128")
-        choice = proxy_choice(Transport(rust=True))
+        choice = proxy_choice(Transport(core_mode=True))
         assert [(h.name, h.value) for h in choice.environment if h.name == "HTTPS_PROXY"] == [
             ("HTTPS_PROXY", "http://us�r:pw@proxy.test:3128")], choice
         choice.SerializeToString()
@@ -735,7 +735,7 @@ def test_a_proxy_from_the_environment_that_isnt_utf8_still_reaches_the_core(monk
     asyncio.run(run())
 
 
-# The client in Rust mode.
+# The client in core mode.
 
 def package_app(file: bytes, framing: str, chunk: Callable[[int], int], redirect: bool = False) -> web.Application:
     """An OpAMP server (plain HTTP) offering one package, whose file it serves (`framing`:
@@ -776,10 +776,10 @@ def package_app(file: bytes, framing: str, chunk: Callable[[int], int], redirect
 
 
 async def download(endpoint: str, state: str, splice: bool, **config) -> bytes:
-    """Download the server's package in Rust mode: the install_package notification's file."""
+    """Download the server's package in core mode: the install_package notification's file."""
     notes: list[Notification] = []
     client = Client.start(Config(endpoint=endpoint, state_file=state, accept_packages=True, heartbeat_interval_ms=60_000,
-                                 mode="rust", rust_splice=splice, **config), Status(), notes.append)
+                                 mode="core", splice_downloads=splice, **config), Status(), notes.append)
     try:
         await until("install_package", lambda: any(n.kind == "install_package" or n.kind == "stopped" for n in notes), 60)
         n = next((n for n in notes if n.kind == "install_package"), None)
@@ -800,7 +800,7 @@ async def serve(app: web.Application, ssl_context=None) -> tuple[web.AppRunner, 
 
 @pytest.mark.parametrize("framing", ["content-length", "chunked"])
 @pytest.mark.parametrize("splice", [True, False], ids=["splice", "no-splice"])
-def test_rust_mode_downloads_a_package_trickled_while_file_writes_are_slow(framing: str, splice: bool, tmp_path,
+def test_core_mode_downloads_a_package_trickled_while_file_writes_are_slow(framing: str, splice: bool, tmp_path,
                                                                             slow) -> None:
     slow(0.002)
     file = os.urandom(3 << 20)
@@ -819,7 +819,7 @@ def test_rust_mode_downloads_a_package_trickled_while_file_writes_are_slow(frami
 
 # covers: RULE-PROXY-01
 @pytest.mark.parametrize("kind", ["http", "https", "socks5"])
-def test_rust_mode_downloads_go_through_the_proxy_with_tls_and_redirects(kind: str, tmp_path) -> None:
+def test_core_mode_downloads_go_through_the_proxy_with_tls_and_redirects(kind: str, tmp_path) -> None:
     file = os.urandom(200_000)
 
     async def run() -> None:
@@ -846,7 +846,7 @@ def test_rust_mode_downloads_go_through_the_proxy_with_tls_and_redirects(kind: s
 
 
 # covers: RULE-CLIENT-16
-def test_rust_mode_stop_while_the_upgrade_is_held_returns_and_closes_the_connection() -> None:
+def test_core_mode_stop_while_the_upgrade_is_held_returns_and_closes_the_connection() -> None:
     """A server that holds the upgrade; stop 300 ms after start returns within 5 s, and
     the server sees the connection closed."""
     async def run() -> None:
@@ -861,7 +861,7 @@ def test_rust_mode_stop_while_the_upgrade_is_held_returns_and_closes_the_connect
 
         server, port = await tcp_server(hold)
         try:
-            client = Client.start(Config(endpoint=f"ws://127.0.0.1:{port}/v1/opamp", mode="rust", proxy=Proxy.DIRECT),
+            client = Client.start(Config(endpoint=f"ws://127.0.0.1:{port}/v1/opamp", mode="core", proxy=Proxy.DIRECT),
                                   Status())
             await asyncio.sleep(0.3)
             started = time.monotonic()
@@ -874,33 +874,33 @@ def test_rust_mode_stop_while_the_upgrade_is_held_returns_and_closes_the_connect
     asyncio.run(run())
 
 
-def test_mode_is_rust_unless_python_is_asked_for() -> None:
-    """With nothing said the client runs in Rust mode; "python" is Python mode; what the mode
+def test_mode_is_core_unless_platform_is_asked_for() -> None:
+    """With nothing said the client runs in core mode; "platform" is platform mode; what the mode
     doesn't honour is an error, never ignored."""
     async def run() -> None:
-        assert Config(endpoint="http://127.0.0.1:1/v1/opamp").mode == "rust"
-        for config, rust in ((Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT), True),
-                             (Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, mode="rust"), True),
-                             (Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, mode="python"), False)):
+        assert Config(endpoint="http://127.0.0.1:1/v1/opamp").mode == "core"
+        for config, core_mode in ((Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT), True),
+                             (Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, mode="core"), True),
+                             (Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, mode="platform"), False)):
             client = Client.start(config, Status())
-            assert (client._streams is not None) == rust, config.mode
+            assert (client._streams is not None) == core_mode, config.mode
             await client.stop()
-        with pytest.raises(ValueError, match='mode is "rust" or "python"'):
+        with pytest.raises(ValueError, match='mode is "core" or "platform"'):
             Client.start(Config(endpoint="http://127.0.0.1:1/v1/opamp", mode="node"), Status())
-        with pytest.raises(ValueError, match="rust_splice in Python mode"):
-            Client.start(Config(endpoint="http://127.0.0.1:1/v1/opamp", mode="python", rust_splice=False), Status())
-        await Client.start(Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, rust_splice=False),
+        with pytest.raises(ValueError, match="splice_downloads in platform mode"):
+            Client.start(Config(endpoint="http://127.0.0.1:1/v1/opamp", mode="platform", splice_downloads=False), Status())
+        await Client.start(Config(endpoint="http://127.0.0.1:1/v1/opamp", proxy=Proxy.DIRECT, splice_downloads=False),
                            Status()).stop()
 
     asyncio.run(run())
 
 
-def test_the_core_hears_of_an_opamp_server_through_rust_mode(tmp_path) -> None:
-    """The Rust-mode client against the tests' own server, every byte the core's."""
+def test_the_core_hears_of_an_opamp_server_through_core_mode(tmp_path) -> None:
+    """The core-mode client against the tests' own server, every byte the core's."""
     async def run() -> None:
         server = await OpampServer().start()
         notes: list[Notification] = []
-        client = Client.start(Config(endpoint=server.endpoint("ws"), mode="rust", heartbeat_interval_ms=50),
+        client = Client.start(Config(endpoint=server.endpoint("ws"), mode="core", heartbeat_interval_ms=50),
                               Status(), notes.append)
         await until("messages", lambda: len(server.arrivals) >= 3)
         await client.stop()

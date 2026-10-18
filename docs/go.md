@@ -93,7 +93,7 @@ in full.
 | Headers | `Config.Header`, sent with every request and WebSocket upgrade; `Config.AuthHeader`, a function asked for headers about every second (a token it renews) | [sdks.md](sdks.md#credentials-and-state) |
 | TLS | `Config.TLS`: `CAPEM`, `IncludeSystemCAs`, `CertPEM` and `KeyPEM`, `MinVersion`, `MaxVersion`, and a `*tls.Config` to start from | package documentation, "TLS and proxies" |
 | Proxy | `Config.Proxy`: `URL`, `ConnectHeader`, `ResolveLocally`, or `Direct` for none. Without one, the environment's | package documentation, "TLS and proxies" |
-| Who speaks HTTP | `Config.Mode`: `opamp.ModeRust` (the default) or `opamp.ModeGo` (net/http and gorilla/websocket); `Config.HTTPClient` selects Go mode | [sdks.md](sdks.md#rust-mode-and-platform-mode) |
+| Who speaks HTTP | `Config.Mode`: `opamp.ModeCore` (the default) or `opamp.ModePlatform` (net/http and gorilla/websocket); `Config.HTTPClient` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `Config.StateFile`: kept across restarts, written 0600; `Config.StateSealer` encrypts it (`go/statekey` has one: `statekey.Load(spec, stateFile)`) | [state-file.md](state-file.md#encrypted-at-rest-go) |
 | Instance UID | `Config.InstanceUID`, or zero for one the core makes; `Config.RequestInstanceUID` to have the server assign it; `client.InstanceUID()` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `Config.Capabilities` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -152,12 +152,12 @@ go test -race ./opamp/... ./statekey/...
 ```
 
 The conformance suite runs this client in both modes: `python3 conformance/runner/run.py --client
-go-core,go-core-rust` ([conformance/README.md](../conformance/README.md)).
+go-core-platform,go-core` ([conformance/README.md](../conformance/README.md)).
 
 ## OpenTelemetry
 
-To put an OpenTelemetry SDK under a server with one call, use `go/otel`: [go-otel.md](go-otel.md).
+To put an OpenTelemetry SDK under a server with one call, use `go/opampotel`: [go-otel.md](go-otel.md).
 To wire this client to an SDK by hand, see [sdks.md](sdks.md) and
-[examples/go](../examples/go/main.go). `go/opamp/sdk` runs the shared SDK settings layer
+[examples/go](../examples/go/main.go). `go/opamp/sdksettings` runs the shared SDK settings layer
 ([sdk-settings.md](sdk-settings.md)). For the OpenTelemetry Collector, see
 [collector.md](collector.md).

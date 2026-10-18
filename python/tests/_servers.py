@@ -16,11 +16,11 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2
-from opamp_client import opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2
+from pydantic_opamp_client import opamp_pb2 as pb
 
 #: Who speaks HTTP and WebSocket (Config.mode): aiohttp, or the core over asyncio's streams.
-MODES = ["python", "rust"]
+MODES = ["platform", "core"]
 
 UID = bytes([0x42] * 16)
 DESCRIPTION = pb.AgentDescription(identifying_attributes=[

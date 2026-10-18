@@ -7,10 +7,10 @@ in a bare interpreter in each platform's container, with nothing but the wheel i
 import platform
 import sys
 
-from opamp_client import CoreError
-from opamp_client._core import Core
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client.sdk import SdkSettings
+from pydantic_opamp_client import CoreError
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client.sdk import SdkSettings
 
 uid = bytes([7] * 16)
 core = Core(corepb.Config(instance_uid=uid, endpoint="http://server/v1/opamp"))

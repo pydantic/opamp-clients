@@ -7,9 +7,9 @@ Everything OpAMP (what to send and when, backoff, heartbeats, full reports, inst
 agent_disconnect, and the requests and responses themselves) is the shared core, run
 natively: a library built from the same source as the WebAssembly module the Go, Node.js and Java clients run, called through `LibraryImport`, and
 held to that module byte for byte (`NativeCoreTests`).
-By default the core speaks HTTP and WebSocket itself too ([Rust mode](#rust-mode-and-net-mode)),
+By default the core speaks HTTP and WebSocket itself too ([core mode](#core-mode-and-platform-mode)),
 and this library only gives it .NET's sockets and `SslStream`, so the bytes on the wire are the
-same as every other language's client here. In .NET mode the library carries out the core's
+same as every other language's client here. In platform mode the library carries out the core's
 requests with `HttpClient` and `ClientWebSocket` instead.
 
 To put automatic instrumentation under a server without writing code, use the plugin next to it,
@@ -91,7 +91,7 @@ var options = new OpAmpClientOptions
 ```
 
 - `CaPem` holds one or more CA certificates. They replace the system's CAs. Set
-  `IncludeSystemCaCerts` to trust both. Without `CaPem` the system's CAs are used.
+  `IncludeSystemCas` to trust both. Without `CaPem` the system's CAs are used.
 - The server's certificate is always checked, and so is its name (SNI unless the host is an
   address). There is no way to turn that off.
 - `ClientCertPem` and `ClientKeyPem` go together. The key is PKCS #8, PKCS #1 or SEC 1, not
@@ -104,21 +104,21 @@ var options = new OpAmpClientOptions
   `https://` proxy too.
 - A SOCKS5 proxy is given the server's host name and resolves it, with `socks5://` and
   `socks5h://` alike. Unlike curl, where `socks5://` resolves the name locally.
-  `ProxyUseLocalResolver` has the client resolve the name instead and give the proxy an address;
+  `ProxyResolveLocally` has the client resolve the name instead and give the proxy an address;
   with an HTTP proxy it is an error.
 - `socks4://` and `socks4a://` are refused, and so is any other scheme: a proxy the client can't
   use is an error, never a direct connection.
-- Without `Proxy` the proxy comes from the environment by the rule every SDK's Rust mode follows:
-  `tests/shell-tables/README.md`, "Rust mode's proxy rule" (put in place by
+- Without `Proxy` the proxy comes from the environment by the rule every SDK's core mode follows:
+  `tests/shell-tables/README.md`, its proxy rule (put in place by
   `scripts/fetch_core.py fetch`)
   (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY`, the upper-case name first; NO_PROXY
-  names, addresses and CIDR networks; nothing under CGI). `ProxyUseLocalResolver` then applies
+  names, addresses and CIDR networks; nothing under CGI). `ProxyResolveLocally` then applies
   to a SOCKS5 proxy the environment names. It does not read the system's proxy settings on
   Windows and macOS, nor `HttpClient.DefaultProxy`: those are
-  [.NET mode](#rust-mode-and-net-mode)'s. Set `DirectConnection` to go direct instead. It can't
+  [platform mode](#core-mode-and-platform-mode)'s. Set `DirectConnection` to go direct instead. It can't
   be combined with `Proxy`.
 - Package downloads use the same settings. With `CaPem` set, a download from another server
-  (where a redirect points, say) needs that server's CA in `CaPem`, or `IncludeSystemCaCerts`.
+  (where a redirect points, say) needs that server's CA in `CaPem`, or `IncludeSystemCas`.
 - Bad settings throw `ArgumentException` from `Start`.
 
 .NET checks the server's certificate once the TLS handshake is done, not during it. A server
@@ -127,37 +127,37 @@ sends it nothing: no request, no upgrade, not a byte of application data. The co
 suite checks both: `rejects_untrusted_server` passes, and `refuses_in_handshake` (a SHOULD)
 warns.
 
-## Rust mode and .NET mode
+## Core mode and platform mode
 
-`Mode` says who speaks HTTP and WebSocket. The client runs in **Rust mode** unless the
+`Mode` says who speaks HTTP and WebSocket. The client runs in **core mode** unless the
 application asks for **platform mode**: by naming it in the mode option, or by handing the client
 an HTTP client of its own, where the SDK takes one (an application that brings its own client has
 asked for the platform's stack). An option only one mode honours is never silently ignored: it
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
-Here platform mode is `Mode = OpAmpMode.DotNet`, and setting `HttpClient` selects it too. `Start`
-throws for `Mode = OpAmpMode.Rust` with an `HttpClient`, and in .NET mode for
-`ProxyUseLocalResolver` and `RustSplice = false`.
+Here platform mode is `Mode = OpAmpMode.Platform`, and setting `HttpClient` selects it too. `Start`
+throws for `Mode = OpAmpMode.Core` with an `HttpClient`, and in platform mode for
+`ProxyResolveLocally` and `SpliceDownloads = false`.
 
-In Rust mode (`Mode = OpAmpMode.Rust`, or no `Mode`) the shared core speaks HTTP/1.1, WebSocket,
+In core mode (`Mode = OpAmpMode.Core`, or no `Mode`) the shared core speaks HTTP/1.1, WebSocket,
 CONNECT and SOCKS5 itself (in the same native library). .NET then only
 opens TCP connections (`Socket`, TCP_NODELAY), starts TLS on them (`SslStream`, TLS inside TLS
 for an `https://` proxy), resolves names when asked to, answers which proxy to use, and writes
 package files; every byte on the wire is the core's.
 
-- `RustSplice` (default true): package bodies of 16 KiB or more go from the socket to the file
+- `SpliceDownloads` (default true): package bodies of 16 KiB or more go from the socket to the file
   without passing through the core.
 - A connection the core closes keeps 2 s at most to flush what was written and hear the server
   end it; `StopAsync` resets whatever is still open, so it still ends within `StopTimeout`.
 
-Choose .NET mode to pass your own `HttpClient`, or when the connection must be made by .NET's
+Choose platform mode to pass your own `HttpClient`, or when the connection must be made by .NET's
 HTTP stack: with the system's proxy settings, say.
 
 ```csharp
 var options = new OpAmpClientOptions
 {
     Endpoint = new Uri("https://opamp.example.com/v1/opamp"),
-    Mode = OpAmpMode.DotNet,
+    Mode = OpAmpMode.Platform,
 };
 ```
 
@@ -173,7 +173,7 @@ What differs there:
   `Proxy`. The system's own proxy settings on Windows and macOS aren't checked.
 - An HTTP proxy gets plain `http://` requests in absolute form and a CONNECT tunnel for
   everything else (`https://`, `ws://`, `wss://`).
-- `ProxyUseLocalResolver` is an error: .NET's SOCKS5 always sends the name, and an HTTP proxy is
+- `ProxyResolveLocally` is an error: .NET's SOCKS5 always sends the name, and an HTTP proxy is
   always given it.
 - You can pass your own `HttpClient`. It then carries everything, the WebSocket and downloads
   included, so set TLS and the proxy on its handler. It can't be combined with `Tls`, `Proxy` or
@@ -202,8 +202,8 @@ dotnet test Pydantic.OpAmp.Client.Tests
 ```
 
 The conformance suite runs this client through `conformance/drivers/dotnet-core`, in both modes:
-`dotnet-core` (.NET mode) and `dotnet-core-rust` (Rust mode, `OPAMP_DOTNET_MODE=rust`). The tests
-run Rust mode over an in-memory network (`MemNet`, with `MemServer` at its far end) as well as
+`dotnet-core` (core mode) and `dotnet-core-platform` (platform mode, `OPAMP_DOTNET_MODE=platform`). The tests
+run core mode over an in-memory network (`MemNet`, with `MemServer` at its far end) as well as
 real sockets.
 
 What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.

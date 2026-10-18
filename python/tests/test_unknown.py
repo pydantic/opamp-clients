@@ -8,9 +8,9 @@ import asyncio
 
 import pytest
 
-from opamp_client import Client, Config, Notification, Status
-from opamp_client._core import Core
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client import Client, Config, Notification, Status
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 
 def test_an_unknown_effect_stops_the_client(monkeypatch):
@@ -19,7 +19,7 @@ def test_an_unknown_effect_stops_the_client(monkeypatch):
 
     async def run() -> None:
         notes: list[Notification] = []
-        client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1", instance_uid=bytes([1] * 16)), Status(),
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1", instance_uid=bytes([1] * 16)), Status(),
                               notes.append)
         # It failed while starting: the application hears once start has returned, without stop().
         assert notes == []
@@ -40,7 +40,7 @@ def test_a_callback_that_throws_stops_the_client_which_says_so_once():
             notes.append(n)
             raise ValueError("the application's bug")
 
-        client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1", instance_uid=bytes([1] * 16)), Status(),
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1", instance_uid=bytes([1] * 16)), Status(),
                               notify)
         # The refused connection is told, the callback raises, and Stopped follows (raised at too).
         for _ in range(500):
@@ -57,7 +57,7 @@ def test_a_callback_that_throws_stops_the_client_which_says_so_once():
 
 def test_a_stalled_save_is_told_as_the_core_says():
     # The core tells of a save that hangs, and of its end: the application hears both, as they are.
-    from opamp_client._client import _notification
+    from pydantic_opamp_client._client import _notification
 
     def told(stalled: bool, waited_ms: int) -> Notification | None:
         n = corepb.Notification(save_stalled=corepb.SaveStalled(stalled=stalled, waited_ms=waited_ms))

@@ -123,7 +123,7 @@ final class Transport {
   }
 
   /**
-   * {@link #build}'s transport, its HTTP client built only when first used: Rust mode's, for
+   * {@link #build}'s transport, its HTTP client built only when first used: core mode's, for
    * platform effects (http_request, ws_open, download) a core may still hand it (the adversary
    * does), which its own core never does: then no HTTP client, and none of its threads, is ever
    * made. The proxy's credentials are checked now, as build does.

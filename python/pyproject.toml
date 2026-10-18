@@ -9,7 +9,7 @@ dependencies = [
     "aiohttp>=3.12",  # client middlewares
     "protobuf>=6.31.1,<8",  # the generated code is protobuf 6's (scripts/gen_core.py)
     # The shared core, compiled: a library per platform, loaded through its C interface
-    # (opamp_client._native). Closed; this package is the shell around it.
+    # (pydantic_opamp_client._native). Closed; this package is the shell around it.
     "pydantic-opamp-core==0.1.0",
 ]
 
@@ -31,9 +31,9 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/opamp_client"]
+packages = ["src/pydantic_opamp_client"]
 # The WebAssembly modules are the tests' oracle (tests/_wasm.py), not shipped.
-exclude = ["src/opamp_client/*.wasm"]
+exclude = ["src/pydantic_opamp_client/*.wasm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

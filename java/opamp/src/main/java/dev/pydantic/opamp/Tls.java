@@ -58,7 +58,7 @@ public final class Tls {
   }
 
   private final List<X509Certificate> trusted;
-  private final boolean systemRoots;
+  private final boolean systemCas;
   private final List<X509Certificate> chain;
   private final PrivateKey key;
   private final Version min;
@@ -66,7 +66,7 @@ public final class Tls {
 
   private Tls(Builder b) {
     trusted = List.copyOf(b.trusted);
-    systemRoots = b.systemRoots;
+    systemCas = b.systemCas;
     chain = b.chain;
     key = b.key;
     min = b.min;
@@ -81,7 +81,7 @@ public final class Tls {
   /** Builds {@link Tls}. */
   public static final class Builder {
     private final List<X509Certificate> trusted = new ArrayList<>();
-    private boolean systemRoots;
+    private boolean systemCas;
     private List<X509Certificate> chain = List.of();
     private PrivateKey key;
     private Version min = Version.TLS_1_2;
@@ -92,7 +92,7 @@ public final class Tls {
     /**
      * Trust the CA certificates in {@code pem} (one or more). The server's certificate must then
      * chain to one of them: the system's CAs are no longer trusted, unless {@link
-     * #includeSystemRoots}.
+     * #includeSystemCas}.
      */
     public Builder trustedCa(String pem) {
       List<X509Certificate> certs = certificates(pem);
@@ -104,8 +104,8 @@ public final class Tls {
     }
 
     /** Trust the system's CAs as well as those given by {@link #trustedCa}; default false. */
-    public Builder includeSystemRoots(boolean include) {
-      this.systemRoots = include;
+    public Builder includeSystemCas(boolean include) {
+      this.systemCas = include;
       return this;
     }
 
@@ -182,7 +182,7 @@ public final class Tls {
           ks.setCertificateEntry("ca" + i, trusted.get(i));
         }
         X509ExtendedTrustManager custom = trustManager(ks);
-        tms = new TrustManager[] {systemRoots ? new Either(custom, trustManager(null)) : custom};
+        tms = new TrustManager[] {systemCas ? new Either(custom, trustManager(null)) : custom};
       }
       SSLContext ctx = SSLContext.getInstance("TLS");
       ctx.init(kms, tms, null);

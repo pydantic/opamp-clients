@@ -37,6 +37,12 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
     /// </summary>
     public void Initializing()
     {
+        if (global::Pydantic.OpAmp.Client.OpAmpSetup.Unavailable() is { } unavailable)
+        {
+            Log.Warn($"the core can't be loaded on {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}; the SDK runs unmanaged: {unavailable}");
+            return;
+        }
+
         try
         {
             this.agent = Agent.Prepare(Variables.Process(), Environment.SetEnvironmentVariable);

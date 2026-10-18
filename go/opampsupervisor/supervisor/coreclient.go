@@ -23,10 +23,11 @@ import (
 // coreClientStateFile is the client's state file in the storage directory: the instance UID,
 // the remote config and own-telemetry settings received, and the OpAMP connection settings the
 // server issued. It holds those credentials, so the client writes it readable by the
-// Supervisor's user only.
-const coreClientStateFile = "opamp-client.state"
+// Supervisor's user only. Its name is the one every SDK integration gives the same file
+// (opamp-state), so operators and docs know one name, and the sealed state's key is named after it.
+const coreClientStateFile = "opamp-state"
 
-// coreClient is the shared core's client (go/opamp, in Go mode) behind opamp-go's client
+// coreClient is the shared core's client (go/opamp, in platform mode) behind opamp-go's client
 // interface, so the Supervisor runs on it unchanged but for where it makes its client. What the
 // core does differently, the Supervisor gets for free:
 //
@@ -118,9 +119,9 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		InstanceUID:  [16]byte(settings.InstanceUid),
 		Capabilities: uint64(caps),
 		Header:       header,
-		// Go mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
+		// Platform mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
 		// environment's proxies, as opamp-go had.
-		Mode:        opamp.ModeGo,
+		Mode:        opamp.ModePlatform,
 		HTTPClient:  &http.Client{Transport: transport},
 		AuthHeader:  auth,
 		StateFile:   c.stateFile,

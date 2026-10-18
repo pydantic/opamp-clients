@@ -124,6 +124,7 @@ import {
   SetupIdentitySchema,
   SetupStartSchema,
   SetupVariableSchema,
+  coreUnavailable,
   identifySetup,
   startSetup,
 } from "@pydantic/opamp-client";
@@ -136,6 +137,7 @@ import {
   type ScopeLevel,
   SdkSettings,
   type Settings,
+  settingsUnavailable,
 } from "@pydantic/opamp-client/sdk";
 
 import { AppSettings, appSettings } from "./app-settings.js";
@@ -467,8 +469,23 @@ const ENDPOINT_IN_CODE = "the endpoint given to register()";
 const HEADERS_IN_CODE = "the headers given to register()";
 
 /** The variables the core's Setup reads. */
-const SETUP_VARIABLES = ["OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
-  "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA"];
+const SETUP_VARIABLES = ["OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED", "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS",
+  "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME",
+  "XDG_STATE_HOME", "LOCALAPPDATA"];
+
+let coreWarned = false;
+
+/**
+ * Whether the core can be loaded, by `unavailable` (why it can't, or undefined); when it can't,
+ * said once, and the SDK runs unmanaged.
+ */
+function coreLoads(unavailable: string | undefined): boolean {
+  if (unavailable !== undefined && !coreWarned) {
+    coreWarned = true;
+    say.warn(`OpAMP: the core can't be loaded on ${process.platform}-${process.arch}; the SDK runs unmanaged: ${unavailable}`);
+  }
+  return unavailable === undefined;
+}
 
 /**
  * Where the server is, from OTEL_OPAMP_* and what the code gives; undefined when the package is
@@ -478,8 +495,9 @@ const SETUP_VARIABLES = ["OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAM
  */
 export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options = {}): Setup | undefined {
   const options = given(code);
-  // No SDK, nothing to manage: not an agent in the fleet either.
-  if (env.OTEL_SDK_DISABLED?.trim().toLowerCase() === "true") return undefined;
+  // OTEL_OPAMP_DISABLED and OTEL_SDK_DISABLED are the core's to read (Setup). A core that can't be
+  // loaded can't read them: then the SDK runs unmanaged whatever they say, and says why.
+  if (!coreLoads(coreUnavailable())) return undefined;
   let heartbeatMs: bigint | undefined;
   const ms = options.heartbeatIntervalMs;
   if (ms !== undefined) {
@@ -522,7 +540,13 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
     return undefined;
   }
   for (const w of s.warnings) say.warn(`OpAMP: ${w}`);
-  if (s.off) return undefined;
+  if (s.off) {
+    // Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+    if (s.offReason) say.warn(`OpAMP: ${s.offReason}`);
+    return undefined;
+  }
+  // The settings layer only once there is a server: an application without one never loads it.
+  if (!coreLoads(settingsUnavailable())) return undefined;
   const setup: Setup = {
     endpoint: s.endpoint,
     headers: Object.fromEntries(s.headers.map((h) => [h.name, h.value])),
@@ -1752,9 +1776,9 @@ export class Agent {
           acceptConnectionSettings: true,
           ...(heartbeat ? { heartbeatIntervalMs: heartbeat } : {}),
           ...(s.stateDir ? { stateFile: join(s.stateDir, "opamp-state") } : {}),
-          // Node mode, asked for by name: the client's requests go through fetch and ws, which
+          // Platform mode, asked for by name: the client's requests go through fetch and ws, which
           // is what the suppressed context above keeps out of the application's traces.
-          mode: "node",
+          mode: "platform",
         },
         {
           description: layer.describe(attributes(resource), this.host, BigInt(this.now())),
@@ -1810,7 +1834,7 @@ export class Agent {
   #notified(n: Notification): void {
     this.reachability?.notified(n);
     if (n.kind === "remoteConfig" && this.client) {
-      const answer = this.remoteConfig(n.config);
+      const answer = this.remoteConfig(n.remoteConfig);
       if (this.effective) this.client.setEffectiveConfig(this.effective);
       this.client.setRemoteConfigStatus(answer);
     } else if (n.kind === "instanceUidChanged") {

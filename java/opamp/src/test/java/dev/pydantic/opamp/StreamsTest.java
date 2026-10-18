@@ -38,13 +38,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Rust mode's executor ({@link Streams}) on its own, the test playing the core: its effects go in on
- * a loop of its own, what it reports comes out. Over {@link MemoryNet} (the test chooses when each
- * connection is made, and how fast the peer reads) and, for TLS, real sockets. The registry: a close,
- * a cancel and shutdown end what they name at once; a connection, a handshake or a resolution that
- * completes after its close is closed and reported to no one; nothing is reported after a close
- * or after shutdown. Backpressure both ways; splices; download files made new, written in order,
- * durable before downloaded, deleted on discard, cancel and failure.
+ * Core mode's executor ({@link Streams}) on its own, the test playing the core: its effects go in
+ * on a loop of its own, what it reports comes out. Over {@link MemoryNet} (the test chooses when
+ * each connection is made, and how fast the peer reads) and, for TLS, real sockets. The registry: a
+ * close, a cancel and shutdown end what they name at once; a connection, a handshake or a
+ * resolution that completes after its close is closed and reported to no one; nothing is reported
+ * after a close or after shutdown. Backpressure both ways; splices; download files made new,
+ * written in order, durable before downloaded, deleted on discard, cancel and failure.
  */
 // covers: RULE-SHELL-04, RULE-SHELL-06, RULE-SHELL-07
 class StreamsTest {

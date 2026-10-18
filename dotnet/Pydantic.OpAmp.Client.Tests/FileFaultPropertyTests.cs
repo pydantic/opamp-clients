@@ -175,7 +175,7 @@ public class FileFaultPropertyTests
         var faulty = new FaultyFiles(plan, state, log, () => Volatile.Read(ref messages));
         var options = new OpAmpClientOptions
         {
-            Mode = OpAmpMode.DotNet,
+            Mode = OpAmpMode.Platform,
             Endpoint = new Uri(server.Url("http")),
             Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig),
             HeartbeatInterval = TimeSpan.FromMilliseconds(100),

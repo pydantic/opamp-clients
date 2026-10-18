@@ -52,7 +52,7 @@ func TestHTTPReportsThenSaysGoodbye(t *testing.T) {
 		Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "test"}}}}}
 	var notes []Notification
 	var nmu sync.Mutex
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, InstanceUID: uid, HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, InstanceUID: uid, HeartbeatInterval: time.Hour},
 		Status{Description: desc}, func(_ *Client, n Notification) { nmu.Lock(); notes = append(notes, n); nmu.Unlock() })
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestHTTPReportsThenSaysGoodbye(t *testing.T) {
 
 func TestAClientThatStopsOnItsOwnSaysWhy(t *testing.T) {
 	stopped := make(chan Notification, 1)
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
 		Status{}, func(_ *Client, n Notification) {
 			if n.Kind == Stopped {
 				stopped <- n
@@ -157,7 +157,7 @@ func TestCallsFromTheCallbackDontBlock(t *testing.T) {
 	var c *Client
 	ready := make(chan struct{})
 	burst := false
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
 		Status{CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{propCapability}}},
 		func(_ *Client, n Notification) {
 			<-ready
@@ -220,7 +220,7 @@ func TestStopFromTheCallbackReturnsAtOnce(t *testing.T) {
 	var mu sync.Mutex
 	var kinds []NotificationKind
 	asked := false
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
 		Status{CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{propCapability}}},
 		func(c *Client, n Notification) {
 			mu.Lock()
@@ -296,7 +296,7 @@ func TestStopFromTheCallbackReturnsAtOnce(t *testing.T) {
 // panic, after the one the callback had panicked on.
 // covers: RULE-SHELL-01, RULE-SHELL-02
 func TestAPanicOnStoppedIsNotToldStoppedAgain(t *testing.T) {
-	for _, mode := range []Mode{ModeRust, ModeGo} {
+	for _, mode := range []Mode{ModeCore, ModePlatform} {
 		t.Run(string(mode), func(t *testing.T) {
 			ts := httptest.NewServer(&server{})
 			defer ts.Close()
@@ -335,7 +335,7 @@ func TestAPanicOnStoppedIsNotToldStoppedAgain(t *testing.T) {
 // between the two (a select with both ready), and said context.Canceled about half the time.
 func TestStopAfterTheEndIgnoresTheContext(t *testing.T) {
 	stopped := make(chan struct{})
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
 		Status{}, func(_ *Client, n Notification) {
 			if n.Kind == Stopped {
 				close(stopped)

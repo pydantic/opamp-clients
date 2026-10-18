@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// Rust mode's sockets and files (src/streams.ts): download files written off the event loop, in
+// Core mode's sockets and files (src/streams.ts): download files written off the event loop, in
 // order, hashed over exactly what was written, answered once (or not at all after a discard or a
 // cancel); and backpressure both ways. File writes are slowed here by wrapping FileHandle's
 // writev, the one call streams.ts writes with.
@@ -207,9 +207,9 @@ async function packageServer(file: Buffer, serve: (res: http.ServerResponse) => 
   return server;
 }
 
-/** Download the server's package in Rust mode: the installPackage notification's file. */
+/** Download the server's package in core mode: the installPackage notification's file. */
 async function download(server: http.Server, splice: boolean): Promise<Buffer> {
-  const state = join(mkdtempSync(join(tmpdir(), "opamp-rust-dl-")), "state");
+  const state = join(mkdtempSync(join(tmpdir(), "opamp-core-dl-")), "state");
   const notes: Notification[] = [];
   const client = Client.start(
     {
@@ -217,8 +217,8 @@ async function download(server: http.Server, splice: boolean): Promise<Buffer> {
       stateFile: state,
       acceptPackages: true,
       heartbeatIntervalMs: 60_000,
-      mode: "rust",
-      rustSplice: splice,
+      mode: "core",
+      spliceDownloads: splice,
       proxy: false,
     },
     {},
@@ -236,7 +236,7 @@ async function download(server: http.Server, splice: boolean): Promise<Buffer> {
 
 for (const framing of ["content-length", "chunked"] as const) {
   for (const splice of [true, false]) {
-    test(`Rust mode: a download trickled while the file writes are slow (${framing}, splice ${splice})`, async () => {
+    test(`core mode: a download trickled while the file writes are slow (${framing}, splice ${splice})`, async () => {
       const file = randomBytes(3 << 20);
       const server = await packageServer(file, (res) => {
         res.writeHead(200, framing === "content-length" ? { "Content-Length": String(file.length) } : {});

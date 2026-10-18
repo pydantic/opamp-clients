@@ -2,6 +2,9 @@ module github.com/pydantic/opamp-clients/go/opampsupervisor
 
 go 1.26.0
 
+// v0.1.0 shipped files that should not have been public; use a later version.
+retract v0.1.0
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/open-telemetry/opamp-go v0.24.0

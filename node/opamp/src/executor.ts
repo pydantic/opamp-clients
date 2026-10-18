@@ -142,9 +142,9 @@ export const TEST_PLATFORM = Symbol("opamp test platform");
 
 /** What a test replaces (TEST_PLATFORM): each part left out is Node's. */
 export interface TestPlatform {
-  /** Node mode's HTTP and WebSocket. */
+  /** Platform mode's HTTP and WebSocket. */
   executor?: ExecutorPlatform;
-  /** Rust mode's sockets (streams.ts). */
+  /** Core mode's sockets (streams.ts). */
   streams?: StreamsPlatform;
   /** The client's monotonic clock, in milliseconds (performance.now). */
   now?: () => number;

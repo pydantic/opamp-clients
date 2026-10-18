@@ -3,10 +3,10 @@
 """The world a schedule test runs the client in: an OpAMP server whose every answer is the
 test's to decide, when it decides, reached through
 
-- Python mode: a fake aiohttp session and WebSocket (``FakeSession``, given to the client as its
+- Platform mode: a fake aiohttp session and WebSocket (``FakeSession``, given to the client as its
   ``_sessions``), as aiohttp behaves: a response body comes in pieces and ``read(n)`` returns what
   has come, a total timeout, a close handshake that waits for the server's Close frame;
-- Rust mode: the seeded loop's in-memory network (``_sched_loop.Network``), with a real aiohttp
+- Core mode: the seeded loop's in-memory network (``_sched_loop.Network``), with a real aiohttp
   server (its low-level ``web.Server``) on each connection, so the core's own HTTP/1.1 and
   WebSocket meet a real peer.
 
@@ -27,7 +27,7 @@ from aiohttp import WSMessage, WSMsgType, web
 from multidict import CIMultiDict
 
 from _sched_loop import Attempt, MemTransport, Network, SeededLoop
-from opamp_client import opamp_pb2 as pb
+from pydantic_opamp_client import opamp_pb2 as pb
 
 CAPABILITY = "io.example.schedules"
 OFFERS = ["none", "config", "custom", "package", "heartbeat"]
@@ -56,7 +56,7 @@ class Op:
     body: bytes = b""
     conn: ServerConn | None = None
     attempt: Attempt | None = None
-    transport: MemTransport | None = None  # Rust mode: the server's end it came on
+    transport: MemTransport | None = None  # Core mode: the server's end it came on
     gone: bool = False  # the client gave up on it
 
     @property
@@ -82,7 +82,7 @@ class ServerConn:
     heard: deque = field(default_factory=deque)  # the client's messages, not yet answered
     ended: bool = False  # closed or dropped, by either side
     closing: bool = False  # the server sent its Close frame
-    impl: Any = None  # the mode's own: a FakeWS, or (Rust mode) the aiohttp WebSocketResponse
+    impl: Any = None  # the mode's own: a FakeWS, or (core mode) the aiohttp WebSocketResponse
 
     def hear(self, data: bytes) -> None:
         self.heard.append(pb.AgentToServer.FromString(data[1:]))
@@ -103,11 +103,11 @@ class World:
         self.customs = self.configs = self.packages = 0
         self.late = 0  # results that came after the client gave up on them
         self.heard: list[pb.AgentToServer] = []  # every message, in arrival order
-        self.fakes: list[FakeWS] = []  # Python mode: every WebSocket made
-        self.requests: list[_Exchange] = []  # Python mode: every request and download
+        self.fakes: list[FakeWS] = []  # Platform mode: every WebSocket made
+        self.requests: list[_Exchange] = []  # Platform mode: every request and download
         self.tasks: set[asyncio.Task] = set()  # the server's own
         self.network: Network | None = None
-        if mode == "rust":
+        if mode == "core":
             self.network = Network(loop, self._serve)
             loop.network = self.network
 
@@ -189,7 +189,7 @@ class World:
     async def mode_push(self, conn: ServerConn, data: bytes) -> None:
         if conn.ended:
             return
-        if self.mode == "python":
+        if self.mode == "platform":
             conn.impl.deliver(WSMessage(WSMsgType.BINARY, data, None))
         else:
             try:
@@ -201,7 +201,7 @@ class World:
         if conn.ended or conn.closing:
             return
         conn.closing = True
-        if self.mode == "python":
+        if self.mode == "platform":
             conn.impl.deliver(WSMessage(WSMsgType.CLOSE, code, ""))
         else:
             self.spawn(_close_quietly(conn.impl, code))
@@ -210,14 +210,14 @@ class World:
         if conn.ended:
             return
         conn.ended = True
-        if self.mode == "python":
+        if self.mode == "platform":
             conn.impl.dropped(ConnectionResetError("reset by the server"))
         else:
             transport = conn.impl._req.transport
             if transport is not None:
                 transport.abort()
 
-    # -- Rust mode: an aiohttp server on each in-memory connection
+    # -- core mode: an aiohttp server on each in-memory connection
 
     def _serve(self, host: str, port: int) -> asyncio.BaseProtocol:
         if not hasattr(self, "_server"):
@@ -314,7 +314,7 @@ async def _write(req: web.BaseRequest, status: int, data: bytes, cuts: list[int]
     return resp
 
 
-# -- Python mode: a fake aiohttp
+# -- platform mode: a fake aiohttp
 
 
 _MORE = object()  # FakeContent.feed: more to come

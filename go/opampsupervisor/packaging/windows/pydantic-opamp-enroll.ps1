@@ -21,6 +21,11 @@ param(
     [string]$CaFile,
     # Allow ws:// or http:// (the token then crosses the network in the clear).
     [switch]$Plaintext,
+    # Where the server's configs may send telemetry, as scheme://host[:port]: the -Endpoint's
+    # host, over https, by default.
+    [string[]]$ExporterEndpoint,
+    # The files, and directories, the server's configs may read logs from: none by default.
+    [string[]]$LogPath,
     # Write the config and the token, but don't start the service.
     [switch]$NoStart,
     # Takes the token's lines when they're piped in, read below from $input. PowerShell pipes
@@ -46,6 +51,27 @@ if ($CaFile) {
     if (-not [System.IO.Path]::IsPathRooted($CaFile)) { Fail '-CaFile needs an absolute path' }
     if (-not (Test-Path -LiteralPath $CaFile -PathType Leaf)) { Fail "can't read $CaFile" }
     if ($CaFile -match "'") { Fail "-CaFile can't contain a single quote" }
+}
+
+# Where the remote config's exporters may send: the OpAMP server's host unless given.
+if (-not $ExporterEndpoint) {
+    $authority = ($Endpoint -replace '^[a-z]+://', '') -replace '[/?#].*$', ''
+    $ExporterEndpoint = @($(if ($Endpoint -match '^(wss|https)://') { "https://$authority" } else { "http://$authority" }))
+}
+foreach ($e in $ExporterEndpoint) {
+    if ($e -match '^http://') {
+        if (-not $Plaintext) { Fail "$e isn't encrypted; pass -Plaintext to use it anyway" }
+    } elseif ($e -notmatch '^https://') {
+        Fail "an exporter endpoint must be an https:// or http:// URL: $e"
+    }
+    $rest = ($e -replace '^https?://', '') -replace '/$', ''
+    if (-not $rest -or $rest -match "[/?#@`"'\\ `$]") { Fail "an exporter endpoint is scheme://host[:port], with nothing else: $e" }
+}
+foreach ($p in $LogPath) {
+    if ($p -notmatch '^[A-Za-z]:[\\/]') { Fail "-LogPath needs an absolute path, with its drive: $p" }
+    if ($p -match "['`"*?\[\]{}`$]" -or $p.Contains('..') -or $p.Substring(2).Contains(':')) {
+        Fail "-LogPath can't hold quotes, glob characters, `$, .. or a second colon: $p"
+    }
 }
 
 $root = $env:OPAMP_ENROLL_ROOT
@@ -85,6 +111,8 @@ function Slashed([string]$path) { $path -replace '\\', '/' }
 $programs = Join-Path $env:ProgramFiles 'pydantic-opamp'
 $tokenPath = Join-Path $root 'enroll-token'
 Write-Atomically $tokenPath $token
+# A YAML flow sequence of single-quoted strings (none holds a quote); [] for none.
+function YamlList([string[]]$items) { '[' + ((@($items) | Where-Object { $_ } | ForEach-Object { "'$_'" }) -join ', ') + ']' }
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
 Write-Atomically (Join-Path $root 'supervisor.yaml') @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
@@ -104,6 +132,22 @@ capabilities:
 
 agent:
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
+
+  # What the server's remote config may do to this host. The server can't change this file;
+  # widen it here, or run pydantic-opamp-enroll.ps1 again with -ExporterEndpoint or -LogPath.
+  remote_config_policy:
+    # The component types a Logfire config uses, by their names and their older aliases.
+    allowed_components:
+      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
+      extensions: [health_check]
+    # No `${...}: env and file would read this host's environment and files.
+    allowed_providers: []
+    # Where its exporters, and the collector's own telemetry, may send.
+    allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
+    # What its filelog receivers may read: these files, and what is under these directories.
+    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))
 
 storage:
   directory: '$(Slashed (Join-Path $root 'var'))'

@@ -4,14 +4,13 @@
 // Package opamp is an OpAMP client over plain HTTP or WebSocket.
 //
 // Everything OpAMP (what to send and when, backoff, heartbeats, full reports, instance UIDs,
-// agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After,
-// size limits) is the shared core, run as WebAssembly in wazero (pure Go).
-// By default the core speaks HTTP and WebSocket itself too (Rust mode), and this package only
-// gives it Go's TCP connections and crypto/tls; in Go mode (below) this package carries out the
-// core's requests with net/http and gorilla/websocket instead. Either way it feeds back what
-// happened, so it behaves exactly like the other languages' clients on the same core.
-// The endpoint's scheme says the transport: http:// and https:// plain HTTP, ws:// and wss://
-// WebSocket.
+// agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After, size
+// limits) is the shared core, run as WebAssembly in wazero (pure Go). By default the core speaks
+// HTTP and WebSocket itself too (core mode), and this package only gives it Go's TCP connections
+// and crypto/tls; in platform mode (below) this package carries out the core's requests with
+// net/http and gorilla/websocket instead. Either way it feeds back what happened, so it behaves
+// exactly like the other languages' clients on the same core. The endpoint's scheme says the
+// transport: http:// and https:// plain HTTP, ws:// and wss:// WebSocket.
 //
 // # Callbacks
 //
@@ -38,38 +37,39 @@
 // Package files are downloaded without following redirects: the client reports each response,
 // whatever its status, with a redirect's Location resolved by net/url, and the core decides.
 //
-// # Rust mode (the default) and Go mode
+// # Core mode (the default) and platform mode
 //
-// Config.Mode says who speaks HTTP and WebSocket. The client runs in Rust mode unless the
+// Config.Mode says who speaks HTTP and WebSocket. The client runs in core mode unless the
 // application asks for platform mode: by naming it in the mode option, or by handing the client
 // an HTTP client of its own, where the SDK takes one (an application that brings its own client
 // has asked for the platform's stack). An option only one mode honours is never silently ignored:
 // it selects that mode, or the client refuses to start with an error that says what to set
 // instead.
 //
-// Here platform mode is Go mode: Mode set to ModeGo, and Config.HTTPClient selects it too. Start
-// refuses ModeRust with an HTTPClient, a TLS.Config that names the server (ServerName) in Rust
-// mode, and NoRustSplice in Go mode.
+// Here platform mode is net/http's: Mode set to ModePlatform, and Config.HTTPClient selects it
+// too. Start refuses ModeCore with an HTTPClient, a TLS.Config that names the server (ServerName)
+// in core mode, and NoSpliceDownloads in platform mode.
 //
-// In Rust mode the shared core speaks HTTP/1.1 (chunked bodies, kept connections), WebSocket,
+// In core mode the shared core speaks HTTP/1.1 (chunked bodies, kept connections), WebSocket,
 // HTTP CONNECT and SOCKS5 itself (in the same WebAssembly module), so the bytes
 // on the wire are the same in every language's client. Go only opens TCP connections, starts TLS
 // on them with crypto/tls and Config.TLS (the certificate verified for the host, SNI unless the
 // host is an address; TLS inside TLS to an https:// proxy), resolves names (only for a SOCKS5
 // proxy with Proxy.ResolveLocally), tells the core which proxy to use, moves the bytes with
 // backpressure, and writes package files (made new, synced before they are handed over; with the
-// core tap on, journaled as in Go mode). The core keeps every time and decides redirects. Package
-// bodies go from the connection straight to their file unless Config.NoRustSplice is set.
+// core tap on, journaled as in platform mode). The core keeps every time and decides redirects.
+// Package bodies go from the connection straight to their file unless Config.NoSpliceDownloads is
+// set.
 //
 //	cfg := opamp.Config{Endpoint: "wss://opamp.example.com/v1/opamp"}
 //
-// In Go mode net/http carries OpAMP requests and package downloads (HTTP/2 where the server
+// In platform mode net/http carries OpAMP requests and package downloads (HTTP/2 where the server
 // offers it) and gorilla/websocket the WebSocket. Choose it to bring your own *http.Client, or
 // when the connection must be made as net/http makes it: by net/http's reading of the
 // environment's proxies (below), over HTTP/2, or with a tls.Config that names the server
 // (TLS.Config.ServerName).
 //
-//	cfg := opamp.Config{Endpoint: "wss://opamp.example.com/v1/opamp", Mode: opamp.ModeGo}
+//	cfg := opamp.Config{Endpoint: "wss://opamp.example.com/v1/opamp", Mode: opamp.ModePlatform}
 //
 // # TLS and proxies
 //
@@ -96,8 +96,8 @@
 // downloads alike; Proxy.Direct tells the client to go direct instead, ignoring the environment.
 // The two modes read the environment by different rules:
 //
-//   - Rust mode, read once when the client starts, by the one rule every SDK's Rust mode shares
-//     (tests/shell-tables/README.md, "Rust mode's proxy rule"), which the core applies:
+//   - core mode, read once when the client starts, by the one rule every SDK's core mode shares
+//     (tests/shell-tables/README.md, its proxy rule), which the core applies:
 //     REQUEST_METHOD set (CGI) means none; each variable's upper-case
 //     name if it is set at all, else its lower-case one, a value empty or only spaces being
 //     unset; HTTP_PROXY for http:// and ws://, HTTPS_PROXY for https:// and wss://, either
@@ -107,20 +107,20 @@
 //     (10.0.0.0/8, 2001:db8::/32) for addresses. localhost and loopback addresses are not
 //     special: with HTTP_PROXY set, a server on localhost is reached through the proxy unless
 //     NO_PROXY names it. NO_PROXY's host:port entries match nothing.
-//   - Go mode, by net/http's (http.ProxyFromEnvironment): HTTP_PROXY, HTTPS_PROXY and NO_PROXY,
+//   - platform mode, by net/http's (http.ProxyFromEnvironment): HTTP_PROXY, HTTPS_PROXY and NO_PROXY,
 //     read once per process; no ALL_PROXY; localhost and loopback addresses never proxied;
 //     NO_PROXY's host:port entries honoured; none under CGI. A proxy it names follows the rules
 //     of one configured.
 //
-// A configured Proxy.URL is used as it is in both modes (in Rust mode it is handed to the core,
+// A configured Proxy.URL is used as it is in both modes (in core mode it is handed to the core,
 // with its credentials and ConnectHeader).
 //
 // An application with its own *http.Client sets Config.HTTPClient instead, and then no TLS or
-// Proxy; the client then runs in Go mode. Its Transport carries HTTP and downloads as it is, one
-// round trip each (no redirect is followed, no cookie sent), and WebSocket takes the Transport's
-// TLSClientConfig, Proxy, ProxyConnectHeader and DialContext (so it must be an *http.Transport).
-// Options that can't work (PEM that doesn't parse, a key that doesn't match its certificate, a
-// proxy scheme the client doesn't know) stop Start with the reason.
+// Proxy; the client then runs in platform mode. Its Transport carries HTTP and downloads as it is,
+// one round trip each (no redirect is followed, no cookie sent), and WebSocket takes the
+// Transport's TLSClientConfig, Proxy, ProxyConnectHeader and DialContext (so it must be an
+// *http.Transport). Options that can't work (PEM that doesn't parse, a key that doesn't match its
+// certificate, a proxy scheme the client doesn't know) stop Start with the reason.
 //
 // The client certificate's key stays in memory: the client doesn't write it anywhere. The state
 // file is still a secret, though: it holds what the server issued (credentials, and the private
@@ -189,10 +189,10 @@ type Config struct {
 	TLS TLS
 	// Proxy is the proxy to reach the server through, for HTTP, WebSocket and package downloads
 	// alike. The zero value takes it from the environment (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY,
-	// NO_PROXY, by Rust mode's rule; in Go mode by net/http's); Proxy.Direct goes direct.
+	// NO_PROXY, by core mode's rule; in platform mode by net/http's); Proxy.Direct goes direct.
 	Proxy Proxy
 	// HTTPClient, if set, is used instead of TLS and Proxy (setting both is an error), and the
-	// client runs in Go mode: only net/http can use it (with Mode set to ModeRust it is an
+	// client runs in platform mode: only net/http can use it (with Mode set to ModeCore it is an
 	// error). OpAMP requests and package downloads go through its Transport, one round trip
 	// each: no redirect is followed (the core decides) and its Jar and Timeout don't apply.
 	// WebSocket takes the TLS settings, proxy, CONNECT headers and dialer of its Transport, which
@@ -229,15 +229,15 @@ type Config struct {
 	MaxPackageBytes uint64
 	// DownloadTimeout is how long a download may take; 0: 10 minutes.
 	DownloadTimeout time.Duration
-	// Mode is who speaks HTTP and WebSocket: ModeRust (the shared core itself, over Go's TCP
-	// connections and crypto/tls) or ModeGo (net/http and gorilla/websocket). Unset (""): Rust
-	// mode, unless HTTPClient is set, which only Go mode can use. Both take TLS and Proxy.
+	// Mode is who speaks HTTP and WebSocket: ModeCore (the shared core itself, over Go's TCP
+	// connections and crypto/tls) or ModePlatform (net/http and gorilla/websocket). Unset (""): core
+	// mode, unless HTTPClient is set, which only platform mode can use. Both take TLS and Proxy.
 	Mode Mode
-	// NoRustSplice, in Rust mode, passes package files' bytes through the core. Unset (the
+	// NoSpliceDownloads, in core mode, passes package files' bytes through the core. Unset (the
 	// default), a download's body goes from the connection straight to its file wherever the
-	// core knows the next bytes are body (Config.splice_downloads). It is Rust mode's: in Go
+	// core knows the next bytes are body (Config.splice_downloads). It is core mode's: in platform
 	// mode it is an error.
-	NoRustSplice bool
+	NoSpliceDownloads bool
 
 	// coreModule, when set (by tests in this package only), is the WebAssembly module run
 	// instead of the embedded core: the adversary (testdata/core/opamp_core_adversary.wasm).
@@ -247,10 +247,10 @@ type Config struct {
 	tapFile string
 	// fs, when set (by tests), is what saves and downloads write with instead of the disk.
 	fs fileSystem
-	// streamNet, when set (by tests), is what Rust mode connects, starts TLS and resolves with
+	// streamNet, when set (by tests), is what core mode connects, starts TLS and resolves with
 	// (its nil functions: Go's own).
 	streamNet *streamPlatform
-	// environ, when set (by tests), is the environment Rust mode's proxy rule reads.
+	// environ, when set (by tests), is the environment core mode's proxy rule reads.
 	environ func(string) (string, bool)
 	// authEvery, when set (by tests), is how often AuthHeader is asked again; 0: every second.
 	authEvery time.Duration
@@ -294,7 +294,7 @@ type Client struct {
 // once): answer through the client it is given. The other methods may be called from it, and from
 // any goroutine at once; none of them blocks. docs/sdk-contract.md has the whole contract.
 func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, Notification)) (*Client, error) {
-	rust, err := cfg.rustMode()
+	coreMode, err := cfg.coreMode()
 	if err != nil {
 		return nil, err
 	}
@@ -307,15 +307,15 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		return nil, err
 	}
 	var tlsCfg *tls.Config
-	var proxies *rustProxies
-	if rust {
+	var proxies *coreProxies
+	if coreMode {
 		// The core speaks HTTP and WebSocket itself, over the streams this gives it.
 		if tlsCfg, err = cfg.TLS.tlsConfig(); err != nil {
 			return nil, fmt.Errorf("opamp: TLS: %w", err)
 		}
-		cc.Streams, cc.SpliceDownloads = true, !cfg.NoRustSplice
+		cc.Streams, cc.SpliceDownloads = true, !cfg.NoSpliceDownloads
 		// The core picks each connection's proxy from these.
-		proxies = newRustProxies(cfg.Proxy, cfg.environ)
+		proxies = newCoreProxies(cfg.Proxy, cfg.environ)
 		cc.Proxy = proxies.choice
 	}
 	if cfg.StateFile != "" {
@@ -359,13 +359,13 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	x.setStateFile(cfg.StateFile)
 	x.sealer = cfg.StateSealer
 	if cfg.StateFile != "" {
-		// With the tap on, every file operation goes to it, the state file named first (Rust
+		// With the tap on, every file operation goes to it, the state file named first (core
 		// mode's download files too: they go through x.fs).
 		x.fs = journaled(x.fs, cfg.StateFile, c.FileTap())
 	}
-	if rust {
+	if coreMode {
 		// What the core hands over that isn't a stream's (store, discard, a save's cancel; and
-		// platform effects, should a core emit them) goes to x as in Go mode.
+		// platform effects, should a core emit them) goes to x as in platform mode.
 		x.streams = newStreams(x, tlsCfg, proxies, cfg.streamNet)
 	}
 	if notify == nil {
@@ -430,7 +430,7 @@ func (c *Client) InstanceUID() [16]byte { return *c.uid.Load() }
 // Endpoint is the endpoint the client uses now: where its latest OpAMP request or WebSocket
 // connection went, which after the server moved the agent (an offer of connection settings) is
 // the offered one, or the configured one again once an offer failed. It is "" before any outcome,
-// and in Rust mode, where the core makes the requests itself (the configured one is all there is
+// and in core mode, where the core makes the requests itself (the configured one is all there is
 // to name then).
 // It holds the URL as the core gave it, credentials and query included: redact it before logging.
 func (c *Client) Endpoint() string {
@@ -550,41 +550,41 @@ func (c *Client) send(in *corepb.Input) {
 	}
 }
 
-// rustMode says which mode the client runs in (true: Rust mode), and refuses what the mode can't
-// take. With no Mode it is Rust mode, unless the application brought its own HTTP client, which
-// only Go mode can use. Nothing one mode alone honours is ignored: it is an error that says what
-// to set instead.
-func (cfg Config) rustMode() (bool, error) {
+// coreMode says which mode the client runs in (true: core mode), and refuses what the mode can't
+// take. With no Mode it is core mode, unless the application brought its own HTTP client, which
+// only platform mode can use. Nothing one mode alone honours is ignored: it is an error that says
+// what to set instead.
+func (cfg Config) coreMode() (bool, error) {
 	switch cfg.Mode {
 	case "":
 		if cfg.HTTPClient != nil {
-			return false, cfg.goModeOnly()
+			return false, cfg.platformModeOnly()
 		}
-		return true, cfg.rustModeOnly()
-	case ModeGo:
-		return false, cfg.goModeOnly()
-	case ModeRust:
+		return true, cfg.coreModeOnly()
+	case ModePlatform:
+		return false, cfg.platformModeOnly()
+	case ModeCore:
 		if cfg.HTTPClient != nil {
-			return false, errors.New("opamp: HTTPClient in Rust mode: the core speaks HTTP itself over Go's connections; set TLS and Proxy instead, or leave Mode unset (an HTTPClient selects Go mode)")
+			return false, errors.New("opamp: HTTPClient in core mode: the core speaks HTTP itself over Go's connections; set TLS and Proxy instead, or leave Mode unset (an HTTPClient selects platform mode)")
 		}
-		return true, cfg.rustModeOnly()
+		return true, cfg.coreModeOnly()
 	default:
-		return false, fmt.Errorf("opamp: Mode %q: want ModeRust or ModeGo", cfg.Mode)
+		return false, fmt.Errorf("opamp: Mode %q: want ModeCore or ModePlatform", cfg.Mode)
 	}
 }
 
-// goModeOnly refuses what Go mode doesn't honour.
-func (cfg Config) goModeOnly() error {
-	if cfg.NoRustSplice {
-		return errors.New("opamp: NoRustSplice in Go mode: it is Rust mode's (net/http writes package files itself); leave it unset, or run in Rust mode (no HTTPClient, and Mode unset or ModeRust)")
+// platformModeOnly refuses what platform mode doesn't honour.
+func (cfg Config) platformModeOnly() error {
+	if cfg.NoSpliceDownloads {
+		return errors.New("opamp: NoSpliceDownloads in platform mode: it is core mode's (net/http writes package files itself); leave it unset, or run in core mode (no HTTPClient, and Mode unset or ModeCore)")
 	}
 	return nil
 }
 
-// rustModeOnly refuses what Rust mode doesn't honour.
-func (cfg Config) rustModeOnly() error {
+// coreModeOnly refuses what core mode doesn't honour.
+func (cfg Config) coreModeOnly() error {
 	if cfg.TLS.Config != nil && cfg.TLS.Config.ServerName != "" {
-		return errors.New("opamp: TLS.Config.ServerName in Rust mode: the core names the host of each handshake (the server's, a download's, an https:// proxy's), so one name can't stand for all; leave it empty, or set Mode to ModeGo, where net/http verifies every server by it")
+		return errors.New("opamp: TLS.Config.ServerName in core mode: the core names the host of each handshake (the server's, a download's, an https:// proxy's), so one name can't stand for all; leave it empty, or set Mode to ModePlatform, where net/http verifies every server by it")
 	}
 	return nil
 }

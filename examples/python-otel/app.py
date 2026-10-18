@@ -21,7 +21,7 @@ import sys
 import time
 import urllib.request
 
-from opamp_otel import app_settings
+from pydantic_opamp_otel import app_settings
 
 if os.environ.get("EXAMPLE_SETUP"):  # check_truth's setups (setups.py): none otherwise
     import setups

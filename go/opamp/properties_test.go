@@ -259,7 +259,7 @@ func checkPlan(plan []propStep, goroutines int, ws bool, mode Mode) error {
 	}
 
 	cfg := Config{Endpoint: ts.URL + "/v1/opamp", InstanceUID: [16]byte{0x42}, HeartbeatInterval: 20 * time.Millisecond, Mode: mode}
-	if mode == ModeRust {
+	if mode == ModeCore {
 		cfg.Proxy = Proxy{Direct: true}
 	}
 	if ws {
@@ -444,10 +444,10 @@ func TestCallsFromAnywhereArriveOnceAndInOrder(t *testing.T) {
 		}
 		seed = n
 	}
-	// Half the runs in Go mode, half in Rust mode.
+	// Half the runs in platform mode, half in core mode.
 	for i := range runs {
 		plan, goroutines, ws := genPlan(rand.New(rand.NewPCG(seed, uint64(i))))
-		mode := []Mode{ModeGo, ModeRust}[i%2]
+		mode := []Mode{ModePlatform, ModeCore}[i%2]
 		if err := checkPlan(plan, goroutines, ws, mode); err != nil {
 			t.Fatalf("run %d (replay: OPAMP_PROP_SEED=%d), %s mode, %d goroutines, websocket %v, plan %v:\n%v",
 				i, seed, modeName(mode), goroutines, ws, plan, err)

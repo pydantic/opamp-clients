@@ -1,13 +1,13 @@
 # The OpenTelemetry Collector
 
 Two pieces put an OpenTelemetry Collector under an OpAMP server on this repository's Go client
-([go.md](go.md)), in Go mode: net/http and gorilla/websocket carry the requests, so the
+([go.md](go.md)), in platform mode: net/http and gorilla/websocket carry the requests, so the
 Collector's TLS settings and the environment's proxies apply as they do to its other clients.
 
 | | What it is | What the server can do |
 |---|---|---|
 | The `opamp` extension, [`go/opampextension`](../go/opampextension/) | The Collector's `opamp` extension with the client underneath replaced. The component type, the config and the custom-message API (`opampcustommessages`) are upstream's | see the collector: its description, effective config, health and available components; exchange custom messages with its components; restart it; issue it new OpAMP credentials |
-| The Supervisor, [`go/opampsupervisor`](../go/opampsupervisor/) | A fork of upstream's `opampsupervisor` at `cmd/opampsupervisor/v0.163.0`, on this client. It runs any vendor's collector as a child process | everything above, plus configure the collector (remote config), and install a new collector executable (packages) |
+| The Supervisor, [`go/opampsupervisor`](../go/opampsupervisor/) | A fork of upstream's `opampsupervisor` at `cmd/opampsupervisor/v0.163.0`, on this client. It runs any vendor's collector as a child process | everything above, plus configure the collector (remote config, within the policy the host sets: [what the server can do](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)), and install a new collector executable (packages) |
 
 The extension alone reports the collector it runs in. To have the server change what the
 collector runs, run it under the Supervisor, which configures it with the extension.

@@ -30,12 +30,22 @@ internal sealed record Server(
     /// <summary>The variables the core's Setup reads.</summary>
     private static readonly string[] Variables =
     [
-        "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL",
-        "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA",
+        "OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED", "OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
+        "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA",
     ];
 
-    /// <summary>The variables that aren't OTEL_OPAMP_*: what the hosting package's settings don't replace.</summary>
-    private static readonly string[] Others = Variables.Where(v => !v.StartsWith("OTEL_OPAMP_", StringComparison.Ordinal)).ToArray();
+    /// <summary>The variables that turn OpAMP off, whatever else is given.</summary>
+    private static readonly string[] Switches = ["OTEL_OPAMP_DISABLED", "OTEL_SDK_DISABLED"];
+
+    /// <summary>The variables without the switches: where the server is, as the variables say it.</summary>
+    private static readonly string[] Settings = Variables.Except(Switches).ToArray();
+
+    /// <summary>
+    /// What the hosting package's settings don't replace: the switches, and the variables that
+    /// aren't OTEL_OPAMP_*.
+    /// </summary>
+    private static readonly string[] Others =
+        Variables.Where(v => Switches.Contains(v) || !v.StartsWith("OTEL_OPAMP_", StringComparison.Ordinal)).ToArray();
 
     /// <summary>The endpoint as it is safe to log.</summary>
     public string ShownEndpoint => this.Shown ?? Reachability.Shown(this.Endpoint.OriginalString, this.Endpoint.OriginalString);
@@ -44,30 +54,37 @@ internal sealed record Server(
     public SetupHints Hinted => this.Hints ?? HintsFor(this.Endpoint.OriginalString);
 
     /// <summary>
-    /// Null when OTEL_OPAMP_ENDPOINT is unset: nothing is managed. The rules are the core's (its
-    /// Setup call), the same in every language; a setting it can't use is the default, with a
-    /// warning. An endpoint that isn't a URL throws.
+    /// Null when OTEL_OPAMP_ENDPOINT is unset, or OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED turns
+    /// OpAMP off (said, through <paramref name="warn"/>): nothing is managed. The rules are the
+    /// core's (its Setup call), the same in every language; a setting it can't use is the default,
+    /// with a warning. An endpoint that isn't a URL throws. Without <paramref name="switches"/>
+    /// the switches aren't read: the hosting package reads them with its options (FromOptions).
     /// </summary>
-    public static Server? FromEnv(Func<string, string?> getenv, Action<string> warn) =>
-        FromCore(Start(getenv), warn);
+    public static Server? FromEnv(Func<string, string?> getenv, Action<string> warn, bool switches = true) =>
+        FromCore(Start(getenv, only: switches ? null : Settings), warn);
 
     /// <summary>
     /// The hosting package's options, given in code (what the configuration and the variables said
     /// is in them already): the endpoint, headers, state directory and interval, named as its
-    /// settings. Null: the core could not read them.
+    /// settings. Null: no endpoint, or OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED turns OpAMP off
+    /// whatever the options say (said, through <paramref name="warn"/>).
     /// </summary>
-    public static Server? FromOptions(Uri endpoint, IDictionary<string, string> headers, string? stateDir, TimeSpan? heartbeat,
+    public static Server? FromOptions(Uri? endpoint, IDictionary<string, string> headers, string? stateDir, TimeSpan? heartbeat,
         Func<string, string?> getenv, Action<string> warn, string endpointName, string headersName, string heartbeatName)
     {
         var start = Start(getenv, only: Others);
         start.Code = new SetupInCode
         {
-            Endpoint = endpoint.OriginalString,
             HeadersGiven = true,
             EndpointName = endpointName,
             HeadersName = headersName,
             HeartbeatName = heartbeatName,
         };
+        if (endpoint is not null)
+        {
+            start.Code.Endpoint = endpoint.OriginalString;
+        }
+
         start.Code.Headers.AddRange(headers.Select(h => new Pydantic.OpAmp.Core.Header { Name = h.Key, Value = h.Value }));
         if (stateDir is not null)
         {
@@ -124,6 +141,12 @@ internal sealed record Server(
 
         if (s.Off)
         {
+            // Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+            if (s.OffReason.Length > 0)
+            {
+                warn(s.OffReason);
+            }
+
             return null;
         }
 
@@ -406,9 +429,9 @@ internal sealed class SdkAgent
             // A key of its own, offered by the server: taken with a state directory (StateFile)
             // and kept there; without one the client neither declares nor takes it.
             AcceptConnectionSettings = true,
-            // .NET mode, asked for by name: the client's requests go through HttpClient, which is
-            // what the suppression below keeps out of the application's traces.
-            Mode = OpAmpMode.DotNet,
+            // Platform mode, asked for by name: the client's requests go through HttpClient, which
+            // is what the suppression below keeps out of the application's traces.
+            Mode = OpAmpMode.Platform,
         };
         ComponentHealth first;
         lock (this.gate)

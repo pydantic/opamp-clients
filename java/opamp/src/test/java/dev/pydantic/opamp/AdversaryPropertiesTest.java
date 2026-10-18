@@ -61,12 +61,12 @@ import org.junit.jupiter.params.provider.EnumSource;
  * after stop returned, a download that changed after stop, or a state file that doesn't hold what
  * was last answered stored; and the batch on a production enabled but never used.
  *
- * <p>Each test runs in both modes. In Rust mode the client tells the core it speaks streams, and
+ * <p>Each test runs in both modes. In core mode the client tells the core it speaks streams, and
  * each run has a raw server of its own ({@link AdversaryRawTest.Server}, the adversary's raw
  * server; {@code raw=PORT} and {@code tls=NAME} in the endpoint's query): the adversary hands the
  * client the stream effects ({@link Streams} carries them out, to that server), and the platform's
- * as well (http_request, ws_open, download), which Rust mode passes to the platform executor: which
- * of the two takes an effect (a cancel above all), Rust mode's stop and its shutdown run with both
+ * as well (http_request, ws_open, download), which core mode passes to the platform executor: which
+ * of the two takes an effect (a cancel above all), core mode's stop and its shutdown run with both
  * under way. The run then also fails on a stream's connection still open, or one made after stop
  * returned.
  *
@@ -109,7 +109,7 @@ class AdversaryPropertiesTest {
       "limit_huge", List.of(2001L, 2002L, 2003L),
       // N7: a wake_at_ms of 2^63 or more was negative: the timer fired at once.
       "wake_max", List.of(7001L, 7002L, 7003L),
-      // N8 (Rust mode): a splice asked for in answer to stream_spliced didn't take the bytes
+      // N8 (core mode): a splice asked for in answer to stream_spliced didn't take the bytes
       // already read: they were handed over as stream_data (splice_leak). Seeds 25 and 26 were
       // the main run's focus on it, the production having failed in every seed of the batch.
       "stream_splice_chain", List.of(25L, 26L)));
@@ -273,14 +273,14 @@ class AdversaryPropertiesTest {
   /** The cancel productions (RULE-SHELL-06), in every run's grammar. */
   static final List<String> CANCELS = List.of("cancel_download", "cancel_http", "cancel_http_done", "cancel_store",
       "cancel_twice", "cancel_ws_closing", "cancel_ws_opening", "stop_cancel");
-  /** And those of the streams and their files, in a Rust mode run's. */
+  /** And those of the streams and their files, in a core mode run's. */
   static final List<String> STREAM_CANCELS = List.of("cancel_file", "cancel_splice", "cancel_stream_open",
       "cancel_stream_opening", "cancel_stream_resolving");
 
   /** The cancel productions of a run in {@code mode}. */
   static List<String> cancels(OpampClient.Mode mode) {
     List<String> all = new ArrayList<>(CANCELS);
-    if (mode == OpampClient.Mode.RUST) {
+    if (mode == OpampClient.Mode.CORE) {
       all.addAll(STREAM_CANCELS);
     }
     return all;
@@ -587,7 +587,7 @@ class AdversaryPropertiesTest {
     final List<Map.Entry<Long, CompletableFuture<Void>>> stops = new CopyOnWriteArrayList<>();
 
     final OpampClient.Mode mode;
-    /** The run's raw server, which its streams connect to (Rust mode; null in Java mode). */
+    /** The run's raw server, which its streams connect to (core mode; null in platform mode). */
     AdversaryRawTest.Server raw;
 
     Seed(long seed, String query, AdversaryServer server, WasmModule module, Path dir, OpampClient.Mode mode) {
@@ -748,8 +748,8 @@ class AdversaryPropertiesTest {
       String endpoint = "http://127.0.0.1:" + server.port() + "/opamp?seed=" + seed + "&margin=" + MARGIN_MS
           + (query.isEmpty() ? "" : "&" + query);
       Tls tls = null;
-      if (mode == OpampClient.Mode.RUST) {
-        // Rust mode: the run has a raw server of its own, which the adversary opens streams to
+      if (mode == OpampClient.Mode.CORE) {
+        // Core mode: the run has a raw server of its own, which the adversary opens streams to
         // (raw=PORT), some of them with TLS under the name its certificate is for (tls=NAME): the
         // client trusts the tests' CA for it.
         raw = new AdversaryRawTest.Server(RawTls.CONTEXT);

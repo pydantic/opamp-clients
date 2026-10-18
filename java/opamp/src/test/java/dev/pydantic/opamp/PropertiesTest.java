@@ -168,7 +168,7 @@ class PropertiesTest {
 
     String endpoint = (ws ? "ws" : "http") + "://127.0.0.1:" + port + "/v1/opamp";
     client.set(OpampClient.start(
-        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.JAVA).heartbeatInterval(Duration.ofMillis(20)).build(),
+        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.PLATFORM).heartbeatInterval(Duration.ofMillis(20)).build(),
         new OpampClient.Status(description(0), null, null, null, null,
             Opamp.CustomCapabilities.newBuilder().addCapabilities(CAPABILITY).build()),
         notify));

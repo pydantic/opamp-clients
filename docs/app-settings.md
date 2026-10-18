@@ -135,8 +135,8 @@ Every integration gives the application the same five things, named as its langu
 
 | Language | Package | Read | Typed | Snapshot | Told of changes |
 |---|---|---|---|---|---|
-| Python | `pydantic-opamp-otel` | `opamp_otel.app_settings.get(key, default=None)` | `get_bool`, `get_int`, `get_float` | `app_settings.snapshot()` → `Mapping[str, str]` | `app_settings.on_change(cb)` → a function that unsubscribes; `cb(settings, changed: frozenset[str])` |
-| Go | `github.com/pydantic/opamp-clients/go/otel` | `opampotel.AppSetting(key, def string) string` | `AppSettingBool`, `AppSettingInt` (`int64`), `AppSettingFloat` (`float64`) | `opampotel.AppSettings() map[string]string` (a copy) | `opampotel.OnAppSettingsChange(func(settings map[string]string, changed []string)) (remove func())` |
+| Python | `pydantic-opamp-otel` | `pydantic_opamp_otel.app_settings.get(key, default=None)` | `get_bool`, `get_int`, `get_float` | `app_settings.snapshot()` → `Mapping[str, str]` | `app_settings.on_change(cb)` → a function that unsubscribes; `cb(settings, changed: frozenset[str])` |
+| Go | `github.com/pydantic/opamp-clients/go/opampotel` | `opampotel.AppSetting(key, def string) string` | `AppSettingBool`, `AppSettingInt` (`int64`), `AppSettingFloat` (`float64`) | `opampotel.AppSettings() map[string]string` (a copy) | `opampotel.OnAppSettingsChange(func(settings map[string]string, changed []string)) (remove func())` |
 | Node.js | `@pydantic/opamp-otel` | `appSettings.get(key, def)` | `getBool`, `getInt`, `getFloat` | `appSettings.snapshot()` → a frozen `Readonly<Record<string, string>>` | `appSettings.onChange((settings, changed: string[]) => void)` → `() => void` |
 | Java | the Java agent extension; the application compiles against its `app-settings` jar | `dev.pydantic.opamp.AppSettings.get(String key, String def)` | `getBoolean`, `getLong`, `getDouble` | `AppSettings.snapshot()` → an unmodifiable `Map<String, String>` | `AppSettings.onChange(AppSettingsListener)` → `AutoCloseable`; `void changed(Map<String, String> settings, Set<String> changed)`, the keys sorted |
 | .NET | `Pydantic.OpAmp.AutoInstrumentation`, `WithOpAmp` (the type is in `Pydantic.OpAmp.Client`, which both bring) | `Pydantic.OpAmp.OpAmpAppSettings.Get(string key, string? defaultValue)` | `GetBool`, `GetInt64`, `GetDouble` | `OpAmpAppSettings.Snapshot()` → `IReadOnlyDictionary<string, string>` | `OpAmpAppSettings.OnChange(Action<IReadOnlyDictionary<string, string>, IReadOnlySet<string>>)` → `IDisposable`; the keys enumerated in ordinal order |
@@ -154,7 +154,7 @@ class loader that has it) finds it there. Node.js's `getInt` takes only safe int
 In Python:
 
 ```python
-from opamp_otel import app_settings
+from pydantic_opamp_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...
@@ -166,7 +166,7 @@ def changed(settings, keys):
 unsubscribe = app_settings.on_change(changed)
 ```
 
-It works whoever built the SDK (`opentelemetry-instrument`, `opamp_otel.configure()`, another
+It works whoever built the SDK (`opentelemetry-instrument`, `pydantic_opamp_otel.configure()`, another
 configurator, `OTEL_CONFIG_FILE`): the package declares `custom` always. A forked worker
 (gunicorn's) follows its parent's values, and its own callbacks are called there. Under
 `opentelemetry-instrument` the saved values are loaded before the application's code runs, so a
@@ -180,7 +180,7 @@ callback the application adds is told of the server's changes from then on, not 
   Node.js `node/opamp/test/sdk.test.ts`), and its integration's tests cover the API (Python
   `python/otel/tests/test_app_settings.py`: reads before and after a config, the typed vectors,
   once per change and never for the same map, callbacks that raise, order, unsubscribing,
-  threads, restarts, forked workers; Go `go/otel/appsettings_test.go`, the same but forked
+  threads, restarts, forked workers; Go `go/opampotel/appsettings_test.go`, the same but forked
   workers, with every `custom.json` case through the Go wrapper's `Decide`, a Refresh, `Setup`,
   and `-race`; Node.js `node/otel/test/app-settings.test.ts`: the same, rejected promises in place
   of threads and forks; Java `java/opamp-javaagent/src/test`, `AppSettingsTest` and

@@ -1,6 +1,6 @@
 # OpenTelemetry for Go, under an OpAMP server
 
-`go/otel` is `github.com/pydantic/opamp-clients/go/otel`, package `opampotel`. `Setup` builds the
+`go/opampotel` is the package `github.com/pydantic/opamp-clients/go/opampotel`. `Setup` builds the
 OpenTelemetry SDK the `OTEL_*` variables describe, sets it as the global providers, and puts it
 under an OpAMP server's fleet: sampling, what to send and which instrumentations run follow the
 server's settings ([sdk-settings.md](sdk-settings.md)).
@@ -13,7 +13,7 @@ instrumentations and the SDK stay the upstream ones. Checked with `go.openteleme
 ## Use it
 
 ```go
-import "github.com/pydantic/opamp-clients/go/otel"
+import "github.com/pydantic/opamp-clients/go/opampotel"
 
 func main() {
 	sdk, err := opampotel.Setup(ctx)
@@ -39,12 +39,14 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 
 | Variable | |
 |---|---|
+| `OTEL_OPAMP_DISABLED` | `true` turns OpAMP off: no client starts, whatever else is given (`WithEndpoint` too), and the SDK runs on its own settings. This is the way to take an application off the server in an incident: set it and restart, no deploy. One warning says so (`opamp: off, as OTEL_OPAMP_DISABLED=true says: no OpAMP client is started, whatever the code gives`). `false` or blank leaves it to the rest; any other value (`1`, `yes`) is taken as `true`, and the warning says how to write it. |
+| `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). Whether the SDK itself is built is still `Setup`'s: it builds the same SDK, unmanaged. |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it, `Setup` builds the same SDK, unmanaged. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. A header HTTP can't carry warns and is left out. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is the default, with a warning; longer than a day is a day. |
 
-The core reads these (and the options below), by the same rules in every language: the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
+The core reads these (and the options below), by the same rules in every language: whether OpAMP is off, the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
 
 ### In code
 
@@ -69,7 +71,7 @@ sdk, err := opampotel.Setup(ctx,
 (`-opamp`, `-state-dir`, `-heartbeat`) and a key in `CHECKOUT_OPAMP_KEY`, and
 [try.py](../examples/go-otel/try.py) runs every check against it that way too, with no
 `OTEL_OPAMP_*` set. The same, on pkg.go.dev: `ExampleSetup_inCode` and `ExampleSetup_fromFlags`
-in [example_test.go](../go/otel/example_test.go).
+in [example_test.go](../go/opampotel/example_test.go).
 
 The SDK is what [autoexport](https://pkg.go.dev/go.opentelemetry.io/contrib/exporters/autoexport)
 and the SDK's own variables make it: the exporter each `OTEL_*_EXPORTER` names (OTLP by default,
@@ -151,7 +153,7 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   it logs why and the SDK runs unmanaged. `Setup` fails only for an exporter the `OTEL_*`
   variables describe that can't be built, and then leaves the global providers as they were.
 
-The rules are the SDK settings layer's (`go/opamp/sdk`, in wazero), the same in every language.
+The rules are the SDK settings layer's (`go/opamp/sdksettings`, in wazero), the same in every language.
 The package only carries them out on the Go SDK.
 
 ### Switching instrumentations off
@@ -216,7 +218,7 @@ the application's own too. To keep the application's own spans, list the instrum
 
 The package reports what the instance runs as its available components, the same shape in every
 language ([available-components.md](available-components.md#what-the-sdk-integrations-report)):
-this package (`github.com/pydantic/opamp-clients/go/otel`) and its version, `telemetry.sdk.language`
+this package (`github.com/pydantic/opamp-clients/go/opampotel`) and its version, `telemetry.sdk.language`
 `go` and the SDK's version (`sdk.Version()`), the instrumentations, the exporters, and the
 settings it carries out. For example, with otelhttp, a log bridge and a Prometheus reader:
 
@@ -424,7 +426,7 @@ told of.
 
 ## How it is checked
 
-- Unit tests (`go/otel`, with `-race`):
+- Unit tests (`go/opampotel`, with `-race`):
   - the sampler, the gates and the switches on a real SDK, with settings applied while spans start;
   - a switched-off instrumentation keeps the trace going, and is switched off too when it takes
     its tracer from the span in the context;

@@ -1,13 +1,13 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the
-// OpAMP client is go/opamp's (the shared core, in Go mode) instead of opamp-go's. The status the
-// collector reports before the client starts (health, custom capabilities) is kept and given to
-// it at the start; the effective config is pushed when it changes instead of asked for; the
-// available components' hash is the core's; and with a state file the client keeps the
-// instance UID and the connection settings the server issued across restarts, sealed with
-// state_key if set. A health update that clears the error is reported even when the status stays.
+// Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the OpAMP
+// client is go/opamp's (the shared core, in platform mode) instead of opamp-go's. The status the
+// collector reports before the client starts (health, custom capabilities) is kept and given to it
+// at the start; the effective config is pushed when it changes instead of asked for; the available
+// components' hash is the core's; and with a state file the client keeps the instance UID and the
+// connection settings the server issued across restarts, sealed with state_key if set. A health
+// update that clears the error is reported even when the status stays.
 
 package opampextension
 
@@ -200,9 +200,9 @@ func (o *opampAgent) Start(_ context.Context, host component.Host) error {
 		Endpoint:     o.cfg.Server.GetEndpoint(),
 		Capabilities: uint64(o.capabilities.toAgentCapabilities()),
 		Header:       header,
-		// Go mode: net/http carries the requests, so the collector's TLS settings, the
+		// Platform mode: net/http carries the requests, so the collector's TLS settings, the
 		// environment's proxies and auth extensions apply as they do to its other clients.
-		Mode:                     opamp.ModeGo,
+		Mode:                     opamp.ModePlatform,
 		HTTPClient:               httpClient,
 		AuthHeader:               authHeader,
 		StateFile:                o.cfg.StateFile,

@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The native core (opamp_client._native) is held to the WebAssembly module it replaced: for runs
+"""The native core (pydantic_opamp_client._native) is held to the WebAssembly module it replaced: for runs
 of configs and inputs, plausible and not, every reply is the module's, byte for byte. The module is
 what the conformance suite, the taps and the other SDKs check, so this carries their checks over to
 the native build. (dotnet's NativeCoreTests holds its build to the same.)"""
@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -18,11 +19,11 @@ from _wasm import WasmCore, WasmSdkSettings
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from opamp_client import CoreError, _native
-from opamp_client._core import Core
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._proto.opamp.sdk.v1 import settings_pb2
-from opamp_client._proto.opamp.v1 import opamp_pb2 as pb
+from pydantic_opamp_client import CoreError, _native
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._proto.opamp.sdk.v1 import settings_pb2
+from pydantic_opamp_client._proto.opamp.v1 import opamp_pb2 as pb
 
 EXAMPLES = int(os.environ.get("OPAMP_NATIVE_EXAMPLES", "200"))
 
@@ -179,25 +180,49 @@ def test_a_trap_is_a_core_error() -> None:
         Core(corepb.Config(instance_uid=bytes([1] * 16), endpoint="http://server/v1/opamp"), _engine=WasmCore(trapping))
 
 
-def _load(env: dict[str, str]) -> subprocess.CompletedProcess:
-    """Import the binding in a fresh interpreter with env, as a user's process would."""
-    return subprocess.run([sys.executable, "-c", "import opamp_client._native as n; print(n._find())"],
-                          env={**os.environ, **env}, capture_output=True, text=True)
+def _load(env: dict[str, str], code: str = "import pydantic_opamp_client._native as n; print(n._find())"
+          ) -> subprocess.CompletedProcess:
+    """Run code in a fresh interpreter with env, as a user's process would."""
+    return subprocess.run([sys.executable, "-c", code], env={**os.environ, **env}, capture_output=True, text=True)
+
+
+def _core_package(tmp_path: Path, library: bytes | None) -> dict[str, str]:
+    """An environment whose pydantic_opamp_core is a package in tmp_path, holding library as its native
+    library (none if None): no other library is looked for."""
+    (tmp_path / "pydantic_opamp_core").mkdir()
+    (tmp_path / "pydantic_opamp_core" / "__init__.py").write_text("")
+    if library is not None:
+        (tmp_path / "pydantic_opamp_core" / _native._lib_name()).write_bytes(library)
+    return {"PYTHONPATH": os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])])}
 
 
 def test_the_library_comes_from_the_core_package() -> None:
     found = _load({})
     assert found.returncode == 0, found.stderr
-    assert Path(found.stdout.strip()).parent.name == "opamp_core"
+    assert Path(found.stdout.strip()).parent.name == "pydantic_opamp_core"
 
 
-def test_a_missing_library_fails_the_import(tmp_path: Path) -> None:
-    # A core package without the library: no other library is looked for.
-    (tmp_path / "opamp_core").mkdir()
-    (tmp_path / "opamp_core" / "__init__.py").write_text("")
-    path = os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])])
-    found = _load({"PYTHONPATH": path, "OPAMP_NATIVE_LIB": str(tmp_path / "libopamp_native.so")})
-    assert found.returncode != 0 and "isn't installed" in found.stderr, found.stderr
+# Importing the package never fails because of the library; the calls that need it raise
+# ImportError, every time with the same reason, and unavailable() says it.
+_CALLS = textwrap.dedent("""
+    import pydantic_opamp_client, pydantic_opamp_client.sdk, pydantic_opamp_client.setup
+    from pydantic_opamp_client import _native
+    print(_native.unavailable())
+    for call in (_native.Core, lambda: _native.sdk_settings_call(b""), lambda: _native.setup_call(b"")):
+        try:
+            call()
+        except ImportError as e:
+            assert str(e) == _native.unavailable(), e
+        else:
+            raise AssertionError("no ImportError")
+""")
+
+
+@pytest.mark.parametrize(("library", "reason"), [(None, "isn't installed"), (b"not a library", "can't be loaded")])
+def test_a_missing_or_corrupt_library_fails_its_calls_not_the_import(tmp_path: Path, library, reason) -> None:
+    run = _load(_core_package(tmp_path, library), _CALLS)
+    assert run.returncode == 0, run.stderr
+    assert reason in run.stdout, run.stdout
 
 
 def test_a_closed_session_frees_its_handle_once() -> None:

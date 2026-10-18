@@ -201,7 +201,7 @@ func TestTheTapJournalsSavesAndDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	installed := make(chan string, 1)
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StateFile: state,
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StateFile: state,
 		AcceptPackages: true}, Status{}, func(c *Client, n Notification) {
 		if n.Kind == InstallPackage {
 			got, err := os.ReadFile(n.Path)
@@ -573,7 +573,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 	defer ts.Close()
 	const stopTimeout = time.Second
 	aTap := filepath.Join(dir, "a.tap")
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig), tapFile: aTap, fs: fsys}
 	a, err := Start(context.Background(), cfg, Status{}, nil)
 	if err != nil {
@@ -834,7 +834,7 @@ func TestAPartialDownloadIsNeverReused(t *testing.T) {
 	if err := os.WriteFile(left, []byte("partial"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", StateFile: state, AcceptPackages: true}, Status{}, nil)
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", StateFile: state, AcceptPackages: true}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -901,7 +901,7 @@ func downloadFaultRun(t *testing.T, seed uint64) error {
 		}
 	}
 	const stopTimeout = time.Second
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
 		AcceptPackages: true, tapFile: filepath.Join(dir, "a.tap"), fs: fsys}
 	a, err := Start(context.Background(), cfg, Status{}, notify)
 	if err != nil {

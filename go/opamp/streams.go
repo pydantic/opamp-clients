@@ -3,13 +3,13 @@
 
 package opamp
 
-// Rust mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
-// and this carries out only what needs the platform: TCP connections, TLS on them (crypto/tls,
-// with the operator's CAs, certificate and versions), name resolution (only for a SOCKS5 proxy
-// with Proxy.ResolveLocally: otherwise the proxy resolves), the proxy Rust mode's rule picks for
-// a URL (rustproxy.go), and the files of downloads. It decides nothing: every byte it writes, the
-// core wrote, and the core keeps every time (it closes a stream it gives up on, and cancels a
-// download's file). As node/opamp/src/streams.ts and python/src/opamp_client/_streams.py do.
+// Core mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself, and this carries out
+// only what needs the platform: TCP connections, TLS on them (crypto/tls, with the operator's CAs,
+// certificate and versions), name resolution (only for a SOCKS5 proxy with Proxy.ResolveLocally:
+// otherwise the proxy resolves), the proxy core mode's rule picks for a URL (coreproxy.go), and the
+// files of downloads. It decides nothing: every byte it writes, the core wrote, and the core keeps
+// every time (it closes a stream it gives up on, and cancels a download's file). As
+// node/opamp/src/streams.ts and python/src/pydantic_opamp_client/_streams.py do.
 //
 // One register (inFlight, as the platform executor's) owns everything under way: each stream (its
 // connection, the goroutine connecting it, starting its TLS and reading it, the one writing it,
@@ -80,7 +80,7 @@ const (
 	maxUnsent = 16 << 20
 )
 
-// streamPlatform is what Rust mode does its network work with: Go's dialer, crypto/tls and
+// streamPlatform is what core mode does its network work with: Go's dialer, crypto/tls and
 // resolver, unless a test stands in for them (Config.streamNet).
 type streamPlatform struct {
 	dial     func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -132,17 +132,17 @@ func goStreams(p *streamPlatform) streamPlatform {
 	return out
 }
 
-// streams carries out Rust mode's effects (do takes those that are its own) for the executor x,
+// streams carries out core mode's effects (do takes those that are its own) for the executor x,
 // whose channel its reports go out on, and whose file system, state file and download paths its
 // files use.
 type streams struct {
 	x       *executor
 	tls     *tls.Config // the operator's, HTTP/1.1 only: each handshake takes a copy for its host
-	proxies *rustProxies
+	proxies *coreProxies
 	p       streamPlatform
 
 	// reg holds every stream and resolution by stream id (the shell's ids), and runs every
-	// goroutine of Rust mode; files holds each download file under way by download id (the
+	// goroutine of core mode; files holds each download file under way by download id (the
 	// core's), for what is reported about it.
 	reg   *inFlight
 	files *inFlight
@@ -158,7 +158,7 @@ type streams struct {
 	reading *stream
 }
 
-func newStreams(x *executor, cfg *tls.Config, proxies *rustProxies, p *streamPlatform) *streams {
+func newStreams(x *executor, cfg *tls.Config, proxies *coreProxies, p *streamPlatform) *streams {
 	return &streams{x: x, tls: http1Only(cfg), proxies: proxies, p: goStreams(p), reg: newInFlight(), files: newInFlight(),
 		live: map[*stream]bool{}, fileOf: map[uint64]*dlFile{}, answered: map[uint64]bool{}}
 }
@@ -279,7 +279,7 @@ func streamFailed(id uint64, detail string) *corepb.Input {
 	return &corepb.Input{Kind: &corepb.Input_StreamFailed{StreamFailed: &corepb.Failed{Id: id, Detail: lossy(detail)}}}
 }
 
-// do carries out e if it is one of Rust mode's: whether it was, and an outcome known at once for
+// do carries out e if it is one of core mode's: whether it was, and an outcome known at once for
 // the loop to queue. A cancel is also the executor's (it may name a save): do says it isn't only
 // this one's.
 func (s *streams) do(eff *corepb.Effect) (bool, *report) {
@@ -1071,6 +1071,6 @@ func (s *streams) cancelAll() {
 	}
 }
 
-// wait waits for Rust mode's goroutines (connects, reads, writes, lingers, resolutions, file
+// wait waits for core mode's goroutines (connects, reads, writes, lingers, resolutions, file
 // work) to end, bound at most, cancelling what is under way first: whether they all did.
 func (s *streams) wait(bound time.Duration) bool { return s.reg.close(bound) }

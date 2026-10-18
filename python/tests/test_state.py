@@ -12,10 +12,10 @@ import time
 
 import pytest
 
-from opamp_client import Client, Config, Status
-from opamp_client import _executor as executor_module
-from opamp_client._executor import Executor, read_state, save_state
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client import Client, Config, Status
+from pydantic_opamp_client import _executor as executor_module
+from pydantic_opamp_client._executor import Executor, read_state, save_state
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 
 def test_saves_replace_what_was_saved_privately(tmp_path):
@@ -96,7 +96,7 @@ def test_saves_land_in_order_beside_the_loop_and_a_cancelled_one_is_never_report
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("mode", ["python", "rust"])
+@pytest.mark.parametrize("mode", ["platform", "core"])
 def test_an_unreadable_state_file_stops_the_client_starting(mode, tmp_path):
     async def run() -> None:
         with pytest.raises(OSError):
@@ -106,7 +106,7 @@ def test_an_unreadable_state_file_stops_the_client_starting(mode, tmp_path):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("mode", ["python", "rust"])
+@pytest.mark.parametrize("mode", ["platform", "core"])
 def test_clients_on_many_state_files_leave_no_saving_threads_behind(mode, tmp_path):
     """A thread saves to a state file while there is work for it, then ends: a process that runs
     clients on one state file after another (the callback model test runs thousands) keeps no

@@ -17,18 +17,18 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from opamp_client import Notification, opamp_pb2
-from opamp_client.sdk import SdkSettings, settings_pb2
+from pydantic_opamp_client import Notification, opamp_pb2
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
-import opamp_otel
+import pydantic_opamp_otel
 from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
 from kept import keep_applied
-from opamp_otel import Agent, Controls, Setup, disabled_instrumentations
+from pydantic_opamp_otel import Agent, Controls, Setup, disabled_instrumentations
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -46,7 +46,7 @@ def _own_state_home(tmp_path_factory, monkeypatch):
 
 def settings(doc: str):
     """The settings as the layer hands them to the package where it built the SDK."""
-    return LAYER.load(doc.encode(), opamp_otel.sdk_host(["otlp"])).settings
+    return LAYER.load(doc.encode(), pydantic_opamp_otel.sdk_host(["otlp"])).settings
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
@@ -107,10 +107,10 @@ def test_next_start_settings_become_the_instrumentations_switch():
     assert disabled_instrumentations(settings(policy()), "") is None
 
 
-def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> opamp_otel.Reachability:
+def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> pydantic_opamp_otel.Reachability:
     """Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them."""
     s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": endpoint, "OTEL_OPAMP_STATE_DIR": "none"})
-    return opamp_otel.Reachability(s.shown, service, uid, s.hints)
+    return pydantic_opamp_otel.Reachability(s.shown, service, uid, s.hints)
 
 
 def test_settings_read_as_the_sdk_reads_its_own():
@@ -130,20 +130,20 @@ def test_a_bad_heartbeat_interval_warns_and_is_the_default(server, caplog):
     # As under opentelemetry-instrument, where an exception would skip all auto-instrumentation.
     for bad in ["soon", "-5s", "1h"]:
         caplog.clear()
-        with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+        with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
             s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": bad})
         assert s.heartbeat_ms == 0
         assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{bad}" is not a duration (as 1500, '
                                    "500ms, 30s or 2m): using the default"]
     # Longer than a day: a day, the longest.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": str(2**53)})
     assert s.heartbeat_ms == 86_400_000
     assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{2**53}" is more than a day: a day it is, the longest']
     # A bad percent escape in the headers leaves that header out, with a warning naming it.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s", "OTEL_OPAMP_STATE_DIR": "none",
                             "OTEL_OPAMP_HEADERS": "a=x%zzy,b=%,c=%e9,d=ok%21"})
     assert s.headers == {"d": "ok!"}
@@ -328,9 +328,9 @@ def test_send_metrics_is_not_carried_out_when_no_metric_exporter_can_be_stopped(
     for names, carried in [(["otlp"], True), (["console", "otlp"], False), (["otlp", "prometheus"], False),
                            (["none"], True), ([""], True), (["NONE"], True), (["console"], False),
                            (["otlp_proto_http"], False)]:
-        assert ("send_metrics" in opamp_otel.sdk_host(names).live) == carried, names
+        assert ("send_metrics" in pydantic_opamp_otel.sdk_host(names).live) == carried, names
         # Declared from the same rule that gates them: carried out exactly where every exporter is gated.
-        gated = opamp_otel.gated_metric_exporters(names)
+        gated = pydantic_opamp_otel.gated_metric_exporters(names)
         assert carried == all(n in ("opamp", "") or n.lower() == "none" for n in gated), names
 
 
@@ -339,7 +339,7 @@ def test_without_an_endpoint_nothing_changes():
     a = Agent()
     a.prepare(env)
     assert not a.on and env == {"OTEL_METRICS_EXPORTER": "otlp"}
-    assert opamp_otel.AGENT is not a
+    assert pydantic_opamp_otel.AGENT is not a
 
 
 class _Recording:
@@ -402,9 +402,9 @@ def test_send_logs_level_drops_records_below_it_live():
 
 
 def test_send_logs_level_is_not_declared_with_send_logs_when_another_configurator_built_the_sdk():
-    live = list(opamp_otel.sdk_host(["otlp"], configured=False).live)
+    live = list(pydantic_opamp_otel.sdk_host(["otlp"], configured=False).live)
     assert "send_logs" not in live and "send_logs_level" not in live
-    assert "send_logs_level" in opamp_otel.sdk_host(["otlp"]).live
+    assert "send_logs_level" in pydantic_opamp_otel.sdk_host(["otlp"]).live
 
 
 def test_the_metric_exporter_is_the_otlp_one_the_protocol_picks_and_stops_with_send_metrics(monkeypatch):
@@ -412,16 +412,16 @@ def test_the_metric_exporter_is_the_otlp_one_the_protocol_picks_and_stops_with_s
     from opentelemetry.sdk.metrics.export import MetricExportResult
 
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-    gated = opamp_otel.GatedOtlpMetricExporter()
+    gated = pydantic_opamp_otel.GatedOtlpMetricExporter()
     assert isinstance(gated._to, OTLPMetricExporter)
     inner = _Recording()
     gated._to = inner
-    opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
+    pydantic_opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
     try:
         assert gated.export("m") == MetricExportResult.SUCCESS
         assert inner.batches == []
     finally:
-        opamp_otel.AGENT.controls.apply(settings(policy()))
+        pydantic_opamp_otel.AGENT.controls.apply(settings(policy()))
     assert gated.export("m") == "exported"
 
 
@@ -532,7 +532,7 @@ def test_a_remote_config_offered_at_once_is_answered_however_late_the_starting_t
     def status(msg, st):
         return msg.HasField("remote_config_status") and msg.remote_config_status.status == st
 
-    real = opamp_otel.asyncio.run_coroutine_threadsafe
+    real = pydantic_opamp_otel.asyncio.run_coroutine_threadsafe
 
     class Late:
         """The starting thread's wait, woken only once the agent has told the server APPLYING:
@@ -546,7 +546,7 @@ def test_a_remote_config_offered_at_once_is_answered_however_late_the_starting_t
             server.wait(lambda: any(status(m, opamp_pb2.RemoteConfigStatuses_APPLYING) for m in server.got))
             return out
 
-    monkeypatch.setattr(opamp_otel.asyncio, "run_coroutine_threadsafe", lambda coro, loop: Late(real(coro, loop)))
+    monkeypatch.setattr(pydantic_opamp_otel.asyncio, "run_coroutine_threadsafe", lambda coro, loop: Late(real(coro, loop)))
     agent = Agent()
     agent.configured = True  # as when the package's Configurator built the SDK
     try:
@@ -564,9 +564,9 @@ def test_the_goodbye_reaches_a_server_named_by_host_at_exit(server):
     # By the time atexit runs, the thread pool that resolves host names takes no more work: the
     # goodbye goes before it shuts down, and exit raises nothing either way.
     child = textwrap.dedent(f"""
-        import time, opamp_otel
+        import time, pydantic_opamp_otel
         from opentelemetry.sdk.resources import Resource
-        agent = opamp_otel.AGENT
+        agent = pydantic_opamp_otel.AGENT
         agent.prepare({{"OTEL_OPAMP_ENDPOINT": "http://localhost:{server.port}/v1/opamp"}})
         agent.start(Resource.create({{"service.name": "checkout"}}))
         while not agent.client._x._session:
@@ -590,9 +590,9 @@ def test_the_uid_reaches_the_sdk_not_the_environment_so_a_child_process_is_not_t
     assert child.uid != agent.uid
     # The configurator gives it to the SDK, over what the environment says.
     built = {}
-    monkeypatch.setattr(opamp_otel._OTelSDKConfigurator, "_configure", lambda self, **kw: built.update(kw))
-    monkeypatch.setattr(opamp_otel, "AGENT", agent)
-    opamp_otel.Configurator()._configure(resource_attributes={"a": "b", "service.instance.id": "mine"})
+    monkeypatch.setattr(pydantic_opamp_otel._OTelSDKConfigurator, "_configure", lambda self, **kw: built.update(kw))
+    monkeypatch.setattr(pydantic_opamp_otel, "AGENT", agent)
+    pydantic_opamp_otel.Configurator()._configure(resource_attributes={"a": "b", "service.instance.id": "mine"})
     assert built["resource_attributes"] == {"a": "b", "service.instance.id": str(agent.uid)}
     assert agent.configured
 
@@ -774,9 +774,9 @@ def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(ser
     child = textwrap.dedent(f"""
         from gevent import monkey
         monkey.patch_all()
-        import asyncio, gevent, opamp_otel
+        import asyncio, gevent, pydantic_opamp_otel
         from opentelemetry.sdk.resources import Resource
-        agent = opamp_otel.AGENT
+        agent = pydantic_opamp_otel.AGENT
         agent.prepare({{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:{server.port}/v1/opamp",
                         "OTEL_OPAMP_HEARTBEAT_INTERVAL": "100ms"}})
         agent.start(Resource.create({{"service.name": "load-generator"}}))
@@ -815,11 +815,11 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import pathlib, time, opamp_otel
+        import pathlib, time, pydantic_opamp_otel
         from opentelemetry import metrics, trace
         # The server given in code, as an application with its settings in its own config would.
-        opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
-        agent = opamp_otel.AGENT
+        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = pydantic_opamp_otel.AGENT
         tracer = trace.get_tracer("t")
         tracer.start_span("before").end()
         trace.get_tracer_provider().force_flush()
@@ -836,7 +836,7 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
         assert provider.sampler is agent.controls.sampler and agent.controls.sampler._rate == 0.5
         assert "deactivate_instrumentations" not in agent.host.next_start  # it instruments nothing
         (reader,) = metrics.get_meter_provider()._metric_readers
-        assert isinstance(reader._exporter, opamp_otel.GatedOtlpMetricExporter)
+        assert isinstance(reader._exporter, pydantic_opamp_otel.GatedOtlpMetricExporter)
         print("uid", agent.uid)
     """)
     try:
@@ -869,10 +869,10 @@ def test_configure_takes_the_server_in_code_end_to_end(tmp_path, given, variable
     server = _Server()
     given = {k: v.format(tmp=tmp_path) if isinstance(v, str) else v for k, v in given.items()}
     child = textwrap.dedent(f"""
-        import time, opamp_otel
-        opamp_otel.configure(endpoint={server.endpoint!r}, **{given!r})
+        import time, pydantic_opamp_otel
+        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, **{given!r})
         time.sleep(1.5)
-        print("state_dir", opamp_otel.AGENT.setup.state_dir)
+        print("state_dir", pydantic_opamp_otel.AGENT.setup.state_dir)
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -897,12 +897,12 @@ def test_configure_takes_the_server_in_code_end_to_end(tmp_path, given, variable
 
 def test_configure_without_an_endpoint_is_the_sdks_own_setup():
     child = textwrap.dedent("""
-        import os, opamp_otel
+        import os, pydantic_opamp_otel
         from opentelemetry import metrics, trace
         from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
-        opamp_otel.configure(sampler=ALWAYS_OFF, resource_attributes={"a": "b"})
+        pydantic_opamp_otel.configure(sampler=ALWAYS_OFF, resource_attributes={"a": "b"})
         provider = trace.get_tracer_provider()
         assert provider.sampler is ALWAYS_OFF
         assert provider.resource.attributes["a"] == "b"
@@ -910,7 +910,7 @@ def test_configure_without_an_endpoint_is_the_sdks_own_setup():
         assert type(spans._batch_processor._exporter) is OTLPSpanExporter
         (reader,) = metrics.get_meter_provider()._metric_readers
         assert type(reader._exporter) is OTLPMetricExporter
-        assert os.environ["OTEL_METRICS_EXPORTER"] == "otlp" and opamp_otel.AGENT.client is None
+        assert os.environ["OTEL_METRICS_EXPORTER"] == "otlp" and pydantic_opamp_otel.AGENT.client is None
     """)
     run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
                          env=_child_env(OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:9",
@@ -929,7 +929,7 @@ def test_in_code_the_instrumentation_switches_are_refused(tmp_path):
     assert s.status == FAILED
     assert s.error_message == "instrumentations: all_disabled: this SDK cannot apply the requested override"
     assert effective(agent) == {}
-    host = opamp_otel.sdk_host(["otlp"], configured=False, auto_instrumented=False)
+    host = pydantic_opamp_otel.sdk_host(["otlp"], configured=False, auto_instrumented=False)
     assert (list(host.live), list(host.next_start)) == (["custom", "send_metrics"], [])
 
 
@@ -954,13 +954,13 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import json, pathlib, time, opamp_otel
+        import json, pathlib, time, pydantic_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-        opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1,
+        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1,
                              span_processors=[SimpleSpanProcessor(ConsoleSpanExporter())],
                              metric_exporter_names=["console"])
-        agent = opamp_otel.AGENT
+        agent = pydantic_opamp_otel.AGENT
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -999,12 +999,12 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import json, pathlib, time, opamp_otel
+        import json, pathlib, time, pydantic_opamp_otel
         from opentelemetry import _logs, trace
         from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogExporter
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-        opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
-        agent = opamp_otel.AGENT
+        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = pydantic_opamp_otel.AGENT
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -1108,7 +1108,7 @@ def _expect(tmp_path, read, expected) -> None:
 @pytest.mark.parametrize("option", OPTIONS)
 def test_each_option_in_code_wins_over_its_variable_and_either_over_the_default(tmp_path, caplog, option, given):
     variable, in_code, as_variable, from_code, from_variable, default = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code} if given in ("code", "both") else {},
                                  {variable: as_variable} if given in ("variable", "both") else {})
     try:
@@ -1141,7 +1141,7 @@ def test_each_option_in_code_wins_over_its_variable_and_either_over_the_default(
 ])
 def test_the_forms_each_option_takes_in_code(tmp_path, caplog, option, in_code, expected):
     variable, _, as_variable, *_ = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code}, {variable: as_variable})
     _released(setup)
     assert read == expected
@@ -1152,7 +1152,7 @@ def test_the_forms_each_option_takes_in_code(tmp_path, caplog, option, in_code, 
 @pytest.mark.parametrize("option", ["endpoint", "state_dir", "heartbeat_interval"])
 def test_blank_in_code_is_not_given(tmp_path, caplog, option, blank):
     variable, _, as_variable, _, from_variable, default = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: blank}, {variable: as_variable})
         _released(setup)
         assert read == from_variable  # the variable's
@@ -1194,7 +1194,7 @@ def test_a_value_in_code_it_cannot_use_warns_and_is_the_default_never_raising(tm
                                                                                 expected, warning):
     # With the variable set too: the value in code displaced it, as a bad variable is the default.
     variable, _, as_variable, *_ = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code}, {variable: as_variable})
     try:
         _expect(tmp_path, read, expected)
@@ -1266,7 +1266,7 @@ def test_the_default_state_directory_gives_way(tmp_path):
 
 
 def test_connecting_failing_and_recovering_are_each_said_once(caplog):
-    caplog.set_level(logging.DEBUG, logger="opamp_otel")
+    caplog.set_level(logging.DEBUG, logger="pydantic_opamp_otel")
     uid = uuid.UUID(int=7)
     r = _reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid)
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
@@ -1293,7 +1293,7 @@ def test_connecting_failing_and_recovering_are_each_said_once(caplog):
 def test_what_is_said_names_the_endpoint_in_use(caplog):
     """After the server moved the agent to another endpoint, what it says names the one the client
     uses now (logged without credentials), not the one configured."""
-    caplog.set_level(logging.INFO, logger="opamp_otel")
+    caplog.set_level(logging.INFO, logger="pydantic_opamp_otel")
     in_use: list[str | None] = [None]  # none yet: the configured one
     r = _reachability("https://a.example.com/v1/opamp")
     r.in_use = lambda: in_use[0]
@@ -1320,7 +1320,7 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     setup = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://other/v1/opamp", "OTEL_OPAMP_HEADERS": "a=b",
                             "OTEL_OPAMP_STATE_DIR": "none"}, **given)
     assert setup is not None
-    r = opamp_otel.Reachability(setup.shown, "", None, setup.hints)
+    r = pydantic_opamp_otel.Reachability(setup.shown, "", None, setup.hints)
     caplog.clear()
     for status in (401, 404, None):
         r.notified(Notification("connect_failed", status=status))
@@ -1338,18 +1338,18 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     ("wss://k:s@[::1]:4320/v1/opamp#x", "wss://[::1]:4320/v1/opamp"),
 ])
 def test_a_malformed_endpoint_is_logged_not_raised(endpoint, logged):
-    assert opamp_otel.shown_endpoint(endpoint, "?") == logged
+    assert pydantic_opamp_otel.shown_endpoint(endpoint, "?") == logged
 
 
 def test_an_endpoint_without_a_scheme_or_with_one_the_client_cannot_speak_is_warned_about(caplog):
-    setup = opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "opamp.example.com:4320/v1/opamp"})
+    setup = pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "opamp.example.com:4320/v1/opamp"})
     assert setup is not None
     assert "has no scheme" in caplog.text
     # Taken as http://, as the warning says: the client refuses an endpoint without a scheme.
     assert setup.endpoint == "http://opamp.example.com:4320/v1/opamp"
     # A scheme the client doesn't speak: warned about at start, not only at each failed connect.
     caplog.clear()
-    assert opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None
+    assert pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None
     assert caplog.messages == ['OpAMP: OTEL_OPAMP_ENDPOINT "ftp://opamp.example.com/v1/opamp" is not http(s):// or '
                                "ws(s)://, so the client can't reach it"]
 
@@ -1374,7 +1374,73 @@ def test_a_warning_reaches_stderr_once_whatever_the_root_logger_has(root):
     (OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED) used to swallow them: Python's last resort is
     skipped once any handler exists. Each shows on stderr exactly once, by the application's handler
     where it has one that takes warnings; an application that turned warnings off sees none."""
-    program = "import logging\n" + _ROOT_HANDLERS[root] + "\nimport opamp_otel\nopamp_otel._log.warning('OpAMP: fix me')\n"
+    program = "import logging\n" + _ROOT_HANDLERS[root] + "\nimport pydantic_opamp_otel\npydantic_opamp_otel._log.warning('OpAMP: fix me')\n"
     err = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=60).stderr
     assert err.count("OpAMP: fix me") == (0 if root == "errors only" else 1), err
     assert ("app: OpAMP: fix me" in err) == (root in ("stderr", "otel+stderr")), err
+
+
+@pytest.mark.parametrize(("library", "reason"), [(None, "isn't installed"), (b"not a library", "can't be loaded")])
+def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_path, library, reason):
+    # An pydantic_opamp_core package without its library, or with a file that isn't one: the import and
+    # configure() go through, the SDK works on its own settings, and one line says why.
+    core = tmp_path / "pydantic_opamp_core"
+    core.mkdir()
+    (core / "__init__.py").write_text("")
+    if library is not None:
+        from pydantic_opamp_client import _native
+        (core / _native._lib_name()).write_bytes(library)
+    child = textwrap.dedent("""
+        import pydantic_opamp_otel
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+        pydantic_opamp_otel.configure(endpoint="http://127.0.0.1:9/v1/opamp")
+        pydantic_opamp_otel.AGENT.prepare()  # set up again: not said again
+        exporter = InMemorySpanExporter()
+        trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))
+        with trace.get_tracer("app").start_as_current_span("work"):
+            pass
+        assert [s.name for s in exporter.get_finished_spans()] == ["work"]
+        assert pydantic_opamp_otel.AGENT.setup is None and pydantic_opamp_otel.AGENT.client is None
+    """)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])]),
+           "OTEL_TRACES_EXPORTER": "none", "OTEL_METRICS_EXPORTER": "none", "OTEL_LOGS_EXPORTER": "none"}
+    run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=env)
+    assert run.returncode == 0, run.stderr
+    said = [line for line in run.stderr.splitlines() if "OpAMP" in line]
+    assert len(said) == 1, run.stderr
+    assert said[0].startswith("OpAMP: the core can't be loaded on ") and "; the SDK runs unmanaged: " in said[0]
+    assert reason in said[0], said
+
+
+_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text())["cases"]
+
+
+@pytest.mark.parametrize("case", _OFF, ids=[c["id"] for c in _OFF])
+def test_the_off_switch_table_through_configure(case):
+    """tests/shell-tables/off.json, each case through configure() in a process given its
+    environment: off, no client starts and the reason is said once, at WARNING; on, the client
+    starts and the server hears from it. Every endpoint of a case is the test server."""
+    server = _Server()
+    local = lambda v: server.endpoint if v.startswith(("http://", "https://")) else v  # noqa: E731
+    endpoint = None if case["code_endpoint"] is None else local(case["code_endpoint"])
+    child = textwrap.dedent(f"""
+        import logging, sys
+        logging.basicConfig(stream=sys.stdout, format="%(levelname)s %(message)s")
+        import pydantic_opamp_otel
+        pydantic_opamp_otel.configure(endpoint={endpoint!r})
+        print("client", pydantic_opamp_otel.AGENT.client is not None)
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env(OTEL_OPAMP_STATE_DIR="none", OTEL_TRACES_EXPORTER="none",
+                                            OTEL_METRICS_EXPORTER="none", OTEL_LOGS_EXPORTER="none",
+                                            **{k: local(v) for k, v in case["env"].items()}))
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    assert f"client {not case['off']}" in run.stdout, run.stdout + run.stderr
+    assert bool(server.got) is not case["off"], server.got
+    said = [line for line in run.stdout.splitlines() if "OpAMP: off" in line]
+    assert said == ([f"WARNING OpAMP: {case['reason']}"] if case["reason"] else []), run.stdout

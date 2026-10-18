@@ -22,7 +22,7 @@ import run  # noqa: E402
 import shells  # noqa: E402
 
 RULES = [
-    {"clients": ["node"], "category": "config", "first": "^stop_timeout_ms:", "reason": "Node stops slower"},
+    {"clients": ["node-core-platform"], "category": "config", "first": "^stop_timeout_ms:", "reason": "Node stops slower"},
     {"clients": ["java-*"], "scenarios": ["proxy-*"], "transports": ["ws"], "reason": "no SOCKS"},
 ]
 
@@ -30,21 +30,21 @@ RULES = [
 class Allowlist(unittest.TestCase):
     def test_a_rule_matches_client_scenario_transport_category_and_first_line(self):
         a = lambda *args: shells.allowed(RULES, *args)  # noqa: E731
-        self.assertIsNotNone(a("node", "basic", "http", "config", "stop_timeout_ms: 5000 | 1"))
-        self.assertIsNone(a("node", "basic", "http", "config", "connect_timeout_ms: 30000 | 1"))
-        self.assertIsNone(a("node", "basic", "http", "notify", "stop_timeout_ms: 5000 | 1"))
-        self.assertIsNone(a("go-core", "basic", "http", "config", "stop_timeout_ms: 5000 | 1"))
-        self.assertIsNotNone(a("java-core", "proxy-socks5", "ws", "conn", "- x | + y"))
-        self.assertIsNone(a("java-core", "proxy-socks5", "http", "conn", "- x | + y"))
-        self.assertIsNone(a("java-core", "basic", "ws", "conn", "- x | + y"))
+        self.assertIsNotNone(a("node-core-platform", "basic", "http", "config", "stop_timeout_ms: 5000 | 1"))
+        self.assertIsNone(a("node-core-platform", "basic", "http", "config", "connect_timeout_ms: 30000 | 1"))
+        self.assertIsNone(a("node-core-platform", "basic", "http", "notify", "stop_timeout_ms: 5000 | 1"))
+        self.assertIsNone(a("go-core-platform", "basic", "http", "config", "stop_timeout_ms: 5000 | 1"))
+        self.assertIsNotNone(a("java-core-platform", "proxy-socks5", "ws", "conn", "- x | + y"))
+        self.assertIsNone(a("java-core-platform", "proxy-socks5", "http", "conn", "- x | + y"))
+        self.assertIsNone(a("java-core-platform", "basic", "ws", "conn", "- x | + y"))
 
     def test_every_rule_needs_a_reason(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "x.toml"
-            p.write_text('[[allow]]\nclients = ["node"]\n')
+            p.write_text('[[allow]]\nclients = ["node-core-platform"]\n')
             with self.assertRaises(SystemExit):
                 shells.load_rules(p)
-            p.write_text('[[allow]]\nclients = ["node"]\nreason = "why"\n')
+            p.write_text('[[allow]]\nclients = ["node-core-platform"]\nreason = "why"\n')
             self.assertEqual(len(shells.load_rules(p)), 1)
         # The checked-in list reads.
         shells.load_rules()
@@ -53,54 +53,55 @@ class Allowlist(unittest.TestCase):
         rules = shells.load_rules()
         a = lambda *args: shells.allowed(rules, *args)  # noqa: E731
         # credential-offer-broken-ws (CI): the old connection's close and the new one's refusal.
-        self.assertIsNotNone(a("dotnet-core", "credential-offer-broken", "ws", "conn", "- ws_failed(401) | + "))
-        self.assertIsNotNone(a("java-core", "credential-offer-broken", "ws", "conn", "-  | + ws_failed(401)"))
-        self.assertIsNone(a("dotnet-core", "credential-offer-broken", "ws", "conn", "- ws_lost | + "))
-        self.assertIsNone(a("dotnet-core", "close-frame", "ws", "conn", "- ws_failed(401) | + "))
+        self.assertIsNotNone(a("dotnet-core-platform", "credential-offer-broken", "ws", "conn", "- ws_failed(401) | + "))
+        self.assertIsNotNone(a("java-core-platform", "credential-offer-broken", "ws", "conn", "-  | + ws_failed(401)"))
+        self.assertIsNone(a("dotnet-core-platform", "credential-offer-broken", "ws", "conn", "- ws_lost | + "))
+        self.assertIsNone(a("dotnet-core-platform", "close-frame", "ws", "conn", "- ws_failed(401) | + "))
         # packages-redirects-refused-http: PackageFailuresGrouped.
-        self.assertIsNone(a("node-rust", "packages-redirects-refused", "http", "saves", "- stored | + store x"))
+        self.assertIsNone(a("node-core", "packages-redirects-refused", "http", "saves", "- stored | + store x"))
         # Not allowed: the differences this change fixed rather than allowed.
-        self.assertIsNone(a("node", "close-frame", "ws", "conn", "- ws_closed(1000) | + ws_lost"))
-        self.assertIsNone(a("go-core", "remote-config-restart", "ws", "send",
+        self.assertIsNone(a("node-core-platform", "close-frame", "ws", "conn", "- ws_closed(1000) | + ws_lost"))
+        self.assertIsNone(a("go-core-platform", "remote-config-restart", "ws", "send",
                             "- uid#0 caps=3807 rcs(2,a2562a2b) | + uid#0 caps=3807 rcs(1,a2562a2b)"))
-        # restart-mid-download-ws, own-metrics-restart-ws (go-core on CI): a second message before
-        # the first was answered, so the server asked for the full state. The kernel holds the second
-        # until the first answer now (RULE-CLIENT-22): no longer allowed, on either transport.
+        # restart-mid-download-ws, own-metrics-restart-ws (go-core-platform on CI): a second message
+        # before the first was answered, so the server asked for the full state. The kernel holds
+        # the second until the first answer now (RULE-CLIENT-22): no longer allowed, on either
+        # transport.
         full = "uid#0 caps=281f desc(id:service.name driver.change) health(true,) effective() "
-        self.assertIsNone(a("go-core", "restart-mid-download", "ws", "send", f"-  | + {full}pkgs(held:2)"))
-        self.assertIsNone(a("go-core", "own-metrics-restart", "ws", "send", f"- {full}css(2) | + "))
-        self.assertIsNone(a("go-core", "restart-mid-download", "ws", "recv", "-  | + flags=1"))
-        self.assertIsNone(a("go-core", "own-metrics-restart", "ws", "recv", "- flags=1 | + "))
-        self.assertIsNone(a("go-core", "own-metrics-restart", "http", "recv", "-  | + flags=1"))
-        self.assertIsNone(a("go-core", "basic", "ws", "recv", "-  | + flags=1"))
-        self.assertIsNone(a("go-core", "own-metrics-restart", "ws", "send", "- uid#0 caps=a8e7 css(2) | + "))
+        self.assertIsNone(a("go-core-platform", "restart-mid-download", "ws", "send", f"-  | + {full}pkgs(held:2)"))
+        self.assertIsNone(a("go-core-platform", "own-metrics-restart", "ws", "send", f"- {full}css(2) | + "))
+        self.assertIsNone(a("go-core-platform", "restart-mid-download", "ws", "recv", "-  | + flags=1"))
+        self.assertIsNone(a("go-core-platform", "own-metrics-restart", "ws", "recv", "- flags=1 | + "))
+        self.assertIsNone(a("go-core-platform", "own-metrics-restart", "http", "recv", "-  | + flags=1"))
+        self.assertIsNone(a("go-core-platform", "basic", "ws", "recv", "-  | + flags=1"))
+        self.assertIsNone(a("go-core-platform", "own-metrics-restart", "ws", "send", "- uid#0 caps=a8e7 css(2) | + "))
         # Nor the Rust client's first message after a restart saying APPLYING for a saved config
         # its callback answered (remote-config-restart-ws on CI): that one is a bug.
         self.assertIsNone(a("rust", "remote-config-restart", "ws", "send", f"- {full}rcs(2,a2562a2b) | + "))
-        self.assertIsNone(a("go-core", "remote-config-restart", "ws", "send", f"-  | + {full}rcs(2,a2562a2b)"))
+        self.assertIsNone(a("go-core-platform", "remote-config-restart", "ws", "send", f"-  | + {full}rcs(2,a2562a2b)"))
         # A hostile server's cycle of holding and answering, in a container: hostile-packages-http.
-        self.assertIsNotNone(a("java-core", "hostile-packages", "http", "send", "- uid#0 caps=281f pkgs(zz-good:2) | + "))
-        self.assertIsNone(a("go-core", "hostile-packages", "http", "send", "- uid#0 caps=281f pkgs(zz-good:2) | + "))
+        self.assertIsNotNone(a("java-core-platform", "hostile-packages", "http", "send", "- uid#0 caps=281f pkgs(zz-good:2) | + "))
+        self.assertIsNone(a("go-core-platform", "hostile-packages", "http", "send", "- uid#0 caps=281f pkgs(zz-good:2) | + "))
         # A goodbye at the end of a run the server never let connect (accept-then-drop-ws: node,
-        # tls-untrusted-http: go-core, on CI): only the disconnect, only there.
-        self.assertIsNotNone(a("node", "accept-then-drop", "ws", "send", "-  | + uid#0 caps=2807 disconnect"))
-        self.assertIsNotNone(a("go-core", "tls-untrusted", "http", "send", "-  | + uid#0 caps=2807 disconnect"))
-        self.assertIsNotNone(a("go-core", "tls-untrusted", "http", "send", "- uid#0 caps=2807 disconnect | + "))
-        self.assertIsNone(a("node", "basic", "ws", "send", "-  | + uid#0 caps=2807 disconnect"))
-        self.assertIsNone(a("node", "accept-then-drop", "ws", "send", f"-  | + {full}"))
-        self.assertIsNone(a("node", "accept-then-drop", "ws", "send", "-  | + uid#0 caps=2807 health(false,) disconnect"))
+        # tls-untrusted-http: go-core-platform, on CI): only the disconnect, only there.
+        self.assertIsNotNone(a("node-core-platform", "accept-then-drop", "ws", "send", "-  | + uid#0 caps=2807 disconnect"))
+        self.assertIsNotNone(a("go-core-platform", "tls-untrusted", "http", "send", "-  | + uid#0 caps=2807 disconnect"))
+        self.assertIsNotNone(a("go-core-platform", "tls-untrusted", "http", "send", "- uid#0 caps=2807 disconnect | + "))
+        self.assertIsNone(a("node-core-platform", "basic", "ws", "send", "-  | + uid#0 caps=2807 disconnect"))
+        self.assertIsNone(a("node-core-platform", "accept-then-drop", "ws", "send", f"-  | + {full}"))
+        self.assertIsNone(a("node-core-platform", "accept-then-drop", "ws", "send", "-  | + uid#0 caps=2807 health(false,) disconnect"))
 
     def test_compare_reports_and_allows(self):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)
-            for client in ("rust", "node", "go-core"):
+            for client in ("rust", "node-core-platform", "go-core-platform"):
                 run_dir = out / client / "basic-http"
                 run_dir.mkdir(parents=True)
                 (run_dir / "core-0.tap").write_bytes(b"")
-            (out / "go-core" / "only-http").mkdir(parents=True)
+            (out / "go-core-platform" / "only-http").mkdir(parents=True)
             report = {"reference": "rust", "clients": {
-                "node": {"streams": False, "config": [["stop_timeout_ms", "5000", "1"]], "differences": []},
-                "go-core": {"streams": False, "config": [], "differences": [
+                "node-core-platform": {"streams": False, "config": [["stop_timeout_ms", "5000", "1"]], "differences": []},
+                "go-core-platform": {"streams": False, "config": [], "differences": [
                     {"category": "conn", "first": ["ws_closed(1000)", "ws_lost"], "diff": "- ws_closed(1000)\n+ ws_lost\n"}]},
             }}
             done = mock.Mock(returncode=0, stdout=json.dumps(report), stderr="")
@@ -109,24 +110,25 @@ class Allowlist(unittest.TestCase):
             cmd = called.call_args[0][0]
             self.assertEqual(cmd[1:3], ["diff", "--json"])
             self.assertTrue(cmd[3].startswith("rust="))
-            self.assertEqual([f["client"] for f in found], ["go-core", "node"])
+            self.assertEqual([f["client"] for f in found], ["go-core-platform", "node-core-platform"])
             self.assertEqual([bool(f["allowed"]) for f in found], [False, True])
             text = "\n".join(lines)
-            self.assertIn("allowed node config: stop_timeout_ms: 5000 | 1", text)
-            self.assertIn("DIFFERS go-core conn: - ws_closed(1000) | + ws_lost", text)
+            self.assertIn("allowed node-core-platform config: stop_timeout_ms: 5000 | 1", text)
+            self.assertIn("DIFFERS go-core-platform conn: - ws_closed(1000) | + ws_lost", text)
             self.assertIn("+ ws_lost", text)
             # A failing diff is reported.
             failed = mock.Mock(returncode=2, stdout="", stderr="no core taps")
             with mock.patch.object(shells.subprocess, "run", return_value=failed):
-                lines, found = shells.compare(out, "rust", ["go-core"], "basic", RULES)
+                lines, found = shells.compare(out, "rust", ["go-core-platform"], "basic", RULES)
             self.assertEqual(found[0]["category"], "error")
 
     def test_a_run_with_no_reference_to_compare_with_fails_strict(self):
-        # A change to one SDK runs its family alone: node's and node-rust's taps, no rust's. That
-        # compared nothing and passed; each such run is now a difference no rule allows.
+        # A change to one SDK runs its family alone: node-core's and node-core-platform's taps, no
+        # rust's. That compared nothing and passed; each such run is now a difference no rule
+        # allows.
         with tempfile.TemporaryDirectory() as d:
             out = Path(d)
-            for client in ("node", "node-rust"):
+            for client in ("node-core-platform", "node-core"):
                 run_dir = out / client / "basic-ws"
                 run_dir.mkdir(parents=True)
                 (run_dir / "core-1.tap").write_bytes(b"")
@@ -134,8 +136,8 @@ class Allowlist(unittest.TestCase):
                 lines, found = shells.compare(out, "rust", [], "", RULES)
             called.assert_not_called()
             self.assertEqual([(f["client"], f["category"], f["allowed"]) for f in found],
-                             [("node", "no-reference", None), ("node-rust", "no-reference", None)])
-            self.assertIn("basic-ws: no run of rust to compare node, node-rust with", "\n".join(lines))
+                             [("node-core", "no-reference", None), ("node-core-platform", "no-reference", None)])
+            self.assertIn("basic-ws: no run of rust to compare node-core, node-core-platform with", "\n".join(lines))
             argv = ["shells.py", "--strict", "--out", str(out)]
             with mock.patch.object(sys, "argv", argv), mock.patch.object(shells, "TAP", Path(__file__)), \
                     mock.patch("builtins.print"):
@@ -185,8 +187,8 @@ class PackageFailuresGrouped(unittest.TestCase):
                                 (" ", "stored"))))
 
     def test_a_real_run_is_allowed(self):
-        # node-rust against rust, packages-redirects-refused-http, eight runs at once: f5's failure
-        # saved alone in the reference, with f6's in node-rust's.
+        # node-core against rust, packages-redirects-refused-http, eight runs at once: f5's failure
+        # saved alone in the reference, with f6's in node-core's.
         state = "store uid#0 valid(http:///v1/opamp) pkgs(f1-six:>1.0.0 failed,f2-downgrade:>1.0.0 failed,f3-up-then-down:>1.0.0 failed,{})"
         real = diff(("...", ""), (" ", state.format("f4-bad-host:>1.0.0,f5-bad-scheme:>1.0.0,f6-userinfo:>1.0.0,zz-good:>1.0.0")),
                     (" ", "stored"), (" ", state.format("f4-bad-host:>1.0.0 failed,f5-bad-scheme:>1.0.0,f6-userinfo:>1.0.0,zz-good:>1.0.0")),
@@ -200,8 +202,8 @@ class PackageFailuresGrouped(unittest.TestCase):
         self.assertTrue(shells.package_failures_grouped(real))
 
     def test_a_save_replaced_whose_answer_both_have_is_allowed(self):
-        # node-rust against rust, packages-redirects-refused (CI, 2026-10-04 and -05): the reference
-        # saved f4's failure and node-rust f4's and f5's, in the same place. Each is answered
+        # node-core against rust, packages-redirects-refused (CI, 2026-10-04 and -05): the reference
+        # saved f4's failure and node-core f4's and f5's, in the same place. Each is answered
         # `stored`, which the diff shows once, after the hunk, as a line both have.
         ok = shells.package_failures_grouped
         self.assertTrue(ok(diff(("...", ""), (" ", save()), (" ", "stored"), ("-", save(F4)), ("+", save(F4, F5)),
@@ -219,8 +221,8 @@ class PackageFailuresGrouped(unittest.TestCase):
                                  (" ", "stored"), *tail)))
 
     def test_a_real_run_whose_answers_line_up_is_allowed(self):
-        # node-rust against rust, packages-redirects-refused-http on CI: f4's failure
-        # saved alone in the reference, with f5's in node-rust's. Each made one save there, so the
+        # node-core against rust, packages-redirects-refused-http on CI: f4's failure
+        # saved alone in the reference, with f5's in node-core's. Each made one save there, so the
         # diff lines their "stored" up as one unchanged line after the two saves.
         state = "store uid#0 valid(http:///v1/opamp) pkgs(f1-six:>1.0.0 failed,f2-downgrade:>1.0.0 failed,f3-up-then-down:>1.0.0 failed,{})"
         real = diff(("...", ""), (" ", state.format("f4-bad-host:>1.0.0,f5-bad-scheme:>1.0.0,f6-userinfo:>1.0.0,zz-good:>1.0.0")),
@@ -241,8 +243,8 @@ class PackageFailuresGrouped(unittest.TestCase):
         self.assertFalse(ok(diff(*head, ("-", save(F4, F5)), ("+", save(F4)), (" ", "stored"), (" ", save(F4)), (" ", "stored"))))
 
     def test_a_real_run_whose_next_save_starts_a_download_is_allowed(self):
-        # dotnet-core against rust, packages-redirects-refused-ws on CI: f5's failure
-        # saved alone in the reference, with f6's in dotnet-core's. The save both reach next also
+        # dotnet-core-platform against rust, packages-redirects-refused-ws on CI: f5's failure saved
+        # alone in the reference, with f6's in dotnet-core-platform's. The save both reach next also
         # marks zz-good's download as started, so it is not the differing saves' state but for
         # failures; the save both had before is.
         state = "store uid#0 valid(ws:///v1/opamp) pkgs(f1-six:>1.0.0 failed,f2-downgrade:>1.0.0 failed,f3-up-then-down:>1.0.0 failed,{})"
@@ -286,9 +288,9 @@ class PackageFailuresGrouped(unittest.TestCase):
         bad = diff((" ", save()), (" ", "stored"), ("-", save(F4)), ("-", "stored"), ("+", save(F5)), ("+", "stored"),
                    ("+", save()), ("+", "stored"), (" ", save(F4, F5, F6)), (" ", "stored"))
         first = f"- {save(F4)} | + {save(F4, F5)}"
-        self.assertIsNotNone(a("node-rust", "packages-redirects-refused", "http", "saves", first, good))
-        self.assertIsNone(a("node-rust", "packages-redirects-refused", "http", "saves", f"- {save(F4)} | + {save(F5)}", bad))
-        self.assertIsNone(a("node-rust", "remote-config", "http", "saves", first, good))
+        self.assertIsNotNone(a("node-core", "packages-redirects-refused", "http", "saves", first, good))
+        self.assertIsNone(a("node-core", "packages-redirects-refused", "http", "saves", f"- {save(F4)} | + {save(F5)}", bad))
+        self.assertIsNone(a("node-core", "remote-config", "http", "saves", first, good))
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "x.toml"
             p.write_text('[[allow]]\ngrouping = "nope"\nreason = "why"\n')
@@ -369,10 +371,10 @@ class DriverDeadlines(unittest.TestCase):
             self.assertIsNone(run.event_wall(log, "stopped", 2))
 
     def test_a_driver_slow_to_start_is_not_killed_after_its_stop(self):
-        # CI, java-core stop-mid-connect-ws: the JVM said started 25.9 s after it was spawned, stopped
-        # 3.3 s later, lingered 3 s; the runner's deadline of run + linger + 30 s from the spawn
-        # killed it as it ended. Here in small: 1 s to start, a run of 0.2 s, 0.3 s to end; 1 s
-        # to end after stopped.
+        # CI, java-core-platform stop-mid-connect-ws: the JVM said started 25.9 s after it was
+        # spawned, stopped 3.3 s later, lingered 3 s; the runner's deadline of run + linger + 30 s
+        # from the spawn killed it as it ended. Here in small: 1 s to start, a run of 0.2 s, 0.3 s
+        # to end; 1 s to end after stopped.
         with tempfile.TemporaryDirectory() as d, mock.patch.object(run, "EXIT_S", 1.0):
             log = Path(d) / "driver.jsonl"
             script = ("import json, sys, time\n"

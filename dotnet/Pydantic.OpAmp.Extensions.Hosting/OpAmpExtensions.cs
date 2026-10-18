@@ -91,7 +91,13 @@ public static class OpAmpOpenTelemetryBuilderExtensions
         string? unusable = null;
         try
         {
-            env = Server.FromEnv(name => configuration[name] is { Length: > 0 } v ? v : Environment.GetEnvironmentVariable(name), o.Warnings.Add);
+            // A core that can't be loaded is said by OpAmpAgent, once: nothing is read through it here.
+            if (global::Pydantic.OpAmp.Client.OpAmpSetup.Unavailable() is null)
+            {
+                // The switches (OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED) are read with the options, in OpAmpAgent: they beat them.
+                env = Server.FromEnv(name => configuration[name] is { Length: > 0 } v ? v : Environment.GetEnvironmentVariable(name), o.Warnings.Add,
+                    switches: false);
+            }
         }
         catch (UriFormatException e)
         {

@@ -139,7 +139,7 @@ The conformance suite holds every client to this from outside (the checks under
 
 ### Known deviations
 
-Both are platform mode's (below): in Rust mode the core reads the response itself.
+Both are platform mode's (below): in core mode the core reads the response itself.
 
 - **Decompression in Node.** `fetch` decompresses whatever it is sent, and has no way to stop.
   The core asks for `Accept-Encoding: identity`, so a server sends nothing to decompress; from one
@@ -149,15 +149,15 @@ Both are platform mode's (below): in Rust mode the core reads the response itsel
   decompression, so one an application passes in must be built with `AllowAutoRedirect = false`.
   Go copies the caller's client and turns redirects off; Java refuses one that follows them.
 
-## Rust mode and platform mode
+## Core mode and platform mode
 
-By default (**Rust mode**) the core also speaks HTTP/1.1, chunked bodies, WebSocket, CONNECT and
+By default (**core mode**) the core also speaks HTTP/1.1, chunked bodies, WebSocket, CONNECT and
 SOCKS5 itself: the client only opens TCP connections, starts TLS with the operator's settings,
 resolves names for a SOCKS5 proxy told to, answers which proxy to use (by one rule for every
 language, `tests/shell-tables`), moves bytes with backpressure, runs the timer and writes files.
 Every byte on the wire is then the same in every language. In **platform mode** the language's
 own HTTP and WebSocket libraries carry out the core's requests and connections, for applications
-that bring their own client or need that stack. [sdks.md](sdks.md#rust-mode-and-platform-mode)
+that bring their own client or need that stack. [sdks.md](sdks.md#core-mode-and-platform-mode)
 says how to choose; `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`) has
 the precise rules of the byte streams.
 

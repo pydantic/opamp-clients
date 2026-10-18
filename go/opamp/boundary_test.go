@@ -44,7 +44,7 @@ func TestAResponseHeaderThatIsntUTF8DoesntStopTheClient(t *testing.T) {
 	}))
 	defer ts.Close()
 	stoppedWith := make(chan error, 1)
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour},
 		Status{}, func(_ *Client, n Notification) {
 			if n.Kind == Stopped {
 				stoppedWith <- n.Err
@@ -73,7 +73,7 @@ func TestAResponseHeaderThatIsntUTF8DoesntStopTheClient(t *testing.T) {
 
 // Every string the client puts in an input from outside the core (headers, a Location, an error's
 // text naming a path, the environment's proxy) is UTF-8, bytes that aren't replaced by U+FFFD as
-// Rust mode's own HTTP reader does.
+// core mode's own HTTP reader does.
 func TestWhatTheClientHandsTheCoreIsUTF8(t *testing.T) {
 	h := fromHTTP(http.Header{"X-Note": {"caf\xe9"}, "\xff": {"v"}})
 	mustCross(t, "a header", &corepb.Input{Kind: &corepb.Input_HttpResponse{HttpResponse: &corepb.HttpResponse{Headers: h}}})
@@ -97,12 +97,12 @@ func TestWhatTheClientHandsTheCoreIsUTF8(t *testing.T) {
 		}
 		return "", false
 	}
-	mustCross(t, "the environment's proxy", newRustProxies(Proxy{}, env).choice)
-	configured := newRustProxies(Proxy{URL: "http://u:p\xe9@proxy:3128", ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil)
+	mustCross(t, "the environment's proxy", newCoreProxies(Proxy{}, env).choice)
+	configured := newCoreProxies(Proxy{URL: "http://u:p\xe9@proxy:3128", ConnectHeader: http.Header{"X-\xe9": {"\xe9"}}}, nil)
 	mustCross(t, "the configured proxy", configured.choice)
 	mustCross(t, "the configured proxy, asked", configured.answer(1))
 
-	// A download's file that can't be written, under a directory whose name isn't UTF-8 (Rust mode).
+	// A download's file that can't be written, under a directory whose name isn't UTF-8 (core mode).
 	r := newStreamRig(t, nil, &slowFS{})
 	r.x.setStateFile(r.state + "-caf\xe9/missing/state")
 	r.do(nil, dData(3, []byte("x")), dDone(3))

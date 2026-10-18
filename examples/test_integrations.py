@@ -335,7 +335,7 @@ class Inventory(unittest.TestCase):
         self.assertEqual(failed(judge_inventory(log.events, "urllib", False, switches=False)), [])
 
     def test_an_integration_built_on_the_checkout_leaves_its_version_out(self):
-        unversioned = {"integration.name": "github.com/pydantic/opamp-clients/go/otel", "telemetry.sdk.language": "go",
+        unversioned = {"integration.name": "github.com/pydantic/opamp-clients/go/opampotel", "telemetry.sdk.language": "go",
                        "telemetry.sdk.version": "1.46.0"}
         self.assertEqual(failed(judge_inventory(inventory_sent(sdk=unversioned).events, "urllib", False,
                                                 versioned=False)), [])

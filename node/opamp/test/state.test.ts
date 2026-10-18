@@ -53,5 +53,5 @@ test("a store is answered", async () => {
 
 test("an unreadable state file stops the client starting", () => {
   const instanceUid = new Uint8Array(16);
-  assert.throws(() => Client.start({ endpoint: "http://127.0.0.1:1", instanceUid, stateFile: dir(), mode: "node" }, {}));
+  assert.throws(() => Client.start({ endpoint: "http://127.0.0.1:1", instanceUid, stateFile: dir(), mode: "platform" }, {}));
 });

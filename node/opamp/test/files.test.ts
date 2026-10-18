@@ -32,7 +32,7 @@ import {
   until,
 } from "./disk.js";
 
-const MODES = ["node", "rust"] as const;
+const MODES = ["platform", "core"] as const;
 const dir = (name: string) => mkdtempSync(join(tmpdir(), `opamp-files-${name}-`));
 const hex = (b: Uint8Array) => Buffer.from(b).toString("hex");
 
@@ -67,7 +67,7 @@ for (const mode of MODES) {
       {},
       (n) => {
         notes.push(n);
-        if (n.kind === "installPackage") client?.packageInstalled(n.name, n.package.hash);
+        if (n.kind === "installPackage") client?.packageInstalled(n.packageName, n.package.hash);
       },
     );
     try {
@@ -181,7 +181,7 @@ for (const mode of MODES) {
 
 // A download's file is made new: one already at its path (another client's, or a crashed run's)
 // fails the download, untouched.
-test("a download never writes over a file already at its path (node mode)", async () => {
+test("a download never writes over a file already at its path (platform mode)", async () => {
   const file = Buffer.from("the package");
   const server = await opampServer({ pkg: file });
   const state = join(dir("exec"), "state.bin");
@@ -201,7 +201,7 @@ test("a download never writes over a file already at its path (node mode)", asyn
   }
 });
 
-test("a download never writes over a file already at its path (Rust mode)", async () => {
+test("a download never writes over a file already at its path (core mode)", async () => {
   const state = join(dir("streams"), "state.bin");
   mkdirSync(downloadsDir(state), { recursive: true });
   writeFileSync(downloadPath(state, 2n), "SOMEONE ELSE'S");
@@ -331,7 +331,7 @@ test("settled: once the save stop left writing has landed, and the state file ho
     },
   });
   // No instance UID: the core makes one up and saves it at once.
-  const config = { endpoint: server.url, stateFile: state, heartbeatIntervalMs: 50, stopTimeoutMs: 200, mode: "node",
+  const config = { endpoint: server.url, stateFile: state, heartbeatIntervalMs: 50, stopTimeoutMs: 200, mode: "platform",
     proxy: false } as Config;
   const a = Client.start({ ...config, [TEST_FILE_OPS]: disk.ops } as Config, {});
   try {
@@ -357,7 +357,7 @@ test("settled: once the save stop left writing has landed, and the state file ho
     server.close();
   }
   // Without a state file there is nothing to wait for.
-  const c = Client.start({ endpoint: "http://127.0.0.1:1/", mode: "node", proxy: false } as Config, {});
+  const c = Client.start({ endpoint: "http://127.0.0.1:1/", mode: "platform", proxy: false } as Config, {});
   await c.settled();
   await c.stop();
 });
@@ -378,7 +378,7 @@ test("saves land one at a time, in order; a cancelled save not begun is never wr
   const x = new Executor((i) => got.push(i), state, new Transport({ proxy: false }), disk.ops);
   const store = (id: bigint) => create(EffectSchema, { kind: { case: "store", value: { id, data: Buffer.from(`save ${id}`) } } });
   for (const id of [1n, 2n, 3n, 4n]) x.do(store(id));
-  // The core gives up on 3 before it begins (Rust mode, at its stop timeout), and on 1 while it
+  // The core gives up on 3 before it begins (core mode, at its stop timeout), and on 1 while it
   // is writing: 1 ends whole, unreported; 3 is never written.
   x.do(create(EffectSchema, { kind: { case: "cancel", value: { id: 3n } } }));
   await until("save 1 writing", () => disk.calls.some((c) => c.op === "create"));

@@ -1,99 +1,100 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.5.0",
-  "commit": "13084f84cc78964c677bcafa311c8aa79f94d092",
+  "version": "0.6.0",
+  "commit": "e54781b94181079e6bd92987fa386a3f41a80107",
   "files": {
     "native-linux-arm64-libopamp_native.so": {
-      "sha256": "dc0fec23a7740874db21d3064375da876e85d4737e60fd20fc77d87bbb643887",
+      "sha256": "ade1a860e43874375b05ef38104fd408ab321ce3462d208483d850ad9031003b",
       "kind": "native",
       "target": "linux-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-arm64-libopamp_native.so": {
-      "sha256": "cb02de431dcb67a383310995387ece68a989959bedd78aa614c10a7963159cef",
+      "sha256": "04529e0cd7ee44d845d29d6907ec64518207759e8a7d376e384c509c48d01ca3",
       "kind": "native",
       "target": "linux-musl-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-x64-libopamp_native.so": {
-      "sha256": "707c323b5ec342fbc477084c07026132e9e2190b7091aa0ccb1ce977044c31d0",
+      "sha256": "5cfdde7994eb4f5ee25d5ff7173d76b9aac71d54d3db1cf1d1fbe36eb8ccf6ac",
       "kind": "native",
       "target": "linux-musl-x64",
       "lib": "libopamp_native.so"
     },
     "native-linux-x64-libopamp_native.so": {
-      "sha256": "56acb70200519910230949c783d1448fe8c1a656c789ca5235baab4b09f6a043",
+      "sha256": "3ced8e7c5e5dcd45edb951ec5d8a90232c2a8e576a602ad17646cb062520cf28",
       "kind": "native",
       "target": "linux-x64",
       "lib": "libopamp_native.so"
     },
     "native-osx-arm64-libopamp_native.dylib": {
-      "sha256": "dc93cb3a761e94e8274b642203eea017c7247eca30b91c01a3926e8d3eabce2c",
+      "sha256": "4e0c3d2876923c4effaec71c7508fc723696b767051c9276e3996fb11c7aabc5",
       "kind": "native",
       "target": "osx-arm64",
       "lib": "libopamp_native.dylib"
     },
     "native-osx-x64-libopamp_native.dylib": {
-      "sha256": "286ad3dea80bdb8bd772610d06f06163028c03c604e809514372ba761dd13630",
+      "sha256": "75fa634f85f1e3e0d5712207f6975711ababa934814dc63313cd9754fe607d22",
       "kind": "native",
       "target": "osx-x64",
       "lib": "libopamp_native.dylib"
     },
     "native-win-arm64-opamp_native.dll": {
-      "sha256": "18b939cc27ca0d4201acbb161603b58024f48446564063115bb288534e17d872",
+      "sha256": "f5771c2d0699e6961092c2ea4e23c12302d27e5763eb4e7472c5c05b8fbf3a47",
       "kind": "native",
       "target": "win-arm64",
       "lib": "opamp_native.dll"
     },
     "native-win-x64-opamp_native.dll": {
-      "sha256": "2d745cc1a3a168b6a0b11f0f359f4a0e6d0973bf4d4b45e0d2ff60a673e1a825",
+      "sha256": "1c3a7d6ef7fd6a983d6f6c80e00dea8e125d21b9fd868de86d60370db6fed20b",
       "kind": "native",
       "target": "win-x64",
       "lib": "opamp_native.dll"
     },
     "opamp-core-tree.tar.gz": {
-      "sha256": "08946346b1fd8b455580c9e8d2f78e9c63cd4549e13f3dd1dd364e213bd8f5b3",
+      "sha256": "ffe389f89852c5729186a427976902abdd29ec5e14ee6472f02ce5ec9ca131b7",
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "3c749cadd5fd0960b8dcc883ef204cacb3291b927112160a6872f72e475184ca",
+      "sha256": "30781d4d1fa272da14fe0435ee6cb50ba83e227ef47faf64815239635bdc491c",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
-      "sha256": "d1a0c7be3021fac2e7276d448e6135d7f455d859578d50f62b43159bdb558fea",
+      "sha256": "042f70838a7b97e0c805a77465651848560144488ab67122ff2d24b5bb57f2e0",
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "5e49ab19b544a10a965115b7dfd254a27b88bad9e0f81cee987731b7e88615b5",
+      "sha256": "3288fee130fc897fe7c836a2a96442ef1c051ec3dc898ae1bf10542d8363cd68",
       "kind": "wasm"
     },
     "tool-linux-x64-opamp-tap": {
-      "sha256": "7d9971e634e619dadbf218fbea3a91ab6f854051e254c15559a1edd95fb3c749",
+      "sha256": "f0af06f9542504138cb7453d9fa6471a473b0c722a6ecf613f9d976ff35de7b7",
       "kind": "tool",
       "target": "linux-x64",
       "bin": "opamp-tap"
     }
   },
   "tree": {
-    "proto/opamp/core/v1/core.proto": "b723373fb38e13fa068be40fda57805823a1cbaf134907cc7714d8734487bde1",
+    "proto/opamp/core/v1/core.proto": "c8ae0d29d148fbf9547fe54e8c90b4269d21f43b05a7ea8a11c405d5cec65072",
     "proto/opamp/sdk/v1/settings.proto": "75b82c1309dd281a18628e10a77fd421d7c6f085340aa25fa8198d50d66ec436",
     "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
     "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
     "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",
     "spec/shell-contract.md": "d30b1f7b630352abc958946338f1def2832a44b91285de1106c46e92a36dda34",
-    "testdata/sdk-settings/caps.json": "c6d267fbb8690a6720d811033579fd61bfc4bf846c00a44f70c870a971013005",
-    "testdata/sdk-settings/components.json": "12759e0879f57dca2a89b8dca31ba02afb107267e73ff8be2c2bdd685275bca5",
-    "testdata/sdk-settings/custom.json": "695d4289d9438bc6ac12ab435b6fdcfaf6645e31a36133ecd2468d0f7b5d0664",
-    "testdata/sdk-settings/debug.json": "224a22d51761497aa686b04bd4ebd0264e936e0759105b9560498eb4997bd3ba",
-    "testdata/sdk-settings/health.json": "6c7898984f5fe9d6ec0a252c8cba8d40819aea12343f4660f6d2f7aedb90c825",
-    "testdata/sdk-settings/logs.json": "39fd1e1bb054b41ccb59fa46ed6ed3b21eb342f545b24b122fad288ad6179586",
-    "testdata/sdk-settings/redact.json": "c20bfce5846f57acc011e8ca7ab7549418c9398fbda2586fc1026df1e68b2ae7",
-    "testdata/sdk-settings/sampling.json": "60368f29da891a74e6e086a8e3ed1715bd44317680672d703bf6509f0a6eaf4f",
-    "testdata/sdk-settings/saving.json": "5cdcf282c997feee30e003d0cd265b9e55e106b5eb44fe0616a19364387d9097",
-    "testdata/sdk-settings/settings.json": "da8ea7310fb78dafebfcf4d3b219d3f22adb60130cb94f1923666ee23e9e50a0",
+    "testdata/sdk-settings/caps.json": "efad6282f0ee7612ad9477ed195277a25860db80393c9699ef5d209f634e6038",
+    "testdata/sdk-settings/components.json": "fa2052cc18dbbaf196c9397f839e46755f0fcaa04539766e092290e1df57cf0e",
+    "testdata/sdk-settings/custom.json": "d6ffb2e46b9266eb0b73dfdf755b17684f8e2087c3ef93be6a359cfed7892a2e",
+    "testdata/sdk-settings/debug.json": "dd215ec46da3b2d1704abd90e3a823db9223eaa5c3a6104d034a19cee25cd247",
+    "testdata/sdk-settings/health.json": "ebacedb3dd165d119f75bb75ada62e24202fc43e9d2d2ce432eb7551c76f515b",
+    "testdata/sdk-settings/logs.json": "c949130360d66e6a494947e4918e64c0cddba97457e78122ce1465e4b4b42088",
+    "testdata/sdk-settings/redact.json": "0ed80ca852c0689a1a4cfc3bef9fcbaefc9248b3b143a06091bb40e092930354",
+    "testdata/sdk-settings/sampling.json": "8d148db857eed6b3c223be1770ee3ec149e981535a7b4d75f33c6a5e5e8b5d27",
+    "testdata/sdk-settings/saving.json": "cebd8bd0f21b37621afed66d96c92e9a95b828bf27e2fbecf9789530d9381fa9",
+    "testdata/sdk-settings/settings.json": "42879272a4c7464dad93b54a911e06ebce89746429aaef43fad937fa389a2075",
     "testdata/sdk-settings/start.json": "8d4831986ae1f3f1850eef114fbfe71999cb343f06a261cb310fa509f6318294",
-    "tests/shell-tables/README.md": "242fd669e7ecb3ed2964802a63d24d14f4f62ac363968ce1958435a9c27b9d63",
-    "tests/shell-tables/proxy.json": "caef7e46b5f17e52b3994b81327267d18075cc61c7450030c5fe5641674e0691",
+    "tests/shell-tables/README.md": "0e521c6ec0e9ffa02f49170f92054fae8900c37fbb04d04337685fbf0b5ed1fb",
+    "tests/shell-tables/off.json": "6133e73d1761676dfb5275dc221146fc16964ca4cb06f44dc356430f320a9ff7",
+    "tests/shell-tables/proxy.json": "8a97ac3a974fb3ff2f67061c95276ecbf10198553d0cfa7849159000cd7bd5ae",
     "tests/shell-tables/tls.json": "5aee89823ec096a37f28764d4cb2bb2fa213db883f088434b0d79de500f94daf",
     "tests/shell-tables/tls/ca-truncated.pem": "da6e01d9f7ccb791dad46d04cbc69c923653cb743248f86cc3d6b533bd3a7db8",
     "tests/shell-tables/tls/ca-two.pem": "66550a8d2fff040912e729feb95acd9e2b436e791ce1d08ab980679fce1d00bf",
@@ -112,6 +113,6 @@
     "tests/shell-tables/tls/not-pem.pem": "a54683b938b1806d407cd87713393f36cd2feec4c217efc8057def8a35480205",
     "tests/shell-tables/tls/other-ca.pem": "3b617aef5b7d7b7dca6f99722061a6f49dd1c552dceec7b8a1b20177fc3a05b5",
     "tests/shell-tables/tls/other-ec.key": "e45d15ab73b11411d54febe31bb9ac2825899dc1e962efe53356f526f2bf4857",
-    "tests/shell-tables/urls.json": "190791fcf19905316ddadde5ab38de63952baafad343c624a05a27dde83c8bab"
+    "tests/shell-tables/urls.json": "10ab7f22f0dc55e2e2933ff0bff3b33824ad0ac04ef0dff1e425768f352a0ef7"
   }
 }

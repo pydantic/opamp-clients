@@ -12,7 +12,7 @@ import threading
 import pytest
 from _servers import MODES, UID, OpampServer, wait_for
 
-from opamp_client import Client, Config, CoreError, Notification, Status, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, CoreError, Notification, Status, opamp_pb2 as pb
 
 # Headers the core refuses in every mode, and why: it checks every header list it sends by the
 # rule an offered header meets, in both modes. aiohttp sent each as given: a name that isn't a token

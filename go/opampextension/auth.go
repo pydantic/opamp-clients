@@ -24,7 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// newHTTPClient is the client go/opamp runs on (Go mode): net/http with the extension's TLS
+// newHTTPClient is the client go/opamp runs on (platform mode): net/http with the extension's TLS
 // settings and the environment's proxies (or the configured socket), through the auth extension if one is configured over
 // plain HTTP. Over WebSocket go/opamp takes the TLS settings, proxy and dialer of its transport,
 // and the auth extension gives its headers through newAuthHeader.

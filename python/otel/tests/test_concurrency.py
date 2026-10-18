@@ -44,8 +44,8 @@ import time
 import traceback
 
 import pytest
-from opamp_client import anyvalue_pb2, opamp_pb2
-from opamp_client.sdk import SdkSettings, settings_pb2
+from pydantic_opamp_client import anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry import trace
 from opentelemetry._logs import LogRecord, SeverityNumber
 from opentelemetry.sdk._logs import LoggerProvider
@@ -55,16 +55,16 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 from opentelemetry.trace import Link, NonRecordingSpan, SpanContext, SpanKind, TraceFlags
 
-import opamp_otel
+import pydantic_opamp_otel
 from _policy import SIGNALS, config_map, policy
-from opamp_otel import Controls
+from pydantic_opamp_otel import Controls
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z: the clock the documents are decided at (debug_until is against it).
 NOW = 1_791_979_200_000
 #: What the SDK declares, as a real agent does: a policy that overrides a setting the host leaves out is refused.
-HOST = opamp_otel.sdk_host(["otlp"])
+HOST = pydantic_opamp_otel.sdk_host(["otlp"])
 #: How long the applier flips, in seconds, per run.
 FLIPPING = 0.6
 #: The bound on a run: past it, something is stuck.

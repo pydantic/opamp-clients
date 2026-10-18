@@ -53,14 +53,14 @@ MODULES = {
     "opamp_core.wasm": [
         "go/opamp/internal/core/opamp_core.wasm",
         "node/opamp/core/opamp_core.wasm",
-        "python/src/opamp_client/opamp_core.wasm",
+        "python/src/pydantic_opamp_client/opamp_core.wasm",
         "java/opamp/src/main/wasm/opamp_core.wasm",
         "dotnet/Pydantic.OpAmp.Client/opamp_core.wasm",
     ],
     "opamp_sdk_settings.wasm": [
-        "go/opamp/sdk/opamp_sdk_settings.wasm",
+        "go/opamp/sdksettings/opamp_sdk_settings.wasm",
         "node/opamp/core/opamp_sdk_settings.wasm",
-        "python/src/opamp_client/opamp_sdk_settings.wasm",
+        "python/src/pydantic_opamp_client/opamp_sdk_settings.wasm",
         "java/opamp/src/main/wasm/opamp_sdk_settings.wasm",
         "dotnet/Pydantic.OpAmp.Client/opamp_sdk_settings.wasm",
     ],

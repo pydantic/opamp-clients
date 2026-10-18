@@ -34,6 +34,28 @@ public static class OpAmpSetup
     /// </summary>
     public static SetupIdentified Identify(SetupIdentity identity) => Call(new SetupCall { Identity = identity }).Identified;
 
+    /// <summary>
+    /// Why the core can't be loaded here (no native library for this platform, a file that isn't
+    /// one, or a library of another interface), or null when it can. An integration asks before
+    /// <see cref="Start"/>, and runs unmanaged when the core can't be loaded: the calls above throw then.
+    /// </summary>
+    public static string? Unavailable() => Unavailable(Native.Check);
+
+    /// <summary>Why <paramref name="load"/> fails (as <see cref="Unavailable()"/> says it), or null when it doesn't.</summary>
+    internal static string? Unavailable(Action load)
+    {
+        try
+        {
+            load();
+            return null;
+        }
+        catch (Exception e)
+        {
+            // DllNotFoundException, BadImageFormatException, EntryPointNotFoundException, a stale library's interface.
+            return $"{e.GetType().Name}: {e.Message}";
+        }
+    }
+
     private static SetupReply Call(SetupCall call)
     {
         var reply = SetupReply.Parser.ParseFrom(Native.SetupCall(call.ToByteArray()));

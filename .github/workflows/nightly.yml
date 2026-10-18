@@ -147,26 +147,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { client: go-core-platform, transport: http }
+          - { client: go-core-platform, transport: ws }
           - { client: go-core, transport: http }
           - { client: go-core, transport: ws }
-          - { client: go-core-rust, transport: http }
-          - { client: go-core-rust, transport: ws }
-          - { client: node, transport: http }
-          - { client: node, transport: ws }
-          - { client: node-rust, transport: http }
-          - { client: node-rust, transport: ws }
+          - { client: node-core-platform, transport: http }
+          - { client: node-core-platform, transport: ws }
+          - { client: node-core, transport: http }
+          - { client: node-core, transport: ws }
+          - { client: python-core-platform, transport: http }
+          - { client: python-core-platform, transport: ws }
           - { client: python-core, transport: http }
           - { client: python-core, transport: ws }
-          - { client: python-core-rust, transport: http }
-          - { client: python-core-rust, transport: ws }
+          - { client: java-core-platform, transport: http }
+          - { client: java-core-platform, transport: ws }
           - { client: java-core, transport: http }
           - { client: java-core, transport: ws }
-          - { client: java-core-rust, transport: http }
-          - { client: java-core-rust, transport: ws }
+          - { client: dotnet-core-platform, transport: http }
+          - { client: dotnet-core-platform, transport: ws }
           - { client: dotnet-core, transport: http }
           - { client: dotnet-core, transport: ws }
-          - { client: dotnet-core-rust, transport: http }
-          - { client: dotnet-core-rust, transport: ws }
           # The upstream clients.
           - { client: go, transport: http }
           - { client: go, transport: ws }
@@ -490,9 +490,9 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: |
             go/go.sum
-            go/otel/go.sum
+            go/opampotel/go.sum
       - name: Go
-        working-directory: go/otel
+        working-directory: go/opampotel
         run: go test -race -count=1 -run TestSettingsFlippedWhileTelemetryFlows .
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: ${{ !cancelled() }}

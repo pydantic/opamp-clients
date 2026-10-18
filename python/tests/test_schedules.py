@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The shell's schedules: a Hypothesis state machine driving one client, in Python mode
-(aiohttp, faked: tests/_sched_world.py) and in Rust mode (the core's own HTTP and WebSocket, over
+"""The shell's schedules: a Hypothesis state machine driving one client, in platform mode
+(aiohttp, faked: tests/_sched_world.py) and in core mode (the core's own HTTP and WebSocket, over
 the in-memory network), on a seeded event loop (tests/_sched_loop.py) whose task order comes from
 a seed and whose clock is virtual. The real core runs, tapped; the server is the test's.
 
@@ -29,7 +29,7 @@ After each step, with the loop idle, it checks spec/shell-contract.md:
 - RULE-SHELL-03: the core is stepped on the loop's thread only, never re-entered, and nothing
   touches the loop from another thread;
 - RULE-SHELL-04: every input names an effect the core issued, of its kind, still waited on;
-  each answered once; a connection's messages only while open, its end once; Rust mode's streams
+  each answered once; a connection's messages only while open, its end once; core mode's streams
   likewise (opened, TLS, data, end, resolution, the proxy's answer);
 - RULE-SHELL-06: nothing about an effect after its cancel (or a stream after its close); a
   connection, transport, request or download the core has given up on is released by the time
@@ -65,13 +65,13 @@ from hypothesis import note as _note
 from hypothesis.errors import InvalidArgument
 from hypothesis.stateful import RuleBasedStateMachine, initialize, invariant, precondition, rule, run_state_machine_as_test
 
-import opamp_client._client as _client_mod
-import opamp_client._core as _core_mod
-import opamp_client._executor as _executor
+import pydantic_opamp_client._client as _client_mod
+import pydantic_opamp_client._core as _core_mod
+import pydantic_opamp_client._executor as _executor
 from _sched_loop import SeededLoop
 from _sched_world import CAPABILITY, OFFERS, FakeSession, World
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 UID = bytes([0x5A] * 16)
 CAPABILITIES = (pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
@@ -243,8 +243,8 @@ class Monitor:
                     if t.what == "download":
                         self.discarded.add(v.id)
                     t.state = "cancelled"
-                elif self.m.mode == "rust":
-                    self.discarded.add(v.id)  # a download of Rust mode's, before its download_done
+                elif self.m.mode == "core":
+                    self.discarded.add(v.id)  # a download of core mode's, before its download_done
             elif kind == "discard":
                 self.discarded.add(v.id)
             elif kind == "proxy_query":
@@ -379,7 +379,7 @@ class App:
 
 
 class ScheduleMachine(RuleBasedStateMachine):
-    mode = "python"
+    mode = "platform"
 
     def __init__(self) -> None:
         super().__init__()
@@ -509,7 +509,7 @@ class ScheduleMachine(RuleBasedStateMachine):
         self.world = World(self.loop, self.mode)
         self.writer = Writer(self.loop)
         self.saver = CountingSaver(self.writer)
-        scheme = transport + ("s" if tls and self.mode == "rust" else "")
+        scheme = transport + ("s" if tls and self.mode == "core" else "")
         config = Config(endpoint=f"{scheme}://opamp.test/v1/opamp", instance_uid=UID, capabilities=CAPABILITIES,
                         heartbeat_interval_ms=heartbeat, request_timeout_ms=timeouts, connect_timeout_ms=timeouts,
                         download_timeout_ms=timeouts, state_file=self.state, accept_packages=True, mode=self.mode)
@@ -517,7 +517,7 @@ class ScheduleMachine(RuleBasedStateMachine):
 
         def go() -> None:
             self.client = Client.start(config, status, self._notify,
-                                       _sessions=self._sessions if self.mode == "python" else None)
+                                       _sessions=self._sessions if self.mode == "platform" else None)
             self.app.returned = True
 
         self._run(0, go)
@@ -665,7 +665,7 @@ class ScheduleMachine(RuleBasedStateMachine):
         assert configs == sorted(set(configs)), f"RULE-SHELL-01: remote configs out of order: {configs}"
 
         # RULE-SHELL-06: what the core gave up on is released by now.
-        if self.mode == "python":
+        if self.mode == "platform":
             live_ws = [f for f in world.fakes if not f.gone]
             conns = mon.live("connection", ("open", "peer_closed", "closing"))
             assert len(live_ws) <= conns, f"RULE-SHELL-06: {len(live_ws)} WebSockets open, the core has {conns}"
@@ -713,12 +713,12 @@ class ScheduleMachine(RuleBasedStateMachine):
         assert len(app.stopped) == 1, f"RULE-SHELL-01: stopped {len(app.stopped)} times once stop returned"
         # The core said stopped, or a callback raised and the client left it.
         assert mon.stopped or app.thrown is not None, "RULE-SHELL-07: stop returned before the core said stopped"
-        if self.mode == "python":
+        if self.mode == "platform":
             assert not [f for f in world.fakes if not f.gone], "RULE-SHELL-07: a WebSocket open after stop"
             assert not [r for r in world.requests if not r.finished], "RULE-SHELL-07: a request under way after stop"
         else:
             assert not world.network.open(), f"RULE-SHELL-07: {world.network.open()} open after stop"  # type: ignore[union-attr]
-        left = [t for t in asyncio.all_tasks(self.loop) if not t.done() and "opamp_client" in t.get_coro().cr_code.co_filename]
+        left = [t for t in asyncio.all_tasks(self.loop) if not t.done() and "pydantic_opamp_client" in t.get_coro().cr_code.co_filename]
         assert not left, f"RULE-SHELL-07: the client's tasks are left after stop: {left}"
         # The client's end began at stop(), or earlier if it ended on its own (a callback raised).
         assert self.stop_at is not None
@@ -766,12 +766,12 @@ class ScheduleMachine(RuleBasedStateMachine):
                 CURRENT = None
 
 
-class PythonMode(ScheduleMachine):
-    mode = "python"
+class PlatformMode(ScheduleMachine):
+    mode = "platform"
 
 
-class RustMode(ScheduleMachine):
-    mode = "rust"
+class CoreMode(ScheduleMachine):
+    mode = "core"
 
 
 @pytest.fixture
@@ -804,7 +804,7 @@ def explore(machine: type[ScheduleMachine], monkeypatch, examples: int | None = 
         print("what the runs did:", ", ".join(f"{k}: {v}" for k, v in sorted(STATS.items())), flush=True)
 
 
-@pytest.mark.parametrize("machine", [PythonMode, RustMode], ids=["python", "rust"])
+@pytest.mark.parametrize("machine", [PlatformMode, CoreMode], ids=["platform", "core"])
 def test_the_shell_contract_holds_over_explored_schedules(machine, tapped, monkeypatch) -> None:
     explore(machine, monkeypatch)
 
@@ -833,38 +833,38 @@ def replay(machine: type[ScheduleMachine], steps) -> None:
 
 
 def test_found_a_response_in_pieces_reaches_the_core_whole(tapped) -> None:
-    # Python mode, loop seed 0: an HTTP response whose body came in two pieces reached the core
+    # Platform mode, loop seed 0: an HTTP response whose body came in two pieces reached the core
     # as its first piece alone (resp.content.read(n) returns what has come), and the core said
     # bad_message.
     # covers: RULE-SHELL-05
-    replay(PythonMode, [
+    replay(PlatformMode, [
         ("start", dict(seed=0, transport="http", tls=False, heartbeat=500, timeouts=1000)),
         ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "custom", [100])))),
     ])
 
 
-@pytest.mark.parametrize("machine", [PythonMode, RustMode], ids=["python", "rust"])
+@pytest.mark.parametrize("machine", [PlatformMode, CoreMode], ids=["platform", "core"])
 def test_found_stop_is_bounded_by_one_stop_timeout_with_a_save_writing(machine, tapped) -> None:
-    # Python mode, OPAMP_SCHED_SEED=21 (loop seed 0): a save still writing when the core said
+    # Platform mode, OPAMP_SCHED_SEED=21 (loop seed 0): a save still writing when the core said
     # stopped held stop up for a second stop_timeout (the core's 5 s for the goodbye, then 5 s
     # more for the writer): 10 s, not 5 plus a margin.
     # covers: RULE-SHELL-07
     replay(machine, [
         ("start", dict(seed=0, transport="http", tls=False, heartbeat=30_000, timeouts=30_000)),
         ("next_save", dict(how="slow", seconds=20.0)),
-        *([("server_settles", dict(data=Drawn(0, 0, "accept")))] if machine.mode == "rust" else []),
+        *([("server_settles", dict(data=Drawn(0, 0, "accept")))] if machine.mode == "core" else []),
         ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "config", [])))),
         ("stop", dict(where="outside", k=0)),
     ])
 
 
 def test_found_a_download_finished_after_its_cancel_leaves_no_file(tapped) -> None:
-    # Python mode, OPAMP_SCHED_SEED=21 (loop seed 1 here): a download whose response came as stop
+    # Platform mode, OPAMP_SCHED_SEED=21 (loop seed 1 here): a download whose response came as stop
     # cancelled it (the cancel didn't land in its task: here the fake's, as a library that
     # swallows a cancel would) wrote its whole file after its cancel had deleted it, and the file
     # stayed.
     # covers: RULE-SHELL-06
-    replay(PythonMode, [
+    replay(PlatformMode, [
         ("start", dict(seed=1, transport="http", tls=False, heartbeat=30_000, timeouts=30_000)),
         ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
         ("stop", dict(where="outside", k=0)),
@@ -872,12 +872,12 @@ def test_found_a_download_finished_after_its_cancel_leaves_no_file(tapped) -> No
 
 
 def test_found_stopped_is_the_last_notification(tapped) -> None:
-    # Python mode, OPAMP_SCHED_SEED=1 (loop seed 0): stop while a save that answers a package's
+    # Platform mode, OPAMP_SCHED_SEED=1 (loop seed 0): stop while a save that answers a package's
     # download was writing; the save landed, and the core's output for `stored` held stopped and
     # then install_package (the core emits a notification after stopped). The shell passed them
     # on in that order: the application heard install_package after stopped.
     # covers: RULE-SHELL-01
-    replay(PythonMode, [
+    replay(PlatformMode, [
         ("start", dict(seed=0, transport="http", tls=False, heartbeat=500, timeouts=1000)),
         ("next_save", dict(how="fail", seconds=0.5)),
         ("next_save", dict(how="slow", seconds=0.5)),

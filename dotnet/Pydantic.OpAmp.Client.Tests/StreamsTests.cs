@@ -13,7 +13,7 @@ using Xunit;
 namespace Pydantic.OpAmp.Client.Tests;
 
 /// <summary>
-/// Rust mode's executor (<see cref="Streams"/>) on its own, over the in-memory network
+/// Core mode's executor (<see cref="Streams"/>) on its own, over the in-memory network
 /// (<see cref="MemNet"/>): its registry (a close, a cancel and stop end what they name at once; a
 /// connect, TLS handshake or resolution that completes after its close is closed and untold;
 /// nothing is told after a close or after stop; stop is bounded), its backpressure both ways, its
@@ -452,7 +452,7 @@ public class StreamsTests
     public void TheProxyQuestionIsAnsweredFromTheOptions()
     {
         var endpoint = new Uri("https://server.test/v1/opamp");
-        var configured = OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint, Proxy = new Uri("socks5://user:pa%40ss@proxy.test:1080"), ProxyUseLocalResolver = true });
+        var configured = OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint, Proxy = new Uri("socks5://user:pa%40ss@proxy.test:1080"), ProxyResolveLocally = true });
         Assert.Equal(("socks5://user:pa%40ss@proxy.test:1080", true), (configured.Proxy, configured.ResolveLocally));
         Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint, DirectConnection = true }).Proxy);
         Assert.Equal(string.Empty, OpAmpClient.ProxyAnswerFor(new() { Endpoint = endpoint }).Proxy);
@@ -471,7 +471,7 @@ public class StreamsTests
     [Theory]
     [InlineData("http")]
     [InlineData("ws")]
-    public async Task RustModeWaitsUntilARetryAfterDate(string scheme)
+    public async Task CoreModeWaitsUntilARetryAfterDate(string scheme)
     {
         var time = new AheadTime(TimeSpan.FromDays(1));
         var refused = 0L;
@@ -499,7 +499,7 @@ public class StreamsTests
         var client = OpAmpClient.Start(
             new OpAmpClientOptions
             {
-                Endpoint = new Uri(server.Url(scheme)), Mode = OpAmpMode.Rust, DirectConnection = true,
+                Endpoint = new Uri(server.Url(scheme)), Mode = OpAmpMode.Core, DirectConnection = true,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(100), TimeProvider = time,
             },
             new OpAmpStatus());
@@ -526,20 +526,20 @@ public class StreamsTests
         public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + by;
     }
 
-    // What can't apply in Rust mode is an error at start; a SOCKS5 proxy with local resolution can.
+    // What can't apply in core mode is an error at start; a SOCKS5 proxy with local resolution can.
     [Fact]
-    public void RustModeSettingsThatCantApplyThrowAtStart()
+    public void CoreModeSettingsThatCantApplyThrowAtStart()
     {
         var endpoint = new Uri("http://127.0.0.1:1/v1/opamp");
         using var app = new HttpClient();
         OpAmpClientOptions[] bad =
         [
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, HttpClient = app },
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, Proxy = new Uri("socks4://127.0.0.1:1080") },
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, Proxy = new Uri("ftp://127.0.0.1:1080") },
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, Proxy = new Uri("http://127.0.0.1:3128"), ProxyUseLocalResolver = true },
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, Proxy = new Uri("http://127.0.0.1:3128"), DirectConnection = true },
-            new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, Tls = new OpAmpTlsOptions { CaPem = "not a certificate" } },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, HttpClient = app },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, Proxy = new Uri("socks4://127.0.0.1:1080") },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, Proxy = new Uri("ftp://127.0.0.1:1080") },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, Proxy = new Uri("http://127.0.0.1:3128"), ProxyResolveLocally = true },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, Proxy = new Uri("http://127.0.0.1:3128"), DirectConnection = true },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Core, Tls = new OpAmpTlsOptions { CaPem = "not a certificate" } },
             new() { Endpoint = endpoint, Mode = (OpAmpMode)7 },
         ];
         foreach (var options in bad)
@@ -550,30 +550,30 @@ public class StreamsTests
         foreach (var proxy in new[] { "socks5://u:p@127.0.0.1:1080", "socks5h://127.0.0.1:1080" })
         {
             var c = OpAmpClient.Start(
-                new OpAmpClientOptions { Endpoint = endpoint, Mode = OpAmpMode.Rust, Proxy = new Uri(proxy), ProxyUseLocalResolver = true, StopTimeout = TimeSpan.FromSeconds(1) },
+                new OpAmpClientOptions { Endpoint = endpoint, Mode = OpAmpMode.Core, Proxy = new Uri(proxy), ProxyResolveLocally = true, StopTimeout = TimeSpan.FromSeconds(1) },
                 new OpAmpStatus());
             Assert.True(c.StopAsync().Wait(TimeSpan.FromSeconds(10)));
         }
     }
 
-    // The mode a client runs in: Rust mode with none named, .NET mode when asked for, by Mode or by
-    // an HttpClient of the application's (which only .NET mode can use). Rust mode asks its proxy
-    // rule (the environment) before it connects; .NET mode never reads it.
+    // The mode a client runs in: core mode with none named, platform mode when asked for, by Mode
+    // or by an HttpClient of the application's (which only platform mode can use). Core mode asks
+    // its proxy rule (the environment) before it connects; platform mode never reads it.
     [Fact]
-    public async Task WithNoModeNamedTheClientRunsInRustMode()
+    public async Task WithNoModeNamedTheClientRunsInCoreMode()
     {
         var endpoint = new Uri("http://127.0.0.1:1/v1/opamp");
         using var app = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false });
-        (OpAmpClientOptions Options, bool Rust)[] cases =
+        (OpAmpClientOptions Options, bool CoreMode)[] cases =
         [
             (new() { Endpoint = endpoint }, true),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.Rust }, true),
-            (new() { Endpoint = endpoint, RustSplice = false }, true),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.DotNet }, false),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Core }, true),
+            (new() { Endpoint = endpoint, SpliceDownloads = false }, true),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform }, false),
             (new() { Endpoint = endpoint, HttpClient = app }, false),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.DotNet, HttpClient = app }, false),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app }, false),
         ];
-        foreach (var (options, rust) in cases)
+        foreach (var (options, coreMode) in cases)
         {
             var asked = 0;
             var client = OpAmpClient.Start(
@@ -588,13 +588,13 @@ public class StreamsTests
                         return null;
                     },
                 });
-            for (var i = 0; i < (rust ? 1500 : 50) && Volatile.Read(ref asked) == 0; i++)
+            for (var i = 0; i < (coreMode ? 1500 : 50) && Volatile.Read(ref asked) == 0; i++)
             {
                 await Task.Delay(10);
             }
 
             await client.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            Assert.True(rust == Volatile.Read(ref asked) > 0, $"Mode {options.Mode?.ToString() ?? "unset"}, HttpClient {options.HttpClient is not null}: Rust mode {!rust}, want {rust}");
+            Assert.True(coreMode == Volatile.Read(ref asked) > 0, $"Mode {options.Mode?.ToString() ?? "unset"}, HttpClient {options.HttpClient is not null}: core mode {!coreMode}, want {coreMode}");
         }
     }
 
@@ -606,11 +606,11 @@ public class StreamsTests
         using var app = new HttpClient();
         (OpAmpClientOptions Options, string Says)[] bad =
         [
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.DotNet, RustSplice = false }, "RustSplice is Rust mode's"),
-            (new() { Endpoint = endpoint, HttpClient = app, RustSplice = false }, "RustSplice is Rust mode's"),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.Rust, HttpClient = app }, "HttpClient can't be used in Rust mode"),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.DotNet, Proxy = new Uri("socks5://127.0.0.1:1080"), ProxyUseLocalResolver = true }, "Rust mode can"),
-            (new() { Endpoint = endpoint, HttpClient = app, ProxyUseLocalResolver = true }, "ProxyUseLocalResolver"),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
+            (new() { Endpoint = endpoint, HttpClient = app, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Core, HttpClient = app }, "HttpClient can't be used in core mode"),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, Proxy = new Uri("socks5://127.0.0.1:1080"), ProxyResolveLocally = true }, "core mode can"),
+            (new() { Endpoint = endpoint, HttpClient = app, ProxyResolveLocally = true }, "ProxyResolveLocally"),
         ];
         foreach (var (options, says) in bad)
         {
@@ -620,7 +620,7 @@ public class StreamsTests
     }
 }
 
-/// <summary>The effects of Rust mode, built.</summary>
+/// <summary>The effects of core mode, built.</summary>
 internal static class Fx
 {
     public static Effect Open(ulong id, string host = "server.test", uint port = 80) => new() { StreamOpen = new StreamOpen { Id = id, Host = host, Port = port } };

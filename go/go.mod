@@ -2,6 +2,9 @@ module github.com/pydantic/opamp-clients/go
 
 go 1.25.0
 
+// v0.1.0 shipped files that should not have been public; use a later version.
+retract v0.1.0
+
 require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/open-telemetry/opamp-go v0.24.0

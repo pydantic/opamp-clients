@@ -134,7 +134,7 @@ internal sealed class MemoryTransport : IClientTransport
     }
 
     /// <summary>
-    /// A call made by Rust mode's in-memory server (<see cref="MemServer"/>) for a request the core
+    /// A call made by core mode's in-memory server (<see cref="MemServer"/>) for a request the core
     /// sent over a stream: answered by the test as any other; <paramref name="ct"/> is the client
     /// leaving the stream.
     /// </summary>
@@ -344,7 +344,7 @@ internal sealed class MemBody(MemoryTransport owner, byte[] data, CancellationTo
 
     public Exception? Fault { get; set; }
 
-    /// <summary>How long the body is (Rust mode's server says so in Content-Length).</summary>
+    /// <summary>How long the body is (core mode's server says so in Content-Length).</summary>
     public int Size => data.Length;
 
     public bool Released => Volatile.Read(ref this.released) != 0;

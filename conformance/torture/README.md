@@ -87,10 +87,10 @@ threads.
 
 A container's memory is a poor measure of a JVM's: the heap is committed up front, and the
 container's memory follows eden's high-water mark as those pages are touched for the first time,
-while JIT-compiled code and metaspace grow as the JVM warms up (java-core: 115 -> 152 MB in an
+while JIT-compiled code and metaspace grow as the JVM warms up (java-core-platform: 115 -> 152 MB in an
 hour with the committed heap flat at 254 MB, 9-14 MB live after a GC, and JIT code and metaspace
 level after 20 minutes). So for a client whose driver runs `java` in a container (`java`,
-`java-core`, `java-core-rust`), the harness starts the JVM with native memory tracking
+`java-core-platform`, `java-core`), the harness starts the JVM with native memory tracking
 (`JAVA_TOOL_OPTIONS=-XX:NativeMemoryTracking=summary`), and once a minute, after the container's
 sample, forces a GC and reads the heap and native memory (`docker exec ... jcmd 1` with `GC.run`,
 `GC.heap_info`, `VM.native_memory summary`). Each such sample in `result.json` carries `heap_mb`,
@@ -108,10 +108,10 @@ doesn't change.
 
 A container's memory is a poor measure of a .NET client's too: the runtime sizes gen0's budget
 from the L3 cache, and a client that allocates little takes most of an hour to fill it, so gen0
-is hardly ever collected and the container's memory climbs with dead objects (dotnet-core http,
+is hardly ever collected and the container's memory climbs with dead objects (dotnet-core-platform http,
 Nightly run 38112161610: 65 -> 90 MB against the Go server, and it failed against ours; no leak
 by dotnet-counters and dotnet-gcdump). So for a client whose driver runs `dotnet` in a container
-(`dotnet`, `dotnet-core`, `dotnet-core-rust`), once a minute, after the container's sample, the
+(`dotnet`, `dotnet-core-platform`, `dotnet-core`), once a minute, after the container's sample, the
 harness forces a full blocking GC in it and reads what survived, through the runtime's
 diagnostics port (open by default) with Microsoft's own tools: `dotnet-gcdump collect -p 1` (a
 heap dump, which the runtime takes by inducing the GC and walking the live objects) and
@@ -147,8 +147,8 @@ count as held. Three more checks run:
 
 ## Results
 
-Our clients must pass every run, the five SDKs in both modes (`go-core-rust`,
-`node-rust`, `python-core-rust`, `java-core-rust` and `dotnet-core-rust` are Rust mode). The
+Our clients must pass every run, the five SDKs in both modes (`go-core`,
+`node-core`, `python-core`, `java-core` and `dotnet-core` are core mode). The
 nightly job runs an hour per client and transport; the upstream clients' runs are recorded, not
 required to pass. A MUST failure of an upstream client
 that the conformance baseline of the same server lists (failing or flaky), or that

@@ -2,6 +2,9 @@ module github.com/pydantic/opamp-clients/go/opampextension
 
 go 1.26.0
 
+// v0.1.0 shipped files that should not have been public; use a later version.
+retract v0.1.0
+
 replace github.com/pydantic/opamp-clients/go => ../
 
 require (

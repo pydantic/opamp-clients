@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 // Runs our .NET client (dotnet/Pydantic.OpAmp.Client: the shared core in Wasmtime) under the
-// conformance driver contract (conformance/DRIVERS.md). OPAMP_DOTNET_MODE=rust runs it in Rust mode
-// (the core speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, over .NET's sockets and SslStream),
-// where DRIVER_PROXY may also be socks5://user:password@host:port.
+// conformance driver contract (conformance/DRIVERS.md). It runs in core mode (the core
+// speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, over .NET's sockets and SslStream), where
+// DRIVER_PROXY may also be socks5://user:password@host:port; OPAMP_DOTNET_MODE=platform runs it in
+// platform mode.
 
 using System.Globalization;
 using System.Text.Json;
@@ -52,7 +53,7 @@ AgentDescription Description(int change)
 // The custom capability DRIVERS.md names: ping is answered with pong.
 const string Echo = "io.opentelemetry.echo";
 
-var rust = Environment.GetEnvironmentVariable("OPAMP_DOTNET_MODE") == "rust";
+var platform = Environment.GetEnvironmentVariable("OPAMP_DOTNET_MODE") == "platform";
 OpAmpClient? client = null;
 // The status to start from, a restart after a crash going on from where the application was
 // (DRIVER_FIRST_CHANGE): the changes count on from it.
@@ -106,9 +107,9 @@ try
                 ? null
                 : new OpAmpTlsOptions { CaPem = ca, ClientCertPem = clientCert, ClientKeyPem = clientKey },
             Proxy = Environment.GetEnvironmentVariable("DRIVER_PROXY") is { Length: > 0 } proxy ? new Uri(proxy) : null,
-            // Always asked for by name, never left to the client's default: dotnet-core is .NET
-            // mode, dotnet-core-rust (OPAMP_DOTNET_MODE=rust) Rust mode.
-            Mode = rust ? OpAmpMode.Rust : OpAmpMode.DotNet,
+            // Always asked for by name, never left to the client's default: dotnet-core is core
+            // mode, dotnet-core-platform (OPAMP_DOTNET_MODE=platform) platform mode.
+            Mode = platform ? OpAmpMode.Platform : OpAmpMode.Core,
         },
         status,
         // Answers go through the client the callback is given: a remote config saved by an earlier
@@ -221,7 +222,7 @@ catch (Exception e)
 }
 
 // The UID in use: the one given, a saved one, or the one the core made.
-Emit("started", new() { ["uid"] = Convert.ToHexString(client.InstanceUid).ToLowerInvariant(), ["client"] = rust ? "opamp-dotnet-core (ours, rust mode)" : "opamp-dotnet-core (ours)" });
+Emit("started", new() { ["uid"] = Convert.ToHexString(client.InstanceUid).ToLowerInvariant(), ["client"] = platform ? "opamp-dotnet-core (ours, platform mode)" : "opamp-dotnet-core (ours)" });
 
 var changes = (Environment.GetEnvironmentVariable("DRIVER_CHANGES_AT_S") ?? string.Empty)
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)

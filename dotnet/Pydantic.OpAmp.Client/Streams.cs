@@ -11,7 +11,7 @@ using Pydantic.OpAmp.Core;
 namespace Pydantic.OpAmp.Client;
 
 /// <summary>
-/// What Rust mode does its network work with: TCP connections (TCP_NODELAY), TLS on them
+/// What core mode does its network work with: TCP connections (TCP_NODELAY), TLS on them
 /// (SslStream), name resolution, and a stream's ends (FIN, reset). The real one is
 /// <see cref="Real"/>; a test gives one over in-memory streams, whose connects, handshakes and
 /// resolutions it decides.
@@ -93,14 +93,14 @@ internal class StreamsNet
 }
 
 /// <summary>
-/// Rust mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself, and
+/// Core mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself, and
 /// this carries out only what needs the platform: TCP connections, TLS on them (SslStream, with the
 /// operator's CAs, certificate and versions: <see cref="OpAmpClientOptions.Tls"/>), name resolution
 /// (only for a SOCKS5 proxy with local resolution: otherwise the proxy resolves), the answer to the
 /// core's proxy question (<see cref="OpAmpClient.ProxyAnswerFor"/>), and the files of downloads. It decides nothing:
 /// every byte it writes, the core wrote, and the core keeps every time (it closes a stream it gives
 /// up on, and cancels a download's file). As node/opamp/src/streams.ts and
-/// python/src/opamp_client/_streams.py do.
+/// python/src/pydantic_opamp_client/_streams.py do.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -262,7 +262,7 @@ internal sealed class Streams
         }
     }
 
-    /// <summary>On the loop: carry out <paramref name="e"/> if it is one of Rust mode's; false if it isn't (it goes to the executor).</summary>
+    /// <summary>On the loop: carry out <paramref name="e"/> if it is one of core mode's; false if it isn't (it goes to the executor).</summary>
     public bool Run(Effect e)
     {
         switch (e.KindCase)

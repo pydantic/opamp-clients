@@ -21,32 +21,32 @@ public class StoppedOutputTests
 
     // covers: RULE-SHELL-07
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task AnOutputThatSaysStoppedStartsNothing(OpAmpMode mode)
     {
         using var server = new TestServer();
         var dir = Directory.CreateTempSubdirectory("opamp-stopped-output-");
         try
         {
-            var rust = mode == OpAmpMode.Rust;
+            var coreMode = mode == OpAmpMode.Core;
             var options = new OpAmpClientOptions
             {
                 Endpoint = new Uri(server.Endpoint("http")),
                 HeartbeatInterval = TimeSpan.FromHours(1),
                 StopTimeout = TimeSpan.FromSeconds(2),
                 Mode = mode,
-                DirectConnection = rust,
+                DirectConnection = coreMode,
                 StateFile = Path.Combine(dir.FullName, "state"),
                 AcceptPackages = true,
             };
-            using var transport = new Watching(rust ? ClientTransport.Create(null, null, direct: true) : ClientTransport.Create(options));
+            using var transport = new Watching(coreMode ? ClientTransport.Create(null, null, direct: true) : ClientTransport.Create(options));
             var net = new WatchingNet();
             var added = 0;
             var client = OpAmpClient.Start(options, new OpAmpStatus(), null, new Seams
             {
                 Transport = transport,
-                Net = rust ? net : null,
+                Net = coreMode ? net : null,
                 Stepped = (_, output) =>
                 {
                     if (output.Stopped && Interlocked.Exchange(ref added, 1) == 0)
@@ -108,7 +108,7 @@ public class StoppedOutputTests
         public void Dispose() => inner.Dispose();
     }
 
-    /// <summary>Rust mode's network, noting every connection to the trap and every resolution of it.</summary>
+    /// <summary>Core mode's network, noting every connection to the trap and every resolution of it.</summary>
     private sealed class WatchingNet : StreamsNet
     {
         public ConcurrentQueue<string> Trapped { get; } = new();

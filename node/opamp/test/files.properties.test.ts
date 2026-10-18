@@ -38,7 +38,7 @@ import { checkTap, type Fault, faulty, type OpName, opampServer, readTap, sleep,
 type Where = { on: "save"; op: OpName; nth: number; fault: Fault } | { on: "mkdir" } | { on: "discard" };
 
 interface Case {
-  mode: "node" | "rust";
+  mode: "platform" | "core";
   pkg: boolean;
   where: Where;
 }
@@ -62,7 +62,7 @@ const where: fc.Arbitrary<Where> = fc.oneof(
 );
 
 const cases: fc.Arbitrary<Case> = fc.record({
-  mode: fc.constantFrom<"node" | "rust">("node", "rust"),
+  mode: fc.constantFrom<"platform" | "core">("platform", "core"),
   pkg: fc.boolean(),
   where,
 }).map((c) => (c.where.on === "save" ? c : { ...c, pkg: true }));
@@ -102,7 +102,7 @@ async function run(c: Case, log: (m: string) => void): Promise<void> {
   let a: Client | undefined;
   const notify = (n: Notification) => {
     if (n.kind === "stopped" && n.error !== undefined) errors.push(n.error);
-    if (n.kind === "installPackage") a?.packageInstalled(n.name, n.package.hash);
+    if (n.kind === "installPackage") a?.packageInstalled(n.packageName, n.package.hash);
   };
   a = Client.start({ ...base, endpoint: server.url, [TEST_FILE_OPS]: disk.ops, [TEST_CORE_TAP]: tapA } as Config, {}, notify);
   try {

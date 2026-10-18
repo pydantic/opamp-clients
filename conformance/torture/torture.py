@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 """Torture one OpAMP client for a long time, on a seeded schedule of faults, and check it held up.
 
-    uv run --no-project --with psutil conformance/torture/torture.py --client go-core --transport ws
+    uv run --no-project --with psutil conformance/torture/torture.py --client go-core-platform --transport ws
     ... --minutes 120 --seed 42          # a long run; the same seed replays the same schedule
     ... --server rust                    # against the Rust server instead of the Go one
 

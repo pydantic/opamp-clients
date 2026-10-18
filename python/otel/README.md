@@ -17,7 +17,7 @@ OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
 opentelemetry-instrument python app.py
 ```
 
-When it works, the `opamp_otel` logger says, at INFO:
+When it works, the `pydantic_opamp_otel` logger says, at INFO:
 
 ```
 OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout, instance <uid>
@@ -28,5 +28,5 @@ say). When it can't connect, it warns once, with what to check; warnings show wi
 The instance keeps its UID across restarts with no configuration
 ([default-state-dir.md](../../docs/default-state-dir.md)).
 
-Everything else, including setting the SDK up in code with `opamp_otel.configure()`, is in
+Everything else, including setting the SDK up in code with `pydantic_opamp_otel.configure()`, is in
 [docs/python-otel.md](../../docs/python-otel.md).

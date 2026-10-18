@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from _policy import config_map
-from opamp_client import opamp_pb2
+from pydantic_opamp_client import opamp_pb2
 
 START = Path(__file__).resolve().parents[3] / "testdata" / "sdk-settings" / "start.json"
 BEFORE = "a core state saved before the core kept the config applied: the policy kept before carries over"

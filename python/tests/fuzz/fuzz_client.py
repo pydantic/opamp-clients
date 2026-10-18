@@ -3,13 +3,13 @@
 """Fuzz target (Atheris): the Python client's own code around the core, fed by a server whose every
 answer is the fuzzer's and an application whose callback calls the client as the fuzzer says.
 
-One input is one run of a real Client on the native core (its C interface: opamp_client._native),
+One input is one run of a real Client on the native core (its C interface: pydantic_opamp_client._native),
 on a seeded event loop with a virtual clock (tests/_sched_loop.py), in either mode:
 
-- Python mode: the executor's aiohttp path over a fake session (responses in pieces, resets,
+- Platform mode: the executor's aiohttp path over a fake session (responses in pieces, resets,
   error statuses with any headers, package downloads into the state file's directory; WebSocket
   upgrades taken or refused, messages, closes and drops);
-- Rust mode: the core's own HTTP and WebSocket over _streams.py's connections, on an in-memory
+- Core mode: the core's own HTTP and WebSocket over _streams.py's connections, on an in-memory
   network, the server's bytes arriving in pieces (or any bytes at all, status line included),
   package files spliced or written by the streams' file writer.
 
@@ -58,30 +58,30 @@ except ImportError:  # the seeds' replay under pytest: no instrumentation
     atheris = None
 
 if atheris is not None and __name__ == "__main__":
-    with atheris.instrument_imports(include=["opamp_client"]):
-        import opamp_client._client  # noqa: F401
+    with atheris.instrument_imports(include=["pydantic_opamp_client"]):
+        import pydantic_opamp_client._client  # noqa: F401
 
 import aiohttp  # noqa: E402
 from aiohttp import WSMessage, WSMsgType  # noqa: E402
 import yarl  # noqa: E402
 from multidict import CIMultiDict  # noqa: E402
 
-import opamp_client._client as _client_mod  # noqa: E402
-import opamp_client._core as _core_mod  # noqa: E402
-import opamp_client._executor as _executor_mod  # noqa: E402
+import pydantic_opamp_client._client as _client_mod  # noqa: E402
+import pydantic_opamp_client._core as _core_mod  # noqa: E402
+import pydantic_opamp_client._executor as _executor_mod  # noqa: E402
 from _fuzzlib import CALLS, CAPABILITIES, CAPABILITY, Reader, Server, call, pieces  # noqa: E402
 from _sched_loop import Network, SeededLoop  # noqa: E402
 from _sched_world import FakeContent  # noqa: E402
-from opamp_client import Client, Config, Notification, Proxy, Status, opamp_pb2 as pb  # noqa: E402
-from opamp_client._executor import downloads_dir  # noqa: E402
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
+from pydantic_opamp_client import Client, Config, Notification, Proxy, Status, opamp_pb2 as pb  # noqa: E402
+from pydantic_opamp_client._executor import downloads_dir  # noqa: E402
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
 
 UNIX0 = 1_790_000_000_000
 STOP_S = 5.0
 MARGIN_S = 1.0
 RUN_S = 600.0  # virtual seconds the client runs for, at most, before the application stops it
 UID = bytes([0x46] * 16)
-TAG = "X-Answer"  # Python mode: the header that names each answer the server gave
+TAG = "X-Answer"  # Platform mode: the header that names each answer the server gave
 
 
 class Problem(AssertionError):
@@ -97,7 +97,7 @@ class FixedCore(_core_mod.Core):
         config.unix_ms = UNIX0
         super().__init__(config, _engine=_engine)
 
-    #: The run whose answers it notes (Python mode tags each with an X-Answer header).
+    #: The run whose answers it notes (platform mode tags each with an X-Answer header).
     run: Run | None = None
 
     def step(self, now_ms: int, input_: corepb.Input) -> corepb.Output:
@@ -113,7 +113,7 @@ class FixedCore(_core_mod.Core):
         return out
 
 
-# The effect whose task is running (Python mode): what the fake session tags its answers with.
+# The effect whose task is running (platform mode): what the fake session tags its answers with.
 EFFECT: contextvars.ContextVar[int] = contextvars.ContextVar("effect", default=-1)
 
 
@@ -129,7 +129,7 @@ _executor_mod.Executor._post = _named(_executor_mod.Executor._post)
 _executor_mod.Executor._open = _named(_executor_mod.Executor._open)
 
 
-# -- Python mode: a fake aiohttp session
+# -- platform mode: a fake aiohttp session
 
 
 def _aiohttp_headers(headers: list[tuple[bytes, bytes]]) -> CIMultiDict[str]:
@@ -256,7 +256,7 @@ class _Session:
         pass
 
 
-# -- Rust mode: a raw HTTP/1.1 server on each in-memory connection
+# -- core mode: a raw HTTP/1.1 server on each in-memory connection
 
 
 class _RawServer(asyncio.Protocol):
@@ -415,7 +415,7 @@ class Run:
     def __init__(self, data: bytes, tmp: str) -> None:
         r = self.r = Reader(data)
         flags = r.byte()
-        self.mode = "rust" if flags & 1 else "python"
+        self.mode = "core" if flags & 1 else "platform"
         self.loop = SeededLoop(r.u32(), auto=True)
         self.server = Server(r)
         self.state = os.path.join(tmp, "state")
@@ -427,7 +427,7 @@ class Run:
             request_timeout_ms=[1000, 0][flags >> 4 & 1], state_file=self.state, accept_packages=True,
             accept_connection_settings=bool(flags & 32), request_instance_uid=bool(flags & 64),
             download_timeout_ms=5000, max_package_bytes=[0, 1000][flags >> 7], mode=self.mode, proxy=Proxy.DIRECT,
-            rust_splice=bool(more & 1) or self.mode == "python")
+            splice_downloads=bool(more & 1) or self.mode == "platform")
         self.status = Status(
             description=pb.AgentDescription(), custom_capabilities=pb.CustomCapabilities(capabilities=[CAPABILITY]))
         self.client: Client | None = None
@@ -437,7 +437,7 @@ class Run:
         self.seen: dict[str, Notification] = {}
         self.stop_task: asyncio.Task | None = None
         self.problems: list[str] = []
-        self.tagged: dict[str, int] = {}  # Python mode: the answers the server gave (their effect's id)
+        self.tagged: dict[str, int] = {}  # Platform mode: the answers the server gave (their effect's id)
         self.reached: set[str] = set()  # ...those that reached the core
         self.cancelled: set[int] = set()  # the effects the core gave up on
         self.tasks: list[asyncio.Task] = []  # every task made on the loop
@@ -450,14 +450,14 @@ class Run:
             return task
 
         loop.create_task = create_task
-        if self.mode == "rust":
+        if self.mode == "core":
             self.loop.network = Network(self.loop, lambda host, port: _RawServer(self, host), accept_all=True)
 
     def problem(self, what: str) -> None:
         self.problems.append(what)
 
     def tag(self) -> bytes:
-        """A new answer's tag, for the effect being carried out (Python mode)."""
+        """A new answer's tag, for the effect being carried out (platform mode)."""
         t = str(len(self.tagged) + 1)
         self.tagged[t] = EFFECT.get()
         return t.encode()
@@ -508,7 +508,7 @@ class Run:
     async def main(self) -> None:
         loop = self.loop
         self.client = Client.start(self.config, self.status, self.notify,
-                                   _sessions=(lambda _kind: _Session(self)) if self.mode == "python" else None)
+                                   _sessions=(lambda _kind: _Session(self)) if self.mode == "platform" else None)
         self.returned = True
         begun = loop.time()
         while not self.r.empty and self.stop_task is None and not self.client._finished:
@@ -580,9 +580,9 @@ def _u16(n: int) -> bytes:
 SEEDS = [
     _seed(b"\x00", b"\0\0\0\0"),
     _seed(b"\x01", b"\1\0\0\0"),
-    # Python mode: a remote config (parts bit 2), answered from the callback.
+    # Platform mode: a remote config (parts bit 2), answered from the callback.
     _seed(b"\x04", b"\2\0\0\0", b"\5", _u16(2), b"\2ab", b"\1", b"\0", b"\4conf", b"\0", b"\0", b"\1", b"\3", b"\1"),
-    # Rust mode: a package (bit 4), its file served, installed and answered.
+    # Core mode: a package (bit 4), its file served, installed and answered.
     _seed(b"\x05", b"\3\0\0\0", b"\1", b"\5", _u16(4), b"\0", b"\1", b"\0", b"\0", b"\1", b"1", b"\2h1", b"\1", b"\0",
           b"\5hello", b"\0", b"\0", b"\0", b"\0", b"\0", b"\0", b"\1", b"\4\1\1\0"),
     # Connection settings offered (bit 8), with a new endpoint.

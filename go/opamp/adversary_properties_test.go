@@ -430,7 +430,7 @@ func (s *advServer) websocket(w http.ResponseWriter, r *http.Request, run string
 // advHarness is one seed's client and what its callback saw.
 type advHarness struct {
 	host, run  string  // the server, and the run (run=SEED) the marker sent as stop returns is for
-	raw        *advRaw // the run's raw server, for its streams (Rust mode)
+	raw        *advRaw // the run's raw server, for its streams (core mode)
 	client     atomic.Pointer[Client]
 	started    atomic.Bool
 	inProgress atomic.Int32
@@ -604,11 +604,11 @@ type advCerts struct {
 // (tls=NAME).
 const advTLSName = "localhost"
 
-// runAdversary runs one seed: query is the rest of the endpoint's query (off, focus, steps...).
-// In Rust mode the run has a raw server of its own, which the adversary opens streams to (raw=PORT,
+// runAdversary runs one seed: query is the rest of the endpoint's query (off, focus, steps...). In
+// core mode the run has a raw server of its own, which the adversary opens streams to (raw=PORT,
 // tls=NAME): it hands the shell the stream effects, and the platform's as well (it plays the core,
-// not the shell inside it), which reach Go mode's executor, as a core's would, through Rust mode's
-// wiring, stop and shutdown.
+// not the shell inside it), which reach platform mode's executor, as a core's would, through core
+// mode's wiring, stop and shutdown.
 func runAdversary(srv *advServer, host string, wasm []byte, dir string, seed uint64, query string, mode Mode, certs advCerts) advResult {
 	res := advResult{seed: seed}
 	run := strconv.FormatUint(seed, 10)
@@ -620,7 +620,7 @@ func runAdversary(srv *advServer, host string, wasm []byte, dir string, seed uin
 		coreModule: wasm,
 		Mode:       mode,
 	}
-	if mode != ModeGo {
+	if mode != ModePlatform {
 		raw, err := newAdvRaw(certs.server)
 		if err != nil {
 			res.fails = append(res.fails, fmt.Sprintf("the raw server: %v", err))
@@ -892,7 +892,7 @@ func advReplay(seed uint64, query, test string) string {
 // covers: RULE-SHELL-01, RULE-SHELL-02, RULE-SHELL-03, RULE-SHELL-04, RULE-SHELL-05, RULE-SHELL-07, RULE-SHELL-08, RULE-SHELL-09, RULE-SHELL-10
 func TestAdversary(t *testing.T) {
 	t.Parallel() // (beside the other long ones: each spends its time on the adversary's clocks)
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { testAdversary(t, mode) })
 	}
 }
@@ -936,7 +936,7 @@ func testAdversary(t *testing.T, mode Mode) {
 		return
 	}
 	// A production is drawn at random, and runs only if the run's timing leaves it room, so one can
-	// miss a batch by chance (with Rust mode's streams the grammar is half as large again): each
+	// miss a batch by chance (with core mode's streams the grammar is half as large again): each
 	// missed one runs in focus, on two seeds past the batch's, as in Java's and Node's harnesses.
 	last := seeds[len(seeds)-1]
 	var still []string
@@ -972,7 +972,7 @@ func TestAdversaryKnownBugs(t *testing.T) {
 			query := advKnownOff(prod) + "&focus=" + prod
 			for i := range uint64(tries) {
 				seed := seeds[0] + i
-				r := advBatch(t, wasm, []uint64{seed}, func(uint64) string { return query }, ModeGo)[0]
+				r := advBatch(t, wasm, []uint64{seed}, func(uint64) string { return query }, ModePlatform)[0]
 				if len(r.fails) > 0 {
 					t.Logf("expected failure, %s: %s (seed %d, %s):\n  %s", bug.bug, bug.reason, seed,
 						advReplay(seed, query, "TestAdversaryKnownBugs/"+prod), strings.Join(r.fails, "\n  "))
@@ -991,7 +991,7 @@ func TestAdversaryKnownBugs(t *testing.T) {
 // covers: RULE-SHELL-06
 func TestAdversaryCancel(t *testing.T) {
 	t.Parallel() // (beside the other long ones: each spends its time on the adversary's clocks)
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { testAdversaryCancel(t, mode) })
 	}
 }
@@ -1047,7 +1047,7 @@ func TestAdversaryRegressions(t *testing.T) {
 		{"limit_zero", 1, "a max_message_bytes of 0 took every message (gorilla's SetReadLimit(0) is no limit)"},
 		{"limit_zero", 2, "the same"},
 	} {
-		for _, mode := range []Mode{ModeGo, ModeRust} {
+		for _, mode := range []Mode{ModePlatform, ModeCore} {
 			t.Run(fmt.Sprintf("%s/%s/%d", modeName(mode), c.prod, c.seed), func(t *testing.T) {
 				t.Parallel()
 				query := advKnownOff(c.prod) + "&focus=" + c.prod

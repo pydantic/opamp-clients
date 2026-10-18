@@ -54,7 +54,7 @@ class CallbackAnswerTest {
    * The core's tap at {@code tap} against RULE-SHELL-10: each of {@code calls}, made from inside
    * the callback, reached the core before anything the client took in after the step that called
    * the callback. Between that step and the call the core is fed only the application's calls
-   * (those queued ahead of it), and in Rust mode the shell's own answer to a proxy query of that
+   * (those queued ahead of it), and in core mode the shell's own answer to a proxy query of that
    * step, if {@code known} lets it. A call that never reached the core (the client stopped first)
    * still lets nothing else in. What is wrong, or null.
    */

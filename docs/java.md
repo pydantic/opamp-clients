@@ -86,9 +86,9 @@ agent's status to `start`, so the first message reports it in full.
 |---|---|---|
 | Endpoint | `builder(endpoint)`: `http(s)://` polls, `ws(s)://` keeps one connection open | |
 | Headers | `header(name, value)`, sent with every request and WebSocket upgrade | |
-| TLS | `tls(Tls.builder()...build())`: `trustedCa`, `includeSystemRoots`, `clientCertificate`, `minVersion`, `maxVersion` | [README](../java/opamp/README.md#tls-and-proxies) |
+| TLS | `tls(Tls.builder()...build())`: `trustedCa`, `includeSystemCas`, `clientCertificate`, `minVersion`, `maxVersion` | [README](../java/opamp/README.md#tls-and-proxies) |
 | Proxy | `proxy(url)`, `proxyResolveLocally(true)`, or `directConnection()` for none. Without one, the environment's | [README](../java/opamp/README.md#tls-and-proxies) |
-| Who speaks HTTP | `mode(OpampClient.Mode.RUST)` (the default) or `mode(OpampClient.Mode.JAVA)` (`java.net.http.HttpClient`); `httpClient(...)` selects Java mode | [sdks.md](sdks.md#rust-mode-and-platform-mode) |
+| Who speaks HTTP | `mode(OpampClient.Mode.CORE)` (the default) or `mode(OpampClient.Mode.PLATFORM)` (`java.net.http.HttpClient`); `httpClient(...)` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `stateFile(Path)`: kept across restarts, for the agent's user alone | [state-file.md](state-file.md) |
 | Instance UID | `builder(endpoint, instanceUid)` (16 bytes), or `builder(endpoint)` for one the core makes; `requestInstanceUid(true)` to have the server assign it; `client.instanceUid()` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `capabilities(long)` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -105,18 +105,18 @@ agent's status to `start`, so the first message reports it in full.
 Certificates and keys are read when given, and the proxy URL and the mode by `build()`, so
 mistakes fail there.
 
-### Proxies in Java mode
+### Proxies in platform mode
 
-In Java mode the JDK's `HttpClient` carries everything, and two of its limits apply:
+In platform mode the JDK's `HttpClient` carries everything, and two of its limits apply:
 
 - HTTP proxies only. `HttpClient` has no SOCKS and no `https://` proxies, so the client refuses
-  those URLs. Without a proxy, Java mode uses `ProxySelector.getDefault()` (`http.proxyHost` and
+  those URLs. Without a proxy, platform mode uses `ProxySelector.getDefault()` (`http.proxyHost` and
   the other proxy properties), not the environment.
 - The JDK sends no Basic proxy credentials through a CONNECT tunnel (`https://`, `ws://`,
   `wss://`) unless the JVM runs with `-Djdk.http.auth.tunneling.disabledSchemes=`. It is the JVM's
   setting, so the client leaves it to the application, and logs a warning at start.
 
-Rust mode, the default, has neither limit: the core speaks to the proxy itself.
+Core mode, the default, has neither limit: the core speaks to the proxy itself.
 
 ## What the client tells the application
 
@@ -161,7 +161,7 @@ mvn package                   # compile and test
 
 `mvn -Pfray test -Dfray.only=true` explores thread schedules with Fray; the
 [README](../java/opamp/README.md#development) says what it needs. The conformance suite runs this
-client in both modes: `python3 conformance/runner/run.py --client java-core,java-core-rust`
+client in both modes: `python3 conformance/runner/run.py --client java-core-platform,java-core`
 ([conformance/README.md](../conformance/README.md)).
 
 ## OpenTelemetry

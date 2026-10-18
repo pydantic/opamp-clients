@@ -23,9 +23,9 @@ an issue in this repository; track release work where the steward skill says. Pu
 | Tag | Workflow | What gets published |
 |---|---|---|
 | `go/vX.Y.Z` | none | the client module `github.com/pydantic/opamp-clients/go`, served by proxy.golang.org |
-| `go/otel/vX.Y.Z`, `go/opampextension/vX.Y.Z` | none | those nested modules (the extension is used through an ocb manifest) |
+| `go/opampotel/vX.Y.Z`, `go/opampextension/vX.Y.Z` | none | those nested modules (the extension is used through an ocb manifest) |
 | `go/opampsupervisor/vX.Y.Z` | `release.yml` | the module, plus a GitHub Release: six archives (linux, darwin, windows x amd64, arm64), `SHA256SUMS`, a provenance attestation per archive |
-| `sdk/vX.Y.Z` | `registries.yml` | PyPI, npm, Maven Central, NuGet, each only once `SDK_REGISTRIES` names it |
+| `sdk/vX.Y.Z` | `registries.yml` | PyPI, npm, Maven Central, NuGet, each from its own environment, only once `SDK_REGISTRIES` names it |
 | `core/vX.Y.Z` | not here | the core release the lock pins; never cut by a session in this repository |
 
 The collector extension has no artifact of its own: it ships as the `go/opampextension` module
@@ -35,7 +35,7 @@ and tested in CI, not published.
 
 ## 2. Go modules
 
-1. In a PR, make every nested `go.mod` (`go/otel`, `go/opampextension`, `go/opampsupervisor`)
+1. In a PR, make every nested `go.mod` (`go/opampotel`, `go/opampextension`, `go/opampsupervisor`)
    `require github.com/pydantic/opamp-clients/go vX.Y.Z`, the version about to be tagged. Keep each
    `replace ... => ../`: consumers ignore it, but a `v0.0.0` require breaks them. See
    [docs/sdk-registries.md](../../../docs/sdk-registries.md) (Go row). Squash-merge on the maintainer's line.
@@ -43,13 +43,13 @@ and tested in CI, not published.
    for more), the client first and the Supervisor alone:
    ```bash
    git fetch origin main
-   for t in go go/otel go/opampextension go/opampsupervisor; do git tag "$t/vX.Y.Z" <merge-sha>; done
-   git push origin go/vX.Y.Z go/otel/vX.Y.Z go/opampextension/vX.Y.Z
+   for t in go go/opampotel go/opampextension go/opampsupervisor; do git tag "$t/vX.Y.Z" <merge-sha>; done
+   git push origin go/vX.Y.Z go/opampotel/vX.Y.Z go/opampextension/vX.Y.Z
    git push origin go/opampsupervisor/vX.Y.Z      # alone: it triggers release.yml
    ```
 3. Check that the proxy serves them (each prints Path, Version, Time):
    ```bash
-   for m in go go/otel go/opampextension go/opampsupervisor; do
+   for m in go go/opampotel go/opampextension go/opampsupervisor; do
      GOFLAGS=-mod=mod go list -m -json github.com/pydantic/opamp-clients/$m@vX.Y.Z; done
    ```
    The proxy caches a tag for good: a wrong tag is fixed by the next version, never by moving it.
@@ -95,39 +95,62 @@ the ocb manifests, each `builder@vX` in CI, `archive.sh` and docs/collector.md),
 
 ## 5. SDK packages (registries.yml)
 
-Nothing has been released this way yet (no `sdk/*` tag); every manifest is at `0.1.0`. Before the
-first one, the registry setup in [docs/sdk-registries.md](../../../docs/sdk-registries.md) must exist:
-PyPI and npm trusted publishers (environment `pypi`, `npm`), NuGet's `NUGET_API_KEY` in the
-`nuget` environment, and the repository variable `SDK_REGISTRIES` (e.g. `pypi npm nuget`). Maven
-Central isn't wired up: its job fails if enabled. Sessions can't read Actions variables (403), so
-ask the maintainer what `SDK_REGISTRIES` holds rather than assuming.
+Nothing has been released this way yet (no `sdk/*` tag); every manifest is at `0.1.0`. The
+workflow publishes from an `sdk/vX.Y.Z` tag on `main` only: by hand it takes no version and
+runs only when started from such a tag (Use workflow from: the tag). Each registry's job runs in
+its own environment (`pypi`, `npm`, `maven`, `nuget`), and uploads only once the repository
+variable `SDK_REGISTRIES` names it. Before the first release, the maintainer sets up what
+[docs/sdk-registries.md](../../../docs/sdk-registries.md#what-the-maintainer-sets-up-before-the-first-release)
+lists. In short:
+- GitHub: the four environments, each limited to `sdk/v*` tags with a required reviewer; in
+  `maven` the secrets `MAVEN_CENTRAL_USERNAME`, `MAVEN_CENTRAL_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY`
+  and `MAVEN_GPG_PASSPHRASE`; in `nuget` the variable `NUGET_USER`; `SDK_REGISTRIES`; and a tag
+  ruleset.
+- PyPI: three pending trusted publishers.
+- npm: the `@pydantic` organization, a first publish by hand of each package, then a trusted
+  publisher on each.
+- Maven Central: the `dev.pydantic` namespace verified, a user token, and a GPG key on a public
+  keyserver.
+- NuGet: the `Pydantic.OpAmp` prefix reserved, and a trusted publishing policy.
 
-What the workflow runs, in order (a PR touching it, the scripts or the lock runs it all at 0.0.0
-as a dry run that uploads nothing):
+Sessions can't read Actions variables, environments or secrets (403): ask the maintainer what is
+set up rather than assuming.
+
+What the workflow runs, in order (a PR touching it, the scripts, the poms or the lock runs it all at
+0.0.0 as a dry run that uploads nothing):
 ```bash
 python3 scripts/fetch_core.py fetch --all-platforms   # every platform's native library
 python3 scripts/sdk_release.py stamp X.Y.Z            # every manifest at X.Y.Z, ours pinned exactly
 python3 scripts/native_dist.py build                  # dist/native: runtimes/<rid>/native/, wheels/ (~8 s here)
 python3 scripts/native_dist.py pack                   # dist/native/nuget (needs dotnet)
 python3 scripts/native_dist.py check
-python3 scripts/sdk_release.py pack                   # dist/sdk: otel wheel, npm tarballs, Maven jars, .NET plugin
-python3 scripts/sdk_release.py check                  # all there, no sdist, no core sources
+python3 scripts/sdk_release.py pack                   # dist/sdk: otel wheel, npm tarballs, Maven jars (-Prelease: sources, javadoc), .NET plugin
+python3 scripts/sdk_release.py check                  # all there, no sdist, no core sources, what Central requires of each pom
 twine check --strict dist/native/wheels/*.whl dist/sdk/wheels/*.whl
+# then, in the maven job, with the key imported:
+python3 scripts/sdk_release.py bundle dist/sdk/maven central-bundle.zip   # Central's layout, .md5/.sha1/.asc
 ```
 Locally, `native_dist.py build` works after `fetch --all-platforms`; `check` then fails with
 `0 Pydantic.OpAmp.Core.Native packages, not 1` until `pack` has run, which needs the .NET SDK
 (refused in the sandbox: CI only). Don't run `stamp` in a working tree you'll commit from: it
 rewrites tracked manifests (and drops npm's `private` flag). Its behavior is covered by the tests.
+`bundle --unsigned` makes the bundle without signatures, as the dry run does.
 `native_dist.py smoke` installs and runs the packages in Docker.
 
-Release: merge what ships, then the maintainer pushes `git push origin sdk/vX.Y.Z` alone. Go has nothing to
-upload (section 2), and the Rust client is not published.
+Each registry takes the packages in the order they pin each other (the core, the client, then
+what is built on the client), and a rerun skips what a registry already has, so rerunning a
+failed job is the fix for a partial upload. Maven Central takes one bundle for both artifacts.
+
+Release: merge what ships, then the maintainer pushes `git push origin sdk/vX.Y.Z` alone and
+approves each environment's deployment. Go has nothing to upload (section 2), and the Rust client
+is not published. A bad version is fixed by the next one; how to keep users off it meanwhile, per
+registry: docs/sdk-registries.md, "A bad release".
 
 ## 6. Tests
 
 ```bash
 python3 -m unittest scripts/test_sdk_release.py scripts/test_collector_release.py \
-  scripts/test_native_dist.py scripts/test_redact_mutants.py scripts/test_public_check.py   # 48 tests, ~2 s
+  scripts/test_native_dist.py scripts/test_redact_mutants.py scripts/test_public_check.py   # 59 tests, ~3 s
 ```
 
 ## Gotchas

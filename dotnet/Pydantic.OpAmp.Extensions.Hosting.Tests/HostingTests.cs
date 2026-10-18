@@ -949,6 +949,32 @@ public class HostingTests
     }
 
     [Fact]
+    public async Task ACoreThatCantBeLoadedIsSaidOnceAndTheHostRunsUnmanaged()
+    {
+        var said = new Said();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = "http://127.0.0.1:1/v1/opamp" });
+        b.Logging.AddProvider(said);
+        // The agent WithOpAmp would make, but for a core that can't be loaded.
+        b.Services.AddSingleton(sp => new OpAmpAgent(sp.GetRequiredService<IOptions<OpAmpOptions>>(), sp.GetService<IConfiguration>(),
+            () => "DllNotFoundException: Unable to load shared library 'opamp_native'"));
+        b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("app").AddOtlpExporter()).WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel); // the host runs
+        Assert.Null(host.Services.GetRequiredService<OpAmpAgent>().Agent);
+        Assert.False(Gated(Exporter(host)));
+        using (var source = new ActivitySource("app"))
+        using (var work = source.StartActivity("work"))
+        {
+            Assert.NotNull(work); // the SDK traces the application
+        }
+
+        await host.StopAsync(Cancel);
+        var rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+        var line = Assert.Single(said.Lines, l => l.Contains("OpAMP", StringComparison.Ordinal));
+        Assert.Equal($"Warning: OpAMP: the core can't be loaded on {rid}; the SDK runs unmanaged: DllNotFoundException: Unable to load shared library 'opamp_native'", line);
+    }
+
+    [Fact]
     public void AnEndpointTheDelegateSetsWinsOverABadOne()
     {
         var b = Builder(new() { ["OpAmp:Endpoint"] = "opamp server, please" });

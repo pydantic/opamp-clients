@@ -38,10 +38,10 @@ import org.junit.jupiter.api.io.TempDir;
  * says. Where the JDK differs, the case is listed below with the reason, so the test still fails if
  * the behaviour changes. In platform mode there is no proxy table: the client takes no proxy from
  * the environment (HTTP_PROXY and the like), only the JDK's ProxySelector or one given ({@link
- * OpampClient.Config.Builder#proxy}). In Rust mode (the core speaks HTTP and WebSocket over this
+ * OpampClient.Config.Builder#proxy}). In core mode (the core speaks HTTP and WebSocket over this
  * client's sockets) every URL is sent by the core with exactly its target, the proxy comes from
- * the environment by Rust mode's rule with no difference from proxy.json, and the TLS settings
- * are taken or refused as the table says, for Rust mode's engines too.
+ * the environment by core mode's rule with no difference from proxy.json, and the TLS settings
+ * are taken or refused as the table says, for core mode's engines too.
  *
  * <p>The tables are found at OPAMP_SHELL_TABLES if set (a Docker run that mounts only java/opamp
  * mounts them there), else at tests/shell-tables in a directory above this one.
@@ -149,9 +149,9 @@ class ShellTablesTest {
     }
   }
 
-  /** Rust mode: the core sends each URL's exact target over this client's streams, HTTP and WebSocket. */
+  /** Core mode: the core sends each URL's exact target over this client's streams, HTTP and WebSocket. */
   @Test
-  void rustModeSendsEveryUrlAsItsTarget() throws Exception {
+  void coreModeSendsEveryUrlAsItsTarget() throws Exception {
     List<Object> urls = list(table("urls.json").get("urls"));
     LinkedBlockingQueue<String> seen = new LinkedBlockingQueue<>();
     try (Raw server = new Raw(s -> {
@@ -179,7 +179,7 @@ class ShellTablesTest {
         boolean ws = ((String) e.get("scheme")).toLowerCase(Locale.ROOT).startsWith("ws");
         String endpoint = (ws ? "ws://" : "http://") + base + target;
         seen.clear();
-        OpampClient c = OpampClient.start(OpampClient.Config.builder(endpoint, new byte[16]).mode(OpampClient.Mode.RUST)
+        OpampClient c = OpampClient.start(OpampClient.Config.builder(endpoint, new byte[16]).mode(OpampClient.Mode.CORE)
             .directConnection().heartbeatInterval(java.time.Duration.ofSeconds(60)).build(), OpampClient.Status.of(null), n -> {});
         String arrived;
         try {
@@ -192,7 +192,7 @@ class ShellTablesTest {
         }
       }
       // No known differences: the core writes the request itself.
-      assertEquals(Map.of(), wrong, "URLs Rust mode sends otherwise, " + wrong.size() + " of " + urls.size());
+      assertEquals(Map.of(), wrong, "URLs core mode sends otherwise, " + wrong.size() + " of " + urls.size());
     }
   }
 
@@ -245,16 +245,16 @@ class ShellTablesTest {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Proxies (Rust mode: platform mode takes none from the environment).
+  // Proxies (core mode: platform mode takes none from the environment).
 
   /**
-   * Rust mode's proxy from the environment: the client hands the core the variables
+   * Core mode's proxy from the environment: the client hands the core the variables
    * ({@code Config.proxy}) and the core picks by the shared rule. Each case through this client's
    * reading of the environment and the core it ships: exactly proxy.json, no known differences.
    */
   // covers: RULE-PROXY-02
   @Test
-  void rustModeTakesTheEnvironmentsProxyExactlyAsTheTableSays() throws Exception {
+  void coreModeTakesTheEnvironmentsProxyExactlyAsTheTableSays() throws Exception {
     List<Object> cases = list(table("proxy.json").get("cases"));
     assertTrue(cases.size() > 30, "the cases");
     Map<String, String> wrong = new TreeMap<>();
@@ -263,33 +263,33 @@ class ShellTablesTest {
       Map<String, String> env = new java.util.HashMap<>();
       map(c.get("env")).forEach((k, v) -> env.put(k, (String) v));
       String url = (String) c.get("url");
-      OpampClient.Config config = OpampClient.Config.builder(url).mode(OpampClient.Mode.RUST).environment(env).build();
+      OpampClient.Config config = OpampClient.Config.builder(url).mode(OpampClient.Mode.CORE).environment(env).build();
       String got = coreRoute(OpampClient.proxyChoice(config), url);
       if (!java.util.Objects.equals(got, c.get("proxy"))) {
         wrong.put((String) c.get("id"), got + ", the table says " + c.get("proxy") + " (" + c.get("why") + ")");
       }
     }
-    assertEquals(Map.of(), wrong, "Rust mode's proxy otherwise than proxy.json");
+    assertEquals(Map.of(), wrong, "core mode's proxy otherwise than proxy.json");
   }
 
   /**
-   * What Rust mode tells the core: the configured proxy and no variables; none for a direct
+   * What core mode tells the core: the configured proxy and no variables; none for a direct
    * connection; otherwise each variable the rule reads that is set, even empty, by its own name. A
    * proxy_query (only a core that wasn't told asks) hears the configured proxy or none.
    */
   // covers: RULE-PROXY-02
   @Test
-  void rustModeTellsTheCoreItsProxy() throws Exception {
+  void coreModeTellsTheCoreItsProxy() throws Exception {
     Map<String, String> env = Map.of("HTTP_PROXY", "http://env:1", "no_proxy", "", "REQUEST_METHOD", "GET", "OTHER", "x");
-    OpampClient.Config configured = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env)
+    OpampClient.Config configured = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.CORE).environment(env)
         .proxy("socks5://u:p%40ss@configured:1080").proxyResolveLocally(true).build();
     assertEquals(CoreProto.ProxyChoice.newBuilder().setUrl("socks5://u:p%40ss@configured:1080").setResolveLocally(true).build(),
         OpampClient.proxyChoice(configured));
     assertEquals("socks5://u:p%40ss@configured:1080", OpampClient.proxies(configured).apply("http://x/").getProxy());
-    OpampClient.Config direct = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env)
+    OpampClient.Config direct = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.CORE).environment(env)
         .directConnection().build();
     assertEquals(CoreProto.ProxyChoice.newBuilder().setDirect(true).build(), OpampClient.proxyChoice(direct));
-    OpampClient.Config fromEnv = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.RUST).environment(env).build();
+    OpampClient.Config fromEnv = OpampClient.Config.builder("http://x/").mode(OpampClient.Mode.CORE).environment(env).build();
     CoreProto.ProxyChoice choice = OpampClient.proxyChoice(fromEnv);
     List<String> got = new ArrayList<>();
     choice.getEnvironmentList().forEach(h -> got.add(h.getName() + "=" + h.getValue()));
@@ -300,7 +300,7 @@ class ShellTablesTest {
   }
 
   /**
-   * Where Rust mode's core connects first for {@code url} when told {@code choice}: the proxy as
+   * Where core mode's core connects first for {@code url} when told {@code choice}: the proxy as
    * the table writes a route (scheme://host:port, credentials left out), or null for directly. The
    * core picks it itself: it asks no proxy_query.
    */
@@ -391,7 +391,7 @@ class ShellTablesTest {
         if (c.get("max") != null) {
           b.maxVersion(version((String) c.get("max")));
         }
-        // The settings, and the transport built from them (HTTP and WebSocket share it); and Rust
+        // The settings, and the transport built from them (HTTP and WebSocket share it); and core
         // mode's TLS from the same settings, an engine for a name and one for an address.
         Tls tls = b.build();
         Transport.build(tls, null, true);

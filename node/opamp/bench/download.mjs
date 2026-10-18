@@ -6,9 +6,9 @@
 // asked for. The time is from the server's first byte of the file to the installPackage
 // notification (the file written, hashed and checked).
 //
-//   node bench/download.mjs rust cl [record.bin]      # Rust mode, Content-Length
-//   node bench/download.mjs node chunked              # Node mode (undici), chunked
-//   BENCH_SPLICE=0 node bench/download.mjs rust cl     # Rust mode, every byte through the core
+//   node bench/download.mjs core cl [record.bin]          # Core mode, Content-Length
+//   node bench/download.mjs platform chunked              # Platform mode (undici), chunked
+//   BENCH_SPLICE=0 node bench/download.mjs core cl         # Core mode, every byte through the core
 //
 // With a third argument, every init and step the module gets is recorded there (length-prefixed),
 // to replay under another runtime (java/bench).
@@ -19,7 +19,7 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const [mode = "rust", framing = "cl", record] = process.argv.slice(2);
+const [mode = "core", framing = "cl", record] = process.argv.slice(2);
 const MB = Number(process.env.BENCH_MB ?? 100);
 
 if (record) {
@@ -97,7 +97,7 @@ const done = new Promise((resolve, reject) => {
       acceptPackages: true,
       heartbeatIntervalMs: 60_000,
       mode,
-      rustSplice: process.env.BENCH_SPLICE !== "0",
+      spliceDownloads: process.env.BENCH_SPLICE !== "0",
       proxy: false,
     },
     {},
@@ -113,7 +113,7 @@ const done = new Promise((resolve, reject) => {
   );
 });
 const ms = await done;
-console.log(JSON.stringify({ mode, splice: mode === "rust" && process.env.BENCH_SPLICE !== "0", framing, mb: MB, ms: Math.round(ms), mbPerS: Math.round((MB / ms) * 1000 * 10) / 10 }));
+console.log(JSON.stringify({ mode, splice: mode === "core" && process.env.BENCH_SPLICE !== "0", framing, mb: MB, ms: Math.round(ms), mbPerS: Math.round((MB / ms) * 1000 * 10) / 10 }));
 server.close();
 rmSync(dir, { recursive: true, force: true });
 process.exit(0);

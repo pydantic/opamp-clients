@@ -100,7 +100,7 @@ const STOPS = ["at once", "held", "connected", "from callback", "after config", 
 type Stop = (typeof STOPS)[number];
 
 /** Start one client, stop it at `where`, and check it stopped as it should. */
-async function churnRun(srv: ChurnServer, port: number, dir: string, mode: "rust" | "node", ws: boolean, where: Stop): Promise<void> {
+async function churnRun(srv: ChurnServer, port: number, dir: string, mode: "core" | "platform", ws: boolean, where: Stop): Promise<void> {
   const endpoint = `${ws ? "ws" : "http"}://127.0.0.1:${port}${where === "held" ? "/hold" : "/v1/opamp"}`;
   let configs = 0;
   let stopped: Notification | undefined;
@@ -123,7 +123,7 @@ async function churnRun(srv: ChurnServer, port: number, dir: string, mode: "rust
       if (n.kind === "stopped") stopped = n;
       if (n.kind !== "remoteConfig") return;
       configs++;
-      client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.config.configHash, status: 1 }));
+      client.setRemoteConfigStatus(create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash, status: 1 }));
       if (where === "from callback") fromCallback ??= client.stop();
       if (where === "threw") throw new Error("churn");
     },
@@ -196,11 +196,11 @@ async function settle(base: Usage, slack: number): Promise<Usage> {
 // Starting and stopping clients again and again leaves nothing behind: after a warm-up, rounds of
 // a client stopped at every point, over HTTP and WebSocket, leave the process with no more active
 // handles, open file descriptors or memory than before them. A client's core instance is hundreds
-// of KiB of WebAssembly memory, so a client kept is plain in the memory: Rust mode's streams kept
+// of KiB of WebAssembly memory, so a client kept is plain in the memory: core mode's streams kept
 // each client stopped for 2 s after its connection had closed (the linger timer, never cleared,
 // held the socket and so the client), some 80 MiB over these rounds. Its connections are a
 // descriptor each (the client's timers and sockets are unref'd, which active handles leave out).
-for (const mode of ["rust", "node"] as const) {
+for (const mode of ["core", "platform"] as const) {
   test(`churn leaves nothing behind (${mode} mode)`, async (t) => {
     const warmup = 2;
     const rounds = 15;

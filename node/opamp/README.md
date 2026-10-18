@@ -6,9 +6,9 @@ plain HTTP or WebSocket.
 Everything OpAMP (what to send and when, backoff, heartbeats, full reports, instance UIDs,
 agent_disconnect, and the requests and responses themselves) is the shared OpAMP
 client core, run in Node's own WebAssembly engine: nothing native to install. By default
-the core speaks HTTP and WebSocket itself too ([Rust mode](#rust-mode-and-node-mode)), and this
+the core speaks HTTP and WebSocket itself too ([core mode](#core-mode-and-platform-mode)), and this
 package only gives it Node's TCP and TLS sockets, so the bytes on the wire are the same as every
-other language's client here. In Node mode the package carries out the core's requests with
+other language's client here. In platform mode the package carries out the core's requests with
 [`undici`](https://github.com/nodejs/undici)'s `fetch` and the
 [`ws`](https://github.com/websockets/ws) package instead (SOCKS5 proxies through the
 [`socks`](https://github.com/JoshGlazebrook/socks) package).
@@ -25,7 +25,7 @@ const client = Client.start(
   },
   (n) => {
     if (n.kind === "remoteConfig") {
-      // apply n.config, then report with client.setRemoteConfigStatus(...)
+      // apply n.remoteConfig, then report with client.setRemoteConfigStatus(...)
     }
   },
 );
@@ -58,7 +58,7 @@ clients run on daemon threads): the application's own work does. A program whose
 the client keeps itself going, and calls `stop()` when it ends: from `stop()` until the client
 has stopped, the client does hold Node.js, so the goodbye is sent before the program exits. (A
 connection holds Node.js only while it is being opened and until the server first answers on it;
-in Node mode, while a request is in flight.)
+in platform mode, while a request is in flight.)
 
 ## TLS and proxies
 
@@ -83,7 +83,7 @@ const client = Client.start(
 ```
 
 - `tls.ca`: the CA certificates (PEM) to verify the server with. They replace the CAs Node trusts
-  by default. Set `includeDefaultCa: true` to trust both. Without `ca`, Node's defaults apply.
+  by default. Set `includeSystemCas: true` to trust both. Without `ca`, Node's defaults apply.
 - `tls.cert` and `tls.key`: a client certificate and its private key (PEM, the key not
   encrypted), presented in every handshake. Give both or neither.
 - `tls.minVersion` and `tls.maxVersion`: `"TLSv1.2"` or `"TLSv1.3"`. The client never uses
@@ -101,8 +101,8 @@ const client = Client.start(
   address, for a proxy that can't resolve the names the agent can. Default `false`. SOCKS5 only:
   with an `http://` or `https://` proxy it throws. Only the application sets it.
 
-Without `proxy`, the proxy comes from the environment, by the rule every SDK's Rust mode shares
-(`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+Without `proxy`, the proxy comes from the environment, by the rule every SDK's core mode shares
+(`tests/shell-tables/README.md`, its proxy rule, put in place by
 `scripts/fetch_core.py fetch`):
 `HTTP_PROXY` for `http://` and `ws://`, `HTTPS_PROXY` for `https://` and `wss://`, else
 `ALL_PROXY`; the upper-case name first; `NO_PROXY` names (and their subdomains), `*`, addresses
@@ -110,7 +110,7 @@ and CIDR networks; nothing under CGI (`REQUEST_METHOD` set: there `HTTP_PROXY` m
 `Proxy` header, httpoxy). They are read whatever `NODE_USE_ENV_PROXY` says. The value goes to
 the core as it is (trimmed): a scheme it can't use fails the connection rather than going direct,
 at connection time rather than at `start`. `proxy: { resolveLocally: true }` without a `url`
-applies to a SOCKS5 proxy the environment names. [Node mode](#rust-mode-and-node-mode) reads the
+applies to a SOCKS5 proxy the environment names. [platform mode](#core-mode-and-platform-mode) reads the
 environment by Node's convention instead.
 
 `proxy: false` goes direct, whatever the environment says.
@@ -140,26 +140,26 @@ recorded in the tap too, for the `opamp-tap` checker to check against a disk tha
 tap holds the headers sent (the enrollment key) and the credentials saved, so a new one is the
 user's only.
 
-## Rust mode and Node mode
+## Core mode and platform mode
 
-`mode` says who speaks HTTP and WebSocket. The client runs in **Rust mode** unless the
+`mode` says who speaks HTTP and WebSocket. The client runs in **core mode** unless the
 application asks for **platform mode**: by naming it in the mode option, or by handing the client
 an HTTP client of its own, where the SDK takes one (an application that brings its own client has
 asked for the platform's stack). An option only one mode honours is never silently ignored: it
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
-Here platform mode is `mode: "node"`. This client takes no HTTP client of the application's, so
-the mode option is the only way to choose it. `rustSplice: false` is Rust mode's: with
-`mode: "node"` it throws.
+Here platform mode is `mode: "platform"`. This client takes no HTTP client of the application's, so
+the mode option is the only way to choose it. `spliceDownloads: false` is core mode's: with
+`mode: "platform"` it throws.
 
-In Rust mode (`mode: "rust"`, or no `mode`) the core speaks HTTP/1.1, WebSocket, CONNECT and
+In core mode (`mode: "core"`, or no `mode`) the core speaks HTTP/1.1, WebSocket, CONNECT and
 SOCKS5 itself, over Node's TCP and TLS sockets: Node opens connections,
 starts TLS with the options above, picks the proxy, and writes package files.
 
 - Package files are written off the event loop, in order, and hashed over exactly the bytes
   written; a file is synced before the core hears it is complete. A file the core discards or
   cancels while a write is in flight is deleted once that write is over, and nothing more is said
-  about it. With `rustSplice` (the default) body bytes go from the socket to the file without
+  about it. With `spliceDownloads` (the default) body bytes go from the socket to the file without
   passing through the core, wherever the response says how many there are.
 - A socket that brings a file's bytes faster than they can be written is paused while more than
   4 MiB wait, and resumed at 1 MiB.
@@ -169,7 +169,7 @@ starts TLS with the options above, picks the proxy, and writes package files.
   reads nothing more from it, and a write that finds more than 16 MiB still unsent fails the
   stream (the core reconnects, as for any lost connection).
 
-Choose Node mode (`mode: "node"`) when the connection must be made by Node's own stack. What
+Choose platform mode (`mode: "platform"`) when the connection must be made by Node's own stack. What
 differs there:
 
 - The environment's proxies are Node's convention, not the shared rule. With
@@ -180,7 +180,7 @@ differs there:
   `proxy: { resolveLocally: true }` without a `url` applies to them. `NO_PROXY` sends hosts
   direct: `*`, a host or `host:port`, a suffix (`.example.com` or `*.example.com`), or an IPv4
   range (`10.0.0.1-10.0.0.9`). Node 24.0 to 24.4 have only `NODE_USE_ENV_PROXY`, with any value.
-  Otherwise the client goes direct: without the switch, Node mode reads no proxy from the
+  Otherwise the client goes direct: without the switch, platform mode reads no proxy from the
   environment at all, and `ALL_PROXY` never. Under CGI the environment's proxies are ignored
   here too.
 - HTTP and WebSocket are undici's and ws's: their connection pooling and their headers' order
@@ -196,4 +196,4 @@ npm test                    # compile, then node --test
 
 The conformance suite runs this client through `conformance/drivers/node`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Node mode and in Rust mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.

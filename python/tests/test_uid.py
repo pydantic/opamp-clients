@@ -13,14 +13,14 @@ import pytest
 from _servers import MODES
 from aiohttp import web
 
-from opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
 
 
 def test_with_no_uid_chosen_the_core_makes_one_and_the_client_says_which(tmp_path):
     async def run() -> None:
         uids = []
         for _ in range(2):
-            client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp"), Status())
+            client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp"), Status())
             uids.append(client.instance_uid)
             await client.stop()
         a, b = uids
@@ -33,14 +33,14 @@ def test_with_no_uid_chosen_the_core_makes_one_and_the_client_says_which(tmp_pat
 
         # The application's own, as given; and with a state file, the one made is kept.
         chosen = bytes([9] * 16)
-        client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=chosen), Status())
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=chosen), Status())
         assert client.instance_uid == chosen
         await client.stop()
         state = str(tmp_path / "state")
-        first = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp", state_file=state), Status())
+        first = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp", state_file=state), Status())
         await asyncio.sleep(0.05)  # the first save
         await first.stop()
-        again = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp", state_file=state), Status())
+        again = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp", state_file=state), Status())
         assert again.instance_uid == first.instance_uid
         await again.stop()
 

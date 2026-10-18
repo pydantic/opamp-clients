@@ -118,7 +118,7 @@ func instantiate(ctx context.Context, compiled wazero.CompiledModule, cfg *corep
 }
 
 // Step feeds the core one input at now (milliseconds on the caller's monotonic clock) and unixMs
-// (the wall clock, in ms since the Unix epoch: Rust mode reads Retry-After dates against it).
+// (the wall clock, in ms since the Unix epoch: core mode reads Retry-After dates against it).
 func (c *Core) Step(ctx context.Context, nowMs, unixMs uint64, in *corepb.Input) (*corepb.Output, error) {
 	return c.call(ctx, c.st, tapStepIn, &corepb.Step{NowMs: nowMs, Input: in, UnixMs: unixMs})
 }
@@ -253,6 +253,20 @@ func (t *tap) close() {
 		_ = t.f.Close()
 		t.f = nil
 	}
+}
+
+// Unavailable is why the core can't be loaded here (its module doesn't compile or doesn't
+// instantiate), or nil when it can.
+func Unavailable(ctx context.Context) error {
+	compileCore()
+	if compileErr != nil {
+		return fmt.Errorf("compile the OpAMP core: %w", compileErr)
+	}
+	mod, err := runtime.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(""))
+	if err != nil {
+		return fmt.Errorf("instantiate the OpAMP core: %w", err)
+	}
+	return mod.Close(ctx)
 }
 
 // Setup runs the core's Setup call (an SDK integration's start-up decisions): stateless, on an

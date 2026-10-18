@@ -106,7 +106,7 @@ test("a test can run one client on another module", async () => {
   const core = new Core(create(ConfigSchema, { instanceUid: new Uint8Array(16).fill(3), endpoint: "http://server/v1/opamp" }), bytes);
   assert.equal(core.step(0, start()).instanceUid[0], 3);
   // A client given bytes that are no module fails to start: it used them.
-  const config = { endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(4), mode: "node" as const };
+  const config = { endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16).fill(4), mode: "platform" as const };
   assert.throws(() => Client.start(Object.assign({ ...config }, { [TEST_CORE_MODULE]: new Uint8Array([0]) }), {}), WebAssembly.CompileError);
   // And no other client is affected.
   await Client.start(config, {}).stop();

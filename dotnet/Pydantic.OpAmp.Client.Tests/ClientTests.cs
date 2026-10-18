@@ -31,8 +31,8 @@ public class ClientTests
     }
 
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task HttpReportsThenSaysGoodbyeAfterTheRequestInFlight(OpAmpMode mode)
     {
         var got = new ConcurrentQueue<AgentToServer>();
@@ -81,7 +81,7 @@ public class ClientTests
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
                 Headers = new Dictionary<string, string> { ["Authorization"] = "Bearer t" },
-                Mode = mode, DirectConnection = mode == OpAmpMode.Rust,
+                Mode = mode, DirectConnection = mode == OpAmpMode.Core,
             },
             new OpAmpStatus { Description = description },
             notes.Enqueue);
@@ -146,7 +146,7 @@ public class ClientTests
         var client = OpAmpClient.Start(
             new OpAmpClientOptions
             {
-                Mode = OpAmpMode.DotNet,
+                Mode = OpAmpMode.Platform,
                 Endpoint = new Uri($"http://127.0.0.1:{port}/v1/opamp"),
                 InstanceUid = Uid,
                 MaxSendBytes = 1024,

@@ -50,6 +50,13 @@ const (
 	SetupUIDFile  = "instance-uid"
 )
 
+// CoreUnavailable is why the client core can't be loaded here (its module doesn't compile or
+// doesn't instantiate), or nil when it can. An integration asks before StartSetup, and runs
+// unmanaged when the core can't be loaded. (The SDK settings layer's: sdksettings.Unavailable.)
+func CoreUnavailable(ctx context.Context) error {
+	return core.Unavailable(ctx)
+}
+
 // StartSetup is where the server is and how to reach it, from the environment and what the code
 // gives. Off (no endpoint): Started.Off. An error is a failure of the core itself.
 func StartSetup(ctx context.Context, start *SetupStart) (*SetupStarted, error) {

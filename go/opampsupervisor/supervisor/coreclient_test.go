@@ -288,7 +288,8 @@ func issuedSurviveSupervisorRestart(t *testing.T, ts *coreTestServer, name, endp
 		return m.ConnectionSettingsStatus.GetStatus() == protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED
 	})
 	require.NoError(t, s.stopOpAMPClient())
-	info, err := os.Stat(filepath.Join(dir, coreClientStateFile))
+	// Named as every SDK integration names the client's state file.
+	info, err := os.Stat(filepath.Join(dir, "opamp-state"))
 	require.NoError(t, err)
 	if runtime.GOOS != "windows" {
 		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "the state file holds credentials")

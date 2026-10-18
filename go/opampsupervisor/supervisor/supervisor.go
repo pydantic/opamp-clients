@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: the OpAMP
-// client is the shared core's (coreClient, go/opamp in Go mode) instead of opamp-go's, with its
-// state file in the storage directory; it handles OpAMP connection settings offers itself, so
-// onOpampConnectionSettings and its in-memory credentials are gone. A start that can't write
-// the Collector's config fails instead of running it on a stale one, and a rollback that can't be
+// client is the shared core's (coreClient, go/opamp in platform mode) instead of opamp-go's, with
+// its state file in the storage directory; it handles OpAMP connection settings offers itself, so
+// onOpampConnectionSettings and its in-memory credentials are gone. A start that can't write the
+// Collector's config fails instead of running it on a stale one, and a rollback that can't be
 // written leaves the config state as it was. The collector executables the server offers are
 // installed, with a rollback if the new one isn't healthy (agent_update.go). A remote config
-// agent::remote_config_policy refuses is FAILED, and is neither run nor kept. The files holding
-// what the server sent are sealed with storage.state_key (sealed_storage.go). The Supervisor's
-// own telemetry ignores OTEL_EXPORTER_OTLP_* variables (telemetry_env.go).
+// agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
+// the start says the remote config is unrestricted. The files holding what the server sent are
+// sealed with storage.state_key (sealed_storage.go). The Supervisor's own telemetry ignores
+// OTEL_EXPORTER_OTLP_* variables (telemetry_env.go).
 
 package supervisor
 
@@ -310,6 +311,12 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 	}
 
 	s.configApplyTimeout = s.config.Agent.ConfigApplyTimeout
+
+	// Changed here: say so, in the local log, when the server's remote config is unlimited.
+	if logger != nil && s.config.Capabilities.AcceptsRemoteConfig && !s.config.Agent.RemoteConfigPolicy.Enabled() {
+		logger.Warn("The remote config is unrestricted (no agent::remote_config_policy): " +
+			"the server may have the collector read any file it can and send it anywhere")
+	}
 
 	return s, nil
 }

@@ -199,6 +199,26 @@ export class Core {
   }
 }
 
+let unavailable: { reason: string | undefined } | undefined;
+
+/**
+ * Why the client core can't be loaded here (its module missing, a file that isn't one, or one
+ * that won't instantiate), or undefined when it can: found out once per process. An integration
+ * asks before its Setup call, and runs unmanaged when the core can't be loaded; the calls into it
+ * throw then. (The SDK settings layer's module: settingsUnavailable, in ./sdk.)
+ */
+export function coreUnavailable(): string | undefined {
+  if (unavailable === undefined) {
+    try {
+      new WebAssembly.Instance(module(), {});
+      unavailable = { reason: undefined };
+    } catch (e) {
+      unavailable = { reason: String(e) };
+    }
+  }
+  return unavailable.reason;
+}
+
 interface SetupExports {
   memory: WebAssembly.Memory;
   alloc(len: number): number;

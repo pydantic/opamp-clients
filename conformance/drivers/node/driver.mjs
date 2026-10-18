@@ -109,7 +109,7 @@ const onNote = (n) => {
       emit("connect_failed", { error: n.detail, status: n.status ?? null });
       break;
     case "errorResponse":
-      emit("error_response", { type: n.type, message: n.message });
+      emit("error_response", { type: n.errorType, message: n.message });
       break;
     case "remoteConfig":
       if (throwOnConfig && !thrown) {
@@ -117,19 +117,19 @@ const onNote = (n) => {
         emit("throwing");
         throw new Error("callback-throws: the driver's callback threw on the first remote config");
       }
-      emit("message", { remote_config_hash: hex(n.config.configHash) });
+      emit("message", { remote_config_hash: hex(n.remoteConfig.configHash) });
       // Answered after this callback returns: the client is still handling the message.
       setImmediate(() =>
         client.setRemoteConfigStatus(
           create(RemoteConfigStatusSchema, {
-            lastRemoteConfigHash: n.config.configHash,
+            lastRemoteConfigHash: n.remoteConfig.configHash,
             status: RemoteConfigStatuses.RemoteConfigStatuses_APPLIED,
           }),
         ),
       );
       break;
     case "customMessage": {
-      const m = n.message;
+      const m = n.customMessage;
       emit("custom_message", { capability: m.capability, type: m.type, data: hex(m.data) });
       if (m.type === "ping") {
         setImmediate(() =>
@@ -139,7 +139,7 @@ const onNote = (n) => {
       break;
     }
     case "customMessageNotSent":
-      emit("custom_message_not_sent", { reason: n.reason });
+      emit("custom_message_not_sent", { reason: n.detail });
       break;
     case "installPackage": {
       let sha = null;
@@ -149,19 +149,19 @@ const onNote = (n) => {
       } catch (e) {
         error = String(e);
       }
-      emit("install_package", { name: n.name, version: n.package.version, sha256: sha, error: error ?? null });
-      setImmediate(() => client.packageInstalled(n.name, n.package.hash, error));
+      emit("install_package", { name: n.packageName, version: n.package.version, sha256: sha, error: error ?? null });
+      setImmediate(() => client.packageInstalled(n.packageName, n.package.hash, error));
       break;
     }
     case "removePackage":
-      emit("remove_package", { name: n.name });
-      setImmediate(() => client.packageRemoved(n.name));
+      emit("remove_package", { name: n.packageName });
+      setImmediate(() => client.packageRemoved(n.packageName));
       break;
     case "serverCustomCapabilities":
-      emit("server_custom_capabilities", { capabilities: n.capabilities });
+      emit("server_custom_capabilities", { capabilities: n.customCapabilities });
       break;
     case "connectionSettings": {
-      const s = n.settings;
+      const s = n.connectionSettings;
       emit("telemetry_settings", { hash: hex(s.hash), metrics_endpoint: s.ownMetrics?.destinationEndpoint ?? null });
       setImmediate(() =>
         client.setConnectionSettingsStatus(
@@ -177,7 +177,7 @@ const onNote = (n) => {
       emit("message", { new_instance_uid: hex(n.instanceUid) });
       break;
     case "heartbeatInterval":
-      emit("connection_settings", { heartbeat_interval_seconds: Math.floor(n.ms / 1000) });
+      emit("connection_settings", { heartbeat_interval_seconds: Math.floor(n.heartbeatIntervalMs / 1000) });
       break;
     default:
       break;
@@ -208,10 +208,10 @@ try {
       requestInstanceUid: process.env.DRIVER_REQUEST_UID === "1",
       tls: tls(),
       proxy: process.env.DRIVER_PROXY ? { url: process.env.DRIVER_PROXY } : undefined,
-      // The mode is always asked for by name, never left to the client's default: node is Node
-      // mode (fetch and ws), node-rust (OPAMP_NODE_MODE=rust) Rust mode, where the core speaks
-      // HTTP and WebSocket over Node's sockets.
-      mode: process.env.OPAMP_NODE_MODE === "rust" ? "rust" : "node",
+      // The mode is always asked for by name, never left to the client's default: node-core is core
+      // mode, where the core speaks HTTP and WebSocket over Node's sockets, node-core-platform
+      // (OPAMP_NODE_MODE=platform) platform mode (fetch and ws).
+      mode: process.env.OPAMP_NODE_MODE === "platform" ? "platform" : "core",
     },
     {
       description: description(firstChange),
@@ -227,7 +227,7 @@ try {
   emit("fatal", { error: String(e) });
   process.exit(1);
 }
-emit("started", { uid: hex(client.instanceUid ?? uid ?? new Uint8Array()), client: `opamp-node (ours${process.env.OPAMP_NODE_MODE === "rust" ? ", rust mode" : ""})` });
+emit("started", { uid: hex(client.instanceUid ?? uid ?? new Uint8Array()), client: `opamp-node (ours${process.env.OPAMP_NODE_MODE === "platform" ? ", platform mode" : ""})` });
 
 const changes = (process.env.DRIVER_CHANGES_AT_S ?? "")
   .split(",")

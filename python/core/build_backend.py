@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Build pydantic-opamp-core: a wheel holding opamp_core/<the native library> and nothing else.
+"""Build pydantic-opamp-core: a wheel holding pydantic_opamp_core/<the native library> and nothing else.
 
 A PEP 517 backend for building from the repository (uv sync builds one for this machine from the
 library scripts/fetch_core.py fetched); scripts/native_dist.py calls wheel() with each platform's library and tag. There is no source
@@ -33,12 +33,12 @@ def lib_name(platform: str = sys.platform) -> str:
 
 
 def wheel(lib: Path, tag: str, out: Path) -> Path:
-    """Write the wheel for one platform: lib as opamp_core/<lib's name>, tagged py3-none-<tag>."""
+    """Write the wheel for one platform: lib as pydantic_opamp_core/<lib's name>, tagged py3-none-<tag>."""
     p = _project()
     dist = p["name"].replace("-", "_")
     info = f"{dist}-{p['version']}.dist-info"
     files = {
-        f"opamp_core/{lib.name}": lib.read_bytes(),
+        f"pydantic_opamp_core/{lib.name}": lib.read_bytes(),
         f"{info}/METADATA": (f"Metadata-Version: 2.4\nName: {p['name']}\nVersion: {p['version']}\n"
                              f"Summary: {p['description']}\nLicense-Expression: {p['license']}\n"
                              f"Requires-Python: {p['requires-python']}\n"
@@ -54,7 +54,7 @@ def wheel(lib: Path, tag: str, out: Path) -> Path:
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         for name, data in files.items():
             info_ = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
-            info_.external_attr = (0o755 if name.startswith("opamp_core/") else 0o644) << 16
+            info_.external_attr = (0o755 if name.startswith("pydantic_opamp_core/") else 0o644) << 16
             z.writestr(info_, data, zipfile.ZIP_DEFLATED)
     return path
 

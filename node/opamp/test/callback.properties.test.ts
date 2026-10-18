@@ -14,7 +14,7 @@
 // Node is single-threaded: "from another thread" is from another task (a macrotask or a
 // microtask), and two callbacks at once could only be a callback re-entered from a call it made.
 //
-// Each test runs in both modes (MODES): Node mode (fetch and ws), and Rust mode (the core's own
+// Each test runs in both modes (MODES): platform mode (fetch and ws), and core mode (the core's own
 // HTTP and WebSocket, over Node's sockets), against the same server.
 //
 // OPAMP_MODEL_RUNS runs per mode (30 by default), both modes from one seed; the seed is printed,
@@ -59,7 +59,7 @@ const STOP_BOUND_MS = REQUEST_TIMEOUT_MS + 3000;
 const HEARTBEAT_MS = 50;
 
 /** The modes every test runs in. */
-const MODES = ["node", "rust"] as const;
+const MODES = ["platform", "core"] as const;
 type Mode = (typeof MODES)[number];
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -219,7 +219,7 @@ class Life {
       // Answer every config from inside the callback, through the handle it was given.
       if (n.kind === "remoteConfig") {
         client.setRemoteConfigStatus(
-          create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.config.configHash, status: 1 }),
+          create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash, status: 1 }),
         );
       }
       for (const a of this.inside.splice(0)) {
@@ -265,27 +265,27 @@ class Life {
     if (this.saved !== undefined && this.notes.length > 0) {
       const first = this.notes[0]!;
       assert.ok(
-        first.kind === "remoteConfig" && first.config.configHash[0] === this.saved,
+        first.kind === "remoteConfig" && first.remoteConfig.configHash[0] === this.saved,
         `the saved remote config ${this.saved} is handed over first: ${log()}`,
       );
     }
     const increasing = (xs: number[], what: string) =>
       xs.forEach((x, i) => i === 0 || assert.ok(x > xs[i - 1]!, `${what} in order: ${log()}`));
     increasing(
-      this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.config.configHash[0]!] : [])),
+      this.notes.flatMap((n) => (n.kind === "remoteConfig" ? [n.remoteConfig.configHash[0]!] : [])),
       "remote configs",
     );
     increasing(
-      this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.message.data[0]!] : [])),
+      this.notes.flatMap((n) => (n.kind === "customMessage" ? [n.customMessage.data[0]!] : [])),
       "custom messages",
     );
     increasing(
       this.notes.flatMap((n) =>
-        n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.message.data))] : [],
+        n.kind === "customMessageNotSent" ? [Number(new TextDecoder().decode(n.customMessage.data))] : [],
       ),
       "refused custom messages",
     );
-    const beats = this.notes.flatMap((n) => (n.kind === "heartbeatInterval" ? [n.ms] : []));
+    const beats = this.notes.flatMap((n) => (n.kind === "heartbeatInterval" ? [n.heartbeatIntervalMs] : []));
     beats.forEach((b, i) => {
       assert.ok([0, 1000, HEARTBEAT_MS].includes(b), `a heartbeat interval offered: ${log()}`);
       assert.ok(i === 0 || b !== beats[i - 1], `a heartbeat interval only when it changes: ${log()}`);
@@ -301,13 +301,13 @@ class Life {
 function describe(n: Notification): string {
   switch (n.kind) {
     case "remoteConfig":
-      return `remoteConfig(${n.config.configHash[0]})`;
+      return `remoteConfig(${n.remoteConfig.configHash[0]})`;
     case "customMessage":
-      return `customMessage(${n.message.data[0]})`;
+      return `customMessage(${n.customMessage.data[0]})`;
     case "customMessageNotSent":
-      return `customMessageNotSent(${new TextDecoder().decode(n.message.data)})`;
+      return `customMessageNotSent(${new TextDecoder().decode(n.customMessage.data)})`;
     case "heartbeatInterval":
-      return `heartbeatInterval(${n.ms})`;
+      return `heartbeatInterval(${n.heartbeatIntervalMs})`;
     case "stopped":
       return n.error === undefined ? "stopped" : `stopped(${String(n.error)})`;
     default:
@@ -342,7 +342,7 @@ class World {
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
       stateFile: this.stateFile,
       mode: this.mode,
-      // Rust mode reads HTTP_PROXY and the like: the local server is reached directly.
+      // Core mode reads HTTP_PROXY and the like: the local server is reached directly.
       proxy: false,
     };
   }

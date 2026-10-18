@@ -12,10 +12,10 @@ import time
 
 from aiohttp import WSMsgType, web
 
-from opamp_client import Client, Config, Status
-from opamp_client._core import Core
-from opamp_client._executor import Executor
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client import Client, Config, Status
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._executor import Executor
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 UID = bytes([0x42] * 16)
 
@@ -256,7 +256,7 @@ def test_a_result_queued_before_its_cancel_never_reaches_the_core(tmp_path, monk
     state = tmp_path / "state"
 
     async def run() -> None:
-        client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=UID, state_file=str(state)),
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=UID, state_file=str(state)),
                               Status())
         await until(lambda: state.exists())
         await asyncio.sleep(0.05)
@@ -289,11 +289,11 @@ def test_stop_returns_when_the_core_says_and_steps_no_more(tmp_path, monkeypatch
     stepped no more."""
     tap = tmp_path / "tap"
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tap))
-    monkeypatch.setattr("opamp_client._core._taps", 0)
+    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
 
     async def run() -> None:
         server = await Silent().start()
-        client = Client.start(Config(mode="python", endpoint=f"http://127.0.0.1:{server.port}/v1/opamp", instance_uid=UID,
+        client = Client.start(Config(mode="platform", endpoint=f"http://127.0.0.1:{server.port}/v1/opamp", instance_uid=UID,
                                      stop_timeout_ms=300), Status())
         assert await until(lambda: server.accepted == 1)
         t0 = time.monotonic()
@@ -320,7 +320,7 @@ def test_stop_returns_when_the_core_says_and_steps_no_more(tmp_path, monkeypatch
 def test_a_handshake_that_never_answers_is_given_up_and_tried_again() -> None:
     async def run() -> None:
         server = await Silent().start()
-        client = Client.start(Config(mode="python", endpoint=f"ws://127.0.0.1:{server.port}/v1/opamp", instance_uid=UID,
+        client = Client.start(Config(mode="platform", endpoint=f"ws://127.0.0.1:{server.port}/v1/opamp", instance_uid=UID,
                                      connect_timeout_ms=300), Status())
         try:
             assert await until(lambda: server.accepted >= 2, 10), "a second attempt"
@@ -431,7 +431,7 @@ def test_what_the_server_sends_that_isnt_utf8_still_reaches_the_core(tmp_path) -
     lone surrogates (surrogateescape), which a protobuf string refuses. A response with one was
     reported as a failed request (a server that sends one, a Latin-1 Server or Set-Cookie say, was
     never heard); a refused upgrade with one, or a download's redirect to such a Location, raised in
-    the effect's task, which ended with nothing reported. Each reaches the core as Rust mode's own
+    the effect's task, which ended with nothing reported. Each reaches the core as core mode's own
     HTTP reader takes it: what isn't UTF-8 replaced by U+FFFD (String::from_utf8_lossy)."""
     async def run() -> None:
         async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:

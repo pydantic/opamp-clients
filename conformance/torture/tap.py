@@ -5,7 +5,7 @@
 The server's log says when it read a message and wrote an answer; under a slow proxy that says
 little of when the client sent the one or read the other (messages queue behind the latency). The
 core tap (opamp-tap's records, run.py's check_taps) has every call into the core in the order it
-happened: the messages the core sent (ws_send, or in Rust mode the WebSocket frames it wrote on a
+happened: the messages the core sent (ws_send, or in core mode the WebSocket frames it wrote on a
 stream) and the ones it read (ws_message, or the frames on a stream). Paired in order on each
 connection, as the server answers them, they say for each message the client sent whether it had
 read the answer to an earlier one by then.
@@ -95,7 +95,7 @@ def records(data: bytes):
 
 
 class _Stream:
-    """One direction of a Rust-mode stream: HTTP heads (a CONNECT's, the upgrade's), then
+    """One direction of a core-mode stream: HTTP heads (a CONNECT's, the upgrade's), then
     WebSocket frames once the upgrade went through."""
 
     def __init__(self, outgoing: bool):

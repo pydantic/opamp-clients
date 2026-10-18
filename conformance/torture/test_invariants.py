@@ -147,7 +147,7 @@ CASES = {
                      .respond(http_status=413), 8, 44).at(T0 + 45).stop(), FLAT),
          # The driver counts from its own start, seconds after the server's (a JVM): its last
          # change of the chaos lands 2 s into the quiet window, and is delivered (nightly 10-02,
-         # java-core http: "the server holds change 59, the application set 58").
+         # java-core-platform http: "the server holds change 59, the application set 58").
          (heartbeats(late_change().send(FULL, driver_change=2).respond(), 14, 44).at(T0 + 45).stop(), FLAT)],
         [(heartbeats(run().at(T0 + 1).driver("status_change", change=1).send(FULL, driver_change=1).respond()
                      .at(T0 + 5).server("restart"), 8, 44).at(T0 + 45).stop(), FLAT),
@@ -277,7 +277,7 @@ class Tap:
 
 
 def queued_crossing() -> tuple[Log, Tap]:
-    """Over WebSocket, as the java-core-rust ws rerun of 2026-10-10 under 800 ms latency did: the
+    """Over WebSocket, as the java-core ws rerun of 2026-10-10 under 800 ms latency did: the
     server rejects a heartbeat (message 2), change 40 (3) and change 41 (4), all three sent before
     any rejection came back. Each owes a full report: the client sends change 41 again (5) after
     reading the first rejection, and again (6) after reading the second, both before it read the
@@ -301,7 +301,7 @@ def queued_crossing() -> tuple[Log, Tap]:
 
 
 def rejected_twice(read_first: bool, stream: bool = True) -> tuple[Log, Tap]:
-    """Over WebSocket, as the java-core-rust ws run of 2026-10-10 did under 800 ms latency: the
+    """Over WebSocket, as the java-core ws run of 2026-10-10 did under 800 ms latency: the
     server rejects message 2 (change 32), then message 3 (change 33), both sent before either
     rejection came back. The client reads the first and owes a full report, which carries change 33
     again: message 4. With not `read_first` the client sent it before it read the second rejection
@@ -405,8 +405,8 @@ class AsHeardTests(unittest.TestCase):
             {"kind": "stall"})], [True, True, False, True, False, False])
 
     def test_a_uid_lost_with_its_reply_is_excused(self):
-        # Nightly 10-02, java-core and dotnet-core http: the reply with the UID was cut by a reset,
-        # and the driver, which logs the UIDs it gets, never got it.
+        # Nightly 10-02, java-core-platform and dotnet-core-platform http: the reply with the UID
+        # was cut by a reset, and the driver, which logs the UIDs it gets, never got it.
         self.assertEqual(self.status(assigned_then_reset(None), PLAN, "adopts_assigned_uid"), "pass")
 
     def test_a_uid_that_arrived_is_judged(self):
@@ -417,10 +417,10 @@ class AsHeardTests(unittest.TestCase):
 
 
     def test_messages_sent_before_the_uid_was_read_are_excused(self):
-        # Torture rust ws (and node-rust ws) on the go server, nightly 10-11, seed 20261011: "message
-        # 1188 still uses 01a129ea..., assigned 01a129ea...". The server read 1188 and 1189 0.8 s
-        # after it wrote the assignment, under an 800 ms latency; the client's tap: it sent both
-        # before it read the assignment, and adopted it from the next message on.
+        # Torture rust ws (and node-core ws) on the go server, nightly 10-11, seed 20261011:
+        # "message 1188 still uses 01a129ea..., assigned 01a129ea...". The server read 1188 and 1189
+        # 0.8 s after it wrote the assignment, under an 800 ms latency; the client's tap: it sent
+        # both before it read the assignment, and adopted it from the next message on.
         for stream in (True, False):
             log, tap = assigned_while_slow(read_first=False, stream=stream)
             self.assertEqual(self.status(log, SLOW, "adopts_assigned_uid", tap), "pass", f"stream={stream}")
@@ -435,14 +435,14 @@ class AsHeardTests(unittest.TestCase):
         self.assertEqual(self.status(log, SLOW, "adopts_assigned_uid"), "fail")
 
     def test_a_report_queued_behind_a_rejection_it_crossed_is_excused(self):
-        # Rerun of nightly 10-10's java-core-rust ws under 800 ms latency: "message 71 was rejected
+        # Rerun of nightly 10-10's java-core ws under 800 ms latency: "message 71 was rejected
         # and resent unchanged 2 time(s)". The client's tap: both resends went before it read 71's
         # rejection.
         log, tap = queued_crossing()
         self.assertEqual(self.status(log, SLOW, "rejected_not_resent", tap), "pass")
 
     def test_a_report_sent_before_its_rejection_was_read_is_excused(self):
-        # Nightly 10-10, java-core-rust ws: "message 737 was rejected and resent unchanged", inside
+        # Nightly 10-10, java-core ws: "message 737 was rejected and resent unchanged", inside
         # an 800 ms latency. The full report owed for the first rejection crossed the second one.
         for stream in (True, False):
             log, tap = rejected_twice(read_first=False, stream=stream)

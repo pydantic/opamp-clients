@@ -74,7 +74,7 @@ func TestAConnectionOpeningAtStopIsClosed(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "ws" + strings.TrimPrefix(ts.URL, "http"),
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "ws" + strings.TrimPrefix(ts.URL, "http"),
 		InstanceUID: [16]byte{0x42}, HeartbeatInterval: time.Hour}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -129,7 +129,7 @@ func TestADownloadDoesNotOutliveStop(t *testing.T) {
 	}}
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, InstanceUID: [16]byte{0x42}, HeartbeatInterval: time.Hour,
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, InstanceUID: [16]byte{0x42}, HeartbeatInterval: time.Hour,
 		StateFile: filepath.Join(t.TempDir(), "state"), AcceptPackages: true}
 
 	a, err := Start(context.Background(), cfg, Status{}, nil)
@@ -175,7 +175,7 @@ func TestASlowSaveHoldsUpNothing(t *testing.T) {
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
 	// No UID chosen: the core makes one and saves it at once.
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: 50 * time.Millisecond, StopTimeout: 300 * time.Millisecond, StateFile: path}
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: 50 * time.Millisecond, StopTimeout: 300 * time.Millisecond, StateFile: path}
 	a, err := Start(context.Background(), cfg, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +232,7 @@ func TestReadStateWaitsForTheSaveAStoppedClientLeftWriting(t *testing.T) {
 	ts := httptest.NewServer(&server{})
 	defer ts.Close()
 	// No UID chosen: the core makes one and saves it at once.
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StopTimeout: 300 * time.Millisecond, StateFile: path}
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StopTimeout: 300 * time.Millisecond, StateFile: path}
 	a, err := Start(context.Background(), cfg, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -283,7 +283,7 @@ func TestTheCallbackGetsTheClient(t *testing.T) {
 	}}
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
-	cfg := Config{Mode: ModeGo, Endpoint: ts.URL, InstanceUID: [16]byte{0x42}, HeartbeatInterval: time.Hour,
+	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, InstanceUID: [16]byte{0x42}, HeartbeatInterval: time.Hour,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig), StateFile: filepath.Join(t.TempDir(), "state")}
 	got := make(chan struct{}, 1)
 	a, err := Start(context.Background(), cfg, Status{}, func(_ *Client, n Notification) {
@@ -328,7 +328,7 @@ func TestTheCallbackGetsTheClient(t *testing.T) {
 // A panic in the callback ends the client, saying why, rather than the process.
 func TestAPanickingCallbackStopsTheClient(t *testing.T) {
 	stopped := make(chan error, 1)
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", HeartbeatInterval: time.Hour},
 		Status{}, func(_ *Client, n Notification) {
 			switch n.Kind {
 			case ConnectFailed:

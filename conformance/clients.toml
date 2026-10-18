@@ -35,68 +35,71 @@ transports = ["http", "ws"]
 build = { cwd = ".", cmd = ["cargo", "build", "--release", "-p", "driver"] }
 run = ["{core}/target/release/driver"]
 
-[go-core]
-# Ours: go/opamp, the shared Rust core (as WebAssembly, in wazero) behind a Go wrapper, in Go mode
-# (net/http and gorilla; the driver asks for it by name: the SDK's default is Rust mode).
+[go-core-platform]
+# Ours: go/opamp, the shared core (as WebAssembly, in wazero) behind a Go wrapper, in platform mode
+# (net/http and gorilla; the driver asks for it by name, OPAMP_GO_MODE=platform: the SDK's default
+# is core mode).
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "conformance/drivers/go-core", cmd = ["go", "build", "-o", "{bin}/driver-go-core", "."] }
-run = ["{bin}/driver-go-core"]
+run = ["env", "OPAMP_GO_MODE=platform", "{bin}/driver-go-core"]
 
-[go-core-rust]
-# Ours: go/opamp in Rust mode (the SDK's default; the driver asks for it by name, OPAMP_GO_MODE=rust):
+[go-core]
+# Ours: go/opamp in core mode (the SDK's default; the driver asks for it by name):
 # the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 # over Go's TCP connections and crypto/tls (the core's shell), and decides download redirects.
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "conformance/drivers/go-core", cmd = ["go", "build", "-o", "{bin}/driver-go-core", "."] }
-run = ["env", "OPAMP_GO_MODE=rust", "{bin}/driver-go-core"]
+run = ["{bin}/driver-go-core"]
 
-[node]
-# Ours: node/opamp, the shared Rust core (as WebAssembly, in Node's engine) behind a TypeScript
-# client, in Node mode (fetch and ws; the driver asks for it by name: the SDK's default is Rust mode).
+[node-core-platform]
+# Ours: node/opamp, the shared core (as WebAssembly, in Node's engine) behind a TypeScript client,
+# in platform mode (fetch and ws; the driver asks for it by name, OPAMP_NODE_MODE=platform: the
+# SDK's default is core mode).
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "node/opamp", cmd = ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"] }
-run = ["node", "{conf}/drivers/node/driver.mjs"]
+run = ["env", "OPAMP_NODE_MODE=platform", "node", "{conf}/drivers/node/driver.mjs"]
 
-[node-rust]
-# Ours: node/opamp in Rust mode (the SDK's default; the driver asks for it by name,
-# OPAMP_NODE_MODE=rust): the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
+[node-core]
+# Ours: node/opamp in core mode (the SDK's default; the driver asks for it by name): the core
+# speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 # over Node's TCP and TLS sockets (the core's shell), and decides download redirects: it keeps
 # every time, and closes every stream by stop's end.
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "node/opamp", cmd = ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"] }
-run = ["env", "OPAMP_NODE_MODE=rust", "node", "{conf}/drivers/node/driver.mjs"]
+run = ["node", "{conf}/drivers/node/driver.mjs"]
+
+[python-core-platform]
+# Ours: python/, the shared core (natively, through ctypes) behind an asyncio client, in platform
+# mode (aiohttp; the driver asks for it by name, OPAMP_PYTHON_MODE=platform: the SDK's default is
+# core mode).
+upstream = false
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+transports = ["http", "ws"]
+build = { cwd = "python", cmd = ["uv", "sync", "--quiet"] }
+run = ["env", "OPAMP_PYTHON_MODE=platform", "uv", "run", "--quiet", "--project", "{conf}/../python", "python", "{conf}/drivers/python-core/driver.py"]
 
 [python-core]
-# Ours: python/, the shared Rust core (natively, through ctypes) behind an asyncio client, in
-# Python mode (aiohttp; the driver asks for it by name: the SDK's default is Rust mode).
+# Ours: python/ in core mode (the SDK's default; the driver asks for it by name): the core speaks
+# HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
+# over asyncio's TCP connections and TLS (the core's shell), and decides download redirects.
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "python", cmd = ["uv", "sync", "--quiet"] }
 run = ["uv", "run", "--quiet", "--project", "{conf}/../python", "python", "{conf}/drivers/python-core/driver.py"]
 
-[python-core-rust]
-# Ours: python/ in Rust mode (the SDK's default; the driver asks for it by name,
-# OPAMP_PYTHON_MODE=rust): the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
-# over asyncio's TCP connections and TLS (the core's shell), and decides download redirects.
-upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
-transports = ["http", "ws"]
-build = { cwd = "python", cmd = ["uv", "sync", "--quiet"] }
-run = ["env", "OPAMP_PYTHON_MODE=rust", "uv", "run", "--quiet", "--project", "{conf}/../python", "python", "{conf}/drivers/python-core/driver.py"]
-
-[java-core]
-# Ours: java/opamp, the shared Rust core (WebAssembly compiled to JVM classes, run with Chicory)
-# behind a Java client, in Java mode (the JDK's HTTP client; the driver asks for it by name: the
-# SDK's default is Rust mode).
+[java-core-platform]
+# Ours: java/opamp, the shared core (WebAssembly compiled to JVM classes, run with Chicory)
+# behind a Java client, in platform mode (the JDK's HTTP client; the driver asks for it by name,
+# OPAMP_JAVA_MODE=platform: the SDK's default is core mode).
 upstream = false
 # HTTP proxies only (the JDK's HTTP client has no SOCKS): no proxy_socks5.
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "file_journal", "callback_failure", "max_send_bytes"]
@@ -109,7 +112,7 @@ build = { cwd = "java/opamp", cmd = [
   "-v", "{m2}:/root/.m2", "-w", "/src", "{maven}", "sh", "-c",
   "mvn -q -B -DskipTests package && javac -d target/driver -cp 'target/classes:target/lib/*' /drv/Driver.java"] }
 run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", "--user", "{user}", "-e", "HOME=/tmp", "-e", "MAVEN_CONFIG=/tmp/.m2",
-       "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
+       "-e", "OPAMP_JAVA_MODE=platform", "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
        "-e", "DRIVER_CHANGES_AT_S", "-e", "DRIVER_FIRST_CHANGE", "-e", "DRIVER_TOKEN",
        "-e", "DRIVER_ACCEPT_CONNECTION_SETTINGS", "-e", "DRIVER_OWN_TELEMETRY", "-e", "DRIVER_COMPONENTS", "-e", "DRIVER_CUSTOM", "-e", "DRIVER_PACKAGES", "-e", "DRIVER_REQUEST_UID", "-e", "DRIVER_STATE_FILE",
        "-e", "DRIVER_CA_FILE", "-e", "DRIVER_CLIENT_CERT", "-e", "DRIVER_CLIENT_KEY", "-e", "DRIVER_PROXY", "-e", "OPAMP_CORE_TAP", "-e", "DRIVER_LINGER_S", "-e", "DRIVER_THROW_ON_CONFIG", "-e", "DRIVER_MAX_SEND_BYTES", "-e", "DRIVER_DESCRIPTION_PAD", "-v", "{conf}/out:/out", "-v", "{conf}/../java/opamp:/src",
@@ -118,9 +121,9 @@ run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", 
        "-cp", "/src/target/driver:/src/target/classes:/src/target/lib/*", "Driver"]
 
 
-[java-core-rust]
-# Ours: java/opamp in Rust mode (the SDK's default; the driver asks for it by name,
-# OPAMP_JAVA_MODE=rust): the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
+[java-core]
+# Ours: java/opamp in core mode (the SDK's default; the driver asks for it by name): the core
+# speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 # over the JDK's sockets and SSLEngine (the core's shell), and decides download redirects.
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
@@ -133,17 +136,19 @@ build = { cwd = "java/opamp", cmd = [
   "-v", "{m2}:/root/.m2", "-w", "/src", "{maven}", "sh", "-c",
   "mvn -q -B -DskipTests package && javac -d target/driver -cp 'target/classes:target/lib/*' /drv/Driver.java"] }
 run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", "--user", "{user}", "-e", "HOME=/tmp", "-e", "MAVEN_CONFIG=/tmp/.m2",
-       "-e", "OPAMP_JAVA_MODE=rust", "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
+       "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
        "-e", "DRIVER_CHANGES_AT_S", "-e", "DRIVER_FIRST_CHANGE", "-e", "DRIVER_TOKEN",
        "-e", "DRIVER_ACCEPT_CONNECTION_SETTINGS", "-e", "DRIVER_OWN_TELEMETRY", "-e", "DRIVER_COMPONENTS", "-e", "DRIVER_CUSTOM", "-e", "DRIVER_PACKAGES", "-e", "DRIVER_REQUEST_UID", "-e", "DRIVER_STATE_FILE",
        "-e", "DRIVER_CA_FILE", "-e", "DRIVER_CLIENT_CERT", "-e", "DRIVER_CLIENT_KEY", "-e", "DRIVER_PROXY", "-e", "OPAMP_CORE_TAP", "-e", "DRIVER_LINGER_S", "-e", "DRIVER_THROW_ON_CONFIG", "-e", "DRIVER_MAX_SEND_BYTES", "-e", "DRIVER_DESCRIPTION_PAD", "-v", "{conf}/out:/out", "-v", "{conf}/../java/opamp:/src",
-       # (The JDK's tunnelling property is Java mode's; Rust mode's core speaks to the proxy itself.)
+       # (The JDK's tunnelling property is platform mode's; core mode's core speaks to the proxy
+       # itself.)
        "{maven}", "java", "-Djdk.http.auth.tunneling.disabledSchemes=",
        "-cp", "/src/target/driver:/src/target/classes:/src/target/lib/*", "Driver"]
 
-[dotnet-core]
-# Ours: dotnet/Pydantic.OpAmp.Client, the shared Rust core (natively, the native library) behind a
-# .NET client, in .NET mode (HttpClient; the driver asks for it by name: the SDK's default is Rust mode).
+[dotnet-core-platform]
+# Ours: dotnet/Pydantic.OpAmp.Client, the shared core (natively, the native library) behind a .NET
+# client, in platform mode (HttpClient; the driver asks for it by name, OPAMP_DOTNET_MODE=platform:
+# the SDK's default is core mode).
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid",
             "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
@@ -156,16 +161,16 @@ build = { cwd = "conformance/drivers/dotnet-core", cmd = [
   "dotnet", "publish", "-c", "Release", "-o", "/repo/conformance/drivers/dotnet-core/out", "--nologo", "-v", "q",
   "-p:OpAmpNativeLib=/repo/target/native-linux/release/libopamp_native.so"] }
 run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", "--user", "{user}", "-e", "HOME=/tmp",
-       "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
+       "-e", "OPAMP_DOTNET_MODE=platform", "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
        "-e", "DRIVER_CHANGES_AT_S", "-e", "DRIVER_FIRST_CHANGE", "-e", "DRIVER_TOKEN",
        "-e", "DRIVER_ACCEPT_CONNECTION_SETTINGS", "-e", "DRIVER_OWN_TELEMETRY", "-e", "DRIVER_COMPONENTS", "-e", "DRIVER_CUSTOM", "-e", "DRIVER_PACKAGES", "-e", "DRIVER_REQUEST_UID", "-e", "DRIVER_STATE_FILE",
        "-e", "DRIVER_CA_FILE", "-e", "DRIVER_CLIENT_CERT", "-e", "DRIVER_CLIENT_KEY", "-e", "DRIVER_PROXY", "-e", "OPAMP_CORE_TAP", "-e", "DRIVER_LINGER_S", "-e", "DRIVER_THROW_ON_CONFIG", "-e", "DRIVER_MAX_SEND_BYTES", "-e", "DRIVER_DESCRIPTION_PAD", "-v", "{conf}/out:/out", "-v", "{conf}/drivers/dotnet-core:/src", "mcr.microsoft.com/dotnet/runtime:8.0",
        "dotnet", "/src/out/Driver.dll"]
 
 
-[dotnet-core-rust]
-# Ours: dotnet/Pydantic.OpAmp.Client in Rust mode (the SDK's default; the driver asks for it by
-# name, OPAMP_DOTNET_MODE=rust): the core speaks HTTP/1.1, WebSocket, CONNECT and
+[dotnet-core]
+# Ours: dotnet/Pydantic.OpAmp.Client in core mode (the SDK's default; the driver asks for it by
+# name): the core speaks HTTP/1.1, WebSocket, CONNECT and
 # SOCKS5 itself, over .NET's sockets and SslStream (the core's shell), and decides download redirects.
 upstream = false
 features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
@@ -178,7 +183,7 @@ build = { cwd = "conformance/drivers/dotnet-core", cmd = [
   "dotnet", "publish", "-c", "Release", "-o", "/repo/conformance/drivers/dotnet-core/out", "--nologo", "-v", "q",
   "-p:OpAmpNativeLib=/repo/target/native-linux/release/libopamp_native.so"] }
 run = ["docker", "run", "--rm", "--add-host=host.docker.internal:host-gateway", "--user", "{user}", "-e", "HOME=/tmp",
-       "-e", "OPAMP_DOTNET_MODE=rust", "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
+       "-e", "OPAMP_ENDPOINT", "-e", "DRIVER_RUN_S", "-e", "DRIVER_POLL_S", "-e", "DRIVER_UID",
        "-e", "DRIVER_CHANGES_AT_S", "-e", "DRIVER_FIRST_CHANGE", "-e", "DRIVER_TOKEN",
        "-e", "DRIVER_ACCEPT_CONNECTION_SETTINGS", "-e", "DRIVER_OWN_TELEMETRY", "-e", "DRIVER_COMPONENTS", "-e", "DRIVER_CUSTOM", "-e", "DRIVER_PACKAGES", "-e", "DRIVER_REQUEST_UID", "-e", "DRIVER_STATE_FILE",
        "-e", "DRIVER_CA_FILE", "-e", "DRIVER_CLIENT_CERT", "-e", "DRIVER_CLIENT_KEY", "-e", "DRIVER_PROXY", "-e", "OPAMP_CORE_TAP", "-e", "DRIVER_LINGER_S", "-e", "DRIVER_THROW_ON_CONFIG", "-e", "DRIVER_MAX_SEND_BYTES", "-e", "DRIVER_DESCRIPTION_PAD", "-v", "{conf}/out:/out", "-v", "{conf}/drivers/dotnet-core:/src", "mcr.microsoft.com/dotnet/runtime:8.0",

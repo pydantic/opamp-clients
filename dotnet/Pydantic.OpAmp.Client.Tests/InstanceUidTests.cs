@@ -20,7 +20,7 @@ public class InstanceUidTests
     {
         using var server = new TestServer();
         OpAmpClient Start(byte[]? uid) => OpAmpClient.Start(
-            new OpAmpClientOptions { Mode = OpAmpMode.DotNet, Endpoint = new Uri(server.Endpoint("http")), InstanceUid = uid, HeartbeatInterval = TimeSpan.FromHours(1) },
+            new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = new Uri(server.Endpoint("http")), InstanceUid = uid, HeartbeatInterval = TimeSpan.FromHours(1) },
             new OpAmpStatus());
         var a = Start(null);
         var b = Start(null);
@@ -103,7 +103,7 @@ public class InstanceUidTests
         var client = OpAmpClient.Start(
             new OpAmpClientOptions
             {
-                Mode = OpAmpMode.DotNet,
+                Mode = OpAmpMode.Platform,
                 Endpoint = new Uri($"http://127.0.0.1:{port}/v1/opamp"),
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
                 RequestInstanceUid = on,

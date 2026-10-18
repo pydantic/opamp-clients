@@ -20,15 +20,15 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// cancel (RULE-SHELL-06); no step after the output that said stopped (RULE-SHELL-07); what a
 /// callback asked of the client (<see cref="Asked"/>) before anything the client took in after the
 /// step that called it, but the application's calls queued ahead of it (RULE-SHELL-10). At the end,
-/// every effect ended or was cancelled (RULE-SHELL-05). In Rust mode the boundary is the shell's:
+/// every effect ended or was cancelled (RULE-SHELL-05). In core mode the boundary is the shell's:
 /// each stream's inputs only as the stream's state allows (the proxy's answer once, the resolution
 /// once, opened once, TLS once asked for, bytes and the end only while open, a splice's end only
 /// after it, a failure once), nothing about a stream after the core closed it (RULE-SHELL-06), and
 /// each download_done answered once, unless cancelled; at the end every stream closed or failed.
 /// </summary>
-internal sealed class Trace(bool rust = false)
+internal sealed class Trace(bool coreMode = false)
 {
-    // Rust mode: each stream's state (asking, resolving, opening, tls, open, eof; answered,
+    // Core mode: each stream's state (asking, resolving, opening, tls, open, eof; answered,
     // resolved, failed, closed, let go: still asking when the core stopped), the splices it has
     // pending, and the downloads the core cancelled or discarded (their files must go).
     private readonly Dictionary<ulong, string> streams = new();
@@ -151,7 +151,7 @@ internal sealed class Trace(bool rust = false)
             {
                 // What a callback asked comes before anything the client takes in next: until the
                 // core has it, it is fed only the application's calls (those queued ahead of it),
-                // and in Rust mode the shell's own answer to a proxy question of that step.
+                // and in core mode the shell's own answer to a proxy question of that step.
                 var call = Call(q.Input);
                 if (call is not null)
                 {
@@ -164,7 +164,7 @@ internal sealed class Trace(bool rust = false)
                 }
             }
 
-            if (q.Of is { } id && rust && q.Registry is not null)
+            if (q.Of is { } id && coreMode && q.Registry is not null)
             {
                 this.StreamResult(id, q.Input, q.Final);
             }
@@ -183,7 +183,7 @@ internal sealed class Trace(bool rust = false)
             }
 
             this.Stopped |= o.Stopped;
-            if (o.Stopped && rust)
+            if (o.Stopped && coreMode)
             {
                 // A proxy question whose answer (given at once) is still queued behind the step
                 // that stopped: the shell lets go of a stream it never opened without a word, and
@@ -215,7 +215,7 @@ internal sealed class Trace(bool rust = false)
         }
     }
 
-    /// <summary>The effects that neither ended nor were cancelled (RULE-SHELL-05); in Rust mode, the streams neither closed nor failed.</summary>
+    /// <summary>The effects that neither ended nor were cancelled (RULE-SHELL-05); in core mode, the streams neither closed nor failed.</summary>
     public string[] Unended()
     {
         lock (this.gate)
@@ -263,12 +263,12 @@ internal sealed class Trace(bool rust = false)
         }
     }
 
-    /// <summary>Downloads the core cancelled before they ended (Rust mode: or discarded): their files must go.</summary>
+    /// <summary>Downloads the core cancelled before they ended (core mode: or discarded): their files must go.</summary>
     public ulong[] CancelledDownloads()
     {
         lock (this.gate)
         {
-            return rust
+            return coreMode
                 ? [.. this.discarded]
                 : this.effects.Values.Where(f => f.Kind == Effect.KindOneofCase.Download && f.Cancelled).Select(f => f.Id).ToArray();
         }
@@ -328,8 +328,8 @@ internal sealed class Trace(bool rust = false)
         Input.KindOneofCase.WsLost => (i.WsLost.Id, Effect.KindOneofCase.WsOpen, null),
         Input.KindOneofCase.Stored => (i.Stored.Id_, Effect.KindOneofCase.Store, null),
         Input.KindOneofCase.StoreFailed => (i.StoreFailed.Id, Effect.KindOneofCase.Store, null),
-        Input.KindOneofCase.Downloaded => (i.Downloaded.Id, rust ? Effect.KindOneofCase.DownloadDone : Effect.KindOneofCase.Download, null),
-        Input.KindOneofCase.DownloadFailed => (i.DownloadFailed.Id, rust ? Effect.KindOneofCase.DownloadDone : Effect.KindOneofCase.Download, null),
+        Input.KindOneofCase.Downloaded => (i.Downloaded.Id, coreMode ? Effect.KindOneofCase.DownloadDone : Effect.KindOneofCase.Download, null),
+        Input.KindOneofCase.DownloadFailed => (i.DownloadFailed.Id, coreMode ? Effect.KindOneofCase.DownloadDone : Effect.KindOneofCase.Download, null),
         Input.KindOneofCase.DownloadResponse => (i.DownloadResponse.Id, Effect.KindOneofCase.Download, i.DownloadResponse.Status),
         _ => null,
     };
@@ -396,16 +396,16 @@ internal sealed class Trace(bool rust = false)
                 break;
             case Effect.KindOneofCase.Cancel when this.effects.TryGetValue(e.Cancel.Id_, out var cancelled) && !cancelled.Ended:
                 cancelled.Cancelled = true;
-                if (rust)
+                if (coreMode)
                 {
                     this.discarded.Add(e.Cancel.Id_);
                 }
 
                 break;
-            case Effect.KindOneofCase.Cancel when rust:
+            case Effect.KindOneofCase.Cancel when coreMode:
                 this.discarded.Add(e.Cancel.Id_); // a download whose file hadn't begun, or its done not asked
                 break;
-            case Effect.KindOneofCase.Discard when rust:
+            case Effect.KindOneofCase.Discard when coreMode:
                 this.discarded.Add(e.Discard.Id_);
                 break;
             case Effect.KindOneofCase.DownloadDone:
@@ -444,7 +444,7 @@ internal sealed class Trace(bool rust = false)
 
     private void Tally(string what) => this.streamTally[what] = this.streamTally.GetValueOrDefault(what) + 1;
 
-    /// <summary>Rust mode: an input about stream <paramref name="id"/>, as its state allows.</summary>
+    /// <summary>Core mode: an input about stream <paramref name="id"/>, as its state allows.</summary>
     private void StreamResult(ulong id, Input input, bool final)
     {
         var kind = input.KindCase;
@@ -669,7 +669,7 @@ internal enum How
 /// <summary>
 /// One client on the in-memory transport and fake time, its callback model
 /// (<see cref="CallbackPropertyTests.Agent"/>) and its trace; started on first use, so that a
-/// generator can make one without side effects. In Rust mode the client's streams are in memory
+/// generator can make one without side effects. In core mode the client's streams are in memory
 /// (<see cref="MemNet"/>), and the server at their far end (<see cref="MemServer"/>) turns what the
 /// core sends into the same calls, answered the same way.
 /// </summary>
@@ -696,21 +696,21 @@ internal sealed class Rig
     /// <param name="deafMask">Which calls (the n-th of each kind, bit n) ignore their cancel.</param>
     /// <param name="onCall">Answers calls as they are made (else the test answers them).</param>
     /// <param name="stateful">With a state file (saves, and packages), or without.</param>
-    /// <param name="rust">Rust mode: the core's own HTTP and WebSocket over in-memory streams.</param>
-    /// <param name="tls">Rust mode: https:// or wss:// (TLS asked for, and none in memory).</param>
-    /// <param name="connectMask">Rust mode: which connects (the n-th, n under 16) are refused (bit n) or held until their cancel and then accepted (bit n + 16).</param>
-    public Rig(bool ws, ulong deafMask, Action<Call>? onCall = null, bool stateful = true, bool rust = false, bool tls = false, ulong connectMask = 0)
+    /// <param name="coreMode">core mode: the core's own HTTP and WebSocket over in-memory streams.</param>
+    /// <param name="tls">core mode: https:// or wss:// (TLS asked for, and none in memory).</param>
+    /// <param name="connectMask">core mode: which connects (the n-th, n under 16) are refused (bit n) or held until their cancel and then accepted (bit n + 16).</param>
+    public Rig(bool ws, ulong deafMask, Action<Call>? onCall = null, bool stateful = true, bool coreMode = false, bool tls = false, ulong connectMask = 0)
     {
         this.Ws = ws;
         this.stateful = stateful;
         this.DeafMask = deafMask;
-        this.Rust = rust;
+        this.CoreMode = coreMode;
         this.Tls = tls;
         this.ConnectMask = connectMask;
-        this.Trace = new Trace(rust);
+        this.Trace = new Trace(coreMode);
         this.Agent.Asked = this.Trace.Asked;
         this.Transport = new MemoryTransport((_, n) => n < 64 && (deafMask >> n & 1) != 0, onCall);
-        if (rust)
+        if (coreMode)
         {
             this.Server = new MemServer(
                 this.Transport,
@@ -769,13 +769,13 @@ internal sealed class Rig
 
     public Trace Trace { get; }
 
-    public bool Rust { get; }
+    public bool CoreMode { get; }
 
     public bool Tls { get; }
 
     public ulong ConnectMask { get; }
 
-    /// <summary>Rust mode's network, and the server at its far end.</summary>
+    /// <summary>Core mode's network, and the server at its far end.</summary>
     public MemNet Net { get; } = new();
 
     public MemServer? Server { get; }
@@ -802,8 +802,8 @@ internal sealed class Rig
     public static ServerToAgent Plain(ByteString uid) => new() { InstanceUid = uid };
 
     public override string ToString() =>
-        $"{(this.Rust ? "Rust mode" : ".NET mode")}, {(this.Ws ? "ws" : "http")}{(this.Tls ? " over TLS" : string.Empty)}, deaf calls {this.DeafMask:x}"
-        + (this.Rust ? $", connects {this.ConnectMask:x}" : string.Empty);
+        $"{(this.CoreMode ? "core mode" : "platform mode")}, {(this.Ws ? "ws" : "http")}{(this.Tls ? " over TLS" : string.Empty)}, deaf calls {this.DeafMask:x}"
+        + (this.CoreMode ? $", connects {this.ConnectMask:x}" : string.Empty);
 
     /// <summary>What happened: the ops, the calls, the trace's tail, the violations.</summary>
     public string Report()
@@ -815,7 +815,7 @@ internal sealed class Rig
         }
 
         return $"\n  {this}\n  ops: {string.Join("; ", ops)}\n  calls:\n    {string.Join("\n    ", this.Transport.Calls.Select(c => c.ToString()))}"
-            + (this.Rust ? $"\n  connects:\n    {string.Join("\n    ", this.Net.Dials.Select(d => d.ToString()))}" : string.Empty)
+            + (this.CoreMode ? $"\n  connects:\n    {string.Join("\n    ", this.Net.Dials.Select(d => d.ToString()))}" : string.Empty)
             + $"\n  callbacks: {string.Join(", ", this.Agent.Seen().Select(n => n.GetType().Name))}"
             + $"\n  trace:\n{this.Trace.Log}\n  violations: {string.Join("; ", this.Trace.Violations)}";
     }
@@ -902,8 +902,9 @@ internal sealed class Rig
         else if (how == How.Package)
         {
             var url = $"http://packages.test/p{n}";
-            // (Rust mode: some of 24 KiB or 48 KiB, which the shell splices to the file: from 16 KiB.)
-            var file = Encoding.UTF8.GetBytes($"package {n} " + new string('x', (n % 7 * 100) + (this.Rust ? n % 3 * 24_000 : 0)));
+            // (core mode: some of 24 KiB or 48 KiB, which the shell splices to the file:
+            // from 16 KiB.)
+            var file = Encoding.UTF8.GetBytes($"package {n} " + new string('x', (n % 7 * 100) + (this.CoreMode ? n % 3 * 24_000 : 0)));
             lock (this.Transport.Files)
             {
                 this.Transport.Files[url] = file;
@@ -1065,7 +1066,7 @@ internal sealed class Rig
             this.Stop(why);
             var problems = new List<string>();
             problems.AddRange(this.Trace.Unended().Select(u => $"never ended, nor cancelled (RULE-SHELL-05): {u}"));
-            if (this.Rust)
+            if (this.CoreMode)
             {
                 // Every stream closed (the client's end reset or disposed) when stop returns, and
                 // none left in the registry; then the server's side of each call settles.
@@ -1114,7 +1115,7 @@ internal sealed class Rig
                 problems.AddRange(this.Transport.Calls.Where(c => !c.Released).Select(c => $"a late resource never released (RULE-SHELL-06): {c}"));
             }
 
-            // Rust mode: a connect that completed after its cancel is reset at once.
+            // Core mode: a connect that completed after its cancel is reset at once.
             if (this.Server is { } server && !Until(() => server.Late.All(d => !d.Done || d.Task.IsCanceled || d.Server is null || d.Server.WasReset)))
             {
                 problems.AddRange(server.Late.Where(d => d.Server is { WasReset: false }).Select(d => $"a connection that came after its close stayed open (RULE-SHELL-06): {d}"));
@@ -1197,10 +1198,10 @@ internal sealed class Rig
         _ => Input.KindOneofCase.WsFailed,
     };
 
-    // Rust mode: the core's own HTTP effects are inside the shell, so what each answer becomes
+    // Core mode: the core's own HTTP effects are inside the shell, so what each answer becomes
     // isn't seen at the boundary; the trace holds the streams to their rules instead.
     private Expected? Expect(Call call, Input.KindOneofCase input, uint? status) =>
-        call.CancelledFirst || this.Rust ? null : new Expected(call.Kind, call.OfKind, input, status, call.ToString());
+        call.CancelledFirst || this.CoreMode ? null : new Expected(call.Kind, call.OfKind, input, status, call.ToString());
 
     /// <summary>
     /// The client's work that can still finish on its own: what it tracks, but for what waits on
@@ -1208,7 +1209,7 @@ internal sealed class Rig
     /// </summary>
     private int Running()
     {
-        if (this.Rust)
+        if (this.CoreMode)
         {
             // A stream's task, waiting to read (or connect), and a closed stream's linger, waiting on
             // the clock.
@@ -1229,8 +1230,8 @@ internal sealed class Rig
             new OpAmpClientOptions
             {
                 Endpoint = new Uri($"{(this.Ws ? "ws" : "http")}{(this.Tls ? "s" : string.Empty)}://opamp.test/v1/opamp"),
-                Mode = this.Rust ? OpAmpMode.Rust : OpAmpMode.DotNet,
-                DirectConnection = this.Rust,
+                Mode = this.CoreMode ? OpAmpMode.Core : OpAmpMode.Platform,
+                DirectConnection = this.CoreMode,
                 StateFile = this.stateful ? this.StateFile : null,
                 AcceptPackages = this.stateful,
                 Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig
@@ -1245,7 +1246,7 @@ internal sealed class Rig
             },
             new OpAmpStatus(),
             this.Agent.Notify,
-            new Seams { Transport = this.Transport, Stepped = this.Trace.OnStep, Net = this.Rust ? this.Net : null });
+            new Seams { Transport = this.Transport, Stepped = this.Trace.OnStep, Net = this.CoreMode ? this.Net : null });
         this.Agent.Started(c);
         return c;
     }

@@ -31,12 +31,14 @@ opentelemetry-instrument python app.py
 
 | Variable | |
 |---|---|
+| `OTEL_OPAMP_DISABLED` | `true` turns OpAMP off: no client starts, whatever else is given (the endpoint given to `configure()` too), and the SDK runs on its own settings. This is the way to take an application off the server in an incident: set it and restart, no deploy. One warning says so (`OpAMP: off, as OTEL_OPAMP_DISABLED=true says: no OpAMP client is started, whatever the code gives`). `false` or blank leaves it to the rest; any other value (`1`, `yes`) is taken as `true`, and the warning says how to write it. |
+| `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). What the SDK does with it is upstream's. |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the package does nothing beyond the upstream distro's defaults. |
 | `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the application. |
 
-The core reads these (and the keyword arguments below), by the same rules in every language: the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
+The core reads these (and the keyword arguments below), by the same rules in every language: whether OpAMP is off, the endpoint, the headers, the interval, which state directory, and the instance UID kept there. The package keeps only the I/O: reading the variables, making and locking the state directory's slot, reading and writing its `instance-uid` file, and logging the warnings.
 
 It is a distro (`opentelemetry_distro`) and a configurator (`opentelemetry_configurator`), both
 named `opamp`. If another distro is installed too (`opentelemetry-distro`, say), pick this one
@@ -52,7 +54,7 @@ answered as done ([the host](sdk-settings.md#the-host)). The package logs a warn
 
 ### Is it working?
 
-The package says so on the `opamp_otel` logger. When the client first reaches the server it logs,
+The package says so on the `pydantic_opamp_otel` logger. When the client first reaches the server it logs,
 at INFO, `OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout,
 instance <uid>`. When it can't, it logs one WARNING per run of failures, with what to check:
 
@@ -76,9 +78,9 @@ An application that sets its SDK up in code, rather than under `opentelemetry-in
 (Locust, say, whose gevent rules it out), gets the same with one call in place of that setup:
 
 ```python
-import opamp_otel
+import pydantic_opamp_otel
 
-opamp_otel.configure()
+pydantic_opamp_otel.configure()
 # then the application's own instrumentors, as before:
 RequestsInstrumentor().instrument()
 ```
@@ -90,7 +92,7 @@ above), set as the global ones, with the live sampler, the gated exporters and t
 above, or from the application, as `configure()`'s own arguments:
 
 ```python
-opamp_otel.configure(
+pydantic_opamp_otel.configure(
     endpoint="https://opamp.example.com/v1/opamp",
     headers={"Authorization": f"Bearer {settings.opamp_key}"},
 )
@@ -106,7 +108,7 @@ and with neither it is the default:
 | `state_dir` | `OTEL_OPAMP_STATE_DIR` | A directory (`str` or a path), or `"none"` for none, not even the default one. |
 | `heartbeat_interval` | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | Seconds (`0.5`, `30`), a `timedelta`, or a string as the variable (`"30s"`, `"2m"`, `"1500"` for milliseconds). |
 
-A value it can't use is warned about on the `opamp_otel` logger and is the default, as a variable
+A value it can't use is warned about on the `pydantic_opamp_otel` logger and is the default, as a variable
 it can't read is: an endpoint that isn't a string leaves the SDK unmanaged, headers that aren't
 all strings are none (the warning doesn't show them), a `state_dir` that isn't a path is the
 default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, NaN, `"soon"`) is
@@ -193,7 +195,7 @@ other override above that a process cannot carry out.
   keeps the parent's resource, `service.instance.id` included. When the parent stops it removes
   the file, and its children keep the settings in force.
 
-The rules are the SDK settings layer's (`opamp_client.sdk`), the same in every language. The
+The rules are the SDK settings layer's (`pydantic_opamp_client.sdk`), the same in every language. The
 package only carries them out on the Python SDK.
 
 ## The newer settings
@@ -219,7 +221,7 @@ local.
 ```
 
 No traces of health checks, served or made, every `checkout ...` trace, and a quarter of the
-rest. In the live sampler (`opamp_otel.LiveSampler`), for a span with no parent only: the first
+rest. In the live sampler (`pydantic_opamp_otel.LiveSampler`), for a span with no parent only: the first
 rule that matches sets the rate, applied by the SDK's `TraceIdRatioBased`; with none,
 `head_sampling`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
 parent follows it. What a rule sees is what the instrumentation passes when it starts the span:
@@ -313,7 +315,7 @@ The server may send the application settings of its own in the policy's `app_set
 ([app-settings.md](app-settings.md)):
 
 ```python
-from opamp_otel import app_settings
+from pydantic_opamp_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...

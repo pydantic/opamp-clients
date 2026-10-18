@@ -20,7 +20,7 @@ class StopOnErrorTest {
     RuntimeException bug = new IllegalStateException("the application's bug");
     List<Notification> notes = new CopyOnWriteArrayList<>();
     CompletableFuture<Notification.Stopped> stopped = new CompletableFuture<>();
-    OpampClient.Config config = OpampClient.Config.builder("http://127.0.0.1:1", new byte[16]).mode(OpampClient.Mode.JAVA).build();
+    OpampClient.Config config = OpampClient.Config.builder("http://127.0.0.1:1", new byte[16]).mode(OpampClient.Mode.PLATFORM).build();
     OpampClient client = OpampClient.start(config, OpampClient.Status.of(null), n -> {
       notes.add(n);
       if (n instanceof Notification.Stopped s) {

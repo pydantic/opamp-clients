@@ -36,14 +36,14 @@ import pytest
 from _servers import MODES
 from aiohttp import web
 
-from opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
-from opamp_client import _executor
-from opamp_client._client import STOP_GRACE_S
-from opamp_client._executor import Executor, _save, download_path, downloads_dir, read_state
-from opamp_client._files import REAL, Files, Journal
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._streams import Streams
-from opamp_client._transport import Proxy, Transport
+from pydantic_opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from pydantic_opamp_client import _executor
+from pydantic_opamp_client._client import STOP_GRACE_S
+from pydantic_opamp_client._executor import Executor, _save, download_path, downloads_dir, read_state
+from pydantic_opamp_client._files import REAL, Files, Journal
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._streams import Streams
+from pydantic_opamp_client._transport import Proxy, Transport
 
 ROOT = Path(__file__).resolve().parents[2]  # the repository
 OPAMP_TAP = ROOT / "target" / "release" / "opamp-tap"
@@ -740,7 +740,7 @@ def test_the_downloads_left_before_are_deleted_beside_the_loop(mode: str, tmp_pa
 
 @pytest.mark.parametrize("how", ["cancel", "close"])
 @pytest.mark.parametrize("op", ["mkdir", "create", "write", "sync"])
-def test_python_mode_a_download_ended_while_its_file_operation_runs_leaves_nothing(op: str, how: str,
+def test_platform_mode_a_download_ended_while_its_file_operation_runs_leaves_nothing(op: str, how: str,
                                                                                     tmp_path) -> None:
     """A cancel (or close, at stop) while the download's file operation is running in its worker
     thread: once that operation is over, the file is closed and deleted, nothing is reported, and
@@ -851,7 +851,7 @@ def test_a_download_does_not_outlive_stop_into_the_next_clients_file(mode: str, 
 PLANTED = b"left by a run that crashed"
 
 
-def test_rust_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
+def test_core_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
     async def run() -> None:
         got: list[corepb.Input] = []
         state = str(tmp_path / "state")
@@ -869,7 +869,7 @@ def test_rust_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> 
     asyncio.run(run())
 
 
-def test_python_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
+def test_platform_mode_never_reuses_a_file_already_at_a_downloads_path(tmp_path) -> None:
     async def run() -> None:
         server = await Server(package=b"new").start()
         got: list[corepb.Input] = []

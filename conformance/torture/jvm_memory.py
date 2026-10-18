@@ -4,7 +4,7 @@
 
 A container's memory is a poor measure of a JVM's. The heap is committed up front, and the
 container's memory follows eden's high-water mark as those pages are touched for the first time;
-JIT-compiled code and metaspace grow while the JVM warms up. java-core grew 115 -> 152 MB in an
+JIT-compiled code and metaspace grow while the JVM warms up. java-core-platform grew 115 -> 152 MB in an
 hour (nightly, seed 20261010) with the committed heap flat at 254 MB, 9-14 MB live after a GC, and
 JIT code and metaspace level after 20 minutes. So for a JVM, once a minute, the harness forces a
 GC in the client's container and reads the heap still in use, and the non-heap memory the JVM

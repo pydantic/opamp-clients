@@ -13,7 +13,7 @@ To put an SDK under a server without writing code, use a language's integration:
 | Java | the Java agent extension, [javaagent.md](javaagent.md) | `-Dotel.javaagent.extensions=...` on the upstream OpenTelemetry Java agent |
 | Python | `pydantic-opamp-otel`, [python-otel.md](python-otel.md) | installed next to `opentelemetry-instrument`: a distro, a configurator and the SDK's OpAMP hook |
 | Node.js | `@pydantic/opamp-otel`, [node-otel.md](node-otel.md) | `node --import @pydantic/opamp-otel/register`, in place of upstream's `register` |
-| Go | `github.com/pydantic/opamp-clients/go/otel`, [go-otel.md](go-otel.md) | `opampotel.Setup(ctx)` in place of the application's own SDK setup |
+| Go | `github.com/pydantic/opamp-clients/go/opampotel`, [go-otel.md](go-otel.md) | `opampotel.Setup(ctx)` in place of the application's own SDK setup |
 | .NET | `Pydantic.OpAmp.AutoInstrumentation`, [dotnet-otel.md](dotnet-otel.md) | a plugin for upstream's automatic instrumentation (`OTEL_DOTNET_AUTO_PLUGINS`) |
 
 To wire a client to an SDK by hand instead, see [sdks.md](sdks.md).
@@ -466,7 +466,7 @@ What else to know:
 - **Turned off means dropped at export.** Spans, metrics and logs are still made while a signal's
   export is off (a span is still sampled, so services downstream still trace it). They are only
   dropped at export. Cumulative metrics carry the counts made meanwhile into the next export.
-- **An SDK the application builds on its own isn't reached.** Python (`opamp_otel.configure()`)
+- **An SDK the application builds on its own isn't reached.** Python (`pydantic_opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
   Node.js and Go set aside what a provider the application registers or sets as the global one
@@ -626,7 +626,7 @@ The client runs with instrumentation suppressed, as OpenTelemetry's own exporter
 where instrumentation wraps a transport, with an HTTP transport of its own). Thus its requests
 and its goodbye are never traced. The end-to-end check fails if one is. This is built around the
 platform's HTTP stack, so every integration asks for its client's platform mode by name
-([sdks.md](sdks.md#rust-mode-and-platform-mode)) rather than the clients' default, Rust mode.
+([sdks.md](sdks.md#core-mode-and-platform-mode)) rather than the clients' default, core mode.
 
 What stays in each language is what touches its SDK:
 
@@ -667,7 +667,7 @@ under declarative configuration, to the configuration model), and the agent's ex
   language's vector tests run them in place of testdata's when `OPAMP_SETTINGS_VECTORS` names
   their directory.
 - Each language: its wrapper through its WebAssembly runtime (`SdkSettingsTest`, `test_sdk_settings.py`,
-  `sdk.test.ts`, `go/opamp/sdk`, `SdkSettingsTests`),
+  `sdk.test.ts`, `go/opamp/sdksettings`, `SdkSettingsTests`),
   and its integration end to end against an OpAMP server, with the same checks for every
   integration (`examples/integrations.py`; [javaagent.md](javaagent.md#how-it-is-checked)). Its
   `check_signals` sends each control that matches telemetry to each integration in turn, and

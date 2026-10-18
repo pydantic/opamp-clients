@@ -253,7 +253,7 @@ func churnRun(t *testing.T, ts *httptest.Server, srv *churnServer, dir string, m
 // goroutines, open file descriptors or heap than before them (a client's core instance is MiBs of
 // heap; its connections are a goroutine or two and a descriptor each).
 func TestChurnLeavesNothingBehind(t *testing.T) {
-	for _, mode := range []Mode{ModeRust, ModeGo} {
+	for _, mode := range []Mode{ModeCore, ModePlatform} {
 		t.Run(modeName(mode), func(t *testing.T) { churn(t, mode) })
 	}
 }
@@ -301,7 +301,7 @@ func churn(t *testing.T, mode Mode) {
 // Clients on state files no longer used leave nothing behind for them: after clients, each on a
 // state file of its own, took a config and stopped, no file's work is counted any more.
 func TestChurnStateFilesLeaveNoWork(t *testing.T) {
-	for _, mode := range []Mode{ModeRust, ModeGo} {
+	for _, mode := range []Mode{ModeCore, ModePlatform} {
 		t.Run(modeName(mode), func(t *testing.T) {
 			srv := &churnServer{held: make(chan struct{}, 1)}
 			ts := httptest.NewServer(srv)

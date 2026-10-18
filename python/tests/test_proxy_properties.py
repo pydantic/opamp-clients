@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Python mode's own CONNECT and SOCKS5 client (``_transport._ProxyConnector``: Rust mode uses
+"""Platform mode's own CONNECT and SOCKS5 client (``_transport._ProxyConnector``: core mode uses
 the core's, proved) against a fake proxy whose answers Hypothesis writes:
 split anywhere, too long, cut short and then closed, reset or left hanging, malformed (a status
 line that isn't one, a status in other digits, a SOCKS version, method, reply or address type
@@ -36,7 +36,7 @@ from hypothesis import note as _note
 from hypothesis.errors import InvalidArgument
 
 from _sched_loop import MemTransport, Network, SeededLoop
-from opamp_client._transport import Proxy, Transport, _ProxyConnector
+from pydantic_opamp_client._transport import Proxy, Transport, _ProxyConnector
 
 HEAD_LIMIT = 16 * 1024
 CONNECT_TIMEOUT = 30.0

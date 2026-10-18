@@ -113,7 +113,7 @@ async function run(plan: Step[], ws: boolean): Promise<void> {
   };
 
   client = Client.start(
-    { endpoint: `${ws ? "ws" : "http"}://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 20, mode: "node" },
+    { endpoint: `${ws ? "ws" : "http"}://127.0.0.1:${port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 20, mode: "platform" },
     { description: description(0), customCapabilities: create(CustomCapabilitiesSchema, { capabilities: [CAPABILITY] }) },
     notify,
   );

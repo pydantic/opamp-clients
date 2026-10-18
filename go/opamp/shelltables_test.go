@@ -204,10 +204,10 @@ func TestTheSharedURLTable(t *testing.T) {
 	}
 }
 
-// Rust mode: every URL of the corpus as the endpoint of a client, whose core sends its first
+// Core mode: every URL of the corpus as the endpoint of a client, whose core sends its first
 // request (a POST, or a WebSocket upgrade for ws:// and wss://) over Go's connection: the target
 // on the wire is exactly the table's.
-func TestTheSharedURLTableRustMode(t *testing.T) {
+func TestTheSharedURLTableCoreMode(t *testing.T) {
 	var table struct {
 		URLs []struct{ URL, Scheme, Target string }
 	}
@@ -224,7 +224,7 @@ func TestTheSharedURLTableRustMode(t *testing.T) {
 			scheme = "ws"
 		}
 		before := srv.count()
-		c, err := Start(context.Background(), Config{Endpoint: scheme + "://" + base + e.Target, Mode: ModeRust,
+		c, err := Start(context.Background(), Config{Endpoint: scheme + "://" + base + e.Target, Mode: ModeCore,
 			Proxy: Proxy{Direct: true}, InstanceUID: [16]byte{1}, HeartbeatInterval: time.Hour}, Status{}, nil)
 		if err != nil {
 			wrong = append(wrong, fmt.Sprintf("%s: start: %v", e.URL, err))
@@ -412,7 +412,7 @@ func environmentProxyFor(rawURL string) (string, error) {
 	return p.Scheme + "://" + net.JoinHostPort(host, port), nil
 }
 
-// coreRoute is where Rust mode's core connects first for rawURL when told choice: the proxy as
+// coreRoute is where core mode's core connects first for rawURL when told choice: the proxy as
 // the table writes a route (scheme://host:port, without credentials), or "" for directly. The
 // core picks it itself: it asks no proxy_query.
 func coreRoute(t *testing.T, choice *corepb.ProxyChoice, rawURL string) string {
@@ -469,12 +469,12 @@ func coreRoute(t *testing.T, choice *corepb.ProxyChoice, rawURL string) string {
 	return scheme + "://" + at
 }
 
-// Rust mode: the proxy each case of the table names, with no known differences. The client hands
-// the core the environment's variables (Config.proxy) and the core picks by Rust mode's one rule:
+// Core mode: the proxy each case of the table names, with no known differences. The client hands
+// the core the environment's variables (Config.proxy) and the core picks by core mode's one rule:
 // this runs each case through this client's reading of the environment and the core it ships.
 //
 // covers: RULE-PROXY-02
-func TestTheSharedProxyTableRustMode(t *testing.T) {
+func TestTheSharedProxyTableCoreMode(t *testing.T) {
 	var table struct {
 		Cases []struct {
 			ID, URL, Why string
@@ -489,7 +489,7 @@ func TestTheSharedProxyTableRustMode(t *testing.T) {
 	var wrong []string
 	for _, c := range table.Cases {
 		env := func(name string) (string, bool) { v, ok := c.Env[name]; return v, ok }
-		got := coreRoute(t, newRustProxies(Proxy{}, env).choice, c.URL)
+		got := coreRoute(t, newCoreProxies(Proxy{}, env).choice, c.URL)
 		want := ""
 		if c.Proxy != nil {
 			want = *c.Proxy
@@ -503,18 +503,18 @@ func TestTheSharedProxyTableRustMode(t *testing.T) {
 	}
 }
 
-// What Rust mode tells the core: the configured proxy (its URL as given, credentials and all, the
+// What core mode tells the core: the configured proxy (its URL as given, credentials and all, the
 // CONNECT headers, ResolveLocally) and no variables; none with Direct; otherwise each variable
 // the rule reads that is set, even empty, by its own name. A proxy_query (only a core that wasn't
 // told asks) hears the configured proxy or none.
 //
 // covers: RULE-PROXY-02
-func TestRustModeTellsTheCoreItsProxy(t *testing.T) {
+func TestCoreModeTellsTheCoreItsProxy(t *testing.T) {
 	env := func(m map[string]string) func(string) (string, bool) {
 		return func(name string) (string, bool) { v, ok := m[name]; return v, ok }
 	}
 	all := env(map[string]string{"HTTP_PROXY": "http://env:1", "no_proxy": "", "REQUEST_METHOD": "GET", "OTHER": "x"})
-	p := newRustProxies(Proxy{URL: "http://u:p%40ss@proxy:3128", ConnectHeader: http.Header{"X-B": {"2"}, "X-A": {"1", "3"}}}, all)
+	p := newCoreProxies(Proxy{URL: "http://u:p%40ss@proxy:3128", ConnectHeader: http.Header{"X-B": {"2"}, "X-A": {"1", "3"}}}, all)
 	c := p.choice
 	if c.Url != "http://u:p%40ss@proxy:3128" || len(c.Headers) != 3 || c.Headers[0].Name != "X-A" || c.Headers[1].Value != "3" ||
 		c.Headers[2].Name != "X-B" || c.ResolveLocally || c.Direct || len(c.Environment) != 0 {
@@ -523,14 +523,14 @@ func TestRustModeTellsTheCoreItsProxy(t *testing.T) {
 	if a := p.answer(3).GetProxyAnswer(); a.Id != 3 || a.Proxy != c.Url || len(a.Headers) != 3 {
 		t.Errorf("configured, asked: %v", a)
 	}
-	if c := newRustProxies(Proxy{URL: "socks5://proxy:1080", ResolveLocally: true}, all).choice; !c.ResolveLocally {
+	if c := newCoreProxies(Proxy{URL: "socks5://proxy:1080", ResolveLocally: true}, all).choice; !c.ResolveLocally {
 		t.Errorf("configured SOCKS5, resolving locally: %v", c)
 	}
-	d := newRustProxies(Proxy{Direct: true}, all)
+	d := newCoreProxies(Proxy{Direct: true}, all)
 	if !d.choice.Direct || len(d.choice.Environment) != 0 || d.answer(3).GetProxyAnswer().Proxy != "" {
 		t.Errorf("direct: %v", d.choice)
 	}
-	e := newRustProxies(Proxy{ResolveLocally: true}, all)
+	e := newCoreProxies(Proxy{ResolveLocally: true}, all)
 	var got []string
 	for _, h := range e.choice.Environment {
 		got = append(got, h.Name+"="+h.Value)
@@ -546,7 +546,7 @@ func TestRustModeTellsTheCoreItsProxy(t *testing.T) {
 		t.Errorf("under CGI: %q", r)
 	}
 	// A value that isn't UTF-8 still reaches the core.
-	bad := newRustProxies(Proxy{}, env(map[string]string{"HTTPS_PROXY": "http://caf\xe9:3128"})).choice
+	bad := newCoreProxies(Proxy{}, env(map[string]string{"HTTPS_PROXY": "http://caf\xe9:3128"})).choice
 	if _, err := proto.Marshal(bad); err != nil {
 		t.Errorf("%v", err)
 	}
@@ -589,19 +589,19 @@ func TestTheSharedTLSTable(t *testing.T) {
 			if _, err := newConnection(opts, Proxy{Direct: true}); err == nil {
 				goOK = true
 			}
-			// Rust mode's TLS, from the same settings: Start takes them, or refuses them at once.
-			rustOK := false
-			if cl, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeRust, TLS: opts,
+			// Core mode's TLS, from the same settings: Start takes them, or refuses them at once.
+			coreOK := false
+			if cl, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: opts,
 				Proxy: Proxy{Direct: true}, HeartbeatInterval: time.Hour}, Status{}, nil); err == nil {
-				rustOK = true
+				coreOK = true
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				_ = cl.Stop(ctx)
 				cancel()
 			}
-			if goOK != rustOK {
-				wrong = append(wrong, fmt.Sprintf("%s: Go mode ok=%v, Rust mode ok=%v", c.ID, goOK, rustOK))
+			if goOK != coreOK {
+				wrong = append(wrong, fmt.Sprintf("%s: platform mode ok=%v, core mode ok=%v", c.ID, goOK, coreOK))
 			}
-			if goOK && rustOK {
+			if goOK && coreOK {
 				got = "ok"
 			}
 		}

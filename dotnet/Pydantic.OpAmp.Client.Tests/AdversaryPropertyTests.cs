@@ -24,11 +24,11 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// requests after stop, downloads after stop, the state file). Seeds: OPAMP_ADVERSARY_SEEDS
 /// (default 24) from OPAMP_ADVERSARY_BASE (default 1); OPAMP_ADVERSARY_SEED=S replays one;
 /// OPAMP_ADVERSARY_WASM overrides the module. The main property and the cancel productions run in
-/// both modes. In Rust mode each run has a raw server of its own (AdversaryRawServer.cs), which the
+/// both modes. In core mode each run has a raw server of its own (AdversaryRawServer.cs), which the
 /// adversary opens streams to (raw=PORT, tls=NAME in the endpoint's query): it hands the shell the
 /// stream effects, and the platform's as well (it plays the core, not the shell inside it), which
-/// reach the platform executor beside Rust mode's, as a core's saves do. So the streams themselves,
-/// the choice of which of the two takes an effect, and Rust mode's stop and shutdown all run
+/// reach the platform executor beside core mode's, as a core's saves do. So the streams themselves,
+/// the choice of which of the two takes an effect, and core mode's stop and shutdown all run
 /// against a hostile core.
 /// </summary>
 public partial class AdversaryPropertyTests
@@ -80,8 +80,8 @@ public partial class AdversaryPropertyTests
 
     // covers: RULE-SHELL-01, RULE-SHELL-03, RULE-SHELL-04, RULE-SHELL-05, RULE-SHELL-07, RULE-SHELL-08, RULE-SHELL-09, RULE-SHELL-10
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task TheShellKeepsTheContractAgainstAHostileCore(OpAmpMode mode)
     {
         var replay = Env("OPAMP_ADVERSARY_SEED");
@@ -116,7 +116,7 @@ public partial class AdversaryPropertyTests
         this.output.WriteLine($"{mode} mode: {used.Count} of {enabled.Count} productions ran ({used.Count(p => StreamProduction(p))} of the streams'); never: {string.Join(", ", never)}");
 
         // A production is drawn at random, and runs only if the run's timing leaves it room, so one
-        // can miss a batch by chance (with Rust mode's streams the grammar is half as large again):
+        // can miss a batch by chance (with core mode's streams the grammar is half as large again):
         // each missed one runs in focus, on two seeds past the batch's, as in Java's, Node's and
         // Go's harnesses.
         var last = seeds[^1];
@@ -189,25 +189,25 @@ public partial class AdversaryPropertyTests
         "cancel_ws_closing", "cancel_ws_opening", "stop_cancel",
     ];
 
-    /// <summary>The cancel productions of the streams and their files (RULE-SHELL-06), in a Rust mode run's grammar.</summary>
+    /// <summary>The cancel productions of the streams and their files (RULE-SHELL-06), in a core mode run's grammar.</summary>
     private static readonly string[] StreamCancels =
     [
         "cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving",
     ];
 
     /// <summary>
-    /// Every cancel production is enabled, and each runs in focus, two seeds each: in Rust mode
+    /// Every cancel production is enabled, and each runs in focus, two seeds each: in core mode
     /// those of the streams too.
     /// </summary>
     // covers: RULE-SHELL-06
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task NothingAfterACancel(OpAmpMode mode)
     {
         using var server = new AdversaryServer();
         var seed = Env("OPAMP_ADVERSARY_BASE") ?? 1;
-        string[] cancels = mode == OpAmpMode.Rust ? [.. Cancels, .. StreamCancels] : Cancels;
+        string[] cancels = mode == OpAmpMode.Core ? [.. Cancels, .. StreamCancels] : Cancels;
         var probe = await RunSeedAsync(server, seed, Query(seed, KnownBugs.Keys, steps: 3), mode: mode);
         Assert.True(probe.Verdict, $"seed {seed}: no verdict: {string.Join("; ", probe.Failures)}");
         var missing = cancels.Where(p => !probe.Enabled.Contains(p)).ToArray();
@@ -371,7 +371,7 @@ public partial class AdversaryPropertyTests
             : null;
     }
 
-    /// <summary>Whether <paramref name="production"/> is one of Rust mode's: of the streams, or of the files written through them.</summary>
+    /// <summary>Whether <paramref name="production"/> is one of core mode's: of the streams, or of the files written through them.</summary>
     private static bool StreamProduction(string production) =>
         production.Contains("stream", StringComparison.Ordinal) || production.Contains("splice", StringComparison.Ordinal) || production.Contains("file", StringComparison.Ordinal);
 
@@ -430,7 +430,7 @@ public partial class AdversaryPropertyTests
         return q;
     }
 
-    private static async Task<SeedResult[]> RunAllAsync(AdversaryServer server, ulong[] seeds, Func<ulong, string> query, OpAmpMode mode = OpAmpMode.DotNet)
+    private static async Task<SeedResult[]> RunAllAsync(AdversaryServer server, ulong[] seeds, Func<ulong, string> query, OpAmpMode mode = OpAmpMode.Platform)
     {
         using var slots = new SemaphoreSlim(AtOnce);
         return await Task.WhenAll(seeds.Select(async seed =>
@@ -447,7 +447,7 @@ public partial class AdversaryPropertyTests
         }));
     }
 
-    private static async Task<SeedResult> RunSeedAsync(AdversaryServer server, ulong seed, string query, bool tolerateS1 = false, OpAmpMode mode = OpAmpMode.DotNet)
+    private static async Task<SeedResult> RunSeedAsync(AdversaryServer server, ulong seed, string query, bool tolerateS1 = false, OpAmpMode mode = OpAmpMode.Platform)
     {
         var run = new SeedRun(server, seed, query, tolerateS1, mode);
         try
@@ -491,8 +491,8 @@ public partial class AdversaryPropertyTests
     /// </remarks>
     private sealed class SeedRun(AdversaryServer server, ulong seed, string query, bool tolerateS1, OpAmpMode mode)
     {
-        // The run's raw server, for its streams (Rust mode).
-        private readonly AdversaryRaw? raw = mode == OpAmpMode.Rust ? new AdversaryRaw(Pki.Server) : null;
+        // The run's raw server, for its streams (core mode).
+        private readonly AdversaryRaw? raw = mode == OpAmpMode.Core ? new AdversaryRaw(Pki.Server) : null;
         private readonly string dir = Directory.CreateTempSubdirectory("opamp-adversary-").FullName;
         private readonly TaskCompletionSource<OpAmpClient> handle = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource<Task> stopAsked = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -518,7 +518,7 @@ public partial class AdversaryPropertyTests
 
         public async Task RunAsync()
         {
-            // Rust mode: the streams go to the run's raw server, whose certificate (for TlsName) is
+            // Core mode: the streams go to the run's raw server, whose certificate (for TlsName) is
             // under the CA the client is given.
             var streams = this.raw is null ? string.Empty : $"&raw={this.raw.Port}&tls={TlsName}";
             var client = OpAmpClient.Start(

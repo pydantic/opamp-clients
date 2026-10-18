@@ -60,7 +60,7 @@ test("the core tap records every crossing, a file per core", () => {
 // The tap ends with the client's stop: the stop input, then the reply that says stopped (with the
 // stopped notification); nothing is fed after it. (In between, the core may still take in the
 // response to a request in flight, or what its closing handshake reads.)
-for (const mode of ["node", "rust"] as const) {
+for (const mode of ["platform", "core"] as const) {
   for (const ws of [false, true]) {
     test(`${mode} mode${ws ? ", WebSocket" : ""}: the tap ends with stop and stopped`, async () => {
       const server = await opampServer({ configs: 1 });

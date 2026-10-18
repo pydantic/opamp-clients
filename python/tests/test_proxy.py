@@ -15,10 +15,10 @@ from _servers import MODES, HttpProxy, OpampServer, Socks5Proxy, run_client
 from hypothesis import given
 from hypothesis import strategies as st
 
-from opamp_client import TLS, Client, Config, Proxy, Status
-from opamp_client._executor import Executor
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._transport import Transport, _route
+from pydantic_opamp_client import TLS, Client, Config, Proxy, Status
+from pydantic_opamp_client._executor import Executor
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._transport import Transport, _route
 
 TRANSPORTS = ["http", "ws"]
 
@@ -254,7 +254,7 @@ def test_the_environment_may_name_a_socks5_proxy(transport: str, scheme: str, mo
 def test_the_environment_may_not_name_socks4_or_an_unknown_scheme(scheme: str, monkeypatch, no_env_proxies) -> None:
     async def run() -> None:
         with pytest.raises(ValueError, match="HTTP_PROXY"):
-            Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp"), Status())
+            Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp"), Status())
 
     monkeypatch.setenv("HTTP_PROXY", f"{scheme}://127.0.0.1:1080")
     asyncio.run(run())
@@ -274,8 +274,8 @@ def test_no_proxy_is_respected(transport: str, no_proxy: str, monkeypatch, mode:
         finally:
             await proxy.close()
             await server.close()
-        if mode == "rust" and no_proxy == "NO_PROXY=*":
-            # Rust mode's shared rule (tests/shell-tables, no-proxy-star-address): * is a name
+        if mode == "core" and no_proxy == "NO_PROXY=*":
+            # Core mode's shared rule (tests/shell-tables, no-proxy-star-address): * is a name
             # entry, and an address (the endpoint's 127.0.0.1) is matched by address entries only.
             through(proxy, server)
             return
@@ -342,7 +342,7 @@ def test_downloads_use_the_environment_too(bypass: bool, tmp_path, monkeypatch, 
 def test_a_bad_proxy_in_the_environment_fails_at_start(monkeypatch) -> None:
     async def run() -> None:
         with pytest.raises(ValueError, match="HTTPS_PROXY"):
-            Client.start(Config(mode="python", endpoint="https://127.0.0.1:1/v1/opamp"), Status())
+            Client.start(Config(mode="platform", endpoint="https://127.0.0.1:1/v1/opamp"), Status())
 
     monkeypatch.setenv("HTTPS_PROXY", "ftp://127.0.0.1:21")
     asyncio.run(run())

@@ -126,6 +126,11 @@ final class Core implements AutoCloseable {
     }
   }
 
+  /** An instance of the embedded core, made and dropped: it throws if the core can't be loaded. */
+  static void instantiate() {
+    Instance.builder(module()).withMachineFactory(CoreModule::create).build();
+  }
+
   /** The instance the Setup call runs on: one of its own, made on first use. Guarded by SETUP_LOCK. */
   private static Instance setupInstance;
   private static final Object SETUP_LOCK = new Object();
@@ -179,7 +184,7 @@ final class Core implements AutoCloseable {
 
   /**
    * Feed the core one input at {@code nowMs} (milliseconds on a monotonic clock) and {@code unixMs}
-   * (the wall clock, in ms since the Unix epoch: Rust mode reads Retry-After dates against it).
+   * (the wall clock, in ms since the Unix epoch: core mode reads Retry-After dates against it).
    */
   CoreProto.Output step(long nowMs, long unixMs, CoreProto.Input input) {
     return call(step, Tap.STEP_IN,

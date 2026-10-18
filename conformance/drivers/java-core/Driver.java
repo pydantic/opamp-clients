@@ -20,9 +20,10 @@ import opamp.proto.v1.Opamp;
 /**
  * Runs our Java client (java/opamp: the shared core in Chicory) under the conformance driver
  * contract (conformance/DRIVERS.md). Run as a single source file on the client's classpath.
- * The mode is always asked for by name, never left to the client's default: java-core is Java
- * mode (the JDK's HTTP client), java-core-rust ({@code OPAMP_JAVA_MODE=rust}) Rust mode (the core
- * speaks HTTP and WebSocket over the JDK's sockets), where DRIVER_PROXY may be a SOCKS5 proxy too.
+ * The mode is always asked for by name, never left to the client's default: java-core is core
+ * mode (the core speaks HTTP and WebSocket over the JDK's sockets), where DRIVER_PROXY may be a
+ * SOCKS5 proxy too, java-core-platform ({@code OPAMP_JAVA_MODE=platform}) platform mode (the JDK's
+ * HTTP client).
  */
 public class Driver {
   /** The client stopped on its own: the driver no longer stops it, and exits 1. */
@@ -96,7 +97,7 @@ public class Driver {
   }
 
   public static void main(String[] args) throws Exception {
-    boolean rust = "rust".equals(System.getenv("OPAMP_JAVA_MODE"));
+    boolean platform = "platform".equals(System.getenv("OPAMP_JAVA_MODE"));
     byte[] uid = instanceUid();
     // The callback runs on the client's own thread, from before start returns (a remote config
     // saved by an earlier run is handed over on its first step): it waits for the client.
@@ -107,7 +108,7 @@ public class Driver {
         : OpampClient.Config.builder(endpoint, uid))
         .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
         .heartbeatInterval(Duration.ofMillis((long) (envDouble("DRIVER_POLL_S", 2) * 1000)))
-        .mode(rust ? OpampClient.Mode.RUST : OpampClient.Mode.JAVA);
+        .mode(platform ? OpampClient.Mode.PLATFORM : OpampClient.Mode.CORE);
     String maxSend = System.getenv().getOrDefault("DRIVER_MAX_SEND_BYTES", "");
     if (!maxSend.isEmpty()) {
       builder.maxSendBytes(Long.parseLong(maxSend));
@@ -137,7 +138,7 @@ public class Driver {
     // Package files come the same way as messages: the same TLS (DRIVER_CA_FILE) and proxy, and no
     // redirect followed (the core decides).
     // An HTTP proxy. Its credentials go through CONNECT tunnels only because clients.toml runs
-    // the JVM with -Djdk.http.auth.tunneling.disabledSchemes= (java/opamp/README.md). In Rust mode
+    // the JVM with -Djdk.http.auth.tunneling.disabledSchemes= (java/opamp/README.md). In core mode
     // the core speaks to the proxy itself: http://, https://, socks5:// or socks5h://, with
     // credentials (no JVM property needed).
     String proxy = System.getenv().getOrDefault("DRIVER_PROXY", "");
@@ -256,7 +257,7 @@ public class Driver {
       System.exit(1);
     }
     // The UID in use: the one given, or the one the core made.
-    emit("started", "uid", HexFormat.of().formatHex(client.join().instanceUid()), "client", "opamp-java-core (ours" + (rust ? ", rust mode" : "") + ")");
+    emit("started", "uid", HexFormat.of().formatHex(client.join().instanceUid()), "client", "opamp-java-core (ours" + (platform ? ", platform mode" : "") + ")");
 
     List<Double> changes = new ArrayList<>();
     for (String s : System.getenv().getOrDefault("DRIVER_CHANGES_AT_S", "").split(",")) {
