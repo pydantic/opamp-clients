@@ -18,6 +18,11 @@ extension and a systemd unit, and enrolls the host in one step:
 echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
+It writes a remote config policy: the server's configs may use the components a Logfire config
+needs, send only to the OpAMP server's host (or the `--exporter-endpoint`s given), read no file
+(or only the `--log-path`s given), and reference no `${env:...}` or `${file:...}`
+([what the server can do](packaging/README.md#what-the-server-can-do-to-this-host)).
+
 The [macOS .pkg](packaging/README.md#macos) and the [Windows .msi](packaging/README.md#windows)
 do the same with a LaunchDaemon and a Windows service.
 
@@ -43,6 +48,12 @@ storage:
   state_key: auto
 agent:
   executable: /usr/bin/otelcol-contrib
+  remote_config_policy:
+    allowed_components:
+      receivers: [otlp, hostmetrics]
+      processors: [batch]
+      exporters: [otlphttp]
+    allowed_exporter_endpoints: ["https://logfire-us.pydantic.dev"]
 ```
 
 ## What changes
@@ -72,10 +83,17 @@ agent:
 - **An `auth` extension runs on every HTTP request, and at every WebSocket upgrade** (a
   refreshed token is used from the next one). It can't be combined with
   `accepts_opamp_connection_settings`, since it would overwrite the headers the server issued.
-- **The remote config can be limited** (`agent.remote_config_policy`): to the component types
-  listed for each kind, and the confmap providers listed, so a server can't point a `filelog`
-  receiver at any file the collector reads or `${file:...}` a secret into an exporter. A config
-  refused is FAILED and never runs. Upstream has no limit.
+- **The remote config can be limited** (`agent.remote_config_policy`), and the packages limit
+  it: to the component types listed for each kind and the confmap providers listed; the
+  exporters (and the collector's own telemetry) to the endpoints listed, with no proxy or TLS
+  setting of their own; and `filelog` receivers to the paths listed. So a server can't point a
+  `filelog` receiver at any file the collector reads, `${file:...}` a secret into an exporter,
+  or send what it collects anywhere. A config refused is FAILED, with the reason, and never
+  runs. The policy is read with confmap, as the config is merged (a `receivers::filelog` key is a
+  receiver). Without a policy the Supervisor says at start that the remote config is
+  unrestricted. Upstream has no limit. What the packaged policy allows, how to widen it on the
+  host, and what a server can still do:
+  [packaging/README.md](packaging/README.md#what-the-server-can-do-to-this-host).
 - **Remote config statuses are about the last config received.** After an automatic rollback
   (`automatic_config_rollback`) the server keeps the FAILED status of the config that failed;
   upstream's also reported the restored one APPLIED, under that config's hash. The effective

@@ -109,6 +109,116 @@ func TestEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "systemd-creds", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+}
+
+// packagedComponents are the component types every enroll script lets a remote config use.
+var packagedComponents = map[string][]string{
+	"receivers":  {"otlp", "host_metrics", "hostmetrics", "file_log", "filelog", "nop"},
+	"processors": {"batch", "memory_limiter", "resource_detection", "resourcedetection"},
+	"exporters":  {"otlp_grpc", "otlp", "otlp_http", "otlphttp", "debug", "nop"},
+	"extensions": {"health_check"},
+}
+
+// assertPackagedPolicy checks the policy an enroll script wrote: the packaged components, no
+// providers, and the destinations and log paths given.
+func assertPackagedPolicy(t *testing.T, p config.RemoteConfigPolicy, endpoints, logPaths []string) {
+	t.Helper()
+	require.True(t, p.Enabled(), "no remote config policy")
+	assert.Equal(t, packagedComponents, p.AllowedComponents)
+	assert.Empty(t, p.AllowedProviders)
+	assert.Equal(t, endpoints, p.AllowedExporterEndpoints)
+	if len(logPaths) == 0 {
+		assert.Empty(t, p.AllowedLogPaths)
+	} else {
+		assert.Equal(t, logPaths, p.AllowedLogPaths)
+	}
+}
+
+// loadEnrolled loads the config pydantic-opamp-enroll wrote, with the paths systemd provides
+// made real.
+func (e enrollment) loadEnrolled(t *testing.T) config.Supervisor {
+	t.Helper()
+	token := filepath.Join(t.TempDir(), "opamp-enroll-token")
+	require.NoError(t, os.WriteFile(token, []byte("t"), 0o600))
+	collector := filepath.Join(t.TempDir(), "otelcol")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	cfg := strings.NewReplacer(
+		"/run/credentials/pydantic-opamp-supervisor.service/opamp-enroll-token", token,
+		"/usr/lib/pydantic-opamp/otelcol", collector,
+		"/var/lib/pydantic-opamp", t.TempDir(),
+	).Replace(e.read(t, "supervisor.yaml"))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(cfg), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	return loaded
+}
+
+// The policy widened locally: the destinations and log paths given replace the defaults.
+func TestEnrollWidensThePolicyLocally(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp",
+		"--exporter-endpoint", "https://logfire-us.pydantic.dev", "--exporter-endpoint", "https://logfire-eu.pydantic.dev:443/",
+		"--log-path", "/var/log/app", "--log-path", "/var/log/syslog", "--no-start")
+	require.NoError(t, err, out)
+	assertPackagedPolicy(t, e.loadEnrolled(t).Agent.RemoteConfigPolicy,
+		[]string{"https://logfire-us.pydantic.dev", "https://logfire-eu.pydantic.dev:443/"}, []string{"/var/log/app", "/var/log/syslog"})
+
+	// By default, the OpAMP server's host and port, over https or (with --plaintext) http.
+	e = newEnrollment(t)
+	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp?x=1", "--no-start")
+	require.NoError(t, err, out)
+	assertPackagedPolicy(t, e.loadEnrolled(t).Agent.RemoteConfigPolicy, []string{"https://opamp.example.com:8443"}, nil)
+	e = newEnrollment(t)
+	out, err = e.run(t, "t", "--endpoint", "ws://127.0.0.1:4320/v1/opamp", "--plaintext", "--no-start")
+	require.NoError(t, err, out)
+	assertPackagedPolicy(t, e.loadEnrolled(t).Agent.RemoteConfigPolicy, []string{"http://127.0.0.1:4320"}, nil)
+}
+
+// What the packaged policy lets a server do: a Logfire config, but not what turns the
+// collector against the host (SEC-4's file and environment reads, and sends elsewhere).
+func TestPackagedPolicy(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "t", "--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--log-path", "/var/log/app", "--no-start")
+	require.NoError(t, err, out)
+	p := e.loadEnrolled(t).Agent.RemoteConfigPolicy
+	require.NoError(t, p.Check("", []byte(`receivers:
+  otlp:
+    protocols: {grpc: {endpoint: 127.0.0.1:4317}, http: {endpoint: 127.0.0.1:4318}}
+  hostmetrics:
+    collection_interval: 30s
+    scrapers: {cpu: {}, memory: {}, filesystem: {}}
+  filelog:
+    include: [/var/log/app/*.log]
+processors:
+  memory_limiter: {check_interval: 1s, limit_percentage: 80}
+  resourcedetection: {detectors: [system]}
+  batch: {}
+exporters:
+  otlphttp:
+    endpoint: https://logfire-us.pydantic.dev
+    headers: {Authorization: "a-write-token"}
+service:
+  pipelines:
+    traces: {receivers: [otlp], processors: [memory_limiter, batch], exporters: [otlphttp]}
+    metrics: {receivers: [otlp, hostmetrics], processors: [memory_limiter, resourcedetection, batch], exporters: [otlphttp]}
+    logs: {receivers: [otlp, filelog], processors: [memory_limiter, batch], exporters: [otlphttp]}
+`)))
+	for name, tc := range map[string]struct{ body, wantErr string }{
+		"a file read":            {`receivers: {filelog: {include: [/etc/shadow]}}`, `reads "/etc/shadow"`},
+		"a file read, new name":  {`receivers: {file_log: {include: [/etc/shadow]}}`, `reads "/etc/shadow"`},
+		"elsewhere, new name":    {`exporters: {otlp_http: {endpoint: "https://collector.example.com"}}`, "allowed_exporter_endpoints doesn't allow"},
+		"a credential read":      {`receivers: {filelog: {include: [/run/credentials/pydantic-opamp-supervisor.service/opamp-enroll-token]}}`, "allowed_log_paths doesn't allow"},
+		"a file provider":        {`exporters: {otlphttp: {headers: {x: "${file:/etc/shadow}"}}}`, "references the file provider"},
+		"an env provider":        {`exporters: {otlphttp: {headers: {x: "${env:AWS_SECRET_ACCESS_KEY}"}}}`, "references the env provider"},
+		"another destination":    {`exporters: {otlphttp: {endpoint: "https://collector.example.com"}}`, "allowed_exporter_endpoints doesn't allow"},
+		"a component not listed": {`exporters: {file: {path: /etc/cron.d/x}}`, `configures exporter "file"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, p.Check("", []byte(tc.body)), tc.wantErr)
+		})
+	}
 }
 
 // Enrolling again replaces the token but keeps the state key: a new key couldn't open the
@@ -156,6 +266,16 @@ func TestEnrollRefuses(t *testing.T) {
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"--endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"--endpoint", "wss://x", "--ca-file", "enroll_test.go"}},
 		{"a missing CA file", "t", "can't read", []string{"--endpoint", "wss://x", "--ca-file", "/nonexistent/ca.pem"}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--exporter-endpoint", "http://x"}},
+		{"an exporter endpoint not a URL", "t", "must be an https:// or http:// URL", []string{"--endpoint", "wss://x", "--exporter-endpoint", "x:443"}},
+		{"an exporter endpoint with a path", "t", "scheme://host[:port], with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x/v1/traces"}},
+		{"an exporter endpoint with user info", "t", "with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x@y"}},
+		{"user info in the endpoint", "t", "with nothing else", []string{"--endpoint", "wss://u@x/v1/opamp"}},
+		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--log-path", "var/log"}},
+		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--log-path", "/var/log/*"}},
+		{"a log path climbing out", "t", "..", []string{"--endpoint", "wss://x", "--log-path", "/var/log/../../etc"}},
+		{"a log path with a quote", "t", "can't hold quotes", []string{"--endpoint", "wss://x", "--log-path", `/var/log/"`}},
+		{"a log path with a newline", "t", "can't hold a newline", []string{"--endpoint", "wss://x", "--log-path", "/var/log/a\n/b"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

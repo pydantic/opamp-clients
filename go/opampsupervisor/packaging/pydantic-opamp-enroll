@@ -14,13 +14,18 @@ set -eu
 
 usage() {
 	cat >&2 <<'EOF'
-usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--no-start]
+usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
+                             [--exporter-endpoint URL]... [--log-path PATH]... [--no-start]
 
-  --endpoint URL     the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
-  --token-file PATH  where to read the enrollment token (default: standard input)
-  --ca-file PATH     a CA bundle to trust for the server, in place of the system's
-  --plaintext        allow ws:// or http:// (the token then crosses the network in the clear)
-  --no-start         write the config and credentials, but don't start the service
+  --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
+  --token-file PATH        where to read the enrollment token (default: standard input)
+  --ca-file PATH           a CA bundle to trust for the server, in place of the system's
+  --plaintext              allow ws:// or http:// (the token then crosses the network in the clear)
+  --exporter-endpoint URL  where the server's configs may send telemetry, as scheme://host[:port];
+                           repeat it for more (default: the --endpoint's host, over https)
+  --log-path PATH          a file, or a directory, the server's configs may read logs from;
+                           repeat it for more (default: none)
+  --no-start               write the config and credentials, but don't start the service
 EOF
 	exit 2
 }
@@ -30,6 +35,30 @@ fail() {
 	exit 1
 }
 
+# The policy's lists: one item a line. An item can't hold a newline.
+nl='
+'
+append() {
+	case $2 in
+	*"$nl"*) fail "an --exporter-endpoint or --log-path can't hold a newline" ;;
+	esac
+	printf '%s' "${1:+$1$nl}$2"
+}
+
+# yaml_list prints a list of one item a line as a YAML flow sequence of quoted strings.
+yaml_list() {
+	set -f
+	old_ifs=$IFS
+	IFS=$nl
+	out=
+	for item in $1; do
+		out="$out${out:+, }\"$item\""
+	done
+	IFS=$old_ifs
+	set +f
+	printf '[%s]' "$out"
+}
+
 root=${OPAMP_ENROLL_ROOT:-}
 creds=${SYSTEMD_CREDS:-systemd-creds}
 systemctl=${SYSTEMCTL:-systemctl}
@@ -37,6 +66,8 @@ etc=$root/etc/pydantic-opamp
 unit=pydantic-opamp-supervisor.service
 
 endpoint=
+exporter_endpoints=
+log_paths=
 token_file=-
 ca_file=
 plaintext=
@@ -47,6 +78,8 @@ while [ $# -gt 0 ]; do
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
 	--ca-file) [ $# -ge 2 ] || usage; ca_file=$2; shift 2 ;;
 	--plaintext) plaintext=yes; shift ;;
+	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
+	--log-path) [ $# -ge 2 ] || usage; log_paths=$(append "$log_paths" "$2"); shift 2 ;;
 	--no-start) start=; shift ;;
 	*) usage ;;
 	esac
@@ -68,6 +101,42 @@ if [ -n "$ca_file" ]; then
 	*) fail "--ca-file needs an absolute path" ;;
 	esac
 fi
+# Where the remote config's exporters may send: the OpAMP server's host unless given.
+if [ -z "$exporter_endpoints" ]; then
+	authority=${endpoint#*://}
+	authority=${authority%%/*}
+	authority=${authority%%\?*}
+	authority=${authority%%#*}
+	case $endpoint in
+	wss://* | https://*) exporter_endpoints="https://$authority" ;;
+	*) exporter_endpoints="http://$authority" ;;
+	esac
+fi
+set -f
+old_ifs=$IFS
+IFS=$nl
+for e in $exporter_endpoints; do
+	case $e in
+	https://?*) ;;
+	http://?*) [ -n "$plaintext" ] || fail "$e isn't encrypted; pass --plaintext to use it anyway" ;;
+	*) fail "an exporter endpoint must be an https:// or http:// URL: $e" ;;
+	esac
+	rest=${e#*://}
+	case ${rest%/} in
+	*/* | *'?'* | *'#'* | *@* | *'"'* | *'\'* | *' '* | *'$'* | '') fail "an exporter endpoint is scheme://host[:port], with nothing else: $e" ;;
+	esac
+done
+for p in $log_paths; do
+	case $p in
+	/*) ;;
+	*) fail "--log-path needs an absolute path: $p" ;;
+	esac
+	case $p in
+	*'"'* | *'\'* | *'*'* | *'?'* | *'['* | *']'* | *'{'* | *'}'* | *'$'* | *..*) fail "--log-path can't hold quotes, backslashes, glob characters, \$ or ..: $p" ;;
+	esac
+done
+IFS=$old_ifs
+set +f
 [ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
 
 if [ "$token_file" = - ]; then
@@ -121,6 +190,22 @@ capabilities:
 
 agent:
   executable: /usr/lib/pydantic-opamp/otelcol
+
+  # What the server's remote config may do to this host. The server can't change this file;
+  # widen it here, or run pydantic-opamp-enroll again with --exporter-endpoint or --log-path.
+  remote_config_policy:
+    # The component types a Logfire config uses, by their names and their older aliases.
+    allowed_components:
+      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
+      extensions: [health_check]
+    # No \${...}: env and file would read this host's environment and files.
+    allowed_providers: []
+    # Where its exporters, and the collector's own telemetry, may send.
+    allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
+    # What its filelog receivers may read: these files, and what is under these directories.
+    allowed_log_paths: $(yaml_list "$log_paths")
 
 storage:
   directory: /var/lib/pydantic-opamp

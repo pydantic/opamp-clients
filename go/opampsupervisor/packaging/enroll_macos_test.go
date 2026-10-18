@@ -72,6 +72,29 @@ func TestMacEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "keychain", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+}
+
+// The policy widened locally, as on Linux.
+func TestMacEnrollWidensThePolicyLocally(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp",
+		"--exporter-endpoint", "https://logfire-us.pydantic.dev", "--log-path", "/Library/Logs/app", "--no-start")
+	require.NoError(t, err, out)
+	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
+	cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))
+	require.NoError(t, err)
+	collector := filepath.Join(t.TempDir(), "otelcol")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.NewReplacer(
+		"/opt/pydantic-opamp/etc/enroll-token", filepath.Join(etc, "enroll-token"),
+		"/opt/pydantic-opamp/bin/otelcol", collector,
+		"/opt/pydantic-opamp/var", t.TempDir(),
+	).Replace(string(cfg))), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://logfire-us.pydantic.dev"}, []string{"/Library/Logs/app"})
 }
 
 func TestMacEnrollNoStart(t *testing.T) {
@@ -95,6 +118,10 @@ func TestMacEnrollRefuses(t *testing.T) {
 		{"an empty token", "\n", "token is empty", []string{"--endpoint", "wss://x"}},
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"--endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"--endpoint", "wss://x", "--ca-file", "enroll_test.go"}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--exporter-endpoint", "http://x"}},
+		{"an exporter endpoint with a path", "t", "with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x/v1/traces"}},
+		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--log-path", "Logs/app"}},
+		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--log-path", "/Library/Logs/*"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()

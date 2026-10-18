@@ -56,6 +56,25 @@ func TestWinEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "dpapi", loaded.Storage.StateKey)
 	assert.Equal(t, filepath.ToSlash(filepath.Join(root, "var")), loaded.Storage.Directory)
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+}
+
+// The policy widened locally, as on Linux; the log path with forward slashes.
+func TestWinEnrollWidensThePolicyLocally(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp",
+		"-ExporterEndpoint", "https://logfire-us.pydantic.dev", "-LogPath", `C:\ProgramData\app\logs`, "-NoStart")
+	require.NoError(t, err, out)
+	cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
+	require.NoError(t, err)
+	collector := filepath.Join(t.TempDir(), "otelcol.exe")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	programs := filepath.ToSlash(filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe"))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(cfg), programs, filepath.ToSlash(collector), 1)), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://logfire-us.pydantic.dev"}, []string{"C:/ProgramData/app/logs"})
 }
 
 // What it refuses, before it writes anything.
@@ -70,6 +89,11 @@ func TestWinEnrollRefuses(t *testing.T) {
 		{"an empty token", "\r\n", "token is empty", []string{"-Endpoint", "wss://x"}},
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"-Endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"-Endpoint", "wss://x", "-CaFile", "enroll_test.go"}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"-Endpoint", "wss://x", "-ExporterEndpoint", "http://x"}},
+		{"an exporter endpoint with a path", "t", "with nothing else", []string{"-Endpoint", "wss://x", "-ExporterEndpoint", "https://x/v1/traces"}},
+		{"a relative log path", "t", "absolute path", []string{"-Endpoint", "wss://x", "-LogPath", `logs\app`}},
+		{"a log path with a glob", "t", "glob characters", []string{"-Endpoint", "wss://x", "-LogPath", `C:\logs\*`}},
+		{"a log path climbing out", "t", "..", []string{"-Endpoint", "wss://x", "-LogPath", `C:\logs\..\secret`}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "pydantic-opamp")
