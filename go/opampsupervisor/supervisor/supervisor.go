@@ -2102,6 +2102,9 @@ func (s *Supervisor) runAgentProcess() {
 		case update := <-s.connectionUpdates:
 			s.stopAgentApplyConfig()
 			_, err := s.startAgent()
+			if err != nil {
+				restartTimer.Reset(5 * time.Second)
+			}
 			s.reportConnectionSettings(update.hash, err)
 		case req := <-s.agentInstalls:
 			// Changed here: the update stops and starts the collector itself. A restart still

@@ -33,6 +33,9 @@ func connectionCredentials(bindings map[string]string, settings map[string]*prot
 		if token == "" {
 			return nil, errors.New("the offered connection has no bearer credential")
 		}
+		if _, exists := env[variable]; exists {
+			return nil, errors.New("multiple offered connections use the same environment binding")
+		}
 		env[variable] = token
 	}
 	return env, nil

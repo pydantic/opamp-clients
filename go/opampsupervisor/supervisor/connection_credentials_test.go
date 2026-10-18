@@ -14,8 +14,13 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/commander"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/telemetry"
 	"github.com/stretchr/testify/require"
+	metricnoop "go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestBootstrapExchangePersistsBothCredentialsAcrossRestart(t *testing.T) {
@@ -90,4 +95,61 @@ func TestConnectionCredentialBindings(t *testing.T) {
 			require.NotContains(t, err.Error(), "synthetic-secret")
 		})
 	}
+}
+
+func TestConnectionCredentialsRejectDuplicateEnvironmentBindings(t *testing.T) {
+	settings := map[string]*protobufs.OtherConnectionSettings{
+		"first":  {Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer first-secret"}}}},
+		"second": {Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer second-secret"}}}},
+	}
+	env, err := connectionCredentials(map[string]string{"first": "EXPORT_TOKEN", "second": "EXPORT_TOKEN"}, settings)
+	require.ErrorContains(t, err, "same environment binding")
+	require.Nil(t, env)
+	require.NotContains(t, err.Error(), "first-secret")
+	require.NotContains(t, err.Error(), "second-secret")
+}
+
+func TestConnectionUpdateRetriesFailedCollectorStart(t *testing.T) {
+	s := newComposeMergedConfigTestSupervisor(t, filepath.Join(t.TempDir(), "missing-collector"), false)
+	metrics, err := telemetry.NewMetrics(metricnoop.NewMeterProvider())
+	require.NoError(t, err)
+	s.metrics = metrics
+	s.doneChan = make(chan struct{})
+	s.connectionUpdates = make(chan connectionUpdate, 1)
+	failed := make(chan struct{}, 1)
+	s.opampClient = &mockOpAMPClient{setHealthFunc: func(health *protobufs.ComponentHealth) {
+		if !health.Healthy {
+			select {
+			case failed <- struct{}{}:
+			default:
+			}
+		}
+	}}
+	_, err = s.composeMergedConfig(nil)
+	require.NoError(t, err)
+	core, observed := observer.New(zap.DebugLevel)
+	agent := s.config.Agent
+	agent.Env = map[string]string{supervisorRestartHelperEnv: "sleep"}
+	s.commander, err = commander.NewCommander(zap.New(core), filepath.Join(t.TempDir(), "collector.log"), agent)
+	require.NoError(t, err)
+	stopped := make(chan struct{})
+	go func() { defer close(stopped); s.runAgentProcess() }()
+	t.Cleanup(func() {
+		close(s.doneChan)
+		select {
+		case <-stopped:
+		case <-time.After(15 * time.Second):
+			t.Error("the Collector loop did not stop")
+		}
+	})
+	s.connectionUpdates <- connectionUpdate{hash: []byte("credential-update")}
+	select {
+	case <-failed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the missing Collector did not fail to start")
+	}
+	s.commander.SetExecutable(os.Args[0])
+	require.Eventually(t, func() bool {
+		return observed.FilterMessage(commander.AgentStartedLogMsg).Len() == 1
+	}, 8*time.Second, 10*time.Millisecond)
 }
