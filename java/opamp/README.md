@@ -8,9 +8,9 @@ agent_disconnect, and the requests and responses themselves) is the shared core,
 WebAssembly module run with [Chicory](https://chicory.dev), a runtime written
 in plain Java: nothing native. The build compiles the module to JVM classes, so the jar carries
 classes rather than WebAssembly and nothing is interpreted or compiled when the client runs. By
-default the core speaks HTTP and WebSocket itself too ([Rust mode](#rust-mode-and-java-mode)), and
+default the core speaks HTTP and WebSocket itself too ([core mode](#core-mode-and-platform-mode)), and
 this library only gives it the JDK's sockets and TLS, so the bytes on the wire are the same as
-every other language's client here. In Java mode the library carries out the core's requests with
+every other language's client here. In platform mode the library carries out the core's requests with
 the JDK's own `java.net.http.HttpClient` instead. Either way its only dependencies are Chicory and
 protobuf-javalite.
 
@@ -75,7 +75,7 @@ OpampClient.Config.builder("wss://opamp.example.com/v1/opamp")
     .build();
 ```
 
-- The CAs given replace the system's. Add `includeSystemRoots(true)` to trust both.
+- The CAs given replace the system's. Add `includeSystemCas(true)` to trust both.
 - The client certificate's PEM holds the certificate, then any intermediates. The key may be
   PKCS #8 (`BEGIN PRIVATE KEY`), PKCS #1 RSA (`BEGIN RSA PRIVATE KEY`) or SEC 1 EC (`BEGIN EC
   PRIVATE KEY`), and not encrypted: decrypt an encrypted one with
@@ -91,7 +91,7 @@ an HTTP proxy is a CONNECT tunnel (`http://` endpoints too), with the URL's cred
 the server's name, unless `proxyResolveLocally(true)`.
 
 With no proxy configured, the client takes the proxy from the environment by the rule every SDK
-follows in Rust mode (`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+follows in core mode (`tests/shell-tables/README.md`, its proxy rule, put in place by
 `scripts/fetch_core.py fetch`): `HTTP_PROXY` for
 `http://` and `ws://`, `HTTPS_PROXY` for `https://` and `wss://`, `ALL_PROXY` for either when its
 own is unset (upper case first, an empty value unset); `NO_PROXY` lists names (`example.com`
@@ -99,22 +99,22 @@ covers its subdomains, `*` every name), addresses and CIDR networks (`10.0.0.0/8
 resolving a name; and under CGI (`REQUEST_METHOD` set) no proxy comes from the environment. It
 does not read the JDK's proxy settings: `http.proxyHost`, `https.proxyHost`, `http.nonProxyHosts`,
 `java.net.useSystemProxies` and a `ProxySelector` the application installed are
-[Java mode](#rust-mode-and-java-mode)'s. `directConnection()` ignores the environment and
+[platform mode](#core-mode-and-platform-mode)'s. `directConnection()` ignores the environment and
 connects straight to the server. It can't be combined with `proxy(...)`.
 
-## Rust mode and Java mode
+## Core mode and platform mode
 
-`mode(...)` says who speaks HTTP and WebSocket. The client runs in **Rust mode** unless the
+`mode(...)` says who speaks HTTP and WebSocket. The client runs in **core mode** unless the
 application asks for **platform mode**: by naming it in the mode option, or by handing the client
 an HTTP client of its own, where the SDK takes one (an application that brings its own client has
 asked for the platform's stack). An option only one mode honours is never silently ignored: it
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
-Here platform mode is `mode(OpampClient.Mode.JAVA)`, and `httpClient(...)` selects it too.
-`build()` refuses `mode(Mode.RUST)` with an `httpClient`, and in Java mode `proxyResolveLocally`,
-`rustSplice(false)` and a proxy URL that isn't `http://`.
+Here platform mode is `mode(OpampClient.Mode.PLATFORM)`, and `httpClient(...)` selects it too.
+`build()` refuses `mode(Mode.CORE)` with an `httpClient`, and in platform mode `proxyResolveLocally`,
+`spliceDownloads(false)` and a proxy URL that isn't `http://`.
 
-In Rust mode (`mode(OpampClient.Mode.RUST)`, or no `mode`) the core speaks HTTP/1.1 (chunked,
+In core mode (`mode(OpampClient.Mode.CORE)`, or no `mode`) the core speaks HTTP/1.1 (chunked,
 keep-alive), WebSocket, CONNECT and SOCKS5 itself (inside the same WebAssembly module), over byte streams this library opens. The client then only opens TCP
 connections (blocking sockets, `TCP_NODELAY`), starts TLS on them (the JDK's `SSLEngine`, with the
 `tls(...)` settings: the certificate is verified for the server's name, or for its address when
@@ -122,17 +122,17 @@ the endpoint is an IP literal; TLS to an `https://` proxy carries TLS to the ser
 resolves names for a SOCKS5 proxy told to (`proxyResolveLocally`), picks the proxy, and writes
 package files.
 
-- `rustSplice(false)` passes package bytes through the core instead of from the socket straight
+- `spliceDownloads(false)` passes package bytes through the core instead of from the socket straight
   to the file (where the response says how long the body is).
 - Stop is bounded: the core's stop (its goodbye and closing handshake), then every stream closed
   at once and the files not complete deleted, within what is left of the stop timeout.
 
-Choose Java mode to bring your own `java.net.http.HttpClient`, or when the connection must be
+Choose platform mode to bring your own `java.net.http.HttpClient`, or when the connection must be
 made by the JDK's HTTP client: with the JVM's proxy settings, say.
 
 ```java
 OpampClient.Config.builder("wss://opamp.example.com/v1/opamp")
-    .mode(OpampClient.Mode.JAVA)
+    .mode(OpampClient.Mode.PLATFORM)
     .build();
 ```
 
@@ -182,18 +182,18 @@ mvn -Pfray test -Dfray.only=true   # Fray's schedule exploration (x86-64 Linux, 
 ```
 
 The `*FrayTest` classes explore thread schedules with [Fray](https://github.com/cmu-pasta/fray) over a
-fake network (`FakeHttp`; in Rust mode, streams in memory, `MemoryNet`): the in-flight registry and
-executor (`RegistryFrayTest`; Rust mode's: `StreamsFrayTest`), and the client with its real core
+fake network (`FakeHttp`; in core mode, streams in memory, `MemoryNet`): the in-flight registry and
+executor (`RegistryFrayTest`; core mode's: `StreamsFrayTest`), and the client with its real core
 (`ShellFrayTest`, its scenarios in both modes). They run only in the `fray` profile, in a JVM Fray builds by
 `jlink` from a JDK 25 (`JDK25_HOME`, or one it downloads); its agent exists for x86-64 Linux and
 macOS on arm64. `OPAMP_FRAY_RUNS` sets the schedules per scenario and `OPAMP_FRAY_BUDGET_S` the
 seconds each may take; a failure prints the plan seed and Fray's recording, which
 `OPAMP_FRAY_SEED=<seed> OPAMP_FRAY_REPLAY=<recording>` replays (with `-Dfray.test=Class#method`).
 `ConnLincheckTest` (Lincheck's model checker, in the normal run) checks a connection's send and
-Close chain, and `StreamLincheckTest` a Rust-mode stream's write queue; `OPAMP_LINCHECK_ITERATIONS`
+Close chain, and `StreamLincheckTest` a core-mode stream's write queue; `OPAMP_LINCHECK_ITERATIONS`
 sets their scenarios.
 
 The conformance suite runs this client through `conformance/drivers/java-core`, in both modes:
-`java-core` (Java mode) and `java-core-rust` (Rust mode, `OPAMP_JAVA_MODE=rust`).
+`java-core` (core mode) and `java-core-platform` (platform mode, `OPAMP_JAVA_MODE=platform`).
 
 What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it.

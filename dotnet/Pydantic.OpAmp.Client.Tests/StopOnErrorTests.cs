@@ -15,7 +15,7 @@ public class StopOnErrorTests
         var notes = new ConcurrentQueue<OpAmpNotification>();
         var stopped = new TaskCompletionSource<OpAmpNotification.Stopped>();
         var client = OpAmpClient.Start(
-            new OpAmpClientOptions { Mode = OpAmpMode.DotNet, Endpoint = new Uri("http://127.0.0.1:1"), InstanceUid = new byte[16] },
+            new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = new Uri("http://127.0.0.1:1"), InstanceUid = new byte[16] },
             new OpAmpStatus(),
             n =>
             {

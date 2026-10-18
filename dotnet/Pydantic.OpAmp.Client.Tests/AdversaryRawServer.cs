@@ -15,7 +15,7 @@ namespace Pydantic.OpAmp.Client.Tests;
 
 /// <summary>
 /// The adversary's raw server: what the
-/// streams of a Rust mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
+/// streams of a core mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
 /// server what to do in the first line it writes:
 /// <code>opamp-raw tag=7 send=1000 chunk=100 gap=5 end=fin</code>
 /// The server answers "ok\n", then does what the line says, and keeps for each connection that

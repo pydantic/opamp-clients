@@ -81,7 +81,7 @@ class TransportTest {
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(origin.url("wss")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(origin.url("https") + "/file").getKindCase());
       // The system's CAs as well: still the given one.
-      Probe both = new Probe(Transport.build(Tls.builder().trustedCa(CA).includeSystemRoots(true).build(), null, false), dir);
+      Probe both = new Probe(Transport.build(Tls.builder().trustedCa(CA).includeSystemCas(true).build(), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, both.post(origin.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, both.open(origin.url("wss")).getKindCase());
     }
@@ -92,7 +92,7 @@ class TransportTest {
   void sendsNothingToAServerItCannotVerify(@TempDir Path dir) throws Exception {
     try (Origin origin = Origin.tls(false, null)) {
       for (Transport t : List.of(Transport.build(null, null, false), Transport.build(trusting(OTHER_CA), null, false),
-          Transport.build(Tls.builder().trustedCa(OTHER_CA).includeSystemRoots(true).build(), null, false))) {
+          Transport.build(Tls.builder().trustedCa(OTHER_CA).includeSystemCas(true).build(), null, false))) {
         Probe p = new Probe(t, dir);
         CoreProto.Input http = p.post(origin.url("https"));
         assertEquals(CoreProto.Input.KindCase.HTTP_FAILED, http.getKindCase());
@@ -202,8 +202,8 @@ class TransportTest {
       IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Transport.Proxy.parse(bad), bad);
       assertFalse(e.getMessage().contains("u:p"), e.getMessage());
     }
-    // Checked at build, as the mode reads it (Rust mode takes SOCKS5: RustModeTest).
-    assertTrue(assertThrows(IllegalArgumentException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.JAVA).proxy("socks5://proxy:1080").build())
+    // Checked at build, as the mode reads it (core mode takes SOCKS5: CoreModeTest).
+    assertTrue(assertThrows(IllegalArgumentException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).proxy("socks5://proxy:1080").build())
         .getMessage().contains("SOCKS"));
     assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x")
         .httpClient(java.net.http.HttpClient.newHttpClient()).proxy("http://proxy:3128").build());
@@ -503,7 +503,7 @@ class TransportTest {
       this(user, password, null);
     }
 
-    /** {@code tls}: an {@code https://} proxy, TLS with this server context (Rust mode's). */
+    /** {@code tls}: an {@code https://} proxy, TLS with this server context (core mode's). */
     HttpProxy(String user, String password, SSLContext tls) throws IOException {
       listener = tls == null ? new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
           : tls.getServerSocketFactory().createServerSocket(0, 50, InetAddress.getByName("127.0.0.1"));

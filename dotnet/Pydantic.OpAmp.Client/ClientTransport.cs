@@ -18,13 +18,13 @@ public sealed record OpAmpTlsOptions
 {
     /// <summary>
     /// PEM of the CA certificates to trust for the server's certificate. They replace the
-    /// system's, unless <see cref="IncludeSystemCaCerts"/>. None: the system's.
+    /// system's, unless <see cref="IncludeSystemCas"/>. None: the system's.
     /// </summary>
     // covers: RULE-TLS-01
     public string? CaPem { get; init; }
 
     /// <summary>With <see cref="CaPem"/>: trust the system's CAs as well.</summary>
-    public bool IncludeSystemCaCerts { get; init; }
+    public bool IncludeSystemCas { get; init; }
 
     /// <summary>
     /// PEM of the client certificate to present in every handshake, with
@@ -46,7 +46,7 @@ public sealed record OpAmpTlsOptions
     private bool PrintMembers(StringBuilder builder) => Redacted.Print(
         builder,
         (nameof(this.CaPem), this.CaPem),
-        (nameof(this.IncludeSystemCaCerts), this.IncludeSystemCaCerts),
+        (nameof(this.IncludeSystemCas), this.IncludeSystemCas),
         (nameof(this.ClientCertPem), this.ClientCertPem),
         (nameof(this.ClientKeyPem), Redacted.Secret(this.ClientKeyPem)),
         (nameof(this.MinVersion), this.MinVersion),
@@ -120,12 +120,12 @@ internal sealed class ClientTransport : IClientTransport
     /// </summary>
     public static ClientTransport Create(OpAmpClientOptions options)
     {
-        if (options.ProxyUseLocalResolver)
+        if (options.ProxyResolveLocally)
         {
             throw new ArgumentException(
                 options.Proxy is { IsAbsoluteUri: true, Scheme: "http" or "https" }
-                    ? "ProxyUseLocalResolver can't be honoured: an HTTP proxy is given the server's host name (CONNECT host:port) and resolves it itself"
-                    : "ProxyUseLocalResolver can't be honoured in .NET mode: .NET's SOCKS5 support always sends the server's host name for the proxy to resolve (Rust mode can: no HttpClient, and Mode unset or Rust)",
+                    ? "ProxyResolveLocally can't be honoured: an HTTP proxy is given the server's host name (CONNECT host:port) and resolves it itself"
+                    : "ProxyResolveLocally can't be honoured in platform mode: .NET's SOCKS5 support always sends the server's host name for the proxy to resolve (core mode can: no HttpClient, and Mode unset or Core)",
                 nameof(options));
         }
 
@@ -267,7 +267,7 @@ internal sealed class ClientTransport : IClientTransport
                 throw new ArgumentException("Tls.CaPem holds no certificate", nameof(tls));
             }
 
-            if (tls.IncludeSystemCaCerts)
+            if (tls.IncludeSystemCas)
             {
                 // The system's chain first; if it fails only for want of a root, these roots.
                 ssl.RemoteCertificateValidationCallback = (_, cert, chain, errors) => TrustedBySystemOr(cas, cert, chain, errors);

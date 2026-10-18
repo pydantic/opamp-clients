@@ -56,7 +56,7 @@ internal sealed class CoreInstance : IDisposable
 
     /// <summary>
     /// Feed the core one input at <paramref name="nowMs"/> (milliseconds, monotonic) and
-    /// <paramref name="unixMs"/> (the wall clock, in ms since the Unix epoch: Rust mode reads
+    /// <paramref name="unixMs"/> (the wall clock, in ms since the Unix epoch: core mode reads
     /// Retry-After dates against it).
     /// </summary>
     public Output Step(long nowMs, long unixMs, Input input) =>

@@ -75,11 +75,11 @@ func TestStoreEffectAnswers(t *testing.T) {
 func TestStartReadsTheStateFile(t *testing.T) {
 	dir := t.TempDir()
 	// A directory where the file should be: unreadable, so Start says so.
-	if _, err := Start(t.Context(), Config{Mode: ModeGo, Endpoint: "http://x", StateFile: dir}, Status{}, nil); err == nil {
+	if _, err := Start(t.Context(), Config{Mode: ModePlatform, Endpoint: "http://x", StateFile: dir}, Status{}, nil); err == nil {
 		t.Fatal("started with an unreadable state file")
 	}
 	// No file yet is fine.
-	c, err := Start(t.Context(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", StateFile: filepath.Join(dir, "s")}, Status{}, nil)
+	c, err := Start(t.Context(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", StateFile: filepath.Join(dir, "s")}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestStartRefusesAStateItCantOpen(t *testing.T) {
 	if err := os.WriteFile(path, []byte("sealed:junk"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := Start(t.Context(), Config{Mode: ModeGo, Endpoint: "http://127.0.0.1:1", StateFile: path,
+	_, err := Start(t.Context(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", StateFile: path,
 		StateSealer: prefixSealer{openErr: errors.New("wrong key")}}, Status{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "wrong key") {
 		t.Fatalf("Start = %v", err)

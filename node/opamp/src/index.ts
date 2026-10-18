@@ -4,12 +4,12 @@
 // An OpAMP client for Node.js.
 //
 // Everything OpAMP (what to send and when, backoff, heartbeats, full reports, instance UIDs,
-// agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After,
-// size limits) is the shared OpAMP client core, run as WebAssembly. By default the core
-// speaks HTTP and WebSocket itself too (Rust mode), over Node's TCP and TLS sockets; in Node mode
-// this package carries out the core's requests with undici's fetch and the ws package instead.
-// Either way it feeds back what happened, so it behaves exactly like the other languages'
-// clients on the same core.
+// agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After, size
+// limits) is the shared OpAMP client core, run as WebAssembly. By default the core speaks HTTP and
+// WebSocket itself too (core mode), over Node's TCP and TLS sockets; in platform mode this package
+// carries out the core's requests with undici's fetch and the ws package instead. Either way it
+// feeds back what happened, so it behaves exactly like the other languages' clients on the same
+// core.
 
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -138,37 +138,37 @@ export interface Config {
   tls?: TlsOptions;
   /** A proxy for every connection to the server and every download (HTTP, HTTPS or SOCKS5).
    * `false`: none. Omitted (or without `url`): the proxies in the environment (HTTP_PROXY,
-   * HTTPS_PROXY, ALL_PROXY, NO_PROXY), by the rule every SDK's Rust mode shares, never under CGI
-   * (REQUEST_METHOD set: httpoxy). In Node mode: Node's default instead, the environment's
+   * HTTPS_PROXY, ALL_PROXY, NO_PROXY), by the rule every SDK's core mode shares, never under CGI
+   * (REQUEST_METHOD set: httpoxy). In platform mode: Node's default instead, the environment's
    * proxies only when NODE_USE_ENV_PROXY=1 or --use-env-proxy says to use them, read as Node
    * reads them. A SOCKS5 proxy resolves the server's name (`socks5://` and `socks5h://` alike,
    * unlike curl) unless `resolveLocally`.
    * covers: RULE-PROXY-01 */
   proxy?: ProxyOptions | false;
-  /** Who speaks HTTP and WebSocket. "rust" (the default): the shared core itself, over Node's
+  /** Who speaks HTTP and WebSocket. "core" (the default): the shared core itself, over Node's
    * TCP and TLS sockets; Node only opens connections, starts TLS with the options above and
    * picks the proxy. "node": undici's fetch and the ws package, for an application that needs
    * Node's own stack (its convention for the environment's proxies, say). */
-  mode?: "rust" | "node";
-  /** Rust mode: package files go from the socket to the file without passing through the core
-   * (where the response says how long the body is). Default true. It is Rust mode's: `false`
-   * in Node mode throws. */
-  rustSplice?: boolean;
+  mode?: "core" | "platform";
+  /** Core mode: package files go from the socket to the file without passing through the core
+   * (where the response says how long the body is). Default true. It is core mode's: `false`
+   * in platform mode throws. */
+  spliceDownloads?: boolean;
 }
 
-/** Whether `config` runs in Rust mode: yes, unless it asks for Node mode by name. What the mode
+/** Whether `config` runs in core mode: yes, unless it asks for platform mode by name. What the mode
  * it runs in doesn't honour throws, saying what to set instead: nothing is ignored. */
-function rustMode(config: Config): boolean {
+function runsInCoreMode(config: Config): boolean {
   const mode: unknown = config.mode;
-  if (mode !== undefined && mode !== "rust" && mode !== "node") {
-    throw new TypeError(`mode is "rust" or "node", not ${JSON.stringify(mode)}`);
+  if (mode !== undefined && mode !== "core" && mode !== "platform") {
+    throw new TypeError(`mode is "core" or "platform", not ${JSON.stringify(mode)}`);
   }
-  if (mode === "node" && config.rustSplice === false) {
+  if (mode === "platform" && config.spliceDownloads === false) {
     throw new TypeError(
-      'rustSplice in Node mode: it is Rust mode\'s (undici writes package files itself); leave it out, or leave mode out (or "rust")',
+      'spliceDownloads in platform mode: it is core mode\'s (undici writes package files itself); leave it out, or leave mode out (or "core")',
     );
   }
-  return mode !== "node";
+  return mode !== "platform";
 }
 
 /** The agent's status as the client starts. The first message reports it in full. */
@@ -200,24 +200,24 @@ export type StatusField =
 export type Notification =
   | { kind: "connected" }
   | { kind: "connectFailed"; status?: number; detail: string }
-  | { kind: "errorResponse"; type: number; message: string }
-  | { kind: "remoteConfig"; config: AgentRemoteConfig }
+  | { kind: "errorResponse"; errorType: number; message: string }
+  | { kind: "remoteConfig"; remoteConfig: AgentRemoteConfig }
   /** Own telemetry and other connection settings, all of them; answer with setConnectionSettingsStatus. */
-  | { kind: "connectionSettings"; settings: ConnectionSettingsOffers }
+  | { kind: "connectionSettings"; connectionSettings: ConnectionSettingsOffers }
   /** A custom message from the server, for a custom capability the agent declared. */
-  | { kind: "customMessage"; message: CustomMessage }
+  | { kind: "customMessage"; customMessage: CustomMessage }
   /** The custom capabilities the server supports changed. */
-  | { kind: "serverCustomCapabilities"; capabilities: string[] }
+  | { kind: "serverCustomCapabilities"; customCapabilities: string[] }
   /** A custom message the application sent won't be, and why. */
-  | { kind: "customMessageNotSent"; message: CustomMessage; reason: string }
+  | { kind: "customMessageNotSent"; customMessage: CustomMessage; detail: string }
   /** Install a package from the file at `path` (checking its signature is the application's job);
    * answer with packageInstalled. The client deletes the file after the answer. */
-  | { kind: "installPackage"; name: string; package: PackageAvailable; path: string }
+  | { kind: "installPackage"; packageName: string; package: PackageAvailable; path: string }
   /** Remove a package no longer offered; answer with packageRemoved. */
-  | { kind: "removePackage"; name: string }
+  | { kind: "removePackage"; packageName: string }
   | { kind: "command"; command: ServerToAgentCommand }
   | { kind: "instanceUidChanged"; instanceUid: Uint8Array }
-  | { kind: "heartbeatInterval"; ms: number }
+  | { kind: "heartbeatInterval"; heartbeatIntervalMs: number }
   | { kind: "statusTooLarge"; field: StatusField; bytes: number }
   | { kind: "badMessage"; detail: string }
   /** The save under way has run for its stall time without ending (`stalled`), and the client
@@ -246,36 +246,36 @@ function fromCore(n: CoreNotification, stateFile: string | undefined): Notificat
     case "connectFailed":
       return { kind: "connectFailed", status: k.value.status, detail: k.value.detail };
     case "errorResponse":
-      return { kind: "errorResponse", type: k.value.kind, message: k.value.message };
+      return { kind: "errorResponse", errorType: k.value.kind, message: k.value.message };
     case "remoteConfig":
-      return { kind: "remoteConfig", config: k.value };
+      return { kind: "remoteConfig", remoteConfig: k.value };
     case "connectionSettings":
-      return { kind: "connectionSettings", settings: k.value };
+      return { kind: "connectionSettings", connectionSettings: k.value };
     case "customMessage":
-      return { kind: "customMessage", message: k.value };
+      return { kind: "customMessage", customMessage: k.value };
     case "serverCustomCapabilities":
-      return { kind: "serverCustomCapabilities", capabilities: k.value.capabilities };
+      return { kind: "serverCustomCapabilities", customCapabilities: k.value.capabilities };
     case "customMessageNotSent":
       return {
         kind: "customMessageNotSent",
-        message: k.value.message ?? create(CustomMessageSchema),
-        reason: k.value.reason,
+        customMessage: k.value.message ?? create(CustomMessageSchema),
+        detail: k.value.reason,
       };
     case "installPackage":
       return {
         kind: "installPackage",
-        name: k.value.name,
+        packageName: k.value.name,
         package: k.value.package ?? create(PackageAvailableSchema),
         path: downloadPath(stateFile ?? "", k.value.download),
       };
     case "removePackage":
-      return { kind: "removePackage", name: k.value.name };
+      return { kind: "removePackage", packageName: k.value.name };
     case "command":
       return { kind: "command", command: k.value };
     case "instanceUidChanged":
       return { kind: "instanceUidChanged", instanceUid: k.value };
     case "heartbeatIntervalMs":
-      return { kind: "heartbeatInterval", ms: Number(k.value) };
+      return { kind: "heartbeatInterval", heartbeatIntervalMs: Number(k.value) };
     case "statusTooLarge":
       return { kind: "statusTooLarge", field: FIELDS[k.value.field], bytes: Number(k.value.bytes) };
     case "badMessage":
@@ -313,7 +313,7 @@ export class Client {
    * file was still under way: then once that is over). */
   #core: Core | undefined;
   #x: Executor | undefined;
-  /** Rust mode's sockets and files; undefined otherwise. */
+  /** Core mode's sockets and files; undefined otherwise. */
   #streams: Streams | undefined;
   readonly #notify: (n: Notification) => void;
   readonly #stateFile: string | undefined;
@@ -353,7 +353,7 @@ export class Client {
     this.#clock = platform?.now ?? (() => performance.now());
     this.#start = this.#clock();
     // Bad TLS or proxy settings throw here, before anything is sent.
-    const transport = new Transport({ tls: config.tls, proxy: config.proxy }, process, rustMode(config));
+    const transport = new Transport({ tls: config.tls, proxy: config.proxy }, process, runsInCoreMode(config));
     this.#notify = notify;
     this.#stateFile = config.stateFile;
     this.#done = new Promise((resolve, reject) => {
@@ -406,7 +406,7 @@ export class Client {
 
   /** Read the state file, start the core, and clear the downloads of before. */
   #boot(config: Config, transport: Transport): void {
-    const rust = rustMode(config);
+    const coreMode = runsInCoreMode(config);
     const tests = config as {
       [TEST_CORE_MODULE]?: Uint8Array | WebAssembly.Module;
       [TEST_CORE_TAP]?: string;
@@ -438,11 +438,11 @@ export class Client {
         requestInstanceUid: config.requestInstanceUid ?? false,
         maxPackageBytes: ms(config.maxPackageBytes),
         downloadTimeoutMs: ms(config.downloadTimeoutMs),
-        streams: rust,
+        streams: coreMode,
         entropy: new Uint8Array(randomBytes(32)),
         unixMs: BigInt(Date.now()),
-        spliceDownloads: rust && (config.rustSplice ?? true),
-        proxy: rust ? transport.rustProxyChoice() : undefined,
+        spliceDownloads: coreMode && (config.spliceDownloads ?? true),
+        proxy: coreMode ? transport.coreProxyChoice() : undefined,
       }),
       tests[TEST_CORE_MODULE],
       tests[TEST_CORE_TAP],
@@ -461,7 +461,7 @@ export class Client {
     }
     const platform = tests[TEST_PLATFORM];
     this.#x = new Executor((input) => this.#feed(input), config.stateFile, transport, ops, platform?.executor);
-    this.#streams = rust
+    this.#streams = coreMode
       ? new Streams((input) => this.#feed(input), transport, config.stateFile, ops, platform?.streams)
       : undefined;
   }
@@ -530,7 +530,7 @@ export class Client {
   /** The endpoint the client uses now: where its latest OpAMP request or WebSocket connection
    * went, which after the server moved the agent (an offer of connection settings) is the offered
    * one, or the configured one again once an offer failed. Undefined before any outcome, and in
-   * Rust mode, where the core makes the requests itself (the configured one is all there is to
+   * core mode, where the core makes the requests itself (the configured one is all there is to
    * name then). The URL is as the core gave it: redact it before logging. */
   get endpoint(): string | undefined {
     return this.#streams === undefined ? this.#x?.used : undefined;
@@ -673,7 +673,7 @@ export class Client {
       // Whatever is still under way (the client stopped on its own) is given up on; downloads
       // given up on have deleted what they wrote, or the bound has passed.
       await x?.shutdown(left());
-      // Rust mode: files still being written are deleted once their write in flight is over.
+      // Core mode: files still being written are deleted once their write in flight is over.
       await this.#streams?.shutdown(left());
       this.#finish(err);
       // A save still writing ends whole (stop doesn't wait for it, a client started next on the

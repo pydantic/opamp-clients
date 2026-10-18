@@ -42,7 +42,7 @@ type executor struct {
 	done chan struct{} // closed at shutdown: nobody reads out any more
 	fl   *inFlight
 
-	// streams carries out Rust mode's effects (nil in Go mode); what it doesn't take comes here.
+	// streams carries out core mode's effects (nil in platform mode); what it doesn't take comes here.
 	streams *streams
 
 	stateFile string      // where Store saves; "": nowhere
@@ -53,8 +53,8 @@ type executor struct {
 	// stopped before, say) can touch them.
 	instance string
 	lastSave chan struct{} // closed when the last save asked for has ended
-	// used is the URL of the OpAMP request or connection whose outcome came last (Go mode only:
-	// in Rust mode the core makes them itself).
+	// used is the URL of the OpAMP request or connection whose outcome came last (platform mode only:
+	// in core mode the core makes them itself).
 	used atomic.Pointer[string]
 }
 
@@ -196,9 +196,9 @@ func (x *executor) deliver(r report) bool {
 	return x.fl.deliver(r)
 }
 
-// shutdown drops everything still under way (the core has cancelled it all when it stops; in Rust
+// shutdown drops everything still under way (the core has cancelled it all when it stops; in core
 // mode it has closed every stream), waits for it to end for at most bound in all, and discards
-// what is still being reported. Rust mode's files still being written are deleted once their
+// what is still being reported. Core mode's files still being written are deleted once their
 // write in flight is over.
 func (x *executor) shutdown(bound time.Duration) {
 	end := time.Now().Add(bound)
@@ -217,7 +217,7 @@ func failed(id uint64, err error) *corepb.Failed {
 	return &corepb.Failed{Id: id, Detail: lossy(err.Error())}
 }
 
-// lossy is s as UTF-8, each byte that isn't replaced by U+FFFD, as Rust mode's own HTTP reader
+// lossy is s as UTF-8, each byte that isn't replaced by U+FFFD, as core mode's own HTTP reader
 // takes header values (String::from_utf8_lossy). Every string the client hands the core from
 // outside it (what a server sent, the environment, a path in an error) goes through it: a protobuf
 // string must be UTF-8, and one that isn't fails the step, which stops the client.

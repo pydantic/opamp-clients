@@ -51,10 +51,10 @@ const client = Client.start(
   },
   (n) => {
     if (n.kind === "remoteConfig") {
-      // Apply n.config here, then say how it went.
+      // Apply n.remoteConfig here, then say how it went.
       client.setRemoteConfigStatus(
         create(RemoteConfigStatusSchema, {
-          lastRemoteConfigHash: n.config.configHash,
+          lastRemoteConfigHash: n.remoteConfig.configHash,
           status: RemoteConfigStatuses.RemoteConfigStatuses_APPLIED,
         }),
       );
@@ -81,9 +81,9 @@ The first argument is a `Config`, the second a `Status`; both are interfaces in
 |---|---|---|
 | Endpoint | `endpoint`: `http(s)://` polls, `ws(s)://` keeps one connection open | |
 | Headers | `headers`, sent with every request and WebSocket upgrade | |
-| TLS | `tls`: `ca`, `includeDefaultCa`, `cert` and `key`, `minVersion`, `maxVersion` | [README](../node/opamp/README.md#tls-and-proxies) |
+| TLS | `tls`: `ca`, `includeSystemCas`, `cert` and `key`, `minVersion`, `maxVersion` | [README](../node/opamp/README.md#tls-and-proxies) |
 | Proxy | `proxy`: `{ url, headers, resolveLocally }`, or `false` for none. Without one, the environment's | [README](../node/opamp/README.md#tls-and-proxies) |
-| Who speaks HTTP | `mode`: `"rust"` (the default) or `"node"` (undici's `fetch` and `ws`) | [sdks.md](sdks.md#rust-mode-and-platform-mode) |
+| Who speaks HTTP | `mode`: `"core"` (the default) or `"platform"` (undici's `fetch` and `ws`) | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `stateFile`: kept across restarts, written 0600 | [state-file.md](state-file.md) |
 | Instance UID | `instanceUid` (16 bytes), or omitted for one the core makes; `requestInstanceUid` to have the server assign it; `client.instanceUid` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `capabilities` (`AgentCapabilities` bits, as a `bigint`). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
@@ -106,12 +106,12 @@ The callback gets a `Notification`, a union discriminated by `kind`.
 | `kind` | Fields | Answer with |
 |---|---|---|
 | `connected`, `connectFailed` | `status`, `detail` | |
-| `remoteConfig` | `config` | `setRemoteConfigStatus` |
-| `connectionSettings` | `settings` | `setConnectionSettingsStatus` |
-| `installPackage`, `removePackage` | `name`, `package`, `path` | `packageInstalled`, `packageRemoved` |
-| `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` | `message`, `capabilities`, `reason` | |
-| `instanceUidChanged`, `heartbeatInterval`, `command` | `instanceUid`, `ms`, `command` | |
-| `errorResponse`, `badMessage`, `statusTooLarge`, `saveStalled` | `type`, `message`, `detail`, `field`, `bytes`, `stalled`, `waitedMs` | |
+| `remoteConfig` | `remoteConfig` | `setRemoteConfigStatus` |
+| `connectionSettings` | `connectionSettings` | `setConnectionSettingsStatus` |
+| `installPackage`, `removePackage` | `packageName`, `package`, `path` | `packageInstalled`, `packageRemoved` |
+| `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` | `customMessage`, `customCapabilities`, `detail` | |
+| `instanceUidChanged`, `heartbeatInterval`, `command` | `instanceUid`, `heartbeatIntervalMs`, `command` | |
+| `errorResponse`, `badMessage`, `statusTooLarge`, `saveStalled` | `errorType`, `message`, `detail`, `field`, `bytes`, `stalled`, `waitedMs` | |
 | `stopped` | `error`: why it stopped on its own, or `undefined` after `stop()` | |
 
 ## The event loop and stop
@@ -145,7 +145,7 @@ npm test                      # compile, then node --test
 ```
 
 The conformance suite runs this client in both modes: `python3 conformance/runner/run.py --client
-node,node-rust` ([conformance/README.md](../conformance/README.md)).
+node-core-platform,node-core` ([conformance/README.md](../conformance/README.md)).
 
 ## OpenTelemetry
 

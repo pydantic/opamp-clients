@@ -4,7 +4,7 @@
 
 A container's memory is a poor measure of a .NET process's. The runtime sizes gen0's budget from
 the L3 cache, and a client that allocates little takes most of an hour to fill it: gen0 is
-hardly ever collected, and the container's memory climbs with dead objects (dotnet-core http,
+hardly ever collected, and the container's memory climbs with dead objects (dotnet-core-platform http,
 Nightly run 38112161610: 65 -> 90 MB against the Go server, and it failed against ours;
 dotnet-counters and dotnet-gcdump found no leak). So for a .NET client, once a minute, the
 harness forces a full, blocking GC in the client's container and reads what is still live, and

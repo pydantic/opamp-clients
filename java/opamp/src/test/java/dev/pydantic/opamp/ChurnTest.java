@@ -218,7 +218,7 @@ class ChurnTest {
    * Starting and stopping clients again and again leaves nothing behind: after a warm-up, rounds of
    * a client stopped at every point, over HTTP and WebSocket, leave the JVM with no more live
    * threads, open file descriptors or heap than before them (a client is a thread or more, an
-   * HttpClient in Java mode, and a core instance of hundreds of KiB of heap).
+   * HttpClient in platform mode, and a core instance of hundreds of KiB of heap).
    */
   @ParameterizedTest
   @EnumSource(OpampClient.Mode.class)

@@ -119,15 +119,15 @@ Running the examples turned these up:
 - **Python: `uuid.uuid7()` is Python 3.14 and later.** The example uses `uuid4()`; any 16 bytes
   that are not all zero are a valid instance UID.
 
-## Rust mode and platform mode
+## Core mode and platform mode
 
-Each of the five SDKs (Go, Node.js, Python, Java, .NET) can reach the server two ways. In **Rust
+Each of the five SDKs (Go, Node.js, Python, Java, .NET) can reach the server two ways. In **core
 mode** the core speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, and the language only opens
 TCP connections, starts TLS with its own library and moves the bytes, so the bytes on the wire are
 the same from every language. In **platform mode** the language's own HTTP and WebSocket stack
 carries out the core's requests.
 
-The client runs in **Rust mode** unless the application asks for **platform mode**: by naming it
+The client runs in **core mode** unless the application asks for **platform mode**: by naming it
 in the mode option, or by handing the client an HTTP client of its own, where the SDK takes one
 (an application that brings its own client has asked for the platform's stack). An option only
 one mode honours is never silently ignored: it selects that mode, or the client refuses to start
@@ -135,13 +135,13 @@ with an error that says what to set instead.
 
 | Language | Platform mode, by name | An HTTP client of the application's | Refused at start |
 |---|---|---|---|
-| Go | `Mode: opamp.ModeGo` | `Config.HTTPClient`: selects Go mode | `ModeRust` with an `HTTPClient`; `NoRustSplice` in Go mode; a `TLS.Config` with a `ServerName` in Rust mode |
-| Node.js | `mode: "node"` | takes none | `rustSplice: false` in Node mode |
-| Python | `Config(mode="python")` | takes none | `rust_splice=False` in Python mode |
-| Java | `mode(OpampClient.Mode.JAVA)` | `httpClient(...)`: selects Java mode | `Mode.RUST` with an `httpClient`; in Java mode `proxyResolveLocally`, `rustSplice(false)` and a proxy that isn't `http://` |
-| .NET | `Mode = OpAmpMode.DotNet` | `HttpClient`: selects .NET mode | `OpAmpMode.Rust` with an `HttpClient`; in .NET mode `ProxyUseLocalResolver` and `RustSplice = false` |
+| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`: selects platform mode | `ModeCore` with an `HTTPClient`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
+| Node.js | `mode: "platform"` | takes none | `spliceDownloads: false` in platform mode |
+| Python | `Config(mode="platform")` | takes none | `splice_downloads=False` in platform mode |
+| Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`: selects platform mode | `Mode.CORE` with an `httpClient`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
+| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`: selects platform mode | `OpAmpMode.Core` with an `HttpClient`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |
 
-The examples name no mode, so they run in Rust mode. The integrations of
+The examples name no mode, so they run in core mode. The integrations of
 [sdk-settings.md](sdk-settings.md) ask for platform mode by name: keeping the client's own
 requests out of the application's telemetry is built around the platform's HTTP stack there.
 
@@ -151,8 +151,8 @@ What an application that sets nothing gets, and where platform mode differs:
   default (as the language's TLS library finds them), or the CAs, client certificate and versions
   the application gives.
 - **The proxy**, when none is configured, comes from the environment by one rule in every
-  language (`tests/shell-tables/README.md`, put in place by `scripts/fetch_core.py fetch`,
-  "Rust mode's proxy rule"):
+  language (the proxy rule in `tests/shell-tables/README.md`, put in place by
+  `scripts/fetch_core.py fetch`):
   `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY`, the upper-case name first, nothing
   under CGI, and `localhost` like any other host. Platform mode keeps each platform's own
   convention instead: Go's `net/http` (never a proxy for `localhost`, no `ALL_PROXY`), Node's

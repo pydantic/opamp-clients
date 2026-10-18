@@ -75,7 +75,7 @@ class LifecycleTest {
     try (Raw server = new Raw(Raw::hold)) {
       List<Notification> notes = new CopyOnWriteArrayList<>();
       OpampClient client = OpampClient.start(
-          OpampClient.Config.builder(server.url("http") + "/v1/opamp").mode(OpampClient.Mode.JAVA).stopTimeout(Duration.ofMillis(500)).build(),
+          OpampClient.Config.builder(server.url("http") + "/v1/opamp").mode(OpampClient.Mode.PLATFORM).stopTimeout(Duration.ofMillis(500)).build(),
           OpampClient.Status.of(null), notes::add);
       Socket s = server.held();
       long t0 = System.nanoTime();
@@ -139,7 +139,7 @@ class LifecycleTest {
       Raw.upgrade(s.getOutputStream(), h);
     })) {
       OpampClient client = OpampClient.start(
-          OpampClient.Config.builder(server.url("ws") + "/v1/opamp", new byte[16]).mode(OpampClient.Mode.JAVA).build(), OpampClient.Status.of(null), n -> {});
+          OpampClient.Config.builder(server.url("ws") + "/v1/opamp", new byte[16]).mode(OpampClient.Mode.PLATFORM).build(), OpampClient.Status.of(null), n -> {});
       Thread.sleep(300);
       client.stop().get(5, TimeUnit.SECONDS);
       assertTrue(Raw.closedWithin(server.held(), 5000), "the late connection is closed");
@@ -152,7 +152,7 @@ class LifecycleTest {
   void aHandshakeThatNeverAnswersIsGivenUp() throws Exception {
     try (Raw server = new Raw(Raw::hold)) {
       OpampClient client = OpampClient.start(
-          OpampClient.Config.builder(server.url("ws") + "/v1/opamp", new byte[16]).mode(OpampClient.Mode.JAVA)
+          OpampClient.Config.builder(server.url("ws") + "/v1/opamp", new byte[16]).mode(OpampClient.Mode.PLATFORM)
               .connectTimeout(Duration.ofMillis(CONNECT_TIMEOUT_MS)).build(),
           OpampClient.Status.of(null), n -> {});
       try {
@@ -203,7 +203,7 @@ class LifecycleTest {
           .build();
       HttpServer server = opamp(new CopyOnWriteArrayList<>(), m -> Opamp.ServerToAgent.newBuilder().setPackagesAvailable(offer));
       Path state = dir.resolve("state");
-      OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.JAVA)
+      OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.PLATFORM)
           .heartbeatInterval(Duration.ofMillis(100)).stateFile(state).acceptPackages(true).build();
       OpampClient a = OpampClient.start(config, OpampClient.Status.of(null), n -> {});
       assertTrue(firstAsked.await(20, TimeUnit.SECONDS), "the first client downloads");
@@ -248,7 +248,7 @@ class LifecycleTest {
     List<Opamp.AgentToServer> got = new CopyOnWriteArrayList<>();
     HttpServer server = opamp(got, m -> Opamp.ServerToAgent.newBuilder());
     try {
-      OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.JAVA)
+      OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.PLATFORM)
           .heartbeatInterval(Duration.ofMillis(50)).stateFile(state).stopTimeout(Duration.ofMillis(500)).build();
       OpampClient a = OpampClient.start(config, OpampClient.Status.of(null), n -> {});
       assertTrue(saving.await(10, TimeUnit.SECONDS), "a save");
@@ -286,7 +286,7 @@ class LifecycleTest {
         .build();
     HttpServer server = opamp(new CopyOnWriteArrayList<>(), m -> Opamp.ServerToAgent.newBuilder().setRemoteConfig(remote));
     Path state = dir.resolve("state");
-    OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.JAVA)
+    OpampClient.Config config = OpampClient.Config.builder(endpoint(server)).mode(OpampClient.Mode.PLATFORM)
         .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE).stateFile(state).build();
     try {
       CountDownLatch told = new CountDownLatch(1);
@@ -331,7 +331,7 @@ class LifecycleTest {
   void anErrorFromTheCallbackStopsTheClient() throws Exception {
     AssertionError bug = new AssertionError("the application's bug");
     CompletableFuture<Notification.Stopped> stopped = new CompletableFuture<>();
-    OpampClient client = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1", new byte[16]).mode(OpampClient.Mode.JAVA).build(),
+    OpampClient client = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1", new byte[16]).mode(OpampClient.Mode.PLATFORM).build(),
         OpampClient.Status.of(null), n -> {
           if (n instanceof Notification.Stopped s) {
             stopped.complete(s);

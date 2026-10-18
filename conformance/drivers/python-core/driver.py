@@ -13,10 +13,10 @@ import signal
 import sys
 import time
 
-from opamp_client import TLS, Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client import TLS, Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 
-RUST = os.environ.get("OPAMP_PYTHON_MODE") == "rust"
+PLATFORM = os.environ.get("OPAMP_PYTHON_MODE") == "platform"
 
 # The custom capability DRIVERS.md names: ping is answered with pong.
 ECHO = "io.opentelemetry.echo"
@@ -166,9 +166,10 @@ async def main() -> None:
                    tls=tls(),
                    proxy=os.environ.get("DRIVER_PROXY") or None,
                    # The mode is always asked for by name, never left to the client's default:
-                   # python-core is Python mode (aiohttp), python-core-rust (OPAMP_PYTHON_MODE=rust)
-                   # Rust mode, where the core speaks HTTP and WebSocket over asyncio's streams.
-                   mode="rust" if RUST else "python"),
+                   # python-core is core mode, where the core speaks HTTP and WebSocket over
+                   # asyncio's streams, python-core-platform (OPAMP_PYTHON_MODE=platform) platform
+                   # mode (aiohttp).
+                   mode="platform" if PLATFORM else "core"),
             Status(description=description(first),
                    health=pb.ComponentHealth(healthy=True, start_time_unix_nano=time.time_ns()),
                    effective_config=pb.EffectiveConfig(config_map=pb.AgentConfigMap()),
@@ -180,7 +181,7 @@ async def main() -> None:
     except Exception as e:  # noqa: BLE001 - the contract reports anything as fatal
         emit("fatal", error=str(e))
         sys.exit(1)
-    emit("started", uid=client.instance_uid.hex(), client=f"opamp-python-core (ours{', rust mode' if RUST else ''})")
+    emit("started", uid=client.instance_uid.hex(), client=f"opamp-python-core (ours{', platform mode' if PLATFORM else ''})")
 
     changes = [float(s) for s in os.environ.get("DRIVER_CHANGES_AT_S", "").split(",") if s.strip()]
     for i, at in enumerate(changes, start=first + 1):

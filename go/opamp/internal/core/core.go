@@ -118,7 +118,7 @@ func instantiate(ctx context.Context, compiled wazero.CompiledModule, cfg *corep
 }
 
 // Step feeds the core one input at now (milliseconds on the caller's monotonic clock) and unixMs
-// (the wall clock, in ms since the Unix epoch: Rust mode reads Retry-After dates against it).
+// (the wall clock, in ms since the Unix epoch: core mode reads Retry-After dates against it).
 func (c *Core) Step(ctx context.Context, nowMs, unixMs uint64, in *corepb.Input) (*corepb.Output, error) {
 	return c.call(ctx, c.st, tapStepIn, &corepb.Step{NowMs: nowMs, Input: in, UnixMs: unixMs})
 }

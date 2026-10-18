@@ -7,10 +7,10 @@ import struct
 
 import pytest
 
-from opamp_client import CoreError
-from opamp_client._core import Core
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._proto.opamp.v1 import opamp_pb2 as pb
+from pydantic_opamp_client import CoreError
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._proto.opamp.v1 import opamp_pb2 as pb
 
 START = corepb.Input(start=corepb.Empty())
 TIMER = corepb.Input(timer=corepb.Empty())
@@ -77,7 +77,7 @@ def _records(path) -> list[tuple[int, int, bytes]]:
 def test_the_core_tap_records_every_crossing(tmp_path, monkeypatch) -> None:
     tap = tmp_path / "core.tap"
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tap))
-    monkeypatch.setattr("opamp_client._core._taps", 0)
+    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
     config = corepb.Config(instance_uid=bytes([7] * 16), endpoint="http://server/v1/opamp")
     core = Core(config)
     core.step(5, START)
@@ -88,7 +88,7 @@ def test_the_core_tap_records_every_crossing(tmp_path, monkeypatch) -> None:
     assert records[0][2] == config.SerializeToString()
     assert corepb.Reply.FromString(records[1][2]).output.instance_uid == bytes([7] * 16)
     step = corepb.Step.FromString(records[2][2])
-    # (With the wall clock, which Rust mode reads.)
+    # (With the wall clock, which core mode reads.)
     assert step == corepb.Step(now_ms=5, input=START, unix_ms=step.unix_ms) and step.unix_ms > 0
     assert corepb.Reply.FromString(records[3][2]).output.effects[0].WhichOneof("kind") == "http_request"
     nanos = [n for _, n, _ in records]
@@ -109,6 +109,6 @@ def test_the_core_tap_records_every_crossing(tmp_path, monkeypatch) -> None:
 
 def test_a_tap_that_cant_be_opened_is_skipped(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tmp_path / "missing" / "core.tap"))
-    monkeypatch.setattr("opamp_client._core._taps", 0)
+    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
     Core(corepb.Config(instance_uid=bytes([7] * 16), endpoint="http://server/v1/opamp")).step(0, START)
     assert "OPAMP_CORE_TAP" in capsys.readouterr().err

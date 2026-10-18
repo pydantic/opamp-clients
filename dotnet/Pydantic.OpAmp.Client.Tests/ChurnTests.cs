@@ -46,10 +46,10 @@ public class ChurnTests
     // Stopped before the loop has stepped much: the first request or upgrade is cancelled before
     // it has a socket, or as it gets one.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task ClientsStoppedRightAfterStartLeaveNothingBehind(OpAmpMode mode, string transport)
     {
         using var server = new TestServer();
@@ -64,8 +64,8 @@ public class ChurnTests
     // The server holds each upgrade longer than the client lives: the dial is given up on with
     // the connection open and the upgrade sent, unanswered.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task ClientsStoppedDuringTheWebSocketHandshakeLeaveNothingBehind(OpAmpMode mode)
     {
         using var server = new TestServer { HoldUpgrade = TimeSpan.FromMilliseconds(300) };
@@ -81,10 +81,10 @@ public class ChurnTests
     // Stopped once the server has answered and the next heartbeat (or poll) is in: the goodbye
     // goes out, and over WebSocket the closing handshake runs.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task ClientsStoppedWhileConnectedLeaveNothingBehind(OpAmpMode mode, string transport)
     {
         using var server = new TestServer();
@@ -100,10 +100,10 @@ public class ChurnTests
     // The callback answers the remote config and stops the client itself: the stop is queued
     // while the step that told the callback is still under way.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task ClientsStoppedFromTheRemoteConfigCallbackLeaveNothingBehind(OpAmpMode mode, string transport)
     {
         using var server = new TestServer { RemoteConfig = Remote };
@@ -133,10 +133,10 @@ public class ChurnTests
     // One state file for every client, as an agent restarting its client has: each saves (its
     // first answer, a remote config) and the next starts from what it saved.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task ClientsOnOneStateFileLeaveNothingBehind(OpAmpMode mode, string transport)
     {
         using var server = new TestServer { RemoteConfig = Remote };
@@ -172,10 +172,10 @@ public class ChurnTests
     // The callback throws on the remote config: the client stops on its own, mid-connection,
     // with no stop called, and StopAsync throws the callback's exception.
     [Theory]
-    [InlineData(OpAmpMode.DotNet, "http")]
-    [InlineData(OpAmpMode.DotNet, "ws")]
-    [InlineData(OpAmpMode.Rust, "http")]
-    [InlineData(OpAmpMode.Rust, "ws")]
+    [InlineData(OpAmpMode.Platform, "http")]
+    [InlineData(OpAmpMode.Platform, "ws")]
+    [InlineData(OpAmpMode.Core, "http")]
+    [InlineData(OpAmpMode.Core, "ws")]
     public async Task ClientsWhoseCallbackThrowsStopThemselvesAndLeaveNothingBehind(OpAmpMode mode, string transport)
     {
         using var server = new TestServer { RemoteConfig = Remote };
@@ -213,7 +213,7 @@ public class ChurnTests
         // armed after the stop is still there to count.
         StopTimeout = TimeSpan.FromSeconds(30),
         Mode = mode,
-        DirectConnection = mode == OpAmpMode.Rust,
+        DirectConnection = mode == OpAmpMode.Core,
     };
 
     /// <summary>

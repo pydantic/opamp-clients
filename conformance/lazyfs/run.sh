@@ -7,7 +7,7 @@
 # and runs inside.sh there on a copy of the repository. Results: conformance/out/lazyfs/.
 #
 #   conformance/lazyfs/run.sh                   # 25 seeds from today's, every driver of ours
-#   LAZYFS_SEEDS=2 LAZYFS_CLIENTS==go-core conformance/lazyfs/run.sh
+#   LAZYFS_SEEDS=2 LAZYFS_CLIENTS==go-core-platform conformance/lazyfs/run.sh
 #   LAZYFS_SEED_BASE=20261002000 LAZYFS_SEEDS=1 ...    # replay: the seed a failure printed
 #
 # Without FUSE (no /dev/fuse, or no right to mount it) it says why and exits 0, skipped; with
@@ -46,6 +46,6 @@ echo "LazyFS crash seeds ${base} to $(( base + ${LAZYFS_SEEDS:-25} - 1 ))"
 docker run --rm "${fuse[@]}" \
   -v "$root:/src:ro" -v "$out:/results" -v /lazyfs -v "${LAZYFS_CACHE:-opamp-lazyfs-cache}:/cache" \
   -e LAZYFS_SEEDS="${LAZYFS_SEEDS:-25}" -e LAZYFS_SEED_BASE="$base" -e LAZYFS_JOBS="${LAZYFS_JOBS:-2}" \
-  -e LAZYFS_CLIENTS="${LAZYFS_CLIENTS:-=rust,=go-core,=node,=python-core,=java-core,=dotnet-core}" \
+  -e LAZYFS_CLIENTS="${LAZYFS_CLIENTS:-=rust,=go-core-platform,=node-core-platform,=python-core-platform,=java-core-platform,=dotnet-core-platform}" \
   -e LAZYFS_SAVES="${LAZYFS_SAVES:-1}" -e HOST_IDS="$(id -u):$(id -g)" \
   "$image" bash /src/conformance/lazyfs/inside.sh

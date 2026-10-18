@@ -179,7 +179,7 @@ final class Core implements AutoCloseable {
 
   /**
    * Feed the core one input at {@code nowMs} (milliseconds on a monotonic clock) and {@code unixMs}
-   * (the wall clock, in ms since the Unix epoch: Rust mode reads Retry-After dates against it).
+   * (the wall clock, in ms since the Unix epoch: core mode reads Retry-After dates against it).
    */
   CoreProto.Output step(long nowMs, long unixMs, CoreProto.Input input) {
     return call(step, Tap.STEP_IN,

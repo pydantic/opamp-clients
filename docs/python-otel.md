@@ -52,7 +52,7 @@ answered as done ([the host](sdk-settings.md#the-host)). The package logs a warn
 
 ### Is it working?
 
-The package says so on the `opamp_otel` logger. When the client first reaches the server it logs,
+The package says so on the `pydantic_opamp_otel` logger. When the client first reaches the server it logs,
 at INFO, `OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout,
 instance <uid>`. When it can't, it logs one WARNING per run of failures, with what to check:
 
@@ -76,9 +76,9 @@ An application that sets its SDK up in code, rather than under `opentelemetry-in
 (Locust, say, whose gevent rules it out), gets the same with one call in place of that setup:
 
 ```python
-import opamp_otel
+import pydantic_opamp_otel
 
-opamp_otel.configure()
+pydantic_opamp_otel.configure()
 # then the application's own instrumentors, as before:
 RequestsInstrumentor().instrument()
 ```
@@ -90,7 +90,7 @@ above), set as the global ones, with the live sampler, the gated exporters and t
 above, or from the application, as `configure()`'s own arguments:
 
 ```python
-opamp_otel.configure(
+pydantic_opamp_otel.configure(
     endpoint="https://opamp.example.com/v1/opamp",
     headers={"Authorization": f"Bearer {settings.opamp_key}"},
 )
@@ -106,7 +106,7 @@ and with neither it is the default:
 | `state_dir` | `OTEL_OPAMP_STATE_DIR` | A directory (`str` or a path), or `"none"` for none, not even the default one. |
 | `heartbeat_interval` | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | Seconds (`0.5`, `30`), a `timedelta`, or a string as the variable (`"30s"`, `"2m"`, `"1500"` for milliseconds). |
 
-A value it can't use is warned about on the `opamp_otel` logger and is the default, as a variable
+A value it can't use is warned about on the `pydantic_opamp_otel` logger and is the default, as a variable
 it can't read is: an endpoint that isn't a string leaves the SDK unmanaged, headers that aren't
 all strings are none (the warning doesn't show them), a `state_dir` that isn't a path is the
 default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, NaN, `"soon"`) is
@@ -193,7 +193,7 @@ other override above that a process cannot carry out.
   keeps the parent's resource, `service.instance.id` included. When the parent stops it removes
   the file, and its children keep the settings in force.
 
-The rules are the SDK settings layer's (`opamp_client.sdk`), the same in every language. The
+The rules are the SDK settings layer's (`pydantic_opamp_client.sdk`), the same in every language. The
 package only carries them out on the Python SDK.
 
 ## The newer settings
@@ -219,7 +219,7 @@ local.
 ```
 
 No traces of health checks, served or made, every `checkout ...` trace, and a quarter of the
-rest. In the live sampler (`opamp_otel.LiveSampler`), for a span with no parent only: the first
+rest. In the live sampler (`pydantic_opamp_otel.LiveSampler`), for a span with no parent only: the first
 rule that matches sets the rate, applied by the SDK's `TraceIdRatioBased`; with none,
 `head_sampling`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
 parent follows it. What a rule sees is what the instrumentation passes when it starts the span:
@@ -313,7 +313,7 @@ The server may send the application settings of its own in the policy's `app_set
 ([app-settings.md](app-settings.md)):
 
 ```python
-from opamp_otel import app_settings
+from pydantic_opamp_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...

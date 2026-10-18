@@ -38,8 +38,8 @@ class DockerDrivers(unittest.TestCase):
     def test_a_driver_that_torture_crashes_gets_every_variable(self):
         # Docker passes a variable into the container only if `-e` names it. A driver torture
         # restarts after a crash that never sees DRIVER_FIRST_CHANGE starts its statuses over at 0,
-        # and status_never_goes_back fails. Nightly 2026-10-14: every java-core, java-core-rust,
-        # dotnet-core and dotnet-core-rust torture run.
+        # and status_never_goes_back fails. Nightly 2026-10-14: every java-core-platform, java-core,
+        # dotnet-core-platform and dotnet-core torture run.
         wanted = driver_env()
         crashed = 0
         for name, spec in run.load_clients(None).items():

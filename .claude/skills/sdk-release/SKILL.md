@@ -23,7 +23,7 @@ an issue in this repository; track release work where the steward skill says. Pu
 | Tag | Workflow | What gets published |
 |---|---|---|
 | `go/vX.Y.Z` | none | the client module `github.com/pydantic/opamp-clients/go`, served by proxy.golang.org |
-| `go/otel/vX.Y.Z`, `go/opampextension/vX.Y.Z` | none | those nested modules (the extension is used through an ocb manifest) |
+| `go/opampotel/vX.Y.Z`, `go/opampextension/vX.Y.Z` | none | those nested modules (the extension is used through an ocb manifest) |
 | `go/opampsupervisor/vX.Y.Z` | `release.yml` | the module, plus a GitHub Release: six archives (linux, darwin, windows x amd64, arm64), `SHA256SUMS`, a provenance attestation per archive |
 | `sdk/vX.Y.Z` | `registries.yml` | PyPI, npm, Maven Central, NuGet, each only once `SDK_REGISTRIES` names it |
 | `core/vX.Y.Z` | not here | the core release the lock pins; never cut by a session in this repository |
@@ -35,7 +35,7 @@ and tested in CI, not published.
 
 ## 2. Go modules
 
-1. In a PR, make every nested `go.mod` (`go/otel`, `go/opampextension`, `go/opampsupervisor`)
+1. In a PR, make every nested `go.mod` (`go/opampotel`, `go/opampextension`, `go/opampsupervisor`)
    `require github.com/pydantic/opamp-clients/go vX.Y.Z`, the version about to be tagged. Keep each
    `replace ... => ../`: consumers ignore it, but a `v0.0.0` require breaks them. See
    [docs/sdk-registries.md](../../../docs/sdk-registries.md) (Go row). Squash-merge on the maintainer's line.
@@ -43,13 +43,13 @@ and tested in CI, not published.
    for more), the client first and the Supervisor alone:
    ```bash
    git fetch origin main
-   for t in go go/otel go/opampextension go/opampsupervisor; do git tag "$t/vX.Y.Z" <merge-sha>; done
-   git push origin go/vX.Y.Z go/otel/vX.Y.Z go/opampextension/vX.Y.Z
+   for t in go go/opampotel go/opampextension go/opampsupervisor; do git tag "$t/vX.Y.Z" <merge-sha>; done
+   git push origin go/vX.Y.Z go/opampotel/vX.Y.Z go/opampextension/vX.Y.Z
    git push origin go/opampsupervisor/vX.Y.Z      # alone: it triggers release.yml
    ```
 3. Check that the proxy serves them (each prints Path, Version, Time):
    ```bash
-   for m in go go/otel go/opampextension go/opampsupervisor; do
+   for m in go go/opampotel go/opampextension go/opampsupervisor; do
      GOFLAGS=-mod=mod go list -m -json github.com/pydantic/opamp-clients/$m@vX.Y.Z; done
    ```
    The proxy caches a tag for good: a wrong tag is fixed by the next version, never by moving it.

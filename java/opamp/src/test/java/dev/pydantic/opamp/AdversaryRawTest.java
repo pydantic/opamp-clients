@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The adversary's raw server: what the
- * streams of a Rust mode run of {@link AdversaryPropertiesTest} connect to. A stream is bytes, not
+ * streams of a core mode run of {@link AdversaryPropertiesTest} connect to. A stream is bytes, not
  * HTTP, so the adversary tells the server what to do in the first line it writes:
  *
  * <pre>opamp-raw tag=7 send=1000 chunk=100 gap=5 end=fin</pre>

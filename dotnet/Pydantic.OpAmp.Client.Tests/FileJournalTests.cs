@@ -26,8 +26,8 @@ public class FileJournalTests
 
     // covers: RULE-SHELL-09
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task ASaveAndADownloadAreJournaledAndTheCheckerHoldsThem(OpAmpMode mode)
     {
         var dir = Directory.CreateTempSubdirectory("opamp-journal-").FullName;
@@ -63,7 +63,7 @@ public class FileJournalTests
                 HeartbeatInterval = TimeSpan.FromMilliseconds(200),
                 StateFile = state,
                 AcceptPackages = true,
-                Mode = mode, DirectConnection = mode == OpAmpMode.Rust,
+                Mode = mode, DirectConnection = mode == OpAmpMode.Core,
             },
             new OpAmpStatus(),
             n =>
@@ -115,8 +115,9 @@ public class FileJournalTests
         Assert.Equal(Package.Length, writes.Sum(w => int.Parse(w.Field("len"), System.Globalization.CultureInfo.InvariantCulture)));
         var sync = download[2 + writes.Count];
         Assert.Equal("sync", sync.Field("op"));
-        // (Rust mode: the shell answers the core's download itself; what crosses the tap is the file's downloaded.)
-        var answer = mode == OpAmpMode.Rust ? Input.KindOneofCase.Downloaded : Input.KindOneofCase.DownloadResponse;
+        // (core mode: the shell answers the core's download itself; what crosses the tap is the
+        // file's downloaded.)
+        var answer = mode == OpAmpMode.Core ? Input.KindOneofCase.Downloaded : Input.KindOneofCase.DownloadResponse;
         var response = TapKit.Inputs(records).First(i => i.Input.KindCase == answer).Record;
         Assert.True(response.At > sync.At, "the download was answered before its file was flushed");
         Assert.DoesNotContain(files, f => f.Field("op") == "open");
@@ -160,8 +161,8 @@ public class FileJournalTests
     // download gets the same id. The first's download, let go after the second started, lands on
     // nothing of the second's: the file handed over is the one offered.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task S3_ADownloadDoesNotOutliveStop(OpAmpMode mode)
     {
         var file = Encoding.ASCII.GetBytes("the package, version 1");
@@ -209,7 +210,7 @@ public class FileJournalTests
             HeartbeatInterval = TimeSpan.FromHours(1),
             StateFile = state,
             AcceptPackages = true,
-            Mode = mode, DirectConnection = mode == OpAmpMode.Rust,
+            Mode = mode, DirectConnection = mode == OpAmpMode.Core,
         };
         var clock = System.Diagnostics.Stopwatch.StartNew();
         var a = OpAmpClient.Start(options, new OpAmpStatus());

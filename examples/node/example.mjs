@@ -124,12 +124,12 @@ const client = Client.start(
     if (n.kind === "connectionSettings") {
       // Where to send our own telemetry: all the settings, not only what changed.
       const status = create(ConnectionSettingsStatusSchema, {
-        lastConnectionSettingsHash: n.settings.hash,
+        lastConnectionSettingsHash: n.connectionSettings.hash,
         status: ConnectionSettingsStatuses.ConnectionSettingsStatuses_APPLIED,
       });
-      if (n.settings.ownTraces) {
+      if (n.connectionSettings.ownTraces) {
         try {
-          live.set(exporter(n.settings.ownTraces));
+          live.set(exporter(n.connectionSettings.ownTraces));
         } catch (err) {
           status.status = ConnectionSettingsStatuses.ConnectionSettingsStatuses_FAILED;
           status.errorMessage = String(err);
@@ -139,10 +139,10 @@ const client = Client.start(
       return;
     }
     if (n.kind !== "remoteConfig") return;
-    const status = create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.config.configHash });
+    const status = create(RemoteConfigStatusSchema, { lastRemoteConfigHash: n.remoteConfig.configHash });
     let ratio;
     try {
-      const body = n.config.config?.configMap[""]?.body ?? new Uint8Array();
+      const body = n.remoteConfig.config?.configMap[""]?.body ?? new Uint8Array();
       ratio = JSON.parse(new TextDecoder().decode(body)).sampling_ratio;
     } catch {
       ratio = undefined;

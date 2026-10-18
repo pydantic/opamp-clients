@@ -2,15 +2,15 @@
 # container instead, where the mount is: `run.py --clients-override conformance/lazyfs/native.toml`.
 # Only what differs; the rest (features, transports) is clients.toml's.
 
-[java-core]
+[java-core-platform]
 docker = false
 build = { cwd = "java/opamp", cmd = ["sh", "-c",
   "mvn -q -B -DskipTests package && javac -d target/driver -cp 'target/classes:target/lib/*' {conf}/drivers/java-core/Driver.java"] }
 # Basic proxy credentials through CONNECT tunnels, which the JDK refuses by default.
-run = ["java", "-Djdk.http.auth.tunneling.disabledSchemes=",
+run = ["env", "OPAMP_JAVA_MODE=platform", "java", "-Djdk.http.auth.tunneling.disabledSchemes=",
        "-cp", "{root}/java/opamp/target/driver:{root}/java/opamp/target/classes:{root}/java/opamp/target/lib/*", "Driver"]
 
-[dotnet-core]
+[dotnet-core-platform]
 docker = false
 # The native core as the project's own build takes it (no OpAmpNativeLib): built here from the
 # core's sources where they are, else the one fetched into target/release; not in Docker by
@@ -18,4 +18,4 @@ docker = false
 native = false
 build = { cwd = "conformance/drivers/dotnet-core", cmd = [
   "dotnet", "publish", "-c", "Release", "-o", "{conf}/drivers/dotnet-core/out", "--nologo", "-v", "q"] }
-run = ["dotnet", "{conf}/drivers/dotnet-core/out/Driver.dll"]
+run = ["env", "OPAMP_DOTNET_MODE=platform", "dotnet", "{conf}/drivers/dotnet-core/out/Driver.dll"]

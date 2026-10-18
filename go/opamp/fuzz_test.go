@@ -534,13 +534,13 @@ type fuzzDownload struct {
 	cancelled bool
 }
 
-// Rust mode's download files, over any order of data, download_done and cancels the core may give
+// Core mode's download files, over any order of data, download_done and cancels the core may give
 // for a few downloads at once, with faults injected into the disk: a download done is answered
 // once, downloaded with the digest of exactly the bytes handed over and a file holding them, or
 // failed (only when a fault was injected) with no file left; a cancelled one is never answered and
 // leaves no file; a discard deletes the file; every file operation is under the state file's
 // directory; and nothing is left once the core has discarded everything.
-func FuzzRustModeDownloadFiles(f *testing.F) {
+func FuzzCoreModeDownloadFiles(f *testing.F) {
 	f.Add([]byte{0x00, 3, 'a', 'b', 'c', 0x04}, []byte{})
 	f.Add([]byte{0x00, 2, 'x', 'y', 0x08, 1, 'z', 0x04, 0x0c, 0x05}, []byte{})
 	f.Add([]byte{0x00, 1, 'q', 0x05, 0x0c}, []byte{})
@@ -673,14 +673,14 @@ func fuzzURL(raw string) string {
 	return raw
 }
 
-// Go mode's requests and downloads, against a server that answers anything: a request goes only to
-// the URL the core gave (as net/url reads it), with the core's headers exactly and its body, or
-// fails without being sent when that URL can't be requested; the answer names the effect, can be
-// encoded for the core, and is the response as it came (status, headers, body), or failed when the
-// body is over the core's limit. A download's file holds the body, its digest says so, a redirect's
-// Location is resolved against the URL requested, a body over the limit leaves no file, and a
-// discard deletes it.
-func FuzzGoModeRequests(f *testing.F) {
+// Platform mode's requests and downloads, against a server that answers anything: a request goes
+// only to the URL the core gave (as net/url reads it), with the core's headers exactly and its
+// body, or fails without being sent when that URL can't be requested; the answer names the effect,
+// can be encoded for the core, and is the response as it came (status, headers, body), or failed
+// when the body is over the core's limit. A download's file holds the body, its digest says so, a
+// redirect's Location is resolved against the URL requested, a body over the limit leaves no file,
+// and a discard deletes it.
+func FuzzPlatformModeRequests(f *testing.F) {
 	f.Add(false, "/v1/opamp", []byte("Content-Type:application/x-protobuf"), []byte("body"), uint16(200), []byte("X-Odd:caf\xe9"), []byte("reply"), uint64(1<<20))
 	f.Add(true, "/pkg/agent.tar.gz?sig=1", []byte("Authorization:Bearer t"), []byte{}, uint16(302), []byte("Location:../v2/agent.tar.gz"), []byte("moved"), uint64(1<<20))
 	f.Add(true, "/pkg", []byte{}, []byte{}, uint16(301), []byte("Location:http://[\xe9"), []byte{}, uint64(0))
@@ -863,7 +863,7 @@ func FuzzEffectDispatch(f *testing.F) {
 		f.Add(b, false)
 		f.Add(b, true)
 	}
-	f.Fuzz(func(t *testing.T, raw []byte, rust bool) {
+	f.Fuzz(func(t *testing.T, raw []byte, coreMode bool) {
 		out := &corepb.Output{}
 		if err := proto.Unmarshal(raw, out); err != nil || len(out.Effects) > 64 {
 			t.Skip()
@@ -886,8 +886,8 @@ func FuzzEffectDispatch(f *testing.F) {
 			journal = append(journal, m)
 			jmu.Unlock()
 		})
-		if rust {
-			x.streams = newStreams(x, &tls.Config{}, newRustProxies(Proxy{}, func(string) (string, bool) { return "", false }), fuzzStreamPlatform)
+		if coreMode {
+			x.streams = newStreams(x, &tls.Config{}, newCoreProxies(Proxy{}, func(string) (string, bool) { return "", false }), fuzzStreamPlatform)
 		}
 		ids := map[uint64]bool{}
 		for _, e := range out.Effects {

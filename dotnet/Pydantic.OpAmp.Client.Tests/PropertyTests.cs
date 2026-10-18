@@ -196,7 +196,7 @@ public class PropertyTests
         var started = OpAmpClient.Start(
             new OpAmpClientOptions
             {
-                Mode = OpAmpMode.DotNet,
+                Mode = OpAmpMode.Platform,
                 Endpoint = new Uri($"{(plan.Ws ? "ws" : "http")}://127.0.0.1:{port}/v1/opamp"),
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(20),

@@ -19,7 +19,7 @@ test("an annotation is one line, its title and message escaped", () => {
 });
 
 test("a name pattern matches the name alone", () => {
-  const name = "node mode: the shell contract holds (fast-check's scheduler) [x] $1.5 ^ok";
+  const name = "platform mode: the shell contract holds (fast-check's scheduler) [x] $1.5 ^ok";
   const re = new RegExp(namePattern(name));
   assert.ok(re.test(name));
   assert.ok(!re.test(`${name} too`));

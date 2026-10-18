@@ -406,9 +406,9 @@ internal sealed class SdkAgent
             // A key of its own, offered by the server: taken with a state directory (StateFile)
             // and kept there; without one the client neither declares nor takes it.
             AcceptConnectionSettings = true,
-            // .NET mode, asked for by name: the client's requests go through HttpClient, which is
-            // what the suppression below keeps out of the application's traces.
-            Mode = OpAmpMode.DotNet,
+            // Platform mode, asked for by name: the client's requests go through HttpClient, which
+            // is what the suppression below keeps out of the application's traces.
+            Mode = OpAmpMode.Platform,
         };
         ComponentHealth first;
         lock (this.gate)

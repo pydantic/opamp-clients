@@ -13,11 +13,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
- * Rust mode's network in memory ({@link Streams.Platform}): each connection the client asks for
+ * Core mode's network in memory ({@link Streams.Platform}): each connection the client asks for
  * waits as a {@link Dial} until the test accepts it (a pair of bounded pipes, the far end the
  * test's {@link End}) or refuses it; names resolve as the test says. Only monitors (wait and
  * notify) and threads: Fray explores it as it explores the rest (StreamsFrayTest, ShellFrayTest
- * in Rust mode), and a plain test uses it to choose when each step completes.
+ * in core mode), and a plain test uses it to choose when each step completes.
  */
 final class MemoryNet implements Streams.Platform {
   /** Bytes a pipe holds before its writer waits: the kernel's buffers. */

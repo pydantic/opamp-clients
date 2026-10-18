@@ -33,19 +33,20 @@ def lazyfs_clients() -> list[str]:
 class LazyFSClients(unittest.TestCase):
     def test_the_lazyfs_container_needs_no_docker_for_its_clients(self):
         # The LazyFS container has no Docker: a driver that runs in a container, or a build that
-        # needs one (a native core built for Linux in Docker, scripts/native_lib.py), can't run there.
-        # Nightly 2026-10-11: dotnet-core's native build called docker in the container and failed.
+        # needs one (a native core built for Linux in Docker, scripts/native_lib.py), can't run
+        # there. Nightly 2026-10-11: dotnet-core-platform's native build called docker in the
+        # container and failed.
         clients = run.load_clients(LAZYFS / "native.toml")
         # (The Rust client, built from the core's sources, only where they are.)
         wanted = [c for c in lazyfs_clients() if c in clients]
-        self.assertIn("dotnet-core", wanted)
+        self.assertIn("dotnet-core-platform", wanted)
         self.assertEqual(run.need_docker(clients, wanted), [])
 
     def test_a_client_built_or_run_in_docker_is_named(self):
         clients = run.load_clients(None)
-        self.assertIn("dotnet-core", run.need_docker(clients, ["dotnet-core"]))
-        self.assertIn("java-core", run.need_docker(clients, ["java-core"]))
-        self.assertEqual(run.need_docker(clients, [c for c in ("rust", "go-core") if c in clients]), [])
+        self.assertIn("dotnet-core-platform", run.need_docker(clients, ["dotnet-core-platform"]))
+        self.assertIn("java-core-platform", run.need_docker(clients, ["java-core-platform"]))
+        self.assertEqual(run.need_docker(clients, [c for c in ("rust", "go-core-platform") if c in clients]), [])
 
 
 class CoreRoot(unittest.TestCase):
@@ -103,7 +104,7 @@ class BackoffCovered(unittest.TestCase):
     def test_redirect_runs_past_the_latest_comeback(self):
         # redirects_not_followed needs the client back after the redirects. The fault window is
         # timed from the driver's first request, the run from the driver's start: a run of 30 s
-        # against a comeback as late as 31 s failed about 1% of the time (dotnet-core-rust, ws).
+        # against a comeback as late as 31 s failed about 1% of the time (dotnet-core, ws).
         scenario = json.loads((run.CONF / "scenarios" / "redirect.json").read_text())
         (fault,) = [f for f in scenario["server"]["faults"] if f["action"] == "http_status"]
         self.assertEqual(fault["window_s"][0], 0)

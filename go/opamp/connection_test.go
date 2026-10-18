@@ -449,9 +449,9 @@ func endpoint(ts *httptest.Server, ws bool) string {
 	return ts.URL + "/v1/opamp"
 }
 
-// clientConfig is a Go mode client's settings (checkCombination sets the mode it tests).
+// clientConfig is a platform mode client's settings (checkCombination sets the mode it tests).
 func clientConfig(ts *httptest.Server, ws bool) Config {
-	return Config{Mode: ModeGo, Endpoint: endpoint(ts, ws), InstanceUID: [16]byte{0x42}, HeartbeatInterval: 50 * time.Millisecond}
+	return Config{Mode: ModePlatform, Endpoint: endpoint(ts, ws), InstanceUID: [16]byte{0x42}, HeartbeatInterval: 50 * time.Millisecond}
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -464,9 +464,9 @@ func clientConfig(ts *httptest.Server, ws bool) Config {
 // covers: RULE-TLS-01, RULE-TLS-02, RULE-PROXY-01
 //
 // In both modes: Go's net/http and gorilla, and the core's own HTTP and WebSocket over Go's
-// connections and crypto/tls (Rust mode).
+// connections and crypto/tls (core mode).
 func TestEveryTransportOverEveryTLSAndProxy(t *testing.T) {
-	for _, client := range []Mode{ModeGo, ModeRust} {
+	for _, client := range []Mode{ModePlatform, ModeCore} {
 		for _, ws := range []bool{false, true} {
 			for _, mode := range []string{"", "tls", "mtls"} {
 				for _, via := range []string{"", "http", "https", "socks5"} {
@@ -483,8 +483,8 @@ func checkCombination(t *testing.T, client Mode, ws bool, mode, via string) {
 	srv, ts := startServer(t, ca, mode)
 	cfg := clientConfig(ts, ws)
 	cfg.Mode = client
-	if client == ModeRust && via == "" {
-		cfg.Proxy.Direct = true // the local server, whatever the environment says (Rust mode's rule proxies loopback too)
+	if client == ModeCore && via == "" {
+		cfg.Proxy.Direct = true // the local server, whatever the environment says (core mode's rule proxies loopback too)
 	}
 	if mode != "" || via == "https" {
 		cfg.TLS.CAPEM = ca.pem
@@ -556,12 +556,12 @@ func checkCombination(t *testing.T, client Mode, ws bool, mode, via string) {
 			t.Fatalf("%s came from %s, not through the proxy (tunnels %v)", r.path, r.remote, tunnels)
 		}
 		// Plain HTTP through an HTTP proxy is in absolute form with net/http (the download below
-		// is Go mode's executor in both modes); everything else tunnels, and in Rust mode the
+		// is platform mode's executor in both modes); everything else tunnels, and in core mode the
 		// core tunnels plain HTTP too.
 		want := "connect"
 		if via == "socks5" {
 			want = "socks5"
-		} else if mode == "" && ((!ws && client == ModeGo) || r.path == "/file") {
+		} else if mode == "" && ((!ws && client == ModePlatform) || r.path == "/file") {
 			want = "forward"
 		}
 		if tn.via != want {
@@ -797,10 +797,10 @@ func TestBadOptions(t *testing.T) {
 		if cfg.Endpoint == "" {
 			cfg.Endpoint = "http://127.0.0.1:1"
 		}
-		// In each mode that takes the option: an HTTPClient is Go mode's (and selects it).
-		modes := []Mode{ModeGo, ModeRust}
+		// In each mode that takes the option: an HTTPClient is platform mode's (and selects it).
+		modes := []Mode{ModePlatform, ModeCore}
 		if cfg.HTTPClient != nil {
-			modes = []Mode{"", ModeGo}
+			modes = []Mode{"", ModePlatform}
 		}
 		for _, mode := range modes {
 			cfg.Mode = mode
@@ -810,7 +810,7 @@ func TestBadOptions(t *testing.T) {
 			}
 		}
 	}
-	// A wrapped RoundTripper is fine over plain HTTP (the HTTPClient selects Go mode).
+	// A wrapped RoundTripper is fine over plain HTTP (the HTTPClient selects platform mode).
 	c, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:1", HTTPClient: wrapped}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)

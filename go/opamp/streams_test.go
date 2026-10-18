@@ -3,7 +3,7 @@
 
 package opamp
 
-// Rust mode's executor (streams.go) on its own, the test playing the loop: it carries out stream
+// Core mode's executor (streams.go) on its own, the test playing the loop: it carries out stream
 // effects as the core would hand them over, and takes each report as the loop does (deliver, then
 // the step's effects, then settled). Its register: a close, a cancel and stop end what they name
 // at once; a connect, a TLS handshake or a resolution that completes after its close is closed at
@@ -38,7 +38,7 @@ import (
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
 
-// streamRig is a Rust-mode executor with the test as its loop.
+// streamRig is a core-mode executor with the test as its loop.
 type streamRig struct {
 	t     *testing.T
 	x     *executor
@@ -64,7 +64,7 @@ func newStreamRig(t *testing.T, p *streamPlatform, fsys fileSystem) *streamRig {
 		r.journal = append(r.journal, m)
 		r.mu.Unlock()
 	})
-	r.s = newStreams(r.x, &tls.Config{}, newRustProxies(Proxy{Direct: true}, nil), p)
+	r.s = newStreams(r.x, &tls.Config{}, newCoreProxies(Proxy{Direct: true}, nil), p)
 	r.x.streams = r.s
 	t.Cleanup(func() {
 		if !r.x.fl.closed {
@@ -715,7 +715,7 @@ func TestStreamsDownloadFiles(t *testing.T) {
 // ignored; a cancel of a save goes on to the executor.
 func TestStreamsProxyAnswerAndStrays(t *testing.T) {
 	r := newStreamRig(t, nil, nil)
-	r.s.proxies = newRustProxies(Proxy{URL: "socks5://u:p@proxy:1080"}, nil)
+	r.s.proxies = newCoreProxies(Proxy{URL: "socks5://u:p@proxy:1080"}, nil)
 	back := r.do(nil, &corepb.Effect{Kind: &corepb.Effect_ProxyQuery{ProxyQuery: &corepb.Url{Id: 3, Url: "https://example.com/"}}})
 	if len(back) != 1 || back[0].in.GetProxyAnswer().GetProxy() != "socks5://u:p@proxy:1080" || back[0].in.GetProxyAnswer().Id != 3 {
 		t.Fatalf("got %v", back)
@@ -725,7 +725,7 @@ func TestStreamsProxyAnswerAndStrays(t *testing.T) {
 	}
 	r.quiet(50 * time.Millisecond)
 	if mine, _ := r.s.do(cancelEffect(12)); mine {
-		t.Fatal("a cancel taken as Rust mode's alone")
+		t.Fatal("a cancel taken as core mode's alone")
 	}
 }
 
@@ -769,19 +769,19 @@ func tapOutputs(t *testing.T, path string) []*corepb.Effect {
 	return out
 }
 
-// Rust mode end to end: a package offered over HTTP and WebSocket is downloaded by the core over
+// Core mode end to end: a package offered over HTTP and WebSocket is downloaded by the core over
 // Go's connections into a file that holds exactly what the server sent, handed over, then deleted
 // once installed. With splicing (the default) the body goes from the connection to the file;
-// with NoRustSplice it passes through the core (download_data) instead.
-func TestRustModeDownloadsAPackage(t *testing.T) {
+// with NoSpliceDownloads it passes through the core (download_data) instead.
+func TestCoreModeDownloadsAPackage(t *testing.T) {
 	for _, ws := range []bool{false, true} {
 		for _, splice := range []bool{true, false} {
-			t.Run(fmt.Sprintf("ws=%v/splice=%v", ws, splice), func(t *testing.T) { rustModeDownload(t, ws, splice) })
+			t.Run(fmt.Sprintf("ws=%v/splice=%v", ws, splice), func(t *testing.T) { coreModeDownload(t, ws, splice) })
 		}
 	}
 }
 
-func rustModeDownload(t *testing.T, ws, splice bool) {
+func coreModeDownload(t *testing.T, ws, splice bool) {
 	file := bytes.Repeat([]byte("package bytes "), 150_000) // 2.1 MB
 	sum := sha256.Sum256(file)
 	var offered atomic.Bool
@@ -832,7 +832,7 @@ func rustModeDownload(t *testing.T, ws, splice bool) {
 	defer ts.Close()
 	srvURL = ts.URL
 	dir := t.TempDir()
-	cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeRust, NoRustSplice: !splice, Proxy: Proxy{Direct: true},
+	cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeCore, NoSpliceDownloads: !splice, Proxy: Proxy{Direct: true},
 		InstanceUID: [16]byte{7}, HeartbeatInterval: 50 * time.Millisecond, StateFile: filepath.Join(dir, "state"),
 		AcceptPackages: true, tapFile: filepath.Join(dir, "core.tap")}
 	installed := make(chan string, 1)
@@ -878,17 +878,17 @@ func rustModeDownload(t *testing.T, ws, splice bool) {
 		t.Error("no stream_splice with splicing on")
 	}
 	if !splice && (spliced > 0 || data == 0) {
-		t.Errorf("with NoRustSplice: %d splices, %d download_data", spliced, data)
+		t.Errorf("with NoSpliceDownloads: %d splices, %d download_data", spliced, data)
 	}
 	if err := checkTap(dir); err != nil {
 		t.Error(err)
 	}
 }
 
-// Rust mode: a 503 whose Retry-After is an HTTP-date a few seconds ahead is retried after about
+// Core mode: a 503 whose Retry-After is an HTTP-date a few seconds ahead is retried after about
 // that long, the core reading the date against the wall clock each step carries (not 1970, which
 // makes it the hour's cap).
-func TestRustModeRetryAfterDate(t *testing.T) {
+func TestCoreModeRetryAfterDate(t *testing.T) {
 	for _, ws := range []bool{false, true} {
 		t.Run(fmt.Sprintf("ws=%v", ws), func(t *testing.T) {
 			var mu sync.Mutex
@@ -910,7 +910,7 @@ func TestRustModeRetryAfterDate(t *testing.T) {
 				w.WriteHeader(http.StatusServiceUnavailable)
 			}))
 			defer ts.Close()
-			cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeRust, Proxy: Proxy{Direct: true},
+			cfg := Config{Endpoint: endpoint(ts, ws), Mode: ModeCore, Proxy: Proxy{Direct: true},
 				InstanceUID: [16]byte{7}, HeartbeatInterval: 50 * time.Millisecond}
 			c, err := Start(context.Background(), cfg, Status{}, nil)
 			if err != nil {
@@ -945,14 +945,14 @@ func TestAModeRefusesWhatItCantTake(t *testing.T) {
 		cfg  Config
 		want string
 	}{
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeRust, HTTPClient: &http.Client{}}, "HTTPClient in Rust mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, HTTPClient: &http.Client{}}, "HTTPClient in core mode"},
 		{Config{Endpoint: "http://127.0.0.1:9/", Mode: "python"}, "Mode \"python\""},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeRust, Proxy: Proxy{URL: "socks4://p:1"}}, "SOCKS4"},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeRust, TLS: TLS{CAPEM: []byte("no")}}, "CAPEM"},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeRust, TLS: TLS{Config: named}}, "TLS.Config.ServerName in Rust mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", TLS: TLS{Config: named}}, "TLS.Config.ServerName in Rust mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeGo, NoRustSplice: true}, "NoRustSplice in Go mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", HTTPClient: &http.Client{}, NoRustSplice: true}, "NoRustSplice in Go mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, Proxy: Proxy{URL: "socks4://p:1"}}, "SOCKS4"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: TLS{CAPEM: []byte("no")}}, "CAPEM"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", HTTPClient: &http.Client{}, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
 	} {
 		if _, err := Start(context.Background(), c.cfg, Status{}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%+v: %v, want %q", c.cfg, err, c.want)
@@ -960,33 +960,33 @@ func TestAModeRefusesWhatItCantTake(t *testing.T) {
 	}
 }
 
-// The mode a client runs in: Rust mode with nothing said, Go mode when asked for, by Mode or by
-// an HTTP client of the application's (which only Go mode can use).
+// The mode a client runs in: core mode with nothing said, platform mode when asked for, by Mode or
+// by an HTTP client of the application's (which only platform mode can use).
 func TestTheModeAClientRunsIn(t *testing.T) {
 	own := &http.Client{}
 	for _, c := range []struct {
-		name string
-		cfg  Config
-		rust bool
+		name     string
+		cfg      Config
+		coreMode bool
 	}{
 		{"nothing said", Config{}, true},
 		{"TLS and a proxy", Config{TLS: TLS{MinVersion: tls.VersionTLS13}, Proxy: Proxy{URL: "socks5://p:1"}}, true},
-		{"ModeRust", Config{Mode: ModeRust}, true},
-		{"ModeGo", Config{Mode: ModeGo}, false},
+		{"ModeCore", Config{Mode: ModeCore}, true},
+		{"ModePlatform", Config{Mode: ModePlatform}, false},
 		{"an HTTPClient", Config{HTTPClient: own}, false},
-		{"ModeGo and an HTTPClient", Config{Mode: ModeGo, HTTPClient: own}, false},
-		{"Go mode's tls.Config, named", Config{Mode: ModeGo, TLS: TLS{Config: &tls.Config{ServerName: "a"}}}, false},
+		{"ModePlatform and an HTTPClient", Config{Mode: ModePlatform, HTTPClient: own}, false},
+		{"platform mode's tls.Config, named", Config{Mode: ModePlatform, TLS: TLS{Config: &tls.Config{ServerName: "a"}}}, false},
 	} {
-		if rust, err := c.cfg.rustMode(); err != nil || rust != c.rust {
-			t.Errorf("%s: Rust mode %v (%v), want %v", c.name, rust, err, c.rust)
+		if coreMode, err := c.cfg.coreMode(); err != nil || coreMode != c.coreMode {
+			t.Errorf("%s: core mode %v (%v), want %v", c.name, coreMode, err, c.coreMode)
 		}
 	}
 }
 
-// With nothing said about the mode, the client's connection is Rust mode's: which proxy to use is
-// asked of Rust mode's rule (the environment the test gives; Go mode never reads it), and the
+// With nothing said about the mode, the client's connection is core mode's: which proxy to use is
+// asked of core mode's rule (the environment the test gives; platform mode never reads it), and the
 // server hears the client.
-func TestWithNothingSaidTheClientRunsInRustMode(t *testing.T) {
+func TestWithNothingSaidTheClientRunsInCoreMode(t *testing.T) {
 	heard := make(chan struct{}, 1)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
@@ -1014,6 +1014,6 @@ func TestWithNothingSaidTheClientRunsInRustMode(t *testing.T) {
 	defer cancel()
 	_ = c.Stop(ctx)
 	if asked.Load() == 0 {
-		t.Error("Rust mode's proxy rule was never asked: the client ran in Go mode")
+		t.Error("core mode's proxy rule was never asked: the client ran in platform mode")
 	}
 }

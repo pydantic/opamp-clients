@@ -6,9 +6,9 @@
 // the plain HTTP requests and package downloads) and options for the ws package (for WebSocket),
 // so all three go the same way.
 //
-// Without a proxy in the options, the environment's apply. In Rust mode (the client's default)
-// by the rule every SDK's Rust mode shares, which the core applies to the variables it is handed
-// (rustProxyChoice below). In Node mode by Node's own default:
+// Without a proxy in the options, the environment's apply. In core mode (the client's default)
+// by the rule every SDK's core mode shares, which the core applies to the variables it is handed
+// (coreProxyChoice below). In platform mode by Node's own default:
 // the proxies in the environment (HTTP_PROXY, HTTPS_PROXY, NO_PROXY) when Node is told to use
 // them (NODE_USE_ENV_PROXY=1 or --use-env-proxy), read the way Node reads them; otherwise none.
 // `proxy: false` goes direct.
@@ -35,11 +35,11 @@ export type TlsVersion = "TLSv1.2" | "TLSv1.3";
 /** TLS for https:// and wss:// endpoints, and for package downloads. */
 export interface TlsOptions {
   /** The CA certificates (PEM) to verify the server's certificate against. They replace the CAs
-   * Node trusts by default unless `includeDefaultCa` is set. Omitted: Node's defaults. */
+   * Node trusts by default unless `includeSystemCas` is set. Omitted: Node's defaults. */
   ca?: string | Buffer | (string | Buffer)[];
   /** Trust Node's default CAs as well as `ca` (its bundled roots, NODE_EXTRA_CA_CERTS, and the
    * system's with --use-system-ca). Default false. */
-  includeDefaultCa?: boolean;
+  includeSystemCas?: boolean;
   /** A client certificate (PEM, chain included) to present in every handshake, with `key`. */
   cert?: string | Buffer;
   /** The client certificate's private key (PEM, not encrypted). */
@@ -90,7 +90,7 @@ export interface WsOptions {
 const PROXY_TIMEOUT_MS = 30_000;
 
 interface Proxy {
-  /** As given: Rust mode hands it to the core. */
+  /** As given: core mode hands it to the core. */
   url: string;
   /** Resolve the server's name here and give the SOCKS5 proxy the address. */
   resolveLocally: boolean;
@@ -206,9 +206,9 @@ function envProxies(env: NodeJS.ProcessEnv, resolveLocally: boolean): EnvProxies
   };
 }
 
-/** The variables Rust mode's proxy rule reads (tests/shell-tables/README.md, "Rust mode's proxy
+/** The variables core mode's proxy rule reads (tests/shell-tables/README.md, "core mode's proxy
  * rule"). The core applies the rule; the client only reads them, once. */
-const RUST_PROXY_VARIABLES = [
+const CORE_PROXY_VARIABLES = [
   "REQUEST_METHOD",
   "HTTP_PROXY",
   "http_proxy",
@@ -220,8 +220,8 @@ const RUST_PROXY_VARIABLES = [
   "no_proxy",
 ] as const;
 
-/** What Rust mode tells the core about proxies, once (Config.proxy). */
-export interface RustProxyChoice {
+/** What core mode tells the core about proxies, once (Config.proxy). */
+export interface CoreProxyChoice {
   direct: boolean;
   url: string;
   headers: { name: string; value: string }[];
@@ -267,7 +267,7 @@ function secureContext(o: TlsOptions): tls.SecureContext {
   if (o.minVersion === "TLSv1.3" && o.maxVersion === "TLSv1.2") {
     throw new TypeError("tls: minVersion TLSv1.3 is above maxVersion TLSv1.2: no version left");
   }
-  const ca = o.ca === undefined ? undefined : [...(o.includeDefaultCa ? defaultCa() : []), ...certificates(o.ca)];
+  const ca = o.ca === undefined ? undefined : [...(o.includeSystemCas ? defaultCa() : []), ...certificates(o.ca)];
   try {
     return tls.createSecureContext({
       ca,
@@ -295,17 +295,17 @@ export class Transport {
   /** For fetch: the plain HTTP requests and downloads. */
   readonly dispatcher: Dispatcher;
 
-  /** Rust mode: the variables Rust mode's proxy rule reads, as set at the start, when no proxy
+  /** Core mode: the variables core mode's proxy rule reads, as set at the start, when no proxy
    * is named (and not `false`); undefined otherwise. */
-  readonly #rustEnv: { name: string; value: string }[] | undefined;
+  readonly #coreEnv: { name: string; value: string }[] | undefined;
   /** `proxy: false`. */
   readonly #direct: boolean;
   /** `proxy.resolveLocally` without a `url`: for a SOCKS5 proxy the environment names. */
   readonly #resolveLocally: boolean;
 
-  /** `rust`: Rust mode, where the core picks the proxy (rustProxyChoice) by the shared rule
+  /** `coreMode`: core mode, where the core picks the proxy (coreProxyChoice) by the shared rule
    * (tests/shell-tables/README.md) rather than Node's convention. */
-  constructor(options: ConnectionOptions = {}, platform: Platform = process, rust = false) {
+  constructor(options: ConnectionOptions = {}, platform: Platform = process, coreMode = false) {
     this.#context = secureContext(options.tls ?? {});
     const p = options.proxy;
     this.#proxy = p && p.url !== undefined ? parseProxy({ ...p, url: p.url }) : undefined;
@@ -313,9 +313,9 @@ export class Transport {
     const env = p === undefined || (p !== false && p.url === undefined);
     this.#resolveLocally = (p && p.resolveLocally) ?? false;
     this.#direct = p === false;
-    this.#rustEnv =
-      rust && env
-        ? RUST_PROXY_VARIABLES.flatMap((name) => {
+    this.#coreEnv =
+      coreMode && env
+        ? CORE_PROXY_VARIABLES.flatMap((name) => {
             const value = platform.env[name];
             return value === undefined ? [] : [{ name, value }];
           })
@@ -324,7 +324,7 @@ export class Transport {
     // Set at all, even empty: the conservative reading (tests/shell-tables/proxy.json).
     const cgi = platform.env.REQUEST_METHOD !== undefined;
     this.#env =
-      env && !rust && !cgi && envProxyOn(platform)
+      env && !coreMode && !cgi && envProxyOn(platform)
         ? envProxies(platform.env, (p && p.resolveLocally) ?? false)
         : undefined;
     const direct = buildConnector({ secureContext: this.#context });
@@ -352,30 +352,30 @@ export class Transport {
     return proxy && !bypassed(this.#env.noProxy, host, port) ? proxy : undefined;
   }
 
-  /** Trust, client certificate and versions, for Rust mode's TLS on a stream. */
+  /** Trust, client certificate and versions, for core mode's TLS on a stream. */
   get secureContext(): tls.SecureContext {
     return this.#context;
   }
 
-  /** Rust mode: what the core is told about proxies, once (Config.proxy): the configured proxy
+  /** Core mode: what the core is told about proxies, once (Config.proxy): the configured proxy
    * (its URL, CONNECT headers, and whether the core is to have the server's name resolved here),
    * none with `proxy: false`, or else the environment's variables, which the core reads by the
    * shared rule (it refuses a proxy it can't use: the connection fails, never goes direct). */
-  rustProxyChoice(): RustProxyChoice {
+  coreProxyChoice(): CoreProxyChoice {
     const p = this.#proxy;
     return {
       direct: this.#direct,
       url: p?.url ?? "",
       headers: Object.entries(p?.headers ?? {}).map(([name, value]) => ({ name, value })),
       resolveLocally: p ? p.resolveLocally : this.#resolveLocally,
-      environment: this.#rustEnv ?? [],
+      environment: this.#coreEnv ?? [],
     };
   }
 
   /** The proxy for `url` (http or https), if any: its URL, CONNECT headers, and whether the
-   * server's name is resolved here. In Node mode, the options' or Node's convention's. In Rust
+   * server's name is resolved here. In platform mode, the options' or Node's convention's. In core
    * mode, the answer to a proxy question, which the core asks only when it wasn't told
-   * (rustProxyChoice): the configured proxy, or none (the environment's rule is the core's). */
+   * (coreProxyChoice): the configured proxy, or none (the environment's rule is the core's). */
   proxyFor(url: string): { url: string; headers: Record<string, string>; resolveLocally: boolean } | undefined {
     const u = new URL(url);
     const secure = u.protocol === "https:" || u.protocol === "wss:";
@@ -449,7 +449,7 @@ export class Transport {
       };
       if (!p.resolveLocally || net.isIP(host)) return open(host);
       // Resolved here: each address in turn while the proxy can't reach it, as a direct
-      // connection would, and as Rust mode does (any other failure would be the same for each).
+      // connection would, and as core mode does (any other failure would be the same for each).
       const addresses = await lookup(host, { all: true });
       let last: unknown = new Error(`${host} resolved to no address`);
       for (const { address } of addresses) {

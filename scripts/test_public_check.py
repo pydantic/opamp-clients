@@ -27,7 +27,7 @@ class PublicCheck(unittest.TestCase):
             self.assertEqual(pc.problems("python/x", magic + b"rest", ALLOW), ["python/x: a binary"])
 
     def test_a_module_where_the_clients_load_it(self) -> None:
-        rel = "python/src/opamp_client/opamp_core.wasm"
+        rel = "python/src/pydantic_opamp_client/opamp_core.wasm"
         self.assertIn(rel, pc.MODULE_PATHS)
         self.assertEqual(pc.problems(rel, b"\0asm", ALLOW), [])
 

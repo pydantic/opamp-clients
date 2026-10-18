@@ -288,7 +288,7 @@ async function socksProxy(user: string, pass: string) {
 }
 
 type Server = Awaited<ReturnType<typeof opampServer>>;
-type Transport_ = "http" | "ws" | "http+rust" | "ws+rust";
+type Transport_ = "http" | "ws" | "http+core" | "ws+core";
 
 /** Run a client against `server` until it has sent `messages` messages, or has failed to
  * connect when `fail`. */
@@ -299,9 +299,9 @@ async function run(
   config: Partial<Config>,
   { messages = 2, fail = false } = {},
 ): Promise<Notification[]> {
-  // "ws+rust": WebSocket in Rust mode (the core's own HTTP and WebSocket over Node's sockets).
-  const [transport, mode] = how.split("+") as ["http" | "ws", "rust" | undefined];
-  config = { ...config, mode: mode ?? "node" };
+  // "ws+core": WebSocket in core mode (the core's own HTTP and WebSocket over Node's sockets).
+  const [transport, mode] = how.split("+") as ["http" | "ws", "core" | undefined];
+  config = { ...config, mode: mode ?? "platform" };
   const scheme = (transport === "http" ? "http" : "ws") + (secure ? "s" : "");
   const notes: Notification[] = [];
   const start = server.got.length;
@@ -324,7 +324,7 @@ const failure = (notes: Notification[]): string => {
   return n?.kind === "connectFailed" ? n.detail : "";
 };
 
-for (const transport of ["http", "ws", "http+rust", "ws+rust"] as const) {
+for (const transport of ["http", "ws", "http+core", "ws+core"] as const) {
   // covers: RULE-TLS-01
   test(`${transport}: TLS with the CA it is given`, async () => {
     const server = await opampServer(SERVER);
@@ -334,7 +334,7 @@ for (const transport of ["http", "ws", "http+rust", "ws+rust"] as const) {
       for (const h of server.handshakes) assert.match(h.version ?? "", /^TLSv1\.[23]$/);
       // Node's CAs as well: the server's CA still counts.
       const before = server.got.length;
-      await run(server, transport, true, { tls: { ca: CA, includeDefaultCa: true } });
+      await run(server, transport, true, { tls: { ca: CA, includeSystemCas: true } });
       assert.ok(server.got.length > before);
     } finally {
       server.close();
@@ -570,7 +570,7 @@ test("downloads go the same way: the CA, the client certificate, the proxy", asy
 });
 
 // In both modes: the options are read the same way, before anything is sent.
-for (const mode of ["node", "rust"] as const) {
+for (const mode of ["platform", "core"] as const) {
   test(`${mode} mode: settings it can't use throw at start`, () => {
     const start = (config: Partial<Config>) =>
       void Client.start({ endpoint: "https://localhost:1/v1/opamp", instanceUid: UID, mode, ...config }, {}).stop();
@@ -609,15 +609,15 @@ for (const mode of ["node", "rust"] as const) {
   });
 }
 
-// The mode a client runs in: Rust mode, unless it asks for Node mode by name. With HTTP_PROXY set
-// and Node not told to read it, only Rust mode's rule takes the proxy: the proxy says which mode
-// ran. What the mode doesn't honour throws.
-test("with no mode named the client runs in Rust mode; \"node\" is Node mode", async () => {
+// The mode a client runs in: core mode, unless it asks for platform mode by name. With HTTP_PROXY
+// set and Node not told to read it, only core mode's rule takes the proxy: the proxy says which
+// mode ran. What the mode doesn't honour throws.
+test("with no mode named the client runs in core mode; \"platform\" is platform mode", async () => {
   const server = await opampServer();
   const proxy = await socksProxy("agent", "pw");
   try {
     await withEnv({ HTTP_PROXY: `socks5://agent:pw@127.0.0.1:${proxy.port}` }, async () => {
-      for (const [mode, through] of [[undefined, true], ["rust", true], ["node", false]] as const) {
+      for (const [mode, through] of [[undefined, true], ["core", true], ["platform", false]] as const) {
         const tunnels = proxy.tunnels.length;
         const messages = server.got.length;
         const notes: Notification[] = [];
@@ -651,10 +651,10 @@ test("with no mode named the client runs in Rust mode; \"node\" is Node mode", a
   }
   const start = (config: Partial<Config>) =>
     void Client.start({ endpoint: "http://localhost:1/v1/opamp", instanceUid: UID, proxy: false, ...config }, {}).stop();
-  assert.throws(() => start({ mode: "python" as never }), /mode is "rust" or "node", not "python"/);
-  assert.throws(() => start({ mode: "node", rustSplice: false }), /rustSplice in Node mode/);
-  assert.doesNotThrow(() => start({ mode: "node", rustSplice: true }));
-  assert.doesNotThrow(() => start({ rustSplice: false }));
+  assert.throws(() => start({ mode: "python" as never }), /mode is "core" or "platform", not "python"/);
+  assert.throws(() => start({ mode: "platform", spliceDownloads: false }), /spliceDownloads in platform mode/);
+  assert.doesNotThrow(() => start({ mode: "platform", spliceDownloads: true }));
+  assert.doesNotThrow(() => start({ spliceDownloads: false }));
 });
 
 // covers: RULE-PROXY-01
@@ -878,7 +878,7 @@ test("the environment's proxies follow the same rules, resolveLocally too", { sk
 test("SOCKS5 from the environment: the proxy resolves; SOCKS4 and unknown schemes are errors", { skip: !envProxySupported }, async () => {
   const server = await opampServer();
   const proxy = await socksProxy("agent", "pw");
-  const start = () => void Client.start({ endpoint: "http://localhost:1/v1/opamp", instanceUid: UID, mode: "node" }, {}).stop();
+  const start = () => void Client.start({ endpoint: "http://localhost:1/v1/opamp", instanceUid: UID, mode: "platform" }, {}).stop();
   try {
     for (const socks of ["socks5", "socks5h"]) {
       const url = `${socks}://agent:pw@127.0.0.1:${proxy.port}`;

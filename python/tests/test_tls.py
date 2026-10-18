@@ -12,7 +12,7 @@ import pytest
 import trustme
 from _servers import MODES, OpampServer, run_client
 
-from opamp_client import TLS, Client, Config, Status
+from pydantic_opamp_client import TLS, Client, Config, Status
 
 TRANSPORTS = ["http", "ws"]
 
@@ -68,7 +68,7 @@ def test_refuses_a_server_it_cannot_verify(transport: str, mode: str) -> None:
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize("transport", TRANSPORTS)
 def test_the_system_cas_are_the_default_and_can_be_added(transport: str, mode: str) -> None:
-    """A private CA is not among the system's: the default refuses the server; system_cas with the
+    """A private CA is not among the system's: the default refuses the server; include_system_cas with the
     CA trusts both (the system's are loaded)."""
     async def run() -> None:
         ca = trustme.CA()
@@ -76,12 +76,12 @@ def test_the_system_cas_are_the_default_and_can_be_added(transport: str, mode: s
         try:
             refused = await run_client(server, mode=mode, endpoint=server.endpoint(transport))
             assert not server.arrivals and any(n.kind == "connect_failed" for n in refused)
-            await run_client(server, mode=mode, endpoint=server.endpoint(transport), tls=TLS(ca_pem=ca.cert_pem.bytes(), system_cas=True))
+            await run_client(server, mode=mode, endpoint=server.endpoint(transport), tls=TLS(ca_pem=ca.cert_pem.bytes(), include_system_cas=True))
             assert server.arrivals
         finally:
             await server.close()
 
-    ctx = TLS(ca_pem=trustme.CA().cert_pem.bytes(), system_cas=True).context()
+    ctx = TLS(ca_pem=trustme.CA().cert_pem.bytes(), include_system_cas=True).context()
     default = ssl.create_default_context()
     assert ctx.cert_store_stats()["x509_ca"] == default.cert_store_stats()["x509_ca"] + 1
     asyncio.run(run())

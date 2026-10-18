@@ -349,7 +349,7 @@ but a later time does. Every integration ends it on a timer of its own, server o
 
 These values are not settings of the SDK but of the application. The SDK hands `app_settings` to
 the application. The application reads a key with a default, for example
-`opamp_otel.app_settings.get("checkout.new_flow", "off")` in Python, and it can be told when the
+`pydantic_opamp_otel.app_settings.get("checkout.new_flow", "off")` in Python, and it can be told when the
 values change. The values are in force at once. When the control is `local` again, each key is
 back to the default of the application ([docs/app-settings.md](../../docs/app-settings.md)). Only
 an integration that lets the application read them takes them. Elsewhere the SDK refuses the

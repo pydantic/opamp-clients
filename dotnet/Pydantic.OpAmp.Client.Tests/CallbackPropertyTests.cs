@@ -26,7 +26,7 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// callback threw; <c>StopAsync</c> returns within its bound with that error, every time; what the
 /// server offered reaches the callback in the order offered, unless the client stopped first.
 /// Runs: OPAMP_MODEL_RUNS (default 30), seeds from a random base, printed on failure;
-/// OPAMP_MODEL_SEED=S replays one run. In both modes: .NET's WebSocket, and Rust mode's (the core's
+/// OPAMP_MODEL_SEED=S replays one run. In both modes: .NET's WebSocket, and core mode's (the core's
 /// own, over the client's streams).
 /// </summary>
 /// <remarks>
@@ -95,8 +95,8 @@ public class CallbackPropertyTests
 
     // covers: RULE-SHELL-01, RULE-SHELL-02, RULE-SHELL-03, RULE-SHELL-07
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task CallbacksKeepTheContractWhateverTheApplicationAndServerDo(OpAmpMode mode)
     {
         var runs = int.TryParse(Environment.GetEnvironmentVariable("OPAMP_MODEL_RUNS"), out var n) ? n : 30;
@@ -462,7 +462,7 @@ public class CallbackPropertyTests
                 Endpoint = new Uri(this.server.Endpoint),
                 StateFile = this.StateFile,
                 Mode = mode,
-                DirectConnection = mode == OpAmpMode.Rust,
+                DirectConnection = mode == OpAmpMode.Core,
                 Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig
                     | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig),
             },

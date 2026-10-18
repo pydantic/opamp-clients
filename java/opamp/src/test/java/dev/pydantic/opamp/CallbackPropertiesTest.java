@@ -46,7 +46,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * the callback, but for the application's calls queued ahead of it (RULE-SHELL-10, {@link
  * CallbackAnswerTest#check}).
  *
- * <p>Each test runs in both modes: platform mode (the JDK's HTTP client) and Rust mode (the core
+ * <p>Each test runs in both modes: platform mode (the JDK's HTTP client) and core mode (the core
  * speaking HTTP and WebSocket over this client's sockets, {@link Streams}), against the same
  * servers.
  *
@@ -256,13 +256,13 @@ class CallbackPropertiesTest {
   }
 
   static OpampClient.Config config(String endpoint, Path stateFile) {
-    return config(endpoint, stateFile, OpampClient.Mode.JAVA);
+    return config(endpoint, stateFile, OpampClient.Mode.PLATFORM);
   }
 
   static OpampClient.Config config(String endpoint, Path stateFile, OpampClient.Mode mode) {
     return OpampClient.Config.builder(endpoint, UID)
         .mode(mode)
-        // Rust mode reads HTTP_PROXY and the like: the local servers are reached directly.
+        // Core mode reads HTTP_PROXY and the like: the local servers are reached directly.
         .environment(java.util.Map.of())
         .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
         .heartbeatInterval(Duration.ofMillis(50))

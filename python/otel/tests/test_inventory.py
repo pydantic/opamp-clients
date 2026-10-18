@@ -14,8 +14,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from opamp_client import opamp_pb2
-from opamp_client.sdk import SdkSettings, settings_pb2
+from pydantic_opamp_client import opamp_pb2
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
@@ -26,9 +26,9 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.util._importlib_metadata import entry_points
 
-import opamp_otel
+import pydantic_opamp_otel
 from _policy import config_map, policy
-from opamp_otel import Agent, Controls
+from pydantic_opamp_otel import Agent, Controls
 
 LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z.
@@ -74,7 +74,7 @@ def instrumentors() -> dict[str, str]:
 def test_the_sdk_entry_is_this_package_and_the_python_sdk_it_runs():
     from opentelemetry.sdk.version import __version__
 
-    inv = opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
+    inv = pydantic_opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
     assert (inv.integration, inv.integration_version) == ("pydantic-opamp-otel", version("pydantic-opamp-otel"))
     assert (inv.sdk_language, inv.sdk_version) == ("python", __version__)
     assert parts(LAYER.components(inv))["sdk"] == {
@@ -83,14 +83,14 @@ def test_the_sdk_entry_is_this_package_and_the_python_sdk_it_runs():
 
 
 def test_the_instrumentations_are_the_names_opentelemetry_instrument_matches_at_their_versions():
-    got = {i.name: i.version for i in opamp_otel.instrumentations()}
+    got = {i.name: i.version for i in pydantic_opamp_otel.instrumentations()}
     assert got == instrumentors() and "aiohttp-client" in got  # the dev group's
     assert got["aiohttp-client"] == version("opentelemetry-instrumentation-aiohttp-client")
     # Each is a name the switch takes: it lands in the variable opentelemetry-instrument reads.
     local = policy().encode()
     s = LAYER.decide(_config(policy(instrumentations={"disabled": ["aiohttp-client"]})), local, local,
-                     opamp_otel.sdk_host(["otlp"]), save=lambda doc: None).apply
-    assert opamp_otel.disabled_instrumentations(s, "") == "aiohttp-client"
+                     pydantic_opamp_otel.sdk_host(["otlp"]), save=lambda doc: None).apply
+    assert pydantic_opamp_otel.disabled_instrumentations(s, "") == "aiohttp-client"
 
 
 def _ep(name: str, dist) -> SimpleNamespace:
@@ -107,20 +107,20 @@ def test_an_instrumentation_whose_library_is_missing_is_left_out_and_one_without
     monkeypatch.setattr(metadata, "entry_points", lambda group: eps if group == "opentelemetry_instrumentor" else [])
     # django's library isn't installed: opentelemetry-instrument would skip it, so it can't run.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: "missing" if d is django else None)
-    got = opamp_otel.instrumentations()
+    got = pydantic_opamp_otel.instrumentations()
     assert [(i.name, i.version) for i in got] == [("flask", "0.56b0"), ("bare", ""), ("nodist", "")]
     assert parts(LAYER.components(settings_pb2.Inventory(instrumentations=got)))["instrumentations"] == {
         "bare": None, "flask": "0.56b0", "nodist": None}
     # A requirement it can't read: listed, as opentelemetry-instrument would still try it.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: 1 / 0)
-    assert [i.name for i in opamp_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
+    assert [i.name for i in pydantic_opamp_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
 
 
 def test_no_instrumentation_installed_is_an_empty_list(monkeypatch):
     import opentelemetry.util._importlib_metadata as metadata
 
     monkeypatch.setattr(metadata, "entry_points", lambda group: [])
-    inv = opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
+    inv = pydantic_opamp_otel.inventory(None, TracerProvider(), MeterProvider(), LoggerProvider())
     assert list(inv.instrumentations) == []
     got = parts(LAYER.components(inv))
     assert got["instrumentations"] == {} and got["exporters"] == {}
@@ -144,7 +144,7 @@ def test_the_exporters_are_read_off_the_providers_gated_where_the_packages_gates
     traces.add_span_processor(SimpleSpanProcessor(HttpSpanExporter(endpoint="http://127.0.0.1:9")))
     traces.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
     traces.add_span_processor(_NotAnExporter())
-    gated_otlp = opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
+    gated_otlp = pydantic_opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
     meters = MeterProvider(metric_readers=[
         PeriodicExportingMetricReader(gated_otlp, export_interval_millis=3_600_000),
         PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=3_600_000),
@@ -153,7 +153,7 @@ def test_the_exporters_are_read_off_the_providers_gated_where_the_packages_gates
     logs.add_log_record_processor(BatchLogRecordProcessor(c.logs(OTLPLogExporter(endpoint="http://127.0.0.1:9"))))
     logs.add_log_record_processor(SimpleLogRecordProcessor(ConsoleLogRecordExporter()))
     try:
-        got = opamp_otel.exporters(traces, meters, logs)
+        got = pydantic_opamp_otel.exporters(traces, meters, logs)
     finally:
         meters.shutdown()
         traces.shutdown()
@@ -171,19 +171,19 @@ def test_the_exporters_are_read_off_the_providers_gated_where_the_packages_gates
 
 
 def test_a_gated_exporter_whose_send_setting_the_host_cant_carry_out_is_ungated():
-    gated_otlp = opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
+    gated_otlp = pydantic_opamp_otel.GatedOtlpMetricExporter(endpoint="http://127.0.0.1:9")
     meters = MeterProvider(metric_readers=[PeriodicExportingMetricReader(gated_otlp, export_interval_millis=3_600_000)])
     traces = TracerProvider()
     traces.add_span_processor(SimpleSpanProcessor(Controls().spans(ConsoleSpanExporter())))
     try:
         def gated(host):
-            return listed(opamp_otel.inventory(host, traces, meters, LoggerProvider()).exporters)
+            return listed(pydantic_opamp_otel.inventory(host, traces, meters, LoggerProvider()).exporters)
 
-        assert gated(opamp_otel.sdk_host(["otlp"])) == [("metrics", "otlp", True), ("traces", "console", True)]
+        assert gated(pydantic_opamp_otel.sdk_host(["otlp"])) == [("metrics", "otlp", True), ("traces", "console", True)]
         # Beside a console exporter, send_metrics is ignored; under another configurator, send_traces.
-        assert gated(opamp_otel.sdk_host(["otlp", "console"])) == [
+        assert gated(pydantic_opamp_otel.sdk_host(["otlp", "console"])) == [
             ("metrics", "otlp", False), ("traces", "console", True)]
-        assert gated(opamp_otel.sdk_host(["otlp"], configured=False)) == [
+        assert gated(pydantic_opamp_otel.sdk_host(["otlp"], configured=False)) == [
             ("metrics", "otlp", True), ("traces", "console", False)]
     finally:
         meters.shutdown()
@@ -194,8 +194,8 @@ def test_providers_that_arent_the_sdks_have_no_exporters():
     from opentelemetry.metrics import NoOpMeterProvider
     from opentelemetry.trace import NoOpTracerProvider
 
-    assert opamp_otel.exporters(NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider()) == []
-    assert opamp_otel.exporters(TracerProvider(), MeterProvider(), LoggerProvider()) == []
+    assert pydantic_opamp_otel.exporters(NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider()) == []
+    assert pydantic_opamp_otel.exporters(TracerProvider(), MeterProvider(), LoggerProvider()) == []
 
 
 def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_imported_to_find_out():
@@ -205,7 +205,7 @@ def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_
     traces = TracerProvider()
     traces.add_span_processor(SimpleSpanProcessor(MySpanExporter()))
     before = set(sys.modules)
-    assert listed(opamp_otel.exporters(traces, None, None)) == [("traces", "MySpanExporter", False)]
+    assert listed(pydantic_opamp_otel.exporters(traces, None, None)) == [("traces", "MySpanExporter", False)]
     assert set(sys.modules) == before
 
 
@@ -255,7 +255,7 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     finally:
         server.close()
     for agent in (ours, theirs):
-        assert agent.components == LAYER.components(opamp_otel.inventory(agent.host), agent.host, NOW)
+        assert agent.components == LAYER.components(pydantic_opamp_otel.inventory(agent.host), agent.host, NOW)
     settings = parts(ours.components)["settings"]
     assert settings["sampling_rules"] == settings["send_metrics"] == "at once"
     assert settings["deactivate_instrumentations"] == "next start"
@@ -286,7 +286,7 @@ def _without_hash(c: opamp_pb2.AvailableComponents) -> opamp_pb2.AvailableCompon
 def test_an_inventory_that_cant_be_listed_leaves_the_instance_managed(tmp_path, monkeypatch, caplog):
     import test_opamp_otel
 
-    monkeypatch.setattr(opamp_otel, "inventory", lambda host: 1 / 0)
+    monkeypatch.setattr(pydantic_opamp_otel, "inventory", lambda host: 1 / 0)
     server = test_opamp_otel._Server()
     try:
         agent = _started(server, tmp_path, configured=True, OTEL_OPAMP_HEARTBEAT_INTERVAL="100ms")
@@ -364,10 +364,10 @@ def test_a_metric_exporter_beside_otlp_is_ungated_and_send_metrics_is_not_listed
 def test_configure_lists_a_span_processor_it_was_given_as_ungated_and_no_instrumentation_switch(tmp_path):
     server = _asking()
     child = textwrap.dedent(f"""
-        import time, opamp_otel
+        import time, pydantic_opamp_otel
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-        opamp_otel.configure(endpoint={server.endpoint!r},
+        pydantic_opamp_otel.configure(endpoint={server.endpoint!r},
                              span_processors=[SimpleSpanProcessor(InMemorySpanExporter())])
         time.sleep(0.5)
     """)

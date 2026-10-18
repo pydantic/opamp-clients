@@ -1,6 +1,6 @@
 # OpenTelemetry for Go, under an OpAMP server
 
-`go/otel` is `github.com/pydantic/opamp-clients/go/otel`, package `opampotel`. `Setup` builds the
+`go/opampotel` is the package `github.com/pydantic/opamp-clients/go/opampotel`. `Setup` builds the
 OpenTelemetry SDK the `OTEL_*` variables describe, sets it as the global providers, and puts it
 under an OpAMP server's fleet: sampling, what to send and which instrumentations run follow the
 server's settings ([sdk-settings.md](sdk-settings.md)).
@@ -13,7 +13,7 @@ instrumentations and the SDK stay the upstream ones. Checked with `go.openteleme
 ## Use it
 
 ```go
-import "github.com/pydantic/opamp-clients/go/otel"
+import "github.com/pydantic/opamp-clients/go/opampotel"
 
 func main() {
 	sdk, err := opampotel.Setup(ctx)
@@ -69,7 +69,7 @@ sdk, err := opampotel.Setup(ctx,
 (`-opamp`, `-state-dir`, `-heartbeat`) and a key in `CHECKOUT_OPAMP_KEY`, and
 [try.py](../examples/go-otel/try.py) runs every check against it that way too, with no
 `OTEL_OPAMP_*` set. The same, on pkg.go.dev: `ExampleSetup_inCode` and `ExampleSetup_fromFlags`
-in [example_test.go](../go/otel/example_test.go).
+in [example_test.go](../go/opampotel/example_test.go).
 
 The SDK is what [autoexport](https://pkg.go.dev/go.opentelemetry.io/contrib/exporters/autoexport)
 and the SDK's own variables make it: the exporter each `OTEL_*_EXPORTER` names (OTLP by default,
@@ -151,7 +151,7 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   it logs why and the SDK runs unmanaged. `Setup` fails only for an exporter the `OTEL_*`
   variables describe that can't be built, and then leaves the global providers as they were.
 
-The rules are the SDK settings layer's (`go/opamp/sdk`, in wazero), the same in every language.
+The rules are the SDK settings layer's (`go/opamp/sdksettings`, in wazero), the same in every language.
 The package only carries them out on the Go SDK.
 
 ### Switching instrumentations off
@@ -216,7 +216,7 @@ the application's own too. To keep the application's own spans, list the instrum
 
 The package reports what the instance runs as its available components, the same shape in every
 language ([available-components.md](available-components.md#what-the-sdk-integrations-report)):
-this package (`github.com/pydantic/opamp-clients/go/otel`) and its version, `telemetry.sdk.language`
+this package (`github.com/pydantic/opamp-clients/go/opampotel`) and its version, `telemetry.sdk.language`
 `go` and the SDK's version (`sdk.Version()`), the instrumentations, the exporters, and the
 settings it carries out. For example, with otelhttp, a log bridge and a Prometheus reader:
 
@@ -424,7 +424,7 @@ told of.
 
 ## How it is checked
 
-- Unit tests (`go/otel`, with `-race`):
+- Unit tests (`go/opampotel`, with `-race`):
   - the sampler, the gates and the switches on a real SDK, with settings applied while spans start;
   - a switched-off instrumentation keeps the trace going, and is switched off too when it takes
     its tracer from the span in the context;

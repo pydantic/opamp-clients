@@ -66,7 +66,7 @@ class FilesTest {
   // ---------------------------------------------------------------------------------------------
   // The journal: a save's records and a download's, in the order the checker needs them.
 
-  // In both modes: in Rust mode the download's file is Streams', through the same journaled Disk,
+  // In both modes: in core mode the download's file is Streams', through the same journaled Disk,
   // and the core hears the client's downloaded (the shell makes the response of it).
   @ParameterizedTest
   @EnumSource(OpampClient.Mode.class)
@@ -625,7 +625,7 @@ class FilesTest {
     }
 
     OpampClient.Config config(Path state) {
-      return config(state, OpampClient.Mode.JAVA);
+      return config(state, OpampClient.Mode.PLATFORM);
     }
 
     OpampClient.Config config(Path state, OpampClient.Mode mode) {

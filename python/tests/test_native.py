@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The native core (opamp_client._native) is held to the WebAssembly module it replaced: for runs
+"""The native core (pydantic_opamp_client._native) is held to the WebAssembly module it replaced: for runs
 of configs and inputs, plausible and not, every reply is the module's, byte for byte. The module is
 what the conformance suite, the taps and the other SDKs check, so this carries their checks over to
 the native build. (dotnet's NativeCoreTests holds its build to the same.)"""
@@ -18,11 +18,11 @@ from _wasm import WasmCore, WasmSdkSettings
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from opamp_client import CoreError, _native
-from opamp_client._core import Core
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from opamp_client._proto.opamp.sdk.v1 import settings_pb2
-from opamp_client._proto.opamp.v1 import opamp_pb2 as pb
+from pydantic_opamp_client import CoreError, _native
+from pydantic_opamp_client._core import Core
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._proto.opamp.sdk.v1 import settings_pb2
+from pydantic_opamp_client._proto.opamp.v1 import opamp_pb2 as pb
 
 EXAMPLES = int(os.environ.get("OPAMP_NATIVE_EXAMPLES", "200"))
 
@@ -181,20 +181,20 @@ def test_a_trap_is_a_core_error() -> None:
 
 def _load(env: dict[str, str]) -> subprocess.CompletedProcess:
     """Import the binding in a fresh interpreter with env, as a user's process would."""
-    return subprocess.run([sys.executable, "-c", "import opamp_client._native as n; print(n._find())"],
+    return subprocess.run([sys.executable, "-c", "import pydantic_opamp_client._native as n; print(n._find())"],
                           env={**os.environ, **env}, capture_output=True, text=True)
 
 
 def test_the_library_comes_from_the_core_package() -> None:
     found = _load({})
     assert found.returncode == 0, found.stderr
-    assert Path(found.stdout.strip()).parent.name == "opamp_core"
+    assert Path(found.stdout.strip()).parent.name == "pydantic_opamp_core"
 
 
 def test_a_missing_library_fails_the_import(tmp_path: Path) -> None:
     # A core package without the library: no other library is looked for.
-    (tmp_path / "opamp_core").mkdir()
-    (tmp_path / "opamp_core" / "__init__.py").write_text("")
+    (tmp_path / "pydantic_opamp_core").mkdir()
+    (tmp_path / "pydantic_opamp_core" / "__init__.py").write_text("")
     path = os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])])
     found = _load({"PYTHONPATH": path, "OPAMP_NATIVE_LIB": str(tmp_path / "libopamp_native.so")})
     assert found.returncode != 0 and "isn't installed" in found.stderr, found.stderr

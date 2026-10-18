@@ -43,7 +43,7 @@ def series(rss: Callable[[float], float], heap: Callable[[float], float] | None,
 
 
 def gen0_garbage(m: float) -> float:
-    """The container's memory in the night that failed (dotnet-core http, Nightly run
+    """The container's memory in the night that failed (dotnet-core-platform http, Nightly run
     38112161610, go server): 65 MB for the first third, 90 MB for the last. The runtime sizes
     gen0 from the L3 cache, a budget this client's garbage takes most of the hour to fill: gen0
     is hardly ever collected, and its pages fill with dead objects."""

@@ -26,7 +26,7 @@ import (
 // Supervisor's user only.
 const coreClientStateFile = "opamp-client.state"
 
-// coreClient is the shared core's client (go/opamp, in Go mode) behind opamp-go's client
+// coreClient is the shared core's client (go/opamp, in platform mode) behind opamp-go's client
 // interface, so the Supervisor runs on it unchanged but for where it makes its client. What the
 // core does differently, the Supervisor gets for free:
 //
@@ -118,9 +118,9 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		InstanceUID:  [16]byte(settings.InstanceUid),
 		Capabilities: uint64(caps),
 		Header:       header,
-		// Go mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
+		// Platform mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
 		// environment's proxies, as opamp-go had.
-		Mode:        opamp.ModeGo,
+		Mode:        opamp.ModePlatform,
 		HTTPClient:  &http.Client{Transport: transport},
 		AuthHeader:  auth,
 		StateFile:   c.stateFile,

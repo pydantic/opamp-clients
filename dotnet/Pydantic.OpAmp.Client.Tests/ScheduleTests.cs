@@ -30,12 +30,12 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// iteration; a failure prints the smallest failing case and its seed: replay it with
 /// OPAMP_SCHEDULE_SEED=&lt;seed&gt; (or CsCheck's own CsCheck_Seed), which runs that one case.
 /// Real threads run the client, so a failure that depends on a race may need a few replays.
-/// The model-based, linearizability and stop-bound properties run in both modes: in Rust mode the
+/// The model-based, linearizability and stop-bound properties run in both modes: in core mode the
 /// client's streams are in memory and a minimal HTTP/1.1 and WebSocket server at their far end
 /// (<see cref="MemServer"/>) turns what the core sends into the same calls, answered the same way;
 /// connects may be refused or complete after their cancel, and https:// and wss:// ask for TLS.
 /// The properties of exception types (where the transport throws, and which type) are platform
-/// mode's alone: in Rust mode .NET carries bytes, and every such failure is a reset stream.
+/// mode's alone: in core mode .NET carries bytes, and every such failure is a reset stream.
 /// They keep several threads busy, so they run alone, after the rest: the timing of other
 /// tests (the adversary's timers) is not theirs to disturb.
 /// </remarks>
@@ -88,7 +88,7 @@ public class ScheduleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ScheduleKeepsTheContract(bool rust) => this.Run($"{nameof(this.ScheduleKeepsTheContract)}({rust})", (seed, iter) =>
+    public void ScheduleKeepsTheContract(bool coreMode) => this.Run($"{nameof(this.ScheduleKeepsTheContract)}({coreMode})", (seed, iter) =>
         (from ws in Gen.Bool
          from a in Gen.ULong
          from b in Gen.ULong
@@ -97,7 +97,7 @@ public class ScheduleTests
          from c in Gen.ULong
          from d in Gen.ULong
          from connects in Gen.Int[0, 2]
-         let rig = Track(new Rig(ws, deafness == 0 ? 0 : a & b, rust: rust, tls: rust && tls, connectMask: rust && connects == 0 ? c & d & 0xFFFF_FFFF : 0))
+         let rig = Track(new Rig(ws, deafness == 0 ? 0 : a & b, coreMode: coreMode, tls: coreMode && tls, connectMask: coreMode && connects == 0 ? c & d & 0xFFFF_FFFF : 0))
          select (rig, new Model(rig)))
         .SampleModelBased(
             [AnswerOp, AnswerOp, AnswerOp, AnswerOp, AnswerOp, AnswerOp, AdvanceOp, AdvanceOp, AdvanceOp, CallOp, CallOp, ServerOp, ServerOp, ServerOp, StopOp],
@@ -123,10 +123,10 @@ public class ScheduleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CallsAndStopFromSeveralThreadsAreLinearizable(bool rust) => this.Run($"{nameof(this.CallsAndStopFromSeveralThreadsAreLinearizable)}({rust})", (seed, iter) =>
+    public void CallsAndStopFromSeveralThreadsAreLinearizable(bool coreMode) => this.Run($"{nameof(this.CallsAndStopFromSeveralThreadsAreLinearizable)}({coreMode})", (seed, iter) =>
         Gen.Const(() =>
             {
-                var rig = Track(new Rig(ws: false, 0, onCall: AnswerAtOnce, stateful: false, rust: rust));
+                var rig = Track(new Rig(ws: false, 0, onCall: AnswerAtOnce, stateful: false, coreMode: coreMode));
                 return (rig, new Calls());
             })
         .SampleParallel(
@@ -283,9 +283,9 @@ public class ScheduleTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void StopTakesOneStopTimeoutWithASaveAndTheGoodbyeHeld(bool rust)
+    public void StopTakesOneStopTimeoutWithASaveAndTheGoodbyeHeld(bool coreMode)
     {
-        var rig = Track(new Rig(ws: false, 0, rust: rust));
+        var rig = Track(new Rig(ws: false, 0, coreMode: coreMode));
         using var hold = new ManualResetEventSlim();
         try
         {
@@ -296,7 +296,7 @@ public class ScheduleTests
             // (a remote config) makes one, and the goodbye is never answered.
             _ = StateFile.SaveBeside(rig.StateFile, [], () => hold.Wait(TimeSpan.FromSeconds(60)) && false, _ => { });
             var first = rig.Transport.Calls[0];
-            Assert.True(rig.Answer(first, How.Config, new IOException()) is not null || (rust && first.Answer is not null), "not answered");
+            Assert.True(rig.Answer(first, How.Config, new IOException()) is not null || (coreMode && first.Answer is not null), "not answered");
             Assert.True(Rig.Until(() => rig.Trace.Unended().Any(u => u.StartsWith("Store", StringComparison.Ordinal))), "no save after the remote config");
             rig.HeldElsewhere = 1;
             rig.Stop("a save and the goodbye held"); // within StopTimeout and a margin
@@ -393,7 +393,7 @@ public class ScheduleTests
                     case 4:
                         s.BreakReceive(Faults.Make(t.fault));
                         var call = r.Transport.Calls.First(c => ReferenceEquals(c.Socket, s));
-                        if (!r.Rust)
+                        if (!r.CoreMode)
                         {
                             r.Expecting.Enqueue(new Expected(CallKind.Connect, call.OfKind, Input.KindOneofCase.None, null, $"{call}, its receive broken"));
                         }

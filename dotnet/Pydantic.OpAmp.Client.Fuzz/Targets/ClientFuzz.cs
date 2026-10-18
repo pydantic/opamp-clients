@@ -20,10 +20,10 @@ namespace Pydantic.OpAmp.Client.Fuzz;
 /// one run of a real client on the native core (through <see cref="Native"/>'s buffers), in either
 /// mode:
 /// <list type="bullet">
-/// <item>.NET mode: the executor's HttpClient path over a transport of the fuzzer's (bodies in
+/// <item>platform mode: the executor's HttpClient path over a transport of the fuzzer's (bodies in
 /// pieces, resets, error statuses with any headers, package downloads into the state file's
 /// directory; WebSocket upgrades taken or refused, messages in pieces, closes and drops);</item>
-/// <item>Rust mode: the core's own HTTP and WebSocket over <see cref="Streams"/>, on
+/// <item>core mode: the core's own HTTP and WebSocket over <see cref="Streams"/>, on
 /// <see cref="MemNet"/>, the server's bytes arriving in pieces (or any bytes at all, status line
 /// included), package files spliced or written by the streams' file writer.</item>
 /// </list>
@@ -35,7 +35,7 @@ namespace Pydantic.OpAmp.Client.Fuzz;
 /// stops on its own (the callback never throws, so an error is this shell's or the core's);
 /// callbacks one at a time, never after Stopped; Stopped once, last; stop completes within its
 /// bound without an error; every answer the server gave reaches the core unless the core gave up
-/// on it first (.NET mode); InstallPackage names a file under the state file's downloads
+/// on it first (platform mode); InstallPackage names a file under the state file's downloads
 /// directory, there as the callback runs, whose SHA-256 is the offer's content hash when it has
 /// one; a heartbeat interval is never negative; no temporary state file is left; nothing is
 /// started once stop has returned.
@@ -52,7 +52,7 @@ internal static class ClientFuzz
 
     public const int RunMs = 5000;
 
-    /// <summary>.NET mode: the header that names each answer the server gave.</summary>
+    /// <summary>Platform mode: the header that names each answer the server gave.</summary>
     public const string Tag = "X-Answer";
 
     /// <summary>Inputs that reach the deeper paths at once (ClientFuzz.java's, read alike).</summary>
@@ -61,10 +61,10 @@ internal static class ClientFuzz
         [0],
         [1, 0],
 
-        // .NET mode, 1 ms heartbeats: a remote config, answered from the callback.
+        // Platform mode, 1 ms heartbeats: a remote config, answered from the callback.
         [0, 0, 5, 2, 0, 2, (byte)'a', (byte)'b', 1, 0, 4, (byte)'c', (byte)'o', (byte)'n', (byte)'f', 0, 0, 1, 3, 1],
 
-        // Rust mode: a package offered, its file served.
+        // Core mode: a package offered, its file served.
         [1, 0, 1, 5, 4, 0, 0, 1, 0, 0, 1, (byte)'1', 2, (byte)'h', (byte)'1', 1, 0, 5, (byte)'h', (byte)'e', (byte)'l', (byte)'l', (byte)'o', 0, 0, 0, 0, 0, 0, 1, 4, 1, 1, 0],
 
         // Connection settings offered, with a new endpoint.
@@ -106,7 +106,7 @@ internal static class ClientFuzz
     {
         private readonly FuzzInput.Reader r;
         private readonly FuzzInput.Server server;
-        private readonly bool rust;
+        private readonly bool coreMode;
         private readonly string state;
         private readonly OpAmpClientOptions options;
         private readonly MemNet net = new();
@@ -129,7 +129,7 @@ internal static class ClientFuzz
         {
             this.r = new FuzzInput.Reader(data);
             var flags = this.r.U8();
-            this.rust = (flags & 1) != 0;
+            this.coreMode = (flags & 1) != 0;
             var more = this.r.U8();
             this.server = new FuzzInput.Server(this.r);
             this.state = Path.Combine(tmp, "state");
@@ -147,11 +147,11 @@ internal static class ClientFuzz
                 DownloadTimeout = TimeSpan.FromSeconds(5),
                 MaxPackageBytes = (flags & 128) != 0 ? 1000UL : 0UL,
                 StopTimeout = TimeSpan.FromMilliseconds(StopMs),
-                Mode = this.rust ? OpAmpMode.Rust : OpAmpMode.DotNet,
-                DirectConnection = this.rust,
-                RustSplice = !this.rust || (more & 1) != 0,
+                Mode = this.coreMode ? OpAmpMode.Core : OpAmpMode.Platform,
+                DirectConnection = this.coreMode,
+                SpliceDownloads = !this.coreMode || (more & 1) != 0,
             };
-            if (this.rust)
+            if (this.coreMode)
             {
                 this.net.OnHandshake = h => h.Ok(); // no TLS in memory
                 this.net.OnLookup = l => l.Answer("127.0.0.1");
@@ -183,7 +183,7 @@ internal static class ClientFuzz
                 this.options,
                 new OpAmpStatus { Description = new AgentDescription(), CustomCapabilities = new CustomCapabilities { Capabilities = { FuzzInput.Capability } } },
                 this.Notify,
-                new Seams { Transport = this.transport, Net = this.rust ? this.net : null, Environment = _ => null, Stepped = this.Stepped });
+                new Seams { Transport = this.transport, Net = this.coreMode ? this.net : null, Environment = _ => null, Stepped = this.Stepped });
             this.client.SetResult(c);
             var begun = Stopwatch.GetTimestamp();
             while (!this.r.Empty && Volatile.Read(ref this.stopped) is null && Stopwatch.GetElapsedTime(begun).TotalMilliseconds < RunMs)
@@ -234,7 +234,7 @@ internal static class ClientFuzz
                 this.Problem("a temporary state file left behind");
             }
 
-            if (!this.rust)
+            if (!this.coreMode)
             {
                 this.CheckAnswers();
             }
@@ -242,7 +242,7 @@ internal static class ClientFuzz
             Thread.Sleep(1); // what a client broke its promise with comes now, if at all
             if (!this.problems.IsEmpty)
             {
-                throw new Problem($"{(this.rust ? "Rust" : ".NET")} mode, {this.server.Answers} answers: {string.Join("; ", this.problems)}");
+                throw new Problem($"{(this.coreMode ? "Core" : "Platform")} mode, {this.server.Answers} answers: {string.Join("; ", this.problems)}");
             }
         }
 
@@ -378,9 +378,9 @@ internal static class ClientFuzz
         }
 
         /// <summary>
-        /// .NET mode: every answer the server gave reached the core, unless the core gave up on its
-        /// effect first. A request is the http_request with its body; the k-th upgrade the shell
-        /// asked for is the core's k-th ws_open (checked only when the shell asked for each).
+        /// Platform mode: every answer the server gave reached the core, unless the core gave up on
+        /// its effect first. A request is the http_request with its body; the k-th upgrade the
+        /// shell asked for is the core's k-th ws_open (checked only when the shell asked for each).
         /// </summary>
         private void CheckAnswers()
         {
@@ -448,7 +448,7 @@ internal static class ClientFuzz
             return [.. f];
         }
 
-        /// <summary>Rust mode: one connection's server, reading requests and writing answers, in pieces.</summary>
+        /// <summary>Core mode: one connection's server, reading requests and writing answers, in pieces.</summary>
         private async Task ServeConnAsync(MemEnd end, string host)
         {
             try
@@ -524,7 +524,7 @@ internal static class ClientFuzz
             }
         }
 
-        /// <summary>Rust mode: an upgraded connection's frames from the client (masked), each answered.</summary>
+        /// <summary>Core mode: an upgraded connection's frames from the client (masked), each answered.</summary>
         private async Task FramesAsync(MemEnd end)
         {
             var message = new List<byte>();
@@ -607,7 +607,7 @@ internal static class ClientFuzz
             }
         }
 
-        /// <summary>.NET mode: what the executor's requests, downloads and upgrades reach: the fuzzer's server.</summary>
+        /// <summary>Platform mode: what the executor's requests, downloads and upgrades reach: the fuzzer's server.</summary>
         private sealed class FuzzTransport(FuzzRun run) : IClientTransport
         {
             private int tags;
@@ -753,8 +753,8 @@ internal static class ClientFuzz
         }
 
         /// <summary>
-        /// .NET mode: a WebSocket connection whose server answers each message the client sends, as
-        /// the fuzzer says; a message longer than the reader's buffer arrives in parts.
+        /// Platform mode: a WebSocket connection whose server answers each message the client
+        /// sends, as the fuzzer says; a message longer than the reader's buffer arrives in parts.
         /// </summary>
         private sealed class FuzzSocket(FuzzRun run) : WebSocket
         {

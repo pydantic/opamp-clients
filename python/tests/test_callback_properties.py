@@ -20,11 +20,11 @@ interval. After each step the notifications seen so far are checked against the 
 A call from another thread is made directly from that thread; the client carries it out on the
 loop. The separate test at the end does the same alone.
 
-Each test runs in both modes: Python mode (aiohttp), and Rust mode (the core's own HTTP and
+Each test runs in both modes: platform mode (aiohttp), and core mode (the core's own HTTP and
 WebSocket, over asyncio's connections), against the same server.
 
 Runs: ``OPAMP_MODEL_RUNS`` per mode (default 30); replay a failing run's seed (printed) with
-``OPAMP_MODEL_SEED`` (or pytest's ``--hypothesis-seed``), and ``-k python`` or ``-k rust`` for its
+``OPAMP_MODEL_SEED`` (or pytest's ``--hypothesis-seed``), and ``-k platform`` or ``-k core`` for its
 mode: a failure prints the whole line."""
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ from aiohttp import WSMsgType, web
 from hypothesis import HealthCheck, Phase, settings, strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, rule, run_state_machine_as_test
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 UID = bytes([0x42] * 16)
 CAPABILITY = "io.example.model"
@@ -54,7 +54,7 @@ SAVED_HASH = b"saved"
 STOP_BOUND = 5 + 2  # the request timeout (the goodbye in flight), plus a margin
 SETTLE = 0.03  # how long the loop runs after each step
 METHODS = ["set_health", "set_description", "send_custom_message", "answer_config"]
-MODES = ["python", "rust"]
+MODES = ["platform", "core"]
 
 
 class Boom(Exception):
@@ -199,7 +199,7 @@ class Run:
 
 
 class CallbackModel(RuleBasedStateMachine):
-    mode = "python"  # the client's: PythonMode's, or RustMode's
+    mode = "platform"  # the client's: PlatformMode's, or CoreMode's
 
     def __init__(self) -> None:
         super().__init__()
@@ -527,16 +527,16 @@ class CallbackModel(RuleBasedStateMachine):
             self.loop.close()
 
 
-class PythonMode(CallbackModel):
-    mode = "python"
+class PlatformMode(CallbackModel):
+    mode = "platform"
 
 
-class RustMode(CallbackModel):
-    mode = "rust"
+class CoreMode(CallbackModel):
+    mode = "core"
 
 
 # covers: RULE-SHELL-01, RULE-SHELL-02, RULE-SHELL-03, RULE-SHELL-07
-@pytest.mark.parametrize("machine", [PythonMode, RustMode], ids=MODES)
+@pytest.mark.parametrize("machine", [PlatformMode, CoreMode], ids=MODES)
 def test_the_callback_contract_holds_over_random_runs(machine: type[CallbackModel], monkeypatch) -> None:
     seed = os.environ.get("OPAMP_MODEL_SEED")
     seed = int(seed) if seed else hypothesis.core.global_force_seed

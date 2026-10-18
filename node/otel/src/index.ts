@@ -1752,9 +1752,9 @@ export class Agent {
           acceptConnectionSettings: true,
           ...(heartbeat ? { heartbeatIntervalMs: heartbeat } : {}),
           ...(s.stateDir ? { stateFile: join(s.stateDir, "opamp-state") } : {}),
-          // Node mode, asked for by name: the client's requests go through fetch and ws, which
+          // Platform mode, asked for by name: the client's requests go through fetch and ws, which
           // is what the suppressed context above keeps out of the application's traces.
-          mode: "node",
+          mode: "platform",
         },
         {
           description: layer.describe(attributes(resource), this.host, BigInt(this.now())),
@@ -1810,7 +1810,7 @@ export class Agent {
   #notified(n: Notification): void {
     this.reachability?.notified(n);
     if (n.kind === "remoteConfig" && this.client) {
-      const answer = this.remoteConfig(n.config);
+      const answer = this.remoteConfig(n.remoteConfig);
       if (this.effective) this.client.setEffectiveConfig(this.effective);
       this.client.setRemoteConfigStatus(answer);
     } else if (n.kind === "instanceUidChanged") {

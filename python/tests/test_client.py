@@ -7,7 +7,7 @@ import pytest
 from _servers import MODES
 from aiohttp import WSMsgType, web
 
-from opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 
 def expected_sequence(got) -> list[int]:
@@ -207,7 +207,7 @@ def test_a_request_that_cant_be_made_at_all_is_a_failed_request(monkeypatch) -> 
         unhandled = []
         asyncio.get_running_loop().set_exception_handler(lambda _loop, ctx: unhandled.append(ctx))
         notes: list[Notification] = []
-        client = Client.start(Config(mode="python", endpoint="http://opamp.invalid/v1/opamp", instance_uid=UID),
+        client = Client.start(Config(mode="platform", endpoint="http://opamp.invalid/v1/opamp", instance_uid=UID),
                               Status(description=DESCRIPTION), notes.append)
         await wait_for(lambda: any(n.kind == "connect_failed" for n in notes), 5)
         await asyncio.wait_for(client.stop(), 5)

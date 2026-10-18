@@ -1,7 +1,7 @@
 # The OpenTelemetry Collector
 
 Two pieces put an OpenTelemetry Collector under an OpAMP server on this repository's Go client
-([go.md](go.md)), in Go mode: net/http and gorilla/websocket carry the requests, so the
+([go.md](go.md)), in platform mode: net/http and gorilla/websocket carry the requests, so the
 Collector's TLS settings and the environment's proxies apply as they do to its other clients.
 
 | | What it is | What the server can do |

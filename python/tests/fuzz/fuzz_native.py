@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Fuzz target (Atheris): the C interface's buffer handling (opamp_client._native and
-opamp_client._core), with any bytes on both sides of it.
+"""Fuzz target (Atheris): the C interface's buffer handling (pydantic_opamp_client._native and
+pydantic_opamp_client._core), with any bytes on both sides of it.
 
 One input is a session of the native core driven through this package's own wrappers: a Config
 (any bytes, or a valid one with any saved state), then steps (any bytes, or valid Steps whose inputs
@@ -30,17 +30,17 @@ except ImportError:
     atheris = None
 
 if atheris is not None and __name__ == "__main__":
-    with atheris.instrument_imports(include=["opamp_client"]):
-        import opamp_client._core  # noqa: F401
+    with atheris.instrument_imports(include=["pydantic_opamp_client"]):
+        import pydantic_opamp_client._core  # noqa: F401
 
 from google.protobuf.message import DecodeError  # noqa: E402
 
 from _fuzzlib import Reader  # noqa: E402
-from opamp_client import _native  # noqa: E402
-from opamp_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
-from opamp_client._proto.opamp.sdk.v1 import settings_pb2 as sdkpb  # noqa: E402
-from opamp_client import anyvalue_pb2, opamp_pb2 as pb  # noqa: E402
-from opamp_client.sdk import SdkSettings  # noqa: E402
+from pydantic_opamp_client import _native  # noqa: E402
+from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
+from pydantic_opamp_client._proto.opamp.sdk.v1 import settings_pb2 as sdkpb  # noqa: E402
+from pydantic_opamp_client import anyvalue_pb2, opamp_pb2 as pb  # noqa: E402
+from pydantic_opamp_client.sdk import SdkSettings  # noqa: E402
 
 
 class Problem(AssertionError):

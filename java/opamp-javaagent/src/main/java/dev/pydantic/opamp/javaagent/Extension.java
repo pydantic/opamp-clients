@@ -817,9 +817,9 @@ final class Extension {
     // A key of its own, offered by the server: taken with a state directory (the state file) and
     // kept there; without one the client neither declares nor takes it.
     b.acceptConnectionSettings(true);
-    // Java mode, asked for by name (an HTTP client selects it too): the client's requests go
+    // Platform mode, asked for by name (an HTTP client selects it too): the client's requests go
     // through the JDK's HTTP client, one of the agent's own that isn't traced.
-    b.mode(OpampClient.Mode.JAVA).httpClient(untracedHttpClient());
+    b.mode(OpampClient.Mode.PLATFORM).httpClient(untracedHttpClient());
     reachability = new Reachability(s.shown(), resource.getAttribute(SERVICE_NAME), uid, s.hints());
     reachability.inUse = () -> {
       OpampClient c = client.getNow(null);

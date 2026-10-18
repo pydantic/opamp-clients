@@ -7,15 +7,15 @@
 // server the adversary expects: one client per seed, several seeds at once, against a server
 // that does what each URL's query says.
 //
-// Each test runs in both modes (MODES). In Rust mode the client tells the core it speaks streams,
+// Each test runs in both modes (MODES). In core mode the client tells the core it speaks streams,
 // and each run has a raw server of its own (adversary.raw.ts; raw=PORT and tls=NAME in the
 // endpoint's query), which the adversary opens streams to: it hands the shell the stream effects
 // (stream_open, stream_write, stream_start_tls, stream_splice, stream_close, download_data...),
 // which src/streams.ts carries out, and the platform's as well (http_request, ws_open, download),
-// which Rust mode's client passes on to the executor, as a core's saves are. So Rust mode's
+// which core mode's client passes on to the executor, as a core's saves are. So core mode's
 // streams and files run against a hostile core, and so does its wiring (Streams is offered every
 // effect first; a cancel or a discard may name a save, a platform download or a stream's file),
-// its stop and its shutdown. Go's harness runs Rust mode the same way (adversary_raw_test.go).
+// its stop and its shutdown. Go's harness runs core mode the same way (adversary_raw_test.go).
 //
 // OPAMP_ADVERSARY_SEEDS seeds per mode (24 by default) from OPAMP_ADVERSARY_BASE (1);
 // OPAMP_ADVERSARY_SEED runs one seed alone (replay; --test-name-pattern picks the mode, and
@@ -60,8 +60,8 @@ const PARALLEL = 4;
  */
 const ARRIVAL_GRACE_MS = 50;
 
-/** The modes every test runs in: Node mode (fetch and ws), and Rust mode (the default). */
-const MODES = ["node", "rust"] as const;
+/** The modes every test runs in: platform mode (fetch and ws), and core mode (the default). */
+const MODES = ["platform", "core"] as const;
 type Mode = (typeof MODES)[number];
 
 /**
@@ -72,7 +72,7 @@ type Mode = (typeof MODES)[number];
  * wake_far, wake_huge and wake_max hold the far wake armed until an answer comes, so a timer that
  * fires early fails the run.
  */
-const KNOWN: Record<Mode, Record<string, string>> = { node: {}, rust: {} };
+const KNOWN: Record<Mode, Record<string, string>> = { platform: {}, core: {} };
 /** Known bugs that are races: their focus runs needn't fail (logged, not asserted). */
 const RACES = new Set<string>();
 
@@ -384,12 +384,12 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
     }
   };
 
-  // In Rust mode the run has a raw server of its own, which the adversary opens streams to
+  // In core mode the run has a raw server of its own, which the adversary opens streams to
   // (raw=PORT), and starts TLS with under the name its certificate is for (tls=NAME): the client
   // trusts the test CA.
   let raw: RawServer | undefined;
   let tls: Config["tls"];
-  if (mode === "rust") {
+  if (mode === "core") {
     raw = new RawServer({ cert: fixture("server.pem"), key: fixture("server-key.pem") });
     try {
       await raw.listen();
@@ -400,8 +400,8 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
     query += `&raw=${raw.port}&tls=${TLS_NAME}`;
     tls = { ca: fixture("ca.pem") };
   }
-  // In either mode the adversary hands the shell platform effects, for the executor's fetch and
-  // ws. No proxy: Rust mode reads HTTP_PROXY and the like, and the local server is reached directly.
+  // In either mode the adversary hands the shell platform effects, for the executor's fetch and ws.
+  // No proxy: core mode reads HTTP_PROXY and the like, and the local server is reached directly.
   const config: Config = { endpoint: `http://127.0.0.1:${server.port}/opamp?seed=${seed}${query}`, stateFile, mode, proxy: false, tls };
   try {
     client = Client.start(
@@ -563,7 +563,7 @@ for (const mode of MODES) {
         // A production is drawn at random, and runs only if the run's timing leaves it room (a far
         // wake only while nothing with a deadline is under way), so one can miss a batch by
         // chance: wake_huge ran in two or three of these 24 seeds, and in none with every test
-        // file running at once on a loaded machine (in Rust mode). Each missed one runs in focus,
+        // file running at once on a loaded machine (in core mode). Each missed one runs in focus,
         // on seeds past the batch's, before it is called one that can't run (as Java's harness
         // does).
         const next = list.at(-1)! + 1;
@@ -623,7 +623,7 @@ const CANCELS = [
   "cancel_ws_opening",
   "stop_cancel",
 ];
-/** And those of the streams and their files, in a Rust mode run's. */
+/** And those of the streams and their files, in a core mode run's. */
 const STREAM_CANCELS = ["cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving"];
 
 // RULE-SHELL-06: nothing after a cancel, a late resource released. Every cancel production is
@@ -635,7 +635,7 @@ for (const mode of MODES) {
     assert.ok(r?.verdict, `a verdict: ${r?.failures.join("; ")}`);
     const cancels = r.verdict.enabled.filter((p) => p.startsWith("cancel_") || p === "stop_cancel");
     assert.deepEqual(
-      [...CANCELS, ...(mode === "rust" ? STREAM_CANCELS : [])].filter((p) => !cancels.includes(p)),
+      [...CANCELS, ...(mode === "core" ? STREAM_CANCELS : [])].filter((p) => !cancels.includes(p)),
       [],
       `every cancel production enabled: ${r.verdict.enabled.join(",")}`,
     );

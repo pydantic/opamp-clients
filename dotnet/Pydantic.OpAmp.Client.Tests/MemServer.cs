@@ -8,7 +8,7 @@ using System.Text;
 namespace Pydantic.OpAmp.Client.Tests;
 
 /// <summary>
-/// The server at the far end of Rust mode's in-memory streams (<see cref="MemNet"/>), for the
+/// The server at the far end of core mode's in-memory streams (<see cref="MemNet"/>), for the
 /// schedule tests: a minimal HTTP/1.1 and WebSocket peer that turns each request, download and
 /// upgrade the core sends into a <see cref="Call"/> of the <see cref="MemoryTransport"/>, which the
 /// test answers as it answers platform mode's: a response (its body held, or failing half-way), a

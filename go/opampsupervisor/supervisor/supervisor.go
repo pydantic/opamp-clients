@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: the OpAMP
-// client is the shared core's (coreClient, go/opamp in Go mode) instead of opamp-go's, with its
-// state file in the storage directory; it handles OpAMP connection settings offers itself, so
-// onOpampConnectionSettings and its in-memory credentials are gone. A start that can't write
-// the Collector's config fails instead of running it on a stale one, and a rollback that can't be
+// client is the shared core's (coreClient, go/opamp in platform mode) instead of opamp-go's, with
+// its state file in the storage directory; it handles OpAMP connection settings offers itself, so
+// onOpampConnectionSettings and its in-memory credentials are gone. A start that can't write the
+// Collector's config fails instead of running it on a stale one, and a rollback that can't be
 // written leaves the config state as it was. The collector executables the server offers are
 // installed, with a rollback if the new one isn't healthy (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept. The files holding
-// what the server sent are sealed with storage.state_key (sealed_storage.go). The Supervisor's
-// own telemetry ignores OTEL_EXPORTER_OTLP_* variables (telemetry_env.go).
+// what the server sent are sealed with storage.state_key (sealed_storage.go). The Supervisor's own
+// telemetry ignores OTEL_EXPORTER_OTLP_* variables (telemetry_env.go).
 
 package supervisor
 

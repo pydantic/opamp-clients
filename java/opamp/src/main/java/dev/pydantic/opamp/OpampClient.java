@@ -25,8 +25,8 @@ import opamp.proto.v1.Opamp;
  * <p>Everything OpAMP (what to send and when, backoff, heartbeats, full reports, instance UIDs,
  * agent_disconnect, and the requests and responses themselves: headers, framing, Retry-After, size
  * limits) is the shared core, run as WebAssembly in Chicory. By default
- * ({@link Mode#RUST}) the core speaks HTTP and WebSocket itself too, over the JDK's sockets
- * ({@link Streams}); in {@link Mode#JAVA} this class carries out the core's requests with the
+ * ({@link Mode#CORE}) the core speaks HTTP and WebSocket itself too, over the JDK's sockets
+ * ({@link Streams}); in {@link Mode#PLATFORM} this class carries out the core's requests with the
  * JDK's HTTP client instead. Either way it feeds back what happened, so it behaves exactly like
  * the other languages' clients on the same core. Everything runs on one
  * thread of its own; the methods may be called from any thread, the callback's included. What the
@@ -37,18 +37,18 @@ public final class OpampClient {
   /** Who speaks HTTP and WebSocket: the shared core itself, or the JDK's client. */
   public enum Mode {
     /**
-     * The JDK's HTTP client and WebSocket: for an application that brings its own {@code
-     * HttpClient} ({@link Config.Builder#httpClient}, which selects it too) or needs the JDK's
-     * own stack (its {@code ProxySelector} and proxy system properties).
-     */
-    JAVA,
-    /**
      * The default: the shared core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
      * over the JDK's sockets and TLS ({@code SSLEngine}, with {@link
      * Config.Builder#tls}); the client only opens connections, starts TLS, picks the proxy and
      * writes package files.
      */
-    RUST
+    CORE,
+    /**
+     * The JDK's HTTP client and WebSocket: for an application that brings its own {@code
+     * HttpClient} ({@link Config.Builder#httpClient}, which selects it too) or needs the JDK's
+     * own stack (its {@code ProxySelector} and proxy system properties).
+     */
+    PLATFORM
   }
 
   /** The client's settings. */
@@ -76,13 +76,13 @@ public final class OpampClient {
     final Duration stopTimeout;
     final Duration connectTimeout;
     final Mode mode;
-    final boolean rustSplice;
-    /** Rust mode's configured proxy, as given, or null. */
-    final String rustProxy;
+    final boolean spliceDownloads;
+    /** Core mode's configured proxy, as given, or null. */
+    final String coreProxy;
     final boolean proxyResolveLocally;
-    /** Where Rust mode reads HTTP_PROXY and the like: the process environment, or a test's. */
+    /** Where core mode reads HTTP_PROXY and the like: the process environment, or a test's. */
     final Map<String, String> environment;
-    /** Rust mode's sockets: the JDK's, or a test's in memory. */
+    /** Core mode's sockets: the JDK's, or a test's in memory. */
     final Streams.Platform streamsPlatform;
 
     private Config(Builder b, Mode resolved) {
@@ -97,11 +97,11 @@ public final class OpampClient {
       httpClient = b.httpClient;
       tls = b.tls;
       mode = resolved;
-      rustSplice = b.rustSplice;
+      spliceDownloads = b.spliceDownloads;
       proxyResolveLocally = b.proxyResolveLocally;
       // The proxy URL is read as the mode reads it: the JDK's client takes HTTP proxies only.
-      proxy = b.proxyUrl == null || mode == Mode.RUST ? null : Transport.Proxy.parse(b.proxyUrl);
-      rustProxy = b.proxyUrl == null || mode != Mode.RUST ? null : RustProxy.check(b.proxyUrl, b.proxyResolveLocally);
+      proxy = b.proxyUrl == null || mode == Mode.CORE ? null : Transport.Proxy.parse(b.proxyUrl);
+      coreProxy = b.proxyUrl == null || mode != Mode.CORE ? null : CoreProxy.check(b.proxyUrl, b.proxyResolveLocally);
       environment = b.environment;
       streamsPlatform = b.streamsPlatform;
       direct = b.direct;
@@ -151,7 +151,7 @@ public final class OpampClient {
       private boolean direct;
       /** Null: none named ({@link #build} picks it). */
       private Mode mode;
-      private boolean rustSplice = true;
+      private boolean spliceDownloads = true;
       private Map<String, String> environment;
       private Streams.Platform streamsPlatform = Streams.SOCKETS;
       private Path stateFile;
@@ -232,22 +232,22 @@ public final class OpampClient {
        * for credentials through it.
        *
        * <p>Without one (and without {@link #directConnection}), the proxy comes from the
-       * environment, by the rule every SDK follows in Rust mode (HTTP_PROXY for http:// and
+       * environment, by the rule every SDK follows in core mode (HTTP_PROXY for http:// and
        * ws://, HTTPS_PROXY for https:// and wss://, ALL_PROXY for either, NO_PROXY: names, their
        * subdomains, addresses and CIDR networks; upper case first; none under CGI). The JDK's
        * {@code ProxySelector} and its system properties ({@code https.proxyHost} and the like)
-       * are not read: they are {@link Mode#JAVA}'s.
+       * are not read: they are {@link Mode#PLATFORM}'s.
        *
-       * <p>In {@link Mode#JAVA} the JDK's HTTP client goes through the proxy: {@code
+       * <p>In {@link Mode#PLATFORM} the JDK's HTTP client goes through the proxy: {@code
        * http://[user:password@]host[:port]} only (port 80 by default; it has no SOCKS and no
        * {@code https://} proxies, and {@link #build} refuses those URLs there). {@code https://},
        * {@code ws://} and {@code wss://} go through a CONNECT tunnel; {@code http://} requests go
        * to the proxy in absolute form. Credentials are sent as Basic Proxy-Authorization, which
        * the JDK sends through a CONNECT tunnel only when the JVM runs with {@code
        * -Djdk.http.auth.tunneling.disabledSchemes=} (set before the first HTTP client is built; it
-       * is the JVM's, so this client doesn't set it). Without one, Java mode uses the platform's
-       * proxy settings, as the JDK does: {@code ProxySelector.getDefault()}, which reads {@code
-       * http.proxyHost}, {@code https.proxyHost}, {@code http.nonProxyHosts} and {@code
+       * is the JVM's, so this client doesn't set it). Without one, platform mode uses the
+       * platform's proxy settings, as the JDK does: {@code ProxySelector.getDefault()}, which reads
+       * {@code http.proxyHost}, {@code https.proxyHost}, {@code http.nonProxyHosts} and {@code
        * java.net.useSystemProxies}. {@link #directConnection} ignores them.
        */
       public Builder proxy(String url) {
@@ -257,8 +257,8 @@ public final class OpampClient {
 
       /**
        * Through a SOCKS5 {@link #proxy}: resolve the server's name here and give the proxy its
-       * address, rather than the name; default false (the proxy resolves it). It is Rust mode's:
-       * in {@link Mode#JAVA} (the JDK's HTTP client has no SOCKS5) {@link #build} refuses it.
+       * address, rather than the name; default false (the proxy resolves it). It is core mode's:
+       * in {@link Mode#PLATFORM} (the JDK's HTTP client has no SOCKS5) {@link #build} refuses it.
        */
       public Builder proxyResolveLocally(boolean resolveLocally) {
         this.proxyResolveLocally = resolveLocally;
@@ -266,11 +266,11 @@ public final class OpampClient {
       }
 
       /**
-       * Who speaks HTTP and WebSocket: {@link Mode#RUST}, the shared core itself, over the JDK's
-       * sockets and TLS; or {@link Mode#JAVA}, the JDK's HTTP client. Not called: Rust mode,
-       * unless an {@link #httpClient} is given, which only Java mode can use (Rust mode with one
-       * is an error). An option only one mode honours is never ignored: it selects that mode, or
-       * {@link #build} refuses it with what to set instead.
+       * Who speaks HTTP and WebSocket: {@link Mode#CORE}, the shared core itself, over the JDK's
+       * sockets and TLS; or {@link Mode#PLATFORM}, the JDK's HTTP client. Not called: core mode,
+       * unless an {@link #httpClient} is given, which only platform mode can use (core mode with
+       * one is an error). An option only one mode honours is never ignored: it selects that mode,
+       * or {@link #build} refuses it with what to set instead.
        */
       public Builder mode(Mode mode) {
         this.mode = Objects.requireNonNull(mode);
@@ -278,22 +278,22 @@ public final class OpampClient {
       }
 
       /**
-       * {@link Mode#RUST}: package files go from the socket to the file without passing through
-       * the core, where the response says how long the body is; default true. It is Rust mode's:
-       * {@code false} in {@link Mode#JAVA} is refused by {@link #build}.
+       * {@link Mode#CORE}: package files go from the socket to the file without passing through
+       * the core, where the response says how long the body is; default true. It is core mode's:
+       * {@code false} in {@link Mode#PLATFORM} is refused by {@link #build}.
        */
-      public Builder rustSplice(boolean splice) {
-        this.rustSplice = splice;
+      public Builder spliceDownloads(boolean splice) {
+        this.spliceDownloads = splice;
         return this;
       }
 
-      /** Tests only: the environment Rust mode reads its proxy from (default: the process's). */
+      /** Tests only: the environment core mode reads its proxy from (default: the process's). */
       Builder environment(Map<String, String> env) {
         this.environment = env == null ? null : Map.copyOf(env);
         return this;
       }
 
-      /** Tests only: Rust mode's sockets (default: the JDK's). */
+      /** Tests only: core mode's sockets (default: the JDK's). */
       Builder streamsPlatform(Streams.Platform platform) {
         this.streamsPlatform = Objects.requireNonNull(platform);
         return this;
@@ -301,7 +301,7 @@ public final class OpampClient {
 
       /**
        * Connect straight to the server and to package files, ignoring the environment's proxy
-       * (in {@link Mode#JAVA}, the platform's proxy settings). Not with {@link #proxy}.
+       * (in {@link Mode#PLATFORM}, the platform's proxy settings). Not with {@link #proxy}.
        */
       public Builder directConnection() {
         this.direct = true;
@@ -310,7 +310,7 @@ public final class OpampClient {
 
       /**
        * Your own HTTP client, used as it is for OpAMP and package downloads. Giving one selects
-       * {@link Mode#JAVA}: only the JDK's stack can use it. It replaces {@link #tls} and {@link
+       * {@link Mode#PLATFORM}: only the JDK's stack can use it. It replaces {@link #tls} and {@link
        * #proxy}: set TLS and proxies on it instead (giving both is an error). It must not follow
        * redirects ({@code HttpClient.Redirect.NEVER}, the JDK's default): every 3xx goes to the
        * core as it is, a download's too, and the core decides whether to follow it.
@@ -409,16 +409,16 @@ public final class OpampClient {
 
       /** The settings. */
       public Config build() {
-        if (mode == Mode.RUST && httpClient != null) {
-          throw new IllegalStateException("Rust mode speaks HTTP itself and takes no httpClient: set tls and proxy instead,"
-              + " or don't call mode (an httpClient selects Mode.JAVA)");
+        if (mode == Mode.CORE && httpClient != null) {
+          throw new IllegalStateException("core mode speaks HTTP itself and takes no httpClient: set tls and proxy instead,"
+              + " or don't call mode (an httpClient selects Mode.PLATFORM)");
         }
-        // With no mode named: Rust mode, unless the application brought its own HTTP client,
-        // which only Java mode can use.
-        Mode resolved = mode != null ? mode : httpClient != null ? Mode.JAVA : Mode.RUST;
-        if (resolved == Mode.JAVA && !rustSplice) {
-          throw new IllegalStateException("rustSplice is Rust mode's (the JDK's HTTP client writes package files itself):"
-              + " leave it out, or run in Rust mode (no httpClient, and mode(Mode.RUST) or none)");
+        // With no mode named: core mode, unless the application brought its own HTTP client,
+        // which only platform mode can use.
+        Mode resolved = mode != null ? mode : httpClient != null ? Mode.PLATFORM : Mode.CORE;
+        if (resolved == Mode.PLATFORM && !spliceDownloads) {
+          throw new IllegalStateException("spliceDownloads is core mode's (the JDK's HTTP client writes package files itself):"
+              + " leave it out, or run in core mode (no httpClient, and mode(Mode.CORE) or none)");
         }
         if (httpClient != null && (tls != null || proxyUrl != null || direct)) {
           throw new IllegalStateException("httpClient replaces tls, proxy and directConnection: set them on your HTTP client instead");
@@ -426,9 +426,9 @@ public final class OpampClient {
         if (proxyUrl != null && direct) {
           throw new IllegalStateException("proxy and directConnection: choose one");
         }
-        if (proxyResolveLocally && resolved != Mode.RUST) {
-          throw new IllegalStateException("proxyResolveLocally is Rust mode's (the JDK's HTTP client has no SOCKS5):"
-              + " leave it out, or run in Rust mode (no httpClient, and mode(Mode.RUST) or none)");
+        if (proxyResolveLocally && resolved != Mode.CORE) {
+          throw new IllegalStateException("proxyResolveLocally is core mode's (the JDK's HTTP client has no SOCKS5):"
+              + " leave it out, or run in core mode (no httpClient, and mode(Mode.CORE) or none)");
         }
         if (proxyResolveLocally && proxyUrl == null) {
           throw new IllegalStateException("proxyResolveLocally goes with a socks5:// or socks5h:// proxy");
@@ -477,7 +477,7 @@ public final class OpampClient {
 
   private final Core core;
   private final Executor executor;
-  /** Rust mode's sockets and files; null in platform mode. */
+  /** Core mode's sockets and files; null in platform mode. */
   private final Streams streams;
   private final Consumer<Notification> notify;
   private final ScheduledExecutorService thread;
@@ -516,21 +516,21 @@ public final class OpampClient {
   private OpampClient(Config config, Consumer<Notification> notify, com.dylibso.chicory.wasm.WasmModule coreModule,
       String tapPath, java.util.function.UnaryOperator<Disk> disk) {
     // First what can fail: nothing is left running then.
-    boolean rust = config.mode == Mode.RUST;
+    boolean coreMode = config.mode == Mode.CORE;
     Transport transport;
     if (config.httpClient != null) {
       transport = Transport.of(config.httpClient);
-    } else if (rust) {
-      // Platform effects reach a Rust-mode client only from a core that ignores streams (the
+    } else if (coreMode) {
+      // Platform effects reach a core-mode client only from a core that ignores streams (the
       // adversary): the JDK's client for them is made if one comes, through the proxy if it is
       // one the JDK can use, else directly.
-      Transport.Proxy http = config.rustProxy != null && RustProxy.scheme(config.rustProxy).equals("http")
-          ? Transport.Proxy.parse(config.rustProxy) : null;
-      transport = Transport.lazy(config.tls, http, config.direct || (config.rustProxy != null && http == null));
+      Transport.Proxy http = config.coreProxy != null && CoreProxy.scheme(config.coreProxy).equals("http")
+          ? Transport.Proxy.parse(config.coreProxy) : null;
+      transport = Transport.lazy(config.tls, http, config.direct || (config.coreProxy != null && http == null));
     } else {
       transport = Transport.build(config.tls, config.proxy, config.direct);
     }
-    java.util.function.Function<String, javax.net.ssl.SSLEngine> engines = rust ? Streams.engines(config.tls) : null;
+    java.util.function.Function<String, javax.net.ssl.SSLEngine> engines = coreMode ? Streams.engines(config.tls) : null;
     // The transport is the endpoint's, as the core reads it: this client carries out whichever
     // effects come. The core keeps every effect's time (this client carries out its cancels),
     // decides what a download's status means, and makes the backoff's jitter seed from the
@@ -552,10 +552,10 @@ public final class OpampClient {
         .setDownloadTimeoutMs(ms(config.downloadTimeout))
         .setStopTimeoutMs(ms(config.stopTimeout))
         .setConnectTimeoutMs(ms(config.connectTimeout))
-        // Rust mode: the core speaks HTTP and WebSocket over the streams this client opens.
-        .setStreams(rust)
-        .setSpliceDownloads(rust && config.rustSplice);
-    if (rust) {
+        // Core mode: the core speaks HTTP and WebSocket over the streams this client opens.
+        .setStreams(coreMode)
+        .setSpliceDownloads(coreMode && config.spliceDownloads);
+    if (coreMode) {
       // The core picks each connection's proxy from this.
       c.setProxy(proxyChoice(config));
     }
@@ -594,7 +594,7 @@ public final class OpampClient {
     loop.setRemoveOnCancelPolicy(true);
     this.thread = loop;
     this.executor = new Executor(transport, this::post, config.stateFile, files);
-    this.streams = rust
+    this.streams = coreMode
         ? new Streams(thread, in -> {
           if (!finished) {
             step(in);
@@ -662,20 +662,20 @@ public final class OpampClient {
   }
 
   /**
-   * What Rust mode tells the core about proxies, once ({@code Config.proxy}): the proxy
+   * What core mode tells the core about proxies, once ({@code Config.proxy}): the proxy
    * configured, as given; none for a direct connection; otherwise the environment's variables,
-   * from which the core picks by Rust mode's rule ({@link RustProxy}).
+   * from which the core picks by core mode's rule ({@link CoreProxy}).
    */
   static CoreProto.ProxyChoice proxyChoice(Config config) {
     CoreProto.ProxyChoice.Builder c = CoreProto.ProxyChoice.newBuilder();
-    if (config.rustProxy != null) {
-      return c.setUrl(config.rustProxy).setResolveLocally(config.proxyResolveLocally).build();
+    if (config.coreProxy != null) {
+      return c.setUrl(config.coreProxy).setResolveLocally(config.proxyResolveLocally).build();
     }
     if (config.direct) {
       return c.setDirect(true).build();
     }
     Map<String, String> env = config.environment != null ? config.environment : System.getenv();
-    for (String name : RustProxy.VARIABLES) {
+    for (String name : CoreProxy.VARIABLES) {
       String v = env.get(name);
       if (v != null) {
         c.addEnvironment(CoreProto.Header.newBuilder().setName(name).setValue(v));
@@ -685,14 +685,14 @@ public final class OpampClient {
   }
 
   /**
-   * Rust mode's answer to the core's proxy_query, which the core asks only when it wasn't told
+   * Core mode's answer to the core's proxy_query, which the core asks only when it wasn't told
    * ({@link #proxyChoice}): the proxy configured, or none (the environment's rule is the core's).
    */
   static java.util.function.Function<String, CoreProto.ProxyAnswer.Builder> proxies(Config config) {
     return url -> {
       CoreProto.ProxyAnswer.Builder a = CoreProto.ProxyAnswer.newBuilder();
-      if (config.rustProxy != null) {
-        a.setProxy(config.rustProxy).setResolveLocally(config.proxyResolveLocally);
+      if (config.coreProxy != null) {
+        a.setProxy(config.coreProxy).setResolveLocally(config.proxyResolveLocally);
       }
       return a;
     };
@@ -712,7 +712,7 @@ public final class OpampClient {
     }
   }
 
-  /** 32 bytes from the platform's CSPRNG, for the instance UID the core makes (and in Rust mode the WebSocket keys and masks). */
+  /** 32 bytes from the platform's CSPRNG, for the instance UID the core makes (and in core mode the WebSocket keys and masks). */
   static byte[] entropy() {
     byte[] b = new byte[32];
     new java.security.SecureRandom().nextBytes(b);
@@ -730,7 +730,7 @@ public final class OpampClient {
   /**
    * The endpoint the client uses now: where its latest OpAMP request or WebSocket connection went,
    * which after the server moved the agent (an offer of connection settings) is the offered one, or
-   * the configured one again once an offer failed. Null before any outcome, and in Rust mode, where
+   * the configured one again once an offer failed. Null before any outcome, and in core mode, where
    * the core makes the requests itself (the configured one is all there is to name then). The URL
    * is as the core gave it: redact it before logging.
    */
@@ -875,7 +875,7 @@ public final class OpampClient {
    * said APPLYING for a saved config the callback had answered. Calls from elsewhere keep their
    * turn: where no callback calls the client, the order is the thread's, as it was.
    *
-   * <p>In Rust mode this runs inside the turn that fed the core a stream's bytes ({@link Streams}
+   * <p>In core mode this runs inside the turn that fed the core a stream's bytes ({@link Streams}
    * names that stream as the source of the download_data the step makes): a call brings the core
    * no bytes, so its step makes none.
    */
@@ -912,7 +912,7 @@ public final class OpampClient {
   }
 
   /**
-   * Step the core with {@code input} (admitted: Rust mode's streams decide what of theirs reaches
+   * Step the core with {@code input} (admitted: core mode's streams decide what of theirs reaches
    * the core) and carry out the effects. On the client's thread only.
    */
   private void step(CoreProto.Input input) {
@@ -941,7 +941,7 @@ public final class OpampClient {
           }
         } else if (!(out.getStopped() && starts(e))) {
           // An output that says stopped starts nothing new (RULE-SHELL-07): its notifications,
-          // cancels and discards only. In Rust mode the stream effects are Streams'; the rest
+          // cancels and discards only. In core mode the stream effects are Streams'; the rest
           // (a save, a save's cancel, a platform effect from a core that ignores streams) the
           // executor's.
           if (streams == null || !streams.run(e)) {
@@ -1002,7 +1002,7 @@ public final class OpampClient {
     // for, within the stop timeout.
     CompletableFuture<Void> over = executor.close();
     if (streams != null) {
-      // Rust mode: every stream closed at once; files still being written are deleted once their
+      // Core mode: every stream closed at once; files still being written are deleted once their
       // write in flight is over.
       over = CompletableFuture.allOf(over, streams.shutdown());
     }

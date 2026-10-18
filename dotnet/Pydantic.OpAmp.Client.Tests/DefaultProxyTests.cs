@@ -44,7 +44,7 @@ public class DefaultProxyTests
             var client = OpAmpClient.Start(
                 new OpAmpClientOptions
                 {
-                    Mode = OpAmpMode.DotNet,
+                    Mode = OpAmpMode.Platform,
                     Endpoint = new Uri(server.Endpoint(transport)),
                     InstanceUid = Uid,
                     HeartbeatInterval = TimeSpan.FromMilliseconds(50),
@@ -112,7 +112,7 @@ public class DefaultProxyTests
         Environment.SetEnvironmentVariable(name, value);
         try
         {
-            var options = new OpAmpClientOptions { Mode = OpAmpMode.DotNet, Endpoint = new Uri("http://localhost:1/v1/opamp"), InstanceUid = Uid };
+            var options = new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = new Uri("http://localhost:1/v1/opamp"), InstanceUid = Uid };
             if (error is null)
             {
                 await OpAmpClient.Start(options, new OpAmpStatus()).StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
@@ -148,7 +148,7 @@ public class DefaultProxyTests
         try
         {
             var e = Assert.Throws<ArgumentException>(() => OpAmpClient.Start(
-                new OpAmpClientOptions { Mode = OpAmpMode.DotNet, Endpoint = new Uri("http://localhost:1/v1/opamp"), InstanceUid = Uid }, new OpAmpStatus()));
+                new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = new Uri("http://localhost:1/v1/opamp"), InstanceUid = Uid }, new OpAmpStatus()));
             Assert.Contains(error, e.Message, StringComparison.Ordinal);
         }
         finally
@@ -224,7 +224,7 @@ public class DefaultProxyTests
             var client = OpAmpClient.Start(
                 new OpAmpClientOptions
                 {
-                    Mode = OpAmpMode.DotNet,
+                    Mode = OpAmpMode.Platform,
                     Endpoint = new Uri(server.Endpoint("http")),
                     InstanceUid = Uid,
                     HeartbeatInterval = TimeSpan.FromMilliseconds(50),
@@ -248,7 +248,7 @@ public class DefaultProxyTests
         var endpoint = new Uri("http://127.0.0.1:1/v1/opamp");
         using var app = new HttpClient();
         Assert.Throws<ArgumentException>(() => OpAmpClient.Start(
-            new OpAmpClientOptions { Mode = OpAmpMode.DotNet, Endpoint = endpoint, DirectConnection = true, Proxy = new Uri("http://127.0.0.1:2") }, new OpAmpStatus()));
+            new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = endpoint, DirectConnection = true, Proxy = new Uri("http://127.0.0.1:2") }, new OpAmpStatus()));
         Assert.Throws<ArgumentException>(() => OpAmpClient.Start(
             new OpAmpClientOptions { Endpoint = endpoint, DirectConnection = true, HttpClient = app }, new OpAmpStatus()));
     }

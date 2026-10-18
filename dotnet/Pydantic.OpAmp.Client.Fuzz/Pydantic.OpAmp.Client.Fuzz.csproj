@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Rust mode's in-memory network, as the tests have it. -->
+    <!-- Core mode's in-memory network, as the tests have it. -->
     <Compile Include="../Pydantic.OpAmp.Client.Tests/MemNet.cs" Link="MemNet.cs" />
   </ItemGroup>
 

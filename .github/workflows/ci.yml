@@ -625,7 +625,7 @@ jobs:
           go-version: "1.25"
           cache-dependency-path: |
             go/go.sum
-            go/otel/go.sum
+            go/opampotel/go.sum
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: matrix.sdk == 'node'
         with:
@@ -651,9 +651,9 @@ jobs:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
           dotnet-version: "8.0.x"
-      - name: Go SDK setup (go/otel)
+      - name: Go SDK setup (go/opampotel)
         if: matrix.sdk == 'go'
-        working-directory: go/otel
+        working-directory: go/opampotel
         run: |
           go vet ./...
           go test -race ./...
@@ -1051,19 +1051,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { family: go, client: go-core-platform }
           - { family: go, client: go-core }
-          - { family: go, client: go-core-rust }
           - { family: go, client: go }
-          - { family: node, client: node }
-          - { family: node, client: node-rust }
+          - { family: node, client: node-core-platform }
+          - { family: node, client: node-core }
+          - { family: python, client: python-core-platform }
           - { family: python, client: python-core }
-          - { family: python, client: python-core-rust }
           - { family: python, client: python }
+          - { family: java, client: java-core-platform }
           - { family: java, client: java-core }
-          - { family: java, client: java-core-rust }
           - { family: java, client: java }
+          - { family: dotnet, client: dotnet-core-platform }
           - { family: dotnet, client: dotnet-core }
-          - { family: dotnet, client: dotnet-core-rust }
           - { family: dotnet, client: dotnet }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1124,9 +1124,9 @@ jobs:
             conformance/out/*/*/core-*.tap*
           if-no-files-found: ignore
 
-  # Every client's taps of each scenario against go-core's: what each SDK told its core should
-  # differ only in timing, or as conformance/differential/shells.toml allows. It reads what the
-  # conformance jobs kept, so it runs after them, whatever they found.
+  # Every client's taps of each scenario against go-core-platform's: what each SDK told its core
+  # should differ only in timing, or as conformance/differential/shells.toml allows. It reads what
+  # the conformance jobs kept, so it runs after them, whatever they found.
   conformance-differential:
     name: Conformance (differential)
     needs: conformance
@@ -1156,7 +1156,7 @@ jobs:
           merge-multiple: true
           path: conformance/out/
       - name: Each scenario's taps, client against client
-        run: python3 conformance/differential/shells.py --strict --reference go-core
+        run: python3 conformance/differential/shells.py --strict --reference go-core-platform
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

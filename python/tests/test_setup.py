@@ -5,7 +5,7 @@ headers and the heartbeat as it reads them; the instance UID saved, or made and 
 
 import pytest
 
-from opamp_client import CoreError, setup
+from pydantic_opamp_client import CoreError, setup
 
 
 def test_setup_is_the_cores_call():

@@ -392,7 +392,7 @@ func (m *mClient) notify(n Notification) {
 			m.answered = append(m.answered, answerCall(k, answer.LastRemoteConfigHash))
 			m.mu.Unlock()
 		} else {
-			// S5: no handle yet. Answer once there is one, as go/otel does.
+			// S5: no handle yet. Answer once there is one, as go/opampotel does.
 			go func() {
 				for m.client.Load() == nil {
 					time.Sleep(time.Millisecond)
@@ -471,7 +471,7 @@ func modelDesc(who mWho, n int64) *protobufs.AgentDescription {
 // modelRun runs a plan; it returns the first way it broke the model, and how many callbacks came
 // before Start returned (S5).
 type modelRun struct {
-	mode  Mode // the client's: Go mode, or Rust mode
+	mode  Mode // the client's: platform mode, or core mode
 	plan  mPlan
 	dir   string
 	srv   *modelServer
@@ -509,7 +509,7 @@ func (r *modelRun) session(s mSession) error {
 	cfg := Config{Endpoint: r.ts.URL + "/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: modelHeartbeat,
 		RequestTimeout: modelReqTimeout, Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
 		Mode: r.mode}
-	if r.mode == ModeRust {
+	if r.mode == ModeCore {
 		cfg.Proxy = Proxy{Direct: true} // the local server, whatever the environment says
 	}
 	if r.plan.ws {
@@ -846,12 +846,12 @@ func modelEnv(t *testing.T) (runs int, seed uint64) {
 	return runs, seed
 }
 
-// Each plan runs in Go mode and in Rust mode (the core's own HTTP and WebSocket over Go's
+// Each plan runs in platform mode and in core mode (the core's own HTTP and WebSocket over Go's
 // connections): the callback contract is the shell's, whoever speaks HTTP.
 //
 // covers: RULE-SHELL-01, RULE-SHELL-02, RULE-SHELL-03, RULE-SHELL-07
 func TestCallbackContractModel(t *testing.T) {
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		t.Run(modeName(mode), func(t *testing.T) { testCallbackContractModel(t, mode) })
 	}
 }
@@ -887,7 +887,7 @@ func TestCallbackModelPanicStopsTheClient(t *testing.T) {
 		s, _ := strconv.ParseUint(seed, 10, 64)
 		i, _ := strconv.ParseUint(run, 10, 64)
 		plan := genModelPlan(rand.New(rand.NewPCG(s, i)), true)
-		if _, err := runModelPlan(plan, t.TempDir(), ModeGo); err != nil {
+		if _, err := runModelPlan(plan, t.TempDir(), ModePlatform); err != nil {
 			t.Fatalf("plan %v:\n%v", plan, err)
 		}
 		return

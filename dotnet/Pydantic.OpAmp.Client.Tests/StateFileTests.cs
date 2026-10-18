@@ -161,7 +161,7 @@ public sealed class StateFileTests : IDisposable
     {
         var options = new OpAmpClientOptions
         {
-            Mode = OpAmpMode.DotNet,
+            Mode = OpAmpMode.Platform,
             Endpoint = new Uri("http://127.0.0.1:1"),
             InstanceUid = new byte[16],
             StateFile = this.dir,

@@ -80,7 +80,7 @@ class OpampClientTest {
             .setValue(Anyvalue.AnyValue.newBuilder().setStringValue("test")))
         .build();
     OpampClient client = OpampClient.start(
-        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.JAVA)
+        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.PLATFORM)
             .heartbeatInterval(Duration.ofMillis(50))
             .header("Authorization", "Bearer t")
             .build(),
@@ -126,7 +126,7 @@ class OpampClientTest {
             .setValue(Anyvalue.AnyValue.newBuilder().setStringValue("x".repeat(4096))))
         .build();
     OpampClient client = OpampClient.start(
-        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.JAVA).maxSendBytes(1024).build(),
+        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.PLATFORM).maxSendBytes(1024).build(),
         OpampClient.Status.of(big),
         notes::add);
     for (int i = 0; i < 1000 && got.isEmpty(); i++) {

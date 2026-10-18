@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 import pytest
-from opamp_client import anyvalue_pb2, opamp_pb2
-from opamp_client.sdk import SdkSettings
+from pydantic_opamp_client import anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client.sdk import SdkSettings
 
 from _policy import FILE, V1, config, effective, full, policy
 
@@ -24,7 +24,7 @@ NOW = 1_791_979_200_000  # 2026-10-14T12:00:00Z
 
 
 def declaring():
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     return settings_pb2.Host(live=LIVE, next_start=NEXT_START)
 
@@ -69,7 +69,7 @@ def described(desc: opamp_pb2.AgentDescription) -> dict:
 
 
 def test_the_description_names_the_policy_formats_and_the_controls_the_host_carries_out() -> None:
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
     host = settings_pb2.Host(live=["sampling_rate", "send_logs", "custom"], next_start=["deactivate_instrumentations"])
@@ -86,7 +86,7 @@ def test_the_description_names_the_policy_formats_and_the_controls_the_host_carr
 
 
 def test_a_host_says_what_it_carries_out() -> None:
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
     # The instrumentation switch at once, and no signal's sending: send_traces is not declared.
@@ -174,7 +174,7 @@ def test_a_log_level_arrives_as_the_lowest_severity_number_to_export() -> None:
 
 
 def test_the_settings_that_match_telemetry_arrive_typed_where_the_host_declares_them() -> None:
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
     doc = policy(sampling_rules={"rules": [{"rate": 0, "kind": "server", "path": "/health*"}]},
@@ -200,7 +200,7 @@ VECTORS = Path(__file__).resolve().parents[2] / "testdata" / "sdk-settings"
 
 def host_of(case: dict):
     """A case's host, as Host's fields; without one, a host that declares every setting."""
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     host = case.get("host")
     if host is None:
@@ -210,7 +210,7 @@ def host_of(case: dict):
 
 def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them() -> None:
     """custom (docs/app-settings.md), and the shared vectors (testdata/sdk-settings/custom.json) through the module."""
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
     doc = policy(app_settings={"values": {"checkout.new_flow": "on", "limit": 25}})
@@ -265,7 +265,7 @@ def test_debug_mode_arrives_folded_in_and_a_refresh_at_its_end_ends_it() -> None
 
 
 def test_export_health_is_sent_at_the_first_call_and_on_a_failure_and_held_while_nothing_changes() -> None:
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     layer = SdkSettings()
     first = layer.health(settings_pb2.ExportCounts(), None, NOW)
@@ -286,7 +286,7 @@ COMPONENTS = json.loads((VECTORS / "components.json").read_text())["cases"]
 
 def inventory_of(case: dict):
     """A case's inventory, as Inventory's fields."""
-    from opamp_client.sdk import settings_pb2
+    from pydantic_opamp_client.sdk import settings_pb2
 
     inv = case.get("inventory", {})
     return settings_pb2.Inventory(

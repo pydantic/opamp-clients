@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROTO = "opamp/sdk/v1/settings.proto"
 JAVA = "java/opamp/src/main/java"
-PY = "python/src/opamp_client/_proto"
+PY = "python/src/pydantic_opamp_client/_proto"
 # The protoc of protobuf 6, as scripts/gen_core.py uses, so the code runs on protobuf 6 and 7.
 PY_PROTOC = ["uvx", "--quiet", "--from", "grpcio-tools==1.75.0", "python", "-m", "grpc_tools.protoc"]
 PY_PACKAGES = ["/opamp/sdk", "/opamp/sdk/v1"]
@@ -41,7 +41,7 @@ TARGETS = [
     f"{PY}/opamp/sdk/v1/settings_pb2.pyi",
     *(f"{PY}{d}/__init__.py" for d in PY_PACKAGES),
     "node/opamp/src/gen/opamp/sdk/v1/settings_pb.ts",
-    "go/opamp/sdk/settingspb/settings.pb.go",
+    "go/opamp/sdksettings/settingspb/settings.pb.go",
     f"{DOTNET}/Generated/Settings.cs",
 ]
 
@@ -62,10 +62,12 @@ def build(out: Path) -> None:
     run([*PY_PROTOC, "-I", "spec/proto", "-I", "proto", f"--python_out={py}", f"--pyi_out={py}", PROTO])
     for d in PY_PACKAGES:
         (out / f"{PY}{d}/__init__.py").write_text("")
-    # Go: the spec's messages are opamp-go's (their go_package says so).
+    # Go: the spec's messages are opamp-go's (their go_package says so). protoc writes the file
+    # where the proto's go_package (.../go/opamp/sdk/settingspb) puts it; it is kept beside the
+    # settings layer's package, go/opamp/sdksettings, and imported from there.
     with tempfile.TemporaryDirectory() as tmp:
         run(["protoc", "-I", "spec/proto", "-I", "proto", f"--go_out={tmp}", f"--go_opt=module={GO_MODULE}", PROTO])
-        go = out / "go/opamp/sdk/settingspb/settings.pb.go"
+        go = out / "go/opamp/sdksettings/settingspb/settings.pb.go"
         go.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(Path(tmp) / "opamp" / "sdk" / "settingspb" / "settings.pb.go", go)
 

@@ -36,7 +36,7 @@ class CompiledOnly(unittest.TestCase):
         self._saved = nd.DIST, nd.TARGETS, nd.file_says
         nd.DIST, nd.TARGETS = self.dist, []
         nd.file_says = lambda path: "ELF 64-bit LSB shared object, x86-64"
-        self.archive(CLIENT, "opamp_client/__init__.py", "opamp_client/_native.py")
+        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "pydantic_opamp_client/_native.py")
 
     def tearDown(self) -> None:
         nd.DIST, nd.TARGETS, nd.file_says = self._saved
@@ -130,12 +130,12 @@ class CompiledOnly(unittest.TestCase):
         self.assertIn(f"{hosting}: doesn't depend on Pydantic.OpAmp.Client", self.problems())
 
     def test_a_binary_in_the_client_fails(self) -> None:
-        self.archive(CLIENT, "opamp_client/__init__.py", "opamp_client/_native.abi3.so")
-        self.assertIn("ships opamp_client/_native.abi3.so", self.problems())
+        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "pydantic_opamp_client/_native.abi3.so")
+        self.assertIn("ships pydantic_opamp_client/_native.abi3.so", self.problems())
 
     def test_python_in_the_core_wheel_fails(self) -> None:
-        self.core_wheel("opamp_core/__init__.py")
-        self.assertIn("not opamp_core/libopamp_native.so alone", self.problems())
+        self.core_wheel("pydantic_opamp_core/__init__.py")
+        self.assertIn("not pydantic_opamp_core/libopamp_native.so alone", self.problems())
 
     def test_a_target_without_its_core_wheel_fails(self) -> None:
         self.core_wheel()
@@ -147,7 +147,7 @@ class CompiledOnly(unittest.TestCase):
         self.assertIn("a source distribution", self.problems())
 
     def test_rust_sources_in_a_wheel_fail(self) -> None:
-        self.archive(CLIENT, "opamp_client/__init__.py", "src/lib.rs")
+        self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "src/lib.rs")
         self.assertIn("ships src/lib.rs", self.problems())
 
     def test_a_crate_manifest_in_the_package_fails(self) -> None:
@@ -164,7 +164,7 @@ class CoreWheel(unittest.TestCase):
         self.assertEqual(path.name, "pydantic_opamp_core-0.1.0-py3-none-musllinux_1_2_aarch64.whl")
         with zipfile.ZipFile(path) as z:
             names = z.namelist()
-            self.assertEqual(z.read("opamp_core/libopamp_native.so"), b"compiled")
+            self.assertEqual(z.read("pydantic_opamp_core/libopamp_native.so"), b"compiled")
             self.assertIn("Tag: py3-none-musllinux_1_2_aarch64", z.read(names[2]).decode())
             self.assertIn("Root-Is-Purelib: false", z.read(names[2]).decode())
             for line in z.read(names[-1]).decode().splitlines()[:-1]:
@@ -172,7 +172,7 @@ class CoreWheel(unittest.TestCase):
                 data = z.read(name)
                 want = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).rstrip(b"=").decode()
                 self.assertEqual((digest, int(size)), (f"sha256={want}", len(data)), name)
-        self.assertEqual(names, ["opamp_core/libopamp_native.so", *(f"pydantic_opamp_core-0.1.0.dist-info/{f}"
+        self.assertEqual(names, ["pydantic_opamp_core/libopamp_native.so", *(f"pydantic_opamp_core-0.1.0.dist-info/{f}"
                                                                      for f in ("METADATA", "WHEEL", "RECORD"))])
 
     # PyPI shows the description; `twine check --strict` (the Registries workflow) refuses a wheel without one.

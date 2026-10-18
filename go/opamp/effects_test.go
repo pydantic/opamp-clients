@@ -254,7 +254,7 @@ func TestWsClosedAfterTheHandshake(t *testing.T) {
 
 // A connection the server drops without a Close frame is lost (ws_lost), not closed: gorilla's
 // 1006 ("abnormal closure") is its own word for no Close frame, never one the server sent. (The
-// differential runs found it: tcp-drop-ws, go-core against rust.)
+// differential runs found it: tcp-drop-ws, go-core-platform against rust.)
 func TestADroppedConnectionIsLostNotClosed(t *testing.T) {
 	x := newExecutor(testConnection(t, TLS{}, Proxy{}))
 	url := wsServer(t, func(c *websocket.Conn) {
@@ -361,7 +361,7 @@ func TestStopEndsWhenTheCoreSays(t *testing.T) {
 			}
 			w.Write(nil)
 		}))
-		cfg := Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StopTimeout: 300 * time.Millisecond}
+		cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StopTimeout: 300 * time.Millisecond}
 		if ws {
 			cfg.Endpoint = "ws" + strings.TrimPrefix(ts.URL, "http")
 		}
@@ -403,7 +403,7 @@ func TestStatusTooLargeNamesTheField(t *testing.T) {
 	big := propDescription(0)
 	big.NonIdentifyingAttributes[0].Key = strings.Repeat("k", 4096)
 	names := make(chan string, 4)
-	c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour, MaxSendBytes: 1024},
+	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, MaxSendBytes: 1024},
 		Status{Description: big}, func(_ *Client, n Notification) {
 			if n.Kind == StatusTooLarge {
 				names <- n.FieldName

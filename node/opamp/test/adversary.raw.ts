@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // The adversary's raw server: what the
-// streams of a Rust mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
+// streams of a core mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
 // server what to do in the first line it writes:
 //
 //   opamp-raw tag=7 send=1000 chunk=100 gap=5 end=fin
@@ -12,7 +12,7 @@
 // is i % 251), and how the connection ended; the adversary asks for that on another stream
 // (ask=TAG). One server per run, on a port of its own, so every connection is that run's, those
 // that never say who they are too. Go's adversary_raw_test.go is the reference: this does what it
-// does. adversary.properties.test.ts gives every Rust mode run one; adversary.raw.test.ts tests it
+// does. adversary.properties.test.ts gives every core mode run one; adversary.raw.test.ts tests it
 // by itself.
 
 import net, { type AddressInfo, type Socket } from "node:net";

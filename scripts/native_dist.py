@@ -134,8 +134,8 @@ def check() -> None:
             continue
         with zipfile.ZipFile(found[0]) as z, tempfile.TemporaryDirectory() as d:
             libs = [n for n in z.namelist() if not n.startswith("pydantic_opamp_core-")]
-            if libs != [f"opamp_core/{t.lib}"]:
-                problems.append(f"{found[0].name}: holds {libs}, not opamp_core/{t.lib} alone")
+            if libs != [f"pydantic_opamp_core/{t.lib}"]:
+                problems.append(f"{found[0].name}: holds {libs}, not pydantic_opamp_core/{t.lib} alone")
                 continue
             if not all(m in (says := file_says(Path(z.extract(libs[0], d)))) for m in t.magic):
                 problems.append(f"{found[0].name}: {libs[0]} is {says!r}, not {t.magic}")

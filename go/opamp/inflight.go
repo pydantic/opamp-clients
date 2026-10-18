@@ -34,7 +34,7 @@ type inFlight struct {
 
 // effect is one effect under way.
 type effect struct {
-	owner  *inFlight // the register it is in (the executor's, or Rust mode's: streams.go)
+	owner  *inFlight // the register it is in (the executor's, or core mode's: streams.go)
 	id     uint64
 	ctx    context.Context // done once cancelled, or the register closed
 	cancel context.CancelFunc
@@ -43,7 +43,7 @@ type effect struct {
 	// closeAsked: the core has asked to close this connection (ws_close; the loop's alone).
 	closeAsked bool
 
-	// stream: Rust mode's stream, for an entry of its register (nil for a resolution).
+	// stream: core mode's stream, for an entry of its register (nil for a resolution).
 	stream *stream
 
 	fileMu     sync.Mutex
@@ -77,9 +77,9 @@ type report struct {
 	in   *corepb.Input
 	last bool
 	// ack, if set, is closed once the loop has stepped the core with it and carried out the
-	// step's effects, or dropped it (Rust mode's streams read in step with the core).
+	// step's effects, or dropped it (core mode's streams read in step with the core).
 	ack chan struct{}
-	// src: the stream whose bytes these are (Rust mode): the download_data the core makes of
+	// src: the stream whose bytes these are (core mode): the download_data the core makes of
 	// them came from it.
 	src *stream
 }

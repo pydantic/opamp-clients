@@ -12,15 +12,15 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// <summary>
 /// Stop ends when the core says, and nothing the client started outlives it; the shell bugs of
 /// the audit (S1, S2, S4, S5, S7), each shown by a test that failed before. Those of the network
-/// run in both modes (.NET's HTTP and WebSocket, and Rust mode's streams).
+/// run in both modes (.NET's HTTP and WebSocket, and core mode's streams).
 /// </summary>
 public class StopTests
 {
     // The goodbye is waited for until the core's stop timeout, no longer, then aborted.
     // covers: RULE-CLIENT-16
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task StopEndsWhenTheCoreSays(OpAmpMode mode)
     {
         var goodbye = new TaskCompletionSource<RawConn>();
@@ -41,7 +41,7 @@ public class StopTests
             }
         });
         var client = OpAmpClient.Start(
-            new OpAmpClientOptions { Endpoint = new Uri(server.Url("http")), HeartbeatInterval = TimeSpan.FromHours(1), StopTimeout = TimeSpan.FromMilliseconds(800), Mode = mode, DirectConnection = mode == OpAmpMode.Rust },
+            new OpAmpClientOptions { Endpoint = new Uri(server.Url("http")), HeartbeatInterval = TimeSpan.FromHours(1), StopTimeout = TimeSpan.FromMilliseconds(800), Mode = mode, DirectConnection = mode == OpAmpMode.Core },
             new OpAmpStatus());
         Assert.True(await Wait.ForAsync(() => Volatile.Read(ref requests) >= 1));
         await Task.Delay(200); // the answer is in
@@ -57,8 +57,8 @@ public class StopTests
     // S1: a stop during the WebSocket handshake returns, and the connection, if it opens after,
     // is closed at once.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task S1_StopDuringTheHandshakeReturnsAndClosesTheConnection(OpAmpMode mode)
     {
         var ended = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -81,7 +81,7 @@ public class StopTests
                 ended.TrySetResult(true);
             }
         });
-        var client = OpAmpClient.Start(new OpAmpClientOptions { Endpoint = new Uri(server.Url("ws")), Mode = mode, DirectConnection = mode == OpAmpMode.Rust }, new OpAmpStatus());
+        var client = OpAmpClient.Start(new OpAmpClientOptions { Endpoint = new Uri(server.Url("ws")), Mode = mode, DirectConnection = mode == OpAmpMode.Core }, new OpAmpStatus());
         await Task.Delay(300);
 
         await client.StopAsync().WaitAsync(TimeSpan.FromSeconds(5));
@@ -92,8 +92,8 @@ public class StopTests
     // S2: an upgrade that is never answered is given up on (the core's connect timeout, carried
     // out by aborting the dial), and the client tries again.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task S2_AnUpgradeNeverAnsweredIsAbortedAndTriedAgain(OpAmpMode mode)
     {
         var upgrades = 0;
@@ -104,7 +104,7 @@ public class StopTests
             await c.EndsWithinAsync(TimeSpan.FromMinutes(5)); // never answered
         });
         var client = OpAmpClient.Start(
-            new OpAmpClientOptions { Endpoint = new Uri(server.Url("ws")), ConnectTimeout = TimeSpan.FromSeconds(1), Mode = mode, DirectConnection = mode == OpAmpMode.Rust },
+            new OpAmpClientOptions { Endpoint = new Uri(server.Url("ws")), ConnectTimeout = TimeSpan.FromSeconds(1), Mode = mode, DirectConnection = mode == OpAmpMode.Core },
             new OpAmpStatus());
         try
         {
@@ -143,7 +143,7 @@ public class StopTests
         {
             var options = new OpAmpClientOptions
             {
-                Mode = OpAmpMode.DotNet,
+                Mode = OpAmpMode.Platform,
                 Endpoint = new Uri(server.Endpoint("http")),
                 HeartbeatInterval = TimeSpan.FromMilliseconds(100),
                 StateFile = state,
@@ -206,7 +206,7 @@ public class StopTests
         {
             var options = new OpAmpClientOptions
             {
-                Mode = OpAmpMode.DotNet,
+                Mode = OpAmpMode.Platform,
                 Endpoint = new Uri(server.Endpoint("http")),
                 HeartbeatInterval = TimeSpan.FromHours(1),
                 StateFile = state,
@@ -261,7 +261,7 @@ public class StopTests
         var dir = Directory.CreateTempSubdirectory();
         var options = new OpAmpClientOptions
         {
-            Mode = OpAmpMode.DotNet,
+            Mode = OpAmpMode.Platform,
             Endpoint = new Uri(server.Url("http")),
             Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig),
             HeartbeatInterval = TimeSpan.FromMilliseconds(100),
@@ -306,8 +306,8 @@ public class StopTests
     // S7: timers past what .NET's timers take (a 60-day heartbeat and request timeout) stop
     // nothing: every request ends with an input, and the timer fires early and is set again.
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task S7_TimersPastThePlatformsLimitStopNothing(OpAmpMode mode)
     {
         using var server = new TestServer();
@@ -318,7 +318,7 @@ public class StopTests
                 Endpoint = new Uri(server.Endpoint("http")),
                 HeartbeatInterval = TimeSpan.FromDays(60),
                 RequestTimeout = TimeSpan.FromDays(60),
-                Mode = mode, DirectConnection = mode == OpAmpMode.Rust,
+                Mode = mode, DirectConnection = mode == OpAmpMode.Core,
             },
             new OpAmpStatus(),
             n =>

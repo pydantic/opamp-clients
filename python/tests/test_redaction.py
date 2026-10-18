@@ -11,7 +11,7 @@ from __future__ import annotations
 from hypothesis import given
 from hypothesis import strategies as st
 
-from opamp_client import TLS, Config, Proxy
+from pydantic_opamp_client import TLS, Config, Proxy
 
 # A secret's characters: printable, but none that ends a URL's user-info.
 CHARS = st.characters(min_codepoint=0x21, max_codepoint=0x7E, exclude_characters="@/:%?#[]")

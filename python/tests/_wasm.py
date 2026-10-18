@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """A core run as a WebAssembly module in wasmtime (a dev dependency, not one of the package's),
 behind the interface the client runs the native core through. The modules beside the package's
-sources (src/opamp_client/opamp_core.wasm, opamp_sdk_settings.wasm, not in the wheel) are the
+sources (src/pydantic_opamp_client/opamp_core.wasm, opamp_sdk_settings.wasm, not in the wheel) are the
 oracle the native extension is held to; another module with the core's ABI is a hostile core
 (the adversary, testdata/core/opamp_core_adversary.wasm)."""
 
@@ -13,9 +13,9 @@ from pathlib import Path
 
 import wasmtime
 
-from opamp_client._native import Trap
+from pydantic_opamp_client._native import Trap
 
-_HERE = Path(__file__).resolve().parent.parent / "src" / "opamp_client"
+_HERE = Path(__file__).resolve().parent.parent / "src" / "pydantic_opamp_client"
 _lock = threading.Lock()
 _engine = wasmtime.Engine()
 _modules: dict[bytes, wasmtime.Module] = {}

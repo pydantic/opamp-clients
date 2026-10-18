@@ -11,17 +11,17 @@ import os
 from pathlib import Path
 
 import pytest
-from opamp_client import anyvalue_pb2, opamp_pb2
-from opamp_client.sdk import SdkSettings, settings_pb2
+from pydantic_opamp_client import anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry._logs import LogRecord, SeverityNumber
 from opentelemetry.sdk._logs import ReadableLogRecord
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
-import opamp_otel
+import pydantic_opamp_otel
 from _policy import FILE, config_map, off, overrides, policy
 from kept import keep_applied
-from opamp_otel import Agent, Controls
+from pydantic_opamp_otel import Agent, Controls
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -43,7 +43,7 @@ NOW = 1_791_979_200_000
 LIVE = ["custom", "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
         "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
         "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
-HOST = opamp_otel.sdk_host(["otlp"])
+HOST = pydantic_opamp_otel.sdk_host(["otlp"])
 
 
 @pytest.fixture(autouse=True)
@@ -203,7 +203,7 @@ def test_scope_levels_are_declared_only_where_the_package_built_the_sdk(tmp_path
     assert s.status == APPLIED and agent.controls.logs_scope_levels == (("app", 0xFFFF),)
     assert overrides(agent.effective) == doc
     # Another configurator's SDK: not this package's gates, so refused, never in force.
-    other = opamp_otel.sdk_host(["otlp"], configured=False)
+    other = pydantic_opamp_otel.sdk_host(["otlp"], configured=False)
     assert "send_logs_level_by_scope" not in other.live
     d = LAYER.decide(config(doc), LOCAL, LOCAL, other, NOW)
     assert d.status.status == FAILED and not d.HasField("apply")
@@ -870,7 +870,7 @@ def test_caps_redaction_and_send_switches_stay_in_debug_mode(tmp_path):
 
 
 def test_debug_mode_is_refused_where_the_package_didnt_build_the_sdk():
-    other = opamp_otel.sdk_host(["otlp"], configured=False)
+    other = pydantic_opamp_otel.sdk_host(["otlp"], configured=False)
     d = LAYER.decide(config({"debug": {"until": "2026-10-14T12:10:00Z"}}), LOCAL, LOCAL, other, NOW)
     assert d.status.status == FAILED and not d.HasField("apply") and not d.refresh_at_unix_ms
     assert d.status.error_message == "debug: until: this SDK cannot apply the requested override"
@@ -998,7 +998,7 @@ def test_the_gates_count_exports_failures_and_what_they_drop_on_purpose():
     failing.export([record("a", 13)])
     got = c.logs_counts.proto()
     assert (got.exports_ok, got.exports_failed, got.items_failed, got.items_filtered, got.last_failed) == (1, 1, 1, 1, True)
-    assert got.last_error == opamp_otel.Counts.FAILURE
+    assert got.last_error == pydantic_opamp_otel.Counts.FAILURE
     logs.export([record("a", 13)])
     assert not c.logs_counts.proto().last_failed  # the next success clears it
     # An exporter that raises: counted with its error, then raised as before.
@@ -1027,18 +1027,18 @@ def test_metrics_are_counted_by_data_point_at_the_gated_metric_exporter(monkeypa
     counter.add(1, {"k": "a"})
     counter.add(1, {"k": "b"})
     data = reader.get_metrics_data()
-    gated = opamp_otel.GatedOtlpMetricExporter()
+    gated = pydantic_opamp_otel.GatedOtlpMetricExporter()
     gated._to = Recording(MetricExportResult.FAILURE)
-    before = opamp_otel.AGENT.controls.metrics.proto()
+    before = pydantic_opamp_otel.AGENT.controls.metrics.proto()
     gated.export(data)
-    after = opamp_otel.AGENT.controls.metrics.proto()
+    after = pydantic_opamp_otel.AGENT.controls.metrics.proto()
     assert (after.exports_failed - before.exports_failed, after.items_failed - before.items_failed) == (1, 2)
-    opamp_otel.AGENT.controls.apply(typed({"signal_exports": off("metrics")}))
+    pydantic_opamp_otel.AGENT.controls.apply(typed({"signal_exports": off("metrics")}))
     try:
         gated.export(data)
-        assert opamp_otel.AGENT.controls.metrics.proto().items_filtered - before.items_filtered == 2
+        assert pydantic_opamp_otel.AGENT.controls.metrics.proto().items_filtered - before.items_filtered == 2
     finally:
-        opamp_otel.AGENT.controls.apply(typed({}))
+        pydantic_opamp_otel.AGENT.controls.apply(typed({}))
 
 
 def test_the_timer_sends_export_health_on_a_failure_and_holds_it_while_nothing_changes(tmp_path):
@@ -1062,7 +1062,7 @@ def test_the_timer_sends_export_health_on_a_failure_and_holds_it_while_nothing_c
     assert sent.healthy  # the application's: a failing exporter doesn't make the service look down
     exporters = sent.component_health_map["exporters"]
     assert (exporters.healthy, exporters.status) == (False, "failing")
-    assert exporters.component_health_map["traces"].last_error == opamp_otel.Counts.FAILURE
+    assert exporters.component_health_map["traces"].last_error == pydantic_opamp_otel.Counts.FAILURE
     agent.controls.spans(Recording(SpanExportResult.SUCCESS)).export(["s"])
     clocks.advance(30_000)
     agent._tick()
@@ -1090,16 +1090,16 @@ def test_the_first_message_carries_export_health(tmp_path):
 
 
 def test_the_package_declares_every_setting_it_carries_out():
-    every = opamp_otel.sdk_host(["otlp"])
+    every = pydantic_opamp_otel.sdk_host(["otlp"])
     assert sorted(every.live) == LIVE
     assert sorted(every.next_start) == ["deactivate_all_instrumentations", "deactivate_instrumentations"]
     # Metrics play no part in the rest.
-    assert sorted(opamp_otel.sdk_host(["console"]).live) == [k for k in LIVE if k != "send_metrics"]
+    assert sorted(pydantic_opamp_otel.sdk_host(["console"]).live) == [k for k in LIVE if k != "send_metrics"]
     # Another configurator's SDK: only the gated metric exporter, which the variable still names,
     # and the application's own settings (custom), which the application reads whoever built the
     # SDK (test_app_settings.py).
-    assert list(opamp_otel.sdk_host(["otlp"], configured=False).live) == ["custom", "send_metrics"]
-    assert list(opamp_otel.sdk_host(["otlp"], configured=False, config_file=True).live) == ["custom"]
+    assert list(pydantic_opamp_otel.sdk_host(["otlp"], configured=False).live) == ["custom", "send_metrics"]
+    assert list(pydantic_opamp_otel.sdk_host(["otlp"], configured=False, config_file=True).live) == ["custom"]
     # Every declared name is a setting: the layer refuses a host naming one that isn't.
     LAYER.load(LOCAL, every)
 
@@ -1165,7 +1165,7 @@ def test_the_sampler_agrees_with_the_layers_reference_on_generated_spans():
 
 
 def anyvalue(a: dict):
-    from opamp_client import anyvalue_pb2
+    from pydantic_opamp_client import anyvalue_pb2
 
     if "string" in a:
         return anyvalue_pb2.AnyValue(string_value=a["string"])

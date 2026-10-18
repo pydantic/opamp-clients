@@ -132,7 +132,7 @@ public class CallbackAnswerTests
             var client = OpAmpClient.Start(
                 new OpAmpClientOptions
                 {
-                    Mode = OpAmpMode.DotNet,
+                    Mode = OpAmpMode.Platform,
                     Endpoint = new Uri("ws://opamp.test/v1/opamp"),
                     StateFile = state,
                     Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig),

@@ -51,7 +51,7 @@ import org.junit.jupiter.api.Test;
  * CallbackAnswerTest#check}). See {@link FrayRun} for the number of schedules,
  * the seeds and replay. The core runs interpreted under Fray's instrumentation: runs are kept short.
  *
- * <p>In Rust mode (the {@code ...InRustMode} scenarios) the same plans run over Rust mode's streams
+ * <p>In core mode (the {@code ...InCoreMode} scenarios) the same plans run over core mode's streams
  * in memory ({@link MemoryNet}, through the {@link Streams} seam): the network accepts, refuses or
  * holds each connection as the plan says (and accepts one after the client gave up on it), and a
  * minimal HTTP/1.1 and WebSocket server on the far end of each answers requests, downloads and
@@ -118,38 +118,38 @@ class ShellFrayTest {
     explore("callsFromTheCallback", Scenario.CALLBACK_CALL);
   }
 
-  /** Schedules per Rust-mode scenario in a normal run (OPAMP_FRAY_RUNS overrides it). */
+  /** Schedules per core-mode scenario in a normal run (OPAMP_FRAY_RUNS overrides it). */
   static final int RUST_RUNS = 8;
 
   @Test
-  void stopWhileOpeningInRustMode() throws Exception {
-    exploreRust("stopWhileOpeningInRustMode", Scenario.OPEN);
+  void stopWhileOpeningInCoreMode() throws Exception {
+    exploreCore("stopWhileOpeningInCoreMode", Scenario.OPEN);
   }
 
   @Test
-  void aSendRacingTheCloseInRustMode() throws Exception {
-    exploreRust("aSendRacingTheCloseInRustMode", Scenario.SEND_CLOSE);
+  void aSendRacingTheCloseInCoreMode() throws Exception {
+    exploreCore("aSendRacingTheCloseInCoreMode", Scenario.SEND_CLOSE);
   }
 
   @Test
-  void aDownloadFinishingAfterStopInRustMode() throws Exception {
-    exploreRust("aDownloadFinishingAfterStopInRustMode", Scenario.DOWNLOAD);
+  void aDownloadFinishingAfterStopInCoreMode() throws Exception {
+    exploreCore("aDownloadFinishingAfterStopInCoreMode", Scenario.DOWNLOAD);
   }
 
   @Test
-  void anErrorFromTheCallbackInRustMode() throws Exception {
-    exploreRust("anErrorFromTheCallbackInRustMode", Scenario.CALLBACK_ERROR);
+  void anErrorFromTheCallbackInCoreMode() throws Exception {
+    exploreCore("anErrorFromTheCallbackInCoreMode", Scenario.CALLBACK_ERROR);
   }
 
   @Test
-  void callsFromTheCallbackInRustMode() throws Exception {
-    exploreRust("callsFromTheCallbackInRustMode", Scenario.CALLBACK_CALL);
+  void callsFromTheCallbackInCoreMode() throws Exception {
+    exploreCore("callsFromTheCallbackInCoreMode", Scenario.CALLBACK_CALL);
   }
 
-  private static void exploreRust(String name, Scenario scenario) throws Exception {
+  private static void exploreCore(String name, Scenario scenario) throws Exception {
     warmUp();
     FrayRun.explore("ShellFrayTest." + name, RUST_RUNS, BUDGET_S,
-        seed -> new RustRun(seed, Plan.of(scenario, new SplittableRandom(seed))).run());
+        seed -> new CoreRun(seed, Plan.of(scenario, new SplittableRandom(seed))).run());
   }
 
   private static void explore(String name, Scenario scenario) throws Exception {
@@ -550,8 +550,8 @@ class ShellFrayTest {
   /** The network's last dial: its thread ends. */
   private static final MemoryNet.Dial LAST_DIAL = new MemoryNet.Dial(null, 0, 0);
 
-  /** One schedule in Rust mode: the client over {@link MemoryNet}, a small server on each connection's far end. */
-  static final class RustRun {
+  /** One schedule in core mode: the client over {@link MemoryNet}, a small server on each connection's far end. */
+  static final class CoreRun {
     final long seed;
     final Plan plan;
     final MemoryNet net = new MemoryNet(4096);
@@ -566,9 +566,10 @@ class ShellFrayTest {
     final List<Thread> servers = new CopyOnWriteArrayList<>();
     /**
      * The scenario's ground reached: a connection asked for (OPEN), a message on the WebSocket
-     * (SEND_CLOSE), an answer sent (CALLBACK_ERROR, CALLBACK_CALL). Rust mode takes more turns of the loop to get
-     * there (the proxy's answer, the connection, the request): most schedules wait for it before
-     * the application's steps, so that stop comes in the middle of things rather than before them.
+     * (SEND_CLOSE), an answer sent (CALLBACK_ERROR, CALLBACK_CALL). Core mode takes more turns of
+     * the loop to get there (the proxy's answer, the connection, the request): most schedules wait
+     * for it before the application's steps, so that stop comes in the middle of things rather than
+     * before them.
      */
     final CompletableFuture<Void> reached = new CompletableFuture<>();
     volatile boolean stopping;
@@ -578,7 +579,7 @@ class ShellFrayTest {
     /** A Run of the same plan, for its server's replies and the downloads' listing. */
     final Run like;
 
-    RustRun(long seed, Plan plan) {
+    CoreRun(long seed, Plan plan) {
       this.seed = seed;
       this.plan = plan;
       this.callbacks = new Callbacks(plan.throwAt(), plan.throwError(), violations);
@@ -593,7 +594,7 @@ class ShellFrayTest {
       List<Thread> app = new ArrayList<>();
       Thread network = new Thread(this::network, "network");
       try {
-        dir = Files.createTempDirectory("fray-shell-rust");
+        dir = Files.createTempDirectory("fray-shell-core");
         if (plan.slowSaveS() > 0) {
           StateFile.beforeSave = p -> {
             FrayRun.saw("a slow save");
@@ -609,7 +610,7 @@ class ShellFrayTest {
         network.start();
         OpampClient.Config.Builder b = OpampClient.Config
             .builder((plan.ws() ? "ws" : "http") + "://fake/v1/opamp", new byte[16])
-            .mode(OpampClient.Mode.RUST)
+            .mode(OpampClient.Mode.CORE)
             .streamsPlatform(net)
             .environment(Map.of())
             .heartbeatInterval(Duration.ofSeconds(30));
@@ -658,7 +659,7 @@ class ShellFrayTest {
         }
         Map<String, String> downloads = like.listing();
         if (!downloads.isEmpty()) {
-          FrayRun.saw("rust: a download file there at stop");
+          FrayRun.saw("core: a download file there at stop");
         }
         // Nothing left: every connection the client had closed or reset, none still being made.
         String left = net.leftOpen();
@@ -700,7 +701,7 @@ class ShellFrayTest {
             return;
           }
           Answer a = Plan.at(plan.opens(), opens.getAndIncrement(), Answer.NOW);
-          FrayRun.saw("rust open " + a);
+          FrayRun.saw("core open " + a);
           if (plan.scenario() == Scenario.OPEN) {
             reached.complete(null);
           }
@@ -710,7 +711,7 @@ class ShellFrayTest {
             case HOLD -> d.awaitAborted();
             case HOLD_THEN_ANSWER -> {
               d.awaitAborted();
-              FrayRun.saw("rust: connected after the shell gave up");
+              FrayRun.saw("core: connected after the shell gave up");
               d.accept(); // the client's end is reset at once
             }
           }
@@ -767,7 +768,7 @@ class ShellFrayTest {
             last = m.getSequenceNum();
             answer = like.reply(m);
           }
-          FrayRun.saw("rust " + (download ? "download " : "request ") + a);
+          FrayRun.saw("core " + (download ? "download " : "request ") + a);
           if (plan.scenario() == Scenario.CALLBACK_ERROR || plan.scenario() == Scenario.CALLBACK_CALL) {
             reached.complete(null);
           }
@@ -848,7 +849,7 @@ class ShellFrayTest {
               reached.complete(null);
             }
             if (act != Wire.ANSWER) {
-              FrayRun.saw("rust: server " + act);
+              FrayRun.saw("core: server " + act);
             }
             switch (act) {
               case SERVER_CLOSE -> {
@@ -870,7 +871,7 @@ class ShellFrayTest {
             }
           }
           case 8 -> {
-            FrayRun.saw("rust: our Close came");
+            FrayRun.saw("core: our Close came");
             if (!closeSent) {
               frame(out, 8, payload);
               closeSent = true;

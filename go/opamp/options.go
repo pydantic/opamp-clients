@@ -16,18 +16,18 @@ import (
 type Mode string
 
 const (
-	// ModeRust (the default: also what the zero value "" means, unless Config.HTTPClient is
+	// ModeCore (the default: also what the zero value "" means, unless Config.HTTPClient is
 	// set): the shared core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself
 	// (in the same WebAssembly module), over TCP connections Go opens and TLS
 	// Go starts on them (crypto/tls, with Config.TLS). Go only connects, starts TLS, resolves
 	// names (for a SOCKS5 proxy with Proxy.ResolveLocally), answers which proxy to use, moves the
 	// bytes, and writes package files.
-	ModeRust Mode = "rust"
-	// ModeGo: Go's net/http and gorilla/websocket carry out the core's requests, WebSocket
+	ModeCore Mode = "core"
+	// ModePlatform: Go's net/http and gorilla/websocket carry out the core's requests, WebSocket
 	// connections and downloads. For an application that brings its own *http.Client
 	// (Config.HTTPClient, which selects it too) or needs net/http's own behaviour: its reading of
 	// the environment's proxies, HTTP/2.
-	ModeGo Mode = "go"
+	ModePlatform Mode = "platform"
 )
 
 // TLS is how the client makes TLS connections: to https:// and wss:// endpoints, to the hosts
@@ -52,7 +52,7 @@ type TLS struct {
 	// Config is a *tls.Config to start from, for what the fields above don't cover (a
 	// GetClientCertificate that picks up renewed certificates, say). The client uses a copy;
 	// the fields above apply on top of it. Its NextProtos is the client's to set, and its
-	// ServerName is for Go mode only: in Rust mode each handshake is for the host the core
+	// ServerName is for platform mode only: in core mode each handshake is for the host the core
 	// names, and a ServerName is an error.
 	Config *tls.Config
 }
@@ -63,14 +63,14 @@ func (t TLS) isZero() bool {
 }
 
 // Proxy is how the client reaches the server through a proxy. The zero value takes the proxy
-// from the environment, for HTTP, WebSocket and downloads alike: in Rust mode by the rule every
-// SDK's Rust mode shares (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and NO_PROXY; localhost is not
-// special), in Go mode by net/http's (HTTP_PROXY, HTTPS_PROXY and NO_PROXY, never proxying
+// from the environment, for HTTP, WebSocket and downloads alike: in core mode by the rule every
+// SDK's core mode shares (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and NO_PROXY; localhost is not
+// special), in platform mode by net/http's (HTTP_PROXY, HTTPS_PROXY and NO_PROXY, never proxying
 // localhost). Direct goes without one.
 type Proxy struct {
 	// URL of the proxy, with its credentials, if it needs any, as user:password@:
 	//   - http://host:port: an HTTP proxy. Every connection through it is a CONNECT tunnel. (In
-	//     Go mode http:// endpoints are requested through it in absolute form instead, and
+	//     platform mode http:// endpoints are requested through it in absolute form instead, and
 	//     https://, ws:// and wss:// ones through a CONNECT tunnel.)
 	//   - https://host:port: the same, over TLS to the proxy (with Config.TLS).
 	//   - socks5://host:port or socks5h://host:port: a SOCKS5 proxy (username and password
@@ -82,7 +82,7 @@ type Proxy struct {
 	// environment alike.
 	URL string
 	// ConnectHeader is sent with every CONNECT to an HTTP proxy (Proxy-Authorization from URL
-	// is added to it). Not with Go mode's requests in absolute form, nor to a SOCKS5 proxy.
+	// is added to it). Not with platform mode's requests in absolute form, nor to a SOCKS5 proxy.
 	ConnectHeader http.Header
 	// Direct connects without a proxy, ignoring HTTP_PROXY, HTTPS_PROXY and NO_PROXY. Not with
 	// URL, ConnectHeader or ResolveLocally.

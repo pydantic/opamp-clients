@@ -43,7 +43,7 @@ def series(rss: Callable[[float], float], heap: Callable[[float], float] | None,
 
 
 def eden_touched(m: float) -> float:
-    """The container's memory in a night that failed (java-core http, 2026-10-10): 115 MB for the
+    """The container's memory in a night that failed (java-core-platform http, 2026-10-10): 115 MB for the
     first third, 152 MB for the last, as already-committed heap pages are touched for the first
     time while eden's high-water mark climbs. The committed heap is flat all hour."""
     return 115 + 37 * min(1.0, max(0.0, (m - 20) / 20))

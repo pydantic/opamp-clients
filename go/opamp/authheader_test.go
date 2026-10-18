@@ -62,7 +62,7 @@ func (s *authServer) authorizations() []string {
 // with the next request or connection. The client hands them to the core (SetAuthHeaders), which
 // sends them as it sends any header.
 func TestAuthHeaderGoesWithEveryAttempt(t *testing.T) {
-	for _, mode := range []Mode{ModeGo, ModeRust} {
+	for _, mode := range []Mode{ModePlatform, ModeCore} {
 		for _, ws := range []bool{false, true} {
 			name := string(mode) + map[bool]string{false: "/http", true: "/ws"}[ws]
 			t.Run(name, func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestAuthHeaderChangedInPlaceIsHeard(t *testing.T) {
 	token.Store("Bearer 1")
 	shared := http.Header{}
 	cfg := Config{
-		Mode:              ModeGo,
+		Mode:              ModePlatform,
 		Endpoint:          endpoint(ts, false),
 		HeartbeatInterval: 50 * time.Millisecond,
 		AuthHeader: func() http.Header {

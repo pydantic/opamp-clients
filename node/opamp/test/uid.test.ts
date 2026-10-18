@@ -39,7 +39,7 @@ test("without an instance UID the core makes one: a UUIDv7 of now", async () => 
   try {
     for (let i = 0; i < 2; i++) {
       const before = got.length;
-      const client = Client.start({ endpoint: `http://127.0.0.1:${port}/v1/opamp`, mode: "node" }, {});
+      const client = Client.start({ endpoint: `http://127.0.0.1:${port}/v1/opamp`, mode: "platform" }, {});
       while (got.length === before) await new Promise((r) => setTimeout(r, 10));
       uids.push(got[before]!.instanceUid);
       await client.stop();
@@ -79,7 +79,7 @@ for (const on of [true, false]) {
     const { port } = server.address() as AddressInfo;
     const notes: Notification[] = [];
     const client = Client.start(
-      { endpoint: `http://127.0.0.1:${port}/v1/opamp`, heartbeatIntervalMs: 50, requestInstanceUid: on, mode: "node" },
+      { endpoint: `http://127.0.0.1:${port}/v1/opamp`, heartbeatIntervalMs: 50, requestInstanceUid: on, mode: "platform" },
       {},
       (n) => notes.push(n),
     );

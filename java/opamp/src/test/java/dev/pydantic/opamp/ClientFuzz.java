@@ -38,25 +38,26 @@ import opamp.proto.v1.Opamp;
  * shipped core (the module compiled to JVM classes, through {@link Core}'s buffers), in either mode:
  *
  * <ul>
- *   <li>Java mode: the executor's HttpClient path over {@link FakeHttp} (bodies in pieces, resets,
+ *   <li>platform mode: the executor's HttpClient path over {@link FakeHttp} (bodies in pieces, resets,
  *       error statuses with headers, package downloads into the state file's directory; WebSocket
  *       upgrades taken or refused, messages, closes and drops);
- *   <li>Rust mode: the core's own HTTP over {@link Streams}, on {@link MemoryNet}, the server's
+ *   <li>core mode: the core's own HTTP over {@link Streams}, on {@link MemoryNet}, the server's
  *       bytes arriving in pieces (or any bytes at all, status line included), package files spliced
  *       or written by the streams' file writer.
  * </ul>
  *
  * <p>The server answers each request with any bytes, a ServerToAgent built from the bytes (remote
- * configs, packages with files it serves, connection settings, commands, custom messages, errors,
- * a new instance UID) and perhaps damaged, an error status, or a reset. Each notification makes the
+ * configs, packages with files it serves, connection settings, commands, custom messages, errors, a
+ * new instance UID) and perhaps damaged, an error status, or a reset. Each notification makes the
  * callback call the client (statuses, remote config and package answers, custom messages, stop).
  * Then the application stops the client. What must hold, whatever came: the client never stops on
  * its own (the callback never throws, so an error is this shell's or the core's); callbacks one at
  * a time, never after Stopped; Stopped once, last; stop completes within its bound without an
- * error; every answer the server gave reaches the core unless the core gave up on it first (Java
- * mode, read from the core tap); install_package names a file under the state file's downloads directory, there as the
- * callback runs, whose SHA-256 is the offer's content hash when it has one; a heartbeat interval is
- * never negative; no temporary state file is left; nothing is started once stop has returned.
+ * error; every answer the server gave reaches the core unless the core gave up on it first
+ * (platform mode, read from the core tap); install_package names a file under the state file's
+ * downloads directory, there as the callback runs, whose SHA-256 is the offer's content hash when
+ * it has one; a heartbeat interval is never negative; no temporary state file is left; nothing is
+ * started once stop has returned.
  *
  * <p>scripts/java_fuzz.sh runs it under Jazzer; {@link FuzzInputsTest} runs {@link #SEEDS} and every
  * input under src/test/resources/fuzz/ClientFuzz/ with every {@code mvn test}.
@@ -69,7 +70,7 @@ public final class ClientFuzz {
   /** How long the client may ask for nothing before the application stops it (it is backing off). */
   static final long IDLE_MS = 60;
   static final long RUN_MS = 5000;
-  /** Java mode: the header that names each answer the server gave. */
+  /** Platform mode: the header that names each answer the server gave. */
   static final String TAG = "X-Answer";
 
   /** A property broken: the fuzzer's crash. */
@@ -154,7 +155,7 @@ public final class ClientFuzz {
   static final class Run {
     final FuzzInput.Reader r;
     final FuzzInput.Server server;
-    final boolean rust;
+    final boolean coreMode;
     final Path state;
     final OpampClient.Config config;
     final FakeHttp http = new FakeHttp();
@@ -170,9 +171,9 @@ public final class ClientFuzz {
     /** The core tap: every step, in and out. */
     final Path tap;
     /**
-     * Java mode: the tag (X-Answer) of each OpAMP request's answer, with the body it answered, and
-     * of each upgrade's, in the order the shell asked (empty: no answer to tag). Each must reach the core, unless it gave up on
-     * the effect first.
+     * Platform mode: the tag (X-Answer) of each OpAMP request's answer, with the body it answered,
+     * and of each upgrade's, in the order the shell asked (empty: no answer to tag). Each must
+     * reach the core, unless it gave up on the effect first.
      */
     final Map<String, byte[]> postTags = new java.util.concurrent.ConcurrentHashMap<>();
     final List<String> openTags = new CopyOnWriteArrayList<>();
@@ -181,7 +182,7 @@ public final class ClientFuzz {
     Run(byte[] data, Path tmp) {
       r = new FuzzInput.Reader(data);
       int flags = r.u8();
-      rust = (flags & 1) != 0;
+      coreMode = (flags & 1) != 0;
       int more = r.u8();
       server = new FuzzInput.Server(r);
       state = tmp.resolve("state");
@@ -196,8 +197,8 @@ public final class ClientFuzz {
           .acceptConnectionSettings((flags & 32) != 0).requestInstanceUid((flags & 64) != 0)
           .downloadTimeout(Duration.ofSeconds(5)).maxPackageBytes((flags & 128) != 0 ? 1000 : 0)
           .stopTimeout(Duration.ofMillis(STOP_MS));
-      if (rust) {
-        b.mode(OpampClient.Mode.RUST).streamsPlatform(net).directConnection().rustSplice((more & 1) != 0);
+      if (coreMode) {
+        b.mode(OpampClient.Mode.CORE).streamsPlatform(net).directConnection().spliceDownloads((more & 1) != 0);
       } else {
         b.httpClient(http);
       }
@@ -260,7 +261,7 @@ public final class ClientFuzz {
       }
     }
 
-    /** Java mode: answer what the shell sends, as the server says. */
+    /** Platform mode: answer what the shell sends, as the server says. */
     static Map<String, List<String>> head(List<String[]> headers) {
       Map<String, List<String>> head = new HashMap<>();
       for (String[] h : headers) {
@@ -306,7 +307,7 @@ public final class ClientFuzz {
       q.future.complete(new Response(q.request, a.status(), head(hs), FuzzInput.pieces(a.data(), a.cuts())));
     }
 
-    /** Java mode: the network takes each WebSocket write the shell made, and the server answers it. */
+    /** Platform mode: the network takes each WebSocket write the shell made, and the server answers it. */
     void serveWire() {
       for (Object o; (o = http.wire.poll()) != null; ) {
         FakeHttp.FakeWs w = (FakeHttp.FakeWs) o;
@@ -326,7 +327,7 @@ public final class ClientFuzz {
 
     /** One turn of the server: whatever the shell asked for, answered. */
     void serve(long waitMs) throws InterruptedException {
-      if (rust) {
+      if (coreMode) {
         MemoryNet.Dial d = net.dials.poll(waitMs, TimeUnit.MILLISECONDS);
         if (d != null) {
           lastAsk = System.nanoTime();
@@ -341,7 +342,7 @@ public final class ClientFuzz {
       serveWire();
     }
 
-    /** Rust mode: one connection's server, reading requests and writing answers, in pieces. */
+    /** Core mode: one connection's server, reading requests and writing answers, in pieces. */
     void serveConn(MemoryNet.Dial d) {
       MemoryNet.End end = d.accept();
       String host = d.host;
@@ -466,7 +467,7 @@ public final class ClientFuzz {
       return f.toByteArray();
     }
 
-    /** Rust mode: an upgraded connection's frames from the client (masked), each answered. */
+    /** Core mode: an upgraded connection's frames from the client (masked), each answered. */
     void frames(InputStream in, OutputStream out, MemoryNet.End end) throws IOException {
       ByteArrayOutputStream message = new ByteArrayOutputStream();
       while (true) {
@@ -549,7 +550,7 @@ public final class ClientFuzz {
     }
 
     /**
-     * Java mode: every answer the server gave reached the core, unless the core gave up on its
+     * Platform mode: every answer the server gave reached the core, unless the core gave up on its
      * effect first. A request is the http_request with its body; the k-th upgrade the shell asked
      * for is the core's k-th ws_open (checked only when the shell asked for each).
      */
@@ -647,14 +648,14 @@ public final class ClientFuzz {
         problem("a temporary state file left behind");
       }
       problems.addAll(http.violations);
-      if (!rust) {
+      if (!coreMode) {
         checkAnswers();
       }
       for (Thread t : servers) {
         t.interrupt();
       }
       if (!problems.isEmpty()) {
-        throw new Problem((rust ? "Rust" : "Java") + " mode, " + server.answers + " answers: " + String.join("; ", problems));
+        throw new Problem((coreMode ? "Core" : "Platform") + " mode, " + server.answers + " answers: " + String.join("; ", problems));
       }
     }
   }
@@ -671,9 +672,9 @@ public final class ClientFuzz {
   static final List<byte[]> SEEDS = List.of(
       seed(0),
       seed(1, 0),
-      // Java mode, 1 ms heartbeats: a remote config, answered from the callback.
+      // Platform mode, 1 ms heartbeats: a remote config, answered from the callback.
       seed(0, 0, 5, 2, 0, 2, 'a', 'b', 1, 0, 4, 'c', 'o', 'n', 'f', 0, 0, 1, 3, 1),
-      // Rust mode: a package offered, its file served.
+      // Core mode: a package offered, its file served.
       seed(1, 0, 1, 5, 4, 0, 0, 1, 0, 0, 1, '1', 2, 'h', '1', 1, 0, 5, 'h', 'e', 'l', 'l', 'o', 0, 0, 0, 0, 0, 0, 1, 4, 1, 1, 0),
       // Connection settings offered, with a new endpoint.
       seed(0x24, 0, 6, 8, 0, 2, 'c', 's', 1, 1, 1, 0, 0, 0, 0),

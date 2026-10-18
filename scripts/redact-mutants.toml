@@ -5,11 +5,11 @@
 # dropped redaction lets out.
 
 # ---------------------------------------------------------------------------------------------
-# The Python SDK (python/src/opamp_client).
+# The Python SDK (python/src/pydantic_opamp_client).
 
 [[mutant]]
 name = "python-config-headers-shown"
-file = "python/src/opamp_client/_client.py"
+file = "python/src/pydantic_opamp_client/_client.py"
 test = "python"
 shows = "the headers sent to the server, in a Config's repr"
 find = """            if name == "headers":
@@ -19,7 +19,7 @@ replace = """            if name == "headers":
 
 [[mutant]]
 name = "python-proxy-headers-shown"
-file = "python/src/opamp_client/_transport.py"
+file = "python/src/pydantic_opamp_client/_transport.py"
 test = "python"
 shows = "a proxy's CONNECT headers (Proxy-Authorization), in a Proxy's repr"
 find = """headers={redacted_headers(self.headers)!r}"""
@@ -27,7 +27,7 @@ replace = """headers={dict(self.headers)!r}"""
 
 [[mutant]]
 name = "python-proxy-password-shown"
-file = "python/src/opamp_client/_transport.py"
+file = "python/src/pydantic_opamp_client/_transport.py"
 test = "python"
 shows = "a proxy URL's password, in a Proxy's and a Config's repr"
 find = """    return re.sub(r"(//[^/@:]*):[^/@]*@", r"\\1:***@", url)"""
@@ -35,7 +35,7 @@ replace = """    return url"""
 
 [[mutant]]
 name = "python-key-shown"
-file = "python/src/opamp_client/_transport.py"
+file = "python/src/pydantic_opamp_client/_transport.py"
 test = "python"
 shows = "a client certificate's private key and its password, in a TLS's repr"
 find = """    key_pem: str | bytes | None = field(default=None, repr=False)

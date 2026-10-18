@@ -4,7 +4,7 @@
 package opamp
 
 // The adversary's raw server: what the
-// streams of a Rust mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
+// streams of a core mode run connect to. A stream is bytes, not HTTP, so the adversary tells the
 // server what to do in the first line it writes:
 //
 //	opamp-raw tag=7 send=1000 chunk=100 gap=5 end=fin

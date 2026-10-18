@@ -34,8 +34,8 @@ class InstanceUidTest {
     List<Opamp.AgentToServer> got = new CopyOnWriteArrayList<>();
     HttpServer server = server(got, null);
     String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/opamp";
-    OpampClient a = OpampClient.start(OpampClient.Config.builder(endpoint).mode(OpampClient.Mode.JAVA).build(), OpampClient.Status.of(null), n -> {});
-    OpampClient b = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1").mode(OpampClient.Mode.JAVA).build(), OpampClient.Status.of(null), n -> {});
+    OpampClient a = OpampClient.start(OpampClient.Config.builder(endpoint).mode(OpampClient.Mode.PLATFORM).build(), OpampClient.Status.of(null), n -> {});
+    OpampClient b = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1").mode(OpampClient.Mode.PLATFORM).build(), OpampClient.Status.of(null), n -> {});
     for (int i = 0; i < 1000 && got.isEmpty(); i++) {
       Thread.sleep(10);
     }
@@ -54,7 +54,7 @@ class InstanceUidTest {
     assertArrayEquals(a.instanceUid(), got.get(0).getInstanceUid().toByteArray(), "the one the server hears");
     // Chosen: the application's, as it is.
     byte[] chosen = new byte[16];
-    OpampClient c = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1", chosen).mode(OpampClient.Mode.JAVA).build(),
+    OpampClient c = OpampClient.start(OpampClient.Config.builder("http://127.0.0.1:1", chosen).mode(OpampClient.Mode.PLATFORM).build(),
         OpampClient.Status.of(null), n -> {});
     assertArrayEquals(chosen, c.instanceUid());
     c.stop().get(10, TimeUnit.SECONDS);
@@ -95,7 +95,7 @@ class InstanceUidTest {
     List<Notification> notes = new CopyOnWriteArrayList<>();
     String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/opamp";
     OpampClient client = OpampClient.start(
-        OpampClient.Config.builder(endpoint).mode(OpampClient.Mode.JAVA)
+        OpampClient.Config.builder(endpoint).mode(OpampClient.Mode.PLATFORM)
             .heartbeatInterval(Duration.ofMillis(50))
             .requestInstanceUid(on)
             .build(),

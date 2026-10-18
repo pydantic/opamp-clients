@@ -335,7 +335,7 @@ offer like the first one, and every SDK integration follows it the same way:
 - What the SDK logs about reaching its server (the "can't reach" warning, "connected to") names
   the endpoint the client uses now, so after a move it names the new server. Each client tells
   it (`Endpoint()` in Go, `endpoint` in Python and Node, `endpoint()` in Java, `Endpoint` in .NET):
-  where its latest OpAMP request or connection went. A client in Rust mode can't tell it, so the
+  where its latest OpAMP request or connection went. A client in core mode can't tell it, so the
   SDK names the configured endpoint then.
 
 Each integration's unit tests check a move to a second server, a second key at the same

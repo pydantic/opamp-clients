@@ -49,7 +49,7 @@ func TestTheUIDComesFromTheCore(t *testing.T) {
 	for _, chosen := range [][16]byte{{}, {0x01, 0x92, 0x8f, 0x3a, 0x7c, 0x3e, 0x7a, 0x1b, 0x8c, 0x2d, 0x3e, 0x4f, 0x5a, 0x6b, 0x7c, 0x8d}} {
 		srv := &server{}
 		ts := httptest.NewServer(srv)
-		c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, InstanceUID: chosen, HeartbeatInterval: time.Hour}, Status{}, nil)
+		c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, InstanceUID: chosen, HeartbeatInterval: time.Hour}, Status{}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +82,7 @@ func TestRequestInstanceUIDSetsTheFlag(t *testing.T) {
 	for _, on := range []bool{true, false} {
 		srv := &server{}
 		ts := httptest.NewServer(srv)
-		c, err := Start(context.Background(), Config{Mode: ModeGo, Endpoint: ts.URL, HeartbeatInterval: time.Hour,
+		c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour,
 			RequestInstanceUID: on}, Status{}, nil)
 		if err != nil {
 			t.Fatal(err)

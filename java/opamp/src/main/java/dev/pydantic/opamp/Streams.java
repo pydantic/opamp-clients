@@ -39,15 +39,15 @@ import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
 
 /**
- * Rust mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
+ * Core mode: the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
  * and this carries out only what needs the platform: TCP connections (blocking sockets, a reader
  * and a writer thread each), TLS on them (the JDK's {@link SSLEngine}, with the operator's CAs,
  * certificate and versions: layered, so TLS to an {@code https://} proxy carries TLS to the
  * server), name resolution (only for a SOCKS5 proxy with resolve-locally: otherwise the proxy
- * resolves), the proxy for a URL ({@link RustProxy}), and the files of downloads. It decides
+ * resolves), the proxy for a URL ({@link CoreProxy}), and the files of downloads. It decides
  * nothing: every byte it writes, the core wrote, and the core keeps every time (it closes a
  * stream it gives up on, and cancels a download's file). As node/opamp/src/streams.ts and
- * python/src/opamp_client/_streams.py do.
+ * python/src/pydantic_opamp_client/_streams.py do.
  *
  * <p>Everything about a stream is decided on the client's thread (the loop): effects are carried
  * out there, and what the threads doing the I/O see (bytes read, a connection made, a handshake
@@ -107,9 +107,9 @@ final class Streams {
   }
 
   /**
-   * What Rust mode does its network work with: the JDK's sockets and name resolution ({@link
+   * What core mode does its network work with: the JDK's sockets and name resolution ({@link
    * #SOCKETS}). A test replaces it to run over streams in memory and choose when each step
-   * completes (Fray: StreamsFrayTest, ShellFrayTest in Rust mode).
+   * completes (Fray: StreamsFrayTest, ShellFrayTest in core mode).
    */
   interface Platform {
     /**
@@ -167,7 +167,7 @@ final class Streams {
   };
 
   /**
-   * TLS for Rust mode's streams, from the operator's settings ({@code tls}; null: the system's
+   * TLS for core mode's streams, from the operator's settings ({@code tls}; null: the system's
    * CAs, TLS 1.2 and 1.3), as platform mode's {@link Transport} takes them: a client engine for
    * a host, which verifies the certificate for it (its name, or its address when it is an IP
    * literal: no SNI then) with the JDK's HTTPS rules. The context is built here, once: settings
@@ -195,7 +195,7 @@ final class Streams {
       p.setProtocols(protocols);
       p.setEndpointIdentificationAlgorithm("HTTPS");
       List<javax.net.ssl.SNIServerName> sni = List.of();
-      if (!RustProxy.Ip.literal(h)) {
+      if (!CoreProxy.Ip.literal(h)) {
         try {
           sni = List.of(new javax.net.ssl.SNIHostName(h));
         } catch (IllegalArgumentException notAHostName) {
@@ -310,7 +310,7 @@ final class Streams {
   private Stream reading;
 
   /**
-   * Rust mode's executor. {@code loop}: the client's thread, where effects are carried out and
+   * Core mode's executor. {@code loop}: the client's thread, where effects are carried out and
    * where {@code deliver} feeds the core; {@code tls}: a client engine for a host, with the
    * operator's settings; {@code proxies}: the answer to proxy_query for a URL.
    */
@@ -330,7 +330,7 @@ final class Streams {
   }
 
   /**
-   * Carry out {@code e} if it is one of Rust mode's (on the loop): false if it isn't, or if
+   * Carry out {@code e} if it is one of core mode's (on the loop): false if it isn't, or if
    * another must carry it out too (a cancel names a save as well as a download's file; a discard
    * of a download this didn't write is the platform executor's).
    */

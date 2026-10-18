@@ -12,8 +12,8 @@ import time
 
 from aiohttp import web
 
-from opamp_client import Client, Config, Status, _executor, opamp_pb2 as pb
-from opamp_client._core import Core
+from pydantic_opamp_client import Client, Config, Status, _executor, opamp_pb2 as pb
+from pydantic_opamp_client._core import Core
 
 UID = bytes([0x42] * 16)
 
@@ -60,7 +60,7 @@ def test_stop_during_a_websocket_handshake_returns_and_leaves_nothing_open() -> 
         app.router.add_get("/v1/opamp", handle)
         runner, port = await _serve(app)
         try:
-            client = Client.start(Config(mode="python", endpoint=f"ws://127.0.0.1:{port}/v1/opamp", instance_uid=UID), Status())
+            client = Client.start(Config(mode="platform", endpoint=f"ws://127.0.0.1:{port}/v1/opamp", instance_uid=UID), Status())
             await asyncio.sleep(0.3)
             await asyncio.wait_for(client.stop(), 5)
             await asyncio.wait_for(ended.wait(), 5)
@@ -85,7 +85,7 @@ def test_a_slow_save_holds_up_neither_start_nor_heartbeats(tmp_path, monkeypatch
         runner, port = await _serve(_answering(got))
         try:
             t0 = time.monotonic()
-            client = Client.start(Config(mode="python", endpoint=f"http://127.0.0.1:{port}/v1/opamp", heartbeat_interval_ms=100,
+            client = Client.start(Config(mode="platform", endpoint=f"http://127.0.0.1:{port}/v1/opamp", heartbeat_interval_ms=100,
                                          state_file=str(tmp_path / "state")), Status())
             assert time.monotonic() - t0 < 1, "start waited for the save"
             await asyncio.sleep(1)
@@ -109,7 +109,7 @@ def test_calls_from_another_thread_step_the_core_on_the_loop(monkeypatch) -> Non
     monkeypatch.setattr(Core, "step", step)
 
     async def run() -> None:
-        client = Client.start(Config(mode="python", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=UID), Status())
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1/v1/opamp", instance_uid=UID), Status())
         await asyncio.to_thread(client.set_health, pb.ComponentHealth(healthy=False))
         await asyncio.sleep(0.05)
         await asyncio.wait_for(client.stop(), 10)

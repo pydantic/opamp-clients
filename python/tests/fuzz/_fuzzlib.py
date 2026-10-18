@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import struct
 
-from opamp_client import anyvalue_pb2, opamp_pb2 as pb
+from pydantic_opamp_client import anyvalue_pb2, opamp_pb2 as pb
 
 
 class Reader:
@@ -111,7 +111,7 @@ class Server:
 
     def answer(self, body: bytes) -> tuple[str, int, list[tuple[bytes, bytes]], bytes, list[int]]:
         """The answer to an OpAMP request whose body is `body`: (how, status, headers, data, cuts),
-        how being "ok", "reset" (the connection drops) or "garbage" (Rust mode: `data` is all the
+        how being "ok", "reset" (the connection drops) or "garbage" (core mode: `data` is all the
         server writes, status line included). Header names and values are bytes, as they go on
         the wire."""
         r = self.r

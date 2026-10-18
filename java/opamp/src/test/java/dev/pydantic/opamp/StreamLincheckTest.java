@@ -17,7 +17,7 @@ import org.jetbrains.lincheck.datastructures.Validate;
 import org.junit.jupiter.api.Test;
 
 /**
- * Rust mode's counterpart of {@link ConnLincheckTest}: a stream's writes ({@code Streams.Stream}:
+ * Core mode's counterpart of {@link ConnLincheckTest}: a stream's writes ({@code Streams.Stream}:
  * the core's bytes queued under the stream's lock, past {@link Streams#WRITE_HIGH} holding its
  * reader; its writer taking the oldest and, once it has gone, the next), under Lincheck's model
  * checker. Lincheck draws scenarios of writes (from up to three threads: stronger than the one

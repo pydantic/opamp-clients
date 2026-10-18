@@ -25,8 +25,8 @@ import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 
 /**
- * Rust mode's registry ({@link Streams.InFlight}) and executor under Fray: {@link RegistryFrayTest}
- * in Rust mode. A {@link Streams} on a loop of its own (as the client's thread has it), the test
+ * Core mode's registry ({@link Streams.InFlight}) and executor under Fray: {@link RegistryFrayTest}
+ * in core mode. A {@link Streams} on a loop of its own (as the client's thread has it), the test
  * playing the core (stream effects, closes, a download's file, then the end) and {@link MemoryNet}
  * the network on threads of its own: each connection made at once, refused, held until the shell
  * gives up and made anyway (then reset at once), its far end answering bytes and ending as the

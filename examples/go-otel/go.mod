@@ -4,11 +4,11 @@ go 1.25.0
 
 replace (
 	github.com/pydantic/opamp-clients/go => ../../go
-	github.com/pydantic/opamp-clients/go/otel => ../../go/otel
+	github.com/pydantic/opamp-clients/go/opampotel => ../../go/opampotel
 )
 
 require (
-	github.com/pydantic/opamp-clients/go/otel v0.0.0
+	github.com/pydantic/opamp-clients/go/opampotel v0.0.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.1
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
 	go.opentelemetry.io/otel v1.46.0

@@ -42,7 +42,7 @@ before are deleted at start. A file that was already there is never written over
 application, or deleted by a download that couldn't make its own.
 
 The clients: Go `go/opamp/transport.go` (`saveState`, `fetch`), Python
-`python/src/opamp_client/_executor.py`, Node `node/opamp/src/executor.ts`, Java
+`python/src/pydantic_opamp_client/_executor.py`, Node `node/opamp/src/executor.ts`, Java
 `java/opamp/src/main/java/dev/pydantic/opamp/StateFile.java`, .NET
 `dotnet/Pydantic.OpAmp.Client/StateFile.cs`.
 
@@ -80,8 +80,8 @@ The clients: Go `go/opamp/transport.go` (`saveState`, `fetch`), Python
   in the middle of a write would. The file system is then mounted again on the same disk, and
   `opamp-tap judge` says what the state file holds against the run's tap, for
   `crash_state_consistent`: whole, no older than the last save answered stored, and what the
-  restarted client's core starts from. One driver per runtime (go-core, node, python-core,
-  java-core, dotnet-core), 25 seeds a night (200 crash points each); then the scenarios that save
+  restarted client's core starts from. One driver per runtime (go-core-platform,
+  node-core-platform, python-core-platform, java-core-platform, dotnet-core-platform), 25 seeds a night (200 crash points each); then the scenarios that save
   (`remote-config-restart`, `uid-assigned-restart`, `request-uid-restart`, `credential-offer`,
   `packages`, `restart-mid-download`) run once on LazyFS. A failure names its seed:
   `LAZYFS_SEED_BASE=<seed> LAZYFS_SEEDS=1 conformance/lazyfs/run.sh` replays it.

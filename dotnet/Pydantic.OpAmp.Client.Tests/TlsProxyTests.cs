@@ -14,7 +14,7 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// <summary>
 /// The application's TLS and proxy settings, over plain HTTP and WebSocket and for downloads,
 /// against a test server and proxies of our own (NetworkTestKit.cs); in both modes: .NET's
-/// HttpClient and ClientWebSocket, and Rust mode (the core's own HTTP, WebSocket, CONNECT and
+/// HttpClient and ClientWebSocket, and core mode (the core's own HTTP, WebSocket, CONNECT and
 /// SOCKS5 over .NET's sockets and SslStream).
 /// </summary>
 public class TlsProxyTests
@@ -25,7 +25,7 @@ public class TlsProxyTests
     public static TheoryData<string, string, string, OpAmpMode> Routes()
     {
         var routes = new TheoryData<string, string, string, OpAmpMode>();
-        foreach (var mode in new[] { OpAmpMode.DotNet, OpAmpMode.Rust })
+        foreach (var mode in new[] { OpAmpMode.Platform, OpAmpMode.Core })
         {
             foreach (var transport in new[] { "http", "ws" })
             {
@@ -46,7 +46,7 @@ public class TlsProxyTests
     public static TheoryData<string, string, OpAmpMode> Both(params string[] cases)
     {
         var data = new TheoryData<string, string, OpAmpMode>();
-        foreach (var mode in new[] { OpAmpMode.DotNet, OpAmpMode.Rust })
+        foreach (var mode in new[] { OpAmpMode.Platform, OpAmpMode.Core })
         {
             foreach (var c in cases)
             {
@@ -111,7 +111,7 @@ public class TlsProxyTests
 
             // Plain HTTP goes in absolute form; everything else in a tunnel.
             var how = proxy == "socks5" ? "socks5" : transport == "http" && security == "plain" ? "forward" : "connect";
-            if (mode == OpAmpMode.Rust && proxy == "http")
+            if (mode == OpAmpMode.Core && proxy == "http")
             {
                 how = "connect"; // the shell tunnels plain HTTP too
             }
@@ -132,7 +132,7 @@ public class TlsProxyTests
         var tls = trust == "system" ? null : new OpAmpTlsOptions
         {
             CaPem = Pki.Pem(name ? Pki.Ca : Pki.OtherCa),
-            IncludeSystemCaCerts = trust.EndsWith("system", StringComparison.Ordinal),
+            IncludeSystemCas = trust.EndsWith("system", StringComparison.Ordinal),
         };
 
         var (messages, notes) = await RunAsync(server.Endpoint(transport), tls, null, server, 0, failures: 2, mode: mode);
@@ -150,7 +150,7 @@ public class TlsProxyTests
     {
         _ = none;
         using var server = new TestServer(Pki.Server);
-        var tls = new OpAmpTlsOptions { CaPem = Pki.Pem(Pki.Ca), IncludeSystemCaCerts = true };
+        var tls = new OpAmpTlsOptions { CaPem = Pki.Pem(Pki.Ca), IncludeSystemCas = true };
 
         var (messages, _) = await RunAsync(server.Endpoint(transport), tls, null, server, 2, mode: mode);
 
@@ -175,8 +175,8 @@ public class TlsProxyTests
 
     // covers: RULE-TLS-01
     [Theory]
-    [InlineData(OpAmpMode.DotNet)]
-    [InlineData(OpAmpMode.Rust)]
+    [InlineData(OpAmpMode.Platform)]
+    [InlineData(OpAmpMode.Core)]
     public async Task TlsVersionsAreTheOnesAskedFor(OpAmpMode mode)
     {
         using (var server = new TestServer(Pki.Server))
@@ -288,8 +288,8 @@ public class TlsProxyTests
     }
 
     /// <summary>
-    /// Rust mode can resolve the server's name itself for a SOCKS5 proxy (ProxyUseLocalResolver,
-    /// an error in .NET mode): the client resolves it, and the proxy is given an address. (The
+    /// Core mode can resolve the server's name itself for a SOCKS5 proxy (ProxyResolveLocally,
+    /// an error in platform mode): the client resolves it, and the proxy is given an address. (The
     /// name's addresses are the test's, so that the first is the IPv4 one its server is on; the
     /// connections are real.)
     /// </summary>
@@ -297,7 +297,7 @@ public class TlsProxyTests
     [Theory]
     [InlineData("http", "socks5")]
     [InlineData("ws", "socks5h")]
-    public async Task RustModeResolvesTheNameForASocksProxyWhenAsked(string transport, string scheme)
+    public async Task CoreModeResolvesTheNameForASocksProxyWhenAsked(string transport, string scheme)
     {
         using var server = new TestServer();
         using var via = new TestProxy("socks5");
@@ -309,8 +309,8 @@ public class TlsProxyTests
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
                 Proxy = new UriBuilder(via.Url) { Scheme = scheme }.Uri,
-                ProxyUseLocalResolver = true,
-                Mode = OpAmpMode.Rust,
+                ProxyResolveLocally = true,
+                Mode = OpAmpMode.Core,
             },
             new OpAmpStatus(),
             null,
@@ -337,20 +337,20 @@ public class TlsProxyTests
     [InlineData("socks://127.0.0.1:1080", false, "socks://")]
     [InlineData("socks5x://127.0.0.1:1080", false, "socks5x://")]
     [InlineData("ftp://127.0.0.1:1080", false, "ftp://")]
-    [InlineData("socks5://127.0.0.1:1080", true, "ProxyUseLocalResolver")]
-    [InlineData("socks5h://127.0.0.1:1080", true, "ProxyUseLocalResolver")]
+    [InlineData("socks5://127.0.0.1:1080", true, "ProxyResolveLocally")]
+    [InlineData("socks5h://127.0.0.1:1080", true, "ProxyResolveLocally")]
     [InlineData("http://127.0.0.1:3128", true, "HTTP proxy")]
     [InlineData("https://127.0.0.1:3128", true, "HTTP proxy")]
-    [InlineData(null, true, "ProxyUseLocalResolver")]
+    [InlineData(null, true, "ProxyResolveLocally")]
     public void AProxyThatCantBeUsedAsAskedIsAnError(string? proxy, bool local, string message)
     {
         var options = new OpAmpClientOptions
         {
-            Mode = OpAmpMode.DotNet,
+            Mode = OpAmpMode.Platform,
             Endpoint = new Uri("http://localhost:1/v1/opamp"),
             InstanceUid = Uid,
             Proxy = proxy is null ? null : new Uri(proxy),
-            ProxyUseLocalResolver = local,
+            ProxyResolveLocally = local,
         };
 
         var e = Assert.Throws<ArgumentException>(() => OpAmpClient.Start(options, new OpAmpStatus()));
@@ -452,7 +452,7 @@ public class TlsProxyTests
     /// the goodbye.
     /// </summary>
     private static async Task<(Received[] Messages, OpAmpNotification[] Notes)> RunAsync(
-        string endpoint, OpAmpTlsOptions? tls, Uri? proxy, TestServer server, int messages, int failures = 0, OpAmpMode mode = OpAmpMode.DotNet,
+        string endpoint, OpAmpTlsOptions? tls, Uri? proxy, TestServer server, int messages, int failures = 0, OpAmpMode mode = OpAmpMode.Platform,
         bool localResolver = false)
     {
         var notes = new ConcurrentQueue<OpAmpNotification>();
@@ -464,8 +464,8 @@ public class TlsProxyTests
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
                 Tls = tls,
                 Proxy = proxy,
-                DirectConnection = proxy is null && mode == OpAmpMode.Rust, // the environment's proxies aren't the test's
-                ProxyUseLocalResolver = localResolver,
+                DirectConnection = proxy is null && mode == OpAmpMode.Core, // the environment's proxies aren't the test's
+                ProxyResolveLocally = localResolver,
                 Mode = mode,
             },
             new OpAmpStatus(),
@@ -473,7 +473,7 @@ public class TlsProxyTests
         await WaitAsync(() => (messages > 0 && server.Messages.Count >= messages)
             || (failures > 0 && notes.Count(n => n is OpAmpNotification.ConnectFailed) >= failures));
         await client.StopAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.Equal(0, client.LiveStreams); // Rust mode: every stream closed when stop returns
+        Assert.Equal(0, client.LiveStreams); // Core mode: every stream closed when stop returns
         if (messages > 0)
         {
             // Over WebSocket the goodbye may reach the server just after the client stops.

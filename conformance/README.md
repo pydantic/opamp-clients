@@ -85,13 +85,13 @@ it needs through `DRIVER_CA_FILE`, `DRIVER_CLIENT_CERT`, `DRIVER_CLIENT_KEY` and
 
 The upstream Go driver (opamp-go, which takes a `tls.Config` and a proxy URL) and all six of our
 clients have these features (`clients.toml` lists them), except that Java has no SOCKS5 in
-Java mode (`java-core`): the JDK's HTTP client has none. In Rust mode (`java-core-rust`) the core
-speaks SOCKS5 itself, and every SDK's Rust mode has them all.
+platform mode (`java-core-platform`): the JDK's HTTP client has none. In core mode (`java-core`)
+the core speaks SOCKS5 itself, and every SDK's core mode has them all.
 
-Each of the five SDKs is two clients here, one per mode: `go-core`, `node`,
-`python-core`, `java-core` and `dotnet-core` are platform mode, and the same names with `-rust`
-are Rust mode, the SDKs' default. Each driver asks for its mode by name (the `-rust` clients set
-`OPAMP_<LANGUAGE>_MODE=rust`), so neither depends on what the SDK's default is.
+Each of the five SDKs is two clients here, one per mode: `go-core`, `node-core`, `python-core`,
+`java-core` and `dotnet-core` are core mode, the SDKs' default, and the same names with
+`-platform` are platform mode. Each driver asks for its mode by name (the `-platform` clients set
+`OPAMP_<LANGUAGE>_MODE=platform`), so neither depends on what the SDK's default is.
 
 Both are the Go server's: those scenarios don't list `rust` in `servers`, so `--server rust`
 skips them (the runner refuses a scenario that asks for both).
@@ -303,12 +303,12 @@ Every SDK runs the same core, so on one scenario what each tells its core, and w
 decides, should differ only in timing. `--differential` (or `conformance/differential/shells.py`
 over an existing `conformance/out/`, as the `Conformance (differential)` CI job does with every
 client's uploaded taps) compares each client's taps of each scenario and transport with the Rust
-client's, or go-core's where the Rust client isn't built (`opamp-tap diff`). Each run is reduced to what doesn't depend on timing, per category
+client's, or go-core-platform's where the Rust client isn't built (`opamp-tap diff`). Each run is reduced to what doesn't depend on timing, per category
 (the application's calls, the notifications, the saves and their answers, the messages sent and
 received, the connections' lifecycle, the downloads), dropping the clock, effect ids, instance UIDs
 (named by order of appearance), hosts and ports, identifying attributes' values, errors' texts
 (their class stays), cancels, and a block of up to four lines repeated back to back (one more
-heartbeat), but not an answer repeated alone (a save answered twice). Rust mode's wire categories
+heartbeat), but not an answer repeated alone (a save answered twice). Core mode's wire categories
 are its core's own streams and aren't compared. A difference fails `--strict` unless
 `conformance/differential/shells.toml` allows it, with its reason; the report shows the scenario,
 the two clients and the first lines where they part, with context. So does a run the Rust client

@@ -25,7 +25,7 @@ from dataclasses import dataclass
 import pytest
 from _servers import MODES, UID, OpampServer, wait_for
 
-from opamp_client import Client, Config, Notification, Status, _native, opamp_pb2 as pb
+from pydantic_opamp_client import Client, Config, Notification, Status, _native, opamp_pb2 as pb
 
 # Clients started before counting (caches, pools and lazily made objects fill up), then counted.
 WARM = 5
@@ -35,7 +35,7 @@ CYCLES = 30
 # late, a connection the server has yet to see end. A leak of one per client is CYCLES.
 SLACK = {"native sessions": 0, "threads": 3, "fds": 6, "tasks": 2}
 # Python's allocated blocks move by a few hundred on their own (caches, free lists, the server's
-# record of what arrived); even a stopped client kept alive is 60 (Python mode) to 350 (Rust
+# record of what arrived); even a stopped client kept alive is 60 (platform mode) to 350 (core
 # mode), and CYCLES of them are more.
 BLOCKS_SLACK = 1500
 

@@ -6,12 +6,12 @@
 # or "field: reference's | other's" for config), and `grouping`, a test of the whole difference
 # named in shells.py (GROUPINGS). Keep each rule as narrow as the reason.
 
-# Rust mode: the core speaks HTTP and WebSocket itself (Config.streams); its wire is not compared.
+# Core mode: the core speaks HTTP and WebSocket itself (Config.streams); its wire is not compared.
 [[allow]]
-clients = ["*-rust"]
+clients = ["*-core"]
 category = "config"
 first = "^streams: false \\| true$"
-reason = "Rust mode runs the core with streams: its own HTTP and WebSocket, not the shell's"
+reason = "core mode runs the core with streams: its own HTTP and WebSocket, not the shell's"
 
 # A crash lands at a moment of each client's own progress (the seed picks a time after the driver
 # started, not a point in the run), so what was saved by then, and what the next run starts from,
@@ -101,10 +101,11 @@ category = "conn"
 first = "^- +\\| \\+ ws_open\\(|^- ws_open\\(.*\\) \\| \\+ $"
 reason = "a run ending mid-reconnect: one attempt more or fewer is timing"
 
-# Where the server never lets a connection last (it drops each one, or its certificate is
-# refused), the run ends with the client between attempts, and whether the shell hands the core
-# its goodbye (agent_disconnect) before the driver stops is timing: node in accept-then-drop-ws,
-# go-core in tls-untrusted-http, one run in two on CI. Only that last disconnect, nothing else sent.
+# Where the server never lets a connection last (it drops each one, or its certificate is refused),
+# the run ends with the client between attempts, and whether the shell hands the core its goodbye
+# (agent_disconnect) before the driver stops is timing: node in accept-then-drop-ws,
+# go-core-platform in tls-untrusted-http, one run in two on CI. Only that last disconnect, nothing
+# else sent.
 [[allow]]
 scenarios = ["accept-then-drop*", "tls-untrusted*"]
 category = "send"
@@ -123,14 +124,14 @@ reason = "the server never lets a connection last: whether the goodbye reaches t
 
 # The driver makes its changes (changes_at_s) by its own clock, from when it started; a client in a
 # container (the JVM, .NET) takes seconds over its first exchange, so a change can go in its first
-# message rather than after it, before the server's request for a full report instead of after
-# it, or elsewhere in a hostile server's cycle of holding and answering (java-core, in one run of
-# two: a status report resent once more); and in restart-mid-download the overlapping runs'
-# connections and package reports interleave by the same timing. (The server's faults are timed
-# from the driver's first request now, so the scenarios whose difference was the server's clock,
+# message rather than after it, before the server's request for a full report instead of after it,
+# or elsewhere in a hostile server's cycle of holding and answering (java-core-platform, in one run
+# of two: a status report resent once more); and in restart-mid-download the overlapping runs'
+# connections and package reports interleave by the same timing. (The server's faults are timed from
+# the driver's first request now, so the scenarios whose difference was the server's clock,
 # tcp-drop, close-frame, server-restart and throttle-429, are compared alike.)
 [[allow]]
-clients = ["java-core", "java-core-rust", "dotnet-core", "dotnet-core-rust"]
+clients = ["java-core-platform", "java-core", "dotnet-core-platform", "dotnet-core"]
 scenarios = ["request-uid", "request-uid-ignored", "server-capabilities", "restart-mid-download", "hostile-heartbeat",
              "hostile-settings", "hostile-packages"]
 reason = "the driver's changes are timed by its own clock; a client in a container is slow to its first exchange"

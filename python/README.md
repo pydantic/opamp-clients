@@ -10,15 +10,15 @@ the WebAssembly module the Go, Node.js and Java clients run, and held to it byte
 (`tests/test_native.py`). It comes in its own package, `pydantic-opamp-core` (`core/`: a wheel per
 platform holding the library alone, for Linux (glibc and musl), macOS and Windows on x64 and
 arm64), and this package, pure Python, loads it through its C interface with `ctypes`
-(`opamp_client._native`), on every CPython from 3.11, free-threaded included. The core ships
+(`pydantic_opamp_client._native`), on every CPython from 3.11, free-threaded included. The core ships
 compiled only: there is no source distribution.
-By default the core speaks HTTP and WebSocket itself too ([Rust mode](#rust-mode-and-python-mode)),
+By default the core speaks HTTP and WebSocket itself too ([core mode](#core-mode-and-platform-mode)),
 and Python only moves its bytes, so the bytes on the wire are the same as every other language's
-client here. In Python mode this package carries out the core's requests with
+client here. In platform mode this package carries out the core's requests with
 [aiohttp](https://docs.aiohttp.org) instead.
 
 ```python
-from opamp_client import Client, Config, Status, anyvalue_pb2, opamp_pb2
+from pydantic_opamp_client import Client, Config, Status, anyvalue_pb2, opamp_pb2
 
 async def main() -> None:
     description = opamp_pb2.AgentDescription(identifying_attributes=[
@@ -70,7 +70,7 @@ whether to follow it (`docs/packages.md`, "Redirects").
 WebSocket and every package download, in both modes.
 
 ```python
-from opamp_client import TLS, Proxy
+from pydantic_opamp_client import TLS, Proxy
 
 Config(
     endpoint="wss://opamp.internal:4320/v1/opamp",
@@ -82,7 +82,7 @@ Config(
 ```
 
 Without `tls` the client trusts the system's CAs and uses TLS 1.2 or later. With `ca_file` or
-`ca_pem` it trusts those CAs alone; add `system_cas=True` to trust the system's as well.
+`ca_pem` it trusts those CAs alone; add `include_system_cas=True` to trust the system's as well.
 `min_version` and `max_version` take `ssl.TLSVersion` values; below TLS 1.2 is refused (for
 either), and so is a `min_version` above the `max_version`. The
 same CAs check an `https://` proxy's certificate.
@@ -123,8 +123,8 @@ Basic credentials; a SOCKS5 proxy as its username and password. They never appea
 A proxy you configure is used for every connection, whatever the host. `NO_PROXY` doesn't
 apply to it.
 
-Without `proxy` the client uses the environment's proxies, by the rule every SDK's Rust mode
-shares (`tests/shell-tables/README.md`, "Rust mode's proxy rule", put in place by
+Without `proxy` the client uses the environment's proxies, by the rule every SDK's core mode
+shares (`tests/shell-tables/README.md`, its proxy rule, put in place by
 `scripts/fetch_core.py fetch`):
 `HTTP_PROXY` is for `http://` and `ws://` URLs, `HTTPS_PROXY` for `https://` and `wss://`,
 `ALL_PROXY` for either when its own is unset; the upper-case name first. `NO_PROXY` lists hosts
@@ -136,7 +136,7 @@ The value goes to the core as it is (trimmed): a scheme it can't use fails the c
 than going direct, at connection time rather than at start. The client reads the environment
 once, at start. It matches each URL on its own: the server's, and each package download's. It
 doesn't read the operating system's proxy settings, or `.netrc`.
-[Python mode](#rust-mode-and-python-mode) reads the environment as `urllib` does instead.
+[Platform mode](#core-mode-and-platform-mode) reads the environment as `urllib` does instead.
 
 `proxy=Proxy.DIRECT` goes straight to the server, whatever the environment says.
 
@@ -155,19 +155,19 @@ list: the file takes its directory's permissions.
 Keep it on a local disk, in a directory only the agent's user can read: not on a shared or
 network path, and not in backups or images copied anywhere less protected.
 
-## Rust mode and Python mode
+## Core mode and platform mode
 
-`Config.mode` says who speaks HTTP and WebSocket. The client runs in **Rust mode** unless the
+`Config.mode` says who speaks HTTP and WebSocket. The client runs in **core mode** unless the
 application asks for **platform mode**: by naming it in the mode option, or by handing the client
 an HTTP client of its own, where the SDK takes one (an application that brings its own client has
 asked for the platform's stack). An option only one mode honours is never silently ignored: it
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
-Here platform mode is `Config(mode="python")`. This client takes no HTTP client of the
-application's, so the mode option is the only way to choose it. `rust_splice=False` is Rust
-mode's: with `mode="python"` it is a `ValueError`.
+Here platform mode is `Config(mode="platform")`. This client takes no HTTP client of the
+application's, so the mode option is the only way to choose it. `splice_downloads=False` is core
+mode's: with `mode="platform"` it is a `ValueError`.
 
-In Rust mode (`mode="rust"`, the default) the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5
+In core mode (`mode="core"`, the default) the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5
 itself (the core's own HTTP stack, in the same library), over asyncio's TCP connections and
 TLS. Python opens connections, starts TLS with the `tls` settings above (an `https://` proxy's,
 then the server's inside it), resolves the server's name for a SOCKS5 proxy with
@@ -184,7 +184,7 @@ request, stop. aiohttp isn't used.
 - Package files are written in a worker thread, in order, and hashed over exactly the bytes
   written; a file is synced before the core hears it is complete. A file the core discards or
   cancels while a write is in flight is deleted once that write is over, and nothing more is said
-  about it. With `rust_splice` (the default) body bytes go from the socket to the file without
+  about it. With `splice_downloads` (the default) body bytes go from the socket to the file without
   passing through the core, wherever the response says how many there are.
 - A connection that brings a file's bytes faster than they can be written stops reading while
   more than 4 MiB wait, and reads again at 1 MiB.
@@ -194,7 +194,7 @@ request, stop. aiohttp isn't used.
   high-water mark the client reads nothing more from it, and a write that finds more than 16 MiB
   still unsent fails the stream (the core reconnects, as for any lost connection).
 
-Choose Python mode (`mode="python"`) when the connection must be made by aiohttp. What differs
+Choose platform mode (`mode="platform"`) when the connection must be made by aiohttp. What differs
 there:
 
 - The environment's proxies are read as Python's `urllib` reads them, not by the shared rule:
@@ -204,8 +204,8 @@ there:
 - HTTP and WebSocket are aiohttp's: its connection pooling and its headers' order and case, not
   the core's bytes.
 
-The conformance suite runs both: `python-core` (Python mode) and `python-core-rust` (Rust mode;
-`OPAMP_PYTHON_MODE=rust` for the driver).
+The conformance suite runs both: `python-core` (core mode) and `python-core-platform` (platform
+mode; `OPAMP_PYTHON_MODE=platform` for the driver).
 
 ## Development
 
@@ -221,4 +221,4 @@ checker (`target/release/opamp-tap <tap files...>`, which `fetch_core.py fetch` 
 
 The conformance suite runs this client through `conformance/drivers/python-core`.
 
-What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in Python mode and in Rust mode.
+What the client promises around its callback (when it is called, one at a time and never before `start` returns, what a callback that throws does, which calls are allowed from the callback and from other threads, stop from the callback) is [the SDK contract](../docs/sdk-contract.md), the same for every SDK here. The precise rules, around the core too, are the shell contract, `spec/shell-contract.md` (put in place by `scripts/fetch_core.py fetch`; it lists the breaks known today). The callback model test and the adversary harness in this client's tests check it, each in platform mode and in core mode.

@@ -294,7 +294,7 @@ internal sealed class MemEnd : Stream
 }
 
 /// <summary>
-/// Rust mode's network in memory (<see cref="StreamsNet"/>): every connect, TLS handshake and name
+/// Core mode's network in memory (<see cref="StreamsNet"/>): every connect, TLS handshake and name
 /// resolution waits for the test (or <see cref="OnDial"/>) to decide it. A deaf one ignores its
 /// cancel and completes when told, after it. TLS here is no TLS: the handshake hands back the
 /// stream it was given, so the server reads the core's bytes as they are.
@@ -489,7 +489,7 @@ internal sealed class MemNet : StreamsNet
     }
 }
 
-/// <summary>A minimal HTTP/1.1 and WebSocket peer over a <see cref="MemEnd"/>, for the server's side of Rust mode's tests.</summary>
+/// <summary>A minimal HTTP/1.1 and WebSocket peer over a <see cref="MemEnd"/>, for the server's side of core mode's tests.</summary>
 internal static class MemHttp
 {
     /// <summary>The request line and headers (names as sent), or null at the end of the connection.</summary>
@@ -550,7 +550,7 @@ internal static class MemHttp
     }
 }
 
-/// <summary>A file system's operations that a test holds, fails or watches (Rust mode's download files).</summary>
+/// <summary>A file system's operations that a test holds, fails or watches (core mode's download files).</summary>
 internal sealed class HeldFiles(IFileOps inner) : IFileOps
 {
     private readonly ConcurrentQueue<string> log = new();
