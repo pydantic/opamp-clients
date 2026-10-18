@@ -203,35 +203,35 @@ namespace Pydantic.OpAmp.Core {
             "ASgJSAGIAQESGQoMaGVhcnRiZWF0X21zGAUgASgSSAKIAQESFQoNZW5kcG9p",
             "bnRfbmFtZRgGIAEoCRIUCgxoZWFkZXJzX25hbWUYByABKAkSFgoOaGVhcnRi",
             "ZWF0X25hbWUYCCABKAlCCwoJX2VuZHBvaW50QgwKCl9zdGF0ZV9kaXJCDwoN",
-            "X2hlYXJ0YmVhdF9tcyKcAgoMU2V0dXBTdGFydGVkEgsKA29mZhgBIAEoCBIQ",
-            "CghlbmRwb2ludBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29y",
-            "ZS52MS5IZWFkZXISHQoVaGVhcnRiZWF0X2ludGVydmFsX21zGAQgASgEEhEK",
-            "CXN0YXRlX2RpchgFIAEoCRIVCg1kZWZhdWx0X3Nsb3RzGAYgAygJEhcKD2Fs",
-            "bF9zbG90c190YWtlbhgHIAEoCRIPCgdzZXJ2aWNlGAggASgJEhYKDnNob3du",
-            "X2VuZHBvaW50GAkgASgJEigKBWhpbnRzGAogASgLMhkub3BhbXAuY29yZS52",
-            "MS5TZXR1cEhpbnRzEhAKCHdhcm5pbmdzGAsgAygJIlQKClNldHVwSGludHMS",
-            "DwoHcmVmdXNlZBgBIAEoCRIRCglub3RfZm91bmQYAiABKAkSEwoLdW5yZWFj",
-            "aGFibGUYAyABKAkSDQoFZXJyb3IYBCABKAkicAoNU2V0dXBJZGVudGl0eRIR",
-            "CglzdGF0ZV9kaXIYASABKAgSDQoFc2F2ZWQYAiABKAkSGwoTcmVzb3VyY2Vf",
-            "YXR0cmlidXRlcxgDIAEoCRIPCgdlbnRyb3B5GAQgASgMEg8KB3VuaXhfbXMY",
-            "BSABKAQitgEKD1NldHVwSWRlbnRpZmllZBIUCgxpbnN0YW5jZV91aWQYASAB",
-            "KAwSKQoEZnJvbRgCIAEoDjIbLm9wYW1wLmNvcmUudjEuU2V0dXBVaWRGcm9t",
-            "EgwKBHNhdmUYAyABKAgSDAoEdGV4dBgEIAEoCRITCgt1bnNhdmVkX3VpZBgF",
-            "IAEoDBIxCgx1bnNhdmVkX2Zyb20YBiABKA4yGy5vcGFtcC5jb3JlLnYxLlNl",
-            "dHVwVWlkRnJvbSqrAgoLU3RhdHVzRmllbGQSHAoYU1RBVFVTX0ZJRUxEX0RF",
-            "U0NSSVBUSU9OEAASFwoTU1RBVFVTX0ZJRUxEX0hFQUxUSBABEiEKHVNUQVRV",
-            "U19GSUVMRF9FRkZFQ1RJVkVfQ09ORklHEAISJQohU1RBVFVTX0ZJRUxEX1JF",
-            "TU9URV9DT05GSUdfU1RBVFVTEAMSKwonU1RBVFVTX0ZJRUxEX0NPTk5FQ1RJ",
-            "T05fU0VUVElOR1NfU1RBVFVTEAQSJQohU1RBVFVTX0ZJRUxEX0FWQUlMQUJM",
-            "RV9DT01QT05FTlRTEAUSJAogU1RBVFVTX0ZJRUxEX0NVU1RPTV9DQVBBQklM",
-            "SVRJRVMQBhIhCh1TVEFUVVNfRklFTERfUEFDS0FHRV9TVEFUVVNFUxAHKkYK",
-            "B1NldHVwT3MSEQoNU0VUVVBfT1NfVU5JWBAAEhIKDlNFVFVQX09TX01BQ09T",
-            "EAESFAoQU0VUVVBfT1NfV0lORE9XUxACKlsKDFNldHVwVWlkRnJvbRIXChNT",
-            "RVRVUF9VSURfRlJPTV9NQURFEAASGAoUU0VUVVBfVUlEX0ZST01fU0FWRUQQ",
-            "ARIYChRTRVRVUF9VSURfRlJPTV9HSVZFThACQnYKF2Rldi5weWRhbnRpYy5v",
-            "cGFtcC5jb3JlQglDb3JlUHJvdG9aOmdpdGh1Yi5jb20vcHlkYW50aWMvb3Bh",
-            "bXAtY2xpZW50cy9nby9vcGFtcC9pbnRlcm5hbC9jb3JlcGKqAhNQeWRhbnRp",
-            "Yy5PcEFtcC5Db3JlYgZwcm90bzM="));
+            "X2hlYXJ0YmVhdF9tcyKwAgoMU2V0dXBTdGFydGVkEgsKA29mZhgBIAEoCBIS",
+            "CgpvZmZfcmVhc29uGAwgASgJEhAKCGVuZHBvaW50GAIgASgJEiYKB2hlYWRl",
+            "cnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIdChVoZWFydGJlYXRf",
+            "aW50ZXJ2YWxfbXMYBCABKAQSEQoJc3RhdGVfZGlyGAUgASgJEhUKDWRlZmF1",
+            "bHRfc2xvdHMYBiADKAkSFwoPYWxsX3Nsb3RzX3Rha2VuGAcgASgJEg8KB3Nl",
+            "cnZpY2UYCCABKAkSFgoOc2hvd25fZW5kcG9pbnQYCSABKAkSKAoFaGludHMY",
+            "CiABKAsyGS5vcGFtcC5jb3JlLnYxLlNldHVwSGludHMSEAoId2FybmluZ3MY",
+            "CyADKAkiVAoKU2V0dXBIaW50cxIPCgdyZWZ1c2VkGAEgASgJEhEKCW5vdF9m",
+            "b3VuZBgCIAEoCRITCgt1bnJlYWNoYWJsZRgDIAEoCRINCgVlcnJvchgEIAEo",
+            "CSJwCg1TZXR1cElkZW50aXR5EhEKCXN0YXRlX2RpchgBIAEoCBINCgVzYXZl",
+            "ZBgCIAEoCRIbChNyZXNvdXJjZV9hdHRyaWJ1dGVzGAMgASgJEg8KB2VudHJv",
+            "cHkYBCABKAwSDwoHdW5peF9tcxgFIAEoBCK2AQoPU2V0dXBJZGVudGlmaWVk",
+            "EhQKDGluc3RhbmNlX3VpZBgBIAEoDBIpCgRmcm9tGAIgASgOMhsub3BhbXAu",
+            "Y29yZS52MS5TZXR1cFVpZEZyb20SDAoEc2F2ZRgDIAEoCBIMCgR0ZXh0GAQg",
+            "ASgJEhMKC3Vuc2F2ZWRfdWlkGAUgASgMEjEKDHVuc2F2ZWRfZnJvbRgGIAEo",
+            "DjIbLm9wYW1wLmNvcmUudjEuU2V0dXBVaWRGcm9tKqsCCgtTdGF0dXNGaWVs",
+            "ZBIcChhTVEFUVVNfRklFTERfREVTQ1JJUFRJT04QABIXChNTVEFUVVNfRklF",
+            "TERfSEVBTFRIEAESIQodU1RBVFVTX0ZJRUxEX0VGRkVDVElWRV9DT05GSUcQ",
+            "AhIlCiFTVEFUVVNfRklFTERfUkVNT1RFX0NPTkZJR19TVEFUVVMQAxIrCidT",
+            "VEFUVVNfRklFTERfQ09OTkVDVElPTl9TRVRUSU5HU19TVEFUVVMQBBIlCiFT",
+            "VEFUVVNfRklFTERfQVZBSUxBQkxFX0NPTVBPTkVOVFMQBRIkCiBTVEFUVVNf",
+            "RklFTERfQ1VTVE9NX0NBUEFCSUxJVElFUxAGEiEKHVNUQVRVU19GSUVMRF9Q",
+            "QUNLQUdFX1NUQVRVU0VTEAcqRgoHU2V0dXBPcxIRCg1TRVRVUF9PU19VTklY",
+            "EAASEgoOU0VUVVBfT1NfTUFDT1MQARIUChBTRVRVUF9PU19XSU5ET1dTEAIq",
+            "WwoMU2V0dXBVaWRGcm9tEhcKE1NFVFVQX1VJRF9GUk9NX01BREUQABIYChRT",
+            "RVRVUF9VSURfRlJPTV9TQVZFRBABEhgKFFNFVFVQX1VJRF9GUk9NX0dJVkVO",
+            "EAJCdgoXZGV2LnB5ZGFudGljLm9wYW1wLmNvcmVCCUNvcmVQcm90b1o6Z2l0",
+            "aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1wL2ludGVy",
+            "bmFsL2NvcmVwYqoCE1B5ZGFudGljLk9wQW1wLkNvcmViBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Core.StatusField), typeof(global::Pydantic.OpAmp.Core.SetupOs), typeof(global::Pydantic.OpAmp.Core.SetupUidFrom), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -281,7 +281,7 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Variable), global::Pydantic.OpAmp.Core.Variable.Parser, new[]{ "Name", "Value" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupStart), global::Pydantic.OpAmp.Core.SetupStart.Parser, new[]{ "Env", "Os", "Program", "Cwd", "Code" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupInCode), global::Pydantic.OpAmp.Core.SetupInCode.Parser, new[]{ "Endpoint", "HeadersGiven", "Headers", "StateDir", "HeartbeatMs", "EndpointName", "HeadersName", "HeartbeatName" }, new[]{ "Endpoint", "StateDir", "HeartbeatMs" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupStarted), global::Pydantic.OpAmp.Core.SetupStarted.Parser, new[]{ "Off", "Endpoint", "Headers", "HeartbeatIntervalMs", "StateDir", "DefaultSlots", "AllSlotsTaken", "Service", "ShownEndpoint", "Hints", "Warnings" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupStarted), global::Pydantic.OpAmp.Core.SetupStarted.Parser, new[]{ "Off", "OffReason", "Endpoint", "Headers", "HeartbeatIntervalMs", "StateDir", "DefaultSlots", "AllSlotsTaken", "Service", "ShownEndpoint", "Hints", "Warnings" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupHints), global::Pydantic.OpAmp.Core.SetupHints.Parser, new[]{ "Refused", "NotFound", "Unreachable", "Error" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupIdentity), global::Pydantic.OpAmp.Core.SetupIdentity.Parser, new[]{ "StateDir", "Saved", "ResourceAttributes", "Entropy", "UnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SetupIdentified), global::Pydantic.OpAmp.Core.SetupIdentified.Parser, new[]{ "InstanceUid", "From", "Save", "Text", "UnsavedUid", "UnsavedFrom" }, null, null, null, null)
@@ -638,7 +638,7 @@ namespace Pydantic.OpAmp.Core {
     public const int UserAgentFieldNumber = 17;
     private string userAgent_ = "";
     /// <summary>
-    /// the User-Agent of every request and upgrade; default "opamp-clients"
+    /// the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version>"
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -17240,9 +17240,10 @@ namespace Pydantic.OpAmp.Core {
         = pb::FieldCodec.ForMessage(10, global::Pydantic.OpAmp.Core.Variable.Parser);
     private readonly pbc::RepeatedField<global::Pydantic.OpAmp.Core.Variable> env_ = new pbc::RepeatedField<global::Pydantic.OpAmp.Core.Variable>();
     /// <summary>
-    /// The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-    /// OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-    /// OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+    /// The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+    /// OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+    /// OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+    /// given twice: the last.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -17541,7 +17542,8 @@ namespace Pydantic.OpAmp.Core {
   }
 
   /// <summary>
-  /// What the application gives in code: each part given wins over its variable. A warning names
+  /// What the application gives in code: each part given wins over its variable (but nothing wins
+  /// over OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED, which turn the integration off). A warning names
   /// the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
   /// "the endpoint given in code".
   /// </summary>
@@ -18084,6 +18086,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public SetupStarted(SetupStarted other) : this() {
       off_ = other.off_;
+      offReason_ = other.offReason_;
       endpoint_ = other.endpoint_;
       headers_ = other.headers_.Clone();
       heartbeatIntervalMs_ = other.heartbeatIntervalMs_;
@@ -18107,7 +18110,9 @@ namespace Pydantic.OpAmp.Core {
     public const int OffFieldNumber = 1;
     private bool off_;
     /// <summary>
-    /// no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
+    /// The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+    /// Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+    /// closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -18115,6 +18120,22 @@ namespace Pydantic.OpAmp.Core {
       get { return off_; }
       set {
         off_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "off_reason" field.</summary>
+    public const int OffReasonFieldNumber = 12;
+    private string offReason_ = "";
+    /// <summary>
+    /// With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+    /// empty when it is off for want of an endpoint (not configured: nothing to say).
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string OffReason {
+      get { return offReason_; }
+      set {
+        offReason_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -18281,6 +18302,7 @@ namespace Pydantic.OpAmp.Core {
         return true;
       }
       if (Off != other.Off) return false;
+      if (OffReason != other.OffReason) return false;
       if (Endpoint != other.Endpoint) return false;
       if(!headers_.Equals(other.headers_)) return false;
       if (HeartbeatIntervalMs != other.HeartbeatIntervalMs) return false;
@@ -18299,6 +18321,7 @@ namespace Pydantic.OpAmp.Core {
     public override int GetHashCode() {
       int hash = 1;
       if (Off != false) hash ^= Off.GetHashCode();
+      if (OffReason.Length != 0) hash ^= OffReason.GetHashCode();
       if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
       hash ^= headers_.GetHashCode();
       if (HeartbeatIntervalMs != 0UL) hash ^= HeartbeatIntervalMs.GetHashCode();
@@ -18362,6 +18385,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteMessage(Hints);
       }
       warnings_.WriteTo(output, _repeated_warnings_codec);
+      if (OffReason.Length != 0) {
+        output.WriteRawTag(98);
+        output.WriteString(OffReason);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -18407,6 +18434,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteMessage(Hints);
       }
       warnings_.WriteTo(ref output, _repeated_warnings_codec);
+      if (OffReason.Length != 0) {
+        output.WriteRawTag(98);
+        output.WriteString(OffReason);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -18419,6 +18450,9 @@ namespace Pydantic.OpAmp.Core {
       int size = 0;
       if (Off != false) {
         size += 1 + 1;
+      }
+      if (OffReason.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(OffReason);
       }
       if (Endpoint.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
@@ -18458,6 +18492,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (other.Off != false) {
         Off = other.Off;
+      }
+      if (other.OffReason.Length != 0) {
+        OffReason = other.OffReason;
       }
       if (other.Endpoint.Length != 0) {
         Endpoint = other.Endpoint;
@@ -18552,6 +18589,10 @@ namespace Pydantic.OpAmp.Core {
             warnings_.AddEntriesFrom(input, _repeated_warnings_codec);
             break;
           }
+          case 98: {
+            OffReason = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -18616,6 +18657,10 @@ namespace Pydantic.OpAmp.Core {
           }
           case 90: {
             warnings_.AddEntriesFrom(ref input, _repeated_warnings_codec);
+            break;
+          }
+          case 98: {
+            OffReason = input.ReadString();
             break;
           }
         }

@@ -219,7 +219,7 @@ type Config struct {
 	SavedState               []byte `protobuf:"bytes,14,opt,name=saved_state,json=savedState,proto3" json:"saved_state,omitempty"`                                              // the data of the last Store, as saved (empty: nothing saved)
 	AcceptConnectionSettings bool   `protobuf:"varint,15,opt,name=accept_connection_settings,json=acceptConnectionSettings,proto3" json:"accept_connection_settings,omitempty"` // accept offers, and declare the capabilities for them
 	VerifyTimeoutMs          uint64 `protobuf:"varint,16,opt,name=verify_timeout_ms,json=verifyTimeoutMs,proto3" json:"verify_timeout_ms,omitempty"`                            // how long offered settings have to prove themselves; default 60 s
-	UserAgent                string `protobuf:"bytes,17,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                 // the User-Agent of every request and upgrade; default "opamp-clients"
+	UserAgent                string `protobuf:"bytes,17,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                 // the User-Agent of every request and upgrade; default "pydantic-opamp/<core version>"
 	// Packages (docs/packages.md), only with persistence.
 	AcceptPackages    bool   `protobuf:"varint,19,opt,name=accept_packages,json=acceptPackages,proto3" json:"accept_packages,omitempty"`            // accept packages, and declare the capabilities for them
 	MaxPackageBytes   uint64 `protobuf:"varint,20,opt,name=max_package_bytes,json=maxPackageBytes,proto3" json:"max_package_bytes,omitempty"`       // the largest file downloaded; default 1 GiB
@@ -4264,9 +4264,10 @@ func (x *Variable) GetValue() string {
 // Where the server is and how to reach it, from the environment and what the code gives.
 type SetupStart struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The process environment: all of it, or at least OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS,
-	// OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL, OTEL_SERVICE_NAME,
-	// OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name given twice: the last.
+	// The process environment: all of it, or at least OTEL_OPAMP_DISABLED, OTEL_SDK_DISABLED,
+	// OTEL_OPAMP_ENDPOINT, OTEL_OPAMP_HEADERS, OTEL_OPAMP_STATE_DIR, OTEL_OPAMP_HEARTBEAT_INTERVAL,
+	// OTEL_SERVICE_NAME, OTEL_RESOURCE_ATTRIBUTES, HOME, XDG_STATE_HOME and LOCALAPPDATA. A name
+	// given twice: the last.
 	Env           []*Variable  `protobuf:"bytes,1,rep,name=env,proto3" json:"env,omitempty"`
 	Os            SetupOs      `protobuf:"varint,2,opt,name=os,proto3,enum=opamp.core.v1.SetupOs" json:"os,omitempty"`
 	Program       string       `protobuf:"bytes,3,opt,name=program,proto3" json:"program,omitempty"` // the program's name, the language's own (opamp-clients' docs/default-state-dir.md)
@@ -4341,7 +4342,8 @@ func (x *SetupStart) GetCode() *SetupInCode {
 	return nil
 }
 
-// What the application gives in code: each part given wins over its variable. A warning names
+// What the application gives in code: each part given wins over its variable (but nothing wins
+// over OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED, which turn the integration off). A warning names
 // the part by the name given here (the language's own: "WithEndpoint", "endpoint="), else as
 // "the endpoint given in code".
 type SetupInCode struct {
@@ -4445,12 +4447,18 @@ func (x *SetupInCode) GetHeartbeatName() string {
 }
 
 type SetupStarted struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	Off                 bool                   `protobuf:"varint,1,opt,name=off,proto3" json:"off,omitempty"`                                                              // no endpoint, in code or OTEL_OPAMP_ENDPOINT: the integration is off, and nothing else is set
-	Endpoint            string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                                                     // with a scheme (http:// added, with a warning, where it had none)
-	Headers             []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`                                                       // those the core's header rule takes; the rest left out, with a warning
-	HeartbeatIntervalMs uint64                 `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"` // 0: the client's default; at most a day
-	StateDir            string                 `protobuf:"bytes,5,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"`                                     // a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The integration is off: it starts no OpAMP client, and nothing else is set but off_reason.
+	// Either OTEL_OPAMP_DISABLED or OTEL_SDK_DISABLED is true (or neither true nor false: it fails
+	// closed), whatever the code gives, or there is no endpoint, in code or OTEL_OPAMP_ENDPOINT.
+	Off bool `protobuf:"varint,1,opt,name=off,proto3" json:"off,omitempty"`
+	// With off: the line to say (at WARN, once) that OpAMP is off and which variable turned it off;
+	// empty when it is off for want of an endpoint (not configured: nothing to say).
+	OffReason           string    `protobuf:"bytes,12,opt,name=off_reason,json=offReason,proto3" json:"off_reason,omitempty"`
+	Endpoint            string    `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                                                     // with a scheme (http:// added, with a warning, where it had none)
+	Headers             []*Header `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`                                                       // those the core's header rule takes; the rest left out, with a warning
+	HeartbeatIntervalMs uint64    `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"` // 0: the client's default; at most a day
+	StateDir            string    `protobuf:"bytes,5,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"`                                     // a state directory named (OTEL_OPAMP_STATE_DIR, or in code); empty: see default_slots
 	// No state directory named, and none turned off: the default one's slots, in order. The
 	// integration takes the first it can make (readable by the user only, with its parents) and
 	// whose `lock` file it can lock, and keeps the lock while it runs. None it can have, or this
@@ -4500,6 +4508,13 @@ func (x *SetupStarted) GetOff() bool {
 		return x.Off
 	}
 	return false
+}
+
+func (x *SetupStarted) GetOffReason() string {
+	if x != nil {
+		return x.OffReason
+	}
+	return ""
 }
 
 func (x *SetupStarted) GetEndpoint() string {
@@ -5123,9 +5138,11 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\t_endpointB\f\n" +
 	"\n" +
 	"_state_dirB\x0f\n" +
-	"\r_heartbeat_ms\"\x99\x03\n" +
+	"\r_heartbeat_ms\"\xb8\x03\n" +
 	"\fSetupStarted\x12\x10\n" +
-	"\x03off\x18\x01 \x01(\bR\x03off\x12\x1a\n" +
+	"\x03off\x18\x01 \x01(\bR\x03off\x12\x1d\n" +
+	"\n" +
+	"off_reason\x18\f \x01(\tR\toffReason\x12\x1a\n" +
 	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12/\n" +
 	"\aheaders\x18\x03 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\x122\n" +
 	"\x15heartbeat_interval_ms\x18\x04 \x01(\x04R\x13heartbeatIntervalMs\x12\x1b\n" +

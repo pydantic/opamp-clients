@@ -688,8 +688,9 @@ class SetupInCode(_message.Message):
     def __init__(self, endpoint: _Optional[str] = ..., headers_given: bool = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., state_dir: _Optional[str] = ..., heartbeat_ms: _Optional[int] = ..., endpoint_name: _Optional[str] = ..., headers_name: _Optional[str] = ..., heartbeat_name: _Optional[str] = ...) -> None: ...
 
 class SetupStarted(_message.Message):
-    __slots__ = ("off", "endpoint", "headers", "heartbeat_interval_ms", "state_dir", "default_slots", "all_slots_taken", "service", "shown_endpoint", "hints", "warnings")
+    __slots__ = ("off", "off_reason", "endpoint", "headers", "heartbeat_interval_ms", "state_dir", "default_slots", "all_slots_taken", "service", "shown_endpoint", "hints", "warnings")
     OFF_FIELD_NUMBER: _ClassVar[int]
+    OFF_REASON_FIELD_NUMBER: _ClassVar[int]
     ENDPOINT_FIELD_NUMBER: _ClassVar[int]
     HEADERS_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
@@ -701,6 +702,7 @@ class SetupStarted(_message.Message):
     HINTS_FIELD_NUMBER: _ClassVar[int]
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
     off: bool
+    off_reason: str
     endpoint: str
     headers: _containers.RepeatedCompositeFieldContainer[Header]
     heartbeat_interval_ms: int
@@ -711,7 +713,7 @@ class SetupStarted(_message.Message):
     shown_endpoint: str
     hints: SetupHints
     warnings: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, off: bool = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., heartbeat_interval_ms: _Optional[int] = ..., state_dir: _Optional[str] = ..., default_slots: _Optional[_Iterable[str]] = ..., all_slots_taken: _Optional[str] = ..., service: _Optional[str] = ..., shown_endpoint: _Optional[str] = ..., hints: _Optional[_Union[SetupHints, _Mapping]] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
+    def __init__(self, off: bool = ..., off_reason: _Optional[str] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., heartbeat_interval_ms: _Optional[int] = ..., state_dir: _Optional[str] = ..., default_slots: _Optional[_Iterable[str]] = ..., all_slots_taken: _Optional[str] = ..., service: _Optional[str] = ..., shown_endpoint: _Optional[str] = ..., hints: _Optional[_Union[SetupHints, _Mapping]] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class SetupHints(_message.Message):
     __slots__ = ("refused", "not_found", "unreachable", "error")
