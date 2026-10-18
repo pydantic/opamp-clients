@@ -176,3 +176,56 @@ func TestConnectionUpdateRetriesFailedCollectorStart(t *testing.T) {
 		return observed.FilterMessage(commander.AgentStartedLogMsg).Len() == 1
 	}, 8*time.Second, 10*time.Millisecond)
 }
+
+func TestConnectionUpdateRestartsConfigApplyWindow(t *testing.T) {
+	s := newComposeMergedConfigTestSupervisor(t, os.Args[0], false)
+	metrics, err := telemetry.NewMetrics(metricnoop.NewMeterProvider())
+	require.NoError(t, err)
+	s.metrics = metrics
+	s.config.Agent.ConfigApplyTimeout = 3 * time.Second
+	s.doneChan = make(chan struct{})
+	s.connectionUpdates = make(chan connectionUpdate, 1)
+	failed := make(chan *protobufs.RemoteConfigStatus, 1)
+	s.opampClient = &mockOpAMPClient{
+		setHealthFunc: func(*protobufs.ComponentHealth) {},
+		setRemoteConfigStatusFunc: func(status *protobufs.RemoteConfigStatus) error {
+			if status.Status == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED {
+				failed <- status
+			}
+			return nil
+		},
+	}
+	_, err = s.composeMergedConfig(nil)
+	require.NoError(t, err)
+	core, observed := observer.New(zap.DebugLevel)
+	agent := s.config.Agent
+	agent.Env = map[string]string{supervisorRestartHelperEnv: "sleep"}
+	s.commander, err = commander.NewCommander(zap.New(core), filepath.Join(t.TempDir(), "collector.log"), agent)
+	require.NoError(t, err)
+	stopped := make(chan struct{})
+	go func() { defer close(stopped); s.runAgentProcess() }()
+	t.Cleanup(func() {
+		close(s.doneChan)
+		select {
+		case <-stopped:
+		case <-time.After(15 * time.Second):
+			t.Error("the Collector loop did not stop")
+		}
+	})
+	s.hasNewConfig <- struct{}{}
+	require.Eventually(t, func() bool { return observed.FilterMessage(commander.AgentStartedLogMsg).Len() == 1 }, time.Second, time.Millisecond)
+	time.Sleep(2 * time.Second)
+	s.connectionUpdates <- connectionUpdate{hash: []byte("credential-update")}
+	require.Eventually(t, func() bool { return observed.FilterMessage(commander.AgentStartedLogMsg).Len() == 2 }, time.Second, time.Millisecond)
+	select {
+	case status := <-failed:
+		t.Fatalf("the intentional restart inherited the old deadline: %v", status)
+	case <-time.After(1500 * time.Millisecond):
+	}
+	select {
+	case status := <-failed:
+		require.Equal(t, "Config apply timeout exceeded", status.ErrorMessage)
+	case <-time.After(3 * time.Second):
+		t.Fatal("the restarted unhealthy Collector lost its config deadline")
+	}
+}

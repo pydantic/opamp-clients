@@ -2104,8 +2104,20 @@ func (s *Supervisor) runAgentProcess() {
 	for {
 		select {
 		case update := <-s.connectionUpdates:
+			applying := configApplyTimeoutTimer.Stop()
+			if !applying {
+				select {
+				case <-configApplyTimeoutTimer.C:
+					applying = true
+				default:
+				}
+			}
 			s.stopAgentApplyConfig()
 			_, err := s.startAgent()
+			if applying {
+				// A credential restart gives the current config a full application window.
+				configApplyTimeoutTimer.Reset(s.config.Agent.ConfigApplyTimeout)
+			}
 			if err != nil {
 				restartTimer.Reset(5 * time.Second)
 			}
