@@ -2260,11 +2260,12 @@ func (s *Supervisor) runAgentProcess() {
 			startedEnv = nil
 			applying := stopApplyTimer()
 			s.stopAgentApplyConfig()
+			since := s.agentConn.count()
 			_, err := s.startAgent()
 			if applying {
 				// A credential restart gives the current config a full application window,
 				// on the new collector's health.
-				apply.since = s.agentConn.count()
+				apply.since = since
 				configApplyTimeoutTimer.Reset(s.config.Agent.ConfigApplyTimeout)
 			}
 			if err != nil {
@@ -2414,6 +2415,7 @@ func (s *Supervisor) runAgentProcess() {
 
 		case <-restartTimer.C:
 			s.telemetrySettings.Logger.Debug("Agent starting after start backoff")
+			since := s.agentConn.count()
 			status, err := s.startAgent()
 			switch {
 			case err != nil:
@@ -2423,7 +2425,7 @@ func (s *Supervisor) runAgentProcess() {
 				// Changed here: the config the collector failed on gets another apply window
 				// with this start, and is APPLIED if it is healthy at its end.
 				openApplyWindow()
-				apply.since, apply.retry = s.agentConn.count(), true
+				apply.since, apply.retry = since, true
 			}
 
 		case <-configApplyTimeoutTimer.C:
