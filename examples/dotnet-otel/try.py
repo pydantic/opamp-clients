@@ -114,7 +114,9 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         app = subprocess.Popen(["./instrument.sh", "dotnet", "App.dll", f"{telemetry}/ping"], cwd=OUT,
                                env=os.environ | env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=stderr)
         return lambda: stop_group(app)
-    container = f"opamp-dotnet-otel-{name}-{int(time.time())}"
+    # By this process too: two runs of one check started in the same second (one per transport,
+    # side by side) would otherwise both ask for the same name.
+    container = f"opamp-dotnet-otel-{name}-{os.getpid()}-{int(time.time())}"
     cmd = ["docker", "run", "--rm", "--name", container, "--add-host=host.docker.internal:host-gateway",
            "-v", f"{OUT}:/app:ro", "-v", f"{state}:/state", "-w", "/app"]
     if listen := env.pop("APP_PORT", None):
