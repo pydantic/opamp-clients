@@ -19,6 +19,7 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                              [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
+  --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
   --token-file PATH        where to read the enrollment token (default: standard input)
   --ca-file PATH           a CA bundle to trust for the server, in place of the system's
   --plaintext              allow ws:// or http:// (the token then crosses the network in the clear)
@@ -76,10 +77,12 @@ ca_file=
 plaintext=
 accept_packages=
 start=yes
+telemetry_stdin=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
+	--telemetry-token-stdin) telemetry_stdin=yes; shift ;;
 	--ca-file) [ $# -ge 2 ] || usage; ca_file=$2; shift 2 ;;
 	--plaintext) plaintext=yes; shift ;;
 	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
@@ -144,7 +147,18 @@ IFS=$old_ifs
 set +f
 [ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
 
-if [ "$token_file" = - ]; then
+telemetry_token=
+if [ -n "$telemetry_stdin" ]; then
+	[ "$token_file" = - ] || fail "--telemetry-token-stdin cannot be combined with --token-file"
+	IFS= read -r token || fail "provide an enrollment token on the first input line"
+	IFS= read -r telemetry_token || fail "provide a telemetry token on the second input line"
+	[ -z "$(cat)" ] || fail "provide exactly two credential lines"
+	telemetry_token=$(printf '%s' "$telemetry_token" | tr -d '\r')
+	[ -n "$telemetry_token" ] || fail "the telemetry token is empty"
+	case $telemetry_token in
+	*[!A-Za-z0-9._~+/=-]*) fail "the telemetry token has characters a bearer token cannot contain" ;;
+	esac
+elif [ "$token_file" = - ]; then
 	token=$(cat)
 else
 	token=$(cat -- "$token_file")
@@ -163,6 +177,23 @@ chmod 0750 "$etc"
 printf '%s' "$token" | "$creds" encrypt --name=opamp-enroll-token - "$etc/enroll-token.cred.tmp"
 chmod 0600 "$etc/enroll-token.cred.tmp"
 mv -f "$etc/enroll-token.cred.tmp" "$etc/enroll-token.cred"
+
+if [ -n "$telemetry_stdin" ]; then
+	printf '%s' "$telemetry_token" | "$creds" encrypt --name=opamp-telemetry-token - "$etc/telemetry-token.cred.tmp"
+	chmod 0600 "$etc/telemetry-token.cred.tmp"
+	mv -f "$etc/telemetry-token.cred.tmp" "$etc/telemetry-token.cred"
+	dropin=$root/etc/systemd/system/$unit.d
+	mkdir -p "$dropin"
+	printf '[Service]\nLoadCredentialEncrypted=opamp-telemetry-token:/etc/pydantic-opamp/telemetry-token.cred\n' >"$dropin/telemetry.conf"
+	"$systemctl" daemon-reload
+fi
+
+agent_env=
+if [ -f "$etc/telemetry-token.cred" ]; then
+	agent_env="  env:
+    LOGFIRE_TOKEN: \"\${file:/run/credentials/$unit/opamp-telemetry-token}\"
+"
+fi
 
 if [ ! -e "$etc/state-key.cred" ]; then
 	# A new key can't open a state file sealed with the old one, so it is made only once.
@@ -219,6 +250,7 @@ capabilities:
 
 agent:
   executable: /usr/lib/pydantic-opamp/otelcol
+$agent_env
 
   # What the server's remote config may do to this host. The server can't change this file;
   # widen it here, or run pydantic-opamp-enroll again with --exporter-endpoint or --log-path.

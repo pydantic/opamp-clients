@@ -95,6 +95,25 @@ Other options:
 - `--log-path PATH` lets the server's configs read the logs in a file or a directory (repeat it
   for more). The default is none.
 
+### Telemetry credentials for managed Collectors
+
+The enrollment helpers can supply a separate telemetry token to a managed
+Collector. This support is unreleased. Pass `--telemetry-token-stdin` on Linux
+or macOS, or `-TelemetryTokenStdin` on Windows. Standard input must contain the
+enrollment token on the first line and the telemetry token on the second line.
+Terminate both lines with a newline. Do not put either token in arguments.
+
+The Supervisor supplies `LOGFIRE_TOKEN` to its child Collector. A remote policy
+can use `${env:LOGFIRE_TOKEN}` in an exporter header. The Supervisor configuration
+contains only file references. Linux seals the telemetry token with
+`systemd-creds` and loads it through a service drop-in. macOS and Windows store
+it in the same private directory as the enrollment token. Both credentials
+remain available after a service restart.
+
+Without this option, the helper keeps any existing telemetry token. To rotate
+the telemetry token, run the helper with this option and both credentials again.
+`--token-file` cannot be combined with the two-token input mode.
+
 ### Unmanaged
 
 The package can also run its collector on its own, with no OpAMP server, from a config you give
