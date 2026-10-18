@@ -51,7 +51,7 @@ agent:
   server may issue new OpAMP connection settings (per-agent credentials replacing an enrollment
   token, say). The core tries them, keeps them only once the server has accepted a connection
   with them, goes back to the old ones otherwise, and keeps them in
-  `<storage.directory>/opamp-client.state` (0600), so a restarted Supervisor connects with the
+  `<storage.directory>/opamp-state` (0600), so a restarted Supervisor connects with the
   issued credentials, not the ones in its config
   ([docs/connection-settings.md](../../docs/connection-settings.md)). Upstream's kept them in
   memory only, and "verified" them by restarting its client. The state file also keeps the
@@ -270,7 +270,7 @@ By default, the supervisor will use `/var/lib/otelcol/supervisor` on posix syste
 
 This directory will be created on supervisor startup if it does not exist.
 
-(Changed here: it also holds `opamp-client.state`, the OpAMP client's state, with any connection
+(Changed here: it also holds `opamp-state`, the OpAMP client's state, with any connection
 settings the server issued. It is written readable by the Supervisor's user only, and sealed with
 `storage.state_key` if set.)
 

@@ -67,7 +67,7 @@ systemd decrypts both credentials for the service alone, into
 
 Once the server issues the agent its own credentials, the Supervisor uses them from then on:
 - it verifies them by a connection the server accepts;
-- it keeps them sealed in `/var/lib/pydantic-opamp/opamp-client.state`;
+- it keeps them sealed in `/var/lib/pydantic-opamp/opamp-state`;
 - it uses them after every restart.
 
 The enrollment token in the config is then only a fallback.

@@ -130,7 +130,7 @@ func TestInstallEnrollRestart(t *testing.T) {
 	}, 30*time.Second, 200*time.Millisecond)
 	stop()
 
-	state, err := os.ReadFile(filepath.Join(storage, "opamp-client.state"))
+	state, err := os.ReadFile(filepath.Join(storage, "opamp-state"))
 	require.NoError(t, err)
 	assert.True(t, bytes.HasPrefix(state, []byte("OPAMPSK1")), "the state file is sealed")
 	assert.NotContains(t, string(state), "issued-token")
