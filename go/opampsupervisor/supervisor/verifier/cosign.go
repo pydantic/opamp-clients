@@ -141,7 +141,9 @@ func (v *cosignVerifier) Verify(ctx context.Context, packageBytes, signature []b
 	if err != nil {
 		return err
 	}
-	verifier, err := verify.NewVerifier(trusted, verify.WithTransparencyLog(1), verify.WithIntegratedTimestamps(1))
+	// When it was signed: Rekor's integrated time, or a timestamp authority's, which a bundle
+	// logged in Rekor v2 (which has no integrated time) carries instead.
+	verifier, err := verify.NewVerifier(trusted, verify.WithTransparencyLog(1), verify.WithObserverTimestamps(1))
 	if err != nil {
 		return err
 	}

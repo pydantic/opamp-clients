@@ -26,6 +26,9 @@ param(
     [string[]]$ExporterEndpoint,
     # The files, and directories, the server's configs may read logs from: none by default.
     [string[]]$LogPath,
+    # Install the collector the server offers, if this repository's release workflow signed it;
+    # by default only the installed collector runs.
+    [switch]$AcceptPackages,
     # Write the config and the token, but don't start the service.
     [switch]$NoStart,
     # Takes the token's lines when they're piped in, read below from $input. PowerShell pipes
@@ -113,6 +116,27 @@ $tokenPath = Join-Path $root 'enroll-token'
 Write-Atomically $tokenPath $token
 # A YAML flow sequence of single-quoted strings (none holds a quote); [] for none.
 function YamlList([string[]]$items) { '[' + ((@($items) | Where-Object { $_ } | ForEach-Object { "'$_'" }) -join ', ') + ']' }
+# The collector executables the server offers are installed if this repository's release workflow
+# signed them (PydanticCosignVerifier in supervisor/config/agent_package.go). A literal here-string:
+# the subject regex is written as it is.
+$acceptsPackages = if ($AcceptPackages) { "`n  accepts_packages: true" } else { '' }
+$package = if ($AcceptPackages) {
+    "`n" + @'
+
+  # The collector the OpAMP server offers is installed if this repository's release workflow
+  # signed it, and runs while the server offers it; this one runs again when it stops. The
+  # server can't change whose signatures are accepted.
+  package:
+    agent_binary: otelcol.exe
+    verifier:
+      type: cosign
+      cosign:
+        github_workflow_repository: pydantic/opamp-clients
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subject_regex: '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@refs/(tags/go/opampsupervisor/v[0-9]+\.[0-9]+\.[0-9]+|heads/main)$'
+'@
+} else { '' }
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
 Write-Atomically (Join-Path $root 'supervisor.yaml') @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
@@ -128,7 +152,7 @@ capabilities:
   accepts_opamp_connection_settings: true
   reports_effective_config: true
   reports_health: true
-  reports_available_components: true
+  reports_available_components: true$acceptsPackages
 
 agent:
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
@@ -147,7 +171,7 @@ agent:
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
     # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))
+    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))$package
 
 storage:
   directory: '$(Slashed (Join-Path $root 'var'))'

@@ -32,12 +32,14 @@ const defaultUpdateHealthTimeout = 30 * time.Second
 // runCheckTimeout bounds running a new executable's featuregate command before it is installed.
 const runCheckTimeout = 30 * time.Second
 
-// agentInstall is the core's request to install a package, answered with done (nil: installed).
+// agentInstall is the core's request to install a package, answered with done (nil: installed),
+// or with remove to remove the collector the server installed.
 type agentInstall struct {
-	name string
-	pkg  *protobufs.PackageAvailable
-	path string
-	done func(error)
+	name   string
+	pkg    *protobufs.PackageAvailable
+	path   string
+	remove bool
+	done   func(error)
 }
 
 // installedAgentPath is the installed executable; previousAgentPath holds the one it replaced
@@ -49,13 +51,28 @@ func (s *Supervisor) installedAgentPath() string {
 func (s *Supervisor) previousAgentPath() string { return s.installedAgentPath() + ".previous" }
 func (s *Supervisor) stagedAgentPath() string   { return s.installedAgentPath() + ".new" }
 
+// packagedStampPath records the packaged collector as it was when the installed one went in, so
+// that a start can tell its operator the package manager changed it since.
+func (s *Supervisor) packagedStampPath() string { return s.installedAgentPath() + ".packaged" }
+
+// packagedStamp is the packaged collector's size and modification time; "" if it can't be read.
+func (s *Supervisor) packagedStamp() string {
+	info, err := os.Stat(s.packagedAgent)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%d %d", info.Size(), info.ModTime().UnixNano())
+}
+
 // useInstalledAgent runs the executable an earlier update installed, if any, in place of the
-// configured one. An update interrupted between moving the installed executable aside and
-// putting the new one in its place is undone: the one moved aside goes back.
+// configured one: while the server offers a collector, it decides which one runs, and the
+// configured one is the fallback. An update interrupted between moving the installed executable
+// aside and putting the new one in its place is undone: the one moved aside goes back.
 func (s *Supervisor) useInstalledAgent() {
 	if !s.config.Capabilities.AcceptsPackages {
 		return
 	}
+	s.packagedAgent = s.config.Agent.Executable
 	_ = os.Remove(s.stagedAgentPath())
 	installed := s.installedAgentPath()
 	if _, err := os.Stat(installed); errors.Is(err, os.ErrNotExist) {
@@ -65,6 +82,11 @@ func (s *Supervisor) useInstalledAgent() {
 	}
 	if _, err := os.Stat(installed); err == nil {
 		s.telemetrySettings.Logger.Info("Running the collector executable the OpAMP server installed", zap.String("executable", installed))
+		if stamp, err := os.ReadFile(s.packagedStampPath()); err == nil && string(stamp) != s.packagedStamp() {
+			s.telemetrySettings.Logger.Warn("The configured collector executable changed since the OpAMP server installed one; "+
+				"the server's runs until it stops offering it",
+				zap.String("configured", s.packagedAgent), zap.String("installed", installed))
+		}
 		s.config.Agent.Executable = installed
 	}
 }
@@ -108,8 +130,11 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 	}
 
 	format := archive.FormatNone
-	if bytes.HasPrefix(content, []byte{0x1f, 0x8b}) {
+	switch {
+	case bytes.HasPrefix(content, []byte{0x1f, 0x8b}):
 		format = archive.FormatTarGzip
+	case bytes.HasPrefix(content, []byte("PK\x03\x04")):
+		format = archive.FormatZip
 	}
 	extractor, err := archive.NewExtractor(format)
 	if err != nil {
@@ -150,8 +175,37 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 		return errors.Join(err, s.revertAgentUpdate(running, replaced, logger))
 	}
 	_ = os.Remove(s.previousAgentPath())
+	if err := os.WriteFile(s.packagedStampPath(), []byte(s.packagedStamp()), 0o600); err != nil {
+		logger.Warn("Could not record the configured collector executable", zap.Error(err))
+	}
 	logger.Info("Installed the new collector executable")
 	return nil
+}
+
+// removeAgentPackage goes back to the configured collector when the server stops offering one:
+// the installed executable is deleted, and if it was running, the configured one is started in
+// its place. Nothing to remove, or a configured collector that won't start, is logged: the
+// installed one is gone either way, so the core is told it is removed.
+func (s *Supervisor) removeAgentPackage() {
+	installed := s.installedAgentPath()
+	logger := s.telemetrySettings.Logger.With(zap.String("executable", s.packagedAgent))
+	running := s.commander.Executable() == installed
+	if running {
+		logger.Info("The OpAMP server no longer offers a collector: going back to the configured one")
+		if err := s.commander.Stop(s.runCtx); err != nil {
+			logger.Error("Could not stop the installed collector", zap.Error(err))
+		}
+		s.drainAgentExit()
+	}
+	for _, p := range []string{installed, s.previousAgentPath(), s.packagedStampPath()} {
+		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
+			logger.Error("Could not delete the installed collector", zap.String("path", p), zap.Error(err))
+		}
+	}
+	if running {
+		s.commander.SetExecutable(s.packagedAgent)
+		_ = s.restartAgentAfterUpdate(logger)
+	}
 }
 
 // checkAgentRuns runs a new executable's featuregate command, which the Supervisor runs at each

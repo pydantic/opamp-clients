@@ -18,7 +18,8 @@ set -eu
 usage() {
 	cat >&2 <<'USAGE'
 usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
-                             [--exporter-endpoint URL]... [--log-path PATH]... [--no-start]
+                             [--exporter-endpoint URL]... [--log-path PATH]... [--accept-packages]
+                             [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
   --token-file PATH        where to read the enrollment token (default: standard input)
@@ -28,6 +29,8 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                            repeat it for more (default: the --endpoint's host, over https)
   --log-path PATH          a file, or a directory, the server's configs may read logs from;
                            repeat it for more (default: none)
+  --accept-packages        install the collector the server offers, if this repository's release
+                           workflow signed it (default: only the installed collector runs)
   --no-start               write the config and the token, but don't start the Supervisor
 USAGE
 	exit 2
@@ -74,6 +77,7 @@ log_paths=
 token_file=-
 ca_file=
 plaintext=
+accept_packages=
 start=yes
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -83,6 +87,7 @@ while [ $# -gt 0 ]; do
 	--plaintext) plaintext=yes; shift ;;
 	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
 	--log-path) [ $# -ge 2 ] || usage; log_paths=$(append "$log_paths" "$2"); shift 2 ;;
+	--accept-packages) accept_packages=yes; shift ;;
 	--no-start) start=; shift ;;
 	*) usage ;;
 	esac
@@ -167,6 +172,30 @@ if [ -n "$ca_file" ]; then
     ca_file: \"$ca_file\"
 "
 fi
+accepts_packages=
+package=
+if [ -n "$accept_packages" ]; then
+	# The collector executables the server offers are installed if this repository's release
+	# workflow signed them (PydanticCosignVerifier in supervisor/config/agent_package.go).
+	accepts_packages="$nl  accepts_packages: true"
+	package=$nl$(
+		cat <<'PACKAGE'
+
+  # The collector the OpAMP server offers is installed if this repository's release workflow
+  # signed it, and runs while the server offers it; this one runs again when it stops. The
+  # server can't change whose signatures are accepted.
+  package:
+    agent_binary: otelcol
+    verifier:
+      type: cosign
+      cosign:
+        github_workflow_repository: pydantic/opamp-clients
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subject_regex: '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@refs/(tags/go/opampsupervisor/v[0-9]+\.[0-9]+\.[0-9]+|heads/main)$'
+PACKAGE
+	)
+fi
 cat >"$etc/supervisor.yaml.tmp" <<CONFIG
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
 server:
@@ -181,7 +210,7 @@ capabilities:
   accepts_opamp_connection_settings: true
   reports_effective_config: true
   reports_health: true
-  reports_available_components: true
+  reports_available_components: true$accepts_packages
 
 agent:
   executable: /opt/pydantic-opamp/bin/otelcol
@@ -200,7 +229,7 @@ agent:
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
     # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(yaml_list "$log_paths")
+    allowed_log_paths: $(yaml_list "$log_paths")$package
 
 storage:
   directory: /opt/pydantic-opamp/var

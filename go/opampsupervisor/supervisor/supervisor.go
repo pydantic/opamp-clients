@@ -7,7 +7,8 @@
 // onOpampConnectionSettings and its in-memory credentials are gone. A start that can't write the
 // Collector's config fails instead of running it on a stale one, and a rollback that can't be
 // written leaves the config state as it was. The collector executables the server offers are
-// installed, with a rollback if the new one isn't healthy (agent_update.go). A remote config
+// installed, with a rollback if the new one isn't healthy, and removed when no longer offered
+// (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
 // the start says the remote config is unrestricted. The files holding what the server sent are
 // sealed with storage.state_key (sealed_storage.go). The Supervisor's own telemetry ignores
@@ -205,9 +206,12 @@ type Supervisor struct {
 	storageSealer opamp.StateSealer
 
 	// packageVerifier checks the signature of a collector executable the server offers, and
-	// agentInstalls takes each to the agent loop, which installs it (agent_update.go).
+	// agentInstalls takes each to the agent loop, which installs it, or removes the one installed
+	// (agent_update.go). packagedAgent is agent.executable as configured: the collector run when
+	// the server has installed none.
 	packageVerifier verifier.Verifier
 	agentInstalls   chan agentInstall
+	packagedAgent   string
 
 	doneChan chan struct{}
 	agentWG  sync.WaitGroup
@@ -1997,11 +2001,15 @@ func (s *Supervisor) runAgentProcess() {
 		case req := <-s.agentInstalls:
 			// Changed here: the update stops and starts the collector itself. A restart still
 			// pending stays so: after an update it finds the collector running.
-			err := s.installAgentPackage(req)
-			if err != nil {
+			if req.remove {
+				s.removeAgentPackage()
+				req.done(nil)
+			} else if err := s.installAgentPackage(req); err != nil {
 				s.telemetrySettings.Logger.Error("Could not install the collector the OpAMP server offered", zap.Error(err))
+				req.done(err)
+			} else {
+				req.done(nil)
 			}
-			req.done(err)
 		case <-s.hasNewConfig:
 			s.lastHealthFromClient.Store(nil)
 			s.telemetrySettings.Logger.Debug("agent has new config", zap.String("previous_health", s.lastHealthFromClient.Load().String()))

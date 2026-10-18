@@ -192,7 +192,8 @@ agent:
 
   # Optional configuration for how collector executable updates are identified
   # and verified. The archive format is not configured here: in this fork a file
-  # that starts as gzip does is a .tar.gz, anything else the executable itself.
+  # that starts as gzip does is a .tar.gz, one that starts as zip does a .zip,
+  # anything else the executable itself.
   package:
     # Name of the collector binary as it appears inside the archive the supervisor
     # downloads. Used to locate the binary in archives that bundle multiple files.
@@ -668,6 +669,9 @@ is updated).
 > both the AcceptsPackages and ReportsPackageStatuses OpAMP capabilities) installs the
 > collector the server offers, as the
 > [Collector Executable Updates Flow](#collector-executable-updates-flow) section describes.
+> While the server offers a collector, the installed one runs in place of `agent.executable`.
+> When the server stops offering it (a PackagesAvailable without the package named ""), the
+> Supervisor deletes the installed one and runs `agent.executable` again.
 
 More detail on the specific format and end-to-end flow can
 be found in the [Collector Executable Updates Flow](#collector-executable-updates-flow)
@@ -819,7 +823,7 @@ This configuration and the upgrade behavior is only used when the `accepts_packa
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `agent.package.agent_binary` | string | `"otelcol-contrib"` (Linux/macOS), `"otelcol-contrib.exe"` (Windows) | Name of the collector binary as it appears inside the archive the supervisor downloads. Used to locate the binary in archives that bundle multiple files. The archive format itself is detected from the file (gzip: a .tar.gz; anything else: the executable), not configured. |
+| `agent.package.agent_binary` | string | `"otelcol-contrib"` (Linux/macOS), `"otelcol-contrib.exe"` (Windows) | Name of the collector binary as it appears inside the archive the supervisor downloads. Used to locate the binary in archives that bundle multiple files. In this fork the binary may also sit in the archive's one top directory, and must be a regular file. The archive format itself is detected from the file (gzip: a .tar.gz; zip: a .zip; anything else: the executable), not configured. |
 | `agent.package.verifier.type` | string | `"cosign"` | Specifies which verification type should be used. |
 | `agent.package.health_timeout` | duration | `30s` | How long a new collector has to report healthy before the previous one is put back. Added in this fork. |
 

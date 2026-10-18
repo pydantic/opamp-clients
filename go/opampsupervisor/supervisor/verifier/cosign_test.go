@@ -4,6 +4,7 @@
 package verifier
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,6 +14,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -224,4 +227,41 @@ func TestCosignReadsTheSignatureBeforeFetchingAnything(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorContains(t, v.Verify(t.Context(), []byte("pkg"), []byte("nope")), "joined by a space")
 	require.ErrorContains(t, v.Verify(t.Context(), []byte("pkg"), []byte("{")), "isn't a Sigstore bundle")
+}
+
+// realBundle is a file Cosign v3.1.3's release signed on the public Sigstore instance with
+// `cosign sign-blob --bundle`, as our release workflow signs each archive, and the trusted root
+// it verifies against (from Sigstore's TUF repository).
+func realBundle(t *testing.T) (pkg, bundle []byte, trusted TrustedMaterialFunc) {
+	t.Helper()
+	dir := filepath.Join("testdata", "cosign-v3.1.3")
+	pkg, err := os.ReadFile(filepath.Join(dir, "cosign_checksums.txt"))
+	require.NoError(t, err)
+	bundle, err = os.ReadFile(filepath.Join(dir, "cosign_checksums.txt.sigstore.json"))
+	require.NoError(t, err)
+	tr, err := root.NewTrustedRootFromPath(filepath.Join(dir, "trusted_root.json"))
+	require.NoError(t, err)
+	return pkg, bundle, func(context.Context) (root.TrustedMaterial, error) { return tr, nil }
+}
+
+func noLookup(context.Context, []byte) ([]*tlog.Entry, error) {
+	return nil, errors.New("a bundle carries its log entry")
+}
+
+// What `cosign sign-blob --bundle` writes verifies, with no network: the bundle carries its
+// Rekor entry.
+func TestCosignAcceptsABundleCosignWrote(t *testing.T) {
+	pkg, bundle, trusted := realBundle(t)
+	signer := config.CosignVerifier{Identities: []config.CosignIdentity{{
+		Issuer: "https://accounts.google.com", Subject: "keyless@projectsigstore.iam.gserviceaccount.com",
+	}}}
+	v, err := NewCosignVerifier(signer, trusted, noLookup)
+	require.NoError(t, err)
+	require.NoError(t, v.Verify(t.Context(), pkg, bundle))
+	require.ErrorContains(t, v.Verify(t.Context(), append(bytes.Clone(pkg), '\n'), bundle), "doesn't verify", "another file")
+
+	// Our release workflow's identity doesn't accept Cosign's signer.
+	ours, err := NewCosignVerifier(config.PydanticCosignVerifier(), trusted, noLookup)
+	require.NoError(t, err)
+	require.ErrorContains(t, ours.Verify(t.Context(), pkg, bundle), "doesn't verify")
 }
