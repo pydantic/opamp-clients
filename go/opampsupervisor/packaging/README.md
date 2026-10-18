@@ -268,6 +268,10 @@ collector keeps the config it had.
 What each rule checks in a remote config:
 - **Components.** Each receiver, processor, exporter, connector and extension must have a type
   in the list. A kind that isn't listed allows none.
+  The Windows event log and macOS unified log receivers and the `file_storage` extension
+  are not in the default list. They read the host's system logs and write files where they're
+  configured, so a server's config can't turn them on. Use them in the local config, or add
+  them to `allowed_components` on the host.
 - **Providers.** Every `${...}` reference is refused, in values and in keys. `$${...}` is a
   literal `$` and is allowed. The local config still uses providers: the enrollment token is
   `${file:...}`.
