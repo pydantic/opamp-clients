@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -119,6 +120,7 @@ func TestInstallEnrollRestart(t *testing.T) {
 	}
 
 	install(t)
+	validateHostLogs(t, "")
 	srv := newIssuingServer(t)
 	enroll(t, srv.endpoint)
 
@@ -146,4 +148,38 @@ func TestInstallEnrollRestart(t *testing.T) {
 	}, 30*time.Second, 200*time.Millisecond)
 	auths, _ := srv.seen()
 	assert.NotContains(t, auths, "Bearer enroll-token")
+}
+
+func TestInstallBuiltCollectorHostLogs(t *testing.T) {
+	binary := "otelcol"
+	if runtime.GOOS == "windows" {
+		binary += ".exe"
+	}
+	validateHostLogs(t, filepath.Join("dist", "otelcol", binary))
+}
+
+func validateHostLogs(t *testing.T, binary string) {
+	t.Helper()
+	collector := "/usr/lib/pydantic-opamp/otelcol"
+	receivers := "filelog:\n    include: [/var/log/*.log]\n    storage: file_storage"
+	logs := "filelog"
+	switch runtime.GOOS {
+	case "darwin":
+		collector = "/opt/pydantic-opamp/bin/otelcol"
+		receivers = "macos_unified_logging:\n    max_log_age: 1m\n    predicate: \"logType == 'error' OR logType == 'fault'\""
+		logs = "macos_unified_logging"
+	case "windows":
+		collector = filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe")
+		receivers = "windows_event_log/application:\n    channel: Application\n    storage: file_storage\n  windows_event_log/system:\n    channel: System\n    storage: file_storage"
+		logs = "windows_event_log/application, windows_event_log/system"
+	}
+	if binary != "" {
+		collector = binary
+	}
+	path := filepath.Join(t.TempDir(), "host.yaml")
+	contents := "extensions:\n  file_storage:\n    create_directory: true\nreceivers:\n  " + receivers +
+		"\n  host_metrics:\n    scrapers:\n      cpu: {}\n      memory: {}\nexporters:\n  nop: {}\nservice:\n  extensions: [file_storage]\n  pipelines:\n    logs:\n      receivers: [" + logs +
+		"]\n      exporters: [nop]\n    metrics:\n      receivers: [host_metrics]\n      exporters: [nop]\n"
+	require.NoError(t, os.WriteFile(path, []byte(contents), 0o600))
+	run(t, "", collector, "validate", "--config", path)
 }
