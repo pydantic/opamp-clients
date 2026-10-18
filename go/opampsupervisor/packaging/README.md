@@ -8,6 +8,15 @@ The installers are a deb and an rpm for Linux, a [.pkg for macOS](#macos), and a
 [.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run.
 The enrollment helper enrolls it with one command.
 
+The bundled Collector includes host metrics, file logs, Windows event logs, macOS unified logs,
+and file storage. Windows event logs and macOS unified logs run on their native operating systems.
+Configure `storage: file_storage` on file and event log receivers to keep their positions across
+restarts. Enable the extension under `service.extensions`. macOS unified logs do not have a saved
+cursor. Bound their startup history with `max_log_age`.
+
+These components are in source for the next package build. Version 0.1.0 does not include the
+Windows and macOS log receivers or the file storage extension.
+
 The release installers are unsigned. The macOS package is not notarized. GitHub build
 provenance and the checksums verify their source and contents, but do not replace platform
 code signing. `SHA256SUMS` covers the archives. `SHA256SUMS.installers` covers the installers.
