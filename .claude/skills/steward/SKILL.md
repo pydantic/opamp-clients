@@ -118,7 +118,7 @@ if not, `python3 scripts/fetch_core.py fetch`.
 | redaction code, `scripts/redact-mutants.toml` | `python3 scripts/redact_mutants.py --check` ("14 mutants, each applies once"); the full run, `python3 scripts/redact_mutants.py`, needs .NET (CI) |
 | `python/` | `cd python && uv run --python 3.13 pytest -q tests/test_sdk_settings.py` (or the files for your area); as CI runs it: all of `tests/test_*.py` in 3 shards, and `uv lock --check` |
 | `python/otel/` | `cd python/otel && uv lock --check && uv run --python 3.13 pytest -q` (506 tests, ~1 min) |
-| `go/opamp/`, `go/statekey/` | `cd go && go vet ./... && go test -count=1 ./opamp/sdk/` (one package, ~1 s once built); CI shards `go test -race -count=1` over every test of the module |
+| `go/opamp/`, `go/statekey/` | `cd go && go vet ./... && go test -count=1 ./opamp/sdksettings/` (one package, ~1 s once built); CI shards `go test -race -count=1` over every test of the module |
 | `go/opampotel/` | `cd go/opampotel && go vet ./... && go test -race ./...` (~1.5 min; its own module) |
 | `go/opampextension/`, `go/opampsupervisor/` | (as CI runs it, Go 1.26) `cd go/opampextension && go vet ./... && go test -race ./...`; `cd go/opampsupervisor && go vet ./... && go vet -tags=e2e . && go test -race ./...`; `python3 scripts/collector_release.py pins` |
 | `node/opamp/` | `cd node/opamp && npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/sdk.test.js` (one file, ~5 s); all: `npm test` (as CI runs it, in 2 shards) |

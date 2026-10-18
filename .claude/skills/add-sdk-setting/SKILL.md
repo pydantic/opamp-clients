@@ -169,7 +169,7 @@ python3 -m unittest examples/test_integrations.py examples/test_settings_cookboo
 (cd python && uv run --python 3.13 pytest -q tests/test_sdk_settings.py)                # 35 tests, <1 s
 (cd python/otel && uv run --python 3.13 pytest -q)                                      # 506 tests, ~1 min
 (cd python/otel && uv run --python 3.13 pytest -q tests/test_concurrency.py)            # torture, ~5 s
-(cd go && go test -count=1 ./opamp/sdk/)
+(cd go && go test -count=1 ./opamp/sdksettings/)
 (cd go/opampotel && go vet ./... && go test -race ./...)                                     # own module, ~1.5 min
 (cd go/opampotel && go test -race -count=1 -run TestSettingsFlippedWhileTelemetryFlows .)
 (cd node/opamp && npm ci --no-audit --no-fund && npm run build)                         # node/otel needs it

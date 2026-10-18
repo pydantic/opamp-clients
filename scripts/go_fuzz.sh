@@ -36,7 +36,7 @@ deadline_race() { # TEST OUTPUT
 out=$(mktemp)
 trap 'rm -f "$out"' EXIT
 failed=()
-for pkg in ./opamp ./opamp/internal/core ./opamp/sdk; do
+for pkg in ./opamp ./opamp/internal/core ./opamp/sdksettings; do
 	tests=$(go test -list '^Fuzz' "$pkg" | grep '^Fuzz' || true)
 	[ -n "$tests" ] || { echo "no fuzz tests in $pkg" >&2; exit 1; }
 	for t in $tests; do
