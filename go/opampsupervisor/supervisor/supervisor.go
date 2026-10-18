@@ -12,7 +12,10 @@
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
 // the start says the remote config is unrestricted. The files holding what the server sent are
 // sealed with storage.state_key (sealed_storage.go). The Supervisor's own telemetry ignores
-// OTEL_EXPORTER_OTLP_* variables (telemetry_env.go).
+// OTEL_EXPORTER_OTLP_* variables (telemetry_env.go). The local OpAMP server and the bootstrap
+// one take the collector only with a token made at each start (localserver.go), and its messages
+// only with the Supervisor's instance UID; a request that never became a connection doesn't keep
+// later collectors out. A Restart command is carried out on the agent loop.
 
 package supervisor
 
@@ -31,6 +34,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -154,7 +158,8 @@ type Supervisor struct {
 	extraTelemetryConfigTemplate *template.Template
 	ownTelemetryTemplate         *template.Template
 
-	agentConn *atomic.Value
+	// agentConn is the collector's connection to the local OpAMP server, while it is connected.
+	agentConn localConnection
 
 	// A config section to be added to the Collector's config to fetch its own telemetry.
 	// TODO: store this persistently so that when starting we can compose the effective
@@ -213,6 +218,10 @@ type Supervisor struct {
 	agentInstalls   chan agentInstall
 	packagedAgent   string
 
+	// restartRequests takes the server's Restart commands to the agent loop, which carries them
+	// out. One pending covers any that come before the loop takes it.
+	restartRequests chan struct{}
+
 	doneChan chan struct{}
 	agentWG  sync.WaitGroup
 
@@ -231,6 +240,10 @@ type Supervisor struct {
 	// The OpAMP server to communicate with the Collector's OpAMP extension
 	opampServer     server.OpAMPServer
 	opampServerPort int
+	// localServerToken is the bearer token the collector's opamp extension sends the local
+	// OpAMP server (and the bootstrap one), new at each Start: it is in the extension config
+	// the Supervisor writes, and nowhere the Supervisor sends or logs.
+	localServerToken string
 
 	// The HTTP server for health check endpoint
 	healthCheckServer   *http.Server
@@ -263,6 +276,7 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 		pidProvider:                    defaultPIDProvider{},
 		hasNewConfig:                   make(chan struct{}, 1),
 		agentInstalls:                  make(chan agentInstall),
+		restartRequests:                make(chan struct{}, 1),
 		agentConfigOwnTelemetrySection: &atomic.Value{},
 		cfgState:                       &atomic.Value{},
 		effectiveConfig:                &atomic.Value{},
@@ -270,7 +284,6 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 		availableComponents:            &atomic.Value{},
 		doneChan:                       make(chan struct{}),
 		customMessageToServer:          make(chan *protobufs.CustomMessage, maxBufferedCustomMessages),
-		agentConn:                      &atomic.Value{},
 		featureGates:                   map[string]struct{}{},
 		agentReady:                     atomic.Bool{},
 		agentReadyChan:                 make(chan struct{}, 1),
@@ -398,6 +411,13 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	var err error
 
 	s.runCtx, s.runCtxCancel = context.WithCancel(ctx)
+
+	// Changed here: the local OpAMP server (and the bootstrap one) takes the collector with this
+	// token only. It had no authentication: anything that could reach it could speak for the
+	// collector.
+	if s.localServerToken, err = newLocalServerToken(); err != nil {
+		return err
+	}
 
 	// Start extensions first for any subsequent actions that use them
 	if len(s.config.Extensions) > 0 {
@@ -576,7 +596,10 @@ func (s *Supervisor) getBootstrapInfo() (err error) {
 	// and available components using the Collector's OpAMP extension.
 	err = srv.Start(flattenedSettings{
 		endpoint: fmt.Sprintf("localhost:%d", s.opampServerPort),
-		onConnecting: func(*http.Request) (bool, int) {
+		onConnecting: func(req *http.Request) (bool, int) {
+			if !s.authorizedLocalRequest(req) {
+				return false, http.StatusUnauthorized
+			}
 			connected.Store(true)
 			return true, http.StatusOK
 		},
@@ -686,16 +709,20 @@ func (s *Supervisor) getBootstrapInfo() (err error) {
 	case err = <-done:
 		if errors.Is(err, errNonMatchingInstanceUID) {
 			// try to report the issue to the OpAMP server
+			// Changed here: the client starts with the unhealthy status (startOpAMPClient
+			// publishes the last reported health), so its first message carries it; set after
+			// the start, it could be lost to the stop right after. And the bootstrap fails
+			// whether or not the report is made: the report's outcome replaced the mismatch, so
+			// a report made let Start go on.
+			s.healthMu.Lock()
+			s.lastReportedHealth = &protobufs.ComponentHealth{Healthy: false, LastError: err.Error()}
+			s.healthMu.Unlock()
 			if startOpAMPErr := s.startOpAMPClient(); startOpAMPErr == nil {
 				defer func(s *Supervisor) {
 					if stopErr := s.stopOpAMPClient(); stopErr != nil {
 						s.telemetrySettings.Logger.Error("Could not stop OpAmp client", zap.Error(stopErr))
 					}
 				}(s)
-				err = s.SetHealth(&protobufs.ComponentHealth{Healthy: false, LastError: err.Error()})
-				if err != nil {
-					s.telemetrySettings.Logger.Error("Could not complete bootstrap", zap.Error(err))
-				}
 			} else {
 				s.telemetrySettings.Logger.Error("Could not start OpAMP client to report health to server", zap.Error(startOpAMPErr))
 			}
@@ -798,7 +825,13 @@ func (s *Supervisor) startOpAMPClient() error {
 		settings.HeaderFunc = headerFunc
 	}
 
-	ad := s.agentDescription.Load().(*protobufs.AgentDescription)
+	// Changed here: without the collector's description (a bootstrap that failed before it came,
+	// reporting why) the client describes the agent with the configured attributes only. It
+	// panicked.
+	ad, ok := s.agentDescription.Load().(*protobufs.AgentDescription)
+	if !ok {
+		ad = s.configuredAgentDescription()
+	}
 	if err := s.opampClient.SetAgentDescription(ad); err != nil {
 		return err
 	}
@@ -918,19 +951,35 @@ func (s *Supervisor) startOpAMPServer() error {
 
 	s.telemetrySettings.Logger.Debug("Starting OpAMP server...")
 
-	connected := &atomic.Bool{}
-
+	// Changed here: one collector at a time, held by its connection from OnConnected to
+	// OnConnectionClose (agentConn). Taken in OnConnecting, a request that never became a
+	// connection (one that failed to decode, a failed upgrade) held it for good, and every
+	// collector connection after it was refused.
 	err = s.opampServer.Start(flattenedSettings{
 		endpoint: fmt.Sprintf("localhost:%d", s.opampServerPort),
-		onConnecting: func(*http.Request) (bool, int) {
-			// Only allow one agent to be connected the this server at a time.
-			alreadyConnected := connected.Swap(true)
-			return !alreadyConnected, http.StatusConflict
+		onConnecting: func(req *http.Request) (bool, int) {
+			if !s.authorizedLocalRequest(req) {
+				return false, http.StatusUnauthorized
+			}
+			if s.agentConn.busy() {
+				return false, http.StatusConflict
+			}
+			return true, http.StatusOK
 		},
-		onMessage: s.handleAgentOpAMPMessage,
-		onConnectionClose: func(serverTypes.Connection) {
-			connected.Store(false)
+		onConnected: func(conn serverTypes.Connection) {
+			if !s.agentConn.claim(conn) {
+				// Another connection was made since this one's OnConnecting.
+				s.telemetrySettings.Logger.Warn("Refusing a second connection to the local OpAMP server: a collector is connected")
+				_ = conn.Disconnect()
+			}
 		},
+		onMessage: func(conn serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+			if !s.agentConn.holds(conn) {
+				return &protobufs.ServerToAgent{}
+			}
+			return s.handleAgentOpAMPMessage(conn, message)
+		},
+		onConnectionClose: s.agentConn.release,
 	}.toServerSettings())
 	if err != nil {
 		return err
@@ -941,11 +990,18 @@ func (s *Supervisor) startOpAMPServer() error {
 	return nil
 }
 
-func (s *Supervisor) handleAgentOpAMPMessage(conn serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
+func (s *Supervisor) handleAgentOpAMPMessage(_ serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 	ctx, span := s.getTracer().Start(s.runCtx, "handleAgentOpAMPMessage")
 	defer span.End()
 
-	s.agentConn.Store(conn)
+	// Changed here: the collector's messages are taken with the Supervisor's instance UID only;
+	// it was checked at bootstrap alone.
+	if id := s.persistentState.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
+		s.telemetrySettings.Logger.Warn("Ignoring a message to the local OpAMP server with another instance UID",
+			zap.String("instance_uid", hex.EncodeToString(message.GetInstanceUid())),
+			zap.String("expected_instance_uid", id.String()))
+		return &protobufs.ServerToAgent{}
+	}
 
 	s.telemetrySettings.Logger.Debug("Received OpAMP message from the agent")
 	if message.AgentDescription != nil {
@@ -1045,6 +1101,15 @@ func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
+}
+
+// configuredAgentDescription is the agent description the Supervisor's configuration gives,
+// without the collector's.
+func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
+	return &protobufs.AgentDescription{
+		IdentifyingAttributes:    applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, nil),
+		NonIdentifyingAttributes: applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, nil),
+	}
 }
 
 // setAvailableComponents sets the available components of the OpAMP agent
@@ -1335,6 +1400,7 @@ func (s *Supervisor) composeOpAMPExtensionConfig() []byte {
 		"PPIDPollInterval":           orphanPollInterval,
 		"ReportsAvailableComponents": s.config.Capabilities.ReportsAvailableComponents,
 		"IncludeResourceAttributes":  s.config.Agent.Description.IncludeResourceAttributes,
+		"LocalServerToken":           s.localServerToken,
 	}
 	err := s.opampextensionTemplate.Execute(
 		&cfg,
@@ -1702,9 +1768,10 @@ func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 
 // createEffectiveConfigMsg create an EffectiveConfig with the content of the
 // current effective config.
+// Changed here: without the local server's token, in either.
 func (s *Supervisor) createEffectiveConfigMsg() *protobufs.EffectiveConfig {
 	if cfg, ok := s.effectiveConfig.Load().(*protobufs.EffectiveConfig); ok && cfg != nil {
-		return cfg
+		return s.redactLocalServerTokenInConfig(cfg)
 	}
 
 	// Fallback: construct a single-file EffectiveConfig from the merged config
@@ -1717,7 +1784,7 @@ func (s *Supervisor) createEffectiveConfigMsg() *protobufs.EffectiveConfig {
 	return &protobufs.EffectiveConfig{
 		ConfigMap: &protobufs.AgentConfigMap{
 			ConfigMap: map[string]*protobufs.AgentConfigObject{
-				"": {Body: []byte(cfgState.mergedConfig)},
+				"": {Body: s.redactLocalServerToken([]byte(cfgState.mergedConfig))},
 			},
 		},
 	}
@@ -1936,21 +2003,46 @@ func (s *Supervisor) loadAndWriteFallbackConfig() error {
 	return nil
 }
 
+// handleRestartCommand takes the server's Restart command to the agent loop. Changed here: it
+// restarted the collector on the client's goroutine, outside the agent loop: before Start had
+// made the commander (a Restart in the server's first reply) it panicked, the client's
+// heartbeats and the server's messages waited for the collector's stop, and it started the
+// collector even when its config is deliberately empty.
 func (s *Supervisor) handleRestartCommand() error {
-	s.agentRestarting.Store(true)
-	defer s.agentRestarting.Store(false)
 	s.telemetrySettings.Logger.Debug("Received restart command")
+	select {
+	case s.restartRequests <- struct{}{}:
+	default:
+		// One is pending already: it restarts the collector after this command too.
+	}
+	return nil
+}
 
-	err := s.commander.Stop(s.runCtx)
-	if err == nil {
-		s.resetPassthroughLogBuffer()
-		err = s.commander.Start(s.runCtx)
-	}
-	if err != nil {
+// restartAgent restarts the collector, on the agent loop. With no config to run (the no-op
+// config) the collector stays stopped.
+func (s *Supervisor) restartAgent() error {
+	s.telemetrySettings.Logger.Debug("Restarting the agent process")
+	defer s.resetAgentReady()
+
+	if err := s.commander.Stop(s.runCtx); err != nil {
 		s.telemetrySettings.Logger.Error("Could not restart agent process", zap.Error(err))
+		return err
 	}
-	s.resetAgentReady()
-	return err
+	s.resetPassthroughLogBuffer()
+	if s.cfgState.Load().(*configState).configMapIsEmpty {
+		s.telemetrySettings.Logger.Info("No config present, not starting agent.")
+		// The stop is not an exit the loop restarts the collector after.
+		select {
+		case <-s.commander.Exited():
+		default:
+		}
+		return nil
+	}
+	if _, err := s.startAgent(); err != nil {
+		s.telemetrySettings.Logger.Error("Could not restart agent process", zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func (s *Supervisor) startAgent() (agentStartStatus, error) {
@@ -2071,8 +2163,19 @@ func (s *Supervisor) runAgentProcess() {
 					}
 				}
 			}
+		case <-s.restartRequests:
+			if err := s.restartAgent(); err != nil {
+				// Started again on the restart backoff, as after an exit.
+				if !restartTimer.Stop() {
+					select {
+					case <-restartTimer.C:
+					default:
+					}
+				}
+				restartTimer.Reset(5 * time.Second)
+			}
 		case <-s.commander.Exited():
-			// the agent process exit is expected for restart command and will not attempt to restart
+			// the agent process exit is expected for a HUP reload and will not attempt to restart
 			if s.agentRestarting.Load() {
 				s.telemetrySettings.Logger.Debug("Agent restarted")
 				continue
@@ -2250,10 +2353,34 @@ func (s *Supervisor) reloadAgentConfig() error {
 
 func (s *Supervisor) writeAgentConfig() error {
 	cfgState := s.cfgState.Load().(*configState)
-	if err := os.WriteFile(s.agentConfigFilePath(), []byte(cfgState.mergedConfig), 0o600); err != nil {
+	// Changed here: written and renamed into place, so a collector starting meanwhile reads the
+	// old config or the new one, never a truncated file it exits on.
+	path := s.agentConfigFilePath()
+	tmp, err := os.CreateTemp(filepath.Dir(path), agentConfigFileName+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return nil
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(cfgState.mergedConfig); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return renameOver(tmp.Name(), path)
+}
+
+// renameOver renames from over to. Windows replaces the file in place (MoveFileEx), but refuses
+// while another process has it open, as a collector reading its config briefly does: that is
+// tried again for a little while.
+func renameOver(from, to string) error {
+	err := os.Rename(from, to)
+	for i := 0; err != nil && runtime.GOOS == "windows" && i < 50; i++ {
+		time.Sleep(20 * time.Millisecond)
+		err = os.Rename(from, to)
+	}
+	return err
 }
 
 func (s *Supervisor) hasAgentConfigState() bool {
@@ -2297,7 +2424,12 @@ func (s *Supervisor) validateConfig(configContent string) error {
 	defer cancel()
 
 	if err := s.commander.ValidateConfig(ctx, tempFile.Name(), s.getFeatureGateFlag()...); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+		err = fmt.Errorf("configuration validation failed: %w", err)
+		// Changed here: reported to the server, so without the local server's token.
+		if msg := s.redactLocalServerToken([]byte(err.Error())); string(msg) != err.Error() {
+			return errors.New(string(msg))
+		}
+		return err
 	}
 
 	s.telemetrySettings.Logger.Debug("Configuration validation succeeded")
@@ -2611,14 +2743,17 @@ func (s *Supervisor) onMessage(ctx context.Context, msg *types.MessageData) {
 		haveMessageForAgent = true
 	}
 
-	// Send any messages that need proxying to the agent.
+	// Send any messages that need proxying to the agent. Changed here: only over a connection
+	// still open; a closed one was used until the next collector's first message.
 	if haveMessageForAgent {
-		conn, ok := s.agentConn.Load().(serverTypes.Connection)
-		if ok {
+		if conn := s.agentConn.current(); conn != nil {
 			err := conn.Send(ctx, messageToAgent)
 			if err != nil {
 				s.telemetrySettings.Logger.Error("Error forwarding message to agent from server", zap.Error(err))
 			}
+		} else if msg.CustomMessage != nil {
+			s.telemetrySettings.Logger.Warn("No collector is connected: the server's custom message is not forwarded to it",
+				zap.String("capability", msg.CustomMessage.GetCapability()), zap.String("type", msg.CustomMessage.GetType()))
 		}
 	}
 

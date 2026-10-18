@@ -108,15 +108,28 @@ agent:
   again. A .zip is read as well as a .tar.gz, and the executable may sit in the archive's top
   directory, as in this repository's release archives. See the specification's
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
+- **The local OpAMP server takes the collector only.** The server the collector's opamp
+  extension connects to, and the one the bootstrap starts, take a request only with a bearer
+  token the Supervisor makes at each start and writes into the extension config
+  (`server.ws.headers`; the extension redacts it in the effective config it reports, and the
+  Supervisor leaves it out of what it reports itself). The collector's messages are taken only
+  with the Supervisor's instance UID. One collector is connected at a time, from its connection
+  to its close: a request that fails to decode, or a failed upgrade, doesn't keep later ones out
+  (409), and the server's custom messages go to the collector connected now.
+- **A Restart command is carried out on the agent loop**, as a new config is: the client (its
+  heartbeats, the server's messages) doesn't wait for the collector to stop, a Restart in the
+  server's first reply waits for the loop, and with no config to run the collector stays
+  stopped.
+- A bootstrap that finds another instance UID reports the agent unhealthy, and fails.
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
 - `supervisor/coreclient.go`, `agent_update.go`, `sealed_storage.go`, `telemetry_env.go`,
-  `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests beside them
-  (with `supervisor/remote_config_refusal_test.go` and `supervisor/config/core_test.go`, and
-  the Cosign release fixture in `verifier/testdata/`);
+  `localserver.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
+  beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
+  `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
 - `e2e_packages_test.go` and `e2e_policy_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);

@@ -225,7 +225,6 @@ func clientSupervisor(t *testing.T, server config.OpAMPServer, caps config.Capab
 		effectiveConfig:                &atomic.Value{},
 		cfgState:                       &atomic.Value{},
 		agentConfigOwnTelemetrySection: &atomic.Value{},
-		agentConn:                      &atomic.Value{},
 		hasNewConfig:                   make(chan struct{}, 1),
 		metrics:                        metrics,
 	}

@@ -1,5 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Changed here: the slow-stop and fake-collector helpers.
 
 package supervisor
 
@@ -14,6 +16,9 @@ import (
 )
 
 const supervisorRestartHelperEnv = "OTEL_SUPERVISOR_RESTART_HELPER"
+
+// helperReadyFileEnv names a file the slow-stop helper creates once it handles os.Interrupt.
+const helperReadyFileEnv = "OTEL_SUPERVISOR_HELPER_READY_FILE"
 
 func TestMain(m *testing.M) {
 	switch os.Getenv(supervisorRestartHelperEnv) {
@@ -30,6 +35,21 @@ func TestMain(m *testing.M) {
 		<-sigCh
 		_, _ = fmt.Fprint(os.Stderr, "shutdown error")
 		os.Exit(0)
+	case "slow-stop":
+		// A Collector that takes a while to stop, so tests can tell whether a restart holds up
+		// its caller for the stop.
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, os.Interrupt)
+		if ready := os.Getenv(helperReadyFileEnv); ready != "" {
+			_ = os.WriteFile(ready, nil, 0o600)
+		}
+		<-sigCh
+		time.Sleep(2 * time.Second)
+		os.Exit(0)
+	case "fake-collector":
+		// A Collector whose opamp extension connects to the Supervisor's local server as the
+		// config the Supervisor wrote says (localserver_test.go).
+		os.Exit(runFakeCollector())
 	}
 	goleak.VerifyTestMain(m)
 }

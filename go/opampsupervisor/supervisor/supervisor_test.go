@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: the tests of
-// onOpampConnectionSettings are gone with it, the health tests replace the client directly, and
-// the SDK log export test uses a free port instead of 4318.
+// onOpampConnectionSettings are gone with it, the health tests replace the client directly, the
+// SDK log export test uses a free port instead of 4318, the collector's messages carry the
+// instance UID, and the restart tests call restartAgent, the agent loop's.
 
 package supervisor
 
@@ -467,7 +468,7 @@ func TestCollectorCrashLogSnippetPassthroughLogsClearedBetweenStarts(t *testing.
 	require.Equal(t, "collector crashed", s.appendCollectorCrashDetails("collector crashed"))
 }
 
-func TestHandleRestartCommandClearsPassthroughLogs(t *testing.T) {
+func TestRestartAgentClearsPassthroughLogs(t *testing.T) {
 	cmdr, err := commander.NewCommander(
 		zap.NewNop(),
 		filepath.Join(t.TempDir(), agentLogFileName),
@@ -487,7 +488,9 @@ func TestHandleRestartCommandClearsPassthroughLogs(t *testing.T) {
 		config:            config.Supervisor{Agent: config.Agent{PassthroughLogs: true, CollectorCrashLogSnippetKiB: 4}},
 		telemetrySettings: newNopTelemetrySettings(),
 		agentReadyChan:    make(chan struct{}, 1),
+		cfgState:          &atomic.Value{},
 	}
+	s.cfgState.Store(&configState{mergedConfig: "receivers: {}\n"})
 	cmdr.SetPassthroughLogHook(s.appendPassthroughLogLine)
 
 	s.appendPassthroughLogLine(`{"level":"error","msg":"previous run"}`)
@@ -496,11 +499,11 @@ func TestHandleRestartCommandClearsPassthroughLogs(t *testing.T) {
 		require.NoError(t, cmdr.Stop(t.Context()))
 	})
 
-	require.NoError(t, s.handleRestartCommand())
+	require.NoError(t, s.restartAgent())
 	require.Equal(t, "collector crashed", s.appendCollectorCrashDetails("collector crashed"))
 }
 
-func TestHandleRestartCommandClearsPassthroughShutdownLogsBeforeRestart(t *testing.T) {
+func TestRestartAgentClearsPassthroughShutdownLogsBeforeRestart(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping test on Windows because the helper uses os.Interrupt")
 	}
@@ -524,7 +527,9 @@ func TestHandleRestartCommandClearsPassthroughShutdownLogsBeforeRestart(t *testi
 		config:            config.Supervisor{Agent: config.Agent{PassthroughLogs: true, CollectorCrashLogSnippetKiB: 4}},
 		telemetrySettings: newNopTelemetrySettings(),
 		agentReadyChan:    make(chan struct{}, 1),
+		cfgState:          &atomic.Value{},
 	}
+	s.cfgState.Store(&configState{mergedConfig: "receivers: {}\n"})
 	cmdr.SetPassthroughLogHook(s.appendPassthroughLogLine)
 
 	require.NoError(t, cmdr.Start(t.Context()))
@@ -532,7 +537,7 @@ func TestHandleRestartCommandClearsPassthroughShutdownLogsBeforeRestart(t *testi
 		require.NoError(t, cmdr.Stop(t.Context()))
 	})
 
-	require.NoError(t, s.handleRestartCommand())
+	require.NoError(t, s.restartAgent())
 	require.Equal(t, "collector crashed", s.appendCollectorCrashDetails("collector crashed"))
 }
 
@@ -1191,9 +1196,6 @@ func Test_onMessage(t *testing.T) {
 			},
 		}
 
-		agentConnAtomic := &atomic.Value{}
-		agentConnAtomic.Store(agentConn)
-
 		s := Supervisor{
 			telemetrySettings:              newNopTelemetrySettings(),
 			pidProvider:                    defaultPIDProvider{},
@@ -1203,10 +1205,10 @@ func Test_onMessage(t *testing.T) {
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			cfgState:                       &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      agentConnAtomic,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
 		}
+		require.True(t, s.agentConn.claim(agentConn))
 
 		s.onMessage(t.Context(), &types.MessageData{
 			CustomMessage: customMessage,
@@ -1233,9 +1235,6 @@ func Test_onMessage(t *testing.T) {
 			},
 		}
 
-		agentConnAtomic := &atomic.Value{}
-		agentConnAtomic.Store(agentConn)
-
 		s := Supervisor{
 			telemetrySettings:              newNopTelemetrySettings(),
 			pidProvider:                    defaultPIDProvider{},
@@ -1244,10 +1243,10 @@ func Test_onMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      agentConnAtomic,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
 		}
+		require.True(t, s.agentConn.claim(agentConn))
 
 		s.onMessage(t.Context(), &types.MessageData{
 			CustomCapabilities: customCapabilities,
@@ -1871,7 +1870,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    client,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -1888,6 +1886,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}()
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid:   testUUID[:],
 			CustomMessage: customMessage,
 		})
 
@@ -1928,7 +1927,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    client,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -1937,6 +1935,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid:        testUUID[:],
 			CustomCapabilities: customCapabilities,
 		})
 	})
@@ -2051,7 +2050,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			agentDescription:               &atomic.Value{},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2060,6 +2058,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid:      testUUID[:],
 			AgentDescription: incomingAgentDescription,
 		})
 
@@ -2101,7 +2100,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			agentDescription:               &atomic.Value{},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2110,6 +2108,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid:      testUUID[:],
 			AgentDescription: incomingAgentDescription,
 		})
 
@@ -2137,7 +2136,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2146,6 +2144,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2185,7 +2184,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2194,6 +2192,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2233,7 +2232,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2242,6 +2240,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{},
@@ -2272,7 +2271,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2281,6 +2279,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2316,7 +2315,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2325,6 +2323,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2360,7 +2359,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
 			cfgState:                       &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2372,6 +2370,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		// This simulates what happens when the collector's OpAMP extension
 		// sends its full effective config to the supervisor's internal OpAMP server.
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			EffectiveConfig: &protobufs.EffectiveConfig{
 				ConfigMap: &protobufs.AgentConfigMap{
 					ConfigMap: map[string]*protobufs.AgentConfigObject{
@@ -2423,7 +2422,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2435,6 +2433,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		}
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			Health: &protobufs.ComponentHealth{
 				Healthy: true,
 			},
@@ -2481,7 +2480,6 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 			persistentState:                &persistentState{InstanceID: testUUID},
 			agentConfigOwnTelemetrySection: &atomic.Value{},
 			effectiveConfig:                &atomic.Value{},
-			agentConn:                      &atomic.Value{},
 			opampClient:                    mc,
 			customMessageToServer:          make(chan *protobufs.CustomMessage, 10),
 			doneChan:                       make(chan struct{}),
@@ -2495,6 +2493,7 @@ func Test_handleAgentOpAMPMessage(t *testing.T) {
 		s.usingLastWorkingRemoteConfig.Store(true)
 
 		s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
+			InstanceUid: testUUID[:],
 			Health: &protobufs.ComponentHealth{
 				Healthy: true,
 			},
@@ -3448,6 +3447,49 @@ service:
 		require.Equal(t, before, s.cfgState.Load().(*configState).mergedConfig)
 		require.False(t, s.usingLastWorkingRemoteConfig.Load())
 	})
+}
+
+// A collector starting while its config is rewritten (as a HUP reload can) reads the old config
+// or the new one, never a truncated file, which it would exit on.
+func TestSupervisor_writeAgentConfigIsNeverSeenHalfWritten(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Its reader holds the file open without end, and Windows doesn't rename over an open file.
+		t.Skip("reads without pause, which Windows' rename waits out")
+	}
+	s := newConfigWritingSupervisor(t)
+	bodies := []string{strings.Repeat("a", 1<<16), strings.Repeat("b", 1<<17)}
+	s.cfgState.Store(&configState{mergedConfig: bodies[0]})
+	require.NoError(t, s.writeAgentConfig())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 200 {
+			s.cfgState.Store(&configState{mergedConfig: bodies[i%2]})
+			assert.NoError(t, s.writeAgentConfig())
+		}
+	}()
+	for reading := true; reading; {
+		select {
+		case <-done:
+			reading = false
+		default:
+		}
+		got, err := os.ReadFile(s.agentConfigFilePath())
+		require.NoError(t, err)
+		require.True(t, string(got) == bodies[0] || string(got) == bodies[1], "read %d bytes", len(got))
+	}
+
+	entries, err := os.ReadDir(s.config.Storage.Directory)
+	require.NoError(t, err)
+	for _, e := range entries {
+		require.False(t, strings.HasSuffix(e.Name(), ".tmp"), "left behind: %s", e.Name())
+	}
+	info, err := os.Stat(s.agentConfigFilePath())
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "only the Supervisor's user reads it")
+	}
 }
 
 func newConfigWritingSupervisor(t *testing.T) *Supervisor {
