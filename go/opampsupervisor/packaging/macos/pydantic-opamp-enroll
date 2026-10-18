@@ -22,6 +22,7 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                              [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
+  --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
   --token-file PATH        where to read the enrollment token (default: standard input)
   --ca-file PATH           a CA bundle to trust for the server, in place of the system's
   --plaintext              allow ws:// or http:// (the token then crosses the network in the clear)
@@ -79,10 +80,12 @@ ca_file=
 plaintext=
 accept_packages=
 start=yes
+telemetry_stdin=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--endpoint) [ $# -ge 2 ] || usage; endpoint=$2; shift 2 ;;
 	--token-file) [ $# -ge 2 ] || usage; token_file=$2; shift 2 ;;
+	--telemetry-token-stdin) telemetry_stdin=yes; shift ;;
 	--ca-file) [ $# -ge 2 ] || usage; ca_file=$2; shift 2 ;;
 	--plaintext) plaintext=yes; shift ;;
 	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
@@ -148,7 +151,18 @@ IFS=$old_ifs
 set +f
 [ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
 
-if [ "$token_file" = - ]; then
+telemetry_token=
+if [ -n "$telemetry_stdin" ]; then
+	[ "$token_file" = - ] || fail "--telemetry-token-stdin cannot be combined with --token-file"
+	IFS= read -r token || fail "provide an enrollment token on the first input line"
+	IFS= read -r telemetry_token || fail "provide a telemetry token on the second input line"
+	[ -z "$(cat)" ] || fail "provide exactly two credential lines"
+	telemetry_token=$(printf '%s' "$telemetry_token" | tr -d '\r')
+	[ -n "$telemetry_token" ] || fail "the telemetry token is empty"
+	case $telemetry_token in
+	*[!A-Za-z0-9._~+/=-]*) fail "the telemetry token has characters a bearer token cannot contain" ;;
+	esac
+elif [ "$token_file" = - ]; then
 	token=$(cat)
 else
 	token=$(cat -- "$token_file")
@@ -165,6 +179,17 @@ mkdir -p "$etc"
 chmod 0700 "$etc"
 printf '%s' "$token" >"$etc/enroll-token.tmp"
 mv -f "$etc/enroll-token.tmp" "$etc/enroll-token"
+
+if [ -n "$telemetry_stdin" ]; then
+	printf '%s' "$telemetry_token" >"$etc/telemetry-token.tmp"
+	mv -f "$etc/telemetry-token.tmp" "$etc/telemetry-token"
+fi
+agent_env=
+if [ -f "$etc/telemetry-token" ]; then
+	agent_env="  env:
+    LOGFIRE_TOKEN: \"\${file:/opt/pydantic-opamp/etc/telemetry-token}\"
+"
+fi
 
 tls=
 if [ -n "$ca_file" ]; then
@@ -214,6 +239,7 @@ capabilities:
 
 agent:
   executable: /opt/pydantic-opamp/bin/otelcol
+$agent_env
 
   # What the server's remote config may do to this host. The server can't change this file;
   # widen it here, or run pydantic-opamp-enroll again with --exporter-endpoint or --log-path.

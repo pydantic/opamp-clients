@@ -17,6 +17,8 @@ param(
     [Parameter(Mandatory = $true)][string]$Endpoint,
     # Where to read the enrollment token; standard input by default.
     [string]$TokenFile,
+    # Read the enrollment token and telemetry token from two standard-input lines.
+    [switch]$TelemetryTokenStdin,
     # A CA bundle to trust for the server, in place of the system's.
     [string]$CaFile,
     # Allow ws:// or http:// (the token then crosses the network in the clear).
@@ -88,6 +90,14 @@ if (-not $root) {
 $token = if ($TokenFile) { Get-Content -LiteralPath $TokenFile -Raw }
          elseif ($MyInvocation.ExpectingInput) { @($input) -join "`n" }
          else { [Console]::In.ReadToEnd() }
+$telemetryToken = $null
+if ($TelemetryTokenStdin) {
+    if ($TokenFile) { Fail '-TelemetryTokenStdin cannot be combined with -TokenFile' }
+    $lines = @($token.TrimEnd([char[]]"`r`n") -split '\r?\n')
+    if ($lines.Count -ne 2) { Fail 'provide exactly two credential lines' }
+    $token, $telemetryToken = $lines
+    if ($telemetryToken -cnotmatch '^[A-Za-z0-9._~+/=-]+$') { Fail 'the telemetry token is empty or has invalid characters' }
+}
 # The token goes into an HTTP header: one line, no surrounding space.
 $token = "$token" -replace "[`r`n]", ''
 if (-not $token) { Fail 'the enrollment token is empty' }
@@ -137,6 +147,11 @@ $package = if ($AcceptPackages) {
             subject_regex: '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@refs/(tags/go/opampsupervisor/v[0-9]+\.[0-9]+\.[0-9]+|heads/main)$'
 '@
 } else { '' }
+$telemetryPath = Join-Path $root 'telemetry-token'
+if ($TelemetryTokenStdin) { Write-Atomically $telemetryPath $telemetryToken }
+$agentEnv = if (Test-Path -LiteralPath $telemetryPath -PathType Leaf) {
+    "  env:`n    LOGFIRE_TOKEN: '`${file:$(Slashed $telemetryPath)}'`n"
+} else { '' }
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
 Write-Atomically (Join-Path $root 'supervisor.yaml') @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
@@ -156,6 +171,7 @@ capabilities:
 
 agent:
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
+$agentEnv
 
   # What the server's remote config may do to this host. The server can't change this file;
   # widen it here, or run pydantic-opamp-enroll.ps1 again with -ExporterEndpoint or -LogPath.

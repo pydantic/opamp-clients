@@ -123,3 +123,60 @@ func TestWinEnrollRefuses(t *testing.T) {
 		})
 	}
 }
+
+func TestWinEnrollTelemetryCredentials(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err := winEnroll(t, root, "runtime-token\r\nwrite-token\r\n", "-Endpoint", "wss://opamp.example.com", "-TelemetryTokenStdin", "-NoStart")
+	require.NoError(t, err, out)
+	assert.NotContains(t, out, "write-token")
+	telemetry, err := os.ReadFile(filepath.Join(root, "telemetry-token"))
+	require.NoError(t, err)
+	assert.Equal(t, "write-token", string(telemetry))
+	cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(cfg), "write-token")
+	assert.Contains(t, string(cfg), "LOGFIRE_TOKEN:")
+	collector := filepath.Join(t.TempDir(), "otelcol.exe")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	programs := filepath.ToSlash(filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe"))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(cfg), programs, filepath.ToSlash(collector), 1)), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, "write-token", loaded.Agent.Env["LOGFIRE_TOKEN"])
+	assert.Equal(t, "Bearer runtime-token", loaded.Server.Headers.Get("Authorization"))
+
+	for _, stdin := range []string{"runtime-token\n", "runtime-token\ninvalid token\n", "runtime-token\nwrite-token\nextra\n"} {
+		other := filepath.Join(t.TempDir(), "pydantic-opamp")
+		out, err = winEnroll(t, other, stdin, "-Endpoint", "wss://opamp.example.com", "-TelemetryTokenStdin", "-NoStart")
+		require.Error(t, err)
+		assert.NotContains(t, out, "runtime-token")
+		_, err = os.Stat(other)
+		assert.ErrorIs(t, err, os.ErrNotExist)
+	}
+}
+
+func TestWinEnrollExistingPrivateDirectory(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	setup := exec.Command("powershell", "-NoProfile", "-Command", `
+$root = $env:OPAMP_ENROLL_ROOT
+New-Item -ItemType Directory -Force -Path $root | Out-Null
+$acl = New-Object System.Security.AccessControl.DirectorySecurity
+$acl.SetAccessRuleProtection($true, $false)
+foreach ($sid in @('S-1-5-18', 'S-1-5-32-544')) {
+    $identity = New-Object System.Security.Principal.SecurityIdentifier($sid)
+    $acl.AddAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')))
+}
+Set-Acl -LiteralPath $root -AclObject $acl
+`)
+	setup.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root)
+	out, err := setup.CombinedOutput()
+	require.NoError(t, err, string(out))
+	result, err := winEnroll(t, root, "runtime-token\nwrite-token\n", "-Endpoint", "wss://opamp.example.com", "-TelemetryTokenStdin", "-NoStart")
+	require.NoError(t, err, result)
+	result, err = winEnroll(t, root, "replacement-runtime", "-Endpoint", "wss://opamp.example.com", "-NoStart")
+	require.NoError(t, err, result)
+	telemetry, err := os.ReadFile(filepath.Join(root, "telemetry-token"))
+	require.NoError(t, err)
+	assert.Equal(t, "write-token", string(telemetry))
+}
