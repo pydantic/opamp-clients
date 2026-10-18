@@ -112,6 +112,10 @@ The application says what it can use, and the core offers only that to the serve
 `AcceptsOtherConnectionSettings` for other connections. With any of them the core also declares
 `ReportsConnectionSettingsStatus`.
 
+The Supervisor advertises `AcceptsOtherConnectionSettings` only when
+`accepts_other_connection_settings` is enabled and `agent.connection_env` has a
+binding. An offered connection without its own binding reports FAILED.
+
 ## Who does what
 
 | | Does |

@@ -97,6 +97,29 @@ func TestConnectionCredentialBindings(t *testing.T) {
 	}
 }
 
+func TestOtherConnectionCapabilityRequiresConfiguredBindings(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		enabled  bool
+		bindings map[string]string
+		want     bool
+	}{
+		{"configured", true, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, true},
+		{"no bindings", true, nil, false},
+		{"disabled", false, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := newCoreTestServer(t)
+			s := clientSupervisor(t, config.OpAMPServer{Endpoint: ts.ws}, config.Capabilities{AcceptsOtherConnectionSettings: tc.enabled}, config.Storage{})
+			s.config.Agent.ConnectionEnv = tc.bindings
+			require.NoError(t, s.startOpAMPClient())
+			defer func() { require.NoError(t, s.stopOpAMPClient()) }()
+			hello := ts.waitMsg("hello", func(*protobufs.AgentToServer) bool { return true })
+			require.Equal(t, tc.want, hello.Capabilities&uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsOtherConnectionSettings) != 0)
+		})
+	}
+}
+
 func TestConnectionCredentialsRejectDuplicateEnvironmentBindings(t *testing.T) {
 	settings := map[string]*protobufs.OtherConnectionSettings{
 		"first":  {Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: "Bearer first-secret"}}}},

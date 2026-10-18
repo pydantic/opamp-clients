@@ -860,7 +860,11 @@ func (s *Supervisor) startOpAMPClient() error {
 		}
 	}
 
-	supportedCapabilities := s.config.Capabilities.SupportedCapabilities()
+	capabilities := s.config.Capabilities
+	if len(s.config.Agent.ConnectionEnv) == 0 {
+		capabilities.AcceptsOtherConnectionSettings = false
+	}
+	supportedCapabilities := capabilities.SupportedCapabilities()
 	if err := s.opampClient.SetCapabilities(&supportedCapabilities); err != nil {
 		return err
 	}

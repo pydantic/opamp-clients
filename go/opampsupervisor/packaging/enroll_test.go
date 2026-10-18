@@ -224,10 +224,11 @@ service:
 func TestEnrollPreparedInstance(t *testing.T) {
 	e := newEnrollment(t)
 	uid := "f0cff0a3-08e5-4c49-96ce-1366b14525ed"
-	out, err := e.run(t, "bootstrap-token\n", "--endpoint", "wss://opamp.example.com/enroll", "--instance-id", uid, "--no-start")
+	out, err := e.run(t, "bootstrap-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp/enroll", "--instance-id", uid, "--accept-packages", "--no-start")
 	require.NoError(t, err, out)
 	cfg := e.read(t, "supervisor.yaml")
 	assert.Contains(t, cfg, "instance_id: \""+uid+"\"")
+	assertPackages(t, e.loadEnrolled(t), true, "otelcol")
 	assert.Contains(t, cfg, "accepts_other_connection_settings: true")
 	assert.Contains(t, cfg, "logfire/otlp: LOGFIRE_TOKEN")
 	assert.NotContains(t, cfg, "bootstrap-token")
