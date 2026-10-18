@@ -1,5 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Changed here: OnConnected is passed on (onConnected).
 
 package supervisor
 
@@ -15,6 +17,7 @@ import (
 type flattenedSettings struct {
 	onMessage         func(conn serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent
 	onConnecting      func(request *http.Request) (shouldConnect bool, rejectStatusCode int)
+	onConnected       func(conn serverTypes.Connection)
 	onConnectionClose func(conn serverTypes.Connection)
 	endpoint          string
 }
@@ -44,13 +47,20 @@ func (fs flattenedSettings) OnConnecting(request *http.Request) serverTypes.Conn
 	return serverTypes.ConnectionResponse{
 		Accept: true,
 		ConnectionCallbacks: serverTypes.ConnectionCallbacks{
+			OnConnected:       fs.OnConnected,
 			OnMessage:         fs.OnMessage,
 			OnConnectionClose: fs.OnConnectionClose,
 		},
 	}
 }
 
-func (flattenedSettings) OnConnected(context.Context, serverTypes.Connection) {}
+// OnConnected is called once a request accepted by OnConnecting is a connection: a WebSocket
+// upgraded, or a plain HTTP request whose message decoded.
+func (fs flattenedSettings) OnConnected(_ context.Context, conn serverTypes.Connection) {
+	if fs.onConnected != nil {
+		fs.onConnected(conn)
+	}
+}
 
 func (fs flattenedSettings) OnMessage(_ context.Context, conn serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 	if fs.onMessage != nil {

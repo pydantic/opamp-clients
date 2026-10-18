@@ -3,7 +3,8 @@
 //
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: a state file
 // with no instance ID (empty, null or {}) is replaced by a new one instead of crashing the
-// Supervisor or giving it the all-zero UID, and the file is replaced atomically.
+// Supervisor or giving it the all-zero UID, the file is replaced atomically, and the instance ID
+// can be read from another goroutine (instanceID).
 
 package supervisor
 
@@ -11,6 +12,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/open-telemetry/opamp-go/protobufs"
@@ -28,6 +30,8 @@ type persistentState struct {
 	// This is not marshaled.
 	configPath string      `yaml:"-"`
 	logger     *zap.Logger `yaml:"-"`
+	// idMu guards InstanceID for instanceID, which is read off the goroutine that sets it.
+	idMu sync.RWMutex
 }
 
 // RemoteConfigStatus is a custom struct that is used to marshal/unmarshal the remote config status.
@@ -42,8 +46,17 @@ type RemoteConfigStatus struct {
 }
 
 func (p *persistentState) SetInstanceID(id uuid.UUID) error {
+	p.idMu.Lock()
 	p.InstanceID = id
+	p.idMu.Unlock()
 	return p.writeState()
+}
+
+// instanceID is InstanceID, for goroutines other than the one that sets it.
+func (p *persistentState) instanceID() uuid.UUID {
+	p.idMu.RLock()
+	defer p.idMu.RUnlock()
+	return p.InstanceID
 }
 
 func (p *persistentState) SetLastRemoteConfigStatus(status *protobufs.RemoteConfigStatus) error {

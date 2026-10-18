@@ -1,9 +1,14 @@
+# Changed here: the local OpAMP server's token, as a header.
 extensions:
   opamp:
     instance_uid: "{{.InstanceUid}}"
     server:
       ws:
         endpoint: "ws://127.0.0.1:{{.SupervisorPort}}/v1/opamp"
+{{- if .LocalServerToken}}
+        headers:
+          Authorization: "Bearer {{.LocalServerToken}}"
+{{- end}}
         tls:
           insecure: true
     ppid: {{.PID}}

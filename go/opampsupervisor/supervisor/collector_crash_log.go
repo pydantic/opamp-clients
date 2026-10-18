@@ -1,5 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Changed here: the snippet is without the local OpAMP server's token.
 
 package supervisor
 
@@ -33,7 +35,8 @@ func (s *Supervisor) collectorCrashLogSnippet() string {
 	if s.config.Agent.CollectorCrashLogSnippetKiB <= 0 {
 		return ""
 	}
-	return strings.ToValidUTF8(strings.TrimSpace(s.collectorLogTail()), "")
+	// Reported to the server, so without the local server's token.
+	return string(s.redactLocalServerToken([]byte(strings.ToValidUTF8(strings.TrimSpace(s.collectorLogTail()), ""))))
 }
 
 func (s *Supervisor) appendCollectorCrashDetails(msg string) string {
