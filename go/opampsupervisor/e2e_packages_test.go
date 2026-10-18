@@ -25,6 +25,9 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
@@ -37,6 +40,7 @@ type packageTest struct {
 	files   *httptest.Server
 	served  sync.Map // path -> []byte
 	status  atomic.Pointer[protobufs.PackageStatus]
+	all     atomic.Pointer[protobufs.PackageStatuses]
 	health  atomic.Pointer[protobufs.ComponentHealth]
 	storage string
 }
@@ -56,8 +60,11 @@ func newPackageTest(t *testing.T, verifierNone bool) (*packageTest, func()) {
 	t.Cleanup(pt.files.Close)
 	pt.server = newOpAMPServer(t, defaultConnectingHandler, types.ConnectionCallbacks{
 		OnMessage: func(_ context.Context, _ types.Connection, m *protobufs.AgentToServer) *protobufs.ServerToAgent {
-			if s := m.GetPackageStatuses().GetPackages()[""]; s != nil {
-				pt.status.Store(s)
+			if all := m.GetPackageStatuses(); all != nil {
+				pt.all.Store(all)
+				if s := all.GetPackages()[""]; s != nil {
+					pt.status.Store(s)
+				}
 			}
 			if m.Health != nil {
 				pt.health.Store(m.Health)
@@ -115,6 +122,14 @@ func (pt *packageTest) offer(version string, content []byte, signature string) {
 			Hash:    []byte("package-" + version),
 			File:    &protobufs.DownloadableFile{DownloadUrl: pt.files.URL + path, ContentHash: sum[:], Signature: []byte(signature)},
 		}},
+	}})
+}
+
+// withdraw offers no packages: the collector is no longer offered.
+func (pt *packageTest) withdraw() {
+	pt.server.sendToSupervisor(&protobufs.ServerToAgent{PackagesAvailable: &protobufs.PackagesAvailable{
+		AllPackagesHash: []byte("all-none"),
+		Packages:        map[string]*protobufs.PackageAvailable{},
 	}})
 }
 
@@ -208,6 +223,8 @@ func TestSupervisorRunsTheInstalledCollectorAfterARestart(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfg.Agent.Executable, []byte("#!/bin/sh\nexit 1\n"), 0o700))
 	logger, err := telemetry.NewLogger(cfg.Telemetry.Logs)
 	require.NoError(t, err)
+	observed, logs := observer.New(zap.WarnLevel)
+	logger = zap.New(zapcore.NewTee(logger.Core(), observed))
 	restarted, err := supervisor.NewSupervisor(t.Context(), logger, cfg)
 	require.NoError(t, err)
 	pt.health.Store(nil)
@@ -216,6 +233,36 @@ func TestSupervisorRunsTheInstalledCollectorAfterARestart(t *testing.T) {
 	waitForSupervisorConnection(pt.server.supervisorConnected, true)
 	pt.waitHealthy(t)
 	require.FileExists(t, installed)
+	require.Equal(t, 1, logs.FilterMessageSnippet("The configured collector executable changed since the OpAMP server installed one").Len(),
+		"the operator is told why the configured executable doesn't run")
+}
+
+func TestSupervisorGoesBackToTheConfiguredCollectorWhenNoLongerOffered(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the collector is found with pgrep")
+	}
+	collector, err := os.ReadFile(collectorExecutablePath(t))
+	require.NoError(t, err)
+	pt, _ := newPackageTest(t, true)
+	pt.runHealthCheckConfig(t)
+	installed := filepath.Join(pt.storage, "agent", "otelcol-contrib")
+	pt.health.Store(nil)
+	pt.offer("v2", collector, "")
+	pt.waitFor(t, "v2", protobufs.PackageStatusEnum_PackageStatusEnum_Installed)
+	pt.waitHealthy(t)
+	require.FileExists(t, installed+".packaged")
+	require.NoError(t, exec.Command("pgrep", "-f", installed).Run(), "the installed collector runs")
+
+	pt.health.Store(nil)
+	pt.withdraw()
+	require.Eventually(t, func() bool {
+		all := pt.all.Load()
+		return all != nil && string(all.ServerProvidedAllPackagesHash) == "all-none" && all.Packages[""] == nil
+	}, 30*time.Second, 100*time.Millisecond, "the collector was never reported removed")
+	require.NoFileExists(t, installed)
+	require.NoFileExists(t, installed+".packaged")
+	pt.waitHealthy(t)
+	require.Error(t, exec.Command("pgrep", "-f", installed).Run(), "the installed collector no longer runs")
 }
 
 func TestSupervisorChecksThePackagesSignature(t *testing.T) {

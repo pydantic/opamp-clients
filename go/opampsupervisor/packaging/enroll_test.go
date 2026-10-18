@@ -296,3 +296,32 @@ func TestEnrollPlaintext(t *testing.T) {
 	require.NoError(t, err, out)
 	assert.Contains(t, e.read(t, "supervisor.yaml"), `endpoint: "http://127.0.0.1:4320/v1/opamp"`)
 }
+
+// assertPackages checks the enrolled Supervisor accepts packages from this repository's release
+// workflow alone, or no packages at all.
+func assertPackages(t *testing.T, cfg config.Supervisor, accepted bool, binary string) {
+	t.Helper()
+	assert.Equal(t, accepted, cfg.Capabilities.AcceptsPackages)
+	if !accepted {
+		return
+	}
+	assert.Equal(t, binary, cfg.Agent.Package.AgentBinary)
+	assert.Equal(t, config.VerifierTypeCosign, cfg.Agent.Package.Verifier.Type)
+	assert.Equal(t, config.PydanticCosignVerifier(), cfg.Agent.Package.Verifier.Cosign)
+}
+
+// --accept-packages turns on the collector updates the server offers, checked against this
+// repository's release workflow's signature; without it, there are none.
+func TestEnrollAcceptsPackages(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--no-start")
+	require.NoError(t, err, out)
+	cfg := e.loadEnrolled(t)
+	assertPackages(t, cfg, true, "otelcol")
+	assertPackagedPolicy(t, cfg.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+
+	e = newEnrollment(t)
+	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--no-start")
+	require.NoError(t, err, out)
+	assertPackages(t, e.loadEnrolled(t), false, "")
+}

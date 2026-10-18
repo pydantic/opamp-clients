@@ -239,8 +239,16 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			cl.PackageInstalled(name, hash, err)
 		}})
 	case opamp.RemovePackage:
-		// Nothing to remove: a collector the server stops offering keeps running.
-		cl.PackageRemoved(n.PackageName)
+		// The collector the server stops offering is removed, and the configured one runs again;
+		// the Supervisor installs no other package.
+		name := n.PackageName
+		if name != "" || c.installPackage == nil {
+			cl.PackageRemoved(name)
+			break
+		}
+		go c.installPackage(agentInstall{name: name, remove: true, done: func(error) {
+			cl.PackageRemoved(name)
+		}})
 	case opamp.CustomMessageNotSent:
 		c.logger.Warn("A custom message to the OpAMP server was not sent",
 			zap.String("capability", n.CustomMessage.GetCapability()), zap.String("reason", n.Detail))

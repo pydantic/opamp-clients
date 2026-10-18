@@ -104,7 +104,9 @@ agent:
   server only with their capability, as before.
 - With `accepts_packages` the Supervisor installs the collector executable the server offers,
   checked with Cosign, and puts the previous one back if the new one isn't healthy: upstream
-  refuses the capability. See the specification's
+  refuses the capability. When the server stops offering it, the configured executable runs
+  again. A .zip is read as well as a .tar.gz, and the executable may sit in the archive's top
+  directory, as in this repository's release archives. See the specification's
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
@@ -113,7 +115,8 @@ header. These files are new, and are this repository's:
 
 - `supervisor/coreclient.go`, `agent_update.go`, `sealed_storage.go`, `telemetry_env.go`,
   `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests beside them
-  (with `supervisor/remote_config_refusal_test.go` and `supervisor/config/core_test.go`);
+  (with `supervisor/remote_config_refusal_test.go` and `supervisor/config/core_test.go`, and
+  the Cosign release fixture in `verifier/testdata/`);
 - `e2e_packages_test.go` and `e2e_policy_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);

@@ -73,6 +73,9 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
 - **Starts the service.** It enables and starts `pydantic-opamp-supervisor.service`. Pass
   `--no-start` to skip this step.
 
+With `--accept-packages`, the config also lets the server update the collector (see
+[Collector updates from the server](#collector-updates-from-the-server)).
+
 systemd decrypts both credentials for the service alone, into
 `/run/credentials/pydantic-opamp-supervisor.service/`. The service runs as `pydantic-opamp`.
 
@@ -179,12 +182,21 @@ more than three tags are pushed at once. Select `installers-only` to add install
 existing release. This mode keeps its archives and `SHA256SUMS`. A rerun replaces the installer
 assets and their checksums.
 
+From the release after 0.1.0, each archive is also signed with Cosign (keyless, from the
+workflow's GitHub identity), as
+`<archive>.sigstore.json`: what a Supervisor that accepts packages checks before it installs a
+collector the server offers.
+
 Check a download with either:
 
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS.installers
 gh attestation verify pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+cosign verify-blob --bundle pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@' \
+  pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz
 ```
 
 ## macOS
@@ -227,7 +239,7 @@ msiexec /i pydantic-opamp-supervisor-0.1.0-windows-amd64.msi /qn
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
-It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-ExporterEndpoint`, `-LogPath` and `-NoStart`,
+It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-ExporterEndpoint`, `-LogPath`, `-AcceptPackages` and `-NoStart`,
 like the Linux one's options (give several endpoints or paths as a list:
 `-LogPath 'C:\ProgramData\app\logs','D:\logs'`). It
 writes to `ProgramData\pydantic-opamp`, which only SYSTEM and Administrators can read:
@@ -341,6 +353,27 @@ the file's permissions.
 A remote config holds its own credentials (an exporter's `Authorization` header, say), because
 it can't read them from the host. The Supervisor keeps the configs it received sealed with the
 state key; the merged config the collector reads, in the storage directory, isn't sealed.
+
+### Collector updates from the server
+
+Off by default. With `--accept-packages` (`-AcceptPackages` on Windows), the enroll script turns
+on `accepts_packages`, and the server can offer a collector for this host to run in place of the
+installed one. The Supervisor installs it only if this repository's release workflow signed it:
+the archive's Cosign signature (`<archive>.sigstore.json` on each release) must carry that
+workflow's certificate and be in Sigstore's public transparency log. The accepted signer is in
+the local config (`agent.package.verifier`), and the server can't change it. Before it stops the
+running collector, the Supervisor checks that the new one runs. If the new one doesn't report
+healthy within 30 seconds, the previous one goes back.
+
+The collector the server installed lives in the storage directory, and runs while the server
+offers it. A package upgrade (apt, dnf, the `.pkg` or the `.msi`) still updates the installed
+collector, but that one runs only once the server stops offering a collector. The Supervisor
+then deletes the server's copy and runs the installed collector again. Package upgrades always
+update the Supervisor itself: the server can't.
+
+On Linux the collector runs as `pydantic-opamp`. On macOS and Windows it runs as root and
+LocalSystem, so there a collector the server offers runs with those rights, once its signature
+checks out.
 
 ## Tests
 

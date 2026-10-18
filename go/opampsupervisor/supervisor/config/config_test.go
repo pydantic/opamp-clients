@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -1367,4 +1368,30 @@ func runSupervisorConfigLoadTest(t *testing.T, cfgPath string, expected Supervis
 	}
 	require.NoError(t, err)
 	require.Equal(t, expected, cfg)
+}
+
+// The subject of our release workflow's certificate, on a release tag or run by hand from main,
+// and nothing else.
+func TestPydanticReleaseSubjectRegex(t *testing.T) {
+	re := regexp.MustCompile(PydanticReleaseSubjectRegex)
+	const workflow = "https://github.com/pydantic/opamp-clients/.github/workflows/release.yml"
+	for _, ok := range []string{
+		workflow + "@refs/tags/go/opampsupervisor/v0.1.0",
+		workflow + "@refs/tags/go/opampsupervisor/v12.34.56",
+		workflow + "@refs/heads/main",
+	} {
+		require.True(t, re.MatchString(ok), ok)
+	}
+	for _, refused := range []string{
+		workflow + "@refs/heads/feature",
+		workflow + "@refs/tags/go/opamp/v0.1.0",
+		workflow + "@refs/tags/go/opampsupervisor/v0.1.0-rc1",
+		workflow + "@refs/pull/1/merge",
+		"https://github.com/someone/opamp-clients/.github/workflows/release.yml@refs/heads/main",
+		"https://github.com/pydantic/opamp-clients/.github/workflows/ci.yml@refs/heads/main",
+		"https://github.com/pydantic/opamp-clientsX.github/workflows/release.yml@refs/heads/main",
+	} {
+		require.False(t, re.MatchString(refused), refused)
+	}
+	require.NoError(t, Verifier{Type: VerifierTypeCosign, Cosign: PydanticCosignVerifier()}.Validate())
 }

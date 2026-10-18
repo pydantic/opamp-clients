@@ -1,5 +1,9 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
+//
+// Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: a .zip (the
+// Windows release archive) is read too; the binary may sit in the archive's top directory, as in
+// this repository's release archives; and only a regular file is taken.
 
 // Package archive extracts collector executable updates from downloaded
 // packages, dispatching on the archive format.
@@ -7,6 +11,7 @@ package archive
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -14,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 // maxAgentBytes is the maximum size of an agent binary the supervisor will write
@@ -30,7 +36,20 @@ const (
 	// FormatTarGzip treats the downloaded package as a gzipped tarball containing
 	// the collector binary.
 	FormatTarGzip Format = "tar.gz"
+	// FormatZip treats the downloaded package as a zip archive containing the
+	// collector binary.
+	FormatZip Format = "zip"
 )
+
+// isAgentBinary says whether an archive entry named name is the binary named binaryName: at the
+// archive's root, or in its one top directory (pydantic-opamp-supervisor_<version>_<os>_<arch>/).
+func isAgentBinary(name, binaryName string) bool {
+	if name == binaryName {
+		return true
+	}
+	dir, file, ok := strings.Cut(name, "/")
+	return ok && dir != "" && dir != ".." && file == binaryName
+}
 
 // Extractor extracts the agent binary from a downloaded package.
 type Extractor interface {
@@ -48,6 +67,8 @@ func NewExtractor(format Format) (Extractor, error) {
 		return rawExtractor{maxBytes: maxAgentBytes}, nil
 	case FormatTarGzip:
 		return tarGzipExtractor{maxBytes: maxAgentBytes}, nil
+	case FormatZip:
+		return zipExtractor{maxBytes: maxAgentBytes}, nil
 	default:
 		return nil, fmt.Errorf("unsupported archive format: %q", string(format))
 	}
@@ -109,8 +130,11 @@ func (e tarGzipExtractor) Extract(_ context.Context, pkg []byte, binaryName, des
 		if err != nil {
 			return fmt.Errorf("read tarball looking for %q: %w", binaryName, err)
 		}
-		if header.Name != binaryName {
+		if !isAgentBinary(header.Name, binaryName) {
 			continue
+		}
+		if header.Typeflag != tar.TypeReg {
+			return fmt.Errorf("%q in the tarball isn't a regular file", header.Name)
 		}
 		if header.Size > e.maxBytes {
 			return fmt.Errorf("binary exceeds maximum size of %d bytes", e.maxBytes)
@@ -123,6 +147,48 @@ func (e tarGzipExtractor) Extract(_ context.Context, pkg []byte, binaryName, des
 	}
 
 	return nil
+}
+
+var _ Extractor = zipExtractor{}
+
+// zipExtractor extracts the file named binaryName from a zip archive and writes it to
+// destination.
+type zipExtractor struct {
+	// maxBytes is the maximum binary size the extractor will write. An entry declaring more is
+	// refused before anything is written, and one that inflates to more than it declared fails.
+	maxBytes int64
+}
+
+func (e zipExtractor) Extract(_ context.Context, pkg []byte, binaryName, destination string) error {
+	if binaryName == "" {
+		return errors.New("agent binary name is required for zip archives")
+	}
+	zr, err := zip.NewReader(bytes.NewReader(pkg), int64(len(pkg)))
+	if err != nil {
+		return fmt.Errorf("read zip archive: %w", err)
+	}
+	for _, f := range zr.File {
+		if !isAgentBinary(f.Name, binaryName) {
+			continue
+		}
+		if !f.Mode().IsRegular() {
+			return fmt.Errorf("%q in the zip archive isn't a regular file", f.Name)
+		}
+		if f.UncompressedSize64 > uint64(e.maxBytes) {
+			return fmt.Errorf("binary exceeds maximum size of %d bytes", e.maxBytes)
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return fmt.Errorf("open %q in the zip archive: %w", f.Name, err)
+		}
+		defer rc.Close()
+		// archive/zip fails a read past the declared size (ErrFormat), so the bound holds.
+		if err := writeBinaryToDestination(rc, destination); err != nil {
+			return fmt.Errorf("write binary to destination: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("read zip archive looking for %q: not found", binaryName)
 }
 
 // writeBinaryToDestination writes binary to destination, creating or truncating

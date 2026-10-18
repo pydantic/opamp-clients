@@ -4,7 +4,7 @@
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: Validate
 // refuses server.auth with accepts_opamp_connection_settings (the extension's headers would
 // overwrite the issued credentials); HealthCheck.Validate refuses an endpoint that isn't host:port.
-// Agent has remote_config_policy.
+// Agent has remote_config_policy. AcceptsPackages is implemented.
 
 package config
 
@@ -177,8 +177,6 @@ func (c Capabilities) SupportedCapabilities() protobufs.AgentCapabilities {
 		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat
 	}
 
-	// AcceptsPackages is not yet fully implemented. It is included here for completeness.
-	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/47272
 	// AcceptsPackages enables both the AcceptsPackages and ReportsPackageStatuses
 	// OpAMP capabilities; accepting packages without reporting their statuses is not useful.
 	if c.AcceptsPackages {

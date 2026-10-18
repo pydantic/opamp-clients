@@ -77,6 +77,24 @@ func TestWinEnrollWidensThePolicyLocally(t *testing.T) {
 	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://logfire-us.pydantic.dev"}, []string{"C:/ProgramData/app/logs"})
 }
 
+// -AcceptPackages, as on Linux; the executable in the release's .zip is otelcol.exe.
+func TestWinEnrollAcceptsPackages(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-AcceptPackages", "-NoStart")
+	require.NoError(t, err, out)
+	cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
+	require.NoError(t, err)
+	collector := filepath.Join(t.TempDir(), "otelcol.exe")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	programs := filepath.ToSlash(filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe"))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(cfg), programs, filepath.ToSlash(collector), 1)), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assertPackages(t, loaded, true, "otelcol.exe")
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+}
+
 // What it refuses, before it writes anything.
 func TestWinEnrollRefuses(t *testing.T) {
 	for _, tt := range []struct {

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: the Cosign
-// verifier's settings, as upstream's specification describes them, health_timeout, and the archive
-// format read from the file.
+// verifier's settings, as upstream's specification describes them, health_timeout, the archive
+// format read from the file, and PydanticCosignVerifier.
 
 package config
 
@@ -16,7 +16,7 @@ import (
 
 // AgentPackage describes how collector executable updates downloaded by the
 // supervisor are identified and verified. The archive format is not configured
-// here; the supervisor detects it from the file (gzip: a .tar.gz).
+// here; the supervisor detects it from the file (gzip: a .tar.gz; zip: a .zip).
 type AgentPackage struct {
 	// AgentBinary is the name of the collector binary as it appears inside the
 	// downloaded archive. Used to locate the binary in archives that bundle
@@ -82,6 +82,23 @@ func DefaultCosignVerifier() CosignVerifier {
 		}},
 	}
 }
+
+// PydanticCosignVerifier accepts this repository's Supervisor releases: the archives its release
+// workflow signs, on a go/opampsupervisor/vX.Y.Z tag or run by hand from main. It is what
+// pydantic-opamp-enroll --accept-packages writes.
+func PydanticCosignVerifier() CosignVerifier {
+	return CosignVerifier{
+		GithubWorkflowRepository: "pydantic/opamp-clients",
+		Identities: []CosignIdentity{{
+			Issuer:       "https://token.actions.githubusercontent.com",
+			SubjectRegex: PydanticReleaseSubjectRegex,
+		}},
+	}
+}
+
+// PydanticReleaseSubjectRegex matches the certificate subject of this repository's release
+// workflow.
+const PydanticReleaseSubjectRegex = `^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@refs/(tags/go/opampsupervisor/v[0-9]+\.[0-9]+\.[0-9]+|heads/main)$`
 
 // Validate checks that health_timeout isn't negative (0: the default, 30s).
 func (p AgentPackage) Validate() error {

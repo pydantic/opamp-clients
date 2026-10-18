@@ -97,6 +97,28 @@ func TestMacEnrollWidensThePolicyLocally(t *testing.T) {
 	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://logfire-us.pydantic.dev"}, []string{"/Library/Logs/app"})
 }
 
+// --accept-packages, as on Linux.
+func TestMacEnrollAcceptsPackages(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--no-start")
+	require.NoError(t, err, out)
+	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
+	cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))
+	require.NoError(t, err)
+	collector := filepath.Join(t.TempDir(), "otelcol")
+	require.NoError(t, os.WriteFile(collector, nil, 0o755))
+	path := filepath.Join(t.TempDir(), "supervisor.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(strings.NewReplacer(
+		"/opt/pydantic-opamp/etc/enroll-token", filepath.Join(etc, "enroll-token"),
+		"/opt/pydantic-opamp/bin/otelcol", collector,
+		"/opt/pydantic-opamp/var", t.TempDir(),
+	).Replace(string(cfg))), 0o600))
+	loaded, err := config.Load(path)
+	require.NoError(t, err)
+	assertPackages(t, loaded, true, "otelcol")
+	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+}
+
 func TestMacEnrollNoStart(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
 	out, err := macEnroll(t, root, tools, "t", "--endpoint", "http://127.0.0.1:4320/v1/opamp", "--plaintext", "--no-start")
