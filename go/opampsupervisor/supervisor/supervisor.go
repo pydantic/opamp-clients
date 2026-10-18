@@ -34,6 +34,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -2367,7 +2368,19 @@ func (s *Supervisor) writeAgentConfig() error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), path)
+	return renameOver(tmp.Name(), path)
+}
+
+// renameOver renames from over to. Windows replaces the file in place (MoveFileEx), but refuses
+// while another process has it open, as a collector reading its config briefly does: that is
+// tried again for a little while.
+func renameOver(from, to string) error {
+	err := os.Rename(from, to)
+	for i := 0; err != nil && runtime.GOOS == "windows" && i < 50; i++ {
+		time.Sleep(20 * time.Millisecond)
+		err = os.Rename(from, to)
+	}
+	return err
 }
 
 func (s *Supervisor) hasAgentConfigState() bool {

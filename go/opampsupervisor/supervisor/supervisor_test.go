@@ -3452,6 +3452,10 @@ service:
 // A collector starting while its config is rewritten (as a HUP reload can) reads the old config
 // or the new one, never a truncated file, which it would exit on.
 func TestSupervisor_writeAgentConfigIsNeverSeenHalfWritten(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Its reader holds the file open without end, and Windows doesn't rename over an open file.
+		t.Skip("reads without pause, which Windows' rename waits out")
+	}
 	s := newConfigWritingSupervisor(t)
 	bodies := []string{strings.Repeat("a", 1<<16), strings.Repeat("b", 1<<17)}
 	s.cfgState.Store(&configState{mergedConfig: bodies[0]})
