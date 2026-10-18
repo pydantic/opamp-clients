@@ -66,7 +66,9 @@ from integrations import (  # noqa: E402
 )
 
 IMAGE = "mcr.microsoft.com/dotnet/sdk:8.0"
-NUGET = ["-v", "opamp-clients-nuget:/root/.nuget/packages"]
+# NuGet's package folder, a Docker volume: OPAMP_EXAMPLES_NUGET_VOLUME names another, for a run
+# beside this one (two restores writing into one at once can leave it half written).
+NUGET = ["-v", f"{os.environ.get('OPAMP_EXAMPLES_NUGET_VOLUME') or 'opamp-clients-nuget'}:/root/.nuget/packages"]
 TARGET = target("dotnet-otel")
 # Not "app": on a case-insensitive disk that is the published "App" of an older layout.
 OUT = TARGET / "publish"

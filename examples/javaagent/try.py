@@ -62,7 +62,9 @@ from integrations import (  # noqa: E402
 HERE = Path(__file__).resolve().parent
 TARGET = target("javaagent")
 AGENT_VERSION = "2.31.1"
-M2 = ["-v", "opamp-clients-m2:/root/.m2"]
+# Maven's cache, a Docker volume: OPAMP_EXAMPLES_M2_VOLUME names another, for a run beside this one
+# (two builds installing into one at once can leave it half written).
+M2 = ["-v", f"{os.environ.get('OPAMP_EXAMPLES_M2_VOLUME') or 'opamp-clients-m2'}:/root/.m2"]
 LOCAL = "--local" in sys.argv
 
 
