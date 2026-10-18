@@ -184,7 +184,9 @@ type Supervisor struct {
 	usingLastWorkingRemoteConfig atomic.Bool
 
 	// A channel to indicate there is a new config to apply.
-	hasNewConfig chan struct{}
+	hasNewConfig      chan struct{}
+	connectionEnv     atomic.Pointer[map[string]string]
+	connectionUpdates chan connectionUpdate
 	// configApplyTimeout is the maximum time to wait for the agent to apply a new config.
 	// After this time passes without the agent reporting health as OK, the agent is considered unhealthy.
 	configApplyTimeout time.Duration
@@ -275,6 +277,7 @@ func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Superviso
 	s := &Supervisor{
 		pidProvider:                    defaultPIDProvider{},
 		hasNewConfig:                   make(chan struct{}, 1),
+		connectionUpdates:              make(chan connectionUpdate, 1),
 		agentInstalls:                  make(chan agentInstall),
 		restartRequests:                make(chan struct{}, 1),
 		agentConfigOwnTelemetrySection: &atomic.Value{},
@@ -493,6 +496,12 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return err
 	}
 	s.commander.SetPassthroughLogHook(s.appendPassthroughLogLine)
+	s.commander.SetEnvironmentProvider(func() map[string]string {
+		if env := s.connectionEnv.Load(); env != nil {
+			return *env
+		}
+		return nil
+	})
 
 	s.agentWG.Go(func() {
 		s.runAgentProcess()
@@ -2090,6 +2099,10 @@ func (s *Supervisor) runAgentProcess() {
 
 	for {
 		select {
+		case update := <-s.connectionUpdates:
+			s.stopAgentApplyConfig()
+			_, err := s.startAgent()
+			s.reportConnectionSettings(update.hash, err)
 		case req := <-s.agentInstalls:
 			// Changed here: the update stops and starts the collector itself. A restart still
 			// pending stays so: after an update it finds the collector running.
@@ -2694,6 +2707,9 @@ func (s *Supervisor) onMessage(ctx context.Context, msg *types.MessageData) {
 	ctx, span := s.getTracer().Start(ctx, "onMessage")
 	defer span.End()
 	configChanged := false
+	if msg.OtherConnSettings != nil {
+		s.receiveConnectionCredentials(msg.OfferedConnectionsSettingsHash, msg.OtherConnSettings)
+	}
 
 	if msg.AgentIdentification != nil {
 		configChanged = s.processAgentIdentificationMessage(msg.AgentIdentification) || configChanged

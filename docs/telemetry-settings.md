@@ -8,6 +8,20 @@ connection itself ([connection-settings.md](connection-settings.md) covers that)
 This is how a server tells an SDK or agent where to export its telemetry, and rotates the
 credentials it uses.
 
+## Supervisor exporter credentials
+
+The Supervisor can bind a named connection's bearer credential to a Collector
+environment variable. Enable `accepts_other_connection_settings` and configure
+`agent.connection_env`, for example `logfire/otlp: LOGFIRE_TOKEN`.
+The server supplies an `Authorization: Bearer ...` header for that connection.
+The Collector policy references `${env:LOGFIRE_TOKEN}`.
+
+The Supervisor accepts only configured bindings. It restarts the Collector with
+the new environment before it reports the settings as applied. The client saves
+the offered settings and restores them after a restart. Set `storage.state_key`
+to encrypt those settings at rest. The enrollment helpers configure this binding
+and preserve the key that protects previously issued credentials.
+
 ## What the spec says, and what it leaves open
 
 - An offer's `hash` covers all of its settings, including parts left out because they are

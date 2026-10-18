@@ -214,10 +214,12 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		// The Supervisor has written them into the collector's config (it restarts the collector
 		// with it), and reports no outcome of its own: the core needs the answer to hand over
 		// the next.
-		cl.SetConnectionSettingsStatus(&protobufs.ConnectionSettingsStatus{
-			LastConnectionSettingsHash: offers.GetHash(),
-			Status:                     protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED,
-		})
+		if len(offers.GetOtherConnections()) == 0 {
+			cl.SetConnectionSettingsStatus(&protobufs.ConnectionSettingsStatus{
+				LastConnectionSettingsHash: offers.GetHash(),
+				Status:                     protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED,
+			})
+		}
 	case opamp.CustomMessage:
 		message(&types.MessageData{CustomMessage: n.CustomMessage})
 	case opamp.ServerCustomCapabilities:

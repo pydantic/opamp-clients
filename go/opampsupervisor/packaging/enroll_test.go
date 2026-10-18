@@ -221,6 +221,25 @@ service:
 	}
 }
 
+func TestEnrollPreparedInstance(t *testing.T) {
+	e := newEnrollment(t)
+	uid := "f0cff0a3-08e5-4c49-96ce-1366b14525ed"
+	out, err := e.run(t, "bootstrap-token\n", "--endpoint", "wss://opamp.example.com/enroll", "--instance-id", uid, "--no-start")
+	require.NoError(t, err, out)
+	cfg := e.read(t, "supervisor.yaml")
+	assert.Contains(t, cfg, "instance_id: \""+uid+"\"")
+	assert.Contains(t, cfg, "accepts_other_connection_settings: true")
+	assert.Contains(t, cfg, "logfire/otlp: LOGFIRE_TOKEN")
+	assert.NotContains(t, cfg, "bootstrap-token")
+	assert.NotContains(t, out, "bootstrap-token")
+	other := newEnrollment(t)
+	out, err = other.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/enroll", "--instance-id", "invalid")
+	require.Error(t, err)
+	assert.Contains(t, out, "needs a UUID")
+	_, err = os.Stat(filepath.Join(other.root, "etc"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+}
+
 // Enrolling again replaces the token but keeps the state key: a new key couldn't open the
 // state the old one sealed.
 func TestEnrollAgainKeepsTheStateKey(t *testing.T) {

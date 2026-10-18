@@ -17,6 +17,7 @@ param(
     [Parameter(Mandatory = $true)][string]$Endpoint,
     # Where to read the enrollment token; standard input by default.
     [string]$TokenFile,
+    [Guid]$InstanceId,
     # Read the enrollment token and telemetry token from two standard-input lines.
     [switch]$TelemetryTokenStdin,
     # A CA bundle to trust for the server, in place of the system's.
@@ -165,11 +166,15 @@ $tls
 capabilities:
   accepts_remote_config: true
   accepts_opamp_connection_settings: true
+  accepts_other_connection_settings: true
   reports_effective_config: true
   reports_health: true
   reports_available_components: true$acceptsPackages
 
 agent:
+$(if ($InstanceId -and $InstanceId -ne [Guid]::Empty) { "  instance_id: '$InstanceId'" })
+  connection_env:
+    logfire/otlp: LOGFIRE_TOKEN
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
 $agentEnv
 

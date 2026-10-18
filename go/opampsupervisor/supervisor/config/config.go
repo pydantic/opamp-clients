@@ -106,6 +106,7 @@ type Capabilities struct {
 	AcceptsRemoteConfig            bool `mapstructure:"accepts_remote_config"`
 	AcceptsRestartCommand          bool `mapstructure:"accepts_restart_command"`
 	AcceptsOpAMPConnectionSettings bool `mapstructure:"accepts_opamp_connection_settings"`
+	AcceptsOtherConnectionSettings bool `mapstructure:"accepts_other_connection_settings"`
 	ReportsEffectiveConfig         bool `mapstructure:"reports_effective_config"`
 	ReportsOwnMetrics              bool `mapstructure:"reports_own_metrics"`
 	ReportsOwnLogs                 bool `mapstructure:"reports_own_logs"`
@@ -168,6 +169,9 @@ func (c Capabilities) SupportedCapabilities() protobufs.AgentCapabilities {
 
 	if c.AcceptsOpAMPConnectionSettings {
 		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings
+	}
+	if c.AcceptsOtherConnectionSettings {
+		supportedCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsOtherConnectionSettings
 	}
 
 	if c.ReportsAvailableComponents {
@@ -253,6 +257,8 @@ type Agent struct {
 	ConfigFiles                 []string          `mapstructure:"config_files"`
 	Arguments                   []string          `mapstructure:"args"`
 	Env                         map[string]string `mapstructure:"env"`
+	// ConnectionEnv binds a named connection's bearer credential to a child-process variable.
+	ConnectionEnv map[string]string `mapstructure:"connection_env"`
 	// StartupFallbackConfigs is an ordered list of fallback configuration files to use
 	// when the OpAMP server is unreachable. Configs are merged in order.
 	StartupFallbackConfigs []string `mapstructure:"startup_fallback_configs"`
