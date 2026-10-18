@@ -3449,6 +3449,45 @@ service:
 	})
 }
 
+// A collector starting while its config is rewritten (as a HUP reload can) reads the old config
+// or the new one, never a truncated file, which it would exit on.
+func TestSupervisor_writeAgentConfigIsNeverSeenHalfWritten(t *testing.T) {
+	s := newConfigWritingSupervisor(t)
+	bodies := []string{strings.Repeat("a", 1<<16), strings.Repeat("b", 1<<17)}
+	s.cfgState.Store(&configState{mergedConfig: bodies[0]})
+	require.NoError(t, s.writeAgentConfig())
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := range 200 {
+			s.cfgState.Store(&configState{mergedConfig: bodies[i%2]})
+			assert.NoError(t, s.writeAgentConfig())
+		}
+	}()
+	for reading := true; reading; {
+		select {
+		case <-done:
+			reading = false
+		default:
+		}
+		got, err := os.ReadFile(s.agentConfigFilePath())
+		require.NoError(t, err)
+		require.True(t, string(got) == bodies[0] || string(got) == bodies[1], "read %d bytes", len(got))
+	}
+
+	entries, err := os.ReadDir(s.config.Storage.Directory)
+	require.NoError(t, err)
+	for _, e := range entries {
+		require.False(t, strings.HasSuffix(e.Name(), ".tmp"), "left behind: %s", e.Name())
+	}
+	info, err := os.Stat(s.agentConfigFilePath())
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "only the Supervisor's user reads it")
+	}
+}
+
 func newConfigWritingSupervisor(t *testing.T) *Supervisor {
 	t.Helper()
 	s := &Supervisor{

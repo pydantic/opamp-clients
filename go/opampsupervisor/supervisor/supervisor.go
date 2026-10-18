@@ -2352,10 +2352,22 @@ func (s *Supervisor) reloadAgentConfig() error {
 
 func (s *Supervisor) writeAgentConfig() error {
 	cfgState := s.cfgState.Load().(*configState)
-	if err := os.WriteFile(s.agentConfigFilePath(), []byte(cfgState.mergedConfig), 0o600); err != nil {
+	// Changed here: written and renamed into place, so a collector starting meanwhile reads the
+	// old config or the new one, never a truncated file it exits on.
+	path := s.agentConfigFilePath()
+	tmp, err := os.CreateTemp(filepath.Dir(path), agentConfigFileName+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return nil
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(cfgState.mergedConfig); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }
 
 func (s *Supervisor) hasAgentConfigState() bool {
