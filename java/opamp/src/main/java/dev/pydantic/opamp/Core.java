@@ -126,6 +126,11 @@ final class Core implements AutoCloseable {
     }
   }
 
+  /** An instance of the embedded core, made and dropped: it throws if the core can't be loaded. */
+  static void instantiate() {
+    Instance.builder(module()).withMachineFactory(CoreModule::create).build();
+  }
+
   /** The instance the Setup call runs on: one of its own, made on first use. Guarded by SETUP_LOCK. */
   private static Instance setupInstance;
   private static final Object SETUP_LOCK = new Object();

@@ -32,9 +32,22 @@ internal sealed class OpAmpAgent : IDisposable
     private ComponentHealth? health;
 
     public OpAmpAgent(IOptions<OpAmpOptions> options, IConfiguration? configuration = null)
+        : this(options, configuration, global::Pydantic.OpAmp.Client.OpAmpSetup.Unavailable)
+    {
+    }
+
+    /// <summary>As the other constructor, with <paramref name="coreUnavailable"/> to say why the core can't be loaded (tests).</summary>
+    internal OpAmpAgent(IOptions<OpAmpOptions> options, IConfiguration? configuration, Func<string?> coreUnavailable)
     {
         this.getenv = Getenv(configuration);
         var o = options.Value;
+        if (coreUnavailable() is { } unavailable)
+        {
+            // Whatever the endpoint: the core is what reads it. The application's own settings stand.
+            this.log.Sink.Warn($"the core can't be loaded on {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}; the SDK runs unmanaged: {unavailable}");
+            return;
+        }
+
         foreach (var w in o.Warnings)
         {
             this.log.Sink.Warn(w);

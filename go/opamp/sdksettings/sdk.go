@@ -61,6 +61,16 @@ func New(ctx context.Context) (*Layer, error) {
 		call: mod.ExportedFunction("call")}, nil
 }
 
+// Unavailable is why the layer can't be loaded here (its module doesn't compile or doesn't
+// instantiate), or nil when it can.
+func Unavailable(ctx context.Context) error {
+	l, err := New(ctx)
+	if err != nil {
+		return err
+	}
+	return l.Close(ctx)
+}
+
 // Close releases the instance, once a call in progress has returned. A call after it fails.
 func (l *Layer) Close(ctx context.Context) error {
 	l.mu.Lock()

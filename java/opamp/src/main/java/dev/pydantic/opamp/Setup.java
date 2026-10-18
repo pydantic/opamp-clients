@@ -28,6 +28,45 @@ public final class Setup {
     }
   }
 
+  /** Why the core can't be loaded, once asked: "" when it can. */
+  private static volatile String unavailable;
+
+  /**
+   * Why the client core can't be loaded here (the classes compiled from its module missing or
+   * broken, or a module that won't instantiate), or null when it can: found out once. An
+   * integration asks before {@link #start}, and runs unmanaged when the core can't be loaded. (The
+   * SDK settings layer's: {@link dev.pydantic.opamp.sdk.SdkSettings#unavailable}.)
+   */
+  public static String unavailable() {
+    String why = unavailable;
+    if (why == null) {
+      String found = unavailable(Core::instantiate);
+      why = found == null ? "" : found;
+      unavailable = why;
+    }
+    return why.isEmpty() ? null : why;
+  }
+
+  /**
+   * Why one of {@code loads} fails, or null when none does. A failure of the JVM itself (out of
+   * memory) isn't the core's: it goes on.
+   */
+  public static String unavailable(Runnable... loads) {
+    for (Runnable load : loads) {
+      try {
+        load.run();
+      } catch (VirtualMachineError e) {
+        if (!(e instanceof StackOverflowError)) {
+          throw e;
+        }
+        return e.toString();
+      } catch (Throwable e) { // NoClassDefFoundError, ExceptionInInitializerError, the runtime's own
+        return e.toString();
+      }
+    }
+    return null;
+  }
+
   /**
    * Where the server is and how to reach it, from the environment and what the code gives;
    * {@code off} without an endpoint.

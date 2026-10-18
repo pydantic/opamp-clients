@@ -117,6 +117,15 @@ final class Extension {
   /** {@link #HOST} with {@code custom}. */
   static final SettingsProto.Host HOST_WITH_APP = withApp(HOST);
 
+  /**
+   * Why the client core's and the SDK settings layer's modules can't be loaded here, or null when
+   * they can (a test puts its own in place).
+   */
+  java.util.function.Supplier<String> coreUnavailable = dev.pydantic.opamp.Setup::unavailable;
+  java.util.function.Supplier<String> layerUnavailable = SdkSettings::unavailable;
+  /** Whether a core that can't be loaded has been said: once a JVM. */
+  private boolean coreSaid;
+
   /** Puts the bridge to the application's {@code AppSettings} in place: null when it can't. */
   java.util.function.Supplier<AppSettingsSink> appSettings = AppSettingsSink::install;
   /** The application's own settings in force before {@link #properties}: what a failed setup puts back. */
@@ -494,6 +503,19 @@ final class Extension {
     }
   }
 
+  /**
+   * Whether the core can be loaded, by {@code unavailable} (why it can't, or null); when it can't,
+   * said once, and the agent runs unmanaged.
+   */
+  private boolean coreLoads(String unavailable) {
+    if (unavailable != null && !coreSaid) {
+      coreSaid = true;
+      LOG.warning("OpAMP: the core can't be loaded on " + System.getProperty("os.name") + "-"
+          + System.getProperty("os.arch") + "; the agent runs unmanaged: " + unavailable);
+    }
+    return unavailable == null;
+  }
+
   /** Whether an endpoint is configured: without one the extension changes nothing. */
   synchronized boolean on() {
     return setup != null;
@@ -515,8 +537,22 @@ final class Extension {
     declared = HOST;
     ungated.clear();
     samplerOutside = false;
+    if (!coreLoads(coreUnavailable.get())) {
+      setup = null;
+      return Map.of();
+    }
     setup = Setup.from(config, env, System.getProperty("sun.java.command"));
     if (setup == null) {
+      return Map.of();
+    }
+    // The settings layer only once there is a server: an agent without one never loads it.
+    if (!coreLoads(layerUnavailable.get())) {
+      try {
+        release(setup);
+      } catch (IOException e) {
+        // The JVM's end lets it go.
+      }
+      setup = null;
       return Map.of();
     }
     byte[] saved = null;
@@ -840,7 +876,7 @@ final class Extension {
       OpampClient.Config config = b.build();
       InstrumentationUtil.suppressInstrumentation(
           () -> client.complete(OpampClient.start(config, status, this::notified)));
-    } catch (RuntimeException e) {
+    } catch (RuntimeException | LinkageError | StackOverflowError e) {
       LOG.log(Level.SEVERE, "OpAMP: the client did not start; the agent runs unmanaged", e);
       return;
     }

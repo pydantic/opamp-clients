@@ -12,11 +12,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/sdksettings"
 )
 
 // server is where the OpAMP server is, as the core's Setup decides it from Setup's options and
@@ -101,12 +103,36 @@ func setupOS() opamp.SetupOs {
 	return opamp.SetupOsUnix
 }
 
+var (
+	// coreUnavailable and layerUnavailable are why the client core's and the SDK settings
+	// layer's modules can't be loaded (a test puts failing ones in their place).
+	coreUnavailable  = opamp.CoreUnavailable
+	layerUnavailable = sdksettings.Unavailable
+	coreWarned       sync.Once
+)
+
+// coreLoads is whether the core can be loaded, by unavailable; when it can't, it is said once,
+// and the SDK runs unmanaged.
+func coreLoads(unavailable func(context.Context) error) bool {
+	err := unavailable(context.Background())
+	if err != nil {
+		coreWarned.Do(func() {
+			slog.Warn("opamp: the core can't be loaded on "+runtime.GOOS+"/"+runtime.GOARCH+"; the SDK runs unmanaged",
+				"error", err)
+		})
+	}
+	return err == nil
+}
+
 // serverFromEnv is where the server is, from OTEL_OPAMP_*, each overridden by the option that
 // gives it; nil without an endpoint (the package is off). The rules are the core's (its Setup
 // call), the same in every language; what is here is the I/O: reading the variables, taking a
 // slot of the default state directory, and saying the warnings. A setting it can't use is never
 // an error: the default, with a warning.
 func serverFromEnv(getenv func(string) string, opts ...Option) *server {
+	if !coreLoads(coreUnavailable) {
+		return nil
+	}
 	var o options
 	for _, opt := range opts {
 		opt(&o)
@@ -152,6 +178,10 @@ func serverFromEnv(getenv func(string) string, opts ...Option) *server {
 		slog.Warn("opamp: " + w)
 	}
 	if s.GetOff() {
+		return nil
+	}
+	// The settings layer only once there is a server: an application without one never loads it.
+	if !coreLoads(layerUnavailable) {
 		return nil
 	}
 	srv := &server{endpoint: s.GetEndpoint(), header: http.Header{}, stateDir: s.GetStateDir(),

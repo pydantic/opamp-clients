@@ -124,6 +124,7 @@ import {
   SetupIdentitySchema,
   SetupStartSchema,
   SetupVariableSchema,
+  coreUnavailable,
   identifySetup,
   startSetup,
 } from "@pydantic/opamp-client";
@@ -136,6 +137,7 @@ import {
   type ScopeLevel,
   SdkSettings,
   type Settings,
+  settingsUnavailable,
 } from "@pydantic/opamp-client/sdk";
 
 import { AppSettings, appSettings } from "./app-settings.js";
@@ -470,6 +472,20 @@ const HEADERS_IN_CODE = "the headers given to register()";
 const SETUP_VARIABLES = ["OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR",
   "OTEL_OPAMP_HEARTBEAT_INTERVAL", "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA"];
 
+let coreWarned = false;
+
+/**
+ * Whether the core can be loaded, by `unavailable` (why it can't, or undefined); when it can't,
+ * said once, and the SDK runs unmanaged.
+ */
+function coreLoads(unavailable: string | undefined): boolean {
+  if (unavailable !== undefined && !coreWarned) {
+    coreWarned = true;
+    say.warn(`OpAMP: the core can't be loaded on ${process.platform}-${process.arch}; the SDK runs unmanaged: ${unavailable}`);
+  }
+  return unavailable === undefined;
+}
+
 /**
  * Where the server is, from OTEL_OPAMP_* and what the code gives; undefined when the package is
  * off. The rules are the core's (its Setup call), the same in every language: what is here is the
@@ -480,6 +496,7 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
   const options = given(code);
   // No SDK, nothing to manage: not an agent in the fleet either.
   if (env.OTEL_SDK_DISABLED?.trim().toLowerCase() === "true") return undefined;
+  if (!coreLoads(coreUnavailable())) return undefined;
   let heartbeatMs: bigint | undefined;
   const ms = options.heartbeatIntervalMs;
   if (ms !== undefined) {
@@ -523,6 +540,8 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
   }
   for (const w of s.warnings) say.warn(`OpAMP: ${w}`);
   if (s.off) return undefined;
+  // The settings layer only once there is a server: an application without one never loads it.
+  if (!coreLoads(settingsUnavailable())) return undefined;
   const setup: Setup = {
     endpoint: s.endpoint,
     headers: Object.fromEntries(s.headers.map((h) => [h.name, h.value])),

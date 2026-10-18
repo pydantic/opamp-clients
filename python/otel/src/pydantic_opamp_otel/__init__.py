@@ -33,6 +33,7 @@ import concurrent.futures.thread  # noqa: F401 - its exit hook is registered bef
 import logging
 import math
 import os
+import platform
 import secrets
 import selectors
 import shutil
@@ -93,6 +94,20 @@ _INSTANCE_ID = "service.instance.id"
 #: The variables the core's Setup reads (setup.SetupStart).
 _SETUP_VARIABLES = ("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_HEADERS", "OTEL_OPAMP_STATE_DIR", "OTEL_OPAMP_HEARTBEAT_INTERVAL",
                     "OTEL_SERVICE_NAME", "OTEL_RESOURCE_ATTRIBUTES", "HOME", "XDG_STATE_HOME", "LOCALAPPDATA")
+
+
+_core_warned = False
+
+
+def _core_loads() -> bool:
+    """Whether the core can be loaded; when it can't, said once, and the SDK runs unmanaged."""
+    global _core_warned
+    reason = setup.unavailable()
+    if reason is not None and not _core_warned:
+        _core_warned = True
+        _log.warning("OpAMP: the core can't be loaded on %s-%s; the SDK runs unmanaged: %s", sys.platform,
+                     platform.machine(), reason)
+    return reason is None
 
 
 def _setup_os() -> int:
@@ -236,6 +251,8 @@ class Setup:
         default, as a variable it can't read is: it never stops the application. The rules are the
         core's (its Setup call), the same in every language; what is here is the I/O: reading the
         variables, taking a slot of the default state directory, and saying the warnings."""
+        if not _core_loads():
+            return None
         env = {name: env[name] for name in _SETUP_VARIABLES if env.get(name)}
         code = setup.SetupInCode(endpoint_name="the endpoint given to configure()",
                                  headers_name="the headers given to configure()", heartbeat_name="heartbeat_interval")

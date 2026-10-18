@@ -1378,3 +1378,37 @@ def test_a_warning_reaches_stderr_once_whatever_the_root_logger_has(root):
     err = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=60).stderr
     assert err.count("OpAMP: fix me") == (0 if root == "errors only" else 1), err
     assert ("app: OpAMP: fix me" in err) == (root in ("stderr", "otel+stderr")), err
+
+
+@pytest.mark.parametrize(("library", "reason"), [(None, "isn't installed"), (b"not a library", "can't be loaded")])
+def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_path, library, reason):
+    # An pydantic_opamp_core package without its library, or with a file that isn't one: the import and
+    # configure() go through, the SDK works on its own settings, and one line says why.
+    core = tmp_path / "pydantic_opamp_core"
+    core.mkdir()
+    (core / "__init__.py").write_text("")
+    if library is not None:
+        from pydantic_opamp_client import _native
+        (core / _native._lib_name()).write_bytes(library)
+    child = textwrap.dedent("""
+        import pydantic_opamp_otel
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+        pydantic_opamp_otel.configure(endpoint="http://127.0.0.1:9/v1/opamp")
+        pydantic_opamp_otel.AGENT.prepare()  # set up again: not said again
+        exporter = InMemorySpanExporter()
+        trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))
+        with trace.get_tracer("app").start_as_current_span("work"):
+            pass
+        assert [s.name for s in exporter.get_finished_spans()] == ["work"]
+        assert pydantic_opamp_otel.AGENT.setup is None and pydantic_opamp_otel.AGENT.client is None
+    """)
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])]),
+           "OTEL_TRACES_EXPORTER": "none", "OTEL_METRICS_EXPORTER": "none", "OTEL_LOGS_EXPORTER": "none"}
+    run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=env)
+    assert run.returncode == 0, run.stderr
+    said = [line for line in run.stderr.splitlines() if "OpAMP" in line]
+    assert len(said) == 1, run.stderr
+    assert said[0].startswith("OpAMP: the core can't be loaded on ") and "; the SDK runs unmanaged: " in said[0]
+    assert reason in said[0], said

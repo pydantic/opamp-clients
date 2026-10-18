@@ -255,6 +255,20 @@ func (t *tap) close() {
 	}
 }
 
+// Unavailable is why the core can't be loaded here (its module doesn't compile or doesn't
+// instantiate), or nil when it can.
+func Unavailable(ctx context.Context) error {
+	compileCore()
+	if compileErr != nil {
+		return fmt.Errorf("compile the OpAMP core: %w", compileErr)
+	}
+	mod, err := runtime.InstantiateModule(ctx, compiled, wazero.NewModuleConfig().WithName(""))
+	if err != nil {
+		return fmt.Errorf("instantiate the OpAMP core: %w", err)
+	}
+	return mod.Close(ctx)
+}
+
 // Setup runs the core's Setup call (an SDK integration's start-up decisions): stateless, on an
 // instance of its own that it closes. The reply's error is the core's word that the call is
 // unusable (a bug in the caller).

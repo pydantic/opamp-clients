@@ -26,6 +26,24 @@ public final class SdkSettings {
   private final ExportFunction free;
   private final ExportFunction call;
 
+  /** Why the layer can't be loaded, once asked: "" when it can. */
+  private static volatile String unavailable;
+
+  /**
+   * Why the layer can't be loaded here (the classes compiled from its module missing or broken, or
+   * a module that won't instantiate), or null when it can: found out once. An integration asks
+   * before it makes one, and runs unmanaged when the layer can't be loaded.
+   */
+  public static String unavailable() {
+    String why = unavailable;
+    if (why == null) {
+      String found = dev.pydantic.opamp.Setup.unavailable(SdkSettings::new);
+      why = found == null ? "" : found;
+      unavailable = why;
+    }
+    return why.isEmpty() ? null : why;
+  }
+
   /** An instance of the layer. */
   public SdkSettings() {
     Instance instance =

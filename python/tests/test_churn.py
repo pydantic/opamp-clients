@@ -66,7 +66,7 @@ class Sessions:
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._handles: set[int] = set()
         self._lock = threading.Lock()
-        new, free = _native._lib.opamp_core_new, _native._lib.opamp_core_free
+        new, free = _native._lib().opamp_core_new, _native._lib().opamp_core_free
 
         def counted_new():
             handle = new()
@@ -79,8 +79,8 @@ class Sessions:
                 self._handles.discard(handle)
             free(handle)
 
-        monkeypatch.setattr(_native._lib, "opamp_core_new", counted_new)
-        monkeypatch.setattr(_native._lib, "opamp_core_free", counted_free)
+        monkeypatch.setattr(_native._lib(), "opamp_core_new", counted_new)
+        monkeypatch.setattr(_native._lib(), "opamp_core_free", counted_free)
 
     @property
     def live(self) -> int:

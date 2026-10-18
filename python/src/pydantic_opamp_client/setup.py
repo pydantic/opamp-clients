@@ -16,7 +16,7 @@ from ._proto.opamp.core.v1.core_pb2 import (Header, SetupHints, SetupIdentified,
                                             SetupStart, SetupStarted, Variable)
 
 __all__ = ["LOCK_FILE", "UID_FILE", "Header", "SetupHints", "SetupIdentified", "SetupIdentity", "SetupInCode",
-           "SetupStart", "SetupStarted", "Variable", "identify", "start"]
+           "SetupStart", "SetupStarted", "Variable", "identify", "start", "unavailable"]
 
 #: The files in a state directory's slot: the lock a process holds while it runs, and the UID.
 LOCK_FILE = "lock"
@@ -28,6 +28,13 @@ OS_WINDOWS = core_pb2.SETUP_OS_WINDOWS
 UID_MADE = core_pb2.SETUP_UID_FROM_MADE
 UID_SAVED = core_pb2.SETUP_UID_FROM_SAVED
 UID_GIVEN = core_pb2.SETUP_UID_FROM_GIVEN
+
+
+def unavailable() -> str | None:
+    """Why the core can't be loaded here (no build for this platform, a file that isn't one, a
+    mismatched interface), or None when it can. An integration asks before it calls start, and
+    runs unmanaged when it can't: the calls below raise ImportError then."""
+    return _native.unavailable()
 
 
 def _call(call: core_pb2.SetupCall) -> core_pb2.SetupReply:

@@ -48,7 +48,7 @@ import type {
 
 export * from "./gen/opamp/v1/opamp_pb.js";
 export * from "./gen/opamp/v1/anyvalue_pb.js";
-export { CoreError, identifySetup, startSetup } from "./core.js";
+export { CoreError, coreUnavailable, identifySetup, startSetup } from "./core.js";
 // The core's Setup call: an OpenTelemetry integration's start-up decisions (core.ts).
 export {
   type Header as SetupHeader,

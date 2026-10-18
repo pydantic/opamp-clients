@@ -12,6 +12,7 @@ from __future__ import annotations
 import ctypes
 import importlib.util
 import sys
+import threading
 from pathlib import Path
 
 ABI_VERSION = 1  # the C interface this package speaks (the library's ABI_VERSION)
@@ -36,26 +37,61 @@ def _find() -> str:
                       "pydantic-opamp-core has no build for this platform")
 
 
-_lib = ctypes.CDLL(_find())
 _u8p = ctypes.POINTER(ctypes.c_uint8)
 _call = [ctypes.c_char_p, ctypes.c_size_t, ctypes.POINTER(_u8p), ctypes.POINTER(ctypes.c_size_t)]
-_lib.opamp_native_abi_version.restype = ctypes.c_uint32
-_lib.opamp_native_abi_version.argtypes = []
-_lib.opamp_core_new.restype = ctypes.c_void_p
-_lib.opamp_core_new.argtypes = []
-_lib.opamp_core_free.restype = None
-_lib.opamp_core_free.argtypes = [ctypes.c_void_p]
-for _f in (_lib.opamp_core_init, _lib.opamp_core_step):
-    _f.restype = ctypes.c_int32
-    _f.argtypes = [ctypes.c_void_p, *_call]
-_lib.opamp_sdk_settings_call.restype = ctypes.c_int32
-_lib.opamp_sdk_settings_call.argtypes = _call
-_lib.opamp_bytes_free.restype = None
-_lib.opamp_bytes_free.argtypes = [_u8p, ctypes.c_size_t]
+_loaded: ctypes.CDLL | None = None
+_failed: str | None = None
+_loading = threading.Lock()
 
-if (_version := _lib.opamp_native_abi_version()) != ABI_VERSION:
-    raise ImportError(f"the OpAMP core library speaks interface {_version}, this package {ABI_VERSION}: "
-                      "install the pydantic-opamp-core this package asks for")
+
+def _bind(lib: ctypes.CDLL) -> ctypes.CDLL:
+    lib.opamp_native_abi_version.restype = ctypes.c_uint32
+    lib.opamp_native_abi_version.argtypes = []
+    lib.opamp_core_new.restype = ctypes.c_void_p
+    lib.opamp_core_new.argtypes = []
+    lib.opamp_core_free.restype = None
+    lib.opamp_core_free.argtypes = [ctypes.c_void_p]
+    for f in (lib.opamp_core_init, lib.opamp_core_step):
+        f.restype = ctypes.c_int32
+        f.argtypes = [ctypes.c_void_p, *_call]
+    lib.opamp_sdk_settings_call.restype = ctypes.c_int32
+    lib.opamp_sdk_settings_call.argtypes = _call
+    lib.opamp_bytes_free.restype = None
+    lib.opamp_bytes_free.argtypes = [_u8p, ctypes.c_size_t]
+    if (version := lib.opamp_native_abi_version()) != ABI_VERSION:
+        raise ImportError(f"the OpAMP core library speaks interface {version}, this package {ABI_VERSION}: "
+                          "install the pydantic-opamp-core this package asks for")
+    return lib
+
+
+def _lib() -> ctypes.CDLL:
+    """The library, loaded at the first call, not at import: importing this package never fails
+    because of it. One that can't be loaded (none for this platform, a file that isn't one, a
+    mismatched interface) raises ImportError at that call and at every one after, with the same
+    reason."""
+    global _loaded, _failed
+    if _loaded is not None:
+        return _loaded
+    with _loading:
+        if _loaded is None and _failed is None:
+            try:
+                _loaded = _bind(ctypes.CDLL(_find()))
+            except ImportError as e:
+                _failed = str(e)
+            except Exception as e:  # noqa: BLE001 - OSError for a file that isn't a library, AttributeError for a missing symbol
+                _failed = f"the OpAMP core library can't be loaded ({e}): install the pydantic-opamp-core this package asks for"
+    if _loaded is None:
+        raise ImportError(_failed)
+    return _loaded
+
+
+def unavailable() -> str | None:
+    """Why the library can't be loaded, or None when it can (loading it if it isn't yet)."""
+    try:
+        _lib()
+    except ImportError as e:
+        return str(e)
+    return None
 
 
 def _run(fn, *handle: int, data: bytes) -> bytes:
@@ -65,7 +101,7 @@ def _run(fn, *handle: int, data: bytes) -> bytes:
     try:
         got = ctypes.string_at(out, n.value)
     finally:
-        _lib.opamp_bytes_free(out, n)
+        _lib().opamp_bytes_free(out, n)
     if code != 0:
         raise Trap(got.decode("utf-8", "replace"))
     return got
@@ -76,7 +112,7 @@ class Core:
     encoded Reply. After a Trap every call raises one."""
 
     def __init__(self) -> None:
-        self._handle = _lib.opamp_core_new()
+        self._handle = _lib().opamp_core_new()
         if not self._handle:
             raise MemoryError("opamp_core_new")
 
@@ -86,15 +122,15 @@ class Core:
         doesn't count the memory the library holds. Every call after raises Trap."""
         if handle := getattr(self, "_handle", None):
             self._handle = None
-            _lib.opamp_core_free(handle)
+            _lib().opamp_core_free(handle)
 
     __del__ = close
 
     def init(self, config: bytes) -> bytes:
-        return _run(_lib.opamp_core_init, self._live(), data=config)
+        return _run(_lib().opamp_core_init, self._live(), data=config)
 
     def step(self, step: bytes) -> bytes:
-        return _run(_lib.opamp_core_step, self._live(), data=step)
+        return _run(_lib().opamp_core_step, self._live(), data=step)
 
     def _live(self) -> int:
         if self._handle is None:
@@ -104,13 +140,13 @@ class Core:
 
 def sdk_settings_call(request: bytes) -> bytes:
     """Run one encoded SDK settings Request; returns the encoded Reply."""
-    return _run(_lib.opamp_sdk_settings_call, data=request)
+    return _run(_lib().opamp_sdk_settings_call, data=request)
 
 
 def setup_call(call: bytes) -> bytes:
     """Run one encoded SetupCall (the core's Setup: no session); returns the encoded SetupReply.
     Bound at the first call: a library from before Setup still runs the client."""
-    fn = _lib.opamp_core_setup
+    fn = _lib().opamp_core_setup
     fn.restype = ctypes.c_int32
     fn.argtypes = _call
     return _run(fn, data=call)

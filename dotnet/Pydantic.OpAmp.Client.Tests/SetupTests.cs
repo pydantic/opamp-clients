@@ -47,4 +47,15 @@ public class SetupTests
         // No entropy: the core refuses the call.
         Assert.Throws<CoreException>(() => OpAmpSetup.Identify(new SetupIdentity()));
     }
+
+    [Fact]
+    public void ACoreThatCantBeLoadedIsUnavailableAndSaysWhy()
+    {
+        Assert.Null(OpAmpSetup.Unavailable()); // the core in place
+        // The loader failing as it does on a missing library, a file that isn't one, and one without the entry point.
+        Assert.Equal("DllNotFoundException: Unable to load shared library 'opamp_native'",
+            OpAmpSetup.Unavailable(() => throw new DllNotFoundException("Unable to load shared library 'opamp_native'")));
+        Assert.StartsWith("BadImageFormatException: ", OpAmpSetup.Unavailable(() => throw new BadImageFormatException("not a library")));
+        Assert.StartsWith("EntryPointNotFoundException: ", OpAmpSetup.Unavailable(() => throw new EntryPointNotFoundException("opamp_native_abi_version")));
+    }
 }
