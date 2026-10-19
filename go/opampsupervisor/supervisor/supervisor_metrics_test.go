@@ -68,13 +68,15 @@ service:
 `), 0o600))
 
 	supervisor := &Supervisor{
-		runCtx:                         t.Context(),
-		pidProvider:                    staticPIDProvider(1234),
-		metrics:                        metrics,
-		cfgState:                       &atomic.Value{},
-		featureGates:                   map[string]struct{}{},
-		hasNewConfig:                   make(chan struct{}, 1),
-		instanceUID:                    holdID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+		runCtx:       t.Context(),
+		pidProvider:  staticPIDProvider(1234),
+		metrics:      metrics,
+		cfgState:     &atomic.Value{},
+		featureGates: map[string]struct{}{},
+		hasNewConfig: make(chan struct{}, 1),
+		persistentState: &persistentState{
+			InstanceID: uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb"),
+		},
 		agentDescription:               &atomic.Value{},
 		agentConfigOwnTelemetrySection: &atomic.Value{},
 		telemetrySettings:              newNopTelemetrySettings(),

@@ -33,6 +33,9 @@ func TestSupervisorKeepsItsConfigWhenThePolicyRefusesOne(t *testing.T) {
 	start := func() *Supervisor {
 		s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
 		require.NoError(t, err)
+		// What Start sets up before composing a config.
+		s.persistentState, err = s.clientPersistentState()
+		require.NoError(t, err)
 		s.agentDescription.Store(&protobufs.AgentDescription{})
 		s.opampClient = &mockOpAMPClient{setRemoteConfigStatusFunc: func(rcs *protobufs.RemoteConfigStatus) error {
 			reported = append(reported, rcs)

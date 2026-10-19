@@ -62,6 +62,9 @@ type coreClient struct {
 	status   opamp.Status
 	// callbacks are the Supervisor's, from Start.
 	callbacks types.Callbacks
+	// uid is the instance UID the Supervisor has: the one the client started with, or the last
+	// InstanceUIDChanged passed on (read and written on the client's goroutine after Start).
+	uid [16]byte
 	// installPackage installs a package the server offers, set before Start; it answers through
 	// the request's done, from any goroutine. nil: packages aren't accepted.
 	installPackage func(agentInstall)
@@ -169,9 +172,9 @@ func (c *coreClient) Resumed() opamp.Resumed {
 	return c.opened.Resumed()
 }
 
-// Start starts the core's client, opening it with settings first unless it is open (then it
-// starts with the settings it was opened with). ctx bounds the start only, as with opamp-go:
-// the client runs until Stop.
+// Start starts the core's client, opening it with settings first unless it is open: then it
+// connects with the settings it was opened with, and takes the callbacks and the remote config
+// status from these. ctx bounds the start only, as with opamp-go: the client runs until Stop.
 func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) error {
 	c.mu.Lock()
 	opened := c.opened
@@ -186,7 +189,12 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	if c.client != nil || c.stopped {
 		return errors.New("the OpAMP client was started already")
 	}
+	callbacks, status := settings.Callbacks, settings.RemoteConfigStatus
 	settings = c.settings
+	settings.Callbacks = callbacks
+	if status != nil {
+		settings.RemoteConfigStatus = status
+	}
 	c.callbacks = settings.Callbacks
 	initial := c.status
 	if settings.RemoteConfigStatus != nil && initial.RemoteConfigStatus == nil {
@@ -212,6 +220,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		initial.AvailableComponents = nil
 	}
 
+	c.uid = c.opened.InstanceUID()
 	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err
@@ -285,6 +294,12 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		message(&types.MessageData{CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: n.CustomCapabilities}})
 	case opamp.InstanceUIDChanged:
 		uid := n.InstanceUID
+		if uid == c.uid {
+			// The core says which UID it settled on as it starts: one it made, kept from now
+			// on. The Supervisor has it already (clientPersistentState).
+			return
+		}
+		c.uid = uid
 		message(&types.MessageData{AgentIdentification: &protobufs.AgentIdentification{NewInstanceUid: uid[:]}})
 	case opamp.Command:
 		if cb.OnCommand != nil {

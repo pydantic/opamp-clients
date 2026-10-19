@@ -92,5 +92,81 @@ class Newest(unittest.TestCase):
             cr.newest("0000\trefs/tags/cmd/builder/v0.1.0\n")
 
 
+THEIRS_MODULE = "example.com/upstream/sup"
+OURS_MODULE = "example.com/ours/sup"
+
+
+def write(directory: Path, files: dict[str, str]) -> None:
+    for name, text in files.items():
+        (directory / name).parent.mkdir(parents=True, exist_ok=True)
+        (directory / name).write_text(text)
+
+
+class Forks(unittest.TestCase):
+    """diverged and port, on a fork of one upstream directory."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        base = Path(self.tmp.name)
+        self.root, self.upstream, self.old = base / "root", base / "upstream", base / "old"
+        forks = {"cmd/sup": ("go/sup", THEIRS_MODULE, OURS_MODULE)}
+        for name, value in (("FORKS", forks), ("DROPPED", {"cmd/sup/Makefile": "contrib's build"})):
+            original = getattr(cr, name)
+            setattr(cr, name, value)
+            self.addCleanup(setattr, cr, name, original)
+
+    def upstream_at(self, directory: Path, files: dict[str, str]) -> None:
+        write(directory / "cmd/sup", files)
+
+    def ours(self, files: dict[str, str]) -> None:
+        write(self.root / "go/sup", files)
+
+    def test_a_copy_with_the_module_rewritten_is_upstreams(self) -> None:
+        self.upstream_at(self.upstream, {"a.go": f"// upstream\npackage a\n\nimport \"{THEIRS_MODULE}/b\"\n",
+                                         "Makefile": "all:\n"})
+        self.ours({"a.go": f"// upstream, our header\npackage a\n\nimport \"{OURS_MODULE}/b\"\n", "own.go": "package a\n"})
+        report, problems = cr.diverged(self.root, self.upstream)
+        self.assertEqual(problems, [])
+        self.assertIn("1 files as upstream's, 0 changed (0 lines), 1 not carried, 1 of its own", report[0])
+
+    def test_a_change_its_header_doesnt_name_is_refused(self) -> None:
+        self.upstream_at(self.upstream, {"a.go": "package a\n\nfunc A() {}\n", "a_test.go": "package a\n"})
+        self.ours({"a.go": "package a\n\nfunc A() { hook() }\n", "a_test.go": "package a\n\nfunc TestA() {}\n"})
+        _, problems = cr.diverged(self.root, self.upstream)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("go/sup/a.go differs", problems[0])
+        self.ours({"a.go": "// Changed here: A calls hook.\npackage a\n\nfunc A() { hook() }\n"})
+        self.assertEqual(cr.diverged(self.root, self.upstream)[1], [])
+
+    def test_a_missing_upstream_file_needs_a_reason(self) -> None:
+        self.upstream_at(self.upstream, {"a.go": "package a\n", "Makefile": "all:\n", "packages.go": "package a\n"})
+        self.ours({"a.go": "package a\n"})
+        _, problems = cr.diverged(self.root, self.upstream)
+        self.assertEqual(problems, ["upstream's cmd/sup/packages.go is missing from go/sup, and DROPPED doesn't say why"])
+
+    def test_port_merges_upstreams_change_into_ours(self) -> None:
+        self.upstream_at(self.old, {"a.go": "package a\n\nfunc A() {}\n\nfunc B() {}\n", "gone.go": "package a\n"})
+        self.upstream_at(self.upstream, {"a.go": "package a\n\nfunc A() {}\n\nfunc B() { fixed() }\n",
+                                         "new.go": f"package a\n\nimport \"{THEIRS_MODULE}/c\"\n"})
+        self.ours({"a.go": "// Changed here: A calls hook.\npackage a\n\nfunc A() { hook() }\n\nfunc B() {}\n",
+                   "gone.go": "package a\n"})
+        out = cr.port(self.root, self.old, self.upstream, "v0.1.0", "v0.2.0")
+        self.assertEqual(out, ["merged: go/sup/a.go", "deleted upstream: go/sup/gone.go", "added: go/sup/new.go"])
+        self.assertEqual((self.root / "go/sup/a.go").read_text(),
+                         "// Changed here: A calls hook.\npackage a\n\nfunc A() { hook() }\n\nfunc B() { fixed() }\n")
+        self.assertIn(OURS_MODULE, (self.root / "go/sup/new.go").read_text())
+
+    def test_port_leaves_a_conflict_where_both_changed_a_line(self) -> None:
+        self.upstream_at(self.old, {"a.go": "package a\n\nfunc A() {}\n"})
+        self.upstream_at(self.upstream, {"a.go": "package a\n\nfunc A() { fixed() }\n"})
+        self.ours({"a.go": "package a\n\nfunc A() { hook() }\n"})
+        self.assertEqual(cr.port(self.root, self.old, self.upstream, "v0.1.0", "v0.2.0"), ["CONFLICT: go/sup/a.go"])
+        merged = (self.root / "go/sup/a.go").read_text()
+        self.assertIn("<<<<<<< ours", merged)
+        self.assertIn(">>>>>>> v0.2.0", merged)
+
+
+
 if __name__ == "__main__":
     unittest.main()
