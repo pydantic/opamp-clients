@@ -116,6 +116,12 @@ agent:
   again. A .zip is read as well as a .tar.gz, and the executable may sit in the archive's top
   directory, as in this repository's release archives. See the specification's
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
+  An update stays marked unproven until the new collector reports healthy (on the bootstrap's
+  config when the server's config runs nothing), and a start that finds the mark undoes it, so
+  a crash during the health wait can't cost the rollback target. A shutdown during the wait, or
+  a rollback that can't put the previous executable back (the configured one then runs), isn't
+  reported: the core asks again at the next start. `agent.package.verifier.type` must be set,
+  to `none` to skip signature checks; an empty one turned them off.
 - **The local OpAMP server takes the collector only.** The server the collector's opamp
   extension connects to, and the one the bootstrap starts, take a request only with a bearer
   token the Supervisor makes at each start and writes into the extension config

@@ -16,6 +16,6 @@ agent:
   package:
     {{- if .verifier_none }}
     verifier:
-      type: ""
+      type: none
     {{- end }}
     health_timeout: 20s

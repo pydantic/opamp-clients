@@ -34,7 +34,8 @@ type AgentPackage struct {
 // Verifier configures how downloaded packages are verified. Changed here: Cosign is
 // implemented, and is the default.
 type Verifier struct {
-	// Type selects the verification method: "cosign", or "" for none.
+	// Type selects the verification method: "cosign", or "none". Changed here: "" (a blank
+	// type:, an unset variable) is refused with accepts_packages; it turned the checks off.
 	Type string `mapstructure:"type"`
 	// Cosign configures the "cosign" method.
 	Cosign CosignVerifier `mapstructure:"cosign"`
@@ -44,7 +45,7 @@ type Verifier struct {
 
 const (
 	// VerifierTypeNone disables package signature verification.
-	VerifierTypeNone = ""
+	VerifierTypeNone = "none"
 	// VerifierTypeCosign verifies a keyless Cosign signature: a Fulcio certificate whose
 	// identity matches one of Identities, and the signature's entry in Rekor.
 	VerifierTypeCosign = "cosign"
@@ -111,7 +112,8 @@ func (p AgentPackage) Validate() error {
 // Validate validates the verifier configuration.
 func (v Verifier) Validate() error {
 	switch v.Type {
-	case VerifierTypeNone:
+	case "", VerifierTypeNone:
+		// "": refused by Supervisor.Validate with accepts_packages, where it matters.
 		return nil
 	case VerifierTypeCosign:
 		return v.Cosign.Check()

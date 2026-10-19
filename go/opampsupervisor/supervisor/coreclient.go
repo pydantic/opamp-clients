@@ -238,6 +238,12 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		// Installing stops and starts the collector: not on the client's goroutine, which
 		// would hold up everything else the server says meanwhile.
 		go c.installPackage(agentInstall{name: name, pkg: n.Package, path: n.Path, done: func(err error) {
+			// Changed here: not an outcome the core is told (a shutdown, a rollback that failed).
+			// It keeps the package uncertain, and asks again at the next start.
+			if unanswered(err) {
+				c.logger.Warn("The core isn't told how the collector install went: it asks again at the next start", zap.Error(err))
+				return
+			}
 			cl.PackageInstalled(name, hash, err)
 		}})
 	case opamp.RemovePackage:
