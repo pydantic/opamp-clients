@@ -196,7 +196,10 @@ func TestConnectionUpdateRestartsConfigApplyWindow(t *testing.T) {
 			return nil
 		},
 	}
-	_, err = s.composeMergedConfig(nil)
+	_, err = s.composeMergedConfig(&protobufs.AgentRemoteConfig{
+		Config:     &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{"": {Body: []byte("receivers:\n  nop: null\n")}}},
+		ConfigHash: []byte("remote-config"),
+	})
 	require.NoError(t, err)
 	core, observed := observer.New(zap.DebugLevel)
 	agent := s.config.Agent

@@ -291,6 +291,8 @@ Configuration added by files at the top of the list may be overwritten by the la
 
 The indicated configuration files are merged in memory and the resulting configuration
 is written to `<storage::directory>/effective.yaml`.
+A file that can't be read or merged fails the merge: the remote config is reported
+FAILED, and the Collector keeps the configuration it runs.
 
 There are a few "special" configuration files that can be used to completely
 customize final configuration given to the Collector. Below are the available

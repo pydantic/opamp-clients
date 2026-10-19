@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
@@ -75,6 +76,9 @@ func (s *Supervisor) useInstalledAgent() {
 	s.packagedAgent = s.config.Agent.Executable
 	_ = os.Remove(s.stagedAgentPath())
 	installed := s.installedAgentPath()
+	if err := os.Remove(removedAgentPath(installed)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		s.telemetrySettings.Logger.Warn("Could not delete the collector executable the OpAMP server removed", zap.Error(err))
+	}
 	if _, err := os.Stat(installed); errors.Is(err, os.ErrNotExist) {
 		if err := os.Rename(s.previousAgentPath(), installed); err == nil {
 			s.telemetrySettings.Logger.Warn("Put back the collector executable an interrupted update had moved aside")
@@ -184,9 +188,12 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 
 // removeAgentPackage goes back to the configured collector when the server stops offering one:
 // the installed executable is deleted, and if it was running, the configured one is started in
-// its place. Nothing to remove, or a configured collector that won't start, is logged: the
-// installed one is gone either way, so the core is told it is removed.
-func (s *Supervisor) removeAgentPackage() {
+// its place. A configured collector that won't start is logged: the installed one is gone
+// either way, so the core is told it is removed. Changed here: an installed executable that
+// can't be deleted or moved aside is an error, and the core isn't told it is removed: it stays
+// reported, and runs, until a start can delete it. It was reported removed, and the next start
+// ran it.
+func (s *Supervisor) removeAgentPackage() error {
 	installed := s.installedAgentPath()
 	logger := s.telemetrySettings.Logger.With(zap.String("executable", s.packagedAgent))
 	running := s.commander.Executable() == installed
@@ -197,7 +204,14 @@ func (s *Supervisor) removeAgentPackage() {
 		}
 		s.drainAgentExit()
 	}
-	for _, p := range []string{installed, s.previousAgentPath(), s.packagedStampPath()} {
+	if err := removeExecutable(installed); err != nil {
+		logger.Error("Could not delete the installed collector: it stays installed", zap.Error(err))
+		if running {
+			_ = s.restartAgentAfterUpdate(logger)
+		}
+		return fmt.Errorf("could not delete the installed collector: %w", err)
+	}
+	for _, p := range []string{s.previousAgentPath(), s.packagedStampPath()} {
 		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
 			logger.Error("Could not delete the installed collector", zap.String("path", p), zap.Error(err))
 		}
@@ -206,6 +220,29 @@ func (s *Supervisor) removeAgentPackage() {
 		s.commander.SetExecutable(s.packagedAgent)
 		_ = s.restartAgentAfterUpdate(logger)
 	}
+	return nil
+}
+
+// removedAgentPath is where an installed executable that couldn't be deleted is moved, to be
+// deleted at the next start. Nothing runs it.
+func removedAgentPath(installed string) string { return installed + ".removed" }
+
+// removeExecutable deletes path, or moves it aside to be deleted at the next start. Windows
+// refuses to delete an executable for a little while after its process exits: that is tried
+// again.
+func removeExecutable(path string) error {
+	err := os.Remove(path)
+	for i := 0; err != nil && !errors.Is(err, os.ErrNotExist) && runtime.GOOS == "windows" && i < 50; i++ {
+		time.Sleep(20 * time.Millisecond)
+		err = os.Remove(path)
+	}
+	if err == nil || errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if renameErr := os.Rename(path, removedAgentPath(path)); renameErr != nil {
+		return errors.Join(err, renameErr)
+	}
+	return nil
 }
 
 // checkAgentRuns runs a new executable's featuregate command, which the Supervisor runs at each
