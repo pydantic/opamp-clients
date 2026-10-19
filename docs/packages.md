@@ -46,7 +46,8 @@ reporting each package's status, resuming after a crash); the application instal
   answers `package_installed` (or with an error). The client deletes the file after the answer:
   move it if you keep it.
 - **Removing.** The application gets `RemovePackage` for a package no longer offered, removes
-  it, and answers `package_removed`.
+  it, and answers `package_removed`, with an error if it couldn't: the package is then reported
+  failed, and not removed again until the server offers it and drops it again.
 - **A crash.** Before the application is told to install or remove a package, the client saves
   that the package is uncertain: the application may change it. After a restart, an uncertain
   package is downloaded and installed again, or removed again, whatever the saved record says

@@ -274,7 +274,7 @@ func handle(client *opamp.Client, notes <-chan opamp.Notification, n opamp.Notif
 		client.PackageInstalled(n.PackageName, n.Package.Hash, err)
 	case opamp.RemovePackage:
 		emit("remove_package", map[string]any{"name": n.PackageName})
-		client.PackageRemoved(n.PackageName)
+		client.PackageRemoved(n.PackageName, nil)
 	case opamp.InstanceUIDChanged:
 		emit("message", map[string]any{"new_instance_uid": hex.EncodeToString(n.InstanceUID[:])})
 	case opamp.HeartbeatInterval:

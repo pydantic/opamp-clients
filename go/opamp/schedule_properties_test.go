@@ -585,7 +585,7 @@ func (sc *schedCase) onNotify(n Notification) {
 		}
 	case RemovePackage:
 		if c != nil {
-			c.PackageRemoved(n.PackageName)
+			c.PackageRemoved(n.PackageName, nil)
 		}
 	case CustomMessageNotSent:
 		if k, err := strconv.Atoi(string(n.CustomMessage.GetData())); err == nil {

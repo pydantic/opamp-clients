@@ -65,17 +65,23 @@ agent:
   `<storage.directory>/opamp-state` (0600), so a restarted Supervisor connects with the
   issued credentials, not the ones in its config
   ([docs/connection-settings.md](../../docs/connection-settings.md)). Upstream's kept them in
-  memory only, and "verified" them by restarting its client. The state file also keeps the
-  remote config received, which is handed to the Supervisor again at start.
+  memory only, and "verified" them by restarting its client.
+- **The OpAMP client's state is the only state.** The client keeps the instance UID, the remote
+  config last received, the one the collector last applied, a refused one's FAILED status and
+  the own-telemetry settings in `opamp-state`, and says what it resumes before it connects: the
+  collector starts on that. Upstream's kept copies of its own (`persistent_state.yaml`,
+  `last_recv_remote_config.dat`, `last_working_remote_config.dat`,
+  `last_recv_own_telemetry_config.dat`), which are no longer read or written. The collector
+  starts on the config last received, or, if the collector refused it, on the one it last
+  applied: a refused config isn't run again at start, with or without
+  `automatic_config_rollback` (upstream's ran it again without). `agent.instance_id` wins over
+  a UID kept for another one ([docs/instance-uid.md](../../docs/instance-uid.md)).
 - **The issued credentials can be encrypted at rest.** `storage.state_key` seals the client's
   state file with AES-256-GCM, its key from the OS: `systemd-creds` (a `LoadCredentialEncrypted=`
   credential, bound to the host and its TPM), `keychain` (macOS), `dpapi` (Windows), `file:PATH`
   or `auto` ([docs/state-file.md](../../docs/state-file.md#encrypted-at-rest-go)). A key it can't
-  find stops the client at the start. The Supervisor's own copies of what the server sent (the
-  last received and last working remote configs, and the own-telemetry settings, which may carry
-  an exporter's credentials) are sealed with the same key; files saved before it was set are
-  read as they are and sealed at the next save. The collector's config files in the storage
-  directory aren't sealed: the collector reads them.
+  find stops the client at the start. The collector's config files in the storage directory
+  aren't sealed: the collector reads them.
 - **Certificate checks stay on.** Upstream's turned certificate verification off
   (`InsecureSkipVerify`) for an offer without a certificate, a plain token rotation, and then
   sent the rotated token to a server whose certificate nothing trusted. Here the configured TLS
@@ -128,6 +134,8 @@ agent:
   a rollback that can't put the previous executable back (the configured one then runs), isn't
   reported: the core asks again at the next start. While a start can't undo an unproven update,
   nothing more is installed: the core's request isn't answered until a start has undone it.
+  A collector executable that can't be removed when it is no longer offered is reported failed,
+  with why; it is removed again only once the server offers it and drops it again.
   `agent.package.verifier.type` must be set,
   to `none` to skip signature checks; an empty one turned them off.
 - **The local OpAMP server takes the collector only.** The server the collector's opamp
@@ -148,17 +156,18 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `sealed_storage.go`, `telemetry_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
   `localserver.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `e2e_packages_test.go` and `e2e_policy_test.go`, and their configs in `testdata/`
+- `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);
 - everything under `packaging/`.
 
 Upstream's `supervisor/packages.go` (and its test config `supervisor_packages_cap.yaml`) is
-removed: installing packages is `agent_update.go`'s. So are upstream's `Makefile`, `Dockerfile` and
+removed: installing packages is `agent_update.go`'s. So is `supervisor/persistence.go`: the OpAMP
+client keeps the state. So are upstream's `Makefile`, `Dockerfile` and
 `metadata.yaml`, which need contrib's build: `internal/metadata`, `generated_package_test.go` and
 `documentation.md` are checked in as upstream's mdatagen wrote them.
 
@@ -326,9 +335,10 @@ By default, the supervisor will use `/var/lib/otelcol/supervisor` on posix syste
 
 This directory will be created on supervisor startup if it does not exist.
 
-(Changed here: it also holds `opamp-state`, the OpAMP client's state, with any connection
-settings the server issued. It is written readable by the Supervisor's user only, and sealed with
-`storage.state_key` if set.)
+(Changed here: what is kept between restarts is `opamp-state`, the OpAMP client's state: the
+instance UID, the remote configs, the own-telemetry settings and any connection settings the
+server issued. It is written readable by the Supervisor's user only, and sealed with
+`storage.state_key` if set. Upstream's `persistent_state.yaml` and `.dat` files are gone.)
 
 ## Healthcheck
 
@@ -392,11 +402,13 @@ agent:
 ```
 
 When enabled, the Supervisor will watch the health of the Collector after applying remote
-configurations received from the OpAMP backend and it will cache the last working one in
-disk, besides the last received. If a remote configurations causes the Collector
+configurations received from the OpAMP backend and it will keep the last working one,
+besides the last received. If a remote configurations causes the Collector
 to fail to start correctly, the Supervisor will automatically swap to the last working one
 and restart the Collector. (Changed here: the FAILED status of the configuration that failed
-stays reported; upstream reported a new "APPLIED" status for the last working one.)
+stays reported; upstream reported a new "APPLIED" status for the last working one. The OpAMP
+client keeps the last working one, as the config last applied; after a restart the collector
+starts on it rather than on the one that failed, whether or not rollback is enabled.)
 
 ## Status
 

@@ -111,7 +111,7 @@ func TestOtherConnectionCapabilityRequiresConfiguredBindings(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ts := newCoreTestServer(t)
-			s := clientSupervisor(t, config.OpAMPServer{Endpoint: ts.ws}, config.Capabilities{AcceptsOtherConnectionSettings: tc.enabled}, config.Storage{})
+			s := clientSupervisor(t, config.OpAMPServer{Endpoint: ts.ws}, config.Capabilities{AcceptsOtherConnectionSettings: tc.enabled}, config.Storage{Directory: t.TempDir()})
 			s.config.Agent.ConnectionEnv = tc.bindings
 			require.NoError(t, s.startOpAMPClient())
 			defer func() { require.NoError(t, s.stopOpAMPClient()) }()

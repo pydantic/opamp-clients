@@ -138,6 +138,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -293,7 +294,54 @@ type Client struct {
 // the caller has stored what Start returned (a remote config saved before a restart comes at
 // once): answer through the client it is given. The other methods may be called from it, and from
 // any goroutine at once; none of them blocks. docs/sdk-contract.md has the whole contract.
+//
+// Start is Open, then Opened.Start.
 func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, Notification)) (*Client, error) {
+	o, err := Open(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return o.Start(status, notify)
+}
+
+// Resumed is what the client starts from, read from its state file at Open: for an application
+// that needs it before the client connects. A host that runs an agent of its own (the Supervisor
+// its collector) starts it on AppliedRemoteConfig and ConnectionSettings, keeping no copy of them
+// itself. Every field is nil without a state file, or with a state that isn't this client's
+// (another endpoint's: AppliedRemoteConfig aside, which is kept whatever the endpoint).
+type Resumed struct {
+	// AppliedRemoteConfig is the config the application last answered APPLIED: what it runs from
+	// the start.
+	AppliedRemoteConfig *protobufs.AgentRemoteConfig
+	// RemoteConfig is the config Start hands the application (RemoteConfig), to work on: the last
+	// received, unless the application refused it.
+	RemoteConfig *protobufs.AgentRemoteConfig
+	// RemoteConfigRefused is the application's FAILED about the last config received, reported
+	// again at Start; that config is not handed over again until the server offers another.
+	RemoteConfigRefused *protobufs.RemoteConfigStatus
+	// ConnectionSettings are the telemetry settings Start hands the application
+	// (ConnectionSettings): the parts it asks for.
+	ConnectionSettings *protobufs.ConnectionSettingsOffers
+}
+
+// Opened is a client that has read its state but sent nothing: Start it, or Close it.
+type Opened struct {
+	cfg      Config
+	core     *core.Core
+	out      *corepb.Output
+	coreMode bool
+	conn     *connection
+	tlsCfg   *tls.Config
+	proxies  *coreProxies
+
+	mu   sync.Mutex
+	used bool // started or closed
+}
+
+// Open reads the client's state (its state file, if it has one) and says what the client starts
+// from (InstanceUID, Resumed), without connecting: Start the Opened to run it. ctx bounds Open.
+// Until it is started or closed, nothing else may use the state file.
+func Open(ctx context.Context, cfg Config) (*Opened, error) {
 	coreMode, err := cfg.coreMode()
 	if err != nil {
 		return nil, err
@@ -338,6 +386,53 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 	if err != nil {
 		return nil, err
 	}
+	return &Opened{cfg: cfg, core: c, out: out, coreMode: coreMode, conn: conn, tlsCfg: tlsCfg, proxies: proxies}, nil
+}
+
+// InstanceUID is the instance UID the client starts with: the application's, one saved before
+// a restart, or one the core made (docs/instance-uid.md).
+func (o *Opened) InstanceUID() [16]byte {
+	if uid := o.out.GetInstanceUid(); len(uid) == 16 {
+		return [16]byte(uid)
+	}
+	return [16]byte{}
+}
+
+// Resumed is what the client starts from.
+func (o *Opened) Resumed() Resumed {
+	r := o.out.GetResumed()
+	return Resumed{
+		AppliedRemoteConfig: r.GetAppliedRemoteConfig(),
+		RemoteConfig:        r.GetRemoteConfig(),
+		RemoteConfigRefused: r.GetRemoteConfigRefused(),
+		ConnectionSettings:  r.GetConnectionSettings(),
+	}
+}
+
+// Close lets go of a client that won't be started.
+func (o *Opened) Close() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.used {
+		return
+	}
+	o.used = true
+	_ = o.core.Close(context.Background())
+}
+
+// errOpenedUsed: Start on an Opened started or closed already.
+var errOpenedUsed = errors.New("opamp: the client was started or closed already")
+
+// Start starts the opened client, as Start does: status is the agent's status as it starts, and
+// notify is told everything that happens, on the client's goroutine.
+func (o *Opened) Start(status Status, notify func(*Client, Notification)) (*Client, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.used {
+		return nil, errOpenedUsed
+	}
+	o.used = true
+	cfg, c, out := o.cfg, o.core, o.out
 	cl := &Client{cmds: newMailbox[*corepb.Input](), done: make(chan struct{})}
 	cl.setUID(out.GetInstanceUid())
 	var first []report
@@ -351,7 +446,7 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		first = append(first, report{in: authInput(auth)})
 	}
 	first = append(first, report{in: &corepb.Input{Kind: &corepb.Input_Start{Start: &corepb.Empty{}}}})
-	x := newExecutor(conn)
+	x := newExecutor(o.conn)
 	cl.used = &x.used
 	if cfg.fs != nil {
 		x.fs = cfg.fs
@@ -363,10 +458,10 @@ func Start(ctx context.Context, cfg Config, status Status, notify func(*Client, 
 		// mode's download files too: they go through x.fs).
 		x.fs = journaled(x.fs, cfg.StateFile, c.FileTap())
 	}
-	if coreMode {
+	if o.coreMode {
 		// What the core hands over that isn't a stream's (store, discard, a save's cancel; and
 		// platform effects, should a core emit them) goes to x as in platform mode.
-		x.streams = newStreams(x, tlsCfg, proxies, cfg.streamNet)
+		x.streams = newStreams(x, o.tlsCfg, o.proxies, cfg.streamNet)
 	}
 	if notify == nil {
 		notify = func(*Client, Notification) {}
@@ -507,9 +602,14 @@ func (c *Client) PackageInstalled(name string, hash []byte, err error) {
 	c.send(&corepb.Input{Kind: &corepb.Input_PackageInstalled{PackageInstalled: p}})
 }
 
-// PackageRemoved answers RemovePackage: the package is removed.
-func (c *Client) PackageRemoved(name string) {
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: &corepb.PackageRemoved{Name: name}}})
+// PackageRemoved answers RemovePackage: the package is removed (err nil), or why it isn't. One
+// that isn't is reported failed, and not removed again until it is offered and dropped again.
+func (c *Client) PackageRemoved(name string, err error) {
+	p := &corepb.PackageRemoved{Name: name, Failed: err != nil}
+	if err != nil {
+		p.Detail = err.Error()
+	}
+	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: p}})
 }
 
 // Stop sends agent_disconnect if a message can still be sent, then stops. It returns when the

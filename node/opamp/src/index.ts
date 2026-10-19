@@ -514,9 +514,10 @@ export class Client {
     this.#feed(input({ case: "packageInstalled", value: { name, hash, ok: error === undefined, detail: error ?? "" } } as never));
   }
 
-  /** Answer a removePackage notification: the package is removed. */
-  packageRemoved(name: string): void {
-    this.#feed(input({ case: "packageRemoved", value: { name } } as never));
+  /** Answer a removePackage notification: the package is removed, or (`error`) why it isn't. One
+   * that isn't is reported failed, and not removed again until it is offered and dropped again. */
+  packageRemoved(name: string, error?: string): void {
+    this.#feed(input({ case: "packageRemoved", value: { name, failed: error !== undefined, detail: error ?? "" } } as never));
   }
 
   /** The instance UID in use: the one given, the one the core made, or one the server assigned

@@ -46,7 +46,7 @@ func newLocalServerTestSupervisorWith(t *testing.T, opampClient *mockOpAMPClient
 		runCtx:                         t.Context(),
 		telemetrySettings:              newNopTelemetrySettings(),
 		config:                         config.Supervisor{},
-		persistentState:                &persistentState{InstanceID: uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")},
+		instanceUID:                    holdID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
 		agentDescription:               &atomic.Value{},
 		agentConfigOwnTelemetrySection: &atomic.Value{},
 		effectiveConfig:                &atomic.Value{},
@@ -292,8 +292,7 @@ func newBootstrapTestSupervisor(t *testing.T, serverEndpoint string, collectorEn
 	s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
 	require.NoError(t, err)
 	s.runCtx = t.Context()
-	s.persistentState, err = loadOrCreatePersistentState(filepath.Join(storage, persistentStateFileName), "", zap.NewNop())
-	require.NoError(t, err)
+	s.setInstanceID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb"))
 	s.localServerToken = testLocalServerToken
 	return s
 }
@@ -347,7 +346,7 @@ func TestLocalServerForwardsToTheCollectorConnectedNow(t *testing.T) {
 	require.NoError(t, old.Start(t.Context(), types.StartSettings{
 		OpAMPServerURL: fmt.Sprintf("ws://localhost:%d/v1/opamp", s.opampServerPort),
 		Header:         header,
-		InstanceUid:    types.InstanceUid(s.persistentState.InstanceID),
+		InstanceUid:    types.InstanceUid(s.instanceID()),
 	}))
 	select {
 	case <-described:
@@ -414,7 +413,7 @@ func TestOpAMPExtensionConfigCarriesTheToken(t *testing.T) {
 	cfg := setupSupervisorConfig(t, configTemplate)
 	s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
 	require.NoError(t, err)
-	s.persistentState = &persistentState{InstanceID: uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")}
+	s.setInstanceID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb"))
 	s.localServerToken = testLocalServerToken
 
 	conf, err := config.NewConfFromYAML(s.composeOpAMPExtensionConfig())
@@ -442,7 +441,7 @@ func TestHandleAgentOpAMPMessageIgnoresAnotherInstanceUID(t *testing.T) {
 	require.Zero(t, healths.Load(), "another instance's health was taken")
 	require.False(t, s.agentReady.Load())
 
-	id := s.persistentState.InstanceID
+	id := s.instanceID()
 	s.handleAgentOpAMPMessage(&mockConn{}, &protobufs.AgentToServer{
 		InstanceUid: id[:],
 		Health:      &protobufs.ComponentHealth{Healthy: true},

@@ -52,11 +52,14 @@ type coreClient struct {
 	stateFile string
 	sealer    opamp.StateSealer
 
-	mu      sync.Mutex
-	client  *opamp.Client
-	stopped bool
-	caps    protobufs.AgentCapabilities
-	status  opamp.Status
+	mu sync.Mutex
+	// opened is the client once opened (Open, or Start), and settings what it was opened with.
+	opened   *opamp.Opened
+	settings types.StartSettings
+	client   *opamp.Client
+	stopped  bool
+	caps     protobufs.AgentCapabilities
+	status   opamp.Status
 	// callbacks are the Supervisor's, from Start.
 	callbacks types.Callbacks
 	// installPackage installs a package the server offers, set before Start; it answers through
@@ -85,9 +88,10 @@ var (
 	errReportsRemoteConfigNotSet    = errors.New("ReportsRemoteConfig capability is not set")
 )
 
-// Start starts the core's client. ctx bounds the start only, as with opamp-go: the client runs
-// until Stop.
-func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) error {
+// Open opens the core's client with settings: it reads the state file, so the instance UID and
+// what the client resumes are known (InstanceUID, Resumed), and sends nothing. Start starts it,
+// with the settings it was opened with. ctx bounds the opening only.
+func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) error {
 	if _, err := url.Parse(settings.OpAMPServerURL); err != nil {
 		return fmt.Errorf("parse server endpoint: %w", err)
 	}
@@ -107,7 +111,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.client != nil || c.stopped {
+	if c.opened != nil || c.client != nil || c.stopped {
 		return errors.New("the OpAMP client was started already")
 	}
 	if settings.Capabilities != 0 {
@@ -133,6 +137,56 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	if settings.HeartbeatInterval != nil {
 		cfg.HeartbeatInterval = *settings.HeartbeatInterval
 	}
+	opened, err := opamp.Open(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	c.opened, c.settings = opened, settings
+	return nil
+}
+
+// InstanceUID is the instance UID in use: the one the client opened with, or the server's since.
+// Zero before Open.
+func (c *coreClient) InstanceUID() [16]byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client != nil {
+		return c.client.InstanceUID()
+	}
+	if c.opened != nil {
+		return c.opened.InstanceUID()
+	}
+	return [16]byte{}
+}
+
+// Resumed is what the client starts from (from Open on); the zero Resumed before.
+func (c *coreClient) Resumed() opamp.Resumed {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.opened == nil {
+		return opamp.Resumed{}
+	}
+	return c.opened.Resumed()
+}
+
+// Start starts the core's client, opening it with settings first unless it is open (then it
+// starts with the settings it was opened with). ctx bounds the start only, as with opamp-go:
+// the client runs until Stop.
+func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) error {
+	c.mu.Lock()
+	opened := c.opened
+	c.mu.Unlock()
+	if opened == nil {
+		if err := c.Open(ctx, settings); err != nil {
+			return err
+		}
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.client != nil || c.stopped {
+		return errors.New("the OpAMP client was started already")
+	}
+	settings = c.settings
 	c.callbacks = settings.Callbacks
 	initial := c.status
 	if settings.RemoteConfigStatus != nil && initial.RemoteConfigStatus == nil {
@@ -158,7 +212,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		initial.AvailableComponents = nil
 	}
 
-	started, err := opamp.Start(ctx, cfg, initial, c.onNotification)
+	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err
 	}
@@ -166,12 +220,17 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	return nil
 }
 
+// Stop stops the client; one opened but not started is let go.
 func (c *coreClient) Stop(ctx context.Context) error {
 	c.mu.Lock()
-	started := c.client
+	started, opened := c.client, c.opened
 	c.client, c.stopped = nil, true
 	c.mu.Unlock()
 	if started == nil {
+		if opened != nil {
+			opened.Close()
+			return nil
+		}
 		return errors.New("cannot stop because not started")
 	}
 	return started.Stop(ctx)
@@ -251,17 +310,23 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		// the Supervisor installs no other package.
 		name := n.PackageName
 		if name != "" || c.installPackage == nil {
-			cl.PackageRemoved(name)
+			cl.PackageRemoved(name, nil)
 			break
 		}
 		go c.installPackage(agentInstall{name: name, remove: true, done: func(err error) {
-			// Changed here: not if it is still there. The core keeps it among the installed
-			// packages, and asks again at the next start.
-			if err != nil {
-				c.logger.Error("The collector the OpAMP server stopped offering is still installed", zap.Error(err))
+			// Changed here: a shutdown before it was done isn't an outcome; the core asks again
+			// at the next start.
+			if unanswered(err) {
+				c.logger.Warn("The core isn't told how removing the collector went: it asks again at the next start", zap.Error(err))
 				return
 			}
-			cl.PackageRemoved(name)
+			// Changed here: one still there is reported failed, and runs, until the server
+			// offers a collector again and stops offering it. It was left uncertain, and the
+			// core asked again at every start.
+			if err != nil {
+				c.logger.Error("The collector the OpAMP server stopped offering is still installed", zap.Error(err))
+			}
+			cl.PackageRemoved(name, err)
 		}})
 	case opamp.CustomMessageNotSent:
 		c.logger.Warn("A custom message to the OpAMP server was not sent",
