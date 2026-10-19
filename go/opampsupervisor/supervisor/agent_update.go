@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/archive"
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/verifier"
 )
 
@@ -52,6 +53,29 @@ func (s *Supervisor) installedAgentPath() string {
 func (s *Supervisor) previousAgentPath() string { return s.installedAgentPath() + ".previous" }
 func (s *Supervisor) stagedAgentPath() string   { return s.installedAgentPath() + ".new" }
 
+// unprovenAgentPath marks an update under way, from just before the new executable is put in
+// place until it has proved healthy: a start that finds it undoes the update. It holds
+// unprovenReplaced when the installed executable was moved to previousAgentPath, and is empty
+// when the configured one ran before.
+func (s *Supervisor) unprovenAgentPath() string { return s.installedAgentPath() + ".unproven" }
+
+const unprovenReplaced = "replaced"
+
+// unansweredError is an install or rollback whose outcome the core isn't told: its record of
+// the package stays uncertain, and it asks again at the next start, which first undoes an
+// update left unproven.
+type unansweredError struct{ error }
+
+func (e unansweredError) Unwrap() error { return e.error }
+
+// unanswered says whether the core is to be told nothing of err.
+func unanswered(err error) bool {
+	var u unansweredError
+	return errors.As(err, &u)
+}
+
+var errShuttingDown = unansweredError{errors.New("the Supervisor is shutting down")}
+
 // packagedStampPath records the packaged collector as it was when the installed one went in, so
 // that a start can tell its operator the package manager changed it since.
 func (s *Supervisor) packagedStampPath() string { return s.installedAgentPath() + ".packaged" }
@@ -67,8 +91,10 @@ func (s *Supervisor) packagedStamp() string {
 
 // useInstalledAgent runs the executable an earlier update installed, if any, in place of the
 // configured one: while the server offers a collector, it decides which one runs, and the
-// configured one is the fallback. An update interrupted between moving the installed executable
-// aside and putting the new one in its place is undone: the one moved aside goes back.
+// configured one is the fallback. Changed here: an update interrupted before the new executable
+// proved healthy is undone, and the executable it replaced runs; if it can't be undone, the
+// configured one runs. Only an update interrupted before the new executable was in place was
+// undone, so the unproven one ran.
 func (s *Supervisor) useInstalledAgent() {
 	if !s.config.Capabilities.AcceptsPackages {
 		return
@@ -79,10 +105,11 @@ func (s *Supervisor) useInstalledAgent() {
 	if err := os.Remove(removedAgentPath(installed)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		s.telemetrySettings.Logger.Warn("Could not delete the collector executable the OpAMP server removed", zap.Error(err))
 	}
-	if _, err := os.Stat(installed); errors.Is(err, os.ErrNotExist) {
-		if err := os.Rename(s.previousAgentPath(), installed); err == nil {
-			s.telemetrySettings.Logger.Warn("Put back the collector executable an interrupted update had moved aside")
-		}
+	if undone, err := s.undoUnprovenUpdate(); err != nil {
+		s.telemetrySettings.Logger.Error("Could not undo an update interrupted before the new collector proved healthy: the configured collector runs", zap.Error(err))
+		return
+	} else if undone {
+		s.telemetrySettings.Logger.Warn("Undid an update interrupted before the new collector proved healthy")
 	}
 	if _, err := os.Stat(installed); err == nil {
 		s.telemetrySettings.Logger.Info("Running the collector executable the OpAMP server installed", zap.String("executable", installed))
@@ -95,12 +122,87 @@ func (s *Supervisor) useInstalledAgent() {
 	}
 }
 
+// undoUnprovenUpdate puts back what an update left unproven had replaced: the executable it moved
+// aside, or none, so that the configured one runs. A previous executable without the mark is one
+// a proven update hadn't deleted yet.
+func (s *Supervisor) undoUnprovenUpdate() (bool, error) {
+	mark, err := os.ReadFile(s.unprovenAgentPath())
+	if errors.Is(err, os.ErrNotExist) {
+		_ = os.Remove(s.previousAgentPath())
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if string(mark) == unprovenReplaced {
+		// Not moved aside yet if it isn't there: the installed one is still the one it was.
+		if err := os.Rename(s.previousAgentPath(), s.installedAgentPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return false, err
+		}
+	} else if err := removeExecutable(s.installedAgentPath()); err != nil {
+		return false, err
+	}
+	return true, os.Remove(s.unprovenAgentPath())
+}
+
+// putUpdateInPlace puts the staged executable in place, after marking the update unproven:
+// replaced says whether the installed one runs, and is moved aside.
+func (s *Supervisor) putUpdateInPlace(replaced bool) error {
+	mark := ""
+	if replaced {
+		mark = unprovenReplaced
+	}
+	if err := writeFileSynced(s.unprovenAgentPath(), []byte(mark)); err != nil {
+		return fmt.Errorf("record the update: %w", err)
+	}
+	installed := s.installedAgentPath()
+	if replaced {
+		if err := os.Rename(installed, s.previousAgentPath()); err != nil {
+			_ = os.Remove(s.unprovenAgentPath())
+			return fmt.Errorf("move the installed executable aside: %w", err)
+		}
+	}
+	if err := os.Rename(s.stagedAgentPath(), installed); err != nil {
+		return fmt.Errorf("put the new executable in place: %w", err)
+	}
+	return nil
+}
+
+// writeFileSynced writes path and its directory entry to disk before it returns.
+func writeFileSynced(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	// Windows can't open a directory to sync it, and its renames and creates are journaled.
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
+}
+
 // newPackageVerifier is the configured verifier; Cosign's trusted roots are cached in the
 // storage directory.
 func (s *Supervisor) newPackageVerifier() (verifier.Verifier, error) {
 	cfg := s.config.Agent.Package.Verifier
-	if cfg.Type == "" {
-		s.telemetrySettings.Logger.Warn("agent::package::verifier::type is empty: packages from the OpAMP server are installed without checking their signatures")
+	if cfg.Type == config.VerifierTypeNone {
+		s.telemetrySettings.Logger.Warn("agent::package::verifier::type is none: packages from the OpAMP server are installed without checking their signatures")
 	}
 	return verifier.NewVerifier(cfg, filepath.Join(s.config.Storage.Directory, "sigstore"), &http.Client{})
 }
@@ -110,7 +212,7 @@ func (s *Supervisor) onInstallPackage(req agentInstall) {
 	select {
 	case s.agentInstalls <- req:
 	case <-s.doneChan:
-		req.done(errors.New("the Supervisor is shutting down"))
+		req.done(errShuttingDown)
 	}
 }
 
@@ -164,19 +266,25 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 	s.drainAgentExit()
 	// Moved aside, not copied: the previous executable is installed's own, or the configured one.
 	replaced := running == installed
-	if replaced {
-		if err := os.Rename(installed, s.previousAgentPath()); err != nil {
-			return errors.Join(fmt.Errorf("move the installed executable aside: %w", err), s.restartAgentAfterUpdate(logger))
+	if err := s.putUpdateInPlace(replaced); err != nil {
+		if _, statErr := os.Stat(s.unprovenAgentPath()); statErr != nil {
+			return errors.Join(err, s.restartAgentAfterUpdate(logger))
 		}
-	}
-	if err := os.Rename(staged, installed); err != nil {
-		return errors.Join(fmt.Errorf("put the new executable in place: %w", err), s.revertAgentUpdate(running, replaced, logger))
+		return errors.Join(err, s.revertAgentUpdate(running, replaced, logger))
 	}
 	// The commander's, not s.config's: other goroutines read the config.
 	s.commander.SetExecutable(installed)
 
 	if err := s.waitForUpdatedAgent(); err != nil {
+		if errors.Is(err, errShuttingDown) {
+			// The next start undoes it, and the core asks for it again.
+			return err
+		}
 		return errors.Join(err, s.revertAgentUpdate(running, replaced, logger))
+	}
+	// Proven: the mark goes first, so that a start never undoes it.
+	if err := os.Remove(s.unprovenAgentPath()); err != nil {
+		logger.Warn("Could not record the update as proven", zap.Error(err))
 	}
 	_ = os.Remove(s.previousAgentPath())
 	if err := os.WriteFile(s.packagedStampPath(), []byte(s.packagedStamp()), 0o600); err != nil {
@@ -211,7 +319,7 @@ func (s *Supervisor) removeAgentPackage() error {
 		}
 		return fmt.Errorf("could not delete the installed collector: %w", err)
 	}
-	for _, p := range []string{s.previousAgentPath(), s.packagedStampPath()} {
+	for _, p := range []string{s.previousAgentPath(), s.unprovenAgentPath(), s.packagedStampPath()} {
 		if err := os.Remove(p); err != nil && !errors.Is(err, os.ErrNotExist) {
 			logger.Error("Could not delete the installed collector", zap.String("path", p), zap.Error(err))
 		}
@@ -259,8 +367,9 @@ func (s *Supervisor) checkAgentRuns(executable string) error {
 	return nil
 }
 
-// waitForUpdatedAgent starts the collector and waits for it to report healthy. With no config
-// to run, the collector isn't started and there is nothing to wait for.
+// waitForUpdatedAgent starts the collector and waits for it to report healthy. Changed here:
+// with no config to run, it proves itself on the config the bootstrap runs, and is stopped
+// again. It was installed unchecked.
 func (s *Supervisor) waitForUpdatedAgent() error {
 	s.lastHealthFromClient.Store(nil)
 	s.resetAgentReady()
@@ -269,7 +378,15 @@ func (s *Supervisor) waitForUpdatedAgent() error {
 		return err
 	}
 	if status == agentNotStarting {
-		return nil
+		if err := s.startAgentOnNoopConfig(); err != nil {
+			return err
+		}
+		defer func() {
+			if err := s.commander.Stop(s.runCtx); err != nil {
+				s.telemetrySettings.Logger.Error("Could not stop the new collector after its check", zap.Error(err))
+			}
+			s.drainAgentExit()
+		}()
 	}
 	timeout := s.config.Agent.Package.HealthTimeout
 	if timeout <= 0 {
@@ -290,26 +407,37 @@ func (s *Supervisor) waitForUpdatedAgent() error {
 		case <-deadline.C:
 			return fmt.Errorf("the new collector didn't report healthy within %s", timeout)
 		case <-s.doneChan:
-			return errors.New("the Supervisor is shutting down")
+			return errShuttingDown
 		}
 	}
 }
 
-// revertAgentUpdate puts back the executable that ran before the update and starts it.
+// startAgentOnNoopConfig starts the collector on the config the bootstrap runs.
+func (s *Supervisor) startAgentOnNoopConfig() error {
+	cfg, err := s.composeNoopConfig()
+	if err != nil {
+		return fmt.Errorf("compose a config to check the new collector on: %w", err)
+	}
+	if err := os.WriteFile(s.agentConfigFilePath(), cfg, 0o600); err != nil {
+		return fmt.Errorf("write a config to check the new collector on: %w", err)
+	}
+	s.resetPassthroughLogBuffer()
+	return s.commander.Start(s.runCtx)
+}
+
+// revertAgentUpdate puts back the executable that ran before the update and starts it. Changed
+// here: if it can't be put back, the configured one is started, the core isn't told (it would
+// record the previous version as in place), and the next start tries again. No collector ran.
 func (s *Supervisor) revertAgentUpdate(running string, replaced bool, logger *zap.Logger) error {
 	logger.Warn("Putting the previous collector executable back")
 	if err := s.commander.Stop(s.runCtx); err != nil {
 		logger.Error("Could not stop the new collector", zap.Error(err))
 	}
 	s.drainAgentExit()
-	var err error
-	if replaced {
-		err = os.Rename(s.previousAgentPath(), s.installedAgentPath())
-	} else {
-		err = os.Remove(s.installedAgentPath())
-	}
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("put the previous executable back: %w", err)
+	if _, err := s.undoUnprovenUpdate(); err != nil {
+		logger.Error("Could not put the previous collector executable back: the configured one runs", zap.Error(err))
+		s.commander.SetExecutable(s.packagedAgent)
+		return unansweredError{errors.Join(fmt.Errorf("put the previous executable back: %w", err), s.restartAgentAfterUpdate(logger))}
 	}
 	s.commander.SetExecutable(running)
 	return s.restartAgentAfterUpdate(logger)

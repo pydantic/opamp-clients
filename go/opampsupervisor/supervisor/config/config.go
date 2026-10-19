@@ -74,6 +74,9 @@ func Load(configFile string) (Supervisor, error) {
 }
 
 func (s *Supervisor) Validate() error {
+	if s.Capabilities.AcceptsPackages && s.Agent.Package.Verifier.Type == "" {
+		return errors.New(`agent::package::verifier::type must be set with capabilities.accepts_packages: "cosign", or "none" to install packages without checking their signatures`)
+	}
 	// Changed here: the server's identity is what keeps the credentials it issues from going to
 	// anyone else (the spec's SHOULD for issued credentials).
 	if s.Capabilities.AcceptsOpAMPConnectionSettings && s.Server.TLS.InsecureSkipVerify {

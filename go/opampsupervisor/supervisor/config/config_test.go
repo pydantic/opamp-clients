@@ -884,6 +884,21 @@ func TestOpAMPServerTLSIsWhatItSays(t *testing.T) {
 	}
 }
 
+// Packages are installed unchecked only when the config says so: "none". An empty type (a
+// blank "type:", an unset variable) turned the checks off.
+func TestAnEmptyVerifierTypeIsRefused(t *testing.T) {
+	cfg := Supervisor{Capabilities: Capabilities{AcceptsPackages: true}}
+	require.ErrorContains(t, cfg.Validate(), `agent::package::verifier::type must be set`)
+	cfg.Agent.Package.Verifier.Type = VerifierTypeNone
+	require.NoError(t, cfg.Validate())
+	require.NoError(t, cfg.Agent.Package.Verifier.Validate())
+	require.Equal(t, "none", VerifierTypeNone)
+
+	cfg.Capabilities.AcceptsPackages = false
+	cfg.Agent.Package.Verifier.Type = ""
+	require.NoError(t, cfg.Validate(), "it matters only with accepts_packages")
+}
+
 // TestSupervisor_TopLevelValidate confirms that confmap.Validate produces
 // path-prefixed errors when called at the supervisor-config root, which is
 // what NewSupervisor relies on for actionable validation messages.
