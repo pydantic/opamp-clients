@@ -26,6 +26,7 @@ import (
 	"crypto/tls"
 	_ "embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -578,7 +579,12 @@ func (s *Supervisor) createTemplates() error {
 	if s.opampextensionTemplate, err = template.New("opampextension").Parse(opampextensionTpl); err != nil {
 		return err
 	}
-	if s.ownTelemetryTemplate, err = template.New("owntelemetry").Parse(ownTelemetryTpl); err != nil {
+	// Changed here: the server's endpoints and headers go into the config as YAML strings the
+	// collector expands nothing in. They went in as written: a " or \ broke the config (which
+	// was saved, and failed the next start), a \x escape changed the credential, and ${env:...}
+	// or ${file:...} read the host's secrets into the request the server receives.
+	ownTelemetryFuncs := template.FuncMap{"yamlString": yamlString}
+	if s.ownTelemetryTemplate, err = template.New("owntelemetry").Funcs(ownTelemetryFuncs).Parse(ownTelemetryTpl); err != nil {
 		return err
 	}
 
@@ -1779,26 +1785,18 @@ func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 
 // createEffectiveConfigMsg create an EffectiveConfig with the content of the
 // current effective config.
-// Changed here: without the local server's token, in either.
+// Changed here: without the local server's token. The effective config is what the collector
+// reports it loaded, which it redacts; until it reports, the Supervisor has none to send. (The
+// merged config it wrote is not effective yet, and holds every secret in it.) A server's empty
+// config map runs nothing, so it is reported as an empty one.
 func (s *Supervisor) createEffectiveConfigMsg() *protobufs.EffectiveConfig {
+	if cfgState, ok := s.cfgState.Load().(*configState); ok && cfgState.configMapIsEmpty {
+		return &protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{}}
+	}
 	if cfg, ok := s.effectiveConfig.Load().(*protobufs.EffectiveConfig); ok && cfg != nil {
 		return s.redactLocalServerTokenInConfig(cfg)
 	}
-
-	// Fallback: construct a single-file EffectiveConfig from the merged config
-	// (used when the agent has not yet reported its effective config).
-	cfgState, ok := s.cfgState.Load().(*configState)
-	if !ok {
-		return nil
-	}
-
-	return &protobufs.EffectiveConfig{
-		ConfigMap: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigObject{
-				"": {Body: s.redactLocalServerToken([]byte(cfgState.mergedConfig))},
-			},
-		},
-	}
+	return nil
 }
 
 func (*Supervisor) updateOwnTelemetryData(data map[string]any, signal string, settings *protobufs.TelemetryConnectionSettings) map[string]any {
@@ -1832,6 +1830,12 @@ func (s *Supervisor) setupOwnTelemetry(_ context.Context, settings *protobufs.Co
 			return false, err
 		}
 	}
+	// Changed here: the server's own telemetry destinations are held to the remote config
+	// policy too. They went around it.
+	if err := s.config.Agent.RemoteConfigPolicy.Check(string(config.SpecialConfigFileOwnTelemetry), cfg.Bytes()); err != nil {
+		s.telemetrySettings.Logger.Error("Refusing the own telemetry settings", zap.Error(err))
+		return false, err
+	}
 	previous := s.agentConfigOwnTelemetrySection.Load()
 	s.agentConfigOwnTelemetrySection.Store(cfg.String())
 
@@ -1846,6 +1850,13 @@ func (s *Supervisor) setupOwnTelemetry(_ context.Context, settings *protobufs.Co
 	}
 
 	return configChanged, nil
+}
+
+// yamlString is v as a YAML double-quoted string that the collector's config resolver reads as
+// v: a JSON string (one YAML reads), with each $ doubled ($$ is a literal $ there).
+func yamlString(v string) string {
+	b, _ := json.Marshal(strings.ReplaceAll(v, "$", "$$"))
+	return string(b)
 }
 
 // unsupportedOwnTelemetry says which offered own telemetry settings the Supervisor can't apply:

@@ -74,6 +74,14 @@ func Load(configFile string) (Supervisor, error) {
 }
 
 func (s *Supervisor) Validate() error {
+	if s.Capabilities.AcceptsPackages && s.Agent.Package.Verifier.Type == "" {
+		return errors.New(`agent::package::verifier::type must be set with capabilities.accepts_packages: "cosign", or "none" to install packages without checking their signatures`)
+	}
+	// Changed here: the server's identity is what keeps the credentials it issues from going to
+	// anyone else (the spec's SHOULD for issued credentials).
+	if s.Capabilities.AcceptsOpAMPConnectionSettings && s.Server.TLS.InsecureSkipVerify {
+		return errors.New("server.tls.insecure_skip_verify can't be used with capabilities.accepts_opamp_connection_settings: the credentials the server issues would go to any server; set server.tls.ca_file instead")
+	}
 	if s.Server.Auth == (component.ID{}) {
 		return nil
 	}
@@ -232,10 +240,19 @@ func (o OpAMPServer) Validate() error {
 	default:
 		return fmt.Errorf(`invalid scheme %q for server::endpoint, must be one of "http", "https", "ws", or "wss"`, url.Scheme)
 	}
+	// Changed here: settings that can't apply are refused, not dropped. A URL's credentials
+	// would be logged and sent with the endpoint; and configtls's insecure loads no TLS config,
+	// so over TLS the client certificate, min_version and server_name would be lost.
+	if url.User != nil {
+		return errors.New("server::endpoint can't carry a user name or password; use server::headers or server::auth")
+	}
 
 	err = o.TLS.Validate()
 	if err != nil {
 		return fmt.Errorf("invalid server::tls settings: %w", err)
+	}
+	if o.TLS.Insecure && (url.Scheme == "https" || url.Scheme == "wss") {
+		return fmt.Errorf("server::tls::insecure turns TLS off, but a %s endpoint uses TLS; remove it, or use %s", url.Scheme, map[string]string{"https": "http", "wss": "ws"}[url.Scheme])
 	}
 
 	return nil

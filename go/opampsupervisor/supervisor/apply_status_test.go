@@ -10,13 +10,17 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 )
 
 // applyTestSupervisor runs the agent loop with a stand-in collector, and records the remote
@@ -315,4 +319,72 @@ func TestUnsupportedOwnTelemetrySettingsAreFAILED(t *testing.T) {
 	require.Empty(t, a.hasNewConfig)
 	_, err := os.Stat(filepath.Join(a.config.Storage.Directory, lastRecvOwnTelemetryConfigFile))
 	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
+// The server's endpoint and header values reach the collector as written: no quote breaks the
+// config, no escape changes them, and no ${...} in them is expanded by the collector. They went
+// into the YAML as written.
+func TestOwnTelemetryValuesReachTheCollectorAsWritten(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.agentConfigOwnTelemetrySection.Store("")
+	value := `Bearer a"b\x41c ${env:HOME} $${file:/etc/passwd} ` + "\n"
+	endpoint := `https://ingest.example/v1/metrics?q=${env:HOME}`
+	changed, err := a.processOwnTelemetryConnSettingsMessage(t.Context(), &protobufs.ConnectionSettingsOffers{
+		OwnMetrics: &protobufs.TelemetryConnectionSettings{
+			DestinationEndpoint: endpoint,
+			Headers:             &protobufs.Headers{Headers: []*protobufs.Header{{Key: `Author"ization`, Value: value}}},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, changed)
+
+	// What the collector reads: the merged config, with confmap's $$ escape undone.
+	conf, err := config.NewConfFromYAML([]byte(a.cfgState.Load().(*configState).mergedConfig))
+	require.NoError(t, err)
+	exporter := conf.Get("service::telemetry::metrics::readers").([]any)[0].(map[string]any)["periodic"].(map[string]any)["exporter"].(map[string]any)["otlp"].(map[string]any)
+	unescape := func(s string) string { return strings.ReplaceAll(s, "$$", "$") }
+	require.Equal(t, endpoint, unescape(exporter["endpoint"].(string)))
+	headers := exporter["headers"].(map[string]any)
+	require.Equal(t, value, unescape(headers[`Author"ization`].(string)))
+}
+
+// With the remote config policy on, the own telemetry destination must be one it allows. It went
+// around the policy.
+func TestOwnTelemetryIsHeldToTheRemoteConfigPolicy(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.agentConfigOwnTelemetrySection.Store("")
+	a.config.Agent.RemoteConfigPolicy = config.RemoteConfigPolicy{
+		AllowedComponents:        map[string][]string{"receivers": {"nop"}},
+		AllowedExporterEndpoints: []string{"https://ingest.example"},
+	}
+	offer := func(endpoint string) error {
+		_, err := a.processOwnTelemetryConnSettingsMessage(t.Context(), &protobufs.ConnectionSettingsOffers{
+			OwnMetrics: &protobufs.TelemetryConnectionSettings{DestinationEndpoint: endpoint},
+		})
+		return err
+	}
+	require.ErrorContains(t, offer("https://elsewhere.example/v1/metrics"), "elsewhere.example")
+	require.Empty(t, a.agentConfigOwnTelemetrySection.Load())
+	require.NoError(t, offer("https://ingest.example/v1/metrics"))
+}
+
+// The Supervisor reports as effective only what the collector reports it loaded, which the
+// collector redacts. The merged config it wrote is not that, and holds every secret in it.
+func TestTheMergedConfigIsNotReportedAsEffective(t *testing.T) {
+	s := Supervisor{
+		effectiveConfig:   &atomic.Value{},
+		cfgState:          &atomic.Value{},
+		telemetrySettings: newNopTelemetrySettings(),
+	}
+	s.cfgState.Store(&configState{mergedConfig: "exporters:\n  otlphttp:\n    headers:\n      authorization: secret\n"})
+	assert.Nil(t, s.createEffectiveConfigMsg())
+
+	// A server's empty config map runs nothing, and the collector it stopped reports nothing.
+	s.effectiveConfig.Store(&protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{
+		ConfigMap: map[string]*protobufs.AgentConfigObject{"": {Body: []byte("receivers: {}")}},
+	}})
+	s.cfgState.Store(&configState{configMapIsEmpty: true})
+	got := s.createEffectiveConfigMsg()
+	require.NotNil(t, got)
+	assert.Empty(t, got.GetConfigMap().GetConfigMap())
 }

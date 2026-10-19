@@ -100,6 +100,14 @@ agent:
   config says what runs.
 - A custom message is handed to the client, which queues it: `ErrCustomMessagePending` never
   happens, and a message it can't send after all is logged.
+- **`server` settings that can't apply are refused.** An endpoint with a user name or password,
+  and `server.tls.insecure` with an `https` or `wss` endpoint (upstream then dropped the client
+  certificate, `min_version` and `server_name`), fail validation. So does
+  `server.tls.insecure_skip_verify` with `accepts_opamp_connection_settings`: the credentials the
+  server issues would go to any server.
+- **The effective config is the one the collector reports.** Upstream sent the merged config it
+  wrote until the collector reported, with every secret in it; this one sends none until then,
+  and an empty one while a server's empty config map runs nothing.
 - Health, the effective config, the remote config status and the available components reach the
   server only with their capability, as before.
 - With `accepts_packages` the Supervisor installs the collector executable the server offers,
@@ -108,11 +116,17 @@ agent:
   again. A .zip is read as well as a .tar.gz, and the executable may sit in the archive's top
   directory, as in this repository's release archives. See the specification's
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
+  An update stays marked unproven until the new collector reports healthy (on the bootstrap's
+  config when the server's config runs nothing), and a start that finds the mark undoes it, so
+  a crash during the health wait can't cost the rollback target. A shutdown during the wait, or
+  a rollback that can't put the previous executable back (the configured one then runs), isn't
+  reported: the core asks again at the next start. `agent.package.verifier.type` must be set,
+  to `none` to skip signature checks; an empty one turned them off.
 - **The local OpAMP server takes the collector only.** The server the collector's opamp
   extension connects to, and the one the bootstrap starts, take a request only with a bearer
   token the Supervisor makes at each start and writes into the extension config
   (`server.ws.headers`; the extension redacts it in the effective config it reports, and the
-  Supervisor leaves it out of what it reports itself). The collector's messages are taken only
+  Supervisor leaves it out of what it passes on). The collector's messages are taken only
   with the Supervisor's instance UID. One collector is connected at a time, from its connection
   to its close: a request that fails to decode, or a failed upgrade, doesn't keep later ones out
   (409), and the server's custom messages go to the collector connected now.

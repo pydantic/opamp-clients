@@ -2922,7 +2922,7 @@ service:
             exporter:
               otlp:
                 protocol: http/protobuf
-                endpoint: http://127.0.0.1:4318
+                endpoint: "http://127.0.0.1:4318"
                 headers:
                   "testkey": "testval"
                   "testkey2": "testval2"
@@ -2970,19 +2970,6 @@ func TestSupervisor_createEffectiveConfigMsg(t *testing.T) {
 		got := s.createEffectiveConfigMsg()
 
 		assert.Equal(t, []byte("effective"), got.ConfigMap.ConfigMap[""].Body)
-	})
-	t.Run("only merged config set", func(t *testing.T) {
-		s := Supervisor{
-			effectiveConfig:   &atomic.Value{},
-			cfgState:          &atomic.Value{},
-			telemetrySettings: newNopTelemetrySettings(),
-		}
-
-		s.cfgState.Store(&configState{mergedConfig: "merged"})
-
-		got := s.createEffectiveConfigMsg()
-
-		assert.Equal(t, []byte("merged"), got.ConfigMap.ConfigMap[""].Body)
 	})
 	t.Run("stored effective config has multiple keys - preserve all", func(t *testing.T) {
 		s := Supervisor{

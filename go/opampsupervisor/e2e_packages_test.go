@@ -198,6 +198,30 @@ func TestSupervisorInstallsTheCollectorTheServerOffers(t *testing.T) {
 	require.NoFileExists(t, installed+".new")
 }
 
+// While the server's config runs nothing, a new collector proves itself on the bootstrap's
+// config, and is stopped again.
+func TestSupervisorChecksAnUpdateWithNoConfigToRun(t *testing.T) {
+	collector, err := os.ReadFile(collectorExecutablePath(t))
+	require.NoError(t, err)
+	pt, _ := newPackageTest(t, true)
+	empty := sha256.Sum256(nil)
+	pt.server.sendToSupervisor(&protobufs.ServerToAgent{RemoteConfig: &protobufs.AgentRemoteConfig{
+		Config:     &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{}},
+		ConfigHash: empty[:],
+	}})
+	if runtime.GOOS != "windows" {
+		// One that runs its featuregate command but never starts.
+		pt.offer("v1", []byte("#!/bin/sh\n[ \"$1\" = featuregate ] && exit 0\nexit 1\n"), "")
+		got := pt.waitFor(t, "v1", protobufs.PackageStatusEnum_PackageStatusEnum_InstallFailed)
+		require.Equal(t, protobufs.PackageStatusEnum_PackageStatusEnum_InstallFailed, got.Status)
+	}
+	pt.offer("v2", collector, "")
+	got := pt.waitFor(t, "v2", protobufs.PackageStatusEnum_PackageStatusEnum_Installed)
+	require.Equal(t, protobufs.PackageStatusEnum_PackageStatusEnum_Installed, got.Status, got.ErrorMessage)
+	require.FileExists(t, filepath.Join(pt.storage, "agent", "otelcol-contrib"))
+	require.NoFileExists(t, filepath.Join(pt.storage, "agent", "otelcol-contrib.unproven"))
+}
+
 func TestSupervisorRunsTheInstalledCollectorAfterARestart(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the broken collector is a shell script")
@@ -213,7 +237,9 @@ func TestSupervisorRunsTheInstalledCollectorAfterARestart(t *testing.T) {
 
 	// The configured executable no longer runs: only the installed one can.
 	installed := filepath.Join(pt.storage, "agent", "otelcol-contrib")
-	require.NoError(t, os.Rename(installed, installed+".previous"), "an update interrupted after moving it aside")
+	// An update interrupted after moving it aside: it was marked unproven first.
+	require.NoError(t, os.WriteFile(installed+".unproven", []byte("replaced"), 0o600))
+	require.NoError(t, os.Rename(installed, installed+".previous"))
 	cfg, err := config.Load(getSupervisorConfig(t, "packages", map[string]string{
 		"url": pt.server.addr, "storage_dir": pt.storage, "verifier_none": "true",
 		"log_level": "0", "log_file": filepath.Join(pt.storage, "supervisor.log"),
