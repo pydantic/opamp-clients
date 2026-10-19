@@ -283,8 +283,10 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 		return errors.Join(err, s.revertAgentUpdate(running, replaced, logger))
 	}
 	// Proven: the mark goes first, so that a start never undoes it.
-	if err := os.Remove(s.unprovenAgentPath()); err != nil {
-		logger.Warn("Could not record the update as proven", zap.Error(err))
+	// If it can't go, the next start undoes the update: the core isn't told it is installed,
+	// and the executable it replaced stays the rollback target.
+	if err := os.Remove(s.unprovenAgentPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return unansweredError{fmt.Errorf("record the update as proven: %w", err)}
 	}
 	_ = os.Remove(s.previousAgentPath())
 	if err := os.WriteFile(s.packagedStampPath(), []byte(s.packagedStamp()), 0o600); err != nil {
