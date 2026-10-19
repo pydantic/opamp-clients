@@ -315,9 +315,8 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 // the installed executable is deleted, and if it was running, the configured one is started in
 // its place. A configured collector that won't start is logged: the installed one is gone
 // either way, so the core is told it is removed. Changed here: an installed executable that
-// can't be deleted or moved aside is an error, and the core isn't told it is removed: it stays
-// reported, and runs, until a start can delete it. It was reported removed, and the next start
-// ran it.
+// can't be deleted or moved aside is an error, which the core reports: it stays, and runs, until
+// the server offers a collector again. It was reported removed, and the next start ran it.
 func (s *Supervisor) removeAgentPackage() error {
 	installed := s.installedAgentPath()
 	logger := s.telemetrySettings.Logger.With(zap.String("executable", s.packagedAgent))

@@ -7,7 +7,9 @@
 // a free port rather than 4318, which something on a CI runner may hold, and findRandomPort
 // picks below the kernel's ephemeral range (each marked where it changed). The test that
 // accepts_packages is refused is gone: the Supervisor installs packages now
-// (e2e_packages_test.go).
+// (e2e_packages_test.go). The remote configs a test starts from are left in the OpAMP client's
+// state file (e2e_state_test.go), and checked as the server hears them: the Supervisor keeps no
+// .dat files.
 
 //go:build e2e
 
@@ -559,11 +561,6 @@ func TestSupervisorStartsCollectorWithRemoteConfig(t *testing.T) {
 
 				return n != 0
 			}, 10*time.Second, 500*time.Millisecond, "Log never appeared in output")
-
-			require.Never(t, func() bool {
-				_, err := os.Stat(filepath.Join(storageDir, "last_working_remote_config.dat"))
-				return err == nil
-			}, time.Second, 100*time.Millisecond, "Last working remote config should not be persisted when automatic rollback is disabled")
 		})
 	}
 }
@@ -830,7 +827,6 @@ func TestSupervisorStartsCollectorWithNoOpAMPServerUsingLastRemoteConfig(t *test
 	for _, mode := range modes {
 		t.Run(mode.name, func(t *testing.T) {
 			storageDir := t.TempDir()
-			remoteConfigFilePath := filepath.Join(storageDir, "last_recv_remote_config.dat")
 
 			cfg, hash, healthcheckPort := createHealthCheckCollectorConf(t, true)
 			remoteConfigProto := &protobufs.AgentRemoteConfig{
@@ -841,10 +837,7 @@ func TestSupervisorStartsCollectorWithNoOpAMPServerUsingLastRemoteConfig(t *test
 				},
 				ConfigHash: hash,
 			}
-			marshalledRemoteConfig, err := proto.Marshal(remoteConfigProto)
-			require.NoError(t, err)
-
-			require.NoError(t, os.WriteFile(remoteConfigFilePath, marshalledRemoteConfig, 0o600))
+			seedAppliedRemoteConfig(t, storageDir, remoteConfigProto)
 
 			fallbackConfigHealthCheckPort, err := findRandomPort()
 			require.NoError(t, err)
@@ -1156,11 +1149,15 @@ func TestSupervisorDoesNotTightlyLoopWhenRestoredLastWorkingRemoteConfigFails(t 
 			workingCfg, workingHash := createHealthCheckCollectorConfWithPort(t, strconv.Itoa(workingPort))
 			badCfg, badHash := createBadCollectorConf(t)
 
+			var status atomic.Value
 			server := newOpAMPServer(
 				t,
 				defaultConnectingHandler,
 				types.ConnectionCallbacks{
-					OnMessage: func(context.Context, types.Connection, *protobufs.AgentToServer) *protobufs.ServerToAgent {
+					OnMessage: func(_ context.Context, _ types.Connection, m *protobufs.AgentToServer) *protobufs.ServerToAgent {
+						if m.RemoteConfigStatus != nil {
+							status.Store(m.RemoteConfigStatus)
+						}
 						return &protobufs.ServerToAgent{}
 					},
 				},
@@ -1210,10 +1207,8 @@ agent:
 			require.Eventually(t, func() bool {
 				return healthCheckOK(workingPort)
 			}, 10*time.Second, 100*time.Millisecond, "Collector did not become healthy with the working config")
-			require.Eventually(t, func() bool {
-				_, err := os.Stat(filepath.Join(storageDir, "last_working_remote_config.dat"))
-				return err == nil
-			}, 15*time.Second, 100*time.Millisecond, "Working remote config was not saved as last working")
+			require.Eventually(t, func() bool { return reportedApplied(&status, workingHash) },
+				15*time.Second, 100*time.Millisecond, "Working remote config was not reported applied")
 
 			invocationsBeforeBadConfig := agentStartCount(supervisorLogs)
 			claimedWorkingPortCh := claimPortWhenFree(t, workingPort)
@@ -1262,7 +1257,6 @@ func TestSupervisorStartsCollectorWithRemoteConfigAndExecParams(t *testing.T) {
 	storageDir := t.TempDir()
 
 	// create remote config to check agent's health
-	remoteConfigFilePath := filepath.Join(storageDir, "last_recv_remote_config.dat")
 	cfg, hash, healthcheckPort := createHealthCheckCollectorConf(t, false)
 	remoteConfigProto := &protobufs.AgentRemoteConfig{
 		Config: &protobufs.AgentConfigMap{
@@ -1272,10 +1266,7 @@ func TestSupervisorStartsCollectorWithRemoteConfigAndExecParams(t *testing.T) {
 		},
 		ConfigHash: hash,
 	}
-	marshalledRemoteConfig, err := proto.Marshal(remoteConfigProto)
-	require.NoError(t, err)
-
-	require.NoError(t, os.WriteFile(remoteConfigFilePath, marshalledRemoteConfig, 0o600))
+	seedAppliedRemoteConfig(t, storageDir, remoteConfigProto)
 
 	// create server
 	var agentConfig atomic.Value
@@ -2503,11 +2494,10 @@ func TestSupervisorRestartsWithLastReceivedConfig(t *testing.T) {
 				},
 			})
 
-			require.Eventually(t, func() bool {
-				// Check if the config file was written to the storage directory
-				_, err := os.Stat(path.Join(tempDir, "last_recv_remote_config.dat"))
-				return err == nil
-			}, 5*time.Second, 250*time.Millisecond, "Config file was not written to persistent storage directory")
+			// Changed here: the OpAMP client keeps the config it applied (in its state file, even
+			// for another endpoint); the Supervisor kept a copy of its own.
+			require.Eventually(t, func() bool { return reportedApplied(&initialRemoteConfigStatus, hash) },
+				10*time.Second, 250*time.Millisecond, "The remote config was not reported applied")
 
 			agentConfig.Store("")
 			s.Shutdown()
@@ -2874,7 +2864,6 @@ func TestSupervisorLogging(t *testing.T) {
 	}
 
 	storageDir := t.TempDir()
-	remoteCfgFilePath := filepath.Join(storageDir, "last_recv_remote_config.dat")
 
 	collectorCfg, hash := createHostMetricsCollectorConf(t)
 	remoteCfgProto := &protobufs.AgentRemoteConfig{
@@ -2885,9 +2874,7 @@ func TestSupervisorLogging(t *testing.T) {
 		},
 		ConfigHash: hash,
 	}
-	marshalledRemoteCfg, err := proto.Marshal(remoteCfgProto)
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(remoteCfgFilePath, marshalledRemoteCfg, 0o600))
+	seedAppliedRemoteConfig(t, storageDir, remoteCfgProto)
 
 	connected := atomic.Bool{}
 	server := newUnstartedOpAMPServer(t, defaultConnectingHandler, types.ConnectionCallbacks{

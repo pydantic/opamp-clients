@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/pydantic/opamp-clients/go/opamp"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 )
 
@@ -31,9 +32,6 @@ func TestSupervisorKeepsItsConfigWhenThePolicyRefusesOne(t *testing.T) {
 	var reported []*protobufs.RemoteConfigStatus
 	start := func() *Supervisor {
 		s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
-		require.NoError(t, err)
-		// What Start sets up before composing a config.
-		s.persistentState, err = loadOrCreatePersistentState(s.persistentStateFilePath(), "", s.telemetrySettings.Logger)
 		require.NoError(t, err)
 		s.agentDescription.Store(&protobufs.AgentDescription{})
 		s.opampClient = &mockOpAMPClient{setRemoteConfigStatusFunc: func(rcs *protobufs.RemoteConfigStatus) error {
@@ -65,7 +63,10 @@ func TestSupervisorKeepsItsConfigWhenThePolicyRefusesOne(t *testing.T) {
 	_, err := s.composeMergedConfig(s.remoteConfig.Load())
 	require.NoError(t, err)
 
+	// What the client resumes once the collector has run the allowed config: the refused ones
+	// aren't handed over again.
 	restarted := start()
+	restarted.resumed = opamp.Resumed{AppliedRemoteConfig: allowed, RemoteConfigRefused: last}
 	require.NoError(t, restarted.loadAndWriteInitialMergedConfig())
 	require.Equal(t, []byte("allowed"), restarted.remoteConfig.Load().GetConfigHash())
 }

@@ -219,7 +219,7 @@ func clientSupervisor(t *testing.T, server config.OpAMPServer, caps config.Capab
 			Storage:      storage,
 		},
 		heartbeatIntervalSeconds:       30,
-		persistentState:                &persistentState{InstanceID: uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")},
+		instanceUID:                    holdID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
 		agentDescription:               agentDesc,
 		availableComponents:            &atomic.Value{},
 		effectiveConfig:                &atomic.Value{},

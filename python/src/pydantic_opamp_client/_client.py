@@ -420,9 +420,12 @@ class Client:
         self._call(corepb.Input(package_installed=corepb.PackageInstalled(
             name=name, hash=hash_, ok=error is None, detail=error or "")))
 
-    def package_removed(self, name: str) -> None:
-        """Answer a remove_package notification: the package is removed."""
-        self._call(corepb.Input(package_removed=corepb.PackageRemoved(name=name)))
+    def package_removed(self, name: str, error: str | None = None) -> None:
+        """Answer a remove_package notification: the package is removed, or (`error`) why it isn't.
+        One that isn't is reported failed, and not removed again until it is offered and dropped
+        again."""
+        self._call(corepb.Input(package_removed=corepb.PackageRemoved(
+            name=name, failed=error is not None, detail=error or "")))
 
     async def stop(self) -> None:
         """Send agent_disconnect if a message can still be sent, then stop: this returns when the

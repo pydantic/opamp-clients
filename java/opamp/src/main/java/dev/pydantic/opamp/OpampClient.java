@@ -802,7 +802,21 @@ public final class OpampClient {
 
   /** Answer {@link Notification.RemovePackage}: the package is removed. */
   public void packageRemoved(String name) {
-    call(CoreProto.Input.newBuilder().setPackageRemoved(CoreProto.PackageRemoved.newBuilder().setName(name)).build());
+    packageRemoved(name, null);
+  }
+
+  /**
+   * Answer {@link Notification.RemovePackage}: the package is removed ({@code error} null), or why
+   * it isn't. One that isn't is reported failed, and not removed again until it is offered and
+   * dropped again.
+   */
+  public void packageRemoved(String name, String error) {
+    CoreProto.PackageRemoved.Builder p = CoreProto.PackageRemoved.newBuilder()
+        .setName(name).setFailed(error != null);
+    if (error != null) {
+      p.setDetail(error);
+    }
+    call(CoreProto.Input.newBuilder().setPackageRemoved(p).build());
   }
 
   /**

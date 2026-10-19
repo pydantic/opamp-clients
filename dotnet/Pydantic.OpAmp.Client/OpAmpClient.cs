@@ -652,8 +652,19 @@ public sealed class OpAmpClient
             },
         });
 
-    /// <summary>Answer <see cref="OpAmpNotification.RemovePackage"/>: the package is removed.</summary>
-    public void PackageRemoved(string name) => this.Call(new Input { PackageRemoved = new Pydantic.OpAmp.Core.PackageRemoved { Name = name } });
+    /// <summary>
+    /// Answer <see cref="OpAmpNotification.RemovePackage"/>: the package is removed
+    /// (<paramref name="error"/> null), or why it isn't. One that isn't is reported failed, and not
+    /// removed again until it is offered and dropped again.
+    /// </summary>
+    public void PackageRemoved(string name, string? error = null) =>
+        this.Call(new Input
+        {
+            PackageRemoved = new Core.PackageRemoved
+            {
+                Name = name, Failed = error is not null, Detail = error ?? string.Empty,
+            },
+        });
 
     /// <summary>
     /// Send agent_disconnect if a message can still be sent, then stop: the task ends when the

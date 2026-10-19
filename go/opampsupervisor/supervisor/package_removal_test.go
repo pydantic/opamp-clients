@@ -43,9 +43,9 @@ func TestARemovedCollectorThatCannotBeDeletedIsMovedAside(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrNotExist, "the next start deletes it")
 }
 
-// One that can be neither deleted nor moved aside is still installed: the removal fails, so the
-// core keeps it among the installed packages, and the next start runs it. It was reported
-// removed, and the next start ran it all the same.
+// One that can be neither deleted nor moved aside is still installed: the removal fails, and is
+// reported failed (TestACollectorThatCannotBeRemovedIsReportedFailed), so the next start runs
+// it. It was reported removed, and the next start ran it all the same.
 func TestARemovedCollectorThatStaysIsNotReportedRemoved(t *testing.T) {
 	s := newRemovalTestSupervisor(t)
 	installed := s.installedAgentPath()

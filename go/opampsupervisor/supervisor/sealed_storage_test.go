@@ -4,86 +4,96 @@
 package supervisor
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
+	"github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
+	"go.uber.org/zap/zaptest"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 )
 
 const storedSecret = "Bearer the-exporters-secret"
 
-// The Supervisor's copies of what the server sent hold credentials (an exporter's headers, the
-// own-telemetry settings): with storage.state_key they are sealed like the client's state file.
-func TestSupervisorSealsWhatTheServerSent(t *testing.T) {
+// What the server sent holds credentials (an exporter's headers, the own-telemetry settings):
+// with storage.state_key nothing in the storage directory holds them in the clear. The client's
+// state file keeps them, sealed; the Supervisor keeps no copies of its own (it sealed the ones
+// it kept, last_recv_remote_config.dat and the rest).
+func TestNothingTheServerSentIsInTheClear(t *testing.T) {
 	dir := t.TempDir()
-	s := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{ReportsOwnMetrics: true},
+	s := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{},
 		config.Storage{Directory: dir, StateKey: "file:" + filepath.Join(t.TempDir(), "key")})
 	require.NoError(t, s.loadStorageSealer())
 
 	rc := &protobufs.AgentRemoteConfig{ConfigHash: []byte("h"), Config: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{
 		"": {Body: []byte("exporters: {otlphttp: {headers: {Authorization: '" + storedSecret + "'}}}")},
 	}}}
-	require.NoError(t, s.saveLastReceivedConfig(rc))
-	require.NoError(t, s.saveLastWorkingRemoteConfig(rc))
-	telemetry := &protobufs.ConnectionSettingsOffers{OwnMetrics: &protobufs.TelemetryConnectionSettings{
-		Headers: &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: storedSecret}}},
+	telemetry := &protobufs.ConnectionSettingsOffers{Hash: []byte("t"), OwnMetrics: &protobufs.TelemetryConnectionSettings{
+		DestinationEndpoint: "https://ingest.example/v1/metrics",
+		Headers:             &protobufs.Headers{Headers: []*protobufs.Header{{Key: "Authorization", Value: storedSecret}}},
 	}}
-	require.NoError(t, s.saveLastReceivedOwnTelemetrySettings(telemetry, lastRecvOwnTelemetryConfigFile))
+	ts := newCoreTestServer(t)
+	ts.setRespond(func(string, *protobufs.AgentToServer) *protobufs.ServerToAgent {
+		return &protobufs.ServerToAgent{RemoteConfig: rc, ConnectionSettings: telemetry}
+	})
 
-	for _, name := range []string{lastRecvRemoteConfigFile, lastWorkingRemoteConfigFile, lastRecvOwnTelemetryConfigFile} {
-		raw, err := os.ReadFile(filepath.Join(dir, name))
-		require.NoError(t, err)
-		require.NotContains(t, string(raw), storedSecret, "%s in the clear", name)
-		info, err := os.Stat(filepath.Join(dir, name))
-		require.NoError(t, err)
-		require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
-	}
-	for _, name := range []string{lastRecvRemoteConfigFile, lastWorkingRemoteConfigFile} {
-		got, err := s.loadPersistedRemoteConfig(name)
-		require.NoError(t, err)
-		require.True(t, proto.Equal(rc, got), name)
-	}
-	got, err := s.readStorageFile(lastRecvOwnTelemetryConfigFile)
+	c := newCoreClient(zaptest.NewLogger(t), filepath.Join(dir, coreClientStateFile), s.storageSealer)
+	require.NoError(t, c.SetAgentDescription(&protobufs.AgentDescription{}))
+	interval := 50 * time.Millisecond
+	require.NoError(t, c.Start(t.Context(), types.StartSettings{
+		OpAMPServerURL:    ts.url,
+		InstanceUid:       types.InstanceUid(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+		HeartbeatInterval: &interval,
+		Capabilities: protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnMetrics |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat,
+		Callbacks: types.Callbacks{OnMessage: func(_ context.Context, m *types.MessageData) {
+			if m.RemoteConfig != nil {
+				assert.NoError(t, c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
+					LastRemoteConfigHash: m.RemoteConfig.ConfigHash, Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
+				}))
+			}
+		}},
+	}))
+	ts.waitMsg("the config applied", func(m *protobufs.AgentToServer) bool {
+		return m.GetRemoteConfigStatus().GetStatus() == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
+	})
+	require.NoError(t, c.Stop(context.Background()))
+
+	// The next start resumes them.
+	again := newCoreClient(zaptest.NewLogger(t), filepath.Join(dir, coreClientStateFile), s.storageSealer)
+	require.NoError(t, again.SetCapabilities(&[]protobufs.AgentCapabilities{
+		protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsOwnMetrics,
+	}[0]))
+	require.NoError(t, again.Open(t.Context(), types.StartSettings{OpAMPServerURL: ts.url}))
+	r := again.Resumed()
+	require.NoError(t, again.Stop(context.Background()))
+	require.Equal(t, rc.GetConfigHash(), r.AppliedRemoteConfig.GetConfigHash())
+	require.Equal(t, storedSecret, r.ConnectionSettings.GetOwnMetrics().GetHeaders().GetHeaders()[0].GetValue())
+
+	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
-	opened := &protobufs.ConnectionSettingsOffers{}
-	require.NoError(t, proto.Unmarshal(got, opened))
-	require.True(t, proto.Equal(telemetry, opened))
-
-	// Another key doesn't open them.
-	other := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{},
-		config.Storage{Directory: dir, StateKey: "file:" + filepath.Join(t.TempDir(), "key")})
-	require.NoError(t, other.loadStorageSealer())
-	_, err = other.loadPersistedRemoteConfig(lastRecvRemoteConfigFile)
-	require.Error(t, err)
+	require.NotEmpty(t, entries)
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		require.NoError(t, err)
+		require.NotContains(t, string(raw), "the-exporters-secret", "%s in the clear", e.Name())
+	}
 }
 
-// Files saved before state_key was set are read as they are, and sealed at the next save.
-func TestSupervisorReadsFilesSavedBeforeSealing(t *testing.T) {
-	dir := t.TempDir()
-	plain := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{}, config.Storage{Directory: dir})
-	require.NoError(t, plain.loadStorageSealer())
-	require.Nil(t, plain.storageSealer)
-	rc := &protobufs.AgentRemoteConfig{ConfigHash: []byte("h"), Config: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{
-		"": {Body: []byte(storedSecret)},
-	}}}
-	require.NoError(t, plain.saveLastReceivedConfig(rc))
-
-	s := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{},
-		config.Storage{Directory: dir, StateKey: "file:" + filepath.Join(t.TempDir(), "key")})
-	require.NoError(t, s.loadStorageSealer())
-	got, err := s.loadPersistedRemoteConfig(lastRecvRemoteConfigFile)
-	require.NoError(t, err)
-	require.True(t, proto.Equal(rc, got))
-	require.NoError(t, s.saveLastReceivedConfig(got))
-	raw, err := os.ReadFile(filepath.Join(dir, lastRecvRemoteConfigFile))
-	require.NoError(t, err)
-	require.NotContains(t, string(raw), storedSecret)
-
-	bad := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{}, config.Storage{Directory: dir, StateKey: "nowhere"})
+// A state key that can't be found stops the Supervisor's client before it reads anything.
+func TestAStateKeyThatIsNowhereIsAnError(t *testing.T) {
+	bad := clientSupervisor(t, config.OpAMPServer{}, config.Capabilities{}, config.Storage{Directory: t.TempDir(), StateKey: "nowhere"})
 	require.Error(t, bad.loadStorageSealer())
 }

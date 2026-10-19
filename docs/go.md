@@ -96,6 +96,7 @@ in full.
 | Who speaks HTTP | `Config.Mode`: `opamp.ModeCore` (the default) or `opamp.ModePlatform` (net/http and gorilla/websocket); `Config.HTTPClient` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `Config.StateFile`: kept across restarts, written 0600; `Config.StateSealer` encrypts it (`go/statekey` has one: `statekey.Load(spec, stateFile)`) | [state-file.md](state-file.md#encrypted-at-rest-go) |
 | Instance UID | `Config.InstanceUID`, or zero for one the core makes; `Config.RequestInstanceUID` to have the server assign it; `client.InstanceUID()` is the one in use | [instance-uid.md](instance-uid.md) |
+| Before connecting | `opamp.Open(ctx, cfg)` reads the state file and sends nothing: `InstanceUID()` and `Resumed()` (the config last applied, the one to work on, a refused one's status, the telemetry settings) say what the client starts from; then `Start(status, notify)` or `Close()`. `opamp.Start` is `Open` then `Start` | |
 | Capabilities | `Config.Capabilities` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |
 | Heartbeat | `Config.HeartbeatInterval` until the server offers one (30 s) | |
 | Description, health, effective config | `Status.Description`, `Status.Health`, `Status.EffectiveConfig` at start; `SetDescription`, `SetHealth`, `SetEffectiveConfig` later | [sdks.md](sdks.md#what-goes-where) |
