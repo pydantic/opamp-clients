@@ -43,6 +43,19 @@ func TestAnUpdateInterruptedBeforeItsHealthCheckIsUndone(t *testing.T) {
 	}
 }
 
+// A crash while the mark is written leaves it short: nothing had moved yet, so nothing is undone.
+func TestAMarkWrittenOnlyInPartUndoesNothing(t *testing.T) {
+	s := newRemovalTestSupervisor(t)
+	installed := s.installedAgentPath()
+	require.NoError(t, os.WriteFile(installed, []byte("v1"), 0o700))
+	require.NoError(t, os.WriteFile(s.unprovenAgentPath(), []byte("rep"), 0o600))
+
+	s.config.Agent.Executable = s.packagedAgent
+	s.useInstalledAgent()
+	require.Equal(t, installed, s.config.Agent.Executable)
+	requireNoFile(t, s.unprovenAgentPath())
+}
+
 // Shutting down during the health wait isn't an outcome of the install: the core isn't told, so
 // its record stays uncertain and it installs again after the restart, which first undoes this
 // one. The version was reported failed for good.

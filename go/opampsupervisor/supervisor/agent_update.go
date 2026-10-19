@@ -55,11 +55,15 @@ func (s *Supervisor) stagedAgentPath() string   { return s.installedAgentPath() 
 
 // unprovenAgentPath marks an update under way, from just before the new executable is put in
 // place until it has proved healthy: a start that finds it undoes the update. It holds
-// unprovenReplaced when the installed executable was moved to previousAgentPath, and is empty
-// when the configured one ran before.
+// unprovenReplaced when the installed executable was moved to previousAgentPath, and
+// unprovenFresh when the configured one ran before. Anything else is a mark whose write didn't
+// finish, before anything moved.
 func (s *Supervisor) unprovenAgentPath() string { return s.installedAgentPath() + ".unproven" }
 
-const unprovenReplaced = "replaced"
+const (
+	unprovenReplaced = "replaced"
+	unprovenFresh    = "fresh"
+)
 
 // unansweredError is an install or rollback whose outcome the core isn't told: its record of
 // the package stays uncertain, and it asks again at the next start, which first undoes an
@@ -134,13 +138,16 @@ func (s *Supervisor) undoUnprovenUpdate() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if string(mark) == unprovenReplaced {
+	switch string(mark) {
+	case unprovenReplaced:
 		// Not moved aside yet if it isn't there: the installed one is still the one it was.
 		if err := os.Rename(s.previousAgentPath(), s.installedAgentPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return false, err
 		}
-	} else if err := removeExecutable(s.installedAgentPath()); err != nil {
-		return false, err
+	case unprovenFresh:
+		if err := removeExecutable(s.installedAgentPath()); err != nil {
+			return false, err
+		}
 	}
 	return true, os.Remove(s.unprovenAgentPath())
 }
@@ -148,7 +155,7 @@ func (s *Supervisor) undoUnprovenUpdate() (bool, error) {
 // putUpdateInPlace puts the staged executable in place, after marking the update unproven:
 // replaced says whether the installed one runs, and is moved aside.
 func (s *Supervisor) putUpdateInPlace(replaced bool) error {
-	mark := ""
+	mark := unprovenFresh
 	if replaced {
 		mark = unprovenReplaced
 	}
