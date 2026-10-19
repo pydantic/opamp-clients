@@ -227,9 +227,17 @@ func (s *Supervisor) onInstallPackage(req agentInstall) {
 // signature, unpacks it and runs its featuregate command, then stops the collector, puts the new
 // executable in place and starts it. If it doesn't report healthy within the health timeout,
 // or exits first, the previous executable goes back and is started again.
+//
+// Changed here: while an unproven update is left that a start couldn't undo, nothing is installed
+// and the core isn't told: the next start tries the undo again, and the core asks again after it.
+// The configured collector runs then, so a new update was marked as one over it and written over
+// the executable the left update had kept, and undoing it deleted that executable.
 func (s *Supervisor) installAgentPackage(req agentInstall) error {
 	if req.name != "" || req.pkg.GetType() != protobufs.PackageType_PackageType_TopLevel {
 		return fmt.Errorf("the Supervisor installs only the collector itself: a top-level package named \"\", not %q", req.name)
+	}
+	if _, err := os.Stat(s.unprovenAgentPath()); !errors.Is(err, os.ErrNotExist) {
+		return unansweredError{errors.Join(errors.New("an earlier update the last start couldn't undo is left: the next start tries again"), err)}
 	}
 	logger := s.telemetrySettings.Logger.With(zap.String("version", req.pkg.GetVersion()))
 	logger.Info("Installing a new collector executable")

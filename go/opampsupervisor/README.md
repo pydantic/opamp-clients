@@ -120,7 +120,9 @@ agent:
   config when the server's config runs nothing), and a start that finds the mark undoes it, so
   a crash during the health wait can't cost the rollback target. A shutdown during the wait, or
   a rollback that can't put the previous executable back (the configured one then runs), isn't
-  reported: the core asks again at the next start. `agent.package.verifier.type` must be set,
+  reported: the core asks again at the next start. While a start can't undo an unproven update,
+  nothing more is installed: the core's request isn't answered until a start has undone it.
+  `agent.package.verifier.type` must be set,
   to `none` to skip signature checks; an empty one turned them off.
 - **The local OpAMP server takes the collector only.** The server the collector's opamp
   extension connects to, and the one the bootstrap starts, take a request only with a bearer

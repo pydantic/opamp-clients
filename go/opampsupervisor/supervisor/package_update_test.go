@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,6 +99,37 @@ func TestARollbackThatFailsRunsTheConfiguredCollector(t *testing.T) {
 	require.True(t, unanswered(err))
 	require.Equal(t, s.packagedAgent, s.commander.Executable())
 	require.FileExists(t, s.unprovenAgentPath(), "the next start tries again")
+}
+
+// A start that can't undo an unproven update leaves its mark, and the configured collector runs.
+// The core asks for the install again; it isn't done, and the core isn't told, until a start has
+// undone the update. It was done over the configured collector: the mark was rewritten "fresh",
+// the new executable renamed over the installed one, and undoing it deleted that one.
+func TestNoInstallWhileAnUpdateAStartCouldNotUndoIsLeft(t *testing.T) {
+	s := newRemovalTestSupervisor(t)
+	installed := s.installedAgentPath()
+	require.NoError(t, os.WriteFile(installed, []byte("v1"), 0o700))
+	require.NoError(t, os.WriteFile(s.unprovenAgentPath(), []byte(unprovenReplaced), 0o600))
+	// A directory can't be renamed over the executable: the undo fails.
+	require.NoError(t, os.MkdirAll(filepath.Join(s.previousAgentPath(), "busy"), 0o700))
+
+	s.config.Agent.Executable = s.packagedAgent
+	s.useInstalledAgent()
+	require.Equal(t, s.packagedAgent, s.config.Agent.Executable, "the configured collector runs")
+	require.FileExists(t, s.unprovenAgentPath())
+
+	err := s.installAgentPackage(agentInstall{
+		pkg:  &protobufs.PackageAvailable{Type: protobufs.PackageType_PackageType_TopLevel, Version: "v2"},
+		path: filepath.Join(t.TempDir(), "package.tar.gz"),
+	})
+	require.Error(t, err)
+	require.True(t, unanswered(err), "the core isn't told: %v", err)
+	got, err := os.ReadFile(installed)
+	require.NoError(t, err)
+	require.Equal(t, "v1", string(got), "the installed executable is kept")
+	mark, err := os.ReadFile(s.unprovenAgentPath())
+	require.NoError(t, err)
+	require.Equal(t, unprovenReplaced, string(mark), "the next start tries the undo again")
 }
 
 func requireNoFile(t *testing.T, path string) {
