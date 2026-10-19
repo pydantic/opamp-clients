@@ -2971,19 +2971,6 @@ func TestSupervisor_createEffectiveConfigMsg(t *testing.T) {
 
 		assert.Equal(t, []byte("effective"), got.ConfigMap.ConfigMap[""].Body)
 	})
-	t.Run("only merged config set", func(t *testing.T) {
-		s := Supervisor{
-			effectiveConfig:   &atomic.Value{},
-			cfgState:          &atomic.Value{},
-			telemetrySettings: newNopTelemetrySettings(),
-		}
-
-		s.cfgState.Store(&configState{mergedConfig: "merged"})
-
-		got := s.createEffectiveConfigMsg()
-
-		assert.Equal(t, []byte("merged"), got.ConfigMap.ConfigMap[""].Body)
-	})
 	t.Run("stored effective config has multiple keys - preserve all", func(t *testing.T) {
 		s := Supervisor{
 			effectiveConfig:   &atomic.Value{},

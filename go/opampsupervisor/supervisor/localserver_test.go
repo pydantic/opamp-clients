@@ -466,23 +466,22 @@ func TestBootstrapNeedsTheToken(t *testing.T) {
 	require.ErrorContains(t, s.getBootstrapInfo(), "never connected")
 }
 
-// The token goes nowhere the Supervisor sends: not in the effective config it reports,
-// whether its own merged config or the collector's, nor in the collector's log tail.
+// The token goes nowhere the Supervisor sends: not in the effective config it reports (its own
+// merged config is never reported), nor in the collector's log tail.
 func TestLocalServerTokenIsNotReported(t *testing.T) {
 	s := newLocalServerTestSupervisor(t)
 	withToken := []byte("extensions:\n  opamp:\n    server:\n      ws:\n        headers:\n          Authorization: Bearer " + testLocalServerToken + "\n")
 
 	s.cfgState.Store(&configState{mergedConfig: string(withToken)})
-	body := s.createEffectiveConfigMsg().GetConfigMap().GetConfigMap()[""].GetBody()
-	require.NotContains(t, string(body), testLocalServerToken)
-	require.Contains(t, string(body), "Authorization: Bearer [REDACTED]")
+	require.Nil(t, s.createEffectiveConfigMsg())
 
 	reported := &protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigObject{"": {Body: withToken}},
 	}}
 	s.effectiveConfig.Store(reported)
-	body = s.createEffectiveConfigMsg().GetConfigMap().GetConfigMap()[""].GetBody()
+	body := s.createEffectiveConfigMsg().GetConfigMap().GetConfigMap()[""].GetBody()
 	require.NotContains(t, string(body), testLocalServerToken)
+	require.Contains(t, string(body), "Authorization: Bearer [REDACTED]")
 	require.Contains(t, string(reported.ConfigMap.ConfigMap[""].Body), testLocalServerToken, "what the collector reported is left as it was")
 
 	s.config.Agent.PassthroughLogs = true
