@@ -422,7 +422,7 @@ class Client:
 
     def package_removed(self, name: str) -> None:
         """Answer a remove_package notification: the package is removed."""
-        self._call(corepb.Input(package_removed=corepb.Name(name=name)))
+        self._call(corepb.Input(package_removed=corepb.PackageRemoved(name=name)))
 
     async def stop(self) -> None:
         """Send agent_disconnect if a message can still be sent, then stop: this returns when the

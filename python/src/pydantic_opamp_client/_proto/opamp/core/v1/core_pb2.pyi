@@ -209,7 +209,7 @@ class Input(_message.Message):
     set_custom_capabilities: _opamp_pb2.CustomCapabilities
     send_custom_message: _opamp_pb2.CustomMessage
     package_installed: PackageInstalled
-    package_removed: Name
+    package_removed: PackageRemoved
     downloaded: Downloaded
     download_failed: Failed
     proxy_answer: ProxyAnswer
@@ -223,7 +223,7 @@ class Input(_message.Message):
     download_response: DownloadResponse
     set_auth_headers: Headers
     abort: Empty
-    def __init__(self, start: _Optional[_Union[Empty, _Mapping]] = ..., set_description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., set_health: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., set_effective_config: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., set_remote_config_status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., stop: _Optional[_Union[Empty, _Mapping]] = ..., timer: _Optional[_Union[Empty, _Mapping]] = ..., http_response: _Optional[_Union[HttpResponse, _Mapping]] = ..., http_failed: _Optional[_Union[Failed, _Mapping]] = ..., ws_opened: _Optional[_Union[Id, _Mapping]] = ..., ws_failed: _Optional[_Union[WsFailed, _Mapping]] = ..., ws_message: _Optional[_Union[WsMessage, _Mapping]] = ..., ws_closed: _Optional[_Union[WsClosed, _Mapping]] = ..., ws_lost: _Optional[_Union[Failed, _Mapping]] = ..., stored: _Optional[_Union[Id, _Mapping]] = ..., store_failed: _Optional[_Union[Failed, _Mapping]] = ..., set_connection_settings_status: _Optional[_Union[_opamp_pb2.ConnectionSettingsStatus, _Mapping]] = ..., set_available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., set_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., send_custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., package_installed: _Optional[_Union[PackageInstalled, _Mapping]] = ..., package_removed: _Optional[_Union[Name, _Mapping]] = ..., downloaded: _Optional[_Union[Downloaded, _Mapping]] = ..., download_failed: _Optional[_Union[Failed, _Mapping]] = ..., proxy_answer: _Optional[_Union[ProxyAnswer, _Mapping]] = ..., stream_resolved: _Optional[_Union[StreamResolved, _Mapping]] = ..., stream_opened: _Optional[_Union[Id, _Mapping]] = ..., stream_tls_ready: _Optional[_Union[Id, _Mapping]] = ..., stream_data: _Optional[_Union[WsMessage, _Mapping]] = ..., stream_eof: _Optional[_Union[Id, _Mapping]] = ..., stream_failed: _Optional[_Union[Failed, _Mapping]] = ..., stream_spliced: _Optional[_Union[Id, _Mapping]] = ..., download_response: _Optional[_Union[DownloadResponse, _Mapping]] = ..., set_auth_headers: _Optional[_Union[Headers, _Mapping]] = ..., abort: _Optional[_Union[Empty, _Mapping]] = ...) -> None: ...
+    def __init__(self, start: _Optional[_Union[Empty, _Mapping]] = ..., set_description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., set_health: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., set_effective_config: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., set_remote_config_status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., stop: _Optional[_Union[Empty, _Mapping]] = ..., timer: _Optional[_Union[Empty, _Mapping]] = ..., http_response: _Optional[_Union[HttpResponse, _Mapping]] = ..., http_failed: _Optional[_Union[Failed, _Mapping]] = ..., ws_opened: _Optional[_Union[Id, _Mapping]] = ..., ws_failed: _Optional[_Union[WsFailed, _Mapping]] = ..., ws_message: _Optional[_Union[WsMessage, _Mapping]] = ..., ws_closed: _Optional[_Union[WsClosed, _Mapping]] = ..., ws_lost: _Optional[_Union[Failed, _Mapping]] = ..., stored: _Optional[_Union[Id, _Mapping]] = ..., store_failed: _Optional[_Union[Failed, _Mapping]] = ..., set_connection_settings_status: _Optional[_Union[_opamp_pb2.ConnectionSettingsStatus, _Mapping]] = ..., set_available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., set_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., send_custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., package_installed: _Optional[_Union[PackageInstalled, _Mapping]] = ..., package_removed: _Optional[_Union[PackageRemoved, _Mapping]] = ..., downloaded: _Optional[_Union[Downloaded, _Mapping]] = ..., download_failed: _Optional[_Union[Failed, _Mapping]] = ..., proxy_answer: _Optional[_Union[ProxyAnswer, _Mapping]] = ..., stream_resolved: _Optional[_Union[StreamResolved, _Mapping]] = ..., stream_opened: _Optional[_Union[Id, _Mapping]] = ..., stream_tls_ready: _Optional[_Union[Id, _Mapping]] = ..., stream_data: _Optional[_Union[WsMessage, _Mapping]] = ..., stream_eof: _Optional[_Union[Id, _Mapping]] = ..., stream_failed: _Optional[_Union[Failed, _Mapping]] = ..., stream_spliced: _Optional[_Union[Id, _Mapping]] = ..., download_response: _Optional[_Union[DownloadResponse, _Mapping]] = ..., set_auth_headers: _Optional[_Union[Headers, _Mapping]] = ..., abort: _Optional[_Union[Empty, _Mapping]] = ...) -> None: ...
 
 class ProxyAnswer(_message.Message):
     __slots__ = ("id", "proxy", "headers", "resolve_locally")
@@ -262,6 +262,16 @@ class PackageInstalled(_message.Message):
     ok: bool
     detail: str
     def __init__(self, name: _Optional[str] = ..., hash: _Optional[bytes] = ..., ok: bool = ..., detail: _Optional[str] = ...) -> None: ...
+
+class PackageRemoved(_message.Message):
+    __slots__ = ("name", "failed", "detail")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    FAILED_FIELD_NUMBER: _ClassVar[int]
+    DETAIL_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    failed: bool
+    detail: str
+    def __init__(self, name: _Optional[str] = ..., failed: bool = ..., detail: _Optional[str] = ...) -> None: ...
 
 class Downloaded(_message.Message):
     __slots__ = ("id", "sha256")
@@ -362,18 +372,32 @@ class Reply(_message.Message):
     def __init__(self, output: _Optional[_Union[Output, _Mapping]] = ..., error: _Optional[str] = ...) -> None: ...
 
 class Output(_message.Message):
-    __slots__ = ("effects", "wake_at_ms", "stopped", "instance_uid", "limits")
+    __slots__ = ("effects", "wake_at_ms", "stopped", "instance_uid", "limits", "resumed")
     EFFECTS_FIELD_NUMBER: _ClassVar[int]
     WAKE_AT_MS_FIELD_NUMBER: _ClassVar[int]
     STOPPED_FIELD_NUMBER: _ClassVar[int]
     INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
     LIMITS_FIELD_NUMBER: _ClassVar[int]
+    RESUMED_FIELD_NUMBER: _ClassVar[int]
     effects: _containers.RepeatedCompositeFieldContainer[Effect]
     wake_at_ms: int
     stopped: bool
     instance_uid: bytes
     limits: Limits
-    def __init__(self, effects: _Optional[_Iterable[_Union[Effect, _Mapping]]] = ..., wake_at_ms: _Optional[int] = ..., stopped: bool = ..., instance_uid: _Optional[bytes] = ..., limits: _Optional[_Union[Limits, _Mapping]] = ...) -> None: ...
+    resumed: Resumed
+    def __init__(self, effects: _Optional[_Iterable[_Union[Effect, _Mapping]]] = ..., wake_at_ms: _Optional[int] = ..., stopped: bool = ..., instance_uid: _Optional[bytes] = ..., limits: _Optional[_Union[Limits, _Mapping]] = ..., resumed: _Optional[_Union[Resumed, _Mapping]] = ...) -> None: ...
+
+class Resumed(_message.Message):
+    __slots__ = ("applied_remote_config", "remote_config", "remote_config_refused", "connection_settings")
+    APPLIED_REMOTE_CONFIG_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_CONFIG_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_CONFIG_REFUSED_FIELD_NUMBER: _ClassVar[int]
+    CONNECTION_SETTINGS_FIELD_NUMBER: _ClassVar[int]
+    applied_remote_config: _opamp_pb2.AgentRemoteConfig
+    remote_config: _opamp_pb2.AgentRemoteConfig
+    remote_config_refused: _opamp_pb2.RemoteConfigStatus
+    connection_settings: _opamp_pb2.ConnectionSettingsOffers
+    def __init__(self, applied_remote_config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., remote_config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., remote_config_refused: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., connection_settings: _Optional[_Union[_opamp_pb2.ConnectionSettingsOffers, _Mapping]] = ...) -> None: ...
 
 class Limits(_message.Message):
     __slots__ = ("heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "request_timeout_ms", "max_receive_bytes", "verify_timeout_ms", "max_package_bytes", "download_timeout_ms", "stop_timeout_ms", "connect_timeout_ms")

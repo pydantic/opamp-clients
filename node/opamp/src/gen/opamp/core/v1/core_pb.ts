@@ -23,7 +23,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file opamp/core/v1/core.proto.
  */
 export const file_opamp_core_v1_core: GenFile = /*@__PURE__*/
-  fileDesc("ChhvcGFtcC9jb3JlL3YxL2NvcmUucHJvdG8SDW9wYW1wLmNvcmUudjEilAYKBkNvbmZpZxIUCgxpbnN0YW5jZV91aWQYAiABKAwSFAoMY2FwYWJpbGl0aWVzGAMgASgEEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIaChJiYWNrb2ZmX2luaXRpYWxfbXMYBSABKAQSFgoOYmFja29mZl9tYXhfbXMYBiABKAQSFgoObWF4X3NlbmRfYnl0ZXMYByABKAQSDAoEc2VlZBgIIAEoBBIQCghlbmRwb2ludBgJIAEoCRImCgdoZWFkZXJzGAogAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISGgoScmVxdWVzdF90aW1lb3V0X21zGAsgASgEEhkKEW1heF9yZWNlaXZlX2J5dGVzGAwgASgEEhMKC3BlcnNpc3RlbmNlGA0gASgIEhMKC3NhdmVkX3N0YXRlGA4gASgMEiIKGmFjY2VwdF9jb25uZWN0aW9uX3NldHRpbmdzGA8gASgIEhkKEXZlcmlmeV90aW1lb3V0X21zGBAgASgEEhIKCnVzZXJfYWdlbnQYESABKAkSFwoPYWNjZXB0X3BhY2thZ2VzGBMgASgIEhkKEW1heF9wYWNrYWdlX2J5dGVzGBQgASgEEhsKE2Rvd25sb2FkX3RpbWVvdXRfbXMYFSABKAQSHAoUcmVxdWVzdF9pbnN0YW5jZV91aWQYFiABKAgSDwoHc3RyZWFtcxgXIAEoCBIPCgdlbnRyb3B5GBggASgMEhgKEHNwbGljZV9kb3dubG9hZHMYGSABKAgSDwoHdW5peF9tcxgaIAEoBBIXCg9zdG9wX3RpbWVvdXRfbXMYHCABKAQSGgoSY29ubmVjdF90aW1lb3V0X21zGB0gASgEEikKBXByb3h5GB8gASgLMhoub3BhbXAuY29yZS52MS5Qcm94eUNob2ljZUoECAEQAkoECBIQE0oECBsQHEoECB4QH1IJdHJhbnNwb3J0UhdpbnN0YW5jZV91aWRfaXNfZGVmYXVsdFIOY2FuY2VsX2VmZmVjdHNSD2Rvd25sb2FkX3N0YXR1cyKXAQoLUHJveHlDaG9pY2USDgoGZGlyZWN0GAEgASgIEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISFwoPcmVzb2x2ZV9sb2NhbGx5GAQgASgIEioKC2Vudmlyb25tZW50GAUgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXIiNAoGT3JpZ2luEg4KBnNjaGVtZRgBIAEoCRIMCgRob3N0GAIgASgJEgwKBHBvcnQYAyABKA0iJQoGSGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkiMQoHSGVhZGVycxImCgdoZWFkZXJzGAEgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXIiBwoFRW1wdHkiGAoGRGV0YWlsEg4KBmRldGFpbBgBIAEoCSKiDgoFSW5wdXQSJQoFc3RhcnQYASABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASOwoPc2V0X2Rlc2NyaXB0aW9uGAIgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlvbkgAEjUKCnNldF9oZWFsdGgYAyABKAsyHy5vcGFtcC5wcm90by52MS5Db21wb25lbnRIZWFsdGhIABI/ChRzZXRfZWZmZWN0aXZlX2NvbmZpZxgEIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZ0gAEkYKGHNldF9yZW1vdGVfY29uZmlnX3N0YXR1cxgFIAEoCzIiLm9wYW1wLnByb3RvLnYxLlJlbW90ZUNvbmZpZ1N0YXR1c0gAEiQKBHN0b3AYBiABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASJQoFdGltZXIYByABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASNAoNaHR0cF9yZXNwb25zZRgIIAEoCzIbLm9wYW1wLmNvcmUudjEuSHR0cFJlc3BvbnNlSAASLAoLaHR0cF9mYWlsZWQYCSABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEiYKCXdzX29wZW5lZBgKIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIsCgl3c19mYWlsZWQYCyABKAsyFy5vcGFtcC5jb3JlLnYxLldzRmFpbGVkSAASLgoKd3NfbWVzc2FnZRgMIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASLAoJd3NfY2xvc2VkGA0gASgLMhcub3BhbXAuY29yZS52MS5Xc0Nsb3NlZEgAEigKB3dzX2xvc3QYDiABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEiMKBnN0b3JlZBgPIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItCgxzdG9yZV9mYWlsZWQYECABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAElIKHnNldF9jb25uZWN0aW9uX3NldHRpbmdzX3N0YXR1cxgRIAEoCzIoLm9wYW1wLnByb3RvLnYxLkNvbm5lY3Rpb25TZXR0aW5nc1N0YXR1c0gAEkcKGHNldF9hdmFpbGFibGVfY29tcG9uZW50cxgSIAEoCzIjLm9wYW1wLnByb3RvLnYxLkF2YWlsYWJsZUNvbXBvbmVudHNIABJFChdzZXRfY3VzdG9tX2NhcGFiaWxpdGllcxgTIAEoCzIiLm9wYW1wLnByb3RvLnYxLkN1c3RvbUNhcGFiaWxpdGllc0gAEjwKE3NlbmRfY3VzdG9tX21lc3NhZ2UYFCABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21NZXNzYWdlSAASPAoRcGFja2FnZV9pbnN0YWxsZWQYFSABKAsyHy5vcGFtcC5jb3JlLnYxLlBhY2thZ2VJbnN0YWxsZWRIABIuCg9wYWNrYWdlX3JlbW92ZWQYFiABKAsyEy5vcGFtcC5jb3JlLnYxLk5hbWVIABIvCgpkb3dubG9hZGVkGBcgASgLMhkub3BhbXAuY29yZS52MS5Eb3dubG9hZGVkSAASMAoPZG93bmxvYWRfZmFpbGVkGBggASgLMhUub3BhbXAuY29yZS52MS5GYWlsZWRIABIyCgxwcm94eV9hbnN3ZXIYGSABKAsyGi5vcGFtcC5jb3JlLnYxLlByb3h5QW5zd2VySAASOAoPc3RyZWFtX3Jlc29sdmVkGBogASgLMh0ub3BhbXAuY29yZS52MS5TdHJlYW1SZXNvbHZlZEgAEioKDXN0cmVhbV9vcGVuZWQYGyABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASLQoQc3RyZWFtX3Rsc19yZWFkeRgcIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIvCgtzdHJlYW1fZGF0YRgdIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASJwoKc3RyZWFtX2VvZhgeIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIuCg1zdHJlYW1fZmFpbGVkGB8gASgLMhUub3BhbXAuY29yZS52MS5GYWlsZWRIABIrCg5zdHJlYW1fc3BsaWNlZBggIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABI8ChFkb3dubG9hZF9yZXNwb25zZRghIAEoCzIfLm9wYW1wLmNvcmUudjEuRG93bmxvYWRSZXNwb25zZUgAEjIKEHNldF9hdXRoX2hlYWRlcnMYIiABKAsyFi5vcGFtcC5jb3JlLnYxLkhlYWRlcnNIABIlCgVhYm9ydBgjIAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlIAEIGCgRraW5kImkKC1Byb3h5QW5zd2VyEgoKAmlkGAEgASgEEg0KBXByb3h5GAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIXCg9yZXNvbHZlX2xvY2FsbHkYBCABKAgiLwoOU3RyZWFtUmVzb2x2ZWQSCgoCaWQYASABKAQSEQoJYWRkcmVzc2VzGAIgAygJIhQKBE5hbWUSDAoEbmFtZRgBIAEoCSJKChBQYWNrYWdlSW5zdGFsbGVkEgwKBG5hbWUYASABKAkSDAoEaGFzaBgCIAEoDBIKCgJvaxgDIAEoCBIOCgZkZXRhaWwYBCABKAkiKAoKRG93bmxvYWRlZBIKCgJpZBgBIAEoBBIOCgZzaGEyNTYYAiABKAwigAEKEERvd25sb2FkUmVzcG9uc2USCgoCaWQYASABKAQSDgoGc3RhdHVzGAIgASgNEg4KBnNoYTI1NhgDIAEoDBIQCghsb2NhdGlvbhgEIAEoCRIuCg9sb2NhdGlvbl9vcmlnaW4YBSABKAsyFS5vcGFtcC5jb3JlLnYxLk9yaWdpbiIQCgJJZBIKCgJpZBgBIAEoBCIkCgZGYWlsZWQSCgoCaWQYASABKAQSDgoGZGV0YWlsGAIgASgJInEKDEh0dHBSZXNwb25zZRIKCgJpZBgBIAEoBBIOCgZzdGF0dXMYAiABKA0SJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEgwKBGJvZHkYBCABKAwSDwoHdW5peF9tcxgFIAEoBCJ/CghXc0ZhaWxlZBIKCgJpZBgBIAEoBBITCgZzdGF0dXMYAiABKA1IAIgBARImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISDgoGZGV0YWlsGAQgASgJEg8KB3VuaXhfbXMYBSABKARCCQoHX3N0YXR1cyIlCglXc01lc3NhZ2USCgoCaWQYASABKAQSDAoEZGF0YRgCIAEoDCIkCghXc0Nsb3NlZBIKCgJpZBgBIAEoBBIMCgRjb2RlGAIgASgNIkwKBFN0ZXASDgoGbm93X21zGAEgASgEEiMKBWlucHV0GAIgASgLMhQub3BhbXAuY29yZS52MS5JbnB1dBIPCgd1bml4X21zGAMgASgEIj0KBVJlcGx5EiUKBm91dHB1dBgBIAEoCzIVLm9wYW1wLmNvcmUudjEuT3V0cHV0Eg0KBWVycm9yGAIgASgJIqYBCgZPdXRwdXQSJgoHZWZmZWN0cxgBIAMoCzIVLm9wYW1wLmNvcmUudjEuRWZmZWN0EhcKCndha2VfYXRfbXMYAiABKARIAIgBARIPCgdzdG9wcGVkGAMgASgIEhQKDGluc3RhbmNlX3VpZBgEIAEoDBIlCgZsaW1pdHMYBSABKAsyFS5vcGFtcC5jb3JlLnYxLkxpbWl0c0INCgtfd2FrZV9hdF9tcyKyAgoGTGltaXRzEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIaChJiYWNrb2ZmX2luaXRpYWxfbXMYBSABKAQSFgoOYmFja29mZl9tYXhfbXMYBiABKAQSFgoObWF4X3NlbmRfYnl0ZXMYByABKAQSGgoScmVxdWVzdF90aW1lb3V0X21zGAsgASgEEhkKEW1heF9yZWNlaXZlX2J5dGVzGAwgASgEEhkKEXZlcmlmeV90aW1lb3V0X21zGBAgASgEEhkKEW1heF9wYWNrYWdlX2J5dGVzGBQgASgEEhsKE2Rvd25sb2FkX3RpbWVvdXRfbXMYFSABKAQSFwoPc3RvcF90aW1lb3V0X21zGBwgASgEEhoKEmNvbm5lY3RfdGltZW91dF9tcxgdIAEoBCLUBgoGRWZmZWN0EjIKDGh0dHBfcmVxdWVzdBgBIAEoCzIaLm9wYW1wLmNvcmUudjEuSHR0cFJlcXVlc3RIABIoCgd3c19vcGVuGAIgASgLMhUub3BhbXAuY29yZS52MS5Xc09wZW5IABIrCgd3c19zZW5kGAMgASgLMhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIlCgh3c19jbG9zZRgEIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItCgZub3RpZnkYBSABKAsyGy5vcGFtcC5jb3JlLnYxLk5vdGlmaWNhdGlvbkgAEiUKBXN0b3JlGAYgASgLMhQub3BhbXAuY29yZS52MS5TdG9yZUgAEisKCGRvd25sb2FkGAcgASgLMhcub3BhbXAuY29yZS52MS5Eb3dubG9hZEgAEiQKB2Rpc2NhcmQYCCABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASIwoGY2FuY2VsGAkgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEikKC3Byb3h5X3F1ZXJ5GAogASgLMhIub3BhbXAuY29yZS52MS5VcmxIABIzCg5zdHJlYW1fcmVzb2x2ZRgLIAEoCzIZLm9wYW1wLmNvcmUudjEuU3RyZWFtTmFtZUgAEjAKC3N0cmVhbV9vcGVuGAwgASgLMhkub3BhbXAuY29yZS52MS5TdHJlYW1PcGVuSAASNQoQc3RyZWFtX3N0YXJ0X3RscxgNIAEoCzIZLm9wYW1wLmNvcmUudjEuU3RyZWFtTmFtZUgAEjAKDHN0cmVhbV93cml0ZRgOIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASMgoMc3RyZWFtX2Nsb3NlGA8gASgLMhoub3BhbXAuY29yZS52MS5TdHJlYW1DbG9zZUgAEjEKDWRvd25sb2FkX2RhdGEYECABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVzc2FnZUgAEioKDWRvd25sb2FkX2RvbmUYESABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASNAoNc3RyZWFtX3NwbGljZRgSIAEoCzIbLm9wYW1wLmNvcmUudjEuU3RyZWFtU3BsaWNlSABCBgoEa2luZCIoCgtTdHJlYW1DbG9zZRIKCgJpZBgBIAEoBBINCgVhYm9ydBgCIAEoCCIeCgNVcmwSCgoCaWQYASABKAQSCwoDdXJsGAIgASgJIiYKClN0cmVhbU5hbWUSCgoCaWQYASABKAQSDAoEaG9zdBgCIAEoCSI7CgxTdHJlYW1TcGxpY2USCgoCaWQYASABKAQSEAoIZG93bmxvYWQYAiABKAQSDQoFYnl0ZXMYAyABKAQiNAoKU3RyZWFtT3BlbhIKCgJpZBgBIAEoBBIMCgRob3N0GAIgASgJEgwKBHBvcnQYAyABKA0icgoIRG93bmxvYWQSCgoCaWQYASABKAQSCwoDdXJsGAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIRCgltYXhfYnl0ZXMYBCABKAQSEgoKdGltZW91dF9tcxgFIAEoBCIhCgVTdG9yZRIKCgJpZBgBIAEoBBIMCgRkYXRhGAIgASgMIowBCgtIdHRwUmVxdWVzdBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEgwKBGJvZHkYBCABKAwSEgoKdGltZW91dF9tcxgFIAEoBBIaChJtYXhfcmVzcG9uc2VfYnl0ZXMYBiABKAQieAoGV3NPcGVuEgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISGQoRbWF4X21lc3NhZ2VfYnl0ZXMYBCABKAQSEgoKdGltZW91dF9tcxgFIAEoBCK2BwoMTm90aWZpY2F0aW9uEikKCWNvbm5lY3RlZBgBIAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlIABI8Cg5jb25uZWN0X2ZhaWxlZBgCIAEoCzIiLm9wYW1wLmNvcmUudjEuTm90aWZ5Q29ubmVjdEZhaWxlZEgAEjYKDmVycm9yX3Jlc3BvbnNlGAMgASgLMhwub3BhbXAuY29yZS52MS5FcnJvclJlc3BvbnNlSAASOgoNcmVtb3RlX2NvbmZpZxgEIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnSAASNwoHY29tbWFuZBgFIAEoCzIkLm9wYW1wLnByb3RvLnYxLlNlcnZlclRvQWdlbnRDb21tYW5kSAASHgoUaW5zdGFuY2VfdWlkX2NoYW5nZWQYBiABKAxIABIfChVoZWFydGJlYXRfaW50ZXJ2YWxfbXMYByABKARIABI5ChBzdGF0dXNfdG9vX2xhcmdlGAkgASgLMh0ub3BhbXAuY29yZS52MS5TdGF0dXNUb29MYXJnZUgAEiwKC2JhZF9tZXNzYWdlGAogASgLMhUub3BhbXAuY29yZS52MS5EZXRhaWxIABInCgdzdG9wcGVkGAsgASgLMhQub3BhbXAuY29yZS52MS5FbXB0eUgAEkcKE2Nvbm5lY3Rpb25fc2V0dGluZ3MYDCABKAsyKC5vcGFtcC5wcm90by52MS5Db25uZWN0aW9uU2V0dGluZ3NPZmZlcnNIABI3Cg5jdXN0b21fbWVzc2FnZRgNIAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2VIABJIChpzZXJ2ZXJfY3VzdG9tX2NhcGFiaWxpdGllcxgOIAEoCzIiLm9wYW1wLnByb3RvLnYxLkN1c3RvbUNhcGFiaWxpdGllc0gAEkYKF2N1c3RvbV9tZXNzYWdlX25vdF9zZW50GA8gASgLMiMub3BhbXAuY29yZS52MS5DdXN0b21NZXNzYWdlTm90U2VudEgAEjgKD2luc3RhbGxfcGFja2FnZRgQIAEoCzIdLm9wYW1wLmNvcmUudjEuSW5zdGFsbFBhY2thZ2VIABItCg5yZW1vdmVfcGFja2FnZRgRIAEoCzITLm9wYW1wLmNvcmUudjEuTmFtZUgAEjIKDHNhdmVfc3RhbGxlZBgSIAEoCzIaLm9wYW1wLmNvcmUudjEuU2F2ZVN0YWxsZWRIAEIGCgRraW5kSgQICBAJIjEKC1NhdmVTdGFsbGVkEg8KB3N0YWxsZWQYASABKAgSEQoJd2FpdGVkX21zGAIgASgEImMKDkluc3RhbGxQYWNrYWdlEgwKBG5hbWUYASABKAkSMQoHcGFja2FnZRgCIAEoCzIgLm9wYW1wLnByb3RvLnYxLlBhY2thZ2VBdmFpbGFibGUSEAoIZG93bmxvYWQYAyABKAQiVgoUQ3VzdG9tTWVzc2FnZU5vdFNlbnQSLgoHbWVzc2FnZRgBIAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2USDgoGcmVhc29uGAIgASgJIkUKE05vdGlmeUNvbm5lY3RGYWlsZWQSEwoGc3RhdHVzGAEgASgNSACIAQESDgoGZGV0YWlsGAIgASgJQgkKB19zdGF0dXMiLgoNRXJyb3JSZXNwb25zZRIMCgRraW5kGAEgASgFEg8KB21lc3NhZ2UYAiABKAkiWAoOU3RhdHVzVG9vTGFyZ2USKQoFZmllbGQYASABKA4yGi5vcGFtcC5jb3JlLnYxLlN0YXR1c0ZpZWxkEg0KBWJ5dGVzGAIgASgEEgwKBG5hbWUYAyABKAkicQoJU2V0dXBDYWxsEioKBXN0YXJ0GAEgASgLMhkub3BhbXAuY29yZS52MS5TZXR1cFN0YXJ0SAASMAoIaWRlbnRpdHkYAiABKAsyHC5vcGFtcC5jb3JlLnYxLlNldHVwSWRlbnRpdHlIAEIGCgRjYWxsIo0BCgpTZXR1cFJlcGx5Ei4KB3N0YXJ0ZWQYASABKAsyGy5vcGFtcC5jb3JlLnYxLlNldHVwU3RhcnRlZEgAEjQKCmlkZW50aWZpZWQYAiABKAsyHi5vcGFtcC5jb3JlLnYxLlNldHVwSWRlbnRpZmllZEgAEg8KBWVycm9yGAMgASgJSABCCAoGcmVzdWx0IicKCFZhcmlhYmxlEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkingEKClNldHVwU3RhcnQSJAoDZW52GAEgAygLMhcub3BhbXAuY29yZS52MS5WYXJpYWJsZRIiCgJvcxgCIAEoDjIWLm9wYW1wLmNvcmUudjEuU2V0dXBPcxIPCgdwcm9ncmFtGAMgASgJEgsKA2N3ZBgEIAEoCRIoCgRjb2RlGAUgASgLMhoub3BhbXAuY29yZS52MS5TZXR1cEluQ29kZSKHAgoLU2V0dXBJbkNvZGUSFQoIZW5kcG9pbnQYASABKAlIAIgBARIVCg1oZWFkZXJzX2dpdmVuGAIgASgIEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIWCglzdGF0ZV9kaXIYBCABKAlIAYgBARIZCgxoZWFydGJlYXRfbXMYBSABKBJIAogBARIVCg1lbmRwb2ludF9uYW1lGAYgASgJEhQKDGhlYWRlcnNfbmFtZRgHIAEoCRIWCg5oZWFydGJlYXRfbmFtZRgIIAEoCUILCglfZW5kcG9pbnRCDAoKX3N0YXRlX2RpckIPCg1faGVhcnRiZWF0X21zIrACCgxTZXR1cFN0YXJ0ZWQSCwoDb2ZmGAEgASgIEhIKCm9mZl9yZWFzb24YDCABKAkSEAoIZW5kcG9pbnQYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIRCglzdGF0ZV9kaXIYBSABKAkSFQoNZGVmYXVsdF9zbG90cxgGIAMoCRIXCg9hbGxfc2xvdHNfdGFrZW4YByABKAkSDwoHc2VydmljZRgIIAEoCRIWCg5zaG93bl9lbmRwb2ludBgJIAEoCRIoCgVoaW50cxgKIAEoCzIZLm9wYW1wLmNvcmUudjEuU2V0dXBIaW50cxIQCgh3YXJuaW5ncxgLIAMoCSJUCgpTZXR1cEhpbnRzEg8KB3JlZnVzZWQYASABKAkSEQoJbm90X2ZvdW5kGAIgASgJEhMKC3VucmVhY2hhYmxlGAMgASgJEg0KBWVycm9yGAQgASgJInAKDVNldHVwSWRlbnRpdHkSEQoJc3RhdGVfZGlyGAEgASgIEg0KBXNhdmVkGAIgASgJEhsKE3Jlc291cmNlX2F0dHJpYnV0ZXMYAyABKAkSDwoHZW50cm9weRgEIAEoDBIPCgd1bml4X21zGAUgASgEIrYBCg9TZXR1cElkZW50aWZpZWQSFAoMaW5zdGFuY2VfdWlkGAEgASgMEikKBGZyb20YAiABKA4yGy5vcGFtcC5jb3JlLnYxLlNldHVwVWlkRnJvbRIMCgRzYXZlGAMgASgIEgwKBHRleHQYBCABKAkSEwoLdW5zYXZlZF91aWQYBSABKAwSMQoMdW5zYXZlZF9mcm9tGAYgASgOMhsub3BhbXAuY29yZS52MS5TZXR1cFVpZEZyb20qqwIKC1N0YXR1c0ZpZWxkEhwKGFNUQVRVU19GSUVMRF9ERVNDUklQVElPThAAEhcKE1NUQVRVU19GSUVMRF9IRUFMVEgQARIhCh1TVEFUVVNfRklFTERfRUZGRUNUSVZFX0NPTkZJRxACEiUKIVNUQVRVU19GSUVMRF9SRU1PVEVfQ09ORklHX1NUQVRVUxADEisKJ1NUQVRVU19GSUVMRF9DT05ORUNUSU9OX1NFVFRJTkdTX1NUQVRVUxAEEiUKIVNUQVRVU19GSUVMRF9BVkFJTEFCTEVfQ09NUE9ORU5UUxAFEiQKIFNUQVRVU19GSUVMRF9DVVNUT01fQ0FQQUJJTElUSUVTEAYSIQodU1RBVFVTX0ZJRUxEX1BBQ0tBR0VfU1RBVFVTRVMQBypGCgdTZXR1cE9zEhEKDVNFVFVQX09TX1VOSVgQABISCg5TRVRVUF9PU19NQUNPUxABEhQKEFNFVFVQX09TX1dJTkRPV1MQAipbCgxTZXR1cFVpZEZyb20SFwoTU0VUVVBfVUlEX0ZST01fTUFERRAAEhgKFFNFVFVQX1VJRF9GUk9NX1NBVkVEEAESGAoUU0VUVVBfVUlEX0ZST01fR0lWRU4QAkJ2ChdkZXYucHlkYW50aWMub3BhbXAuY29yZUIJQ29yZVByb3RvWjpnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28vb3BhbXAvaW50ZXJuYWwvY29yZXBiqgITUHlkYW50aWMuT3BBbXAuQ29yZWIGcHJvdG8z", [file_opamp_v1_opamp]);
+  fileDesc("ChhvcGFtcC9jb3JlL3YxL2NvcmUucHJvdG8SDW9wYW1wLmNvcmUudjEilAYKBkNvbmZpZxIUCgxpbnN0YW5jZV91aWQYAiABKAwSFAoMY2FwYWJpbGl0aWVzGAMgASgEEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIaChJiYWNrb2ZmX2luaXRpYWxfbXMYBSABKAQSFgoOYmFja29mZl9tYXhfbXMYBiABKAQSFgoObWF4X3NlbmRfYnl0ZXMYByABKAQSDAoEc2VlZBgIIAEoBBIQCghlbmRwb2ludBgJIAEoCRImCgdoZWFkZXJzGAogAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISGgoScmVxdWVzdF90aW1lb3V0X21zGAsgASgEEhkKEW1heF9yZWNlaXZlX2J5dGVzGAwgASgEEhMKC3BlcnNpc3RlbmNlGA0gASgIEhMKC3NhdmVkX3N0YXRlGA4gASgMEiIKGmFjY2VwdF9jb25uZWN0aW9uX3NldHRpbmdzGA8gASgIEhkKEXZlcmlmeV90aW1lb3V0X21zGBAgASgEEhIKCnVzZXJfYWdlbnQYESABKAkSFwoPYWNjZXB0X3BhY2thZ2VzGBMgASgIEhkKEW1heF9wYWNrYWdlX2J5dGVzGBQgASgEEhsKE2Rvd25sb2FkX3RpbWVvdXRfbXMYFSABKAQSHAoUcmVxdWVzdF9pbnN0YW5jZV91aWQYFiABKAgSDwoHc3RyZWFtcxgXIAEoCBIPCgdlbnRyb3B5GBggASgMEhgKEHNwbGljZV9kb3dubG9hZHMYGSABKAgSDwoHdW5peF9tcxgaIAEoBBIXCg9zdG9wX3RpbWVvdXRfbXMYHCABKAQSGgoSY29ubmVjdF90aW1lb3V0X21zGB0gASgEEikKBXByb3h5GB8gASgLMhoub3BhbXAuY29yZS52MS5Qcm94eUNob2ljZUoECAEQAkoECBIQE0oECBsQHEoECB4QH1IJdHJhbnNwb3J0UhdpbnN0YW5jZV91aWRfaXNfZGVmYXVsdFIOY2FuY2VsX2VmZmVjdHNSD2Rvd25sb2FkX3N0YXR1cyKXAQoLUHJveHlDaG9pY2USDgoGZGlyZWN0GAEgASgIEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISFwoPcmVzb2x2ZV9sb2NhbGx5GAQgASgIEioKC2Vudmlyb25tZW50GAUgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXIiNAoGT3JpZ2luEg4KBnNjaGVtZRgBIAEoCRIMCgRob3N0GAIgASgJEgwKBHBvcnQYAyABKA0iJQoGSGVhZGVyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkiMQoHSGVhZGVycxImCgdoZWFkZXJzGAEgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXIiBwoFRW1wdHkiGAoGRGV0YWlsEg4KBmRldGFpbBgBIAEoCSKsDgoFSW5wdXQSJQoFc3RhcnQYASABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASOwoPc2V0X2Rlc2NyaXB0aW9uGAIgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlvbkgAEjUKCnNldF9oZWFsdGgYAyABKAsyHy5vcGFtcC5wcm90by52MS5Db21wb25lbnRIZWFsdGhIABI/ChRzZXRfZWZmZWN0aXZlX2NvbmZpZxgEIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZ0gAEkYKGHNldF9yZW1vdGVfY29uZmlnX3N0YXR1cxgFIAEoCzIiLm9wYW1wLnByb3RvLnYxLlJlbW90ZUNvbmZpZ1N0YXR1c0gAEiQKBHN0b3AYBiABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASJQoFdGltZXIYByABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASNAoNaHR0cF9yZXNwb25zZRgIIAEoCzIbLm9wYW1wLmNvcmUudjEuSHR0cFJlc3BvbnNlSAASLAoLaHR0cF9mYWlsZWQYCSABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEiYKCXdzX29wZW5lZBgKIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIsCgl3c19mYWlsZWQYCyABKAsyFy5vcGFtcC5jb3JlLnYxLldzRmFpbGVkSAASLgoKd3NfbWVzc2FnZRgMIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASLAoJd3NfY2xvc2VkGA0gASgLMhcub3BhbXAuY29yZS52MS5Xc0Nsb3NlZEgAEigKB3dzX2xvc3QYDiABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEiMKBnN0b3JlZBgPIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItCgxzdG9yZV9mYWlsZWQYECABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAElIKHnNldF9jb25uZWN0aW9uX3NldHRpbmdzX3N0YXR1cxgRIAEoCzIoLm9wYW1wLnByb3RvLnYxLkNvbm5lY3Rpb25TZXR0aW5nc1N0YXR1c0gAEkcKGHNldF9hdmFpbGFibGVfY29tcG9uZW50cxgSIAEoCzIjLm9wYW1wLnByb3RvLnYxLkF2YWlsYWJsZUNvbXBvbmVudHNIABJFChdzZXRfY3VzdG9tX2NhcGFiaWxpdGllcxgTIAEoCzIiLm9wYW1wLnByb3RvLnYxLkN1c3RvbUNhcGFiaWxpdGllc0gAEjwKE3NlbmRfY3VzdG9tX21lc3NhZ2UYFCABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21NZXNzYWdlSAASPAoRcGFja2FnZV9pbnN0YWxsZWQYFSABKAsyHy5vcGFtcC5jb3JlLnYxLlBhY2thZ2VJbnN0YWxsZWRIABI4Cg9wYWNrYWdlX3JlbW92ZWQYFiABKAsyHS5vcGFtcC5jb3JlLnYxLlBhY2thZ2VSZW1vdmVkSAASLwoKZG93bmxvYWRlZBgXIAEoCzIZLm9wYW1wLmNvcmUudjEuRG93bmxvYWRlZEgAEjAKD2Rvd25sb2FkX2ZhaWxlZBgYIAEoCzIVLm9wYW1wLmNvcmUudjEuRmFpbGVkSAASMgoMcHJveHlfYW5zd2VyGBkgASgLMhoub3BhbXAuY29yZS52MS5Qcm94eUFuc3dlckgAEjgKD3N0cmVhbV9yZXNvbHZlZBgaIAEoCzIdLm9wYW1wLmNvcmUudjEuU3RyZWFtUmVzb2x2ZWRIABIqCg1zdHJlYW1fb3BlbmVkGBsgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi0KEHN0cmVhbV90bHNfcmVhZHkYHCABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASLwoLc3RyZWFtX2RhdGEYHSABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVzc2FnZUgAEicKCnN0cmVhbV9lb2YYHiABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASLgoNc3RyZWFtX2ZhaWxlZBgfIAEoCzIVLm9wYW1wLmNvcmUudjEuRmFpbGVkSAASKwoOc3RyZWFtX3NwbGljZWQYICABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASPAoRZG93bmxvYWRfcmVzcG9uc2UYISABKAsyHy5vcGFtcC5jb3JlLnYxLkRvd25sb2FkUmVzcG9uc2VIABIyChBzZXRfYXV0aF9oZWFkZXJzGCIgASgLMhYub3BhbXAuY29yZS52MS5IZWFkZXJzSAASJQoFYWJvcnQYIyABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SABCBgoEa2luZCJpCgtQcm94eUFuc3dlchIKCgJpZBgBIAEoBBINCgVwcm94eRgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISFwoPcmVzb2x2ZV9sb2NhbGx5GAQgASgIIi8KDlN0cmVhbVJlc29sdmVkEgoKAmlkGAEgASgEEhEKCWFkZHJlc3NlcxgCIAMoCSIUCgROYW1lEgwKBG5hbWUYASABKAkiSgoQUGFja2FnZUluc3RhbGxlZBIMCgRuYW1lGAEgASgJEgwKBGhhc2gYAiABKAwSCgoCb2sYAyABKAgSDgoGZGV0YWlsGAQgASgJIj4KDlBhY2thZ2VSZW1vdmVkEgwKBG5hbWUYASABKAkSDgoGZmFpbGVkGAIgASgIEg4KBmRldGFpbBgDIAEoCSIoCgpEb3dubG9hZGVkEgoKAmlkGAEgASgEEg4KBnNoYTI1NhgCIAEoDCKAAQoQRG93bmxvYWRSZXNwb25zZRIKCgJpZBgBIAEoBBIOCgZzdGF0dXMYAiABKA0SDgoGc2hhMjU2GAMgASgMEhAKCGxvY2F0aW9uGAQgASgJEi4KD2xvY2F0aW9uX29yaWdpbhgFIAEoCzIVLm9wYW1wLmNvcmUudjEuT3JpZ2luIhAKAklkEgoKAmlkGAEgASgEIiQKBkZhaWxlZBIKCgJpZBgBIAEoBBIOCgZkZXRhaWwYAiABKAkicQoMSHR0cFJlc3BvbnNlEgoKAmlkGAEgASgEEg4KBnN0YXR1cxgCIAEoDRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISDAoEYm9keRgEIAEoDBIPCgd1bml4X21zGAUgASgEIn8KCFdzRmFpbGVkEgoKAmlkGAEgASgEEhMKBnN0YXR1cxgCIAEoDUgAiAEBEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIOCgZkZXRhaWwYBCABKAkSDwoHdW5peF9tcxgFIAEoBEIJCgdfc3RhdHVzIiUKCVdzTWVzc2FnZRIKCgJpZBgBIAEoBBIMCgRkYXRhGAIgASgMIiQKCFdzQ2xvc2VkEgoKAmlkGAEgASgEEgwKBGNvZGUYAiABKA0iTAoEU3RlcBIOCgZub3dfbXMYASABKAQSIwoFaW5wdXQYAiABKAsyFC5vcGFtcC5jb3JlLnYxLklucHV0Eg8KB3VuaXhfbXMYAyABKAQiPQoFUmVwbHkSJQoGb3V0cHV0GAEgASgLMhUub3BhbXAuY29yZS52MS5PdXRwdXQSDQoFZXJyb3IYAiABKAkizwEKBk91dHB1dBImCgdlZmZlY3RzGAEgAygLMhUub3BhbXAuY29yZS52MS5FZmZlY3QSFwoKd2FrZV9hdF9tcxgCIAEoBEgAiAEBEg8KB3N0b3BwZWQYAyABKAgSFAoMaW5zdGFuY2VfdWlkGAQgASgMEiUKBmxpbWl0cxgFIAEoCzIVLm9wYW1wLmNvcmUudjEuTGltaXRzEicKB3Jlc3VtZWQYBiABKAsyFi5vcGFtcC5jb3JlLnYxLlJlc3VtZWRCDQoLX3dha2VfYXRfbXMijwIKB1Jlc3VtZWQSQAoVYXBwbGllZF9yZW1vdGVfY29uZmlnGAEgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25maWcSOAoNcmVtb3RlX2NvbmZpZxgCIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnEkEKFXJlbW90ZV9jb25maWdfcmVmdXNlZBgDIAEoCzIiLm9wYW1wLnByb3RvLnYxLlJlbW90ZUNvbmZpZ1N0YXR1cxJFChNjb25uZWN0aW9uX3NldHRpbmdzGAQgASgLMigub3BhbXAucHJvdG8udjEuQ29ubmVjdGlvblNldHRpbmdzT2ZmZXJzIrICCgZMaW1pdHMSHQoVaGVhcnRiZWF0X2ludGVydmFsX21zGAQgASgEEhoKEmJhY2tvZmZfaW5pdGlhbF9tcxgFIAEoBBIWCg5iYWNrb2ZmX21heF9tcxgGIAEoBBIWCg5tYXhfc2VuZF9ieXRlcxgHIAEoBBIaChJyZXF1ZXN0X3RpbWVvdXRfbXMYCyABKAQSGQoRbWF4X3JlY2VpdmVfYnl0ZXMYDCABKAQSGQoRdmVyaWZ5X3RpbWVvdXRfbXMYECABKAQSGQoRbWF4X3BhY2thZ2VfYnl0ZXMYFCABKAQSGwoTZG93bmxvYWRfdGltZW91dF9tcxgVIAEoBBIXCg9zdG9wX3RpbWVvdXRfbXMYHCABKAQSGgoSY29ubmVjdF90aW1lb3V0X21zGB0gASgEItQGCgZFZmZlY3QSMgoMaHR0cF9yZXF1ZXN0GAEgASgLMhoub3BhbXAuY29yZS52MS5IdHRwUmVxdWVzdEgAEigKB3dzX29wZW4YAiABKAsyFS5vcGFtcC5jb3JlLnYxLldzT3BlbkgAEisKB3dzX3NlbmQYAyABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVzc2FnZUgAEiUKCHdzX2Nsb3NlGAQgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi0KBm5vdGlmeRgFIAEoCzIbLm9wYW1wLmNvcmUudjEuTm90aWZpY2F0aW9uSAASJQoFc3RvcmUYBiABKAsyFC5vcGFtcC5jb3JlLnYxLlN0b3JlSAASKwoIZG93bmxvYWQYByABKAsyFy5vcGFtcC5jb3JlLnYxLkRvd25sb2FkSAASJAoHZGlzY2FyZBgIIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIjCgZjYW5jZWwYCSABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASKQoLcHJveHlfcXVlcnkYCiABKAsyEi5vcGFtcC5jb3JlLnYxLlVybEgAEjMKDnN0cmVhbV9yZXNvbHZlGAsgASgLMhkub3BhbXAuY29yZS52MS5TdHJlYW1OYW1lSAASMAoLc3RyZWFtX29wZW4YDCABKAsyGS5vcGFtcC5jb3JlLnYxLlN0cmVhbU9wZW5IABI1ChBzdHJlYW1fc3RhcnRfdGxzGA0gASgLMhkub3BhbXAuY29yZS52MS5TdHJlYW1OYW1lSAASMAoMc3RyZWFtX3dyaXRlGA4gASgLMhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIyCgxzdHJlYW1fY2xvc2UYDyABKAsyGi5vcGFtcC5jb3JlLnYxLlN0cmVhbUNsb3NlSAASMQoNZG93bmxvYWRfZGF0YRgQIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASKgoNZG93bmxvYWRfZG9uZRgRIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABI0Cg1zdHJlYW1fc3BsaWNlGBIgASgLMhsub3BhbXAuY29yZS52MS5TdHJlYW1TcGxpY2VIAEIGCgRraW5kIigKC1N0cmVhbUNsb3NlEgoKAmlkGAEgASgEEg0KBWFib3J0GAIgASgIIh4KA1VybBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkiJgoKU3RyZWFtTmFtZRIKCgJpZBgBIAEoBBIMCgRob3N0GAIgASgJIjsKDFN0cmVhbVNwbGljZRIKCgJpZBgBIAEoBBIQCghkb3dubG9hZBgCIAEoBBINCgVieXRlcxgDIAEoBCI0CgpTdHJlYW1PcGVuEgoKAmlkGAEgASgEEgwKBGhvc3QYAiABKAkSDAoEcG9ydBgDIAEoDSJyCghEb3dubG9hZBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhEKCW1heF9ieXRlcxgEIAEoBBISCgp0aW1lb3V0X21zGAUgASgEIiEKBVN0b3JlEgoKAmlkGAEgASgEEgwKBGRhdGEYAiABKAwijAEKC0h0dHBSZXF1ZXN0EgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISDAoEYm9keRgEIAEoDBISCgp0aW1lb3V0X21zGAUgASgEEhoKEm1heF9yZXNwb25zZV9ieXRlcxgGIAEoBCJ4CgZXc09wZW4SCgoCaWQYASABKAQSCwoDdXJsGAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIZChFtYXhfbWVzc2FnZV9ieXRlcxgEIAEoBBISCgp0aW1lb3V0X21zGAUgASgEIrYHCgxOb3RpZmljYXRpb24SKQoJY29ubmVjdGVkGAEgASgLMhQub3BhbXAuY29yZS52MS5FbXB0eUgAEjwKDmNvbm5lY3RfZmFpbGVkGAIgASgLMiIub3BhbXAuY29yZS52MS5Ob3RpZnlDb25uZWN0RmFpbGVkSAASNgoOZXJyb3JfcmVzcG9uc2UYAyABKAsyHC5vcGFtcC5jb3JlLnYxLkVycm9yUmVzcG9uc2VIABI6Cg1yZW1vdGVfY29uZmlnGAQgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25maWdIABI3Cgdjb21tYW5kGAUgASgLMiQub3BhbXAucHJvdG8udjEuU2VydmVyVG9BZ2VudENvbW1hbmRIABIeChRpbnN0YW5jZV91aWRfY2hhbmdlZBgGIAEoDEgAEh8KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgHIAEoBEgAEjkKEHN0YXR1c190b29fbGFyZ2UYCSABKAsyHS5vcGFtcC5jb3JlLnYxLlN0YXR1c1Rvb0xhcmdlSAASLAoLYmFkX21lc3NhZ2UYCiABKAsyFS5vcGFtcC5jb3JlLnYxLkRldGFpbEgAEicKB3N0b3BwZWQYCyABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SAASRwoTY29ubmVjdGlvbl9zZXR0aW5ncxgMIAEoCzIoLm9wYW1wLnByb3RvLnYxLkNvbm5lY3Rpb25TZXR0aW5nc09mZmVyc0gAEjcKDmN1c3RvbV9tZXNzYWdlGA0gASgLMh0ub3BhbXAucHJvdG8udjEuQ3VzdG9tTWVzc2FnZUgAEkgKGnNlcnZlcl9jdXN0b21fY2FwYWJpbGl0aWVzGA4gASgLMiIub3BhbXAucHJvdG8udjEuQ3VzdG9tQ2FwYWJpbGl0aWVzSAASRgoXY3VzdG9tX21lc3NhZ2Vfbm90X3NlbnQYDyABKAsyIy5vcGFtcC5jb3JlLnYxLkN1c3RvbU1lc3NhZ2VOb3RTZW50SAASOAoPaW5zdGFsbF9wYWNrYWdlGBAgASgLMh0ub3BhbXAuY29yZS52MS5JbnN0YWxsUGFja2FnZUgAEi0KDnJlbW92ZV9wYWNrYWdlGBEgASgLMhMub3BhbXAuY29yZS52MS5OYW1lSAASMgoMc2F2ZV9zdGFsbGVkGBIgASgLMhoub3BhbXAuY29yZS52MS5TYXZlU3RhbGxlZEgAQgYKBGtpbmRKBAgIEAkiMQoLU2F2ZVN0YWxsZWQSDwoHc3RhbGxlZBgBIAEoCBIRCgl3YWl0ZWRfbXMYAiABKAQiYwoOSW5zdGFsbFBhY2thZ2USDAoEbmFtZRgBIAEoCRIxCgdwYWNrYWdlGAIgASgLMiAub3BhbXAucHJvdG8udjEuUGFja2FnZUF2YWlsYWJsZRIQCghkb3dubG9hZBgDIAEoBCJWChRDdXN0b21NZXNzYWdlTm90U2VudBIuCgdtZXNzYWdlGAEgASgLMh0ub3BhbXAucHJvdG8udjEuQ3VzdG9tTWVzc2FnZRIOCgZyZWFzb24YAiABKAkiRQoTTm90aWZ5Q29ubmVjdEZhaWxlZBITCgZzdGF0dXMYASABKA1IAIgBARIOCgZkZXRhaWwYAiABKAlCCQoHX3N0YXR1cyIuCg1FcnJvclJlc3BvbnNlEgwKBGtpbmQYASABKAUSDwoHbWVzc2FnZRgCIAEoCSJYCg5TdGF0dXNUb29MYXJnZRIpCgVmaWVsZBgBIAEoDjIaLm9wYW1wLmNvcmUudjEuU3RhdHVzRmllbGQSDQoFYnl0ZXMYAiABKAQSDAoEbmFtZRgDIAEoCSJxCglTZXR1cENhbGwSKgoFc3RhcnQYASABKAsyGS5vcGFtcC5jb3JlLnYxLlNldHVwU3RhcnRIABIwCghpZGVudGl0eRgCIAEoCzIcLm9wYW1wLmNvcmUudjEuU2V0dXBJZGVudGl0eUgAQgYKBGNhbGwijQEKClNldHVwUmVwbHkSLgoHc3RhcnRlZBgBIAEoCzIbLm9wYW1wLmNvcmUudjEuU2V0dXBTdGFydGVkSAASNAoKaWRlbnRpZmllZBgCIAEoCzIeLm9wYW1wLmNvcmUudjEuU2V0dXBJZGVudGlmaWVkSAASDwoFZXJyb3IYAyABKAlIAEIICgZyZXN1bHQiJwoIVmFyaWFibGUSDAoEbmFtZRgBIAEoCRINCgV2YWx1ZRgCIAEoCSKeAQoKU2V0dXBTdGFydBIkCgNlbnYYASADKAsyFy5vcGFtcC5jb3JlLnYxLlZhcmlhYmxlEiIKAm9zGAIgASgOMhYub3BhbXAuY29yZS52MS5TZXR1cE9zEg8KB3Byb2dyYW0YAyABKAkSCwoDY3dkGAQgASgJEigKBGNvZGUYBSABKAsyGi5vcGFtcC5jb3JlLnYxLlNldHVwSW5Db2RlIocCCgtTZXR1cEluQ29kZRIVCghlbmRwb2ludBgBIAEoCUgAiAEBEhUKDWhlYWRlcnNfZ2l2ZW4YAiABKAgSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhYKCXN0YXRlX2RpchgEIAEoCUgBiAEBEhkKDGhlYXJ0YmVhdF9tcxgFIAEoEkgCiAEBEhUKDWVuZHBvaW50X25hbWUYBiABKAkSFAoMaGVhZGVyc19uYW1lGAcgASgJEhYKDmhlYXJ0YmVhdF9uYW1lGAggASgJQgsKCV9lbmRwb2ludEIMCgpfc3RhdGVfZGlyQg8KDV9oZWFydGJlYXRfbXMisAIKDFNldHVwU3RhcnRlZBILCgNvZmYYASABKAgSEgoKb2ZmX3JlYXNvbhgMIAEoCRIQCghlbmRwb2ludBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISHQoVaGVhcnRiZWF0X2ludGVydmFsX21zGAQgASgEEhEKCXN0YXRlX2RpchgFIAEoCRIVCg1kZWZhdWx0X3Nsb3RzGAYgAygJEhcKD2FsbF9zbG90c190YWtlbhgHIAEoCRIPCgdzZXJ2aWNlGAggASgJEhYKDnNob3duX2VuZHBvaW50GAkgASgJEigKBWhpbnRzGAogASgLMhkub3BhbXAuY29yZS52MS5TZXR1cEhpbnRzEhAKCHdhcm5pbmdzGAsgAygJIlQKClNldHVwSGludHMSDwoHcmVmdXNlZBgBIAEoCRIRCglub3RfZm91bmQYAiABKAkSEwoLdW5yZWFjaGFibGUYAyABKAkSDQoFZXJyb3IYBCABKAkicAoNU2V0dXBJZGVudGl0eRIRCglzdGF0ZV9kaXIYASABKAgSDQoFc2F2ZWQYAiABKAkSGwoTcmVzb3VyY2VfYXR0cmlidXRlcxgDIAEoCRIPCgdlbnRyb3B5GAQgASgMEg8KB3VuaXhfbXMYBSABKAQitgEKD1NldHVwSWRlbnRpZmllZBIUCgxpbnN0YW5jZV91aWQYASABKAwSKQoEZnJvbRgCIAEoDjIbLm9wYW1wLmNvcmUudjEuU2V0dXBVaWRGcm9tEgwKBHNhdmUYAyABKAgSDAoEdGV4dBgEIAEoCRITCgt1bnNhdmVkX3VpZBgFIAEoDBIxCgx1bnNhdmVkX2Zyb20YBiABKA4yGy5vcGFtcC5jb3JlLnYxLlNldHVwVWlkRnJvbSqrAgoLU3RhdHVzRmllbGQSHAoYU1RBVFVTX0ZJRUxEX0RFU0NSSVBUSU9OEAASFwoTU1RBVFVTX0ZJRUxEX0hFQUxUSBABEiEKHVNUQVRVU19GSUVMRF9FRkZFQ1RJVkVfQ09ORklHEAISJQohU1RBVFVTX0ZJRUxEX1JFTU9URV9DT05GSUdfU1RBVFVTEAMSKwonU1RBVFVTX0ZJRUxEX0NPTk5FQ1RJT05fU0VUVElOR1NfU1RBVFVTEAQSJQohU1RBVFVTX0ZJRUxEX0FWQUlMQUJMRV9DT01QT05FTlRTEAUSJAogU1RBVFVTX0ZJRUxEX0NVU1RPTV9DQVBBQklMSVRJRVMQBhIhCh1TVEFUVVNfRklFTERfUEFDS0FHRV9TVEFUVVNFUxAHKkYKB1NldHVwT3MSEQoNU0VUVVBfT1NfVU5JWBAAEhIKDlNFVFVQX09TX01BQ09TEAESFAoQU0VUVVBfT1NfV0lORE9XUxACKlsKDFNldHVwVWlkRnJvbRIXChNTRVRVUF9VSURfRlJPTV9NQURFEAASGAoUU0VUVVBfVUlEX0ZST01fU0FWRUQQARIYChRTRVRVUF9VSURfRlJPTV9HSVZFThACQnYKF2Rldi5weWRhbnRpYy5vcGFtcC5jb3JlQglDb3JlUHJvdG9aOmdpdGh1Yi5jb20vcHlkYW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFtcC9pbnRlcm5hbC9jb3JlcGKqAhNQeWRhbnRpYy5PcEFtcC5Db3JlYgZwcm90bzM", [file_opamp_v1_opamp]);
 
 /**
  * Zero means "the default" for every number.
@@ -561,9 +561,9 @@ export type Input = Message<"opamp.core.v1.Input"> & {
     /**
      * answers remove_package
      *
-     * @generated from field: opamp.core.v1.Name package_removed = 22;
+     * @generated from field: opamp.core.v1.PackageRemoved package_removed = 22;
      */
-    value: Name;
+    value: PackageRemoved;
     case: "packageRemoved";
   } | {
     /**
@@ -809,6 +809,41 @@ export const PackageInstalledSchema: GenMessage<PackageInstalled> = /*@__PURE__*
   messageDesc(file_opamp_core_v1_core, 11);
 
 /**
+ * The answer to remove_package. Wire-compatible with Name: unset fields say it is removed.
+ *
+ * @generated from message opamp.core.v1.PackageRemoved
+ */
+export type PackageRemoved = Message<"opamp.core.v1.PackageRemoved"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * not removed: reported failed, and not removed again until
+   *
+   * @generated from field: bool failed = 2;
+   */
+  failed: boolean;
+
+  /**
+   * it is offered and dropped again
+   *
+   * why not
+   *
+   * @generated from field: string detail = 3;
+   */
+  detail: string;
+};
+
+/**
+ * Describes the message opamp.core.v1.PackageRemoved.
+ * Use `create(PackageRemovedSchema)` to create a new message.
+ */
+export const PackageRemovedSchema: GenMessage<PackageRemoved> = /*@__PURE__*/
+  messageDesc(file_opamp_core_v1_core, 12);
+
+/**
  * @generated from message opamp.core.v1.Downloaded
  */
 export type Downloaded = Message<"opamp.core.v1.Downloaded"> & {
@@ -830,7 +865,7 @@ export type Downloaded = Message<"opamp.core.v1.Downloaded"> & {
  * Use `create(DownloadedSchema)` to create a new message.
  */
 export const DownloadedSchema: GenMessage<Downloaded> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 12);
+  messageDesc(file_opamp_core_v1_core, 13);
 
 /**
  * A download's response, whatever its status, its body in the file. The client follows no
@@ -875,7 +910,7 @@ export type DownloadResponse = Message<"opamp.core.v1.DownloadResponse"> & {
  * Use `create(DownloadResponseSchema)` to create a new message.
  */
 export const DownloadResponseSchema: GenMessage<DownloadResponse> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 13);
+  messageDesc(file_opamp_core_v1_core, 14);
 
 /**
  * @generated from message opamp.core.v1.Id
@@ -892,7 +927,7 @@ export type Id = Message<"opamp.core.v1.Id"> & {
  * Use `create(IdSchema)` to create a new message.
  */
 export const IdSchema: GenMessage<Id> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 14);
+  messageDesc(file_opamp_core_v1_core, 15);
 
 /**
  * @generated from message opamp.core.v1.Failed
@@ -914,7 +949,7 @@ export type Failed = Message<"opamp.core.v1.Failed"> & {
  * Use `create(FailedSchema)` to create a new message.
  */
 export const FailedSchema: GenMessage<Failed> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 15);
+  messageDesc(file_opamp_core_v1_core, 16);
 
 /**
  * @generated from message opamp.core.v1.HttpResponse
@@ -953,7 +988,7 @@ export type HttpResponse = Message<"opamp.core.v1.HttpResponse"> & {
  * Use `create(HttpResponseSchema)` to create a new message.
  */
 export const HttpResponseSchema: GenMessage<HttpResponse> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 16);
+  messageDesc(file_opamp_core_v1_core, 17);
 
 /**
  * @generated from message opamp.core.v1.WsFailed
@@ -992,7 +1027,7 @@ export type WsFailed = Message<"opamp.core.v1.WsFailed"> & {
  * Use `create(WsFailedSchema)` to create a new message.
  */
 export const WsFailedSchema: GenMessage<WsFailed> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 17);
+  messageDesc(file_opamp_core_v1_core, 18);
 
 /**
  * @generated from message opamp.core.v1.WsMessage
@@ -1016,7 +1051,7 @@ export type WsMessage = Message<"opamp.core.v1.WsMessage"> & {
  * Use `create(WsMessageSchema)` to create a new message.
  */
 export const WsMessageSchema: GenMessage<WsMessage> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 18);
+  messageDesc(file_opamp_core_v1_core, 19);
 
 /**
  * @generated from message opamp.core.v1.WsClosed
@@ -1038,7 +1073,7 @@ export type WsClosed = Message<"opamp.core.v1.WsClosed"> & {
  * Use `create(WsClosedSchema)` to create a new message.
  */
 export const WsClosedSchema: GenMessage<WsClosed> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 19);
+  messageDesc(file_opamp_core_v1_core, 20);
 
 /**
  * A step's input: the time (milliseconds on the client's monotonic clock) and what happened.
@@ -1069,7 +1104,7 @@ export type Step = Message<"opamp.core.v1.Step"> & {
  * Use `create(StepSchema)` to create a new message.
  */
 export const StepSchema: GenMessage<Step> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 20);
+  messageDesc(file_opamp_core_v1_core, 21);
 
 /**
  * What every call into the core returns: the output, or why the input was unusable (a bug in
@@ -1094,7 +1129,7 @@ export type Reply = Message<"opamp.core.v1.Reply"> & {
  * Use `create(ReplySchema)` to create a new message.
  */
 export const ReplySchema: GenMessage<Reply> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 21);
+  messageDesc(file_opamp_core_v1_core, 22);
 
 /**
  * A step's result.
@@ -1136,6 +1171,13 @@ export type Output = Message<"opamp.core.v1.Output"> & {
    * @generated from field: opamp.core.v1.Limits limits = 5;
    */
   limits?: Limits | undefined;
+
+  /**
+   * init's only: what the client starts from (unset: nothing saved)
+   *
+   * @generated from field: opamp.core.v1.Resumed resumed = 6;
+   */
+  resumed?: Resumed | undefined;
 };
 
 /**
@@ -1143,7 +1185,55 @@ export type Output = Message<"opamp.core.v1.Output"> & {
  * Use `create(OutputSchema)` to create a new message.
  */
 export const OutputSchema: GenMessage<Output> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 22);
+  messageDesc(file_opamp_core_v1_core, 23);
+
+/**
+ * What the client starts from, read from its saved state, as init returns it: for an application
+ * that needs it before the client connects. A host that runs an agent of its own (the Supervisor
+ * its collector) starts it on the applied config and the telemetry settings, keeping no copy of
+ * them itself. Every field is unset without persistence, or with a state that isn't the client's
+ * (another endpoint's: the applied config aside, which is kept whatever the endpoint).
+ *
+ * @generated from message opamp.core.v1.Resumed
+ */
+export type Resumed = Message<"opamp.core.v1.Resumed"> & {
+  /**
+   * The config the application last answered APPLIED: what it runs from the start.
+   *
+   * @generated from field: opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;
+   */
+  appliedRemoteConfig?: AgentRemoteConfig | undefined;
+
+  /**
+   * The config start hands the application (remote_config), to work on: the last received,
+   * unless the application refused it.
+   *
+   * @generated from field: opamp.proto.v1.AgentRemoteConfig remote_config = 2;
+   */
+  remoteConfig?: AgentRemoteConfig | undefined;
+
+  /**
+   * The application's FAILED about the last config received, reported again at start; that
+   * config is not handed over again until the server offers another.
+   *
+   * @generated from field: opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;
+   */
+  remoteConfigRefused?: RemoteConfigStatus | undefined;
+
+  /**
+   * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+   *
+   * @generated from field: opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;
+   */
+  connectionSettings?: ConnectionSettingsOffers | undefined;
+};
+
+/**
+ * Describes the message opamp.core.v1.Resumed.
+ * Use `create(ResumedSchema)` to create a new message.
+ */
+export const ResumedSchema: GenMessage<Resumed> = /*@__PURE__*/
+  messageDesc(file_opamp_core_v1_core, 24);
 
 /**
  * The durations and sizes the core goes by, as the configuration gave them or by default (a
@@ -1217,7 +1307,7 @@ export type Limits = Message<"opamp.core.v1.Limits"> & {
  * Use `create(LimitsSchema)` to create a new message.
  */
 export const LimitsSchema: GenMessage<Limits> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 23);
+  messageDesc(file_opamp_core_v1_core, 25);
 
 /**
  * Something the client must do.
@@ -1386,7 +1476,7 @@ export type Effect = Message<"opamp.core.v1.Effect"> & {
  * Use `create(EffectSchema)` to create a new message.
  */
 export const EffectSchema: GenMessage<Effect> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 24);
+  messageDesc(file_opamp_core_v1_core, 26);
 
 /**
  * Close a stream: once what was written has gone (a FIN), or at once (abort: a reset, the
@@ -1411,7 +1501,7 @@ export type StreamClose = Message<"opamp.core.v1.StreamClose"> & {
  * Use `create(StreamCloseSchema)` to create a new message.
  */
 export const StreamCloseSchema: GenMessage<StreamClose> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 25);
+  messageDesc(file_opamp_core_v1_core, 27);
 
 /**
  * @generated from message opamp.core.v1.Url
@@ -1433,7 +1523,7 @@ export type Url = Message<"opamp.core.v1.Url"> & {
  * Use `create(UrlSchema)` to create a new message.
  */
 export const UrlSchema: GenMessage<Url> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 26);
+  messageDesc(file_opamp_core_v1_core, 28);
 
 /**
  * @generated from message opamp.core.v1.StreamName
@@ -1457,7 +1547,7 @@ export type StreamName = Message<"opamp.core.v1.StreamName"> & {
  * Use `create(StreamNameSchema)` to create a new message.
  */
 export const StreamNameSchema: GenMessage<StreamName> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 27);
+  messageDesc(file_opamp_core_v1_core, 29);
 
 /**
  * @generated from message opamp.core.v1.StreamSplice
@@ -1490,7 +1580,7 @@ export type StreamSplice = Message<"opamp.core.v1.StreamSplice"> & {
  * Use `create(StreamSpliceSchema)` to create a new message.
  */
 export const StreamSpliceSchema: GenMessage<StreamSplice> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 28);
+  messageDesc(file_opamp_core_v1_core, 30);
 
 /**
  * @generated from message opamp.core.v1.StreamOpen
@@ -1519,7 +1609,7 @@ export type StreamOpen = Message<"opamp.core.v1.StreamOpen"> & {
  * Use `create(StreamOpenSchema)` to create a new message.
  */
 export const StreamOpenSchema: GenMessage<StreamOpen> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 29);
+  messageDesc(file_opamp_core_v1_core, 31);
 
 /**
  * An HTTP GET to a file of the client's own, hashed (SHA-256) as it is written.
@@ -1562,7 +1652,7 @@ export type Download = Message<"opamp.core.v1.Download"> & {
  * Use `create(DownloadSchema)` to create a new message.
  */
 export const DownloadSchema: GenMessage<Download> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 30);
+  messageDesc(file_opamp_core_v1_core, 32);
 
 /**
  * Save data, replacing what was saved, all or nothing (write a new file, rename it over the old),
@@ -1587,7 +1677,7 @@ export type Store = Message<"opamp.core.v1.Store"> & {
  * Use `create(StoreSchema)` to create a new message.
  */
 export const StoreSchema: GenMessage<Store> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 31);
+  messageDesc(file_opamp_core_v1_core, 33);
 
 /**
  * @generated from message opamp.core.v1.HttpRequest
@@ -1631,7 +1721,7 @@ export type HttpRequest = Message<"opamp.core.v1.HttpRequest"> & {
  * Use `create(HttpRequestSchema)` to create a new message.
  */
 export const HttpRequestSchema: GenMessage<HttpRequest> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 32);
+  messageDesc(file_opamp_core_v1_core, 34);
 
 /**
  * @generated from message opamp.core.v1.WsOpen
@@ -1670,7 +1760,7 @@ export type WsOpen = Message<"opamp.core.v1.WsOpen"> & {
  * Use `create(WsOpenSchema)` to create a new message.
  */
 export const WsOpenSchema: GenMessage<WsOpen> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 33);
+  messageDesc(file_opamp_core_v1_core, 35);
 
 /**
  * @generated from message opamp.core.v1.Notification
@@ -1811,7 +1901,7 @@ export type Notification = Message<"opamp.core.v1.Notification"> & {
  * Use `create(NotificationSchema)` to create a new message.
  */
 export const NotificationSchema: GenMessage<Notification> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 34);
+  messageDesc(file_opamp_core_v1_core, 36);
 
 /**
  * @generated from message opamp.core.v1.SaveStalled
@@ -1835,7 +1925,7 @@ export type SaveStalled = Message<"opamp.core.v1.SaveStalled"> & {
  * Use `create(SaveStalledSchema)` to create a new message.
  */
 export const SaveStalledSchema: GenMessage<SaveStalled> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 35);
+  messageDesc(file_opamp_core_v1_core, 37);
 
 /**
  * @generated from message opamp.core.v1.InstallPackage
@@ -1866,7 +1956,7 @@ export type InstallPackage = Message<"opamp.core.v1.InstallPackage"> & {
  * Use `create(InstallPackageSchema)` to create a new message.
  */
 export const InstallPackageSchema: GenMessage<InstallPackage> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 36);
+  messageDesc(file_opamp_core_v1_core, 38);
 
 /**
  * @generated from message opamp.core.v1.CustomMessageNotSent
@@ -1888,7 +1978,7 @@ export type CustomMessageNotSent = Message<"opamp.core.v1.CustomMessageNotSent">
  * Use `create(CustomMessageNotSentSchema)` to create a new message.
  */
 export const CustomMessageNotSentSchema: GenMessage<CustomMessageNotSent> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 37);
+  messageDesc(file_opamp_core_v1_core, 39);
 
 /**
  * @generated from message opamp.core.v1.NotifyConnectFailed
@@ -1910,7 +2000,7 @@ export type NotifyConnectFailed = Message<"opamp.core.v1.NotifyConnectFailed"> &
  * Use `create(NotifyConnectFailedSchema)` to create a new message.
  */
 export const NotifyConnectFailedSchema: GenMessage<NotifyConnectFailed> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 38);
+  messageDesc(file_opamp_core_v1_core, 40);
 
 /**
  * @generated from message opamp.core.v1.ErrorResponse
@@ -1934,7 +2024,7 @@ export type ErrorResponse = Message<"opamp.core.v1.ErrorResponse"> & {
  * Use `create(ErrorResponseSchema)` to create a new message.
  */
 export const ErrorResponseSchema: GenMessage<ErrorResponse> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 39);
+  messageDesc(file_opamp_core_v1_core, 41);
 
 /**
  * @generated from message opamp.core.v1.StatusTooLarge
@@ -1963,7 +2053,7 @@ export type StatusTooLarge = Message<"opamp.core.v1.StatusTooLarge"> & {
  * Use `create(StatusTooLargeSchema)` to create a new message.
  */
 export const StatusTooLargeSchema: GenMessage<StatusTooLarge> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 40);
+  messageDesc(file_opamp_core_v1_core, 42);
 
 /**
  * @generated from message opamp.core.v1.SetupCall
@@ -1992,7 +2082,7 @@ export type SetupCall = Message<"opamp.core.v1.SetupCall"> & {
  * Use `create(SetupCallSchema)` to create a new message.
  */
 export const SetupCallSchema: GenMessage<SetupCall> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 41);
+  messageDesc(file_opamp_core_v1_core, 43);
 
 /**
  * @generated from message opamp.core.v1.SetupReply
@@ -2029,7 +2119,7 @@ export type SetupReply = Message<"opamp.core.v1.SetupReply"> & {
  * Use `create(SetupReplySchema)` to create a new message.
  */
 export const SetupReplySchema: GenMessage<SetupReply> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 42);
+  messageDesc(file_opamp_core_v1_core, 44);
 
 /**
  * A variable of the environment.
@@ -2053,7 +2143,7 @@ export type Variable = Message<"opamp.core.v1.Variable"> & {
  * Use `create(VariableSchema)` to create a new message.
  */
 export const VariableSchema: GenMessage<Variable> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 43);
+  messageDesc(file_opamp_core_v1_core, 45);
 
 /**
  * Where the server is and how to reach it, from the environment and what the code gives.
@@ -2101,7 +2191,7 @@ export type SetupStart = Message<"opamp.core.v1.SetupStart"> & {
  * Use `create(SetupStartSchema)` to create a new message.
  */
 export const SetupStartSchema: GenMessage<SetupStart> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 44);
+  messageDesc(file_opamp_core_v1_core, 46);
 
 /**
  * What the application gives in code: each part given wins over its variable (but nothing wins
@@ -2166,7 +2256,7 @@ export type SetupInCode = Message<"opamp.core.v1.SetupInCode"> & {
  * Use `create(SetupInCodeSchema)` to create a new message.
  */
 export const SetupInCodeSchema: GenMessage<SetupInCode> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 45);
+  messageDesc(file_opamp_core_v1_core, 47);
 
 /**
  * @generated from message opamp.core.v1.SetupStarted
@@ -2266,7 +2356,7 @@ export type SetupStarted = Message<"opamp.core.v1.SetupStarted"> & {
  * Use `create(SetupStartedSchema)` to create a new message.
  */
 export const SetupStartedSchema: GenMessage<SetupStarted> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 46);
+  messageDesc(file_opamp_core_v1_core, 48);
 
 /**
  * What to check when the server can't be reached, by what went wrong; each names what gave the
@@ -2309,7 +2399,7 @@ export type SetupHints = Message<"opamp.core.v1.SetupHints"> & {
  * Use `create(SetupHintsSchema)` to create a new message.
  */
 export const SetupHintsSchema: GenMessage<SetupHints> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 47);
+  messageDesc(file_opamp_core_v1_core, 49);
 
 /**
  * The instance UID, once the state directory is known (and locked).
@@ -2358,7 +2448,7 @@ export type SetupIdentity = Message<"opamp.core.v1.SetupIdentity"> & {
  * Use `create(SetupIdentitySchema)` to create a new message.
  */
 export const SetupIdentitySchema: GenMessage<SetupIdentity> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 48);
+  messageDesc(file_opamp_core_v1_core, 50);
 
 /**
  * @generated from message opamp.core.v1.SetupIdentified
@@ -2407,7 +2497,7 @@ export type SetupIdentified = Message<"opamp.core.v1.SetupIdentified"> & {
  * Use `create(SetupIdentifiedSchema)` to create a new message.
  */
 export const SetupIdentifiedSchema: GenMessage<SetupIdentified> = /*@__PURE__*/
-  messageDesc(file_opamp_core_v1_core, 49);
+  messageDesc(file_opamp_core_v1_core, 51);
 
 /**
  * @generated from enum opamp.core.v1.StatusField

@@ -509,7 +509,7 @@ func (c *Client) PackageInstalled(name string, hash []byte, err error) {
 
 // PackageRemoved answers RemovePackage: the package is removed.
 func (c *Client) PackageRemoved(name string) {
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: &corepb.Name{Name: name}}})
+	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: &corepb.PackageRemoved{Name: name}}})
 }
 
 // Stop sends agent_disconnect if a message can still be sent, then stops. It returns when the

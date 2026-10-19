@@ -50,7 +50,7 @@ namespace Pydantic.OpAmp.Core {
             "DAoEaG9zdBgCIAEoCRIMCgRwb3J0GAMgASgNIiUKBkhlYWRlchIMCgRuYW1l",
             "GAEgASgJEg0KBXZhbHVlGAIgASgJIjEKB0hlYWRlcnMSJgoHaGVhZGVycxgB",
             "IAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyIgcKBUVtcHR5IhgKBkRldGFp",
-            "bBIOCgZkZXRhaWwYASABKAkiog4KBUlucHV0EiUKBXN0YXJ0GAEgASgLMhQu",
+            "bBIOCgZkZXRhaWwYASABKAkirA4KBUlucHV0EiUKBXN0YXJ0GAEgASgLMhQu",
             "b3BhbXAuY29yZS52MS5FbXB0eUgAEjsKD3NldF9kZXNjcmlwdGlvbhgCIAEo",
             "CzIgLm9wYW1wLnByb3RvLnYxLkFnZW50RGVzY3JpcHRpb25IABI1CgpzZXRf",
             "aGVhbHRoGAMgASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9uZW50SGVhbHRo",
@@ -75,163 +75,172 @@ namespace Pydantic.OpAmp.Core {
             "KAsyIi5vcGFtcC5wcm90by52MS5DdXN0b21DYXBhYmlsaXRpZXNIABI8ChNz",
             "ZW5kX2N1c3RvbV9tZXNzYWdlGBQgASgLMh0ub3BhbXAucHJvdG8udjEuQ3Vz",
             "dG9tTWVzc2FnZUgAEjwKEXBhY2thZ2VfaW5zdGFsbGVkGBUgASgLMh8ub3Bh",
-            "bXAuY29yZS52MS5QYWNrYWdlSW5zdGFsbGVkSAASLgoPcGFja2FnZV9yZW1v",
-            "dmVkGBYgASgLMhMub3BhbXAuY29yZS52MS5OYW1lSAASLwoKZG93bmxvYWRl",
-            "ZBgXIAEoCzIZLm9wYW1wLmNvcmUudjEuRG93bmxvYWRlZEgAEjAKD2Rvd25s",
-            "b2FkX2ZhaWxlZBgYIAEoCzIVLm9wYW1wLmNvcmUudjEuRmFpbGVkSAASMgoM",
-            "cHJveHlfYW5zd2VyGBkgASgLMhoub3BhbXAuY29yZS52MS5Qcm94eUFuc3dl",
-            "ckgAEjgKD3N0cmVhbV9yZXNvbHZlZBgaIAEoCzIdLm9wYW1wLmNvcmUudjEu",
-            "U3RyZWFtUmVzb2x2ZWRIABIqCg1zdHJlYW1fb3BlbmVkGBsgASgLMhEub3Bh",
-            "bXAuY29yZS52MS5JZEgAEi0KEHN0cmVhbV90bHNfcmVhZHkYHCABKAsyES5v",
-            "cGFtcC5jb3JlLnYxLklkSAASLwoLc3RyZWFtX2RhdGEYHSABKAsyGC5vcGFt",
-            "cC5jb3JlLnYxLldzTWVzc2FnZUgAEicKCnN0cmVhbV9lb2YYHiABKAsyES5v",
-            "cGFtcC5jb3JlLnYxLklkSAASLgoNc3RyZWFtX2ZhaWxlZBgfIAEoCzIVLm9w",
-            "YW1wLmNvcmUudjEuRmFpbGVkSAASKwoOc3RyZWFtX3NwbGljZWQYICABKAsy",
-            "ES5vcGFtcC5jb3JlLnYxLklkSAASPAoRZG93bmxvYWRfcmVzcG9uc2UYISAB",
-            "KAsyHy5vcGFtcC5jb3JlLnYxLkRvd25sb2FkUmVzcG9uc2VIABIyChBzZXRf",
-            "YXV0aF9oZWFkZXJzGCIgASgLMhYub3BhbXAuY29yZS52MS5IZWFkZXJzSAAS",
-            "JQoFYWJvcnQYIyABKAsyFC5vcGFtcC5jb3JlLnYxLkVtcHR5SABCBgoEa2lu",
-            "ZCJpCgtQcm94eUFuc3dlchIKCgJpZBgBIAEoBBINCgVwcm94eRgCIAEoCRIm",
-            "CgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISFwoPcmVz",
-            "b2x2ZV9sb2NhbGx5GAQgASgIIi8KDlN0cmVhbVJlc29sdmVkEgoKAmlkGAEg",
-            "ASgEEhEKCWFkZHJlc3NlcxgCIAMoCSIUCgROYW1lEgwKBG5hbWUYASABKAki",
-            "SgoQUGFja2FnZUluc3RhbGxlZBIMCgRuYW1lGAEgASgJEgwKBGhhc2gYAiAB",
-            "KAwSCgoCb2sYAyABKAgSDgoGZGV0YWlsGAQgASgJIigKCkRvd25sb2FkZWQS",
-            "CgoCaWQYASABKAQSDgoGc2hhMjU2GAIgASgMIoABChBEb3dubG9hZFJlc3Bv",
-            "bnNlEgoKAmlkGAEgASgEEg4KBnN0YXR1cxgCIAEoDRIOCgZzaGEyNTYYAyAB",
-            "KAwSEAoIbG9jYXRpb24YBCABKAkSLgoPbG9jYXRpb25fb3JpZ2luGAUgASgL",
-            "MhUub3BhbXAuY29yZS52MS5PcmlnaW4iEAoCSWQSCgoCaWQYASABKAQiJAoG",
-            "RmFpbGVkEgoKAmlkGAEgASgEEg4KBmRldGFpbBgCIAEoCSJxCgxIdHRwUmVz",
-            "cG9uc2USCgoCaWQYASABKAQSDgoGc3RhdHVzGAIgASgNEiYKB2hlYWRlcnMY",
-            "AyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIMCgRib2R5GAQgASgMEg8K",
-            "B3VuaXhfbXMYBSABKAQifwoIV3NGYWlsZWQSCgoCaWQYASABKAQSEwoGc3Rh",
-            "dHVzGAIgASgNSACIAQESJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUu",
-            "djEuSGVhZGVyEg4KBmRldGFpbBgEIAEoCRIPCgd1bml4X21zGAUgASgEQgkK",
-            "B19zdGF0dXMiJQoJV3NNZXNzYWdlEgoKAmlkGAEgASgEEgwKBGRhdGEYAiAB",
-            "KAwiJAoIV3NDbG9zZWQSCgoCaWQYASABKAQSDAoEY29kZRgCIAEoDSJMCgRT",
-            "dGVwEg4KBm5vd19tcxgBIAEoBBIjCgVpbnB1dBgCIAEoCzIULm9wYW1wLmNv",
-            "cmUudjEuSW5wdXQSDwoHdW5peF9tcxgDIAEoBCI9CgVSZXBseRIlCgZvdXRw",
-            "dXQYASABKAsyFS5vcGFtcC5jb3JlLnYxLk91dHB1dBINCgVlcnJvchgCIAEo",
-            "CSKmAQoGT3V0cHV0EiYKB2VmZmVjdHMYASADKAsyFS5vcGFtcC5jb3JlLnYx",
-            "LkVmZmVjdBIXCgp3YWtlX2F0X21zGAIgASgESACIAQESDwoHc3RvcHBlZBgD",
-            "IAEoCBIUCgxpbnN0YW5jZV91aWQYBCABKAwSJQoGbGltaXRzGAUgASgLMhUu",
-            "b3BhbXAuY29yZS52MS5MaW1pdHNCDQoLX3dha2VfYXRfbXMisgIKBkxpbWl0",
-            "cxIdChVoZWFydGJlYXRfaW50ZXJ2YWxfbXMYBCABKAQSGgoSYmFja29mZl9p",
-            "bml0aWFsX21zGAUgASgEEhYKDmJhY2tvZmZfbWF4X21zGAYgASgEEhYKDm1h",
-            "eF9zZW5kX2J5dGVzGAcgASgEEhoKEnJlcXVlc3RfdGltZW91dF9tcxgLIAEo",
-            "BBIZChFtYXhfcmVjZWl2ZV9ieXRlcxgMIAEoBBIZChF2ZXJpZnlfdGltZW91",
-            "dF9tcxgQIAEoBBIZChFtYXhfcGFja2FnZV9ieXRlcxgUIAEoBBIbChNkb3du",
-            "bG9hZF90aW1lb3V0X21zGBUgASgEEhcKD3N0b3BfdGltZW91dF9tcxgcIAEo",
-            "BBIaChJjb25uZWN0X3RpbWVvdXRfbXMYHSABKAQi1AYKBkVmZmVjdBIyCgxo",
-            "dHRwX3JlcXVlc3QYASABKAsyGi5vcGFtcC5jb3JlLnYxLkh0dHBSZXF1ZXN0",
-            "SAASKAoHd3Nfb3BlbhgCIAEoCzIVLm9wYW1wLmNvcmUudjEuV3NPcGVuSAAS",
-            "KwoHd3Nfc2VuZBgDIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAAS",
-            "JQoId3NfY2xvc2UYBCABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASLQoGbm90",
-            "aWZ5GAUgASgLMhsub3BhbXAuY29yZS52MS5Ob3RpZmljYXRpb25IABIlCgVz",
-            "dG9yZRgGIAEoCzIULm9wYW1wLmNvcmUudjEuU3RvcmVIABIrCghkb3dubG9h",
-            "ZBgHIAEoCzIXLm9wYW1wLmNvcmUudjEuRG93bmxvYWRIABIkCgdkaXNjYXJk",
-            "GAggASgLMhEub3BhbXAuY29yZS52MS5JZEgAEiMKBmNhbmNlbBgJIAEoCzIR",
-            "Lm9wYW1wLmNvcmUudjEuSWRIABIpCgtwcm94eV9xdWVyeRgKIAEoCzISLm9w",
-            "YW1wLmNvcmUudjEuVXJsSAASMwoOc3RyZWFtX3Jlc29sdmUYCyABKAsyGS5v",
-            "cGFtcC5jb3JlLnYxLlN0cmVhbU5hbWVIABIwCgtzdHJlYW1fb3BlbhgMIAEo",
-            "CzIZLm9wYW1wLmNvcmUudjEuU3RyZWFtT3BlbkgAEjUKEHN0cmVhbV9zdGFy",
-            "dF90bHMYDSABKAsyGS5vcGFtcC5jb3JlLnYxLlN0cmVhbU5hbWVIABIwCgxz",
-            "dHJlYW1fd3JpdGUYDiABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVzc2FnZUgA",
-            "EjIKDHN0cmVhbV9jbG9zZRgPIAEoCzIaLm9wYW1wLmNvcmUudjEuU3RyZWFt",
-            "Q2xvc2VIABIxCg1kb3dubG9hZF9kYXRhGBAgASgLMhgub3BhbXAuY29yZS52",
-            "MS5Xc01lc3NhZ2VIABIqCg1kb3dubG9hZF9kb25lGBEgASgLMhEub3BhbXAu",
-            "Y29yZS52MS5JZEgAEjQKDXN0cmVhbV9zcGxpY2UYEiABKAsyGy5vcGFtcC5j",
-            "b3JlLnYxLlN0cmVhbVNwbGljZUgAQgYKBGtpbmQiKAoLU3RyZWFtQ2xvc2US",
-            "CgoCaWQYASABKAQSDQoFYWJvcnQYAiABKAgiHgoDVXJsEgoKAmlkGAEgASgE",
-            "EgsKA3VybBgCIAEoCSImCgpTdHJlYW1OYW1lEgoKAmlkGAEgASgEEgwKBGhv",
-            "c3QYAiABKAkiOwoMU3RyZWFtU3BsaWNlEgoKAmlkGAEgASgEEhAKCGRvd25s",
-            "b2FkGAIgASgEEg0KBWJ5dGVzGAMgASgEIjQKClN0cmVhbU9wZW4SCgoCaWQY",
-            "ASABKAQSDAoEaG9zdBgCIAEoCRIMCgRwb3J0GAMgASgNInIKCERvd25sb2Fk",
-            "EgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUu",
-            "b3BhbXAuY29yZS52MS5IZWFkZXISEQoJbWF4X2J5dGVzGAQgASgEEhIKCnRp",
-            "bWVvdXRfbXMYBSABKAQiIQoFU3RvcmUSCgoCaWQYASABKAQSDAoEZGF0YRgC",
-            "IAEoDCKMAQoLSHR0cFJlcXVlc3QSCgoCaWQYASABKAQSCwoDdXJsGAIgASgJ",
-            "EiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIMCgRi",
-            "b2R5GAQgASgMEhIKCnRpbWVvdXRfbXMYBSABKAQSGgoSbWF4X3Jlc3BvbnNl",
-            "X2J5dGVzGAYgASgEIngKBldzT3BlbhIKCgJpZBgBIAEoBBILCgN1cmwYAiAB",
-            "KAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhkK",
-            "EW1heF9tZXNzYWdlX2J5dGVzGAQgASgEEhIKCnRpbWVvdXRfbXMYBSABKAQi",
-            "tgcKDE5vdGlmaWNhdGlvbhIpCgljb25uZWN0ZWQYASABKAsyFC5vcGFtcC5j",
-            "b3JlLnYxLkVtcHR5SAASPAoOY29ubmVjdF9mYWlsZWQYAiABKAsyIi5vcGFt",
-            "cC5jb3JlLnYxLk5vdGlmeUNvbm5lY3RGYWlsZWRIABI2Cg5lcnJvcl9yZXNw",
-            "b25zZRgDIAEoCzIcLm9wYW1wLmNvcmUudjEuRXJyb3JSZXNwb25zZUgAEjoK",
-            "DXJlbW90ZV9jb25maWcYBCABKAsyIS5vcGFtcC5wcm90by52MS5BZ2VudFJl",
-            "bW90ZUNvbmZpZ0gAEjcKB2NvbW1hbmQYBSABKAsyJC5vcGFtcC5wcm90by52",
-            "MS5TZXJ2ZXJUb0FnZW50Q29tbWFuZEgAEh4KFGluc3RhbmNlX3VpZF9jaGFu",
-            "Z2VkGAYgASgMSAASHwoVaGVhcnRiZWF0X2ludGVydmFsX21zGAcgASgESAAS",
-            "OQoQc3RhdHVzX3Rvb19sYXJnZRgJIAEoCzIdLm9wYW1wLmNvcmUudjEuU3Rh",
-            "dHVzVG9vTGFyZ2VIABIsCgtiYWRfbWVzc2FnZRgKIAEoCzIVLm9wYW1wLmNv",
-            "cmUudjEuRGV0YWlsSAASJwoHc3RvcHBlZBgLIAEoCzIULm9wYW1wLmNvcmUu",
-            "djEuRW1wdHlIABJHChNjb25uZWN0aW9uX3NldHRpbmdzGAwgASgLMigub3Bh",
-            "bXAucHJvdG8udjEuQ29ubmVjdGlvblNldHRpbmdzT2ZmZXJzSAASNwoOY3Vz",
-            "dG9tX21lc3NhZ2UYDSABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21NZXNz",
-            "YWdlSAASSAoac2VydmVyX2N1c3RvbV9jYXBhYmlsaXRpZXMYDiABKAsyIi5v",
-            "cGFtcC5wcm90by52MS5DdXN0b21DYXBhYmlsaXRpZXNIABJGChdjdXN0b21f",
-            "bWVzc2FnZV9ub3Rfc2VudBgPIAEoCzIjLm9wYW1wLmNvcmUudjEuQ3VzdG9t",
-            "TWVzc2FnZU5vdFNlbnRIABI4Cg9pbnN0YWxsX3BhY2thZ2UYECABKAsyHS5v",
-            "cGFtcC5jb3JlLnYxLkluc3RhbGxQYWNrYWdlSAASLQoOcmVtb3ZlX3BhY2th",
-            "Z2UYESABKAsyEy5vcGFtcC5jb3JlLnYxLk5hbWVIABIyCgxzYXZlX3N0YWxs",
-            "ZWQYEiABKAsyGi5vcGFtcC5jb3JlLnYxLlNhdmVTdGFsbGVkSABCBgoEa2lu",
-            "ZEoECAgQCSIxCgtTYXZlU3RhbGxlZBIPCgdzdGFsbGVkGAEgASgIEhEKCXdh",
-            "aXRlZF9tcxgCIAEoBCJjCg5JbnN0YWxsUGFja2FnZRIMCgRuYW1lGAEgASgJ",
-            "EjEKB3BhY2thZ2UYAiABKAsyIC5vcGFtcC5wcm90by52MS5QYWNrYWdlQXZh",
-            "aWxhYmxlEhAKCGRvd25sb2FkGAMgASgEIlYKFEN1c3RvbU1lc3NhZ2VOb3RT",
-            "ZW50Ei4KB21lc3NhZ2UYASABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21N",
-            "ZXNzYWdlEg4KBnJlYXNvbhgCIAEoCSJFChNOb3RpZnlDb25uZWN0RmFpbGVk",
-            "EhMKBnN0YXR1cxgBIAEoDUgAiAEBEg4KBmRldGFpbBgCIAEoCUIJCgdfc3Rh",
-            "dHVzIi4KDUVycm9yUmVzcG9uc2USDAoEa2luZBgBIAEoBRIPCgdtZXNzYWdl",
-            "GAIgASgJIlgKDlN0YXR1c1Rvb0xhcmdlEikKBWZpZWxkGAEgASgOMhoub3Bh",
-            "bXAuY29yZS52MS5TdGF0dXNGaWVsZBINCgVieXRlcxgCIAEoBBIMCgRuYW1l",
-            "GAMgASgJInEKCVNldHVwQ2FsbBIqCgVzdGFydBgBIAEoCzIZLm9wYW1wLmNv",
-            "cmUudjEuU2V0dXBTdGFydEgAEjAKCGlkZW50aXR5GAIgASgLMhwub3BhbXAu",
-            "Y29yZS52MS5TZXR1cElkZW50aXR5SABCBgoEY2FsbCKNAQoKU2V0dXBSZXBs",
-            "eRIuCgdzdGFydGVkGAEgASgLMhsub3BhbXAuY29yZS52MS5TZXR1cFN0YXJ0",
-            "ZWRIABI0CgppZGVudGlmaWVkGAIgASgLMh4ub3BhbXAuY29yZS52MS5TZXR1",
-            "cElkZW50aWZpZWRIABIPCgVlcnJvchgDIAEoCUgAQggKBnJlc3VsdCInCghW",
-            "YXJpYWJsZRIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJIp4BCgpTZXR1",
-            "cFN0YXJ0EiQKA2VudhgBIAMoCzIXLm9wYW1wLmNvcmUudjEuVmFyaWFibGUS",
-            "IgoCb3MYAiABKA4yFi5vcGFtcC5jb3JlLnYxLlNldHVwT3MSDwoHcHJvZ3Jh",
-            "bRgDIAEoCRILCgNjd2QYBCABKAkSKAoEY29kZRgFIAEoCzIaLm9wYW1wLmNv",
-            "cmUudjEuU2V0dXBJbkNvZGUihwIKC1NldHVwSW5Db2RlEhUKCGVuZHBvaW50",
-            "GAEgASgJSACIAQESFQoNaGVhZGVyc19naXZlbhgCIAEoCBImCgdoZWFkZXJz",
-            "GAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISFgoJc3RhdGVfZGlyGAQg",
-            "ASgJSAGIAQESGQoMaGVhcnRiZWF0X21zGAUgASgSSAKIAQESFQoNZW5kcG9p",
-            "bnRfbmFtZRgGIAEoCRIUCgxoZWFkZXJzX25hbWUYByABKAkSFgoOaGVhcnRi",
-            "ZWF0X25hbWUYCCABKAlCCwoJX2VuZHBvaW50QgwKCl9zdGF0ZV9kaXJCDwoN",
-            "X2hlYXJ0YmVhdF9tcyKwAgoMU2V0dXBTdGFydGVkEgsKA29mZhgBIAEoCBIS",
-            "CgpvZmZfcmVhc29uGAwgASgJEhAKCGVuZHBvaW50GAIgASgJEiYKB2hlYWRl",
-            "cnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIdChVoZWFydGJlYXRf",
-            "aW50ZXJ2YWxfbXMYBCABKAQSEQoJc3RhdGVfZGlyGAUgASgJEhUKDWRlZmF1",
-            "bHRfc2xvdHMYBiADKAkSFwoPYWxsX3Nsb3RzX3Rha2VuGAcgASgJEg8KB3Nl",
-            "cnZpY2UYCCABKAkSFgoOc2hvd25fZW5kcG9pbnQYCSABKAkSKAoFaGludHMY",
-            "CiABKAsyGS5vcGFtcC5jb3JlLnYxLlNldHVwSGludHMSEAoId2FybmluZ3MY",
-            "CyADKAkiVAoKU2V0dXBIaW50cxIPCgdyZWZ1c2VkGAEgASgJEhEKCW5vdF9m",
-            "b3VuZBgCIAEoCRITCgt1bnJlYWNoYWJsZRgDIAEoCRINCgVlcnJvchgEIAEo",
-            "CSJwCg1TZXR1cElkZW50aXR5EhEKCXN0YXRlX2RpchgBIAEoCBINCgVzYXZl",
-            "ZBgCIAEoCRIbChNyZXNvdXJjZV9hdHRyaWJ1dGVzGAMgASgJEg8KB2VudHJv",
-            "cHkYBCABKAwSDwoHdW5peF9tcxgFIAEoBCK2AQoPU2V0dXBJZGVudGlmaWVk",
-            "EhQKDGluc3RhbmNlX3VpZBgBIAEoDBIpCgRmcm9tGAIgASgOMhsub3BhbXAu",
-            "Y29yZS52MS5TZXR1cFVpZEZyb20SDAoEc2F2ZRgDIAEoCBIMCgR0ZXh0GAQg",
-            "ASgJEhMKC3Vuc2F2ZWRfdWlkGAUgASgMEjEKDHVuc2F2ZWRfZnJvbRgGIAEo",
-            "DjIbLm9wYW1wLmNvcmUudjEuU2V0dXBVaWRGcm9tKqsCCgtTdGF0dXNGaWVs",
-            "ZBIcChhTVEFUVVNfRklFTERfREVTQ1JJUFRJT04QABIXChNTVEFUVVNfRklF",
-            "TERfSEVBTFRIEAESIQodU1RBVFVTX0ZJRUxEX0VGRkVDVElWRV9DT05GSUcQ",
-            "AhIlCiFTVEFUVVNfRklFTERfUkVNT1RFX0NPTkZJR19TVEFUVVMQAxIrCidT",
-            "VEFUVVNfRklFTERfQ09OTkVDVElPTl9TRVRUSU5HU19TVEFUVVMQBBIlCiFT",
-            "VEFUVVNfRklFTERfQVZBSUxBQkxFX0NPTVBPTkVOVFMQBRIkCiBTVEFUVVNf",
-            "RklFTERfQ1VTVE9NX0NBUEFCSUxJVElFUxAGEiEKHVNUQVRVU19GSUVMRF9Q",
-            "QUNLQUdFX1NUQVRVU0VTEAcqRgoHU2V0dXBPcxIRCg1TRVRVUF9PU19VTklY",
-            "EAASEgoOU0VUVVBfT1NfTUFDT1MQARIUChBTRVRVUF9PU19XSU5ET1dTEAIq",
-            "WwoMU2V0dXBVaWRGcm9tEhcKE1NFVFVQX1VJRF9GUk9NX01BREUQABIYChRT",
-            "RVRVUF9VSURfRlJPTV9TQVZFRBABEhgKFFNFVFVQX1VJRF9GUk9NX0dJVkVO",
-            "EAJCdgoXZGV2LnB5ZGFudGljLm9wYW1wLmNvcmVCCUNvcmVQcm90b1o6Z2l0",
-            "aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1wL2ludGVy",
-            "bmFsL2NvcmVwYqoCE1B5ZGFudGljLk9wQW1wLkNvcmViBnByb3RvMw=="));
+            "bXAuY29yZS52MS5QYWNrYWdlSW5zdGFsbGVkSAASOAoPcGFja2FnZV9yZW1v",
+            "dmVkGBYgASgLMh0ub3BhbXAuY29yZS52MS5QYWNrYWdlUmVtb3ZlZEgAEi8K",
+            "CmRvd25sb2FkZWQYFyABKAsyGS5vcGFtcC5jb3JlLnYxLkRvd25sb2FkZWRI",
+            "ABIwCg9kb3dubG9hZF9mYWlsZWQYGCABKAsyFS5vcGFtcC5jb3JlLnYxLkZh",
+            "aWxlZEgAEjIKDHByb3h5X2Fuc3dlchgZIAEoCzIaLm9wYW1wLmNvcmUudjEu",
+            "UHJveHlBbnN3ZXJIABI4Cg9zdHJlYW1fcmVzb2x2ZWQYGiABKAsyHS5vcGFt",
+            "cC5jb3JlLnYxLlN0cmVhbVJlc29sdmVkSAASKgoNc3RyZWFtX29wZW5lZBgb",
+            "IAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItChBzdHJlYW1fdGxzX3JlYWR5",
+            "GBwgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi8KC3N0cmVhbV9kYXRhGB0g",
+            "ASgLMhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABInCgpzdHJlYW1fZW9m",
+            "GB4gASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi4KDXN0cmVhbV9mYWlsZWQY",
+            "HyABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEisKDnN0cmVhbV9zcGxp",
+            "Y2VkGCAgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEjwKEWRvd25sb2FkX3Jl",
+            "c3BvbnNlGCEgASgLMh8ub3BhbXAuY29yZS52MS5Eb3dubG9hZFJlc3BvbnNl",
+            "SAASMgoQc2V0X2F1dGhfaGVhZGVycxgiIAEoCzIWLm9wYW1wLmNvcmUudjEu",
+            "SGVhZGVyc0gAEiUKBWFib3J0GCMgASgLMhQub3BhbXAuY29yZS52MS5FbXB0",
+            "eUgAQgYKBGtpbmQiaQoLUHJveHlBbnN3ZXISCgoCaWQYASABKAQSDQoFcHJv",
+            "eHkYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVh",
+            "ZGVyEhcKD3Jlc29sdmVfbG9jYWxseRgEIAEoCCIvCg5TdHJlYW1SZXNvbHZl",
+            "ZBIKCgJpZBgBIAEoBBIRCglhZGRyZXNzZXMYAiADKAkiFAoETmFtZRIMCgRu",
+            "YW1lGAEgASgJIkoKEFBhY2thZ2VJbnN0YWxsZWQSDAoEbmFtZRgBIAEoCRIM",
+            "CgRoYXNoGAIgASgMEgoKAm9rGAMgASgIEg4KBmRldGFpbBgEIAEoCSI+Cg5Q",
+            "YWNrYWdlUmVtb3ZlZBIMCgRuYW1lGAEgASgJEg4KBmZhaWxlZBgCIAEoCBIO",
+            "CgZkZXRhaWwYAyABKAkiKAoKRG93bmxvYWRlZBIKCgJpZBgBIAEoBBIOCgZz",
+            "aGEyNTYYAiABKAwigAEKEERvd25sb2FkUmVzcG9uc2USCgoCaWQYASABKAQS",
+            "DgoGc3RhdHVzGAIgASgNEg4KBnNoYTI1NhgDIAEoDBIQCghsb2NhdGlvbhgE",
+            "IAEoCRIuCg9sb2NhdGlvbl9vcmlnaW4YBSABKAsyFS5vcGFtcC5jb3JlLnYx",
+            "Lk9yaWdpbiIQCgJJZBIKCgJpZBgBIAEoBCIkCgZGYWlsZWQSCgoCaWQYASAB",
+            "KAQSDgoGZGV0YWlsGAIgASgJInEKDEh0dHBSZXNwb25zZRIKCgJpZBgBIAEo",
+            "BBIOCgZzdGF0dXMYAiABKA0SJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNv",
+            "cmUudjEuSGVhZGVyEgwKBGJvZHkYBCABKAwSDwoHdW5peF9tcxgFIAEoBCJ/",
+            "CghXc0ZhaWxlZBIKCgJpZBgBIAEoBBITCgZzdGF0dXMYAiABKA1IAIgBARIm",
+            "CgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISDgoGZGV0",
+            "YWlsGAQgASgJEg8KB3VuaXhfbXMYBSABKARCCQoHX3N0YXR1cyIlCglXc01l",
+            "c3NhZ2USCgoCaWQYASABKAQSDAoEZGF0YRgCIAEoDCIkCghXc0Nsb3NlZBIK",
+            "CgJpZBgBIAEoBBIMCgRjb2RlGAIgASgNIkwKBFN0ZXASDgoGbm93X21zGAEg",
+            "ASgEEiMKBWlucHV0GAIgASgLMhQub3BhbXAuY29yZS52MS5JbnB1dBIPCgd1",
+            "bml4X21zGAMgASgEIj0KBVJlcGx5EiUKBm91dHB1dBgBIAEoCzIVLm9wYW1w",
+            "LmNvcmUudjEuT3V0cHV0Eg0KBWVycm9yGAIgASgJIs8BCgZPdXRwdXQSJgoH",
+            "ZWZmZWN0cxgBIAMoCzIVLm9wYW1wLmNvcmUudjEuRWZmZWN0EhcKCndha2Vf",
+            "YXRfbXMYAiABKARIAIgBARIPCgdzdG9wcGVkGAMgASgIEhQKDGluc3RhbmNl",
+            "X3VpZBgEIAEoDBIlCgZsaW1pdHMYBSABKAsyFS5vcGFtcC5jb3JlLnYxLkxp",
+            "bWl0cxInCgdyZXN1bWVkGAYgASgLMhYub3BhbXAuY29yZS52MS5SZXN1bWVk",
+            "Qg0KC193YWtlX2F0X21zIo8CCgdSZXN1bWVkEkAKFWFwcGxpZWRfcmVtb3Rl",
+            "X2NvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29u",
+            "ZmlnEjgKDXJlbW90ZV9jb25maWcYAiABKAsyIS5vcGFtcC5wcm90by52MS5B",
+            "Z2VudFJlbW90ZUNvbmZpZxJBChVyZW1vdGVfY29uZmlnX3JlZnVzZWQYAyAB",
+            "KAsyIi5vcGFtcC5wcm90by52MS5SZW1vdGVDb25maWdTdGF0dXMSRQoTY29u",
+            "bmVjdGlvbl9zZXR0aW5ncxgEIAEoCzIoLm9wYW1wLnByb3RvLnYxLkNvbm5l",
+            "Y3Rpb25TZXR0aW5nc09mZmVycyKyAgoGTGltaXRzEh0KFWhlYXJ0YmVhdF9p",
+            "bnRlcnZhbF9tcxgEIAEoBBIaChJiYWNrb2ZmX2luaXRpYWxfbXMYBSABKAQS",
+            "FgoOYmFja29mZl9tYXhfbXMYBiABKAQSFgoObWF4X3NlbmRfYnl0ZXMYByAB",
+            "KAQSGgoScmVxdWVzdF90aW1lb3V0X21zGAsgASgEEhkKEW1heF9yZWNlaXZl",
+            "X2J5dGVzGAwgASgEEhkKEXZlcmlmeV90aW1lb3V0X21zGBAgASgEEhkKEW1h",
+            "eF9wYWNrYWdlX2J5dGVzGBQgASgEEhsKE2Rvd25sb2FkX3RpbWVvdXRfbXMY",
+            "FSABKAQSFwoPc3RvcF90aW1lb3V0X21zGBwgASgEEhoKEmNvbm5lY3RfdGlt",
+            "ZW91dF9tcxgdIAEoBCLUBgoGRWZmZWN0EjIKDGh0dHBfcmVxdWVzdBgBIAEo",
+            "CzIaLm9wYW1wLmNvcmUudjEuSHR0cFJlcXVlc3RIABIoCgd3c19vcGVuGAIg",
+            "ASgLMhUub3BhbXAuY29yZS52MS5Xc09wZW5IABIrCgd3c19zZW5kGAMgASgL",
+            "Mhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIlCgh3c19jbG9zZRgEIAEo",
+            "CzIRLm9wYW1wLmNvcmUudjEuSWRIABItCgZub3RpZnkYBSABKAsyGy5vcGFt",
+            "cC5jb3JlLnYxLk5vdGlmaWNhdGlvbkgAEiUKBXN0b3JlGAYgASgLMhQub3Bh",
+            "bXAuY29yZS52MS5TdG9yZUgAEisKCGRvd25sb2FkGAcgASgLMhcub3BhbXAu",
+            "Y29yZS52MS5Eb3dubG9hZEgAEiQKB2Rpc2NhcmQYCCABKAsyES5vcGFtcC5j",
+            "b3JlLnYxLklkSAASIwoGY2FuY2VsGAkgASgLMhEub3BhbXAuY29yZS52MS5J",
+            "ZEgAEikKC3Byb3h5X3F1ZXJ5GAogASgLMhIub3BhbXAuY29yZS52MS5VcmxI",
+            "ABIzCg5zdHJlYW1fcmVzb2x2ZRgLIAEoCzIZLm9wYW1wLmNvcmUudjEuU3Ry",
+            "ZWFtTmFtZUgAEjAKC3N0cmVhbV9vcGVuGAwgASgLMhkub3BhbXAuY29yZS52",
+            "MS5TdHJlYW1PcGVuSAASNQoQc3RyZWFtX3N0YXJ0X3RscxgNIAEoCzIZLm9w",
+            "YW1wLmNvcmUudjEuU3RyZWFtTmFtZUgAEjAKDHN0cmVhbV93cml0ZRgOIAEo",
+            "CzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASMgoMc3RyZWFtX2Nsb3Nl",
+            "GA8gASgLMhoub3BhbXAuY29yZS52MS5TdHJlYW1DbG9zZUgAEjEKDWRvd25s",
+            "b2FkX2RhdGEYECABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVzc2FnZUgAEioK",
+            "DWRvd25sb2FkX2RvbmUYESABKAsyES5vcGFtcC5jb3JlLnYxLklkSAASNAoN",
+            "c3RyZWFtX3NwbGljZRgSIAEoCzIbLm9wYW1wLmNvcmUudjEuU3RyZWFtU3Bs",
+            "aWNlSABCBgoEa2luZCIoCgtTdHJlYW1DbG9zZRIKCgJpZBgBIAEoBBINCgVh",
+            "Ym9ydBgCIAEoCCIeCgNVcmwSCgoCaWQYASABKAQSCwoDdXJsGAIgASgJIiYK",
+            "ClN0cmVhbU5hbWUSCgoCaWQYASABKAQSDAoEaG9zdBgCIAEoCSI7CgxTdHJl",
+            "YW1TcGxpY2USCgoCaWQYASABKAQSEAoIZG93bmxvYWQYAiABKAQSDQoFYnl0",
+            "ZXMYAyABKAQiNAoKU3RyZWFtT3BlbhIKCgJpZBgBIAEoBBIMCgRob3N0GAIg",
+            "ASgJEgwKBHBvcnQYAyABKA0icgoIRG93bmxvYWQSCgoCaWQYASABKAQSCwoD",
+            "dXJsGAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhl",
+            "YWRlchIRCgltYXhfYnl0ZXMYBCABKAQSEgoKdGltZW91dF9tcxgFIAEoBCIh",
+            "CgVTdG9yZRIKCgJpZBgBIAEoBBIMCgRkYXRhGAIgASgMIowBCgtIdHRwUmVx",
+            "dWVzdBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoHaGVhZGVycxgDIAMo",
+            "CzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEgwKBGJvZHkYBCABKAwSEgoKdGlt",
+            "ZW91dF9tcxgFIAEoBBIaChJtYXhfcmVzcG9uc2VfYnl0ZXMYBiABKAQieAoG",
+            "V3NPcGVuEgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMg",
+            "AygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISGQoRbWF4X21lc3NhZ2VfYnl0",
+            "ZXMYBCABKAQSEgoKdGltZW91dF9tcxgFIAEoBCK2BwoMTm90aWZpY2F0aW9u",
+            "EikKCWNvbm5lY3RlZBgBIAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlIABI8",
+            "Cg5jb25uZWN0X2ZhaWxlZBgCIAEoCzIiLm9wYW1wLmNvcmUudjEuTm90aWZ5",
+            "Q29ubmVjdEZhaWxlZEgAEjYKDmVycm9yX3Jlc3BvbnNlGAMgASgLMhwub3Bh",
+            "bXAuY29yZS52MS5FcnJvclJlc3BvbnNlSAASOgoNcmVtb3RlX2NvbmZpZxgE",
+            "IAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnSAASNwoH",
+            "Y29tbWFuZBgFIAEoCzIkLm9wYW1wLnByb3RvLnYxLlNlcnZlclRvQWdlbnRD",
+            "b21tYW5kSAASHgoUaW5zdGFuY2VfdWlkX2NoYW5nZWQYBiABKAxIABIfChVo",
+            "ZWFydGJlYXRfaW50ZXJ2YWxfbXMYByABKARIABI5ChBzdGF0dXNfdG9vX2xh",
+            "cmdlGAkgASgLMh0ub3BhbXAuY29yZS52MS5TdGF0dXNUb29MYXJnZUgAEiwK",
+            "C2JhZF9tZXNzYWdlGAogASgLMhUub3BhbXAuY29yZS52MS5EZXRhaWxIABIn",
+            "CgdzdG9wcGVkGAsgASgLMhQub3BhbXAuY29yZS52MS5FbXB0eUgAEkcKE2Nv",
+            "bm5lY3Rpb25fc2V0dGluZ3MYDCABKAsyKC5vcGFtcC5wcm90by52MS5Db25u",
+            "ZWN0aW9uU2V0dGluZ3NPZmZlcnNIABI3Cg5jdXN0b21fbWVzc2FnZRgNIAEo",
+            "CzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2VIABJIChpzZXJ2ZXJf",
+            "Y3VzdG9tX2NhcGFiaWxpdGllcxgOIAEoCzIiLm9wYW1wLnByb3RvLnYxLkN1",
+            "c3RvbUNhcGFiaWxpdGllc0gAEkYKF2N1c3RvbV9tZXNzYWdlX25vdF9zZW50",
+            "GA8gASgLMiMub3BhbXAuY29yZS52MS5DdXN0b21NZXNzYWdlTm90U2VudEgA",
+            "EjgKD2luc3RhbGxfcGFja2FnZRgQIAEoCzIdLm9wYW1wLmNvcmUudjEuSW5z",
+            "dGFsbFBhY2thZ2VIABItCg5yZW1vdmVfcGFja2FnZRgRIAEoCzITLm9wYW1w",
+            "LmNvcmUudjEuTmFtZUgAEjIKDHNhdmVfc3RhbGxlZBgSIAEoCzIaLm9wYW1w",
+            "LmNvcmUudjEuU2F2ZVN0YWxsZWRIAEIGCgRraW5kSgQICBAJIjEKC1NhdmVT",
+            "dGFsbGVkEg8KB3N0YWxsZWQYASABKAgSEQoJd2FpdGVkX21zGAIgASgEImMK",
+            "Dkluc3RhbGxQYWNrYWdlEgwKBG5hbWUYASABKAkSMQoHcGFja2FnZRgCIAEo",
+            "CzIgLm9wYW1wLnByb3RvLnYxLlBhY2thZ2VBdmFpbGFibGUSEAoIZG93bmxv",
+            "YWQYAyABKAQiVgoUQ3VzdG9tTWVzc2FnZU5vdFNlbnQSLgoHbWVzc2FnZRgB",
+            "IAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2USDgoGcmVhc29u",
+            "GAIgASgJIkUKE05vdGlmeUNvbm5lY3RGYWlsZWQSEwoGc3RhdHVzGAEgASgN",
+            "SACIAQESDgoGZGV0YWlsGAIgASgJQgkKB19zdGF0dXMiLgoNRXJyb3JSZXNw",
+            "b25zZRIMCgRraW5kGAEgASgFEg8KB21lc3NhZ2UYAiABKAkiWAoOU3RhdHVz",
+            "VG9vTGFyZ2USKQoFZmllbGQYASABKA4yGi5vcGFtcC5jb3JlLnYxLlN0YXR1",
+            "c0ZpZWxkEg0KBWJ5dGVzGAIgASgEEgwKBG5hbWUYAyABKAkicQoJU2V0dXBD",
+            "YWxsEioKBXN0YXJ0GAEgASgLMhkub3BhbXAuY29yZS52MS5TZXR1cFN0YXJ0",
+            "SAASMAoIaWRlbnRpdHkYAiABKAsyHC5vcGFtcC5jb3JlLnYxLlNldHVwSWRl",
+            "bnRpdHlIAEIGCgRjYWxsIo0BCgpTZXR1cFJlcGx5Ei4KB3N0YXJ0ZWQYASAB",
+            "KAsyGy5vcGFtcC5jb3JlLnYxLlNldHVwU3RhcnRlZEgAEjQKCmlkZW50aWZp",
+            "ZWQYAiABKAsyHi5vcGFtcC5jb3JlLnYxLlNldHVwSWRlbnRpZmllZEgAEg8K",
+            "BWVycm9yGAMgASgJSABCCAoGcmVzdWx0IicKCFZhcmlhYmxlEgwKBG5hbWUY",
+            "ASABKAkSDQoFdmFsdWUYAiABKAkingEKClNldHVwU3RhcnQSJAoDZW52GAEg",
+            "AygLMhcub3BhbXAuY29yZS52MS5WYXJpYWJsZRIiCgJvcxgCIAEoDjIWLm9w",
+            "YW1wLmNvcmUudjEuU2V0dXBPcxIPCgdwcm9ncmFtGAMgASgJEgsKA2N3ZBgE",
+            "IAEoCRIoCgRjb2RlGAUgASgLMhoub3BhbXAuY29yZS52MS5TZXR1cEluQ29k",
+            "ZSKHAgoLU2V0dXBJbkNvZGUSFQoIZW5kcG9pbnQYASABKAlIAIgBARIVCg1o",
+            "ZWFkZXJzX2dpdmVuGAIgASgIEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5j",
+            "b3JlLnYxLkhlYWRlchIWCglzdGF0ZV9kaXIYBCABKAlIAYgBARIZCgxoZWFy",
+            "dGJlYXRfbXMYBSABKBJIAogBARIVCg1lbmRwb2ludF9uYW1lGAYgASgJEhQK",
+            "DGhlYWRlcnNfbmFtZRgHIAEoCRIWCg5oZWFydGJlYXRfbmFtZRgIIAEoCUIL",
+            "CglfZW5kcG9pbnRCDAoKX3N0YXRlX2RpckIPCg1faGVhcnRiZWF0X21zIrAC",
+            "CgxTZXR1cFN0YXJ0ZWQSCwoDb2ZmGAEgASgIEhIKCm9mZl9yZWFzb24YDCAB",
+            "KAkSEAoIZW5kcG9pbnQYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1w",
+            "LmNvcmUudjEuSGVhZGVyEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEo",
+            "BBIRCglzdGF0ZV9kaXIYBSABKAkSFQoNZGVmYXVsdF9zbG90cxgGIAMoCRIX",
+            "Cg9hbGxfc2xvdHNfdGFrZW4YByABKAkSDwoHc2VydmljZRgIIAEoCRIWCg5z",
+            "aG93bl9lbmRwb2ludBgJIAEoCRIoCgVoaW50cxgKIAEoCzIZLm9wYW1wLmNv",
+            "cmUudjEuU2V0dXBIaW50cxIQCgh3YXJuaW5ncxgLIAMoCSJUCgpTZXR1cEhp",
+            "bnRzEg8KB3JlZnVzZWQYASABKAkSEQoJbm90X2ZvdW5kGAIgASgJEhMKC3Vu",
+            "cmVhY2hhYmxlGAMgASgJEg0KBWVycm9yGAQgASgJInAKDVNldHVwSWRlbnRp",
+            "dHkSEQoJc3RhdGVfZGlyGAEgASgIEg0KBXNhdmVkGAIgASgJEhsKE3Jlc291",
+            "cmNlX2F0dHJpYnV0ZXMYAyABKAkSDwoHZW50cm9weRgEIAEoDBIPCgd1bml4",
+            "X21zGAUgASgEIrYBCg9TZXR1cElkZW50aWZpZWQSFAoMaW5zdGFuY2VfdWlk",
+            "GAEgASgMEikKBGZyb20YAiABKA4yGy5vcGFtcC5jb3JlLnYxLlNldHVwVWlk",
+            "RnJvbRIMCgRzYXZlGAMgASgIEgwKBHRleHQYBCABKAkSEwoLdW5zYXZlZF91",
+            "aWQYBSABKAwSMQoMdW5zYXZlZF9mcm9tGAYgASgOMhsub3BhbXAuY29yZS52",
+            "MS5TZXR1cFVpZEZyb20qqwIKC1N0YXR1c0ZpZWxkEhwKGFNUQVRVU19GSUVM",
+            "RF9ERVNDUklQVElPThAAEhcKE1NUQVRVU19GSUVMRF9IRUFMVEgQARIhCh1T",
+            "VEFUVVNfRklFTERfRUZGRUNUSVZFX0NPTkZJRxACEiUKIVNUQVRVU19GSUVM",
+            "RF9SRU1PVEVfQ09ORklHX1NUQVRVUxADEisKJ1NUQVRVU19GSUVMRF9DT05O",
+            "RUNUSU9OX1NFVFRJTkdTX1NUQVRVUxAEEiUKIVNUQVRVU19GSUVMRF9BVkFJ",
+            "TEFCTEVfQ09NUE9ORU5UUxAFEiQKIFNUQVRVU19GSUVMRF9DVVNUT01fQ0FQ",
+            "QUJJTElUSUVTEAYSIQodU1RBVFVTX0ZJRUxEX1BBQ0tBR0VfU1RBVFVTRVMQ",
+            "BypGCgdTZXR1cE9zEhEKDVNFVFVQX09TX1VOSVgQABISCg5TRVRVUF9PU19N",
+            "QUNPUxABEhQKEFNFVFVQX09TX1dJTkRPV1MQAipbCgxTZXR1cFVpZEZyb20S",
+            "FwoTU0VUVVBfVUlEX0ZST01fTUFERRAAEhgKFFNFVFVQX1VJRF9GUk9NX1NB",
+            "VkVEEAESGAoUU0VUVVBfVUlEX0ZST01fR0lWRU4QAkJ2ChdkZXYucHlkYW50",
+            "aWMub3BhbXAuY29yZUIJQ29yZVByb3RvWjpnaXRodWIuY29tL3B5ZGFudGlj",
+            "L29wYW1wLWNsaWVudHMvZ28vb3BhbXAvaW50ZXJuYWwvY29yZXBiqgITUHlk",
+            "YW50aWMuT3BBbXAuQ29yZWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Core.StatusField), typeof(global::Pydantic.OpAmp.Core.SetupOs), typeof(global::Pydantic.OpAmp.Core.SetupUidFrom), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -247,6 +256,7 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamResolved), global::Pydantic.OpAmp.Core.StreamResolved.Parser, new[]{ "Id", "Addresses" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Name), global::Pydantic.OpAmp.Core.Name.Parser, new[]{ "Name_" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageInstalled), global::Pydantic.OpAmp.Core.PackageInstalled.Parser, new[]{ "Name", "Hash", "Ok", "Detail" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageRemoved), global::Pydantic.OpAmp.Core.PackageRemoved.Parser, new[]{ "Name", "Failed", "Detail" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Downloaded), global::Pydantic.OpAmp.Core.Downloaded.Parser, new[]{ "Id", "Sha256" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.DownloadResponse), global::Pydantic.OpAmp.Core.DownloadResponse.Parser, new[]{ "Id", "Status", "Sha256", "Location", "LocationOrigin" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Id), global::Pydantic.OpAmp.Core.Id.Parser, new[]{ "Id_" }, null, null, null, null),
@@ -257,7 +267,8 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.WsClosed), global::Pydantic.OpAmp.Core.WsClosed.Parser, new[]{ "Id", "Code" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Step), global::Pydantic.OpAmp.Core.Step.Parser, new[]{ "NowMs", "Input", "UnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Reply), global::Pydantic.OpAmp.Core.Reply.Parser, new[]{ "Output", "Error" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Output), global::Pydantic.OpAmp.Core.Output.Parser, new[]{ "Effects", "WakeAtMs", "Stopped", "InstanceUid", "Limits" }, new[]{ "WakeAtMs" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Output), global::Pydantic.OpAmp.Core.Output.Parser, new[]{ "Effects", "WakeAtMs", "Stopped", "InstanceUid", "Limits", "Resumed" }, new[]{ "WakeAtMs" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Resumed), global::Pydantic.OpAmp.Core.Resumed.Parser, new[]{ "AppliedRemoteConfig", "RemoteConfig", "RemoteConfigRefused", "ConnectionSettings" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Limits), global::Pydantic.OpAmp.Core.Limits.Parser, new[]{ "HeartbeatIntervalMs", "BackoffInitialMs", "BackoffMaxMs", "MaxSendBytes", "RequestTimeoutMs", "MaxReceiveBytes", "VerifyTimeoutMs", "MaxPackageBytes", "DownloadTimeoutMs", "StopTimeoutMs", "ConnectTimeoutMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Effect), global::Pydantic.OpAmp.Core.Effect.Parser, new[]{ "HttpRequest", "WsOpen", "WsSend", "WsClose", "Notify", "Store", "Download", "Discard", "Cancel", "ProxyQuery", "StreamResolve", "StreamOpen", "StreamStartTls", "StreamWrite", "StreamClose", "DownloadData", "DownloadDone", "StreamSplice" }, new[]{ "Kind" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamClose), global::Pydantic.OpAmp.Core.StreamClose.Parser, new[]{ "Id", "Abort" }, null, null, null, null),
@@ -3446,8 +3457,8 @@ namespace Pydantic.OpAmp.Core {
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::Pydantic.OpAmp.Core.Name PackageRemoved {
-      get { return kindCase_ == KindOneofCase.PackageRemoved ? (global::Pydantic.OpAmp.Core.Name) kind_ : null; }
+    public global::Pydantic.OpAmp.Core.PackageRemoved PackageRemoved {
+      get { return kindCase_ == KindOneofCase.PackageRemoved ? (global::Pydantic.OpAmp.Core.PackageRemoved) kind_ : null; }
       set {
         kind_ = value;
         kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.PackageRemoved;
@@ -4365,7 +4376,7 @@ namespace Pydantic.OpAmp.Core {
           break;
         case KindOneofCase.PackageRemoved:
           if (PackageRemoved == null) {
-            PackageRemoved = new global::Pydantic.OpAmp.Core.Name();
+            PackageRemoved = new global::Pydantic.OpAmp.Core.PackageRemoved();
           }
           PackageRemoved.MergeFrom(other.PackageRemoved);
           break;
@@ -4658,7 +4669,7 @@ namespace Pydantic.OpAmp.Core {
             break;
           }
           case 178: {
-            global::Pydantic.OpAmp.Core.Name subBuilder = new global::Pydantic.OpAmp.Core.Name();
+            global::Pydantic.OpAmp.Core.PackageRemoved subBuilder = new global::Pydantic.OpAmp.Core.PackageRemoved();
             if (kindCase_ == KindOneofCase.PackageRemoved) {
               subBuilder.MergeFrom(PackageRemoved);
             }
@@ -4992,7 +5003,7 @@ namespace Pydantic.OpAmp.Core {
             break;
           }
           case 178: {
-            global::Pydantic.OpAmp.Core.Name subBuilder = new global::Pydantic.OpAmp.Core.Name();
+            global::Pydantic.OpAmp.Core.PackageRemoved subBuilder = new global::Pydantic.OpAmp.Core.PackageRemoved();
             if (kindCase_ == KindOneofCase.PackageRemoved) {
               subBuilder.MergeFrom(PackageRemoved);
             }
@@ -6182,6 +6193,287 @@ namespace Pydantic.OpAmp.Core {
 
   }
 
+  /// <summary>
+  /// The answer to remove_package. Wire-compatible with Name: unset fields say it is removed.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class PackageRemoved : pb::IMessage<PackageRemoved>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<PackageRemoved> _parser = new pb::MessageParser<PackageRemoved>(() => new PackageRemoved());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<PackageRemoved> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[12]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PackageRemoved() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PackageRemoved(PackageRemoved other) : this() {
+      name_ = other.name_;
+      failed_ = other.failed_;
+      detail_ = other.detail_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public PackageRemoved Clone() {
+      return new PackageRemoved(this);
+    }
+
+    /// <summary>Field number for the "name" field.</summary>
+    public const int NameFieldNumber = 1;
+    private string name_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Name {
+      get { return name_; }
+      set {
+        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "failed" field.</summary>
+    public const int FailedFieldNumber = 2;
+    private bool failed_;
+    /// <summary>
+    /// not removed: reported failed, and not removed again until
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Failed {
+      get { return failed_; }
+      set {
+        failed_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "detail" field.</summary>
+    public const int DetailFieldNumber = 3;
+    private string detail_ = "";
+    /// <summary>
+    /// it is offered and dropped again
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Detail {
+      get { return detail_; }
+      set {
+        detail_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as PackageRemoved);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(PackageRemoved other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Name != other.Name) return false;
+      if (Failed != other.Failed) return false;
+      if (Detail != other.Detail) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Name.Length != 0) hash ^= Name.GetHashCode();
+      if (Failed != false) hash ^= Failed.GetHashCode();
+      if (Detail.Length != 0) hash ^= Detail.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Name.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Name);
+      }
+      if (Failed != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(Failed);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Detail);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Name.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Name);
+      }
+      if (Failed != false) {
+        output.WriteRawTag(16);
+        output.WriteBool(Failed);
+      }
+      if (Detail.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(Detail);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Name.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Name);
+      }
+      if (Failed != false) {
+        size += 1 + 1;
+      }
+      if (Detail.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Detail);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(PackageRemoved other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Name.Length != 0) {
+        Name = other.Name;
+      }
+      if (other.Failed != false) {
+        Failed = other.Failed;
+      }
+      if (other.Detail.Length != 0) {
+        Detail = other.Detail;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Name = input.ReadString();
+            break;
+          }
+          case 16: {
+            Failed = input.ReadBool();
+            break;
+          }
+          case 26: {
+            Detail = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Name = input.ReadString();
+            break;
+          }
+          case 16: {
+            Failed = input.ReadBool();
+            break;
+          }
+          case 26: {
+            Detail = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class Downloaded : pb::IMessage<Downloaded>
   #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
@@ -6197,7 +6489,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[12]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[13]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6440,7 +6732,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[13]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[14]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6801,7 +7093,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[14]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[15]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -6999,7 +7291,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[15]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[16]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7234,7 +7526,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[16]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[17]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7573,7 +7865,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[17]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[18]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -7927,7 +8219,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[18]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[19]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8165,7 +8457,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[19]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[20]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8403,7 +8695,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[20]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[21]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8691,7 +8983,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[21]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[22]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8939,7 +9231,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[22]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[23]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8965,6 +9257,7 @@ namespace Pydantic.OpAmp.Core {
       stopped_ = other.stopped_;
       instanceUid_ = other.instanceUid_;
       limits_ = other.limits_ != null ? other.limits_.Clone() : null;
+      resumed_ = other.resumed_ != null ? other.resumed_.Clone() : null;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -9063,6 +9356,21 @@ namespace Pydantic.OpAmp.Core {
       }
     }
 
+    /// <summary>Field number for the "resumed" field.</summary>
+    public const int ResumedFieldNumber = 6;
+    private global::Pydantic.OpAmp.Core.Resumed resumed_;
+    /// <summary>
+    /// init's only: what the client starts from (unset: nothing saved)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Core.Resumed Resumed {
+      get { return resumed_; }
+      set {
+        resumed_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -9083,6 +9391,7 @@ namespace Pydantic.OpAmp.Core {
       if (Stopped != other.Stopped) return false;
       if (InstanceUid != other.InstanceUid) return false;
       if (!object.Equals(Limits, other.Limits)) return false;
+      if (!object.Equals(Resumed, other.Resumed)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -9095,6 +9404,7 @@ namespace Pydantic.OpAmp.Core {
       if (Stopped != false) hash ^= Stopped.GetHashCode();
       if (InstanceUid.Length != 0) hash ^= InstanceUid.GetHashCode();
       if (limits_ != null) hash ^= Limits.GetHashCode();
+      if (resumed_ != null) hash ^= Resumed.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -9130,6 +9440,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(42);
         output.WriteMessage(Limits);
       }
+      if (resumed_ != null) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Resumed);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -9157,6 +9471,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(42);
         output.WriteMessage(Limits);
       }
+      if (resumed_ != null) {
+        output.WriteRawTag(50);
+        output.WriteMessage(Resumed);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -9179,6 +9497,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (limits_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Limits);
+      }
+      if (resumed_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Resumed);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -9207,6 +9528,12 @@ namespace Pydantic.OpAmp.Core {
           Limits = new global::Pydantic.OpAmp.Core.Limits();
         }
         Limits.MergeFrom(other.Limits);
+      }
+      if (other.resumed_ != null) {
+        if (resumed_ == null) {
+          Resumed = new global::Pydantic.OpAmp.Core.Resumed();
+        }
+        Resumed.MergeFrom(other.Resumed);
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -9248,6 +9575,13 @@ namespace Pydantic.OpAmp.Core {
               Limits = new global::Pydantic.OpAmp.Core.Limits();
             }
             input.ReadMessage(Limits);
+            break;
+          }
+          case 50: {
+            if (resumed_ == null) {
+              Resumed = new global::Pydantic.OpAmp.Core.Resumed();
+            }
+            input.ReadMessage(Resumed);
             break;
           }
         }
@@ -9292,6 +9626,379 @@ namespace Pydantic.OpAmp.Core {
             input.ReadMessage(Limits);
             break;
           }
+          case 50: {
+            if (resumed_ == null) {
+              Resumed = new global::Pydantic.OpAmp.Core.Resumed();
+            }
+            input.ReadMessage(Resumed);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
+  /// What the client starts from, read from its saved state, as init returns it: for an application
+  /// that needs it before the client connects. A host that runs an agent of its own (the Supervisor
+  /// its collector) starts it on the applied config and the telemetry settings, keeping no copy of
+  /// them itself. Every field is unset without persistence, or with a state that isn't the client's
+  /// (another endpoint's: the applied config aside, which is kept whatever the endpoint).
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class Resumed : pb::IMessage<Resumed>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<Resumed> _parser = new pb::MessageParser<Resumed>(() => new Resumed());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<Resumed> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[24]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Resumed() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Resumed(Resumed other) : this() {
+      appliedRemoteConfig_ = other.appliedRemoteConfig_ != null ? other.appliedRemoteConfig_.Clone() : null;
+      remoteConfig_ = other.remoteConfig_ != null ? other.remoteConfig_.Clone() : null;
+      remoteConfigRefused_ = other.remoteConfigRefused_ != null ? other.remoteConfigRefused_.Clone() : null;
+      connectionSettings_ = other.connectionSettings_ != null ? other.connectionSettings_.Clone() : null;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Resumed Clone() {
+      return new Resumed(this);
+    }
+
+    /// <summary>Field number for the "applied_remote_config" field.</summary>
+    public const int AppliedRemoteConfigFieldNumber = 1;
+    private global::OpAmp.Proto.V1.AgentRemoteConfig appliedRemoteConfig_;
+    /// <summary>
+    /// The config the application last answered APPLIED: what it runs from the start.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.AgentRemoteConfig AppliedRemoteConfig {
+      get { return appliedRemoteConfig_; }
+      set {
+        appliedRemoteConfig_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "remote_config" field.</summary>
+    public const int RemoteConfigFieldNumber = 2;
+    private global::OpAmp.Proto.V1.AgentRemoteConfig remoteConfig_;
+    /// <summary>
+    /// The config start hands the application (remote_config), to work on: the last received,
+    /// unless the application refused it.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.AgentRemoteConfig RemoteConfig {
+      get { return remoteConfig_; }
+      set {
+        remoteConfig_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "remote_config_refused" field.</summary>
+    public const int RemoteConfigRefusedFieldNumber = 3;
+    private global::OpAmp.Proto.V1.RemoteConfigStatus remoteConfigRefused_;
+    /// <summary>
+    /// The application's FAILED about the last config received, reported again at start; that
+    /// config is not handed over again until the server offers another.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.RemoteConfigStatus RemoteConfigRefused {
+      get { return remoteConfigRefused_; }
+      set {
+        remoteConfigRefused_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "connection_settings" field.</summary>
+    public const int ConnectionSettingsFieldNumber = 4;
+    private global::OpAmp.Proto.V1.ConnectionSettingsOffers connectionSettings_;
+    /// <summary>
+    /// The telemetry settings start hands the application (connection_settings): the parts it asks for.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::OpAmp.Proto.V1.ConnectionSettingsOffers ConnectionSettings {
+      get { return connectionSettings_; }
+      set {
+        connectionSettings_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as Resumed);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(Resumed other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (!object.Equals(AppliedRemoteConfig, other.AppliedRemoteConfig)) return false;
+      if (!object.Equals(RemoteConfig, other.RemoteConfig)) return false;
+      if (!object.Equals(RemoteConfigRefused, other.RemoteConfigRefused)) return false;
+      if (!object.Equals(ConnectionSettings, other.ConnectionSettings)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (appliedRemoteConfig_ != null) hash ^= AppliedRemoteConfig.GetHashCode();
+      if (remoteConfig_ != null) hash ^= RemoteConfig.GetHashCode();
+      if (remoteConfigRefused_ != null) hash ^= RemoteConfigRefused.GetHashCode();
+      if (connectionSettings_ != null) hash ^= ConnectionSettings.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (appliedRemoteConfig_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(AppliedRemoteConfig);
+      }
+      if (remoteConfig_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(RemoteConfig);
+      }
+      if (remoteConfigRefused_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(RemoteConfigRefused);
+      }
+      if (connectionSettings_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(ConnectionSettings);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (appliedRemoteConfig_ != null) {
+        output.WriteRawTag(10);
+        output.WriteMessage(AppliedRemoteConfig);
+      }
+      if (remoteConfig_ != null) {
+        output.WriteRawTag(18);
+        output.WriteMessage(RemoteConfig);
+      }
+      if (remoteConfigRefused_ != null) {
+        output.WriteRawTag(26);
+        output.WriteMessage(RemoteConfigRefused);
+      }
+      if (connectionSettings_ != null) {
+        output.WriteRawTag(34);
+        output.WriteMessage(ConnectionSettings);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (appliedRemoteConfig_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(AppliedRemoteConfig);
+      }
+      if (remoteConfig_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(RemoteConfig);
+      }
+      if (remoteConfigRefused_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(RemoteConfigRefused);
+      }
+      if (connectionSettings_ != null) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(ConnectionSettings);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(Resumed other) {
+      if (other == null) {
+        return;
+      }
+      if (other.appliedRemoteConfig_ != null) {
+        if (appliedRemoteConfig_ == null) {
+          AppliedRemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+        }
+        AppliedRemoteConfig.MergeFrom(other.AppliedRemoteConfig);
+      }
+      if (other.remoteConfig_ != null) {
+        if (remoteConfig_ == null) {
+          RemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+        }
+        RemoteConfig.MergeFrom(other.RemoteConfig);
+      }
+      if (other.remoteConfigRefused_ != null) {
+        if (remoteConfigRefused_ == null) {
+          RemoteConfigRefused = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+        }
+        RemoteConfigRefused.MergeFrom(other.RemoteConfigRefused);
+      }
+      if (other.connectionSettings_ != null) {
+        if (connectionSettings_ == null) {
+          ConnectionSettings = new global::OpAmp.Proto.V1.ConnectionSettingsOffers();
+        }
+        ConnectionSettings.MergeFrom(other.ConnectionSettings);
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            if (appliedRemoteConfig_ == null) {
+              AppliedRemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            }
+            input.ReadMessage(AppliedRemoteConfig);
+            break;
+          }
+          case 18: {
+            if (remoteConfig_ == null) {
+              RemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            }
+            input.ReadMessage(RemoteConfig);
+            break;
+          }
+          case 26: {
+            if (remoteConfigRefused_ == null) {
+              RemoteConfigRefused = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+            }
+            input.ReadMessage(RemoteConfigRefused);
+            break;
+          }
+          case 34: {
+            if (connectionSettings_ == null) {
+              ConnectionSettings = new global::OpAmp.Proto.V1.ConnectionSettingsOffers();
+            }
+            input.ReadMessage(ConnectionSettings);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            if (appliedRemoteConfig_ == null) {
+              AppliedRemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            }
+            input.ReadMessage(AppliedRemoteConfig);
+            break;
+          }
+          case 18: {
+            if (remoteConfig_ == null) {
+              RemoteConfig = new global::OpAmp.Proto.V1.AgentRemoteConfig();
+            }
+            input.ReadMessage(RemoteConfig);
+            break;
+          }
+          case 26: {
+            if (remoteConfigRefused_ == null) {
+              RemoteConfigRefused = new global::OpAmp.Proto.V1.RemoteConfigStatus();
+            }
+            input.ReadMessage(RemoteConfigRefused);
+            break;
+          }
+          case 34: {
+            if (connectionSettings_ == null) {
+              ConnectionSettings = new global::OpAmp.Proto.V1.ConnectionSettingsOffers();
+            }
+            input.ReadMessage(ConnectionSettings);
+            break;
+          }
         }
       }
     }
@@ -9320,7 +10027,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[23]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[25]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9894,7 +10601,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[24]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[26]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11098,7 +11805,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[25]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[27]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11333,7 +12040,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[26]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[28]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11568,7 +12275,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[27]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[29]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11806,7 +12513,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[28]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[30]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12087,7 +12794,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[29]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[31]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12365,7 +13072,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[30]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[32]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12710,7 +13417,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[31]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[33]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -12945,7 +13652,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[32]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[34]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -13320,7 +14027,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[33]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[35]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -13658,7 +14365,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[34]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[36]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -14780,7 +15487,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[35]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[37]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -15018,7 +15725,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[36]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[38]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -15305,7 +16012,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[37]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[39]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -15550,7 +16257,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[38]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[40]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -15801,7 +16508,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[39]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[41]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16039,7 +16746,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[40]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[42]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16314,7 +17021,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[41]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[43]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16608,7 +17315,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[42]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[44]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16962,7 +17669,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[43]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[45]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -17200,7 +17907,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[44]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[46]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -17563,7 +18270,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[45]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[47]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -18065,7 +18772,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[46]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[48]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -18689,7 +19396,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[47]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[49]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -19013,7 +19720,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[48]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[50]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -19374,7 +20081,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[49]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[51]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

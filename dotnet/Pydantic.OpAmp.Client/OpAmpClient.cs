@@ -653,7 +653,7 @@ public sealed class OpAmpClient
         });
 
     /// <summary>Answer <see cref="OpAmpNotification.RemovePackage"/>: the package is removed.</summary>
-    public void PackageRemoved(string name) => this.Call(new Input { PackageRemoved = new Name { Name_ = name } });
+    public void PackageRemoved(string name) => this.Call(new Input { PackageRemoved = new Pydantic.OpAmp.Core.PackageRemoved { Name = name } });
 
     /// <summary>
     /// Send agent_disconnect if a message can still be sent, then stop: the task ends when the
