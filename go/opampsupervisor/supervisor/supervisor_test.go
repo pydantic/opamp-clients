@@ -2922,7 +2922,7 @@ service:
             exporter:
               otlp:
                 protocol: http/protobuf
-                endpoint: http://127.0.0.1:4318
+                endpoint: "http://127.0.0.1:4318"
                 headers:
                   "testkey": "testval"
                   "testkey2": "testval2"
