@@ -2206,6 +2206,28 @@ func (s *Supervisor) healthySince(a *configApply) bool {
 	return h != nil && h.Healthy && h.connection > a.since
 }
 
+// applyStep takes stepApply's step on the apply and does what it says. openWindow (re)starts the
+// apply timer, backoff the restart timer.
+func (s *Supervisor) applyStep(apply **configApply, in applyInput, openWindow, backoff func()) {
+	next, fx := stepApply(**apply, in)
+	**apply = next
+	if fx.openWindow {
+		openWindow()
+	}
+	restored := false
+	if r := fx.report; r != nil {
+		message := r.message
+		if in.event == applyCollectorExited {
+			message = s.appendCollectorCrashDetails(message)
+		}
+		restored = s.reportApply(*apply, r.status, message, r.restore)
+	}
+	if fx.backoff && !restored {
+		// Wait 5 seconds before starting again.
+		backoff()
+	}
+}
+
 func (s *Supervisor) runAgentProcess() {
 	apply := s.newConfigApply()
 	apply.since = 0
@@ -2404,49 +2426,27 @@ func (s *Supervisor) runAgentProcess() {
 				s.telemetrySettings.Logger.Error("Could not report health to OpAMP server", zap.Error(err))
 			}
 
-			switch {
-			case stopApplyTimer():
-				// The collector exited while applying the config: FAILED now, rather than at
-				// the timeout. When the restored last working remote config crashes as well,
-				// skip restoring it again and retry it on the regular restart backoff.
-				s.telemetrySettings.Logger.Info("Agent crashed during config application, reporting FAILED status")
-				failureMsg := fmt.Sprintf("Agent exited unexpectedly with exit code %d while applying configuration", s.commander.ExitCode())
-				if s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, s.appendCollectorCrashDetails(failureMsg), !apply.retry) {
-					continue
-				}
-			case apply.status == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
-				// Changed here: an APPLIED config the collector then exits on is FAILED. It
-				// stayed APPLIED while the collector crash-looped.
-				failureMsg := fmt.Sprintf("Agent exited unexpectedly with exit code %d after applying configuration", s.commander.ExitCode())
-				s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, s.appendCollectorCrashDetails(failureMsg), false)
-			}
-
-			// Wait 5 seconds before starting again.
-			resetRestartTimer()
+			s.applyStep(&apply, applyInput{
+				event: applyCollectorExited, windowOpen: stopApplyTimer(), exitCode: s.commander.ExitCode(),
+			}, openApplyWindow, resetRestartTimer)
 
 		case <-restartTimer.C:
 			s.telemetrySettings.Logger.Debug("Agent starting after start backoff")
 			since := s.agentConn.count()
 			status, err := s.startAgent()
-			switch {
-			case err != nil:
+			if err != nil {
 				s.telemetrySettings.Logger.Error("restarting agent failed", zap.Error(err))
-				s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, err.Error(), false)
-			case status == agentStarting && apply.status == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
-				// Changed here: the config the collector failed on gets another apply window
-				// with this start, and is APPLIED if it is healthy at its end.
-				openApplyWindow()
-				apply.since, apply.retry = since, true
 			}
+			s.applyStep(&apply, applyInput{
+				event: applyRestarted, startErr: err, starting: status == agentStarting, since: since,
+			}, openApplyWindow, resetRestartTimer)
 
 		case <-configApplyTimeoutTimer.C:
-			// Changed here: only health the collector reported since it was given the config
-			// counts. The old collector's, sent before it stopped, made a hung one APPLIED.
-			if !s.healthySince(apply) {
-				s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, "Config apply timeout exceeded", !apply.retry)
-				continue
-			}
-			s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, "", false)
+			// Only health the collector reported since it was given the config counts, and
+			// only while it runs: IsRunning goes false before its exit is announced.
+			s.applyStep(&apply, applyInput{
+				event: applyTimedOut, healthy: s.healthySince(apply), running: s.commander.IsRunning(),
+			}, openApplyWindow, resetRestartTimer)
 
 		case <-s.doneChan:
 			err := s.commander.Stop(s.runCtx)

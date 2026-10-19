@@ -98,6 +98,12 @@ agent:
   (`automatic_config_rollback`) the server keeps the FAILED status of the config that failed;
   upstream's also reported the restored one APPLIED, under that config's hash. The effective
   config says what runs.
+- **APPLIED means the running collector is healthy on the config.** It is reported only when, at
+  the end of the apply window, the collector runs and reported healthy on a connection made
+  since it was given the config. An exit in the window, or as it ends, is FAILED, and so is an
+  exit after APPLIED. A collector the restart backoff can't start is tried again on the backoff;
+  it stayed down until the next config. The loop's decisions on an exit, a restart and the
+  window's end are one pure step (`supervisor/apply_step.go`), tested rule by rule.
 - A custom message is handed to the client, which queues it: `ErrCustomMessagePending` never
   happens, and a message it can't send after all is logged.
 - **`server` settings that can't apply are refused.** An endpoint with a user name or password,
@@ -120,7 +126,9 @@ agent:
   config when the server's config runs nothing), and a start that finds the mark undoes it, so
   a crash during the health wait can't cost the rollback target. A shutdown during the wait, or
   a rollback that can't put the previous executable back (the configured one then runs), isn't
-  reported: the core asks again at the next start. `agent.package.verifier.type` must be set,
+  reported: the core asks again at the next start. While a start can't undo an unproven update,
+  nothing more is installed: the core's request isn't answered until a start has undone it.
+  `agent.package.verifier.type` must be set,
   to `none` to skip signature checks; an empty one turned them off.
 - **The local OpAMP server takes the collector only.** The server the collector's opamp
   extension connects to, and the one the bootstrap starts, take a request only with a bearer
@@ -140,7 +148,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `sealed_storage.go`, `telemetry_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `sealed_storage.go`, `telemetry_env.go`,
   `localserver.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
