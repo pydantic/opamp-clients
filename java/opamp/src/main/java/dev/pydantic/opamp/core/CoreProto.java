@@ -6847,7 +6847,7 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      * @return Whether the packageRemoved field is set.
      */
     boolean hasPackageRemoved();
@@ -6856,10 +6856,10 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      * @return The packageRemoved.
      */
-    dev.pydantic.opamp.core.CoreProto.Name getPackageRemoved();
+    dev.pydantic.opamp.core.CoreProto.PackageRemoved getPackageRemoved();
 
     /**
      * <pre>
@@ -8561,7 +8561,7 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      */
     @java.lang.Override
     public boolean hasPackageRemoved() {
@@ -8572,24 +8572,24 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      */
     @java.lang.Override
-    public dev.pydantic.opamp.core.CoreProto.Name getPackageRemoved() {
+    public dev.pydantic.opamp.core.CoreProto.PackageRemoved getPackageRemoved() {
       if (kindCase_ == 22) {
-         return (dev.pydantic.opamp.core.CoreProto.Name) kind_;
+         return (dev.pydantic.opamp.core.CoreProto.PackageRemoved) kind_;
       }
-      return dev.pydantic.opamp.core.CoreProto.Name.getDefaultInstance();
+      return dev.pydantic.opamp.core.CoreProto.PackageRemoved.getDefaultInstance();
     }
     /**
      * <pre>
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setPackageRemoved(dev.pydantic.opamp.core.CoreProto.Name value) {
+    private void setPackageRemoved(dev.pydantic.opamp.core.CoreProto.PackageRemoved value) {
       value.getClass();  // minimal bytecode null check
       kind_ = value;
       kindCase_ = 22;
@@ -8599,14 +8599,14 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergePackageRemoved(dev.pydantic.opamp.core.CoreProto.Name value) {
+    private void mergePackageRemoved(dev.pydantic.opamp.core.CoreProto.PackageRemoved value) {
       value.getClass();  // minimal bytecode null check
       if (kindCase_ == 22 &&
-          kind_ != dev.pydantic.opamp.core.CoreProto.Name.getDefaultInstance()) {
-        kind_ = dev.pydantic.opamp.core.CoreProto.Name.newBuilder((dev.pydantic.opamp.core.CoreProto.Name) kind_)
+          kind_ != dev.pydantic.opamp.core.CoreProto.PackageRemoved.getDefaultInstance()) {
+        kind_ = dev.pydantic.opamp.core.CoreProto.PackageRemoved.newBuilder((dev.pydantic.opamp.core.CoreProto.PackageRemoved) kind_)
             .mergeFrom(value).buildPartial();
       } else {
         kind_ = value;
@@ -8618,7 +8618,7 @@ public final class CoreProto {
      * answers remove_package
      * </pre>
      *
-     * <code>.opamp.core.v1.Name package_removed = 22;</code>
+     * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
      */
     private void clearPackageRemoved() {
       if (kindCase_ == 22) {
@@ -10974,7 +10974,7 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
       @java.lang.Override
       public boolean hasPackageRemoved() {
@@ -10985,10 +10985,10 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
       @java.lang.Override
-      public dev.pydantic.opamp.core.CoreProto.Name getPackageRemoved() {
+      public dev.pydantic.opamp.core.CoreProto.PackageRemoved getPackageRemoved() {
         return instance.getPackageRemoved();
       }
       /**
@@ -10996,9 +10996,9 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
-      public Builder setPackageRemoved(dev.pydantic.opamp.core.CoreProto.Name value) {
+      public Builder setPackageRemoved(dev.pydantic.opamp.core.CoreProto.PackageRemoved value) {
         copyOnWrite();
         instance.setPackageRemoved(value);
         return this;
@@ -11008,10 +11008,10 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
       public Builder setPackageRemoved(
-          dev.pydantic.opamp.core.CoreProto.Name.Builder builderForValue) {
+          dev.pydantic.opamp.core.CoreProto.PackageRemoved.Builder builderForValue) {
         copyOnWrite();
         instance.setPackageRemoved(builderForValue.build());
         return this;
@@ -11021,9 +11021,9 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
-      public Builder mergePackageRemoved(dev.pydantic.opamp.core.CoreProto.Name value) {
+      public Builder mergePackageRemoved(dev.pydantic.opamp.core.CoreProto.PackageRemoved value) {
         copyOnWrite();
         instance.mergePackageRemoved(value);
         return this;
@@ -11033,7 +11033,7 @@ public final class CoreProto {
        * answers remove_package
        * </pre>
        *
-       * <code>.opamp.core.v1.Name package_removed = 22;</code>
+       * <code>.opamp.core.v1.PackageRemoved package_removed = 22;</code>
        */
       public Builder clearPackageRemoved() {
         copyOnWrite();
@@ -12040,7 +12040,7 @@ public final class CoreProto {
               opamp.proto.v1.Opamp.CustomCapabilities.class,
               opamp.proto.v1.Opamp.CustomMessage.class,
               dev.pydantic.opamp.core.CoreProto.PackageInstalled.class,
-              dev.pydantic.opamp.core.CoreProto.Name.class,
+              dev.pydantic.opamp.core.CoreProto.PackageRemoved.class,
               dev.pydantic.opamp.core.CoreProto.Downloaded.class,
               dev.pydantic.opamp.core.CoreProto.Failed.class,
               dev.pydantic.opamp.core.CoreProto.ProxyAnswer.class,
@@ -14449,6 +14449,558 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<PackageInstalled> PARSER;
 
     public static com.google.protobuf.Parser<PackageInstalled> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface PackageRemovedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.PackageRemoved)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    java.lang.String getName();
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    com.google.protobuf.ByteString
+        getNameBytes();
+
+    /**
+     * <pre>
+     * not removed: reported failed, and not removed again until
+     * </pre>
+     *
+     * <code>bool failed = 2;</code>
+     * @return The failed.
+     */
+    boolean getFailed();
+
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @return The detail.
+     */
+    java.lang.String getDetail();
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @return The bytes for detail.
+     */
+    com.google.protobuf.ByteString
+        getDetailBytes();
+  }
+  /**
+   * <pre>
+   * The answer to remove_package. Wire-compatible with Name: unset fields say it is removed.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.PackageRemoved}
+   */
+  public  static final class PackageRemoved extends
+      com.google.protobuf.GeneratedMessageLite<
+          PackageRemoved, PackageRemoved.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.PackageRemoved)
+      PackageRemovedOrBuilder {
+    private PackageRemoved() {
+      name_ = "";
+      detail_ = "";
+    }
+    public static final int NAME_FIELD_NUMBER = 1;
+    private java.lang.String name_;
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    @java.lang.Override
+    public java.lang.String getName() {
+      return name_;
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(name_);
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The name to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      name_ = value;
+    }
+    /**
+     * <code>string name = 1;</code>
+     */
+    private void clearName() {
+
+      name_ = getDefaultInstance().getName();
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The bytes for name to set.
+     */
+    private void setNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      name_ = value.toStringUtf8();
+
+    }
+
+    public static final int FAILED_FIELD_NUMBER = 2;
+    private boolean failed_;
+    /**
+     * <pre>
+     * not removed: reported failed, and not removed again until
+     * </pre>
+     *
+     * <code>bool failed = 2;</code>
+     * @return The failed.
+     */
+    @java.lang.Override
+    public boolean getFailed() {
+      return failed_;
+    }
+    /**
+     * <pre>
+     * not removed: reported failed, and not removed again until
+     * </pre>
+     *
+     * <code>bool failed = 2;</code>
+     * @param value The failed to set.
+     */
+    private void setFailed(boolean value) {
+      
+      failed_ = value;
+    }
+    /**
+     * <pre>
+     * not removed: reported failed, and not removed again until
+     * </pre>
+     *
+     * <code>bool failed = 2;</code>
+     */
+    private void clearFailed() {
+
+      failed_ = false;
+    }
+
+    public static final int DETAIL_FIELD_NUMBER = 3;
+    private java.lang.String detail_;
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @return The detail.
+     */
+    @java.lang.Override
+    public java.lang.String getDetail() {
+      return detail_;
+    }
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @return The bytes for detail.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDetailBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(detail_);
+    }
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @param value The detail to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDetail(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      detail_ = value;
+    }
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     */
+    private void clearDetail() {
+
+      detail_ = getDefaultInstance().getDetail();
+    }
+    /**
+     * <pre>
+     * it is offered and dropped again
+     * </pre>
+     *
+     * <code>string detail = 3;</code>
+     * @param value The bytes for detail to set.
+     */
+    private void setDetailBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      detail_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.PackageRemoved prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * The answer to remove_package. Wire-compatible with Name: unset fields say it is removed.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.PackageRemoved}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.PackageRemoved, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.PackageRemoved)
+        dev.pydantic.opamp.core.CoreProto.PackageRemovedOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.PackageRemoved.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>string name = 1;</code>
+       * @return The name.
+       */
+      @java.lang.Override
+      public java.lang.String getName() {
+        return instance.getName();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return The bytes for name.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getNameBytes() {
+        return instance.getNameBytes();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setName(value);
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearName() {
+        copyOnWrite();
+        instance.clearName();
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The bytes for name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setNameBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * not removed: reported failed, and not removed again until
+       * </pre>
+       *
+       * <code>bool failed = 2;</code>
+       * @return The failed.
+       */
+      @java.lang.Override
+      public boolean getFailed() {
+        return instance.getFailed();
+      }
+      /**
+       * <pre>
+       * not removed: reported failed, and not removed again until
+       * </pre>
+       *
+       * <code>bool failed = 2;</code>
+       * @param value The failed to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFailed(boolean value) {
+        copyOnWrite();
+        instance.setFailed(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * not removed: reported failed, and not removed again until
+       * </pre>
+       *
+       * <code>bool failed = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFailed() {
+        copyOnWrite();
+        instance.clearFailed();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * it is offered and dropped again
+       * </pre>
+       *
+       * <code>string detail = 3;</code>
+       * @return The detail.
+       */
+      @java.lang.Override
+      public java.lang.String getDetail() {
+        return instance.getDetail();
+      }
+      /**
+       * <pre>
+       * it is offered and dropped again
+       * </pre>
+       *
+       * <code>string detail = 3;</code>
+       * @return The bytes for detail.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDetailBytes() {
+        return instance.getDetailBytes();
+      }
+      /**
+       * <pre>
+       * it is offered and dropped again
+       * </pre>
+       *
+       * <code>string detail = 3;</code>
+       * @param value The detail to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDetail(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setDetail(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * it is offered and dropped again
+       * </pre>
+       *
+       * <code>string detail = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDetail() {
+        copyOnWrite();
+        instance.clearDetail();
+        return this;
+      }
+      /**
+       * <pre>
+       * it is offered and dropped again
+       * </pre>
+       *
+       * <code>string detail = 3;</code>
+       * @param value The bytes for detail to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDetailBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setDetailBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.PackageRemoved)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.PackageRemoved();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "name_",
+              "failed_",
+              "detail_",
+            };
+            java.lang.String info =
+                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u0007" +
+                "\u0003\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.PackageRemoved> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.PackageRemoved.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.PackageRemoved>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.PackageRemoved)
+    private static final dev.pydantic.opamp.core.CoreProto.PackageRemoved DEFAULT_INSTANCE;
+    static {
+      PackageRemoved defaultInstance = new PackageRemoved();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        PackageRemoved.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.PackageRemoved getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<PackageRemoved> PARSER;
+
+    public static com.google.protobuf.Parser<PackageRemoved> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
@@ -19101,6 +19653,25 @@ public final class CoreProto {
      * @return The limits.
      */
     dev.pydantic.opamp.core.CoreProto.Limits getLimits();
+
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     * @return Whether the resumed field is set.
+     */
+    boolean hasResumed();
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     * @return The resumed.
+     */
+    dev.pydantic.opamp.core.CoreProto.Resumed getResumed();
   }
   /**
    * <pre>
@@ -19453,6 +20024,74 @@ public final class CoreProto {
     private void clearLimits() {
       limits_ = null;
       bitField0_ = (bitField0_ & ~0x00000002);
+    }
+
+    public static final int RESUMED_FIELD_NUMBER = 6;
+    private dev.pydantic.opamp.core.CoreProto.Resumed resumed_;
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     */
+    @java.lang.Override
+    public boolean hasResumed() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.Resumed getResumed() {
+      return resumed_ == null ? dev.pydantic.opamp.core.CoreProto.Resumed.getDefaultInstance() : resumed_;
+    }
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setResumed(dev.pydantic.opamp.core.CoreProto.Resumed value) {
+      value.getClass();  // minimal bytecode null check
+      resumed_ = value;
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeResumed(dev.pydantic.opamp.core.CoreProto.Resumed value) {
+      value.getClass();  // minimal bytecode null check
+      if (resumed_ != null &&
+          resumed_ != dev.pydantic.opamp.core.CoreProto.Resumed.getDefaultInstance()) {
+        resumed_ =
+          dev.pydantic.opamp.core.CoreProto.Resumed.newBuilder(resumed_).mergeFrom(value).buildPartial();
+      } else {
+        resumed_ = value;
+      }
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * init's only: what the client starts from (unset: nothing saved)
+     * </pre>
+     *
+     * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+     */
+    private void clearResumed() {
+      resumed_ = null;
+      bitField0_ = (bitField0_ & ~0x00000004);
     }
 
     public static dev.pydantic.opamp.core.CoreProto.Output parseFrom(
@@ -19909,6 +20548,77 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      @java.lang.Override
+      public boolean hasResumed() {
+        return instance.hasResumed();
+      }
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.Resumed getResumed() {
+        return instance.getResumed();
+      }
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      public Builder setResumed(dev.pydantic.opamp.core.CoreProto.Resumed value) {
+        copyOnWrite();
+        instance.setResumed(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      public Builder setResumed(
+          dev.pydantic.opamp.core.CoreProto.Resumed.Builder builderForValue) {
+        copyOnWrite();
+        instance.setResumed(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      public Builder mergeResumed(dev.pydantic.opamp.core.CoreProto.Resumed value) {
+        copyOnWrite();
+        instance.mergeResumed(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * init's only: what the client starts from (unset: nothing saved)
+       * </pre>
+       *
+       * <code>.opamp.core.v1.Resumed resumed = 6;</code>
+       */
+      public Builder clearResumed() {  copyOnWrite();
+        instance.clearResumed();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Output)
     }
     @java.lang.Override
@@ -19932,10 +20642,11 @@ public final class CoreProto {
               "stopped_",
               "instanceUid_",
               "limits_",
+              "resumed_",
             };
             java.lang.String info =
-                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u001b\u0002\u1003" +
-                "\u0000\u0003\u0007\u0004\n\u0005\u1009\u0001";
+                "\u0000\u0006\u0000\u0001\u0001\u0006\u0006\u0000\u0001\u0000\u0001\u001b\u0002\u1003" +
+                "\u0000\u0003\u0007\u0004\n\u0005\u1009\u0001\u0006\u1009\u0002";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -19986,6 +20697,871 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<Output> PARSER;
 
     public static com.google.protobuf.Parser<Output> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface ResumedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.Resumed)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     * @return Whether the appliedRemoteConfig field is set.
+     */
+    boolean hasAppliedRemoteConfig();
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     * @return The appliedRemoteConfig.
+     */
+    opamp.proto.v1.Opamp.AgentRemoteConfig getAppliedRemoteConfig();
+
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     * @return Whether the remoteConfig field is set.
+     */
+    boolean hasRemoteConfig();
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     * @return The remoteConfig.
+     */
+    opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig();
+
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     * @return Whether the remoteConfigRefused field is set.
+     */
+    boolean hasRemoteConfigRefused();
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     * @return The remoteConfigRefused.
+     */
+    opamp.proto.v1.Opamp.RemoteConfigStatus getRemoteConfigRefused();
+
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     * @return Whether the connectionSettings field is set.
+     */
+    boolean hasConnectionSettings();
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     * @return The connectionSettings.
+     */
+    opamp.proto.v1.Opamp.ConnectionSettingsOffers getConnectionSettings();
+  }
+  /**
+   * <pre>
+   * What the client starts from, read from its saved state, as init returns it: for an application
+   * that needs it before the client connects. A host that runs an agent of its own (the Supervisor
+   * its collector) starts it on the applied config and the telemetry settings, keeping no copy of
+   * them itself. Every field is unset without persistence, or with a state that isn't the client's
+   * (another endpoint's: the applied config aside, which is kept whatever the endpoint).
+   * </pre>
+   *
+   * Protobuf type {@code opamp.core.v1.Resumed}
+   */
+  public  static final class Resumed extends
+      com.google.protobuf.GeneratedMessageLite<
+          Resumed, Resumed.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.Resumed)
+      ResumedOrBuilder {
+    private Resumed() {
+    }
+    private int bitField0_;
+    public static final int APPLIED_REMOTE_CONFIG_FIELD_NUMBER = 1;
+    private opamp.proto.v1.Opamp.AgentRemoteConfig appliedRemoteConfig_;
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     */
+    @java.lang.Override
+    public boolean hasAppliedRemoteConfig() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.AgentRemoteConfig getAppliedRemoteConfig() {
+      return appliedRemoteConfig_ == null ? opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance() : appliedRemoteConfig_;
+    }
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAppliedRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      appliedRemoteConfig_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeAppliedRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      if (appliedRemoteConfig_ != null &&
+          appliedRemoteConfig_ != opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance()) {
+        appliedRemoteConfig_ =
+          opamp.proto.v1.Opamp.AgentRemoteConfig.newBuilder(appliedRemoteConfig_).mergeFrom(value).buildPartial();
+      } else {
+        appliedRemoteConfig_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * The config the application last answered APPLIED: what it runs from the start.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+     */
+    private void clearAppliedRemoteConfig() {
+      appliedRemoteConfig_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
+    public static final int REMOTE_CONFIG_FIELD_NUMBER = 2;
+    private opamp.proto.v1.Opamp.AgentRemoteConfig remoteConfig_;
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasRemoteConfig() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig() {
+      return remoteConfig_ == null ? opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance() : remoteConfig_;
+    }
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      remoteConfig_ = value;
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      if (remoteConfig_ != null &&
+          remoteConfig_ != opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance()) {
+        remoteConfig_ =
+          opamp.proto.v1.Opamp.AgentRemoteConfig.newBuilder(remoteConfig_).mergeFrom(value).buildPartial();
+      } else {
+        remoteConfig_ = value;
+      }
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <pre>
+     * The config start hands the application (remote_config), to work on: the last received,
+     * unless the application refused it.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+     */
+    private void clearRemoteConfig() {
+      remoteConfig_ = null;
+      bitField0_ = (bitField0_ & ~0x00000002);
+    }
+
+    public static final int REMOTE_CONFIG_REFUSED_FIELD_NUMBER = 3;
+    private opamp.proto.v1.Opamp.RemoteConfigStatus remoteConfigRefused_;
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     */
+    @java.lang.Override
+    public boolean hasRemoteConfigRefused() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.RemoteConfigStatus getRemoteConfigRefused() {
+      return remoteConfigRefused_ == null ? opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance() : remoteConfigRefused_;
+    }
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setRemoteConfigRefused(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+      value.getClass();  // minimal bytecode null check
+      remoteConfigRefused_ = value;
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeRemoteConfigRefused(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+      value.getClass();  // minimal bytecode null check
+      if (remoteConfigRefused_ != null &&
+          remoteConfigRefused_ != opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance()) {
+        remoteConfigRefused_ =
+          opamp.proto.v1.Opamp.RemoteConfigStatus.newBuilder(remoteConfigRefused_).mergeFrom(value).buildPartial();
+      } else {
+        remoteConfigRefused_ = value;
+      }
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * The application's FAILED about the last config received, reported again at start; that
+     * config is not handed over again until the server offers another.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+     */
+    private void clearRemoteConfigRefused() {
+      remoteConfigRefused_ = null;
+      bitField0_ = (bitField0_ & ~0x00000004);
+    }
+
+    public static final int CONNECTION_SETTINGS_FIELD_NUMBER = 4;
+    private opamp.proto.v1.Opamp.ConnectionSettingsOffers connectionSettings_;
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     */
+    @java.lang.Override
+    public boolean hasConnectionSettings() {
+      return ((bitField0_ & 0x00000008) != 0);
+    }
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.ConnectionSettingsOffers getConnectionSettings() {
+      return connectionSettings_ == null ? opamp.proto.v1.Opamp.ConnectionSettingsOffers.getDefaultInstance() : connectionSettings_;
+    }
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setConnectionSettings(opamp.proto.v1.Opamp.ConnectionSettingsOffers value) {
+      value.getClass();  // minimal bytecode null check
+      connectionSettings_ = value;
+      bitField0_ |= 0x00000008;
+    }
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeConnectionSettings(opamp.proto.v1.Opamp.ConnectionSettingsOffers value) {
+      value.getClass();  // minimal bytecode null check
+      if (connectionSettings_ != null &&
+          connectionSettings_ != opamp.proto.v1.Opamp.ConnectionSettingsOffers.getDefaultInstance()) {
+        connectionSettings_ =
+          opamp.proto.v1.Opamp.ConnectionSettingsOffers.newBuilder(connectionSettings_).mergeFrom(value).buildPartial();
+      } else {
+        connectionSettings_ = value;
+      }
+      bitField0_ |= 0x00000008;
+    }
+    /**
+     * <pre>
+     * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+     */
+    private void clearConnectionSettings() {
+      connectionSettings_ = null;
+      bitField0_ = (bitField0_ & ~0x00000008);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.Resumed parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.Resumed prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * What the client starts from, read from its saved state, as init returns it: for an application
+     * that needs it before the client connects. A host that runs an agent of its own (the Supervisor
+     * its collector) starts it on the applied config and the telemetry settings, keeping no copy of
+     * them itself. Every field is unset without persistence, or with a state that isn't the client's
+     * (another endpoint's: the applied config aside, which is kept whatever the endpoint).
+     * </pre>
+     *
+     * Protobuf type {@code opamp.core.v1.Resumed}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.Resumed, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.Resumed)
+        dev.pydantic.opamp.core.CoreProto.ResumedOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.Resumed.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      @java.lang.Override
+      public boolean hasAppliedRemoteConfig() {
+        return instance.hasAppliedRemoteConfig();
+      }
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.AgentRemoteConfig getAppliedRemoteConfig() {
+        return instance.getAppliedRemoteConfig();
+      }
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      public Builder setAppliedRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.setAppliedRemoteConfig(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      public Builder setAppliedRemoteConfig(
+          opamp.proto.v1.Opamp.AgentRemoteConfig.Builder builderForValue) {
+        copyOnWrite();
+        instance.setAppliedRemoteConfig(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      public Builder mergeAppliedRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.mergeAppliedRemoteConfig(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The config the application last answered APPLIED: what it runs from the start.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig applied_remote_config = 1;</code>
+       */
+      public Builder clearAppliedRemoteConfig() {  copyOnWrite();
+        instance.clearAppliedRemoteConfig();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasRemoteConfig() {
+        return instance.hasRemoteConfig();
+      }
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig() {
+        return instance.getRemoteConfig();
+      }
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      public Builder setRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.setRemoteConfig(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      public Builder setRemoteConfig(
+          opamp.proto.v1.Opamp.AgentRemoteConfig.Builder builderForValue) {
+        copyOnWrite();
+        instance.setRemoteConfig(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      public Builder mergeRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.mergeRemoteConfig(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The config start hands the application (remote_config), to work on: the last received,
+       * unless the application refused it.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 2;</code>
+       */
+      public Builder clearRemoteConfig() {  copyOnWrite();
+        instance.clearRemoteConfig();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      @java.lang.Override
+      public boolean hasRemoteConfigRefused() {
+        return instance.hasRemoteConfigRefused();
+      }
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.RemoteConfigStatus getRemoteConfigRefused() {
+        return instance.getRemoteConfigRefused();
+      }
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      public Builder setRemoteConfigRefused(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+        copyOnWrite();
+        instance.setRemoteConfigRefused(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      public Builder setRemoteConfigRefused(
+          opamp.proto.v1.Opamp.RemoteConfigStatus.Builder builderForValue) {
+        copyOnWrite();
+        instance.setRemoteConfigRefused(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      public Builder mergeRemoteConfigRefused(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+        copyOnWrite();
+        instance.mergeRemoteConfigRefused(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The application's FAILED about the last config received, reported again at start; that
+       * config is not handed over again until the server offers another.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus remote_config_refused = 3;</code>
+       */
+      public Builder clearRemoteConfigRefused() {  copyOnWrite();
+        instance.clearRemoteConfigRefused();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      @java.lang.Override
+      public boolean hasConnectionSettings() {
+        return instance.hasConnectionSettings();
+      }
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.ConnectionSettingsOffers getConnectionSettings() {
+        return instance.getConnectionSettings();
+      }
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      public Builder setConnectionSettings(opamp.proto.v1.Opamp.ConnectionSettingsOffers value) {
+        copyOnWrite();
+        instance.setConnectionSettings(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      public Builder setConnectionSettings(
+          opamp.proto.v1.Opamp.ConnectionSettingsOffers.Builder builderForValue) {
+        copyOnWrite();
+        instance.setConnectionSettings(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      public Builder mergeConnectionSettings(opamp.proto.v1.Opamp.ConnectionSettingsOffers value) {
+        copyOnWrite();
+        instance.mergeConnectionSettings(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The telemetry settings start hands the application (connection_settings): the parts it asks for.
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ConnectionSettingsOffers connection_settings = 4;</code>
+       */
+      public Builder clearConnectionSettings() {  copyOnWrite();
+        instance.clearConnectionSettings();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.Resumed)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.Resumed();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "appliedRemoteConfig_",
+              "remoteConfig_",
+              "remoteConfigRefused_",
+              "connectionSettings_",
+            };
+            java.lang.String info =
+                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
+                "\u1009\u0001\u0003\u1009\u0002\u0004\u1009\u0003";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.Resumed> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.Resumed.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.Resumed>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.Resumed)
+    private static final dev.pydantic.opamp.core.CoreProto.Resumed DEFAULT_INSTANCE;
+    static {
+      Resumed defaultInstance = new Resumed();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        Resumed.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.Resumed getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<Resumed> PARSER;
+
+    public static com.google.protobuf.Parser<Resumed> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }

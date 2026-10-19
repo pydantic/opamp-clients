@@ -802,7 +802,7 @@ public final class OpampClient {
 
   /** Answer {@link Notification.RemovePackage}: the package is removed. */
   public void packageRemoved(String name) {
-    call(CoreProto.Input.newBuilder().setPackageRemoved(CoreProto.Name.newBuilder().setName(name)).build());
+    call(CoreProto.Input.newBuilder().setPackageRemoved(CoreProto.PackageRemoved.newBuilder().setName(name)).build());
   }
 
   /**
