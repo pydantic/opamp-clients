@@ -851,6 +851,39 @@ func TestSupervisor_Validate(t *testing.T) {
 	}
 }
 
+// The server's identity is what keeps the credentials it issues from going to anyone else, and
+// TLS settings that can't apply to the endpoint are refused rather than dropped.
+func TestOpAMPServerTLSIsWhatItSays(t *testing.T) {
+	insecure := configtls.NewDefaultClientConfig()
+	insecure.Insecure = true
+	skipVerify := configtls.NewDefaultClientConfig()
+	skipVerify.InsecureSkipVerify = true
+
+	for name, tc := range map[string]struct {
+		server      OpAMPServer
+		accepts     bool
+		errContains string
+	}{
+		"insecure over wss":   {server: OpAMPServer{Endpoint: "wss://example.com/v1/opamp", TLS: insecure}, errContains: "server::tls::insecure turns TLS off"},
+		"insecure over https": {server: OpAMPServer{Endpoint: "https://example.com/v1/opamp", TLS: insecure}, errContains: "server::tls::insecure turns TLS off"},
+		"insecure over ws":    {server: OpAMPServer{Endpoint: "ws://example.com/v1/opamp", TLS: insecure}},
+		"userinfo":            {server: OpAMPServer{Endpoint: "https://user:pass@example.com/v1/opamp"}, errContains: "server::endpoint can't carry a user name or password"},
+		"skip verify":         {server: OpAMPServer{Endpoint: "wss://example.com/v1/opamp", TLS: skipVerify}},
+		"skip verify, issued": {server: OpAMPServer{Endpoint: "wss://example.com/v1/opamp", TLS: skipVerify}, accepts: true, errContains: "server.tls.insecure_skip_verify can't be used with capabilities.accepts_opamp_connection_settings"},
+		"verified, issued":    {server: OpAMPServer{Endpoint: "wss://example.com/v1/opamp"}, accepts: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := Supervisor{Server: tc.server, Capabilities: Capabilities{AcceptsOpAMPConnectionSettings: tc.accepts}}
+			err := errors.Join(cfg.Server.Validate(), cfg.Validate())
+			if tc.errContains != "" {
+				require.ErrorContains(t, err, tc.errContains)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 // TestSupervisor_TopLevelValidate confirms that confmap.Validate produces
 // path-prefixed errors when called at the supervisor-config root, which is
 // what NewSupervisor relies on for actionable validation messages.

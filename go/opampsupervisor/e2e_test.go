@@ -2757,12 +2757,11 @@ func TestSupervisorStopsAgentProcessWithEmptyConfigMap(t *testing.T) {
 		types.ConnectionCallbacks{
 			OnMessage: func(_ context.Context, _ types.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 				if message.EffectiveConfig != nil {
-					config := message.EffectiveConfig.ConfigMap.ConfigMap[""]
-					if config != nil {
-						select {
-						case agentCfgChan <- string(config.Body):
-						default:
-						}
+					// Changed here: with an empty config map nothing runs, and the effective
+					// config is reported as an empty map.
+					select {
+					case agentCfgChan <- string(message.EffectiveConfig.GetConfigMap().GetConfigMap()[""].GetBody()):
+					default:
 					}
 				}
 				if message.Health != nil {
@@ -2831,11 +2830,14 @@ func TestSupervisorStopsAgentProcessWithEmptyConfigMap(t *testing.T) {
 		},
 	})
 
-	select {
-	case <-agentCfgChan:
-	case <-time.After(1 * time.Second):
-		require.FailNow(t, "timed out waitng for agent to report its noop config")
-	}
+	require.Eventually(t, func() bool {
+		select {
+		case c := <-agentCfgChan:
+			return c == ""
+		default:
+			return false
+		}
+	}, 5*time.Second, 10*time.Millisecond, "timed out waiting for the empty effective config")
 
 	// Verify the collector is not running after 250 ms by checking the healthcheck endpoint
 	require.EventuallyWithT(t, func(tt *assert.CollectT) {

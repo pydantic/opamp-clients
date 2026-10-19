@@ -1785,26 +1785,18 @@ func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 
 // createEffectiveConfigMsg create an EffectiveConfig with the content of the
 // current effective config.
-// Changed here: without the local server's token, in either.
+// Changed here: without the local server's token. The effective config is what the collector
+// reports it loaded, which it redacts; until it reports, the Supervisor has none to send. (The
+// merged config it wrote is not effective yet, and holds every secret in it.) A server's empty
+// config map runs nothing, so it is reported as an empty one.
 func (s *Supervisor) createEffectiveConfigMsg() *protobufs.EffectiveConfig {
+	if cfgState, ok := s.cfgState.Load().(*configState); ok && cfgState.configMapIsEmpty {
+		return &protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{}}
+	}
 	if cfg, ok := s.effectiveConfig.Load().(*protobufs.EffectiveConfig); ok && cfg != nil {
 		return s.redactLocalServerTokenInConfig(cfg)
 	}
-
-	// Fallback: construct a single-file EffectiveConfig from the merged config
-	// (used when the agent has not yet reported its effective config).
-	cfgState, ok := s.cfgState.Load().(*configState)
-	if !ok {
-		return nil
-	}
-
-	return &protobufs.EffectiveConfig{
-		ConfigMap: &protobufs.AgentConfigMap{
-			ConfigMap: map[string]*protobufs.AgentConfigObject{
-				"": {Body: s.redactLocalServerToken([]byte(cfgState.mergedConfig))},
-			},
-		},
-	}
+	return nil
 }
 
 func (*Supervisor) updateOwnTelemetryData(data map[string]any, signal string, settings *protobufs.TelemetryConnectionSettings) map[string]any {

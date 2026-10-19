@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -364,4 +366,25 @@ func TestOwnTelemetryIsHeldToTheRemoteConfigPolicy(t *testing.T) {
 	require.ErrorContains(t, offer("https://elsewhere.example/v1/metrics"), "elsewhere.example")
 	require.Empty(t, a.agentConfigOwnTelemetrySection.Load())
 	require.NoError(t, offer("https://ingest.example/v1/metrics"))
+}
+
+// The Supervisor reports as effective only what the collector reports it loaded, which the
+// collector redacts. The merged config it wrote is not that, and holds every secret in it.
+func TestTheMergedConfigIsNotReportedAsEffective(t *testing.T) {
+	s := Supervisor{
+		effectiveConfig:   &atomic.Value{},
+		cfgState:          &atomic.Value{},
+		telemetrySettings: newNopTelemetrySettings(),
+	}
+	s.cfgState.Store(&configState{mergedConfig: "exporters:\n  otlphttp:\n    headers:\n      authorization: secret\n"})
+	assert.Nil(t, s.createEffectiveConfigMsg())
+
+	// A server's empty config map runs nothing, and the collector it stopped reports nothing.
+	s.effectiveConfig.Store(&protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{
+		ConfigMap: map[string]*protobufs.AgentConfigObject{"": {Body: []byte("receivers: {}")}},
+	}})
+	s.cfgState.Store(&configState{configMapIsEmpty: true})
+	got := s.createEffectiveConfigMsg()
+	require.NotNil(t, got)
+	assert.Empty(t, got.GetConfigMap().GetConfigMap())
 }
