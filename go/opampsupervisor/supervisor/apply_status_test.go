@@ -6,6 +6,8 @@ package supervisor
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,6 +18,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 )
@@ -228,9 +231,12 @@ func TestARollbackReportsOnlyTheFailedConfig(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 	a.health(a.connect(), true)
 	time.Sleep(3 * a.config.Agent.ConfigApplyTimeout)
-	// The client keeps W as the config applied and R as refused: the next start runs W
-	// (TestStartupConfig).
 	require.Equal(t, []string{"W APPLYING", "W APPLIED", "R APPLYING", "R FAILED"}, a.reported())
+	require.True(t, proto.Equal(&protobufs.RemoteConfigStatus{
+		LastRemoteConfigHash: []byte("R"),
+		Status:               protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED,
+		ErrorMessage:         last.ErrorMessage,
+	}, a.persistentState.GetLastRemoteConfigStatus()), "the next start runs the last working config")
 }
 
 // connectionStatuses records the connection settings statuses a reports.
@@ -286,8 +292,8 @@ func TestOwnTelemetrySettingsAreAnsweredWithTheApply(t *testing.T) {
 	require.Equal(t, "m3 APPLIED ", got()[2])
 }
 
-// Own telemetry settings the Supervisor can't give the collector are FAILED, and not applied.
-// They were dropped, and the rest APPLIED.
+// Own telemetry settings the Supervisor can't give the collector are FAILED, and neither applied
+// nor saved. They were dropped, and the rest APPLIED.
 func TestUnsupportedOwnTelemetrySettingsAreFAILED(t *testing.T) {
 	a := newApplyTestSupervisor(t, "sleep")
 	got := a.connectionStatuses()
@@ -311,6 +317,8 @@ func TestUnsupportedOwnTelemetrySettingsAreFAILED(t *testing.T) {
 	require.Same(t, before, a.cfgState.Load(), "the collector's config is unchanged")
 	require.Empty(t, a.agentConfigOwnTelemetrySection.Load())
 	require.Empty(t, a.hasNewConfig)
+	_, err := os.Stat(filepath.Join(a.config.Storage.Directory, lastRecvOwnTelemetryConfigFile))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 // The server's endpoint and header values reach the collector as written: no quote breaks the

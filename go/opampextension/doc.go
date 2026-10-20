@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
+//
+// Changed here: replaces upstream's doc.go, whose go:generate runs contrib's mdatagen.
 
 // Package opampextension is the OpenTelemetry Collector's OpAMP extension on the shared core
 // (go/opamp, in platform mode) instead of opamp-go: upstream's extension

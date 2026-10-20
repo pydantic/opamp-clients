@@ -10,10 +10,11 @@
 // installed, with a rollback if the new one isn't healthy, and removed when no longer offered
 // (agent_update.go). A remote config
 // agent::remote_config_policy refuses is FAILED, and is neither run nor kept; without a policy,
-// the start says the remote config is unrestricted. The Supervisor keeps no state of its own
-// (persistent_state.yaml and the .dat files are gone): it opens the client first, and starts the
-// collector on what the client resumes (startup.go), so a refused config isn't run again. The
-// client's state file is sealed with storage.state_key (sealed_storage.go). The Supervisor's own telemetry ignores
+// the start says the remote config is unrestricted. The Supervisor's state (persistentState, and
+// the remote configs and own-telemetry settings it saved) is the OpAMP client's, read before the
+// bootstrap (client_state.go): it writes no files of its own, and a remote config the collector
+// refused isn't run again at the next start. The client's state file is sealed with
+// storage.state_key (sealed_storage.go). The Supervisor's own telemetry ignores
 // OTEL_EXPORTER_OTLP_* variables (telemetry_env.go). The local OpAMP server and the bootstrap
 // one take the collector only with a token made at each start (localserver.go), and its messages
 // only with the Supervisor's instance UID; a request that never became a connection doesn't keep
@@ -93,10 +94,15 @@ var (
 	//go:embed templates/nooptelemetry.yaml
 	noopTelemetry string
 
+	lastRecvRemoteConfigFile       = "last_recv_remote_config.dat"
+	lastWorkingRemoteConfigFile    = "last_working_remote_config.dat"
+	lastRecvOwnTelemetryConfigFile = "last_recv_own_telemetry_config.dat"
+
 	errNonMatchingInstanceUID = errors.New("received collector instance UID does not match expected UID set by the supervisor")
 )
 
 const (
+	persistentStateFileName     = "persistent_state.yaml"
 	agentConfigFileName         = "effective.yaml"
 	agentLogFileName            = "agent.log"
 	AllowNoPipelinesFeatureGate = "service.AllowNoPipelines"
@@ -158,21 +164,12 @@ type Supervisor struct {
 	agentDescription    *atomic.Value
 	availableComponents *atomic.Value
 
-	// instanceUID is the instance UID in use: the OpAMP client's (it keeps it across restarts),
-	// or the server's since. Changed here: the Supervisor kept it in persistent_state.yaml, with
-	// the last remote config status; the client's state file holds both.
-	instanceUID *idHolder
-	// resumed is what the OpAMP client starts from, as it opened: the remote configs and
-	// own-telemetry settings the collector starts on. Changed here: the Supervisor kept its own
-	// copies (last_recv_remote_config.dat, last_working_remote_config.dat,
-	// last_recv_own_telemetry_config.dat).
-	resumed opamp.Resumed
-	// opened is the OpAMP client opened (openOpAMPClient) and not yet started, and
-	// opampSettings what it starts with.
-	opened        *coreClient
-	opampSettings types.StartSettings
-	// startupStatus is what is known about the remote config the collector starts on: APPLIED,
-	// or UNSET.
+	// Supervisor's persistent state
+	persistentState *persistentState
+	// Changed here: the OpAMP client opened to read its state, what it resumes, and the status
+	// of the remote config the collector starts on (client_state.go).
+	openedClient  *coreClient
+	resumed       opamp.Resumed
 	startupStatus protobufs.RemoteConfigStatuses
 
 	noopPipelineTemplate         *template.Template
@@ -304,7 +301,6 @@ type Supervisor struct {
 func NewSupervisor(ctx context.Context, logger *zap.Logger, cfg config.Supervisor) (*Supervisor, error) {
 	s := &Supervisor{
 		pidProvider:                    defaultPIDProvider{},
-		instanceUID:                    &idHolder{},
 		hasNewConfig:                   make(chan struct{}, 1),
 		configRetargets:                make(chan struct{}, 1),
 		connectionUpdates:              make(chan connectionUpdate, 1),
@@ -474,10 +470,10 @@ func (s *Supervisor) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start health check server: %w", err)
 	}
 
-	// The client's state names the instance UID the bootstrap gives the collector, and holds
-	// the config it starts on.
-	if err = s.openOpAMPClient(); err != nil {
-		return fmt.Errorf("cannot open OpAMP client: %w", err)
+	// Changed here: the OpAMP client's state (client_state.go).
+	s.persistentState, err = s.clientPersistentState()
+	if err != nil {
+		return err
 	}
 
 	// Changed here: the Supervisor installs the collector executables the server offers.
@@ -497,7 +493,7 @@ func (s *Supervisor) Start(ctx context.Context) error {
 	}
 
 	s.telemetrySettings.Logger.Info("Supervisor starting",
-		zap.String("id", s.instanceID().String()))
+		zap.String("id", s.persistentState.InstanceID.String()))
 
 	if err = s.startOpAMP(); err != nil {
 		return fmt.Errorf("cannot start OpAMP client: %w", err)
@@ -651,11 +647,11 @@ func (s *Supervisor) getBootstrapInfo() (err error) {
 		onMessage: func(_ serverTypes.Connection, message *protobufs.AgentToServer) *protobufs.ServerToAgent {
 			response := &protobufs.ServerToAgent{}
 
-			if id := s.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
+			if !slices.Equal(message.GetInstanceUid(), s.persistentState.InstanceID[:]) {
 				done <- fmt.Errorf(
 					"the Collector's instance ID (%s) does not match with the instance ID set by the Supervisor (%s): %w",
 					hex.EncodeToString(message.GetInstanceUid()),
-					id.String(),
+					s.persistentState.InstanceID.String(),
 					errNonMatchingInstanceUID,
 				)
 				return response
@@ -793,9 +789,7 @@ func (s *Supervisor) startOpAMP() error {
 	return nil
 }
 
-// openOpAMPClient makes the OpAMP client and opens it: its state is read (the instance UID, and
-// what the collector starts on), nothing is sent. startOpAMPClient starts it.
-func (s *Supervisor) openOpAMPClient() error {
+func (s *Supervisor) startOpAMPClient() error {
 	// determine if we need to load a TLS config or not
 	var tlsConfig *tls.Config
 	parsedURL, err := url.Parse(s.config.Server.Endpoint)
@@ -808,7 +802,6 @@ func (s *Supervisor) openOpAMPClient() error {
 			return err
 		}
 	}
-	var c *coreClient
 	switch parsedURL.Scheme {
 	case "ws", "wss", "http", "https":
 		// The shared core's client, over either transport. Changed here: it keeps the OpAMP
@@ -817,21 +810,26 @@ func (s *Supervisor) openOpAMPClient() error {
 			return err
 		}
 		stateFile := filepath.Join(s.config.Storage.Directory, coreClientStateFile)
-		c = newCoreClient(s.telemetrySettings.Logger.Named("opamp-client"), stateFile, s.storageSealer)
+		// Changed here: the client its state was read from, first (client_state.go).
+		c := s.takeOpenedClient()
+		if c == nil {
+			c = newCoreClient(s.telemetrySettings.Logger.Named("opamp-client"), stateFile, s.storageSealer)
+		}
 		if s.config.Capabilities.AcceptsPackages {
 			c.installPackage = s.onInstallPackage
 		}
+		s.opampClient = c
 	default:
 		return fmt.Errorf("unsupported scheme in server endpoint: %q", parsedURL.Scheme)
 	}
 
+	s.telemetrySettings.Logger.Debug("Connecting to OpAMP server...", zap.String("endpoint", s.config.Server.Endpoint), zap.Any("headers", s.config.Server.OpaqueHeaders()))
 	settings := types.StartSettings{
-		OpAMPServerURL: s.config.Server.Endpoint,
-		Header:         s.config.Server.Headers,
-		TLSConfig:      tlsConfig,
-		// The configured UID, if any: the client uses the one it saved unless this is another
-		// (docs/instance-uid.md).
-		InstanceUid: types.InstanceUid(s.configuredInstanceID()),
+		OpAMPServerURL:     s.config.Server.Endpoint,
+		Header:             s.config.Server.Headers,
+		TLSConfig:          tlsConfig,
+		InstanceUid:        types.InstanceUid(s.persistentState.InstanceID),
+		RemoteConfigStatus: s.persistentState.GetLastRemoteConfigStatus(),
 		Callbacks: types.Callbacks{
 			OnConnect: s.onConnect,
 			OnConnectFailed: func(_ context.Context, err error) {
@@ -872,90 +870,6 @@ func (s *Supervisor) openOpAMPClient() error {
 		settings.HeaderFunc = headerFunc
 	}
 
-	capabilities := s.config.Capabilities
-	if len(s.config.Agent.ConnectionEnv) == 0 {
-		capabilities.AcceptsOtherConnectionSettings = false
-	}
-	supportedCapabilities := capabilities.SupportedCapabilities()
-	if err := c.SetCapabilities(&supportedCapabilities); err != nil {
-		return err
-	}
-
-	// Set heartbeat interval if the agent supports it
-	if s.config.Capabilities.ReportsHeartbeat {
-		d := time.Duration(s.heartbeatIntervalSeconds) * time.Second
-		settings.HeartbeatInterval = &d
-	}
-
-	if err := c.Open(s.runCtx, settings); err != nil {
-		return err
-	}
-	s.setInstanceID(uuid.UUID(c.InstanceUID()))
-	s.resumed = c.Resumed()
-	s.opened, s.opampSettings = c, settings
-	return nil
-}
-
-// configuredInstanceID is agent::instance_id, or zero: none, or one that isn't a UUID (the
-// client then uses the one it saved, or makes one).
-func (s *Supervisor) configuredInstanceID() uuid.UUID {
-	if s.config.Agent.InstanceID == "" {
-		return uuid.Nil
-	}
-	id, err := uuid.Parse(s.config.Agent.InstanceID)
-	if err != nil {
-		s.telemetrySettings.Logger.Warn("Failed to parse instance_id, generating one automatically", zap.Error(err))
-		return uuid.Nil
-	}
-	return id
-}
-
-// idHolder holds an instance UID, read and replaced from any goroutine.
-type idHolder struct{ p atomic.Pointer[uuid.UUID] }
-
-func holdID(id uuid.UUID) *idHolder {
-	h := &idHolder{}
-	h.p.Store(&id)
-	return h
-}
-
-// instanceID is the instance UID in use (zero before the OpAMP client opens).
-func (s *Supervisor) instanceID() uuid.UUID {
-	if s.instanceUID == nil {
-		return uuid.Nil
-	}
-	if id := s.instanceUID.p.Load(); id != nil {
-		return *id
-	}
-	return uuid.Nil
-}
-
-// setInstanceID replaces the instance UID in use (the holder is made before anything reads it
-// from another goroutine: with the Supervisor, or as the client opens).
-func (s *Supervisor) setInstanceID(id uuid.UUID) {
-	if s.instanceUID == nil {
-		s.instanceUID = holdID(id)
-		return
-	}
-	s.instanceUID.p.Store(&id)
-}
-
-// instanceUIDBytes is id's 16 bytes, in a slice of their own.
-func instanceUIDBytes(id uuid.UUID) []byte { return id[:] }
-
-// startOpAMPClient starts the OpAMP client opened, opening one first if none is.
-func (s *Supervisor) startOpAMPClient() error {
-	if s.opened == nil {
-		if err := s.openOpAMPClient(); err != nil {
-			return err
-		}
-	}
-	c, settings := s.opened, s.opampSettings
-	s.opened = nil
-	s.opampClient = c
-
-	s.telemetrySettings.Logger.Debug("Connecting to OpAMP server...", zap.String("endpoint", s.config.Server.Endpoint), zap.Any("headers", s.config.Server.OpaqueHeaders()))
-
 	// Changed here: without the collector's description (a bootstrap that failed before it came,
 	// reporting why) the client describes the agent with the configured attributes only. It
 	// panicked.
@@ -982,6 +896,21 @@ func (s *Supervisor) startOpAMPClient() error {
 		}
 	}
 
+	capabilities := s.config.Capabilities
+	if len(s.config.Agent.ConnectionEnv) == 0 {
+		capabilities.AcceptsOtherConnectionSettings = false
+	}
+	supportedCapabilities := capabilities.SupportedCapabilities()
+	if err := s.opampClient.SetCapabilities(&supportedCapabilities); err != nil {
+		return err
+	}
+
+	// Set heartbeat interval if the agent supports it
+	if s.config.Capabilities.ReportsHeartbeat {
+		d := time.Duration(s.heartbeatIntervalSeconds) * time.Second
+		settings.HeartbeatInterval = &d
+	}
+
 	s.telemetrySettings.Logger.Debug("Starting OpAMP client...")
 	if err := s.opampClient.Start(s.runCtx, settings); err != nil {
 		return err
@@ -998,9 +927,9 @@ func (s *Supervisor) startHealthCheckServer() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-		if s.instanceID() == uuid.Nil {
+		if s.persistentState == nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_, _ = w.Write([]byte("the OpAMP client's state isn't read yet"))
+			_, _ = w.Write([]byte("persistent state is nil"))
 			return
 		}
 
@@ -1116,7 +1045,7 @@ func (s *Supervisor) handleAgentOpAMPMessage(conn serverTypes.Connection, messag
 
 	// Changed here: the collector's messages are taken with the Supervisor's instance UID only;
 	// it was checked at bootstrap alone.
-	if id := s.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
+	if id := s.persistentState.instanceID(); !slices.Equal(message.GetInstanceUid(), id[:]) {
 		s.telemetrySettings.Logger.Warn("Ignoring a message to the local OpAMP server with another instance UID",
 			zap.String("instance_uid", hex.EncodeToString(message.GetInstanceUid())),
 			zap.String("expected_instance_uid", id.String()))
@@ -1480,7 +1409,7 @@ func (s *Supervisor) composeRequiredResourceAttributesConfig() []byte {
 					"attributes": []map[string]any{
 						{
 							"name":  "service.instance.id",
-							"value": s.instanceID().String(),
+							"value": s.persistentState.InstanceID.String(),
 						},
 					},
 				},
@@ -1515,7 +1444,7 @@ func (s *Supervisor) composeOpAMPExtensionConfig() []byte {
 
 	var cfg bytes.Buffer
 	tplVars := map[string]any{
-		"InstanceUid":                s.instanceID().String(),
+		"InstanceUid":                s.persistentState.InstanceID.String(),
 		"SupervisorPort":             s.opampServerPort,
 		"PID":                        s.pidProvider.PID(),
 		"PPIDPollInterval":           orphanPollInterval,
@@ -1663,7 +1592,7 @@ func normalizeTelemetryResourceConfig(conf *confmap.Conf) error {
 // merging the last received remote config, last received own metrics config,
 // and any local configs.
 func (s *Supervisor) loadAndWriteInitialMergedConfig() error {
-	if !s.initialOpampConnSuccess.Load() && !s.hasAgentConfigState() && s.config.Agent.FallbackEnabled() && !resumesRemoteConfig(s.resumed, s.config.Capabilities.AcceptsRemoteConfig) {
+	if !s.initialOpampConnSuccess.Load() && !s.hasAgentConfigState() && s.config.Agent.FallbackEnabled() && !s.hasResumedRemoteConfig() {
 		err := s.loadAndWriteFallbackConfig()
 		if err != nil {
 			return fmt.Errorf("could not switch to fallback config: %w", err)
@@ -1672,10 +1601,10 @@ func (s *Supervisor) loadAndWriteInitialMergedConfig() error {
 		return nil
 	}
 
-	// the remote config the client resumes
+	// load the last received remote config
 	s.loadRemoteConfig()
 
-	// the own telemetry settings the client resumes
+	// load the last received own telemetry config
 	s.loadLastReceivedOwnTelemetryConfig()
 
 	// compose the initial merged config
@@ -1692,34 +1621,10 @@ func (s *Supervisor) loadAndWriteInitialMergedConfig() error {
 	return nil
 }
 
-// loadRemoteConfig takes the remote config the collector starts on from what the client resumes
-// (startupConfig).
+// loadRemoteConfig loads the last received remote config from file if the capability is supported.
+// Changed here: from what the OpAMP client resumes (client_state.go).
 func (s *Supervisor) loadRemoteConfig() {
-	if !s.config.Capabilities.AcceptsRemoteConfig {
-		s.telemetrySettings.Logger.Debug("Remote config is not supported, will not attempt to load config from file")
-		return
-	}
-	st := startupConfig(s.resumed, true, s.config.Agent.AutomaticConfigRollback)
-	if st.lastWorking != nil {
-		s.lastWorkingRemoteConfig.Store(st.lastWorking)
-	}
-	s.startupStatus = st.status
-	if st.config == nil {
-		s.telemetrySettings.Logger.Info("No last received remote config found")
-		return
-	}
-	if st.rolledBack {
-		s.telemetrySettings.Logger.Info("The last remote config received failed: starting on the last working one")
-	}
-	// Changed here: one a tightened policy refuses isn't run; the server sends another.
-	if err := s.checkRemoteConfigPolicy(st.config); err != nil {
-		s.telemetrySettings.Logger.Error("Not running the saved remote config", zap.Error(err))
-		s.usingLastWorkingRemoteConfig.Store(false)
-		s.startupStatus = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_UNSET
-		return
-	}
-	s.usingLastWorkingRemoteConfig.Store(st.rolledBack)
-	s.remoteConfig.Store(st.config)
+	s.loadResumedRemoteConfig()
 }
 
 // checkRemoteConfigPolicy refuses a remote config agent::remote_config_policy doesn't allow.
@@ -1731,6 +1636,42 @@ func (s *Supervisor) checkRemoteConfigPolicy(rc *protobufs.AgentRemoteConfig) er
 		}
 	}
 	return nil
+}
+
+func (s *Supervisor) loadPersistedRemoteConfig(fileName string) (*protobufs.AgentRemoteConfig, error) {
+	cfg, err := s.readStorageFile(fileName)
+	if err != nil {
+		return nil, err
+	}
+
+	config := &protobufs.AgentRemoteConfig{}
+	if err := proto.Unmarshal(cfg, config); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", fileName, err)
+	}
+
+	return config, nil
+}
+
+func (s *Supervisor) remoteConfigForStartup(lastReceivedRemoteConfig *protobufs.AgentRemoteConfig) *protobufs.AgentRemoteConfig {
+	if lastReceivedRemoteConfig == nil {
+		return nil
+	}
+
+	lastReceivedStatus := s.persistentState.GetLastRemoteConfigStatus()
+	if lastReceivedStatus == nil || lastReceivedStatus.Status != protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED {
+		return lastReceivedRemoteConfig
+	}
+	if !bytes.Equal(lastReceivedStatus.LastRemoteConfigHash, lastReceivedRemoteConfig.GetConfigHash()) {
+		return lastReceivedRemoteConfig
+	}
+
+	lastWorkingRemoteConfig := s.lastWorkingRemoteConfig.Load()
+	if lastWorkingRemoteConfig == nil {
+		return lastReceivedRemoteConfig
+	}
+
+	s.usingLastWorkingRemoteConfig.Store(true)
+	return lastWorkingRemoteConfig
 }
 
 // restoreLastWorkingRemoteConfig attempts to restore the last working remote
@@ -1791,16 +1732,34 @@ func (s *Supervisor) composeWithLastWorkingRemoteConfig() (bool, error) {
 	return true, nil
 }
 
-// loadLastReceivedOwnTelemetryConfig sets up the own telemetry settings the client resumes, if
-// the capability is supported.
+func (s *Supervisor) hasPersistedRemoteConfig() bool {
+	if !s.config.Capabilities.AcceptsRemoteConfig {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(s.config.Storage.Directory, lastRecvRemoteConfigFile))
+	return err == nil
+}
+
+// loadLastReceivedOwnTelemetryConfig loads the last received own telemetry config from file if the capability is supported.
 func (s *Supervisor) loadLastReceivedOwnTelemetryConfig() {
 	// If none of the own telemetry capabilities are supported, do nothing.
 	if !s.config.Capabilities.ReportsOwnMetrics && !s.config.Capabilities.ReportsOwnTraces && !s.config.Capabilities.ReportsOwnLogs {
 		s.telemetrySettings.Logger.Debug("Own telemetry is not supported, will not attempt to load config from file")
 		return
 	}
-	if set := s.resumed.ConnectionSettings; set != nil {
-		_, _ = s.setupOwnTelemetry(s.runCtx, set)
+
+	// Try to load the last received own metrics config if it exists.
+	var lastRecvOwnTelemetryConfig []byte
+	var err error
+	lastRecvOwnTelemetryConfig, err = s.readStorageFile(lastRecvOwnTelemetryConfigFile)
+	if err == nil {
+		set := &protobufs.ConnectionSettingsOffers{}
+		err = proto.Unmarshal(lastRecvOwnTelemetryConfig, set)
+		if err != nil {
+			s.telemetrySettings.Logger.Error("Cannot parse last received own telemetry config", zap.Error(err))
+		} else {
+			_, _ = s.setupOwnTelemetry(s.runCtx, set)
+		}
 	}
 }
 
@@ -2211,7 +2170,9 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 		}
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
 		if s.config.Agent.AutomaticConfigRollback {
-			s.setLastWorkingRemoteConfig(a.config)
+			if err := s.saveLastWorkingRemoteConfig(a.config); err != nil {
+				s.telemetrySettings.Logger.Error("Could not save last working remote config", zap.Error(err))
+			}
 		}
 	}
 	s.reportConfigStatus(a.config.GetConfigHash(), status, message)
@@ -2251,7 +2212,7 @@ func (s *Supervisor) runAgentProcess() {
 	apply := s.newConfigApply()
 	apply.since = 0
 	if apply.config != nil {
-		// The collector ran it last: APPLIED (from what the client resumes, loadRemoteConfig).
+		// Changed here: APPLIED if the collector ran it last (client_state.go).
 		apply.status = s.startupStatus
 	}
 	if _, err := os.Stat(s.agentConfigFilePath()); err == nil {
@@ -2721,11 +2682,7 @@ func (s *Supervisor) Shutdown() {
 			s.telemetrySettings.Logger.Error("Could not stop the OpAMP client", zap.Error(err))
 		}
 	}
-	if s.opened != nil {
-		// Opened, never started: a start that failed after the client read its state.
-		_ = s.opened.Stop(s.runCtx)
-		s.opened = nil
-	}
+	s.closeOpenedClient() // Changed here: one opened to read its state, and never started.
 
 	// Stop extensions after the OpAMP client (which may use their HeaderFunc)
 	// and before self-telemetry shuts down (extensions may log on shutdown).
@@ -2774,23 +2731,49 @@ func (s *Supervisor) shutdownTelemetry() error {
 	return err
 }
 
-// setLastWorkingRemoteConfig keeps config as the one a failed config is rolled back to. (The
-// client keeps it across restarts, as the config last APPLIED.)
-func (s *Supervisor) setLastWorkingRemoteConfig(config *protobufs.AgentRemoteConfig) {
-	if config == nil {
-		return
+func (s *Supervisor) saveLastReceivedConfig(config *protobufs.AgentRemoteConfig) error {
+	cfg, err := proto.Marshal(config)
+	if err != nil {
+		return err
 	}
-	s.lastWorkingRemoteConfig.Store(proto.Clone(config).(*protobufs.AgentRemoteConfig))
+
+	return s.writeStorageFile(lastRecvRemoteConfigFile, cfg)
 }
 
-// reportConfigStatus reports the status of the remote config with hash, which need not be the
-// current one: a refused config is reported without becoming current. The client keeps it
-// across restarts.
+func (s *Supervisor) saveLastWorkingRemoteConfig(config *protobufs.AgentRemoteConfig) error {
+	if config == nil {
+		return nil
+	}
+
+	clonedConfig := proto.Clone(config).(*protobufs.AgentRemoteConfig)
+	cfg, err := proto.Marshal(clonedConfig)
+	if err != nil {
+		return err
+	}
+
+	s.lastWorkingRemoteConfig.Store(clonedConfig)
+	return s.writeStorageFile(lastWorkingRemoteConfigFile, cfg)
+}
+
+func (s *Supervisor) saveLastReceivedOwnTelemetrySettings(set *protobufs.ConnectionSettingsOffers, filePath string) error {
+	cfg, err := proto.Marshal(set)
+	if err != nil {
+		return err
+	}
+
+	return s.writeStorageFile(filePath, cfg)
+}
+
+// reportConfigStatus saves and reports the status of the remote config with hash, which need
+// not be the current one: a refused config is reported without becoming current.
 func (s *Supervisor) reportConfigStatus(hash []byte, status protobufs.RemoteConfigStatuses, errorMessage string) {
 	rcs := &protobufs.RemoteConfigStatus{
 		LastRemoteConfigHash: hash,
 		Status:               status,
 		ErrorMessage:         errorMessage,
+	}
+	if err := s.persistentState.SetLastRemoteConfigStatus(rcs); err != nil {
+		s.telemetrySettings.Logger.Error("Could not save last remote config status", zap.Error(err))
 	}
 	if err := s.opampClient.SetRemoteConfigStatus(rcs); err != nil {
 		s.telemetrySettings.Logger.Error("Could not report OpAMP remote config status", zap.Error(err))
@@ -2903,7 +2886,7 @@ func (s *Supervisor) onMessage(ctx context.Context, msg *types.MessageData) {
 	}
 
 	messageToAgent := &protobufs.ServerToAgent{
-		InstanceUid: instanceUIDBytes(s.instanceID()),
+		InstanceUid: s.persistentState.InstanceID[:],
 	}
 	haveMessageForAgent := false
 	// Proxy server capabilities to opamp extension
@@ -2969,6 +2952,10 @@ func (s *Supervisor) processRemoteConfigMessage(ctx context.Context, msg *protob
 		return false
 	}
 	s.usingLastWorkingRemoteConfig.Store(false)
+	if err := s.saveLastReceivedConfig(msg); err != nil {
+		span.SetStatus(codes.Error, fmt.Sprintf("Could not save last received remote config: %s", err.Error()))
+		s.telemetrySettings.Logger.Error("Could not save last received remote config", zap.Error(err))
+	}
 	s.remoteConfig.Store(clonedMsg)
 
 	if configChanged {
@@ -2998,6 +2985,9 @@ func (s *Supervisor) processOwnTelemetryConnSettingsMessage(ctx context.Context,
 	if err != nil {
 		return false, err
 	}
+	if err := s.saveLastReceivedOwnTelemetrySettings(msg, lastRecvOwnTelemetryConfigFile); err != nil {
+		s.telemetrySettings.Logger.Error("Could not save last received own telemetry settings", zap.Error(err))
+	}
 	return changed, nil
 }
 
@@ -3008,17 +2998,15 @@ func (s *Supervisor) processAgentIdentificationMessage(msg *protobufs.AgentIdent
 		s.telemetrySettings.Logger.Error("Failed to parse instance UUID", zap.Error(err))
 		return false
 	}
-	// The client says which UID it settled on as it starts: the one it opened with, mostly.
-	if newInstanceID == s.instanceID() {
-		return false
-	}
 
 	s.telemetrySettings.Logger.Debug("Agent identity is changing",
-		zap.String("old_id", s.instanceID().String()),
+		zap.String("old_id", s.persistentState.InstanceID.String()),
 		zap.String("new_id", newInstanceID.String()))
 
-	// The client keeps it across restarts.
-	s.setInstanceID(newInstanceID)
+	err = s.persistentState.SetInstanceID(newInstanceID)
+	if err != nil {
+		s.telemetrySettings.Logger.Error("Failed to persist new instance ID, instance ID will revert on restart.", zap.String("new_id", newInstanceID.String()), zap.Error(err))
+	}
 
 	err = s.opampClient.SetAgentDescription(s.agentDescription.Load().(*protobufs.AgentDescription))
 	if err != nil {
@@ -3033,6 +3021,10 @@ func (s *Supervisor) processAgentIdentificationMessage(msg *protobufs.AgentIdent
 	}
 
 	return configChanged
+}
+
+func (s *Supervisor) persistentStateFilePath() string {
+	return filepath.Join(s.config.Storage.Directory, persistentStateFileName)
 }
 
 func (s *Supervisor) agentConfigFilePath() string {

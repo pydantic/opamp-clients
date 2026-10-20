@@ -810,6 +810,8 @@ jobs:
             go/opampsupervisor/go.sum
       - name: Every pin of the collector's modules names one release
         run: python3 scripts/collector_release.py pins
+      - name: The Supervisor and the extension differ from upstream's only where their files say so
+        run: python3 scripts/collector_release.py diverged
       - name: State encryption (go/statekey), unit tests
         working-directory: go
         run: |

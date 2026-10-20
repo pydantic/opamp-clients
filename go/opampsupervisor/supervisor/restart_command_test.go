@@ -47,7 +47,11 @@ func newRestartTestSupervisor(t *testing.T, emptyConfig bool) *restartTestSuperv
 	require.NoError(t, err)
 	r := &restartTestSupervisor{Supervisor: s}
 	s.runCtx = t.Context()
-	s.setInstanceID(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb"))
+	s.persistentState = &persistentState{
+		InstanceID: uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb"),
+		configPath: filepath.Join(t.TempDir(), persistentStateFileName),
+		logger:     zap.NewNop(),
+	}
 	s.opampClient = &mockOpAMPClient{
 		setHealthFunc: func(h *protobufs.ComponentHealth) {
 			r.mu.Lock()

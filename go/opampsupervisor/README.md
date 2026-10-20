@@ -71,7 +71,9 @@ agent:
   the own-telemetry settings in `opamp-state`, and says what it resumes before it connects: the
   collector starts on that. Upstream's kept copies of its own (`persistent_state.yaml`,
   `last_recv_remote_config.dat`, `last_working_remote_config.dat`,
-  `last_recv_own_telemetry_config.dat`), which are no longer read or written. The collector
+  `last_recv_own_telemetry_config.dat`), which are no longer written: upstream's code that
+  saves and loads them is kept, and `supervisor/client_state.go` serves it the client's state
+  instead, read before the bootstrap. The collector
   starts on the config last received, or, if the collector refused it, on the one it last
   applied: a refused config isn't run again at start, with or without
   `automatic_config_rollback` (upstream's ran it again without). `agent.instance_id` wins over
@@ -156,7 +158,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
   `localserver.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
@@ -166,10 +168,17 @@ header. These files are new, and are this repository's:
 - everything under `packaging/`.
 
 Upstream's `supervisor/packages.go` (and its test config `supervisor_packages_cap.yaml`) is
-removed: installing packages is `agent_update.go`'s. So is `supervisor/persistence.go`: the OpAMP
-client keeps the state. So are upstream's `Makefile`, `Dockerfile` and
+removed: installing packages is `agent_update.go`'s. So are upstream's `Makefile`, `Dockerfile` and
 `metadata.yaml`, which need contrib's build: `internal/metadata`, `generated_package_test.go` and
 `documentation.md` are checked in as upstream's mdatagen wrote them.
+
+The fork is kept close to upstream so that upstream's changes merge in: a change here goes in a
+new file, with a small hook in upstream's code where it must, rather than rewriting upstream's
+functions ([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)).
+`scripts/collector_release.py diverged` (run by CI) lists every file that differs from upstream's
+at the pinned release and refuses one whose header doesn't say what changed, or a missing
+upstream file nobody explained; `scripts/collector_release.py port vX.Y.Z` three-way merges
+upstream's changes since the pinned release into this directory.
 
 ## Upstream's README
 

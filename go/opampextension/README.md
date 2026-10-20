@@ -71,6 +71,11 @@ across restarts (upstream makes up a new one at every start).
 - With upstream's `socket` setting, the client dials the socket for each connection, over `http`
   and `ws` alike, and uses no proxy for it.
 
+The extension is kept close to upstream's so that upstream's changes merge in
+([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)):
+`scripts/collector_release.py diverged` (run by CI) lists every file that differs from upstream's
+at the pinned release, and `port vX.Y.Z` merges upstream's changes since.
+
 ## License
 
 Derived from opentelemetry-collector-contrib's `extension/opampextension`, under the Apache
