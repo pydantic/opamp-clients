@@ -57,6 +57,19 @@ def _packages(line: str) -> tuple[str, frozenset[str]] | None:
     return line[:m.start(1)] + bare + line[m.end(1):], failed
 
 
+def _segments(diff: str) -> list[list[tuple[str, str]]] | None:
+    """A diff's segments (split at "..."), each a list of (mark, line); None if a line isn't one."""
+    segments: list[list[tuple[str, str]]] = [[]]
+    for raw in diff.splitlines():
+        if raw.strip() == "...":
+            segments.append([])
+        elif len(raw) >= 2 and raw[0] in " -+" and raw[1] == " ":
+            segments[-1].append((raw[0], raw[2:]))
+        else:
+            return None
+    return segments
+
+
 def package_failures_grouped(diff: str) -> bool:
     """Whether the saves of two clients differ only in how package failures were grouped into
     saves: failures that reach the core in one step make one save, in two steps two, and which
@@ -66,14 +79,9 @@ def package_failures_grouped(diff: str) -> bool:
     save in common after (a difference at the end is where they ended, not how they got there).
     "The same state" is the state of the save before, or of the save after when that one records
     more than failures (a download started in the step that brought the last failure)."""
-    segments: list[list[tuple[str, str]]] = [[]]
-    for raw in diff.splitlines():
-        if raw.strip() == "...":
-            segments.append([])
-        elif len(raw) >= 2 and raw[0] in " -+" and raw[1] == " ":
-            segments[-1].append((raw[0], raw[2:]))
-        else:
-            return False
+    segments = _segments(diff)
+    if segments is None:
+        return False
     found = False
     for seg in segments:
         i = 0
@@ -123,9 +131,80 @@ def package_failures_grouped(diff: str) -> bool:
     return found
 
 
+#: How far a package's status has got: pending, downloading, installing, then done (installed or
+#: failed). A report's status is a number: 0 installed, 1 pending, 2 installing, 3 failed,
+#: 4 downloading.
+_STATUS_RANK = {"1": 0, "4": 1, "2": 2, "0": 3, "3": 3}
+
+
+def _report(line: str) -> tuple[str, dict[str, str]] | None:
+    """A report's line split into what comes before its packages and each package's status; None
+    for a line with no packages, or a status this doesn't know."""
+    m = re.fullmatch(r"(.*)pkgs\(([^)]*)\)", line)
+    if not m:
+        return None
+    ranks = {}
+    for entry in filter(None, m.group(2).split(",")):
+        name, _, status = entry.rpartition(":")
+        if status not in _STATUS_RANK:
+            return None
+        ranks[name] = status
+    return m.group(1), ranks
+
+
+def _moves_on(status: str, then: str) -> bool:
+    return status == then or _STATUS_RANK[status] < _STATUS_RANK[then]
+
+
+def package_reports_grouped(diff: str) -> bool:
+    """Whether the reports two clients sent differ only in which package statuses share a report:
+    the core reports package statuses at most once a second, so how far each download has got by
+    then is the client's speed. So every line that differs is a report of package statuses alone,
+    for the same agent and packages as the report both sent after it, within the same run; and on
+    each side, from the report both sent before to that one, each package's status only moves on
+    (pending, downloading, installing, done)."""
+    segments = _segments(diff)
+    if segments is None:
+        return False
+    found = False
+    for seg in segments:
+        i = 0
+        while i < len(seg):
+            if seg[i][0] == " ":
+                i += 1
+                continue
+            j = i
+            while j < len(seg) and seg[j][0] != " ":
+                j += 1
+            hunk = seg[i:j]
+            before = after = None
+            for _, ln in reversed(seg[:i]):
+                if ln.startswith("-- run "):
+                    break
+                if (before := _report(ln)) is not None:
+                    break
+            for _, ln in seg[j:]:
+                if ln.startswith("-- run "):
+                    break
+                if (after := _report(ln)) is not None:
+                    break
+            if after is None or before is None:
+                return False
+            for side in "-+":
+                reports = [_report(ln) for m, ln in hunk if m == side]
+                if any(r is None or r[0] != after[0] or r[1].keys() != after[1].keys() for r in reports):
+                    return False
+                chain = [before[1]] + [r[1] for r in reports] + [after[1]]
+                if any(not _moves_on(v, b[k]) for a, b in zip(chain, chain[1:]) for k, v in a.items() if k in b):
+                    return False
+            found = True
+            i = j
+    return found
+
+
 #: Differences a rule allows by what its whole diff shows (`grouping` names one), beyond the
 #: first lines its `first` matches.
-GROUPINGS = {"package-failures": package_failures_grouped}
+GROUPINGS = {"package-failures": package_failures_grouped, "package-reports": package_reports_grouped}
 
 
 def load_rules(path: Path = ALLOWED) -> list[dict]:

@@ -298,6 +298,74 @@ class PackageFailuresGrouped(unittest.TestCase):
                 shells.load_rules(p)
 
 
+R = "uid#0 caps=281f "
+
+
+def report(**statuses: int) -> str:
+    """A report of package statuses alone, in the taps' diff."""
+    return R + "pkgs(" + ",".join(f"{n.replace('_', '-')}:{s}" for n, s in statuses.items()) + ")"
+
+
+class PackageReportsGrouped(unittest.TestCase):
+    """The packages-* send allowance: package statuses are reported at most once a second, so which
+    intermediate statuses a report catches is the client's speed."""
+
+    RUN = ((" ", "-- run 0 --"), (" ", R + "desc(id:service.name driver.change) health(true,) effective() pkgs()"))
+
+    def test_the_reports_seen_on_ci_are_allowed(self):
+        ok = shells.package_reports_grouped
+        # packages-redirects-http, java-core-platform: r6 caught downloading on its way to installed.
+        names = ("r1_same", "r2_relative", "r3_other", "r4_other_back", "r5_five", "r6_upgrade", "r7_https")
+        st = lambda *v: report(**dict(zip(names, v)))  # noqa: E731
+        self.assertTrue(ok(diff(*self.RUN, (" ", st(4, 1, 1, 1, 1, 1, 1)), ("+", st(0, 0, 0, 0, 0, 4, 1)),
+                                (" ", st(0, 0, 0, 0, 0, 0, 0)), (" ", R + "disconnect"))))
+        self.assertTrue(ok(diff(*self.RUN, (" ", st(4, 1, 1, 1, 1, 1, 1)), ("+", st(0, 0, 0, 0, 0, 0, 4)),
+                                (" ", st(0, 0, 0, 0, 0, 0, 0)), (" ", R + "disconnect"))))
+        # packages-redirects-refused-ws, java-core-platform: f1 failed and f2 downloading.
+        names = ("f1_six", "f2_downgrade", "f3_up_then_down", "f4_bad_host", "f5_bad_scheme", "f6_userinfo", "zz_good")
+        self.assertTrue(ok(diff(*self.RUN, (" ", st(4, 1, 1, 1, 1, 1, 1)), ("+", st(3, 4, 1, 1, 1, 1, 1)),
+                                (" ", st(3, 3, 3, 3, 3, 1, 1)))))
+        # On both sides, and in two places.
+        self.assertTrue(ok(diff((" ", report(a=1, b=1)), ("-", report(a=4, b=1)), ("+", report(a=2, b=4)),
+                                (" ", report(a=0, b=2)), ("...", ""), (" ", report(a=0, b=2)), ("-", report(a=0, b=0)),
+                                (" ", report(a=0, b=0)))))
+
+    def test_a_constructed_bad_difference_is_not(self):
+        ok = shells.package_reports_grouped
+        head, tail = [(" ", report(a=1, b=1))], [(" ", report(a=0, b=0))]
+        self.assertTrue(ok(diff(*head, ("+", report(a=4, b=2)), *tail)))
+        # A status that goes back, or from installed to failed.
+        self.assertFalse(ok(diff(*head, ("+", report(a=4, b=1)), ("+", report(a=1, b=1)), *tail)))
+        self.assertFalse(ok(diff(*head, ("+", report(a=0, b=1)), (" ", report(a=3, b=0)))))
+        # Another package, or one fewer.
+        self.assertFalse(ok(diff(*head, ("+", report(a=4, b=1, c=1)), *tail)))
+        self.assertFalse(ok(diff(*head, ("+", report(a=4)), *tail)))
+        # A report that carries more than package statuses, or another agent's.
+        self.assertFalse(ok(diff(*head, ("+", R + "health(true,) pkgs(a:4,b:1)"), *tail)))
+        self.assertFalse(ok(diff(*head, ("+", "uid#1 caps=281f pkgs(a:4,b:1)"), *tail)))
+        self.assertFalse(ok(diff(*head, ("+", R + "disconnect"), *tail)))
+        # An unknown status.
+        self.assertFalse(ok(diff(*head, ("+", report(a=9, b=1)), *tail)))
+        # Where they ended differs: no report in common after, or only in the next run.
+        self.assertFalse(ok(diff(*head, ("-", report(a=0, b=0)), ("+", report(a=0, b=2)))))
+        self.assertFalse(ok(diff(*head, ("+", report(a=4, b=1)), (" ", "-- run 1 --"), *tail)))
+        # Nor a report both sent before only in the run before.
+        self.assertFalse(ok(diff(*head, (" ", "-- run 1 --"), ("+", report(a=4, b=1)), *tail)))
+        self.assertFalse(ok(diff(*head, ("+", "garbage line"), *tail)))
+        self.assertFalse(ok(""))
+
+    def test_the_checked_in_rule_uses_it(self):
+        rules = shells.load_rules()
+        a = lambda *args: shells.allowed(rules, *args)  # noqa: E731
+        good = diff((" ", report(a=1, b=1)), ("+", report(a=4, b=2)), (" ", report(a=0, b=0)))
+        bad = diff((" ", report(a=1, b=1)), ("+", report(a=0, b=2)), (" ", report(a=3, b=0)))
+        first = f"-  | + {report(a=4, b=2)}"
+        self.assertEqual(a("java-core-platform", "packages-redirects", "http", "send", first, good)["grouping"],
+                         "package-reports")
+        self.assertIsNone(a("java-core-platform", "packages-redirects", "http", "send", first, bad))
+        self.assertIsNone(a("java-core-platform", "remote-config", "http", "send", first, good))
+
+
 class CrashHelpers(unittest.TestCase):
     def test_the_saved_state_a_tap_starts_from(self):
         state = b"\x0a\x03abc"
