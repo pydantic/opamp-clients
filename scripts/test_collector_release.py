@@ -139,6 +139,13 @@ class Forks(unittest.TestCase):
         self.ours({"a.go": "// Changed here: A calls hook.\npackage a\n\nfunc A() { hook() }\n"})
         self.assertEqual(cr.diverged(self.root, self.upstream)[1], [])
 
+    def test_a_changed_build_constraint_is_a_change(self) -> None:
+        self.upstream_at(self.upstream, {"a.go": "// upstream\n//go:build linux\n\npackage a\n"})
+        self.ours({"a.go": "// upstream\n//go:build linux || darwin\n\npackage a\n"})
+        _, problems = cr.diverged(self.root, self.upstream)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("go/sup/a.go differs", problems[0])
+
     def test_a_missing_upstream_file_needs_a_reason(self) -> None:
         self.upstream_at(self.upstream, {"a.go": "package a\n", "Makefile": "all:\n", "packages.go": "package a\n"})
         self.ours({"a.go": "package a\n"})

@@ -136,13 +136,15 @@ def rewrite(text: str, theirs_module: str, ours_module: str) -> str:
 
 
 def body(text: str, name: str) -> str:
-    """A Go file without its header comment (license, and what changed here), else text."""
+    """A Go file without its header comment (license, and what changed here), else text. Build
+    constraints and other directives (`//go:build`, `// +build`) are code, and stay."""
     if not name.endswith(".go"):
         return text
     lines = text.splitlines(keepends=True)
+    directives = [line for line in lines if line.startswith(("//go:", "// +build"))]
     for i, line in enumerate(lines):
         if not line.startswith("//") and line.strip():
-            return "".join(lines[i:])
+            return "".join(directives) + "".join(line for line in lines[i:] if line not in directives)
     return text
 
 
