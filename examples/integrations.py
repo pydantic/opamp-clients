@@ -73,8 +73,8 @@ it: the server confirms the key (`key_promoted`) once the agent says APPLIED whi
 Then, against the same server, the next start with the same state directory and the enrollment
 key still configured: the agent comes back on the key it was given, which it kept (the server no
 longer takes the enrollment key for it: a request with it would be refused), and checks in every
-second, as it is set up to (the key's offer carried the server's interval, which lasts until the
-next start).
+second, as it is set up to (the key's offer carries the server's interval, which the agent keeps
+across restarts; the reference server offers the one the examples are set up with).
 For an application that gives the token in code (key_in_code()), the same runs with the token
 given in code and OTEL_OPAMP_HEADERS set to the other one, which the code wins over: run 5's
 warning names the option given in code, not OTEL_OPAMP_HEADERS, and run 6 is accepted.

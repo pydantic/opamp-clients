@@ -46,7 +46,7 @@ SETUP_UID_FROM_SAVED: SetupUidFrom
 SETUP_UID_FROM_GIVEN: SetupUidFrom
 
 class Config(_message.Message):
-    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy")
+    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy", "reports_heartbeat")
     INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
     CAPABILITIES_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
@@ -74,6 +74,7 @@ class Config(_message.Message):
     STOP_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     CONNECT_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     PROXY_FIELD_NUMBER: _ClassVar[int]
+    REPORTS_HEARTBEAT_FIELD_NUMBER: _ClassVar[int]
     instance_uid: bytes
     capabilities: int
     heartbeat_interval_ms: int
@@ -101,7 +102,8 @@ class Config(_message.Message):
     stop_timeout_ms: int
     connect_timeout_ms: int
     proxy: ProxyChoice
-    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ..., proxy: _Optional[_Union[ProxyChoice, _Mapping]] = ...) -> None: ...
+    reports_heartbeat: bool
+    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ..., proxy: _Optional[_Union[ProxyChoice, _Mapping]] = ..., reports_heartbeat: bool = ...) -> None: ...
 
 class ProxyChoice(_message.Message):
     __slots__ = ("direct", "url", "headers", "resolve_locally", "environment")
