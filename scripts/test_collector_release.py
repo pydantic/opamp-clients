@@ -139,6 +139,11 @@ class Forks(unittest.TestCase):
         self.ours({"a.go": "// Changed here: A calls hook.\npackage a\n\nfunc A() { hook() }\n"})
         self.assertEqual(cr.diverged(self.root, self.upstream)[1], [])
 
+    def test_a_package_import_comment_is_not_a_change(self) -> None:
+        self.upstream_at(self.upstream, {"a.go": f"// upstream\npackage a // import \"{THEIRS_MODULE}\"\n"})
+        self.ours({"a.go": "// upstream\npackage a\n"})
+        self.assertIn("1 files as upstream's, 0 changed", cr.diverged(self.root, self.upstream)[0][0])
+
     def test_a_changed_build_constraint_is_a_change(self) -> None:
         self.upstream_at(self.upstream, {"a.go": "// upstream\n//go:build linux\n\npackage a\n"})
         self.ours({"a.go": "// upstream\n//go:build linux || darwin\n\npackage a\n"})

@@ -31,12 +31,13 @@ copy to the lock. A package that carries the core ships both files, and its meta
 core's license as well as MIT (`sdk_release.py check` and `native_dist.py check` refuse one that
 doesn't).
 
-## The Supervisor fork
+## The Supervisor and collector extension forks
 
-`go/opampsupervisor` is upstream's `cmd/opampsupervisor` (opentelemetry-collector-contrib) at the
-release the collector pins name, with its OpAMP client swapped for the core and the changes its
-README lists under "What changes". It tracks upstream: each upstream release is merged in, so
-every change here is one that must merge again, and is made the way that keeps that easy.
+`go/opampsupervisor` and `go/opampextension` are upstream's `cmd/opampsupervisor` and
+`extension/opampextension` (opentelemetry-collector-contrib) at the release the collector pins
+name, with the OpAMP client swapped for the core and the changes each README lists. They track
+upstream: each upstream release is merged in, so every change here is one that must merge again,
+and is made the way that keeps that easy.
 
 Allowed:
 
@@ -58,8 +59,8 @@ Not allowed:
 Anything beyond this says in its PR why the divergence is worth maintaining, and what else was
 tried. A fix that isn't ours alone (upstream's bug, not our client's) goes upstream too.
 
-`python3 scripts/collector_release.py diverged` lists how each file differs from upstream's at the
-pinned release, and fails on a changed file whose header doesn't say so or a missing upstream file
+`python3 scripts/collector_release.py diverged` lists how each fork's files differ from upstream's
+at the pinned release, and fails on a changed file whose header doesn't say so or a missing upstream file
 `DROPPED` doesn't explain; CI runs it. When a new contrib release is out (`latest` fails nightly),
 `python3 scripts/collector_release.py port vX.Y.Z` three-way merges what upstream changed since the
-pinned release into the fork; resolve its conflicts, then move the pins (`pins`) in the same PR.
+pinned release into the forks; resolve its conflicts, then move the pins (`pins`) in the same PR.

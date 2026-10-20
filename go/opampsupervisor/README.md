@@ -174,7 +174,7 @@ removed: installing packages is `agent_update.go`'s. So are upstream's `Makefile
 
 The fork is kept close to upstream so that upstream's changes merge in: a change here goes in a
 new file, with a small hook in upstream's code where it must, rather than rewriting upstream's
-functions ([AGENTS.md](../../AGENTS.md#the-supervisor-fork)).
+functions ([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)).
 `scripts/collector_release.py diverged` (run by CI) lists every file that differs from upstream's
 at the pinned release and refuses one whose header doesn't say what changed, or a missing
 upstream file nobody explained; `scripts/collector_release.py port vX.Y.Z` three-way merges

@@ -19,8 +19,7 @@ move. It reads contrib's tags with git (a shallow, blobless fetch), so it needs 
     scripts/collector_release.py diverged           # how each fork differs from its release
     scripts/collector_release.py port v0.164.0      # merge upstream's changes since into the forks
 
-`diverged` and `port` keep the Supervisor to upstream (the extension is a rewrite of upstream's
-client side, not kept to it file by file). `diverged` compares the fork with upstream's directory at the pinned release (import paths
+`diverged` compares each fork with upstream's directory at the pinned release (import paths
 rewritten), file by file, and fails when a changed .go file other than a test doesn't say
 "Changed here" in its header, or an upstream file is missing that `DROPPED` doesn't name. `port`
 three-way merges what upstream changed between the pinned release and a newer one into every
@@ -48,12 +47,12 @@ PINNING = ["go/**/go.mod", "go/**/*.yaml", "go/**/*.sh", "go/**/*.ps1", ".github
 MODULE = re.compile(r"(go\.opentelemetry\.io/collector[\w./-]*|github\.com/open-telemetry/opentelemetry-collector-contrib"
                     r"[\w./-]*)(?: |@)(v\d+\.\d+\.\d+)\b")
 TAG = re.compile(r"refs/tags/(v0\.\d+\.\d+)$")
-# Each fork `diverged` and `port` keep to upstream: upstream's directory, this repository's, and
-# the Go module paths that differ. (The collector extension is a rewrite of upstream's client
-# side, not kept to it file by file.)
+# Each fork: upstream's directory, this repository's, and the Go module paths that differ.
 FORKS = {
     "cmd/opampsupervisor": ("go/opampsupervisor", "github.com/open-telemetry/opentelemetry-collector-contrib/cmd/opampsupervisor",
                             "github.com/pydantic/opamp-clients/go/opampsupervisor"),
+    "extension/opampextension": ("go/opampextension", "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension",
+                                 "github.com/pydantic/opamp-clients/go/opampextension"),
 }
 # Upstream files a fork doesn't carry, and why (the forks' READMEs say more).
 DROPPED = {
@@ -62,6 +61,16 @@ DROPPED = {
     "cmd/opampsupervisor/metadata.yaml": "contrib's mdatagen; the files it generated are checked in",
     "cmd/opampsupervisor/supervisor/packages.go": "agent_update.go installs packages",
     "cmd/opampsupervisor/testdata/supervisor/supervisor_packages_cap.yaml": "packages.go's test config",
+    "extension/opampextension/Makefile": "contrib's build",
+    "extension/opampextension/metadata.yaml": "contrib's mdatagen",
+    "extension/opampextension/config.schema.yaml": "contrib's mdatagen",
+    "extension/opampextension/documentation.md": "contrib's mdatagen",
+    "extension/opampextension/generated_component_test.go": "contrib's mdatagen",
+    "extension/opampextension/generated_package_test.go": "contrib's mdatagen",
+    "extension/opampextension/internal/metadata/generated_feature_gates.go": "contrib's mdatagen (factory.go names the type)",
+    "extension/opampextension/internal/metadata/generated_status.go": "contrib's mdatagen (factory.go names the type)",
+    "extension/opampextension/logger.go": "opamp-go's logger adapter; the core's client logs through zap",
+    "extension/opampextension/auth_test.go": "tests makeHeadersFunc, which auth.go's newAuthHeader replaces (extension_test.go)",
 }
 # Files that differ by nature: the module's own.
 OWN = {"go.mod", "go.sum"}
@@ -142,6 +151,8 @@ def body(text: str, name: str) -> str:
         return text
     lines = text.splitlines(keepends=True)
     directives = [line for line in lines if line.startswith(("//go:", "// +build"))]
+    lines = [re.sub(r'^(package \w+) // import ".*"$', r"\1", line.rstrip("\n")) + "\n" if line.startswith("package ") else line
+             for line in lines]
     for i, line in enumerate(lines):
         if not line.startswith("//") and line.strip():
             return "".join(directives) + "".join(line for line in lines[i:] if line not in directives)
