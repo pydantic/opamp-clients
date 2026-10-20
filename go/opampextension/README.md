@@ -70,9 +70,16 @@ across restarts (upstream makes up a new one at every start).
 - The available components' hash is the core's.
 - With upstream's `socket` setting, the client dials the socket for each connection, over `http`
   and `ws` alike, and uses no proxy for it.
+- A health update that clears the error is reported though the status stays the same (upstream's
+  kept reporting the old error).
+- A second `Unregister` of a custom capability is a no-op (upstream's panicked).
 
 The extension is kept close to upstream's so that upstream's changes merge in
-([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)):
+([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)). Upstream's files are
+all here, but its `Makefile` and `config.schema.yaml`. The core's client sits behind opamp-go's
+client interface (`coreclient.go`, and `core_auth.go` for the auth extension), so upstream's
+`opamp_agent.go` runs on it with two lines changed: where it makes its client, and one telling the
+client the collector's host.
 `scripts/collector_release.py diverged` (run by CI) lists every file that differs from upstream's
 at the pinned release, and `port vX.Y.Z` merges upstream's changes since.
 

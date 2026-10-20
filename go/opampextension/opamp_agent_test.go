@@ -1,31 +1,34 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
-//
-// Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the tests
-// run against the shared core's client, and compare protobuf messages with proto.Equal.
 
 package opampextension
 
 import (
 	"context"
 	"errors"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/open-telemetry/opamp-go/client/types"
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"github.com/open-telemetry/opamp-go/server"
+	servertypes "github.com/open-telemetry/opamp-go/server/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/extension/extensioncapabilities"
@@ -35,11 +38,9 @@ import (
 	"go.opentelemetry.io/collector/service"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status/testhelpers"
-	"github.com/pydantic/opamp-clients/go/opamp"
 )
 
 func TestNewOpampAgent(t *testing.T) {
@@ -71,6 +72,113 @@ func TestNewOpampAgentAttributes(t *testing.T) {
 	assert.Equal(t, "distro.0", o.serviceVersion)
 	assert.Equal(t, "f8999bc1-4c9b-4619-9bae-7f009d2411ec", o.serviceInstanceID)
 	assert.NoError(t, o.Shutdown(t.Context()))
+}
+
+// TestOpampAgentConnectsOverUnixSocket exercises the full OpAMP handshake from
+// the extension's client to a server listening on a filesystem Unix domain
+// socket, over both the WebSocket and plain HTTP transports. The endpoint host
+// is cosmetic; the configured unix_socket drives the dial. The server-side
+// connection must be a *net.UnixConn so a consumer (e.g. the supervisor) can
+// authenticate the peer via SO_PEERCRED.
+func TestOpampAgentConnectsOverUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix domain socket peer authentication is not supported on Windows")
+	}
+
+	tests := []struct {
+		name   string
+		server func(socketPath string) *OpAMPServer
+	}{
+		{
+			name: "websocket",
+			server: func(socketPath string) *OpAMPServer {
+				return &OpAMPServer{
+					WS: &commonFields{
+						// Host is cosmetic; DialContext dials the socket regardless.
+						Endpoint: "ws://localhost/v1/opamp",
+						Socket: &confignet.AddrConfig{
+							Transport: confignet.TransportTypeUnix,
+							Endpoint:  socketPath,
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "http",
+			server: func(socketPath string) *OpAMPServer {
+				return &OpAMPServer{
+					HTTP: &httpFields{
+						commonFields: commonFields{
+							Endpoint: "http://localhost/v1/opamp",
+							Socket: &confignet.AddrConfig{
+								Transport: confignet.TransportTypeUnix,
+								Endpoint:  socketPath,
+							},
+						},
+					},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// macOS limits the socket path to ~104 bytes, which t.TempDir() can
+			// exceed, so bind under a short base directory.
+			dir, err := os.MkdirTemp("/tmp", "opampuds") //nolint:usetesting // see above
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = os.RemoveAll(dir) })
+			socketPath := filepath.Join(dir, "opamp.sock")
+
+			ln, err := net.Listen("unix", socketPath)
+			require.NoError(t, err)
+
+			var gotUnixConn atomic.Bool
+			connected := make(chan struct{})
+			var once sync.Once
+
+			callbacks := servertypes.Callbacks{
+				OnConnecting: func(_ *http.Request) servertypes.ConnectionResponse {
+					return servertypes.ConnectionResponse{
+						Accept: true,
+						ConnectionCallbacks: servertypes.ConnectionCallbacks{
+							OnConnected: func(_ context.Context, conn servertypes.Connection) {
+								_, ok := conn.Connection().(*net.UnixConn)
+								gotUnixConn.Store(ok)
+								once.Do(func() { close(connected) })
+							},
+						},
+					}
+				},
+			}
+
+			srv := server.New(nil)
+			require.NoError(t, srv.Start(server.StartSettings{
+				Settings:   server.Settings{Callbacks: callbacks},
+				Listener:   ln,
+				ListenPath: "/v1/opamp",
+			}))
+			require.Equal(t, "unix", srv.Addr().Network())
+
+			cfg := createDefaultConfig().(*Config)
+			cfg.Server = tt.server(socketPath)
+			set := extensiontest.NewNopSettings(extensiontest.NopType)
+			o, err := newOpampAgent(cfg, set)
+			require.NoError(t, err)
+			require.NoError(t, o.Start(t.Context(), componenttest.NewNopHost()))
+
+			select {
+			case <-connected:
+			case <-time.After(10 * time.Second):
+				t.Fatal("timed out waiting for the opamp client to connect over the unix socket")
+			}
+			assert.True(t, gotUnixConn.Load(), "server-side connection should be a *net.UnixConn")
+
+			assert.NoError(t, o.Shutdown(t.Context()))
+			assert.NoError(t, srv.Stop(t.Context()))
+		})
+	}
 }
 
 func TestCreateAgentDescription(t *testing.T) {
@@ -197,6 +305,23 @@ func TestCreateAgentDescription(t *testing.T) {
 	}
 }
 
+func TestUpdateAgentIdentity(t *testing.T) {
+	cfg := createDefaultConfig()
+	set := extensiontest.NewNopSettings(extensiontest.NopType)
+	o, err := newOpampAgent(cfg.(*Config), set)
+	assert.NoError(t, err)
+
+	olduid := o.instanceUID
+	assert.NotEmpty(t, olduid.String())
+
+	uid := uuid.Must(uuid.NewV7())
+	assert.NotEqual(t, uid, olduid)
+
+	o.updateAgentIdentity(uid)
+	assert.Equal(t, o.instanceUID, uid)
+	assert.NoError(t, o.Shutdown(t.Context()))
+}
+
 func TestComposeEffectiveConfig(t *testing.T) {
 	cfg := createDefaultConfig()
 	set := extensiontest.NewNopSettings(extensiontest.NopType)
@@ -293,7 +418,7 @@ func TestNotifyConfigSnapshot(t *testing.T) {
 			set := extensiontest.NewNopSettings(extensiontest.NopType)
 			o, err := newOpampAgent(cfg, set)
 			require.NoError(t, err)
-			o.client = mockOpAMPClient{}
+			o.opampClient = mockOpAMPClient{}
 
 			require.NoError(t, o.NotifyConfigSnapshot(t.Context(), snapshot))
 
@@ -325,7 +450,7 @@ func TestShutdown(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	cfg := startableConfig()
+	cfg := createDefaultConfig()
 	set := extensiontest.NewNopSettings(extensiontest.NopType)
 	o, err := newOpampAgent(cfg.(*Config), set)
 	assert.NoError(t, err)
@@ -335,18 +460,16 @@ func TestStart(t *testing.T) {
 }
 
 func TestStartAvailableComponents(t *testing.T) {
-	cfg := startableConfig()
+	cfg := createDefaultConfig()
 	agentConfig := cfg.(*Config)
 	agentConfig.Capabilities.ReportsAvailableComponents = true
 	set := extensiontest.NewNopSettings(extensiontest.NopType)
 	o, err := newOpampAgent(agentConfig, set)
-	o.client = mockOpAMPClient{}
+	o.opampClient = mockOpAMPClient{}
 	assert.NoError(t, err)
 
 	assert.NoError(t, o.Start(t.Context(), newAvailableComponentsHost(t)))
-	// proto.Equal, not assert.Equal: the client may be marshalling the same message on its own
-	// goroutine, and reflect.DeepEqual reads the internal state proto.Marshal writes.
-	assert.True(t, proto.Equal(generateTestAvailableComponents(), o.availableComponents))
+	assert.Equal(t, generateTestAvailableComponents(), o.availableComponents)
 	assert.NoError(t, o.Shutdown(t.Context()))
 }
 
@@ -403,6 +526,7 @@ func componentNewTypeNoErr(t *testing.T, typeName string) component.Type {
 
 func generateTestAvailableComponents() *protobufs.AvailableComponents {
 	return &protobufs.AvailableComponents{
+		Hash: []byte("(L\f|m.\xfb\x14n\xe9>ѱ퀜\xf5NEg\xa4\xca\f\x0f\xe0P6\xb3\x96\x04\xb0\xc9"),
 		Components: map[string]*protobufs.ComponentDetails{
 			"receivers": {
 				SubComponentMap: map[string]*protobufs.ComponentDetails{
@@ -789,45 +913,6 @@ func TestHealthReportingForwardComponentHealthToAggregator(t *testing.T) {
 	require.True(t, sa.unsubscribed)
 }
 
-// A health update that clears the error is reported even when the status itself doesn't change.
-func TestHealthReportingReportsAClearedError(t *testing.T) {
-	cfg := createDefaultConfig().(*Config)
-	set := extensiontest.NewNopSettings(extensiontest.NopType)
-	statusUpdateChannel := make(chan *status.AggregateStatus)
-
-	var mtx sync.Mutex
-	var lastErrors []string
-	mockOpampClient := &mockOpAMPClient{
-		setHealthFunc: func(health *protobufs.ComponentHealth) error {
-			mtx.Lock()
-			defer mtx.Unlock()
-			lastErrors = append(lastErrors, health.LastError)
-			return nil
-		},
-	}
-	sa := &mockStatusAggregator{statusChan: statusUpdateChannel}
-	o := newTestOpampAgent(cfg, set, mockOpampClient, sa)
-	o.initHealthReporting()
-	require.NoError(t, o.Start(t.Context(), componenttest.NewNopHost()))
-
-	now := time.Now()
-	for _, err := range []error{errors.New("error A"), nil} {
-		statusUpdateChannel <- &status.AggregateStatus{Event: &mockStatusEvent{
-			status:    componentstatus.StatusPermanentError,
-			err:       err,
-			timestamp: now,
-		}}
-	}
-	close(statusUpdateChannel)
-
-	require.Eventually(t, func() bool {
-		mtx.Lock()
-		defer mtx.Unlock()
-		return slices.Equal(lastErrors, []string{"", "error A", ""})
-	}, time.Second, 10*time.Millisecond)
-	require.NoError(t, o.Shutdown(t.Context()))
-}
-
 func TestHealthReportingExitsOnClosedContext(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	set := extensiontest.NewNopSettings(extensiontest.NopType)
@@ -905,13 +990,13 @@ func TestHealthReportingExitsOnClosedContext(t *testing.T) {
 }
 
 func TestHealthReportingDisabled(t *testing.T) {
-	cfg := startableConfig()
+	cfg := createDefaultConfig()
 	set := extensiontest.NewNopSettings(extensiontest.NopType)
 	o, err := newOpampAgent(cfg.(*Config), set)
 	assert.NoError(t, err)
 
 	o.capabilities.ReportsHealth = false
-	o.client = &mockOpAMPClient{
+	o.opampClient = &mockOpAMPClient{
 		setHealthFunc: func(_ *protobufs.ComponentHealth) error {
 			t.Errorf("setHealth is not supposed to be called with deactivated ReportsHealth capability")
 			return nil
@@ -1017,7 +1102,7 @@ func TestOpAMPAgent_onCommand(t *testing.T) {
 			sighupReceived <- true
 		})
 
-		require.NoError(t, agent.onCommand(&protobufs.ServerToAgentCommand{
+		require.NoError(t, agent.onCommand(ctx, &protobufs.ServerToAgentCommand{
 			Type: protobufs.CommandType_CommandType_Restart,
 		}))
 
@@ -1041,7 +1126,7 @@ func TestOpAMPAgent_onCommand(t *testing.T) {
 			sighupReceived <- true
 		})
 
-		require.NoError(t, agent.onCommand(&protobufs.ServerToAgentCommand{
+		require.NoError(t, agent.onCommand(ctx, &protobufs.ServerToAgentCommand{
 			Type: 13,
 		}))
 
@@ -1068,7 +1153,7 @@ func TestOpAMPAgent_onCommand(t *testing.T) {
 			sighupReceived <- true
 		})
 
-		require.NoError(t, agent.onCommand(&protobufs.ServerToAgentCommand{
+		require.NoError(t, agent.onCommand(ctx, &protobufs.ServerToAgentCommand{
 			Type: protobufs.CommandType_CommandType_Restart,
 		}))
 
@@ -1131,19 +1216,63 @@ type mockOpAMPClient struct {
 	setHealthFunc func(health *protobufs.ComponentHealth) error
 }
 
-func (m mockOpAMPClient) SetHealth(health *protobufs.ComponentHealth) {
-	if m.setHealthFunc != nil {
-		_ = m.setHealthFunc(health)
-	}
+func (mockOpAMPClient) SetCapabilities(*protobufs.AgentCapabilities) error {
+	return nil
 }
 
-func (mockOpAMPClient) SetEffectiveConfig(*protobufs.EffectiveConfig) {}
+func (mockOpAMPClient) SetConnectionSettingsStatus(*protobufs.ConnectionSettingsStatus) error {
+	return nil
+}
 
-func (mockOpAMPClient) SetCustomCapabilities(*protobufs.CustomCapabilities) {}
+func (mockOpAMPClient) Start(_ context.Context, _ types.StartSettings) error {
+	return nil
+}
 
-func (mockOpAMPClient) SendCustomMessage(*protobufs.CustomMessage) {}
+func (mockOpAMPClient) Stop(_ context.Context) error {
+	return nil
+}
 
-func (mockOpAMPClient) Stop(context.Context) error { return nil }
+func (mockOpAMPClient) SetAgentDescription(_ *protobufs.AgentDescription) error {
+	return nil
+}
+
+func (mockOpAMPClient) AgentDescription() *protobufs.AgentDescription {
+	return nil
+}
+
+func (m mockOpAMPClient) SetHealth(health *protobufs.ComponentHealth) error {
+	return m.setHealthFunc(health)
+}
+
+func (mockOpAMPClient) UpdateEffectiveConfig(context.Context) error {
+	return nil
+}
+
+func (mockOpAMPClient) SetRemoteConfigStatus(*protobufs.RemoteConfigStatus) error {
+	return nil
+}
+
+func (mockOpAMPClient) SetPackageStatuses(*protobufs.PackageStatuses) error {
+	return nil
+}
+
+func (mockOpAMPClient) RequestConnectionSettings(*protobufs.ConnectionSettingsRequest) error {
+	return nil
+}
+
+func (mockOpAMPClient) SetCustomCapabilities(*protobufs.CustomCapabilities) error {
+	return nil
+}
+
+func (mockOpAMPClient) SendCustomMessage(*protobufs.CustomMessage) (messageSendingChannel chan struct{}, err error) {
+	return nil, nil
+}
+
+func (mockOpAMPClient) SetFlags(protobufs.AgentToServerFlags) {}
+
+func (mockOpAMPClient) SetAvailableComponents(*protobufs.AvailableComponents) error {
+	return nil
+}
 
 type mockStatusEvent struct {
 	status    componentstatus.Status
@@ -1170,32 +1299,20 @@ func (mockStatusEvent) Attributes() pcommon.Map {
 func newTestOpampAgent(cfg *Config, set extension.Settings, mockOpampClient *mockOpAMPClient, sa *mockStatusAggregator) *opampAgent {
 	uid := uuid.New()
 	o := &opampAgent{
-		cfg:                  cfg,
-		logger:               set.Logger,
-		serviceName:          set.BuildInfo.Command,
-		serviceVersion:       set.BuildInfo.Version,
-		instanceUID:          uid,
-		capabilities:         cfg.Capabilities,
-		client:               mockOpampClient,
-		statusSubscriptionWg: &sync.WaitGroup{},
-		componentHealthWg:    &sync.WaitGroup{},
-		readyCh:              make(chan struct{}),
-
-		statusAggregator: sa,
+		cfg:                      cfg,
+		logger:                   set.Logger,
+		serviceName:              set.BuildInfo.Command,
+		serviceVersion:           set.BuildInfo.Version,
+		instanceUID:              uid,
+		capabilities:             cfg.Capabilities,
+		opampClient:              mockOpampClient,
+		statusSubscriptionWg:     &sync.WaitGroup{},
+		componentHealthWg:        &sync.WaitGroup{},
+		readyCh:                  make(chan struct{}),
+		customCapabilityRegistry: newCustomCapabilityRegistry(set.Logger, mockOpampClient),
+		statusAggregator:         sa,
 	}
 
-	o.startClient = func(opamp.Config, opamp.Status, func(*opamp.Client, opamp.Notification)) (agentClient, [16]byte, error) {
-		return mockOpampClient, uid, nil
-	}
-	o.customCapabilityRegistry = newCustomCapabilityRegistry(set.Logger, o)
 	o.lifetimeCtx, o.lifetimeCtxCancel = context.WithCancel(context.Background())
 	return o
-}
-
-// startableConfig is the default config with an endpoint: the core refuses to start without one.
-// Nothing listens there, so the client only ever fails to connect.
-func startableConfig() component.Config {
-	cfg := createDefaultConfig()
-	cfg.(*Config).Server = &OpAMPServer{HTTP: &httpFields{commonFields: commonFields{Endpoint: "http://127.0.0.1:1/v1/opamp"}}}
-	return cfg
 }

@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: a second
-// Unregister is a no-op. The client behind customCapabilityClient is the extension itself
-// (opampAgent), in front of go/opamp's client.
+// Unregister is a no-op.
 
-package opampextension
+package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
 
 import (
 	"container/list"
@@ -205,7 +204,7 @@ func (c *customMessageHandler) Unregister() {
 	c.unregisteredMux.Lock()
 	defer c.unregisteredMux.Unlock()
 
-	// Removing the capability twice would remove from a list that's already gone.
+	// Changed here: removing the capability twice would remove from a list that's already gone.
 	if c.unregistered {
 		return
 	}

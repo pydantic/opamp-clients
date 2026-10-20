@@ -62,15 +62,7 @@ DROPPED = {
     "cmd/opampsupervisor/supervisor/packages.go": "agent_update.go installs packages",
     "cmd/opampsupervisor/testdata/supervisor/supervisor_packages_cap.yaml": "packages.go's test config",
     "extension/opampextension/Makefile": "contrib's build",
-    "extension/opampextension/metadata.yaml": "contrib's mdatagen",
-    "extension/opampextension/config.schema.yaml": "contrib's mdatagen",
-    "extension/opampextension/documentation.md": "contrib's mdatagen",
-    "extension/opampextension/generated_component_test.go": "contrib's mdatagen",
-    "extension/opampextension/generated_package_test.go": "contrib's mdatagen",
-    "extension/opampextension/internal/metadata/generated_feature_gates.go": "contrib's mdatagen (factory.go names the type)",
-    "extension/opampextension/internal/metadata/generated_status.go": "contrib's mdatagen (factory.go names the type)",
-    "extension/opampextension/logger.go": "opamp-go's logger adapter; the core's client logs through zap",
-    "extension/opampextension/auth_test.go": "tests makeHeadersFunc, which auth.go's newAuthHeader replaces (extension_test.go)",
+    "extension/opampextension/config.schema.yaml": "contrib's schema tooling",
 }
 # Files that differ by nature: the module's own.
 OWN = {"go.mod", "go.sum"}
