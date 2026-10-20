@@ -192,7 +192,8 @@ def package_reports_grouped(diff: str) -> bool:
                 return False
             for side in "-+":
                 reports = [_report(ln) for m, ln in hunk if m == side]
-                if any(r is None or r[0] != after[0] or r[1].keys() != after[1].keys() for r in reports):
+                if any(r is None or r[0] != after[0] or not re.fullmatch(r"uid#\d+ caps=[0-9a-f]+ ", r[0])
+                       or r[1].keys() != after[1].keys() for r in reports):
                     return False
                 chain = [before[1]] + [r[1] for r in reports] + [after[1]]
                 if any(not _moves_on(v, b[k]) for a, b in zip(chain, chain[1:]) for k, v in a.items() if k in b):

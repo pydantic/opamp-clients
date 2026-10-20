@@ -342,6 +342,8 @@ class PackageReportsGrouped(unittest.TestCase):
         self.assertFalse(ok(diff(*head, ("+", report(a=4)), *tail)))
         # A report that carries more than package statuses, or another agent's.
         self.assertFalse(ok(diff(*head, ("+", R + "health(true,) pkgs(a:4,b:1)"), *tail)))
+        sick = R + "health(false,) pkgs(a:0,b:0)"
+        self.assertFalse(ok(diff(*head, ("+", R + "health(false,) pkgs(a:4,b:1)"), (" ", sick))))
         self.assertFalse(ok(diff(*head, ("+", "uid#1 caps=281f pkgs(a:4,b:1)"), *tail)))
         self.assertFalse(ok(diff(*head, ("+", R + "disconnect"), *tail)))
         # An unknown status.
