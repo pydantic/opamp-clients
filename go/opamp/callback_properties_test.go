@@ -6,7 +6,8 @@ package opamp
 // The callback contract (spec/shell-contract.md, RULE-SHELL-01 to -03 and -07), as a model
 // test over random runs (a seeded generator, as properties_test.go): each run is one to three
 // sessions of the real client against one local server, on one state file, so a remote config
-// handed over in one session is handed over again at the start of the next. In a session: calls
+// handed over in one session is handed over again at the start of the next, and a heartbeat
+// interval taken in one may be in force from the start of the next. In a session: calls
 // from outside, from another goroutine and from inside the callback, offers from the server (a
 // remote config, a custom message, a heartbeat interval), stop from outside or requested from
 // inside the callback, and calls after stop. After each step the notifications seen so far are
@@ -481,9 +482,18 @@ type modelRun struct {
 	// loop; a config that arrives while one is writing is saved after it, and a stop in between
 	// leaves the earlier one ("as a crash would leave it": the core saves nothing once stopping).
 	savedOr map[string]bool
-	hash    int // the last config hash offered
-	cust    int // the last custom message offered
-	stats   modelStats
+	// savedMaybeNone: the state file may hold no remote config although saved names one. Once
+	// stopping, the core starts no save, so every config save of a session can be lost (one
+	// waiting behind a heartbeat interval's save, say) when the file held none before it.
+	savedMaybeNone bool
+	// heartbeats: the intervals the client may start with on the state file. The core keeps an
+	// offered interval with its settings and starts with it, unless its save was lost at stop, so
+	// any interval a session on the file took may be in force at the next start, as may the
+	// configured one.
+	heartbeats map[time.Duration]bool
+	hash       int // the last config hash offered
+	cust       int // the last custom message offered
+	stats      modelStats
 }
 
 // modelStats: what the runs exercised.
@@ -493,7 +503,8 @@ type modelStats struct {
 }
 
 func runModelPlan(plan mPlan, dir string, mode Mode) (stats modelStats, err error) {
-	r := &modelRun{mode: mode, plan: plan, dir: dir, srv: &modelServer{}}
+	r := &modelRun{mode: mode, plan: plan, dir: dir, srv: &modelServer{},
+		heartbeats: map[time.Duration]bool{modelHeartbeat: true}}
 	r.ts = httptest.NewServer(r.srv)
 	defer r.ts.Close()
 	for i, s := range plan.sessions {
@@ -517,14 +528,25 @@ func (r *modelRun) session(s mSession) error {
 	}
 	// The offers' notifications the model expects, in order.
 	var want []handed
-	savedFirst := false
+	// savedFirst: want[0] is the saved config. savedMaybe: it may not come (savedMaybeNone), which
+	// is settled once anything else is handed over first.
+	savedFirst, savedMaybe := false, false
+	// inForce: the intervals the client may be using; an offer of one of them might not be
+	// announced.
+	inForce := map[time.Duration]bool{modelHeartbeat: true}
+	if s.stateFile {
+		for h := range r.heartbeats {
+			inForce[h] = true
+		}
+	}
+	var took []time.Duration // the intervals this session offered (and the client took)
 	if s.stateFile {
 		cfg.StateFile = filepath.Join(r.dir, "state.bin")
 		if r.saved != "" {
 			// RULE-SHELL-01: the saved config is handed over in the first step, held until Start
 			// has returned.
 			want = append(want, handed{RemoteConfig, r.saved})
-			savedFirst = true
+			savedFirst, savedMaybe = true, r.savedMaybeNone
 			r.stats.savedStarts++
 		}
 	}
@@ -553,18 +575,34 @@ func (r *modelRun) session(s mSession) error {
 	}()
 	defer func() { close(work); <-workDone }()
 
-	heartbeat := modelHeartbeat
 	var outDesc, goDesc int64
 	panicked := false
 
+	// isSaved: h is a config the state file may hold.
+	isSaved := func(h handed) bool { return h.kind == RemoteConfig && (h.key == r.saved || r.savedOr[h.key]) }
+	// expected: how many notifications the model expects so far; the saved config only once it
+	// can't be missing.
+	expected := func() int {
+		if savedMaybe {
+			return len(want) - 1
+		}
+		return len(want)
+	}
 	// check: the model holds so far.
 	check := func(where string) error {
 		if err := m.contract(where, panicked); err != nil {
 			return err
 		}
 		got := m.handedSoFar()
+		if savedMaybe && len(got) > 0 {
+			// The first notification settles it: the saved config, or none was kept.
+			savedMaybe = false
+			if !isSaved(got[0]) {
+				want, savedFirst = want[1:], false
+			}
+		}
 		for i := range min(len(got), len(want)) {
-			if i == 0 && savedFirst && got[0].kind == RemoteConfig && r.savedOr[got[0].key] {
+			if i == 0 && savedFirst && isSaved(got[0]) {
 				continue
 			}
 			if got[i] != want[i] {
@@ -584,7 +622,7 @@ func (r *modelRun) session(s mSession) error {
 				return err
 			}
 			_, stopped, _, _ := m.snapshot()
-			if len(m.handedSoFar()) >= len(want) || stopped > 0 {
+			if len(m.handedSoFar()) >= expected() || stopped > 0 {
 				return nil
 			}
 			if time.Now().After(deadline) {
@@ -659,26 +697,28 @@ func (r *modelRun) session(s mSession) error {
 			case offerCustom:
 				offerCustomMsg(nil)
 			case offerHeartbeat:
-				// Always a value other than the one in force, so that it is announced. Over HTTP, an
-				// offer of 0 falls back to the configured interval (the poll can't be off).
+				// Always a value other than any that may be in force, so that it is announced. Over
+				// HTTP, an offer of 0 falls back to the configured interval (the poll can't be off).
 				var secs uint64
 				next := time.Duration(0)
-				if r.plan.ws {
+				if !r.plan.ws && !inForce[modelHeartbeat] {
+					secs, next = 0, modelHeartbeat
+				} else {
 					options := []uint64{}
-					for _, v := range []uint64{0, 1, 2} {
-						if time.Duration(v)*time.Second != heartbeat {
+					v := uint64(1)
+					if r.plan.ws {
+						v = 0
+					}
+					for ; v <= 2 || len(options) == 0; v++ {
+						if !inForce[time.Duration(v)*time.Second] {
 							options = append(options, v)
 						}
 					}
 					secs = options[st.k%len(options)]
 					next = time.Duration(secs) * time.Second
-				} else if heartbeat != modelHeartbeat {
-					secs, next = 0, modelHeartbeat
-				} else {
-					secs = 1 + uint64(st.k%2)
-					next = time.Duration(secs) * time.Second
 				}
-				heartbeat = next
+				inForce = map[time.Duration]bool{next: true}
+				took = append(took, next)
 				offer(&protobufs.ServerToAgent{ConnectionSettings: &protobufs.ConnectionSettingsOffers{
 					Opamp: &protobufs.OpAMPConnectionSettings{HeartbeatIntervalSeconds: secs}}},
 					handed{HeartbeatInterval, next.String()})
@@ -785,6 +825,10 @@ func (r *modelRun) session(s mSession) error {
 	}
 	// Every offer was handed over before the stop (we awaited each), except the custom message
 	// that carried a stop requested from inside, which may have come after it began.
+	// check("stop") above settled the saved config if anything came.
+	if savedMaybe { // nothing came: none was kept
+		want, savedFirst, savedMaybe = want[1:], false, false
+	}
 	got := m.handedSoFar()
 	if s.stopInside && len(got) == len(want)-1 {
 		want = want[:len(want)-1]
@@ -801,10 +845,18 @@ func (r *modelRun) session(s mSession) error {
 		}
 		last[who] = n
 	}
-	// What the state file holds now: the last config handed over in a session on it.
+	// What the state file holds now: the last config handed over in a session on it, or one
+	// before it (its save waited behind another's when the stop came), or, if it held none at the
+	// start, none.
+	if s.stateFile {
+		for _, h := range took {
+			r.heartbeats[h] = true
+		}
+	}
 	if s.stateFile && !panicked {
+		heldNone := !savedFirst
 		or := map[string]bool{}
-		if r.saved != "" {
+		if savedFirst {
 			or[r.saved] = true
 		}
 		for _, h := range got {
@@ -813,7 +865,11 @@ func (r *modelRun) session(s mSession) error {
 				r.saved = h.key
 			}
 		}
+		if heldNone && len(or) == 0 {
+			r.saved = ""
+		}
 		r.savedOr = or
+		r.savedMaybeNone = heldNone && r.saved != ""
 	}
 	return nil
 }
