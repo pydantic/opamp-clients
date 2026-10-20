@@ -246,7 +246,7 @@ class AppSettingsExtensionTest {
   void theEndOfDebugModeTellsNothingWhenTheMapStaysTheSame(@TempDir Path dir) throws Exception {
     App app = new App();
     Extension e = extension(dir, app);
-    e.wallClock = () -> Vectors.NOW;
+    e.clockForTest(() -> Vectors.NOW);
     assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.1"), "debug", override("\"until\":\"2026-10-14T12:30:00Z\""), "app_settings", override("\"values\":{\"example.feature\":\"on\"}")))).getStatus());
     assertEquals(1, app.told.size());
     long[] armed = e.armedForTest();
