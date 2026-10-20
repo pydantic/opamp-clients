@@ -172,6 +172,9 @@ final class Extension {
    */
   private java.util.concurrent.ScheduledExecutorService timer;
   private java.util.concurrent.ScheduledFuture<?> armed;
+
+  /** For tests on their own clock: the timer is armed but never scheduled (see clockForTest). */
+  private boolean timerHeld;
   private long generation;
   private long refreshAt;
   /** Export health: the layer's last report, and the agent health last sent with it. */
@@ -1009,7 +1012,7 @@ final class Extension {
       armed.cancel(false);
       armed = null;
     }
-    if (at == 0) {
+    if (at == 0 || timerHeld) {
       return;
     }
     long gen = generation;
@@ -1106,6 +1109,16 @@ final class Extension {
   /** The live settings in force. */
   SettingsProto.Settings inForce() {
     return inForce;
+  }
+
+  /**
+   * For tests: read the wall clock from {@code clock}. A timer armed meanwhile is held, not run on
+   * the real clock: the test fires it, at its own time (its delay is the test clock's, so a timer
+   * armed a moment before a test's deadline would otherwise go off on its own, mid-test).
+   */
+  synchronized void clockForTest(java.util.function.LongSupplier clock) {
+    wallClock = clock;
+    timerHeld = true;
   }
 
   /** When the timer is armed for (0: not), and in which generation. */

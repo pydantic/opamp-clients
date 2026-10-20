@@ -193,7 +193,7 @@ class ExtensionTest {
               case "decide" -> {
                 if (e == null) {
                   e = Extension.forTest(setup(canSave ? dir : null));
-                  e.wallClock = () -> now[0];
+                  e.clockForTest(() -> now[0]);
                 }
                 Opamp.RemoteConfigStatus st = e.remoteConfig(config(step.get("document").asText()));
                 if (st.getStatus() == APPLIED && canSave) {
@@ -204,7 +204,7 @@ class ExtensionTest {
               }
               case "load" -> {
                 e = Extension.forTest(null);
-                e.wallClock = () -> now[0];
+                e.clockForTest(() -> now[0]);
                 e.properties(DefaultConfigProperties.createFromMap(Map.of("otel.opamp.endpoint",
                     "http://server/v1/opamp", "otel.opamp.state.dir", canSave ? dir.toString() : "none")));
               }
@@ -232,7 +232,7 @@ class ExtensionTest {
     assertTrue(Extension.HOST.getLiveList().containsAll(List.of("debug_until", "debug_sampling_rate",
         "debug_send_logs_level")));
     Extension e = Extension.forTest(setup(dir));
-    e.wallClock = () -> Vectors.NOW;
+    e.clockForTest(() -> Vectors.NOW);
     assertEquals(APPLIED, e.remoteConfig(config(every("head_sampling", override("\"ratio\":0.01"),
         "sampling_rules", override("\"rules\":[{\"rate\":0,\"name\":\"GET\"}]"),
         "log_levels", override("\"level\":\"error\",\"scopes\":{\"noisy\":\"off\"}"),
@@ -264,11 +264,26 @@ class ExtensionTest {
     assertFalse(effective(e).contains("until"), effective(e));
   }
 
+  /** A timer armed under a test clock goes off when the test fires it, not on the real clock. */
+  @Test
+  void aTimerArmedUnderATestClockWaitsForTheTest(@TempDir Path dir) throws Exception {
+    Extension e = Extension.forTest(setup(dir));
+    long[] now = {Vectors.NOW};
+    e.clockForTest(() -> now[0]);
+    e.remoteConfig(config(debugWindow("0.1", "2026-10-14T12:10:00Z")));
+    long until = Vectors.NOW + 10 * 60_000;
+    now[0] = until - 1;
+    e.refresh(now[0]);
+    Thread.sleep(50);
+    assertEquals(until, e.armedForTest()[1]);
+    assertEquals(1.0, e.inForce().getSamplingRate());
+  }
+
   @Test
   void aTimerArmedBeforeANewerDecisionDoesNothing(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
-    e.wallClock = () -> now[0];
+    e.clockForTest(() -> now[0]);
     e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-14T12:10:00Z\""))));
     long[] stale = e.armedForTest();
     // A newer window, sent before the first ends.
@@ -299,7 +314,7 @@ class ExtensionTest {
   void aFailedConfigAfterTheWallClockPassedDebugUntilEndsDebugMode(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
-    e.wallClock = () -> now[0];
+    e.clockForTest(() -> now[0]);
     e.remoteConfig(config(debugWindow("0.1", "2026-10-14T12:10:00Z")));
     assertEquals(1.0, e.inForce().getSamplingRate());
     now[0] = Vectors.NOW + 25 * 60_000;
@@ -312,7 +327,7 @@ class ExtensionTest {
   @Test
   void aWindowMoreThanADayAheadIsRefused(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
-    e.wallClock = () -> Vectors.NOW;
+    e.clockForTest(() -> Vectors.NOW);
     Opamp.RemoteConfigStatus s = e.remoteConfig(config(every("debug", override("\"until\":\"2026-10-17T00:00:00Z\""))));
     assertEquals(FAILED, s.getStatus());
     assertTrue(s.getErrorMessage().contains("24h"), s.getErrorMessage());
@@ -405,7 +420,7 @@ class ExtensionTest {
   void aFailingExporterShowsInTheHealthAtOnceAndClearsOnTheNextSuccess(@TempDir Path dir) {
     Extension e = Extension.forTest(setup(dir));
     long[] now = {Vectors.NOW};
-    e.wallClock = () -> now[0];
+    e.clockForTest(() -> now[0]);
     ControlsTest.Scripted exporter = new ControlsTest.Scripted();
     var gate = e.controls.spans(exporter);
     var span = io.opentelemetry.sdk.testing.trace.TestSpanData.builder().setName("s")
