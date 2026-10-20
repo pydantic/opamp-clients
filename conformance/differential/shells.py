@@ -93,8 +93,12 @@ def package_failures_grouped(diff: str) -> bool:
             while j < len(seg) and seg[j][0] != " ":
                 j += 1
             hunk = seg[i:j]
-            before = next((p for _, ln in reversed(seg[:i]) if (p := _packages(ln))), None)
-            after = next((p for _, ln in seg[j:] if (p := _packages(ln))), None)
+            # The saves both made around it: a save one side made in a hunk further on is
+            # still on its way there.
+            ib = next((k for k in range(i - 1, -1, -1) if seg[k][0] == " " and _packages(seg[k][1])), None)
+            ia = next((k for k in range(j, len(seg)) if seg[k][0] == " " and _packages(seg[k][1])), None)
+            before = _packages(seg[ib][1]) if ib is not None else None
+            after = _packages(seg[ia][1]) if ia is not None else None
             if after is None:
                 return False
             # Each save is answered stored. When both made as many saves, the diff lines the last
@@ -113,7 +117,9 @@ def package_failures_grouped(diff: str) -> bool:
                     return False
             elif unanswered != {0}:
                 return False
-            for stores, _ in sides:
+            for side in "-+":
+                start = ib + 1 if ib is not None else 0
+                stores = [ln for m, ln in seg[start:ia] if m == side and ln.startswith("store ")]
                 chain = ([before] if before else []) + [_packages(ln) for ln in stores] + [after]
                 if any(p is None for p in chain):
                     return False
@@ -176,22 +182,26 @@ def package_reports_grouped(diff: str) -> bool:
             j = i
             while j < len(seg) and seg[j][0] != " ":
                 j += 1
-            hunk = seg[i:j]
-            before = after = None
-            for _, ln in reversed(seg[:i]):
-                if ln.startswith("-- run "):
+            # The reports both sent around it, in this run: a report one side sent in a hunk
+            # further on is still on its way there.
+            ib = ia = None
+            for k in range(i - 1, -1, -1):
+                if seg[k][1].startswith("-- run "):
                     break
-                if (before := _report(ln)) is not None:
+                if seg[k][0] == " " and _report(seg[k][1]) is not None:
+                    ib = k
                     break
-            for _, ln in seg[j:]:
-                if ln.startswith("-- run "):
+            for k in range(j, len(seg)):
+                if seg[k][1].startswith("-- run "):
                     break
-                if (after := _report(ln)) is not None:
+                if seg[k][0] == " " and _report(seg[k][1]) is not None:
+                    ia = k
                     break
-            if after is None or before is None:
+            if ib is None or ia is None:
                 return False
+            before, after = _report(seg[ib][1]), _report(seg[ia][1])
             for side in "-+":
-                reports = [_report(ln) for m, ln in hunk if m == side]
+                reports = [_report(ln) for m, ln in seg[ib + 1:ia] if m == side]
                 if any(r is None or r[0] != after[0] or not re.fullmatch(r"uid#\d+ caps=[0-9a-f]+ ", r[0])
                        or r[1].keys() != after[1].keys() for r in reports):
                     return False

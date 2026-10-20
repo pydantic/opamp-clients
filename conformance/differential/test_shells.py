@@ -263,6 +263,25 @@ class PackageFailuresGrouped(unittest.TestCase):
         self.assertFalse(ok(diff(before, (" ", "stored"), ("+", late), ("+", "stored"), ("+", f6), ("+", "stored"),
                                  started, (" ", "stored"))))
 
+    def test_a_save_one_side_made_in_the_next_hunk_is_allowed(self):
+        # go-core against go-core-platform, packages-redirects-refused-http (CI): the reference saved
+        # f4's and f5's failures in one save, go-core saved f3's, then f4's, then the rest. The
+        # diff pairs go-core's first save with the reference's and shows its second in a hunk
+        # of its own: each side is checked from the save both made before to the one both made
+        # after, not to the other side's next save.
+        names = ("f1-six", "f2-downgrade", "f3-up-then-down", "f4-bad-host", "f5-bad-scheme", "f6-userinfo", "zz-good")
+        def st(failed: int, tail: str = "") -> str:
+            pkgs = ",".join(f"{n}:>1.0.0{' failed' if k < failed else ''}" for k, n in enumerate(names[:-1]))
+            return f"store uid#0 valid(http:///v1/opamp) pkgs({pkgs},zz-good:>1.0.0{tail})"
+        real = diff(("...", ""), (" ", st(1)), (" ", "stored"), (" ", st(2)), (" ", "stored"),
+                    ("-", st(5)), ("+", st(3)), (" ", "stored"), ("+", st(4)), ("+", "stored"),
+                    (" ", st(6)), (" ", "stored"), (" ", st(6, " uncertain")), (" ", "stored"), ("...", ""))
+        self.assertTrue(shells.package_failures_grouped(real))
+        # Not when that later save takes a failure back.
+        bad = diff((" ", st(2)), (" ", "stored"), ("-", st(5)), ("+", st(4)), (" ", "stored"), ("+", st(3)),
+                   ("+", "stored"), (" ", st(6)), (" ", "stored"))
+        self.assertFalse(shells.package_failures_grouped(bad))
+
     def test_a_constructed_bad_difference_is_not(self):
         ok = shells.package_failures_grouped
         head, tail = [(" ", save()), (" ", "stored")], [(" ", save(F4, F5, F6)), (" ", "stored")]
@@ -329,6 +348,14 @@ class PackageReportsGrouped(unittest.TestCase):
         self.assertTrue(ok(diff((" ", report(a=1, b=1)), ("-", report(a=4, b=1)), ("+", report(a=2, b=4)),
                                 (" ", report(a=0, b=2)), ("...", ""), (" ", report(a=0, b=2)), ("-", report(a=0, b=0)),
                                 (" ", report(a=0, b=0)))))
+
+    def test_a_report_one_side_sent_in_the_next_hunk_is_checked_against_the_common_one(self):
+        ok = shells.package_reports_grouped
+        between = (" ", R + "disconnect")
+        self.assertTrue(ok(diff((" ", report(a=1, b=1)), ("-", report(a=4, b=1)), ("+", report(a=2, b=4)), between,
+                                ("+", report(a=0, b=2)), (" ", report(a=0, b=0)))))
+        self.assertFalse(ok(diff((" ", report(a=1, b=1)), ("-", report(a=4, b=1)), ("+", report(a=2, b=4)), between,
+                                 ("+", report(a=4, b=2)), (" ", report(a=0, b=0)))))
 
     def test_a_constructed_bad_difference_is_not(self):
         ok = shells.package_reports_grouped
