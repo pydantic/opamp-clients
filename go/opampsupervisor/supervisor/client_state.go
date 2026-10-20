@@ -140,6 +140,11 @@ func (s *Supervisor) loadResumedRemoteConfig() {
 	if st.lastWorking != nil {
 		s.lastWorkingRemoteConfig.Store(st.lastWorking)
 	}
+	if s.remoteConfig.Load() != nil {
+		// The server sent a config as the client started (Start starts it first, as upstream):
+		// newer than the one resumed, and what the collector starts on.
+		return
+	}
 	s.startupStatus = st.status
 	if st.config == nil {
 		s.telemetrySettings.Logger.Info("No last received remote config found")

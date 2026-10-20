@@ -58,6 +58,20 @@ first = "^- store .*pkgs\\(.* \\| \\+ store .*pkgs\\(.*$"
 grouping = "package-failures"
 reason = "packages that fail close together reach the core in one step or two: which share a save is timing"
 
+# The core reports package statuses at most once a second: a change goes at once after a quiet
+# while, and the changes in the next second go together at its end. How far each download has got
+# by then is the client's speed (packages-redirects-http, packages-redirects-refused-ws: one
+# client reported a package downloading and the rest installed, or failed, where the other went
+# straight to all installed). Only that (shells.py, package_reports_grouped): every report that
+# differs carries package statuses alone, for the same packages as the report both sent after it,
+# in the same run; and each package's status only moves on between the reports both sent.
+[[allow]]
+scenarios = ["packages-*"]
+category = "send"
+first = "pkgs\\("
+grouping = "package-reports"
+reason = "package statuses are reported at most once a second: which intermediate statuses a report catches is timing"
+
 # Over WebSocket, after a credential switch the old connection's close and the new one's opening
 # race: their reports interleave either way. The new one may be refused (credential-offer-broken:
 # ws_failed(401)) as well as opened.
