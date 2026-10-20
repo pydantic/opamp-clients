@@ -732,6 +732,29 @@ public final class CoreProto {
      * @return The proxy.
      */
     dev.pydantic.opamp.core.CoreProto.ProxyChoice getProxy();
+
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     * @return Whether the reportsHeartbeat field is set.
+     */
+    boolean hasReportsHeartbeat();
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     * @return The reportsHeartbeat.
+     */
+    boolean getReportsHeartbeat();
   }
   /**
    * <pre>
@@ -1980,6 +2003,64 @@ public final class CoreProto {
     private void clearProxy() {
       proxy_ = null;
       bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
+    public static final int REPORTS_HEARTBEAT_FIELD_NUMBER = 32;
+    private boolean reportsHeartbeat_;
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     * @return Whether the reportsHeartbeat field is set.
+     */
+    @java.lang.Override
+    public boolean hasReportsHeartbeat() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     * @return The reportsHeartbeat.
+     */
+    @java.lang.Override
+    public boolean getReportsHeartbeat() {
+      return reportsHeartbeat_;
+    }
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     * @param value The reportsHeartbeat to set.
+     */
+    private void setReportsHeartbeat(boolean value) {
+      bitField0_ |= 0x00000002;
+      reportsHeartbeat_ = value;
+    }
+    /**
+     * <pre>
+     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+     * </pre>
+     *
+     * <code>optional bool reports_heartbeat = 32;</code>
+     */
+    private void clearReportsHeartbeat() {
+      bitField0_ = (bitField0_ & ~0x00000002);
+      reportsHeartbeat_ = false;
     }
 
     public static dev.pydantic.opamp.core.CoreProto.Config parseFrom(
@@ -3369,6 +3450,66 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+       * </pre>
+       *
+       * <code>optional bool reports_heartbeat = 32;</code>
+       * @return Whether the reportsHeartbeat field is set.
+       */
+      @java.lang.Override
+      public boolean hasReportsHeartbeat() {
+        return instance.hasReportsHeartbeat();
+      }
+      /**
+       * <pre>
+       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+       * </pre>
+       *
+       * <code>optional bool reports_heartbeat = 32;</code>
+       * @return The reportsHeartbeat.
+       */
+      @java.lang.Override
+      public boolean getReportsHeartbeat() {
+        return instance.getReportsHeartbeat();
+      }
+      /**
+       * <pre>
+       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+       * </pre>
+       *
+       * <code>optional bool reports_heartbeat = 32;</code>
+       * @param value The reportsHeartbeat to set.
+       * @return This builder for chaining.
+       */
+      public Builder setReportsHeartbeat(boolean value) {
+        copyOnWrite();
+        instance.setReportsHeartbeat(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+       * </pre>
+       *
+       * <code>optional bool reports_heartbeat = 32;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearReportsHeartbeat() {
+        copyOnWrite();
+        instance.clearReportsHeartbeat();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Config)
     }
     @java.lang.Override
@@ -3414,13 +3555,14 @@ public final class CoreProto {
               "stopTimeoutMs_",
               "connectTimeoutMs_",
               "proxy_",
+              "reportsHeartbeat_",
             };
             java.lang.String info =
-                "\u0000\u001b\u0000\u0001\u0002\u001f\u001b\u0000\u0001\u0000\u0002\n\u0003\u0003" +
-                "\u0004\u0003\u0005\u0003\u0006\u0003\u0007\u0003\b\u0003\t\u0208\n\u001b\u000b\u0003" +
-                "\f\u0003\r\u0007\u000e\n\u000f\u0007\u0010\u0003\u0011\u0208\u0013\u0007\u0014\u0003" +
+                "\u0000\u001c\u0000\u0001\u0002 \u001c\u0000\u0001\u0000\u0002\n\u0003\u0003\u0004" +
+                "\u0003\u0005\u0003\u0006\u0003\u0007\u0003\b\u0003\t\u0208\n\u001b\u000b\u0003\f" +
+                "\u0003\r\u0007\u000e\n\u000f\u0007\u0010\u0003\u0011\u0208\u0013\u0007\u0014\u0003" +
                 "\u0015\u0003\u0016\u0007\u0017\u0007\u0018\n\u0019\u0007\u001a\u0003\u001c\u0003" +
-                "\u001d\u0003\u001f\u1009\u0000";
+                "\u001d\u0003\u001f\u1009\u0000 \u1007\u0001";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

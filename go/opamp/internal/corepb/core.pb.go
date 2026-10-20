@@ -249,9 +249,13 @@ type Config struct {
 	ConnectTimeoutMs uint64 `protobuf:"varint,29,opt,name=connect_timeout_ms,json=connectTimeoutMs,proto3" json:"connect_timeout_ms,omitempty"` // a WebSocket to open; default 30 s
 	// With streams: which proxy every connection goes through, the core picking it (no
 	// proxy_query). Unset: the core asks (proxy_query) for each connection.
-	Proxy         *ProxyChoice `protobuf:"bytes,31,opt,name=proxy,proto3" json:"proxy,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Proxy *ProxyChoice `protobuf:"bytes,31,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	// Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
+	// WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
+	// at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
+	ReportsHeartbeat *bool `protobuf:"varint,32,opt,name=reports_heartbeat,json=reportsHeartbeat,proto3,oneof" json:"reports_heartbeat,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Config) Reset() {
@@ -471,6 +475,13 @@ func (x *Config) GetProxy() *ProxyChoice {
 		return x.Proxy
 	}
 	return nil
+}
+
+func (x *Config) GetReportsHeartbeat() bool {
+	if x != nil && x.ReportsHeartbeat != nil {
+		return *x.ReportsHeartbeat
+	}
+	return false
 }
 
 // The proxy for Rust mode's connections, told once. With no url and not direct, the one the
@@ -4973,7 +4984,7 @@ var File_opamp_core_v1_core_proto protoreflect.FileDescriptor
 
 const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\n" +
-	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\x98\t\n" +
+	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\xe0\t\n" +
 	"\x06Config\x12!\n" +
 	"\finstance_uid\x18\x02 \x01(\fR\vinstanceUid\x12\"\n" +
 	"\fcapabilities\x18\x03 \x01(\x04R\fcapabilities\x122\n" +
@@ -5004,7 +5015,9 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\aunix_ms\x18\x1a \x01(\x04R\x06unixMs\x12&\n" +
 	"\x0fstop_timeout_ms\x18\x1c \x01(\x04R\rstopTimeoutMs\x12,\n" +
 	"\x12connect_timeout_ms\x18\x1d \x01(\x04R\x10connectTimeoutMs\x120\n" +
-	"\x05proxy\x18\x1f \x01(\v2\x1a.opamp.core.v1.ProxyChoiceR\x05proxyJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fR\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_status\"\xca\x01\n" +
+	"\x05proxy\x18\x1f \x01(\v2\x1a.opamp.core.v1.ProxyChoiceR\x05proxy\x120\n" +
+	"\x11reports_heartbeat\x18  \x01(\bH\x00R\x10reportsHeartbeat\x88\x01\x01B\x14\n" +
+	"\x12_reports_heartbeatJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fR\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_status\"\xca\x01\n" +
 	"\vProxyChoice\x12\x16\n" +
 	"\x06direct\x18\x01 \x01(\bR\x06direct\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12/\n" +
@@ -5552,6 +5565,7 @@ func file_opamp_core_v1_core_proto_init() {
 	if File_opamp_core_v1_core_proto != nil {
 		return
 	}
+	file_opamp_core_v1_core_proto_msgTypes[0].OneofWrappers = []any{}
 	file_opamp_core_v1_core_proto_msgTypes[7].OneofWrappers = []any{
 		(*Input_Start)(nil),
 		(*Input_SetDescription)(nil),
