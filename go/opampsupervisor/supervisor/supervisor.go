@@ -2943,7 +2943,12 @@ func (s *Supervisor) processRemoteConfigMessage(ctx context.Context, msg *protob
 
 	// Changed here: it becomes the current (and last received) config only once it composes. A
 	// config that fails was kept as both, and the next outcome of the config still running was
-	// reported about it: APPLIED, and saved as the last working config.
+	// reported about it: APPLIED, and saved as the last working config. Composed under
+	// configWriteMu, as Start composes the config the collector starts on: a config that arrived
+	// as the client started was otherwise overwritten by Start's compose, without it, and its
+	// apply reported nothing (APPLYING for good).
+	s.configWriteMu.Lock()
+	defer s.configWriteMu.Unlock()
 	configChanged, err := s.composeMergedConfig(clonedMsg)
 	if err != nil {
 		span.SetStatus(codes.Error, fmt.Sprintf("Error composing merged config. Reporting failed remote config status: %s", err.Error()))
