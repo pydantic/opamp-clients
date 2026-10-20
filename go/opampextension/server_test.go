@@ -403,7 +403,7 @@ func TestCustomMessageBeforeStart(t *testing.T) {
 	handler, err := o.Register("io.opentelemetry.test.early")
 	require.NoError(t, err)
 	_, err = handler.SendMessage("t", nil)
-	require.ErrorIs(t, err, errNotStarted)
+	require.ErrorIs(t, err, errNotRunning)
 	require.NoError(t, o.Shutdown(t.Context()))
 }
 
@@ -423,6 +423,7 @@ func TestStartRefusesAMissingStateKey(t *testing.T) {
 	require.ErrorContains(t, err, "opamp-state-key")
 	_, statErr := os.Stat(cfg.StateFile)
 	assert.ErrorIs(t, statErr, os.ErrNotExist)
+	require.NoError(t, o.Shutdown(t.Context()))
 }
 
 // With a socket set, the extension dials it in place of the endpoint's host and port, over both

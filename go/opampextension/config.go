@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the
-// settings for the state file, its key and for accepting connection settings, and the checks on them;
-// Validate reports a missing server instead of panicking.
+// settings for the state file, its key and for accepting connection settings, and the checks on
+// them; Validate reports a missing server instead of panicking.
 
-package opampextension
+package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
 
 import (
 	"context"
@@ -16,26 +16,29 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/open-telemetry/opamp-go/client"
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/confignet"
 	"go.opentelemetry.io/collector/config/configopaque"
 	"go.opentelemetry.io/collector/config/configtls"
+	"go.uber.org/zap"
+
+	"github.com/pydantic/opamp-clients/go/opampextension/internal/metadata"
 )
 
 // Default value for HTTP client's polling interval, set to 30 seconds in
 // accordance with the OpAMP spec.
 const httpPollingIntervalDefault = 30 * time.Second
 
-// Config contains the configuration for the opamp extension. It is upstream's, so a collector
-// config written for upstream's extension works unchanged, plus StateFile, StateKey and
-// Capabilities.AcceptsOpAMPConnectionSettings.
+// Config contains the configuration for the opamp extension. Trying to mirror
+// the OpAMP supervisor config for some consistency.
 type Config struct {
 	Server *OpAMPServer `mapstructure:"server"`
 
 	// InstanceUID is a UUID formatted as a 36 character string in canonical
-	// representation. Auto-generated on start if missing: with a StateFile, once, and kept
-	// across restarts; without one, on every start.
+	// representation. Auto-generated on start if missing. Changed here: with a StateFile, once,
+	// and kept across restarts.
 	InstanceUID string `mapstructure:"instance_uid"`
 
 	// Capabilities contains options to enable a particular OpAMP capability
@@ -74,6 +77,8 @@ type Config struct {
 	// PPIDPollInterval is the time between polling for whether PPID is running.
 	PPIDPollInterval time.Duration `mapstructure:"ppid_poll_interval"`
 
+	// Changed here (to the end of Config): the client's state file.
+
 	// StateFile is where the client keeps its state across restarts: the instance UID, and the
 	// connection settings the server issued. It holds those credentials, so it is written
 	// readable by the collector's user only (0600). "": nowhere.
@@ -103,9 +108,10 @@ type Capabilities struct {
 	ReportsAvailableComponents bool `mapstructure:"reports_available_components"`
 	// AcceptsRestartCommand enables the OpAMP AcceptsRestartCommand Capability (default: false)
 	AcceptsRestartCommand bool `mapstructure:"accepts_restart_command"`
-	// AcceptsOpAMPConnectionSettings takes the server's offers of new OpAMP connection settings
-	// (endpoint and headers: new credentials), verified before they replace the old ones and
-	// kept in StateFile, which it needs. (default: false)
+	// Changed here: AcceptsOpAMPConnectionSettings takes the server's offers of new OpAMP
+	// connection settings (endpoint and headers: new credentials), verified before they replace
+	// the old ones and kept in StateFile, which it needs. (default: false) The client adds the
+	// capability's bits itself (coreclient.go).
 	AcceptsOpAMPConnectionSettings bool `mapstructure:"accepts_opamp_connection_settings"`
 }
 
@@ -125,7 +131,7 @@ func (caps Capabilities) toAgentCapabilities() protobufs.AgentCapabilities {
 	if caps.AcceptsRestartCommand {
 		agentCapabilities |= protobufs.AgentCapabilities_AgentCapabilities_AcceptsRestartCommand
 	}
-	// (AcceptsOpAMPConnectionSettings: the client adds its bits, with Config.AcceptConnectionSettings.)
+
 	return agentCapabilities
 }
 
@@ -189,6 +195,16 @@ func (h *httpFields) Validate() error {
 type OpAMPServer struct {
 	WS   *commonFields `mapstructure:"ws,omitempty"`
 	HTTP *httpFields   `mapstructure:"http,omitempty"`
+}
+
+func (s OpAMPServer) GetClient(logger *zap.Logger) client.OpAMPClient {
+	if s.WS != nil {
+		return client.NewWebSocket(newLoggerFromZap(logger.With(zap.String("client", "ws"))))
+	}
+
+	httpClient := client.NewHTTP(newLoggerFromZap(logger.With(zap.String("client", "http"))))
+	httpClient.SetPollingInterval(s.GetPollingInterval())
+	return httpClient
 }
 
 func (s OpAMPServer) GetHeaders() map[string]configopaque.String {
@@ -265,11 +281,11 @@ func (s OpAMPServer) GetPollingInterval() time.Duration {
 // Validate checks if the extension configuration is valid
 func (cfg *Config) Validate() error {
 	switch {
-	case cfg.Capabilities.AcceptsRestartCommand && !remoteRestartsGate.IsEnabled():
+	case cfg.Capabilities.AcceptsRestartCommand && !metadata.ExtensionOpampextensionRemoteRestartsFeatureGate.IsEnabled():
 		return errors.New("extension.opampextension.RemoteRestarts feature gate must be enabled to use the accepts_restart_command capability")
-	case cfg.Capabilities.AcceptsRestartCommand && remoteRestartsGate.IsEnabled() && runtime.GOOS == "windows":
+	case cfg.Capabilities.AcceptsRestartCommand && metadata.ExtensionOpampextensionRemoteRestartsFeatureGate.IsEnabled() && runtime.GOOS == "windows":
 		return errors.New("remote restart functionality is not available on the windows operating system")
-	case cfg.Server == nil || cfg.Server.WS == nil && cfg.Server.HTTP == nil:
+	case cfg.Server == nil || cfg.Server.WS == nil && cfg.Server.HTTP == nil: // Changed here: no server isn't a panic.
 		return errors.New("opamp server must have at least ws or http set")
 	case cfg.Server.WS != nil && cfg.Server.HTTP != nil:
 		return errors.New("opamp server must have only ws or http set")
@@ -287,20 +303,9 @@ func (cfg *Config) Validate() error {
 		return errors.New("reports_raw_config requires reports_effective_config to be enabled")
 	}
 
-	if cfg.Capabilities.AcceptsOpAMPConnectionSettings {
-		if cfg.StateFile == "" {
-			// Settings the server issued and the client forgot at a restart would lock the
-			// agent out once the server has dropped the old ones.
-			return errors.New("accepts_opamp_connection_settings requires state_file")
-		}
-		if cfg.Server.GetAuthExtensionID() != (component.ID{}) {
-			// The auth extension would replace the headers the server issued.
-			return errors.New("accepts_opamp_connection_settings can't be used with an auth extension")
-		}
-	}
-
-	if cfg.StateKey != "" && cfg.StateFile == "" {
-		return errors.New("state_key requires state_file")
+	// Changed here: the state file's settings.
+	if err := cfg.validateState(); err != nil {
+		return err
 	}
 
 	if cfg.InstanceUID != "" {

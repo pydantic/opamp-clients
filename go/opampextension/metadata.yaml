@@ -1,0 +1,20 @@
+display_name: OpAMP Agent Extension
+type: opamp
+
+status:
+  class: extension
+  stability:
+    alpha: [extension]
+  distributions: [contrib, k8s]
+  codeowners:
+    active: [portertech, evan-bradley, tigrannajaryan, douglascamata, dpaasman00]
+
+feature_gates:
+  - id: extension.opampextension.RemoteRestarts
+    description: "When enabled, the OpAMP extension supports restart commands from the OpAMP server through the `CommandType_Restart` command."
+    stage: alpha
+    from_version: "v0.145.0"
+    reference_url: https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/45056
+
+tests:
+  config:

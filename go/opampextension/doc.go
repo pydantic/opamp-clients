@@ -1,14 +1,6 @@
-// Copyright (c) 2026 Pydantic Services Inc.
-// SPDX-License-Identifier: MIT
-//
-// Changed here: replaces upstream's doc.go, whose go:generate runs contrib's mdatagen.
+// Copyright The OpenTelemetry Authors
+// SPDX-License-Identifier: Apache-2.0
 
-// Package opampextension is the OpenTelemetry Collector's OpAMP extension on the shared core
-// (go/opamp, in platform mode) instead of opamp-go: upstream's extension
-// (opentelemetry-collector-contrib's extension/opampextension), with its config, its component type
-// and its custom-message API, so that a collector built with it in place of upstream's runs the
-// same config. What changes is the client underneath, and what that brings: with state_file the
-// instance UID is kept across restarts, and with accepts_opamp_connection_settings the server can
-// issue new credentials, which are verified before they replace the old ones and kept in the state
-// file. See README.md.
-package opampextension
+//go:generate make mdatagen
+
+package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
