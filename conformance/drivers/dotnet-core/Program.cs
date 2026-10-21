@@ -89,7 +89,15 @@ try
         {
             Endpoint = new Uri(Environment.GetEnvironmentVariable("OPAMP_ENDPOINT") ?? string.Empty),
             InstanceUid = InstanceUid(),
-            Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig
+            // What the driver reports, declared: the client takes no status field whose bit isn't.
+            Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig
+                    | AgentCapabilities.ReportsRemoteConfig
+                    | AgentCapabilities.ReportsHeartbeat
+                    | AgentCapabilities.ReportsHealth
+                    | AgentCapabilities.ReportsEffectiveConfig)
+                | (Environment.GetEnvironmentVariable("DRIVER_COMPONENTS") == "1"
+                    ? (ulong)AgentCapabilities.ReportsAvailableComponents
+                    : 0UL)
                 | (Environment.GetEnvironmentVariable("DRIVER_OWN_TELEMETRY") == "1"
                     ? (ulong)(AgentCapabilities.ReportsOwnMetrics | AgentCapabilities.ReportsOwnTraces | AgentCapabilities.ReportsOwnLogs)
                     : 0UL),

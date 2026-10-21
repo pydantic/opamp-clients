@@ -80,9 +80,14 @@ func main() {
 	poll := time.Duration(envFloat("DRIVER_POLL_S", 2) * float64(time.Second))
 
 	cfg := opamp.Config{
-		Endpoint:          endpoint,
-		InstanceUID:       instanceUID(),
-		Capabilities:      uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+		Endpoint:    endpoint,
+		InstanceUID: instanceUID(),
+		// What the driver reports, declared: the client takes no status field whose bit isn't.
+		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig),
 		HeartbeatInterval: poll,
 	}
 	if n, err := strconv.ParseUint(os.Getenv("DRIVER_MAX_SEND_BYTES"), 10, 64); err == nil {
@@ -121,6 +126,7 @@ func main() {
 		EffectiveConfig: &protobufs.EffectiveConfig{ConfigMap: &protobufs.AgentConfigMap{}},
 	}
 	if os.Getenv("DRIVER_COMPONENTS") == "1" {
+		cfg.Capabilities |= uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents)
 		status.AvailableComponents = components()
 	}
 	if os.Getenv("DRIVER_CUSTOM") == "1" {

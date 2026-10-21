@@ -1769,7 +1769,16 @@ export class Agent {
         {
           endpoint: s.endpoint,
           instanceUid: uuidBytes(uid),
-          capabilities: BigInt(AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig),
+          // What the integration does and reports, declared: the client takes no status field
+          // whose bit isn't (a remote config's status comes with AcceptsRemoteConfig).
+          capabilities: BigInt(
+            AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig |
+              AgentCapabilities.AgentCapabilities_ReportsRemoteConfig |
+              AgentCapabilities.AgentCapabilities_ReportsHeartbeat |
+              AgentCapabilities.AgentCapabilities_ReportsHealth |
+              AgentCapabilities.AgentCapabilities_ReportsEffectiveConfig |
+              AgentCapabilities.AgentCapabilities_ReportsAvailableComponents,
+          ),
           headers: s.headers,
           // A key of its own, offered by the server: taken with a state directory (stateFile,
           // below) and kept there; without one the client neither declares nor takes it.

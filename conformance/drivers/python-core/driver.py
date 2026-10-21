@@ -148,14 +148,20 @@ async def main() -> None:
     # (DRIVER_FIRST_CHANGE): the changes count on from it.
     first = int(os.environ.get("DRIVER_FIRST_CHANGE") or 0)
     accept = os.environ.get("DRIVER_ACCEPT_CONNECTION_SETTINGS") == "1"
+    # What the driver reports, declared: the client takes no status field whose bit isn't.
+    capabilities = (pb.AgentCapabilities_AcceptsRemoteConfig | pb.AgentCapabilities_ReportsRemoteConfig
+                    | pb.AgentCapabilities_ReportsHeartbeat | pb.AgentCapabilities_ReportsHealth
+                    | pb.AgentCapabilities_ReportsEffectiveConfig)
+    if os.environ.get("DRIVER_COMPONENTS") == "1":
+        capabilities |= pb.AgentCapabilities_ReportsAvailableComponents
+    if os.environ.get("DRIVER_OWN_TELEMETRY") == "1":
+        capabilities |= (pb.AgentCapabilities_ReportsOwnMetrics | pb.AgentCapabilities_ReportsOwnTraces
+                         | pb.AgentCapabilities_ReportsOwnLogs)
     try:
         client = Client.start(
             Config(endpoint=os.environ.get("OPAMP_ENDPOINT", ""),
                    instance_uid=instance_uid(),
-                   capabilities=pb.AgentCapabilities_AcceptsRemoteConfig | (
-                       pb.AgentCapabilities_ReportsOwnMetrics | pb.AgentCapabilities_ReportsOwnTraces
-                       | pb.AgentCapabilities_ReportsOwnLogs
-                       if os.environ.get("DRIVER_OWN_TELEMETRY") == "1" else 0),
+                   capabilities=capabilities,
                    heartbeat_interval_ms=int(env_float("DRIVER_POLL_S", 2) * 1000),
                    max_send_bytes=int(os.environ.get("DRIVER_MAX_SEND_BYTES") or 0),
                    headers={"Authorization": f"Bearer {token}"} if token else {},

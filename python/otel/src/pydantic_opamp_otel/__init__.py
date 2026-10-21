@@ -1104,7 +1104,14 @@ class Agent:
         self._loop = loop
         s = self.setup
         config = Config(endpoint=s.endpoint, instance_uid=self.uid.bytes,
-                        capabilities=opamp_pb2.AgentCapabilities_AcceptsRemoteConfig,
+                        # What the integration does and reports, declared: the client takes
+                        # no status field whose bit isn't.
+                        capabilities=(opamp_pb2.AgentCapabilities_AcceptsRemoteConfig
+                                      | opamp_pb2.AgentCapabilities_ReportsRemoteConfig
+                                      | opamp_pb2.AgentCapabilities_ReportsHeartbeat
+                                      | opamp_pb2.AgentCapabilities_ReportsHealth
+                                      | opamp_pb2.AgentCapabilities_ReportsEffectiveConfig
+                                      | opamp_pb2.AgentCapabilities_ReportsAvailableComponents),
                         heartbeat_interval_ms=s.heartbeat_ms, headers=s.headers,
                         state_file=str(s.state_dir / "opamp-state") if s.state_dir else None,
                         # A key of its own, offered by the server: taken with a state directory

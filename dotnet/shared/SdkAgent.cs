@@ -422,7 +422,14 @@ internal sealed class SdkAgent
         {
             Endpoint = this.server.Endpoint,
             InstanceUid = Uuid.Bytes(this.Uid),
-            Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig,
+            // What the integration does and reports, declared: the client takes no status field
+            // whose bit isn't.
+            Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig
+                | AgentCapabilities.ReportsRemoteConfig
+                | AgentCapabilities.ReportsHeartbeat
+                | AgentCapabilities.ReportsHealth
+                | AgentCapabilities.ReportsEffectiveConfig
+                | AgentCapabilities.ReportsAvailableComponents),
             HeartbeatInterval = this.server.Heartbeat,
             Headers = this.server.Headers,
             StateFile = this.server.StateDir is { } dir ? Path.Combine(dir, "opamp-state") : null,
