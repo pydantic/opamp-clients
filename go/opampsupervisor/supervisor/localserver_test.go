@@ -354,15 +354,20 @@ func TestLocalServerForwardsToTheCollectorConnectedNow(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("the collector's first message never came")
 	}
+	first := s.agentConn.count()
 	require.NoError(t, old.Stop(t.Context()))
 
-	// The one after it connects, and has sent nothing yet.
+	// The one after it connects, and has sent nothing yet. The server answers the upgrade before
+	// it takes the connection as the collector's (OnConnected), so wait for that too.
 	var next io.ReadWriteCloser
 	require.Eventually(t, func() bool {
 		var status int
 		status, next = upgradeLocal(t, s, header, true)
 		return status == http.StatusSwitchingProtocols
 	}, 5*time.Second, 20*time.Millisecond)
+	require.Eventually(t, func() bool {
+		return s.agentConn.count() > first && s.agentConn.current() != nil
+	}, 5*time.Second, 10*time.Millisecond)
 
 	customMessage := &protobufs.CustomMessage{Capability: "teapot", Type: "brew", Data: []byte("chamomile")}
 	s.onMessage(t.Context(), &types.MessageData{CustomMessage: customMessage})
