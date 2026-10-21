@@ -55,7 +55,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, statuses,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, sent_before, statuses,
     stop_container, stop_group, target, opamp_url,
 )
 
@@ -359,30 +359,33 @@ def check_matching_settings(launch_, target_: Path, listen: str) -> bool:
         if len(st) == 5:
             offset = next(e["wall"] - e["t"] for e in seven)
             t = [offset + tt for tt, _, _ in st]
+            # Each window ends when the server sent the next config, not when its APPLIED came
+            # back: what the agent exports in between is already held to the next one.
+            sent = sent_before(seven, st, offset)
 
             def urls(a: float, b: float) -> list[str]:
                 return [str(i["attributes"].get("url.full", "")) for i in proxy.items("traces", a + MARGIN, b)]
 
-            one = urls(t[0], t[1])
+            one = urls(t[0], sent[1])
             expect(f"sampling_rules: /ping traced ({sum('/ping' in u for u in one)}), /health not "
                    f"({sum('/health' in u for u in one)})",
                    any("/ping" in u for u in one) and not any("/health" in u for u in one))
-            two = proxy.items("logs", t[1] + MARGIN, t[2])
+            two = proxy.items("logs", t[1] + MARGIN, sent[2])
             scopes = {i["scope"] for i in two}
             expect(f"log_levels scopes: app's records exported, app.noisy's not ({sorted(scopes)})",
                    "app" in scopes and "app.noisy" not in scopes)
             before = proxy.items("logs", t[0] + MARGIN, t[1])
             expect("app.noisy's records were exported before", any(i["scope"] == "app.noisy" for i in before))
-            three = proxy.items("traces", t[2] + MARGIN, t[3])
+            three = proxy.items("traces", t[2] + MARGIN, sent[3])
             expect(f"attribute_redaction drop: no span with server.address ({len(three)} spans)",
                    bool(three) and not any("server.address" in i["attributes"] for i in three))
             expect("attribute_redaction mask: every span's http.request.method is [REDACTED]",
                    bool(three) and all(i["attributes"].get("http.request.method") == "[REDACTED]" for i in three))
             expect("before them, spans had both", any("server.address" in i["attributes"]
                                                       for i in proxy.items("traces", t[0] + MARGIN, t[1])))
-            seconds = t[4] - t[3] - MARGIN
-            spans = len(proxy.items("traces", t[3] + MARGIN, t[4]))
-            logs = len(proxy.items("logs", t[3] + MARGIN, t[4]))
+            seconds = sent[4] - t[3] - MARGIN
+            spans = len(proxy.items("traces", t[3] + MARGIN, sent[4]))
+            logs = len(proxy.items("logs", t[3] + MARGIN, sent[4]))
             # A second's burst at most beyond the rate; the application makes 5 traces and 10 records a second.
             expect(f"trace_rate_limit 1: {spans} spans in {seconds:.0f} s",
                    seconds > 3 and 0 < spans <= seconds + 2)
