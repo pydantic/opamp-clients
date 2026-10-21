@@ -81,6 +81,14 @@ func runOnce(t *testing.T, srv *oneConfigServer, url, state string, answer proto
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
+	// The answer the server heard may not be saved yet, and a client stopping saves nothing more
+	// (what is unsaved is lost, as in a crash): wait for the state file to hold it.
+	for !savedAnswer(t, url, state, answer) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the state file never held %v", answer)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 	uid := c.InstanceUID()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -88,6 +96,21 @@ func runOnce(t *testing.T, srv *oneConfigServer, url, state string, answer proto
 		t.Fatal(err)
 	}
 	return uid
+}
+
+// Whether the state file holds the application's answer to the config: applied, or refused.
+func savedAnswer(t *testing.T, url, state string, answer protobufs.RemoteConfigStatuses) bool {
+	t.Helper()
+	o, err := Open(t.Context(), Config{Mode: ModePlatform, Endpoint: url, StateFile: state})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer o.Close()
+	r := o.Resumed()
+	if answer == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED {
+		return r.AppliedRemoteConfig != nil
+	}
+	return r.RemoteConfigRefused.GetStatus() == answer
 }
 
 // Open says what a client starts from, without connecting: the config the application last
