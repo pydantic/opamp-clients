@@ -30,6 +30,17 @@ def lazyfs_clients() -> list[str]:
     return [c.lstrip("=") for c in default.group(1).split(",")]
 
 
+class CoreTaps(unittest.TestCase):
+    def test_the_taps_come_in_the_order_the_runs_wrote_them(self):
+        names = ["core-0.tap", "core-1.tap", "core-1.tap.812.1", "core-1.tap.812.2", "core-1.tap.812.10",
+                 "core-2.tap", "core-9.tap", "core-10.tap", "core-10.tap.95.1", "core-11.tap", "core-100.tap"]
+        with tempfile.TemporaryDirectory() as tmp:
+            for name in reversed(names):
+                (Path(tmp) / name).write_bytes(b"")
+            (Path(tmp) / "driver.jsonl").write_bytes(b"")
+            self.assertEqual([p.name for p in run.core_taps(Path(tmp))], names)
+
+
 class LazyFSClients(unittest.TestCase):
     def test_the_lazyfs_container_needs_no_docker_for_its_clients(self):
         # The LazyFS container has no Docker: a driver that runs in a container, or a build that

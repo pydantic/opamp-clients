@@ -185,8 +185,14 @@ def read_jsonl(path: Path, source: str) -> list[dict]:
 
 def core_taps(run_dir: Path) -> list[Path]:
     """The core taps a run's drivers wrote: core-<n>.tap, and core-<n>.tap.<pid>.<k> for a
-    process's later cores."""
-    return sorted(run_dir.glob("core-*.tap*"))
+    process's later cores, in the order they were written: by n, then pid and k, as numbers. (The
+    torture checks pair the server's messages with the taps' sends in this order. By name,
+    core-10.tap came before core-2.tap once a run crashed ten times, and a message was paired with
+    another run's send.)"""
+    def order(path: Path) -> list:
+        return [(0, int(part), "") if part.isdigit() else (1, 0, part)
+                for part in re.split(r"(\d+)", path.name)]
+    return sorted(run_dir.glob("core-*.tap*"), key=order)
 
 
 def tap_env(run_dir: Path, n: int, docker: bool) -> str:
