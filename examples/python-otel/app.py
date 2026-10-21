@@ -12,11 +12,18 @@ levels per scope pick out.
 Its one line of OpAMP code reads a setting of its own the server sends (docs/app-settings.md): a
 feature flag, ``example.feature``. While the server says ``on``, each round also requests
 /feature; and each time its settings change it requests /changed, once. Without a server, or
-until the server says, the flag is its default, ``off``."""
+until the server says, the flag is its default, ``off``.
+
+With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction: a span of its own,
+``example.probe``, with the URL it requests (url.full) on an event and on a link to the round
+before's probe, and a log record ``example.probe`` with that URL. It probes before or after the
+request, at random: under a rate limit of one a second, the first record after the token comes
+takes it, and in a fixed order the probe might never be that one."""
 
 import logging
 import os
 import queue
+import random
 import sys
 import time
 import urllib.request
@@ -29,6 +36,12 @@ if os.environ.get("EXAMPLE_SETUP"):  # check_truth's setups (setups.py): none ot
     setups.apply(os.environ["EXAMPLE_SETUP"])
 
 log = logging.getLogger("app")
+probing = os.environ.get("EXAMPLE_PROBE") == "1"
+if probing:
+    from opentelemetry import trace
+
+    tracer = trace.get_tracer("app")
+last = None  # the round before's probe, which the next links to
 noisy = logging.getLogger("app.noisy")
 logging.getLogger().setLevel(logging.INFO)
 base = sys.argv[1].rsplit("/", 1)[0]
@@ -36,6 +49,18 @@ health = os.environ.get("APP_HEALTH_CHECKS") and base + "/health"
 # Told on the OpAMP client's thread: keep it quick, and do the work in the application's own loop.
 changes: queue.SimpleQueue = queue.SimpleQueue()
 app_settings.on_change(lambda settings, changed: changes.put(sorted(changed)))
+
+
+def probe(url: str) -> None:
+    """A span of its own with `url` on an event and on a link to the last probe, and a log record
+    with `url`: what redaction may drop or mask."""
+    global last
+    attributes = {"url.full": url}
+    links = [trace.Link(last, attributes)] if last else []
+    with tracer.start_as_current_span("example.probe", links=links) as span:
+        span.add_event("example.probe", attributes)
+        last = span.get_span_context()
+    log.info("example.probe", extra=attributes)
 
 
 def request(url: str) -> None:
@@ -47,8 +72,13 @@ def request(url: str) -> None:
 
 try:
     while True:
+        early = random.random() < 0.5
+        if probing and early:
+            probe(sys.argv[1])
         request(sys.argv[1])
         log.info("requested %s", sys.argv[1])
+        if probing and not early:
+            probe(sys.argv[1])
         if app_settings.get("example.feature", "off") == "on":
             request(base + "/feature")
         while not changes.empty():

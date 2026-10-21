@@ -105,6 +105,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         "OTEL_METRICS_EXPORTER": "none",
         "OTEL_LOGS_EXPORTER": "none",
         "OTEL_BSP_SCHEDULE_DELAY": "500",
+        # Program.cs's own activities (run 3's probe): exported only from a source named here.
+        "OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES": "app",
     } | extra
     stderr = open(TARGET / f"{name}.stderr", "w")
     if LOCAL:

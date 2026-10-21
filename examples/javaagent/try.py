@@ -79,8 +79,6 @@ def build() -> None:
                         f"-DoutputDirectory={TARGET}", "-Dmdep.stripVersion=true",
                         "-f", str(ROOT / "java/opamp-javaagent/pom.xml")], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
-        subprocess.run(["javac", "-cp", str(TARGET / APP_SETTINGS), "-d", str(TARGET / "app"), str(HERE / "App.java")],
-                       check=True)
         for name in SETUPS_CLASSPATH:
             subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy",
                             f"-Dartifact=io.opentelemetry:{name}:{SDK_VERSION}", f"-DoutputDirectory={TARGET / 'setups-lib'}",
@@ -88,6 +86,8 @@ def build() -> None:
                            stdout=subprocess.DEVNULL)
         classpath = ":".join(str(TARGET / "setups-lib" / f"{n}.jar") for n in SETUPS_CLASSPATH)
         subprocess.run(["javac", "-cp", classpath, "-d", str(TARGET / "setups"), str(HERE / "Setups.java")], check=True)
+        subprocess.run(["javac", "-cp", f"{TARGET / APP_SETTINGS}:{app_api(TARGET)}",
+                        "-d", str(TARGET / "app"), str(HERE / "App.java")], check=True)
     else:
         for module, goal in [("java/opamp", "install"), ("java/opamp-javaagent", "package")]:
             subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT / module}:/src", *M2, "-w",
@@ -98,16 +98,17 @@ def build() -> None:
                         f"-Dartifact=io.opentelemetry.javaagent:opentelemetry-javaagent:{AGENT_VERSION}",
                         "-DoutputDirectory=/out", "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
-        # Compiled, not run as a source file: the agent stays off under the JDK's source launcher.
-        subprocess.run(["docker", "run", "--rm", "-v", f"{HERE}:/app:ro", "-v", f"{TARGET}:/out",
-                        "eclipse-temurin:21-jdk", "javac", "-cp", f"/out/{APP_SETTINGS}", "-d", "/out/app",
-                        "/app/App.java"], check=True)
         for name in SETUPS_CLASSPATH:
             subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
                             "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
                             f"-Dartifact=io.opentelemetry:{name}:{SDK_VERSION}", "-DoutputDirectory=/out/setups-lib",
                             "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
         classpath = ":".join(f"/out/setups-lib/{n}.jar" for n in SETUPS_CLASSPATH)
+        # Compiled, not run as a source file: the agent stays off under the JDK's source launcher.
+        # Against the OpenTelemetry API too, for run 3's probe (App.java), which the agent bridges.
+        subprocess.run(["docker", "run", "--rm", "-v", f"{HERE}:/app:ro", "-v", f"{TARGET}:/out",
+                        "eclipse-temurin:21-jdk", "javac", "-cp", f"/out/{APP_SETTINGS}:{app_api('/out')}",
+                        "-d", "/out/app", "/app/App.java"], check=True)
         subprocess.run(["docker", "run", "--rm", "-v", f"{HERE}:/app:ro", "-v", f"{TARGET}:/out",
                         "eclipse-temurin:21-jdk", "javac", "-cp", classpath, "-d", "/out/setups", "/app/Setups.java"],
                        check=True)
@@ -132,6 +133,13 @@ def package_setups() -> None:
 
 
 APP_SETTINGS = "opamp-app-settings.jar"
+
+
+def app_api(root: object) -> str:
+    """The OpenTelemetry API the application compiles against and runs with, for its probe, as a
+    class path under `root` (where setups-lib is): the agent bridges it to its own SDK."""
+    return ":".join(f"{root}/setups-lib/{n}.jar" for n in ("opentelemetry-api", "opentelemetry-context",
+                                                           "opentelemetry-common"))
 
 
 def copy_jars() -> None:
@@ -164,7 +172,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
         extensions += f",{agent}/{SETUPS}"
     java = ["java", f"-javaagent:{agent}/opentelemetry-javaagent.jar", f"-Dotel.javaagent.extensions={extensions}",
-            "-cp", f"{agent}/app:{agent}/{APP_SETTINGS}", "App", f"{telemetry}/ping"]
+            "-cp", f"{agent}/app:{agent}/{APP_SETTINGS}:{app_api(agent)}", "App", f"{telemetry}/ping"]
     stderr = open(TARGET / f"{name}.stderr", "w")
     if LOCAL:
         app = subprocess.Popen(java, env=os.environ | env, start_new_session=True, stdout=subprocess.DEVNULL,
