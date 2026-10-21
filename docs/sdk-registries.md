@@ -26,7 +26,7 @@ bundle when Central has both artifacts at the version. Central publishes a bundl
 all; if a rerun finds one artifact there and not the other, the job fails and says so.
 
 For Go, push a tag per module: `go/vX.Y.Z` for the client, then `go/opampotel/vX.Y.Z`,
-`go/opampextension/vX.Y.Z` and `go/opampsupervisor/vX.Y.Z` on a commit whose `go.mod` files
+`go/opampextension/vX.Y.Z`, `go/logfirepolicyprocessor/vX.Y.Z` and `go/opampsupervisor/vX.Y.Z` on a commit whose `go.mod` files
 require that client version. The module proxy serves them, and caches each tag for good. The
 `replace` in each `go.mod` only applies inside this repository. The Supervisor is installed from
 its packages, since `go install` refuses a module with a `replace`.

@@ -11,61 +11,13 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/match"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
 
-// The matchers the settings that match telemetry need (docs/sdk-settings.md, "Settings that match
-// telemetry"), native because they run once a span or log record. The layer reads and checks the
-// settings; these only match, the layer's way: the shared vectors in
-// testdata/sdk-settings and the layer's Evaluate call hold them to it (match_test.go).
-
-// glob says whether text matches pattern: `*` matches any run of characters, none included, and
-// every other character is itself. By Unicode characters (runes), case-sensitively, or ignoring
-// ASCII case with fold. On a mismatch the last `*` takes one more character and the pattern after
-// it starts again, so at most pattern × text steps.
-func glob(pattern, text string, fold bool) bool {
-	p, t := []rune(pattern), []rune(text)
-	pi, ti := 0, 0
-	starAfter, starTaken := -1, 0
-	for ti < len(t) {
-		switch {
-		case pi < len(p) && p[pi] == '*':
-			pi++
-			starAfter, starTaken = pi, ti
-		case pi < len(p) && same(p[pi], t[ti], fold):
-			pi++
-			ti++
-		case starAfter >= 0:
-			starTaken++
-			pi, ti = starAfter, starTaken
-		default:
-			return false
-		}
-	}
-	for ; pi < len(p); pi++ {
-		if p[pi] != '*' {
-			return false
-		}
-	}
-	return true
-}
-
-// same compares two characters, ignoring ASCII case (only) with fold: `A` is `a`, `É` isn't `é`.
-func same(a, b rune, fold bool) bool {
-	if a == b {
-		return true
-	}
-	if !fold {
-		return false
-	}
-	lower := func(r rune) rune {
-		if 'A' <= r && r <= 'Z' {
-			return r + ('a' - 'A')
-		}
-		return r
-	}
-	return lower(a) == lower(b)
-}
+// The sampling rules' matchers, native because they run once a span. The layer reads and checks
+// the settings; these only match, the layer's way, with the globs of package match: the shared
+// vectors in testdata/sdk-settings and the layer's Evaluate call hold them to it.
 
 // rule is a sampling rule, ready to match: the first rule a root span matches decides its rate.
 type rule struct {
@@ -95,7 +47,7 @@ func newRule(r *settingspb.SamplingRule) rule {
 // matches says whether the span, as the sampler sees it at its start, matches every matcher the
 // rule has (a rule with none matches every span).
 func (r *rule) matches(p sdktrace.SamplingParameters) bool {
-	if r.name != nil && !glob(*r.name, p.Name, false) {
+	if r.name != nil && !match.Glob(*r.name, p.Name, false) {
 		return false
 	}
 	if r.kind != 0 {
@@ -109,7 +61,7 @@ func (r *rule) matches(p sdktrace.SamplingParameters) bool {
 	}
 	if r.path != nil {
 		path, ok := spanPath(p.Attributes)
-		if !ok || !glob(*r.path, path, false) {
+		if !ok || !match.Glob(*r.path, path, false) {
 			return false
 		}
 	}
@@ -119,7 +71,7 @@ func (r *rule) matches(p sdktrace.SamplingParameters) bool {
 			return false
 		}
 		text, ok := attributeText(v)
-		if !ok || !glob(a.pattern, text, false) {
+		if !ok || !match.Glob(a.pattern, text, false) {
 			return false
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/match"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
 
@@ -63,9 +64,9 @@ func (c *Controls) apply(s *settingspb.Settings) {
 		traces:  s.SendTraces == nil || *s.SendTraces,
 		metrics: s.SendMetrics == nil || *s.SendMetrics,
 		logs:    s.SendLogs == nil || *s.SendLogs,
-		levels:  &logLevels{min: s.GetSendLogsMinSeverity(), scopes: s.GetSendLogsScopeLevels()},
+		levels:  match.LevelsOf(s),
 		logsCap: c.gates.Load().logsCap,
-		redact:  &redaction{drop: s.GetDropAttributes(), mask: s.GetMaskAttributes()},
+		redact:  &redaction{*match.RedactionOf(s)},
 	}
 	// A cap applied again (the same document re-delivered, or refreshed) keeps its bucket.
 	if !sameCap(g.logsCap, s.SendLogsPerSecond) {
@@ -393,7 +394,7 @@ func (e *logs) Export(ctx context.Context, records []sdklog.Record) error {
 	for i := range records {
 		r := &records[i]
 		scope := r.InstrumentationScope().Name
-		pass := g.levels.keeps(scope, int(r.Severity())) && !g.switches.off(scope)
+		pass := g.levels.Keeps(scope, int(r.Severity())) && !g.switches.off(scope)
 		switch {
 		case pass && copied:
 			kept = append(kept, *r)

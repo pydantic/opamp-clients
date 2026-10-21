@@ -7,10 +7,16 @@ Collector's TLS settings and the environment's proxies apply as they do to its o
 | | What it is | What the server can do |
 |---|---|---|
 | The `opamp` extension, [`go/opampextension`](../go/opampextension/) | The Collector's `opamp` extension with the client underneath replaced. The component type, the config and the custom-message API (`opampcustommessages`) are upstream's | see the collector: its description, effective config, health and available components; exchange custom messages with its components; restart it; issue it new OpAMP credentials |
+| The `logfirepolicy` processor, [`go/logfirepolicyprocessor`](../go/logfirepolicyprocessor/) | A processor of ours: it carries out a Logfire SDK policy on what goes through the collector, as an SDK does | under the Supervisor, send the collector the Logfire SDK policy: head sampling, signal exports, log levels and attribute redaction |
 | The Supervisor, [`go/opampsupervisor`](../go/opampsupervisor/) | A fork of upstream's `opampsupervisor` at `cmd/opampsupervisor/v0.163.0`, on this client. It runs any vendor's collector as a child process | everything above, plus configure the collector (remote config, within the policy the host sets: [what the server can do](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)), and install a new collector executable (packages) |
 
 The extension alone reports the collector it runs in. To have the server change what the
-collector runs, run it under the Supervisor, which configures it with the extension.
+collector runs, run it under the Supervisor, which configures it with the extension. A server
+sends a Supervisor's collector the Logfire SDK policy, the one SDKs take, in the
+`logfire-sdk-policy.json` entry, beside the collector's YAML or alone: the Supervisor puts the
+`logfirepolicy` processor, configured with it, first in every traces, metrics and logs pipeline
+(the [processor's README](../go/logfirepolicyprocessor/README.md) says which controls a collector
+carries out, and why not the others). The packaged collector has the processor.
 
 What each adds to upstream's, and every option, is in its README: the
 [extension's](../go/opampextension/README.md) and the
@@ -114,6 +120,7 @@ checked with Cosign.
 ```bash
 scripts/fetch_core.py fetch
 (cd go/opampextension && go test -race ./...)
+(cd go/logfirepolicyprocessor && go test -race ./...)
 (cd go/opampsupervisor && go test -race ./...)
 ```
 

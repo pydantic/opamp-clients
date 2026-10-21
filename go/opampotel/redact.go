@@ -7,27 +7,18 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/match"
 )
 
 // mask is what a masked attribute's value becomes, whatever its type.
-const mask = "[REDACTED]"
+const mask = match.Mask
 
-// redaction is drop_attributes and mask_attributes: globs on attribute keys, lowercase, matched
-// ignoring ASCII case. A key both match is dropped.
-type redaction struct {
-	drop, mask []string
-}
+// redaction is drop_attributes and mask_attributes (package match, which the Collector's
+// logfirepolicy processor redacts with too).
+type redaction struct{ match.Redaction }
 
-func (r *redaction) none() bool { return r == nil || len(r.drop) == 0 && len(r.mask) == 0 }
-
-func matchesAny(patterns []string, key string) bool {
-	for _, p := range patterns {
-		if glob(p, key, true) {
-			return true
-		}
-	}
-	return false
-}
+func (r *redaction) none() bool { return r == nil || r.Redaction.None() }
 
 // apply is the attributes as exported: dropped ones gone, masked ones the string [REDACTED], the
 // rest as they were, in their order; changed says whether any is. attrs itself is never changed.
@@ -37,10 +28,7 @@ func (r *redaction) apply(attrs []attribute.KeyValue) (out []attribute.KeyValue,
 	}
 	for i, kv := range attrs {
 		key := string(kv.Key)
-		dropped, masked := matchesAny(r.drop, key), false
-		if !dropped {
-			masked = matchesAny(r.mask, key)
-		}
+		dropped, masked := r.Key(key)
 		if !dropped && !masked {
 			if changed {
 				out = append(out, kv)

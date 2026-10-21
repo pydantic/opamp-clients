@@ -101,6 +101,7 @@ require (
 	github.com/transparency-dev/merkle v0.0.2 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opentelemetry.io/collector/internal/statusutil v0.163.0 // indirect
+	go.opentelemetry.io/collector/processor/processorhelper v0.163.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 )
@@ -175,6 +176,7 @@ require (
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/pydantic/opamp-clients/go v0.1.0
+	github.com/pydantic/opamp-clients/go/logfirepolicyprocessor v0.0.0
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.9 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -282,3 +284,5 @@ require (
 )
 
 replace github.com/pydantic/opamp-clients/go => ../
+
+replace github.com/pydantic/opamp-clients/go/logfirepolicyprocessor => ../logfirepolicyprocessor

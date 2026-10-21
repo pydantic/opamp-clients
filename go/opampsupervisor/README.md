@@ -126,6 +126,18 @@ agent:
   backoff, and so is one the Supervisor can't start the first time; both stayed down until the
   next config. The loop's decisions on an exit, a restart and the
   window's end are one pure step (`supervisor/apply_step.go`), tested rule by rule.
+- **The Logfire SDK policy reaches the collector.** A server sends it in the
+  `logfire-sdk-policy.json` entry of the config map, as it sends it to an SDK, beside the
+  collector's YAML or alone. The Supervisor doesn't merge it into the config as YAML (upstream's
+  did, and the collector refused the result): the SDK settings layer checks it, as the SDKs' does,
+  and the collector's [`logfirepolicy` processor](../logfirepolicyprocessor/README.md), configured
+  with it, goes first in every traces, metrics and logs pipeline, local or remote, so the
+  collector redacts, filters by level, switches signals and head-samples as an SDK under the same
+  policy does. A policy that overrides a control the collector can't carry out (`sampling_rules`,
+  the rate caps, `debug`, ...) is FAILED with the layer's reason, and never runs. The agent
+  description carries `logfire.opamp.config_format` and `logfire.opamp.supported_controls` only
+  while the collector lists the processor among its available components; without it, only a
+  policy with every control local is taken, and changes nothing.
 - A custom message is handed to the client, which queues it: `ErrCustomMessagePending` never
   happens, and a message it can't send after all is logged.
 - **`server` settings that can't apply are refused.** An endpoint with a user name or password,
@@ -173,12 +185,12 @@ paths were rewritten to this module's. The files changed beyond that say what ch
 header. These files are new, and are this repository's:
 
 - `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
-  `localserver.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
+  `localserver.go`, `sdk_policy.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
+- `e2e_packages_test.go`, `e2e_policy_test.go`, `e2e_sdk_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
-  `supervisor_packages.yaml` and `supervisor_policy.yaml`);
+  `supervisor_packages.yaml`, `supervisor_policy.yaml` and `supervisor_sdk_policy.yaml`);
 - everything under `packaging/`.
 
 Upstream's `supervisor/packages.go` (and its test config `supervisor_packages_cap.yaml`) is
