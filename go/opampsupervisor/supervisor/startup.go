@@ -4,8 +4,6 @@
 package supervisor
 
 import (
-	"bytes"
-
 	"github.com/open-telemetry/opamp-go/protobufs"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
@@ -13,10 +11,10 @@ import (
 
 // startup is the remote config the collector starts on, from what the OpAMP client resumes.
 type startup struct {
-	// config is the remote config to start on; nil: none (the local config only).
+	// config is the remote config to start on; nil: none (the local config only). Nothing is
+	// known of it: whether it runs healthy is for the collector started on it to show, when the
+	// client hands it over again (configRetargets), even if a collector ran it healthy before.
 	config *protobufs.AgentRemoteConfig
-	// status is what is known about config: APPLIED when the collector ran it last, else UNSET.
-	status protobufs.RemoteConfigStatuses
 	// lastWorking is the config a failed one is rolled back to: the last applied, with
 	// agent::automatic_config_rollback on.
 	lastWorking *protobufs.AgentRemoteConfig
@@ -48,10 +46,6 @@ func startupConfig(r opamp.Resumed, acceptsRemoteConfig, rollback bool) startup 
 	if st.config == nil {
 		st.config = r.AppliedRemoteConfig
 		st.rolledBack = st.config != nil && r.RemoteConfigRefused != nil
-	}
-	if st.config != nil && r.AppliedRemoteConfig != nil &&
-		bytes.Equal(st.config.GetConfigHash(), r.AppliedRemoteConfig.GetConfigHash()) {
-		st.status = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
 	}
 	return st
 }

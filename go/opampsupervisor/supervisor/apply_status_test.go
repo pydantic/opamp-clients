@@ -388,21 +388,3 @@ func TestTheMergedConfigIsNotReportedAsEffective(t *testing.T) {
 	require.NotNil(t, got)
 	assert.Empty(t, got.GetConfigMap().GetConfigMap())
 }
-
-// The core asks again about a saved config at restart. Answer even when its hash is unchanged,
-// so that the core can deliver a later config without restarting the running Collector.
-func TestResumedConfigIsAcknowledgedAgain(t *testing.T) {
-	a := newApplyTestSupervisor(t, "sleep")
-	saved := receiversConfig("saved", "nop")
-	a.remoteConfig.Store(saved)
-	_, err := a.composeMergedConfig(saved)
-	require.NoError(t, err)
-	require.NoError(t, a.writeAgentConfig())
-	a.startupStatus = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
-	startAgentLoop(t, a.Supervisor)
-	require.Eventually(t, a.commander.IsRunning, 5*time.Second, 10*time.Millisecond)
-	pid := a.commander.Pid()
-	a.offer(t, saved)
-	a.waitFor(t, "saved APPLIED")
-	require.Equal(t, pid, a.commander.Pid(), "acknowledging the saved config must not restart its Collector")
-}
