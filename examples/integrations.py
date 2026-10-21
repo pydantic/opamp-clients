@@ -564,6 +564,14 @@ def offered_before(events: list[dict], t: float) -> float:
     return max((e["t"] for e in events if e["event"] == "s2a" and e.get("offer_config") and e["t"] < t), default=t)
 
 
+def sent_before(events: list[dict], st: list[tuple[float, str, str]], offset: float = 0.0) -> list[float]:
+    """For each status in `st` (statuses()), when the server last sent a remote config before it,
+    shifted by `offset` (the run's wall clock less its own): where a window over what the config
+    before it did ends. The agent puts a config in force before it answers, so what it exports
+    between the server sending a config and that config's APPLIED is already held to it."""
+    return [offset + offered_before(events, t) for t, _, _ in st]
+
+
 def pings(events: list[dict], after: float = -1, before: float = 1e9) -> list[dict]:
     """The application's requests (to /ping, which the server doesn't serve)."""
     return [e for e in events if e["event"] == "stray_request" and e.get("path") == "/ping" and after < e["t"] < before]

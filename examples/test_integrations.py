@@ -1162,6 +1162,28 @@ class AppSettings(unittest.TestCase):
         self.assertNotEqual(failed(judge_app_settings_restart(eighth(changed=True).events)), [])
 
 
+class SentBefore(unittest.TestCase):
+    """The windows the matching checks of the Java agent and .NET count exports in: each ends when the
+    server sent the next config, as the agent may already export under it before it answers."""
+
+    def test_a_window_ends_when_the_next_config_is_sent_not_when_it_is_answered(self) -> None:
+        # Three configs, each answered APPLIED 1.5 s after it was sent.
+        log = Log().offer(10).a2s(11.5, status="APPLIED").offer(20).a2s(21.5, status="APPLIED")
+        log.offer(30).a2s(31.5, status="APPLIED")
+        st = integrations.statuses(log.events)
+        sent = integrations.sent_before(log.events, st, offset=1000)
+        self.assertEqual(sent, [1010, 1020, 1030])
+        # An export at 1021, under the second config, after it was sent but before its APPLIED: in
+        # the first config's window if that ended at the answer, out of it as it ends at the offer.
+        t = [1000 + tt for tt, _, _ in st]
+        self.assertTrue(t[0] + integrations.MARGIN < 1021 < t[1])
+        self.assertFalse(t[0] + integrations.MARGIN < 1021 < sent[1])
+
+    def test_a_status_with_no_offer_before_it_ends_its_window_at_itself(self) -> None:
+        log = Log().a2s(5, status="APPLIED")
+        self.assertEqual(integrations.sent_before(log.events, integrations.statuses(log.events)), [5])
+
+
 class RustLog(unittest.TestCase):
     def test_export_end_times_use_the_server_clock(self):
         with tempfile.TemporaryDirectory() as directory:
