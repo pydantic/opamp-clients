@@ -4,7 +4,8 @@
 // Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the OpAMP
 // client is go/opamp's (the shared core, in platform mode) behind opamp-go's client interface
 // (coreclient.go), and a health update that clears the error is reported even when the status
-// stays.
+// stays. Health reports keep the start time from the first healthy one until NotReady
+// (start_time.go).
 
 package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
 
@@ -103,6 +104,7 @@ type opampAgent struct {
 	statusSubscriptionWg *sync.WaitGroup
 	componentHealthWg    *sync.WaitGroup
 	startTimeUnixNano    uint64
+	startTimeState       startTimeState // Changed here: guards startTimeUnixNano (start_time.go).
 	componentStatusCh    chan *eventSourcePair
 	readyCh              chan struct{}
 }
@@ -282,12 +284,14 @@ func (o *opampAgent) Register(capability string, opts ...opampcustommessages.Cus
 }
 
 func (o *opampAgent) Ready() error {
+	o.markStarted() // Changed here: a NotReady before is over (start_time.go).
 	o.setHealth(&protobufs.ComponentHealth{Healthy: true})
 	close(o.readyCh)
 	return nil
 }
 
 func (o *opampAgent) NotReady() error {
+	o.markStopped() // Changed here: a stopping collector reports no start time (start_time.go).
 	o.setHealth(&protobufs.ComponentHealth{Healthy: false})
 	return nil
 }
@@ -546,11 +550,7 @@ func (o *opampAgent) onCommand(_ context.Context, command *protobufs.ServerToAge
 
 func (o *opampAgent) setHealth(ch *protobufs.ComponentHealth) {
 	if o.capabilities.ReportsHealth && o.opampClient != nil {
-		if ch.Healthy && o.startTimeUnixNano == 0 {
-			ch.StartTimeUnixNano = ch.StatusTimeUnixNano
-		} else {
-			ch.StartTimeUnixNano = o.startTimeUnixNano
-		}
+		ch.StartTimeUnixNano = o.reportedStartTime(ch) // Changed here: kept, not per report (start_time.go).
 		if err := o.opampClient.SetHealth(ch); err != nil {
 			o.logger.Error("Could not report health to OpAMP server", zap.Error(err))
 		}

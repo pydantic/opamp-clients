@@ -4,7 +4,8 @@
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: Start waits
 // for the previous run's watcher, so Stop can't take its exit for the new run's; StartOneShot
 // kills a one-shot Collector that ignores the shutdown signal, and returns all of its output;
-// SetExecutable switches the executable, for an installed update.
+// SetExecutable switches the executable, for an installed update. The Collector doesn't inherit
+// the Supervisor's OTEL_EXPORTER_OTLP_* variables (collector_env.go).
 
 package commander
 
@@ -590,7 +591,7 @@ func envVarMapToEnvMapSlice(m map[string]string) []string {
 	if m == nil {
 		return nil
 	}
-	result := os.Environ()
+	result := inheritedEnviron() // Changed here: without OTEL_EXPORTER_OTLP_* (collector_env.go).
 	for key, value := range m {
 		result = append(result, key+"="+value)
 	}
