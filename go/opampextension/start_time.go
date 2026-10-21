@@ -4,10 +4,20 @@
 package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
 
 import (
+	"sync"
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
 )
+
+// startTimeState guards opampAgent.startTimeUnixNano: Ready, NotReady and the status loop report
+// health from different goroutines.
+type startTimeState struct {
+	mu sync.Mutex
+	// stopped is set from NotReady to the next Ready: reports carry no start time, and a healthy
+	// one doesn't set it.
+	stopped bool
+}
 
 // reportedStartTime is the start time a health report carries: the time of the first healthy
 // report (its status time, or now when it has none), kept for every later report until the
@@ -15,8 +25,11 @@ import (
 // and 0 while it isn't running. Upstream's never kept it, so each healthy report carried its own
 // status time, and an unhealthy one from a running collector 0.
 func (o *opampAgent) reportedStartTime(ch *protobufs.ComponentHealth) uint64 {
-	o.startTimeMu.Lock()
-	defer o.startTimeMu.Unlock()
+	o.startTimeState.mu.Lock()
+	defer o.startTimeState.mu.Unlock()
+	if o.startTimeState.stopped {
+		return 0
+	}
 	if ch.Healthy && o.startTimeUnixNano == 0 {
 		o.startTimeUnixNano = ch.StatusTimeUnixNano
 		if o.startTimeUnixNano == 0 {
@@ -26,10 +39,18 @@ func (o *opampAgent) reportedStartTime(ch *protobufs.ComponentHealth) uint64 {
 	return o.startTimeUnixNano
 }
 
-// clearStartTime marks the collector stopped: reports from now on carry no start time, until it
-// is healthy again.
-func (o *opampAgent) clearStartTime() {
-	o.startTimeMu.Lock()
-	defer o.startTimeMu.Unlock()
+// markStopped is NotReady's: the collector is stopping, so every report from now on carries no
+// start time, even a healthy one racing it from the status loop, until Ready.
+func (o *opampAgent) markStopped() {
+	o.startTimeState.mu.Lock()
+	defer o.startTimeState.mu.Unlock()
+	o.startTimeState.stopped = true
 	o.startTimeUnixNano = 0
+}
+
+// markStarted is Ready's: reports carry the start time again, set by the next healthy one.
+func (o *opampAgent) markStarted() {
+	o.startTimeState.mu.Lock()
+	defer o.startTimeState.mu.Unlock()
+	o.startTimeState.stopped = false
 }

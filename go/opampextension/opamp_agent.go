@@ -104,7 +104,7 @@ type opampAgent struct {
 	statusSubscriptionWg *sync.WaitGroup
 	componentHealthWg    *sync.WaitGroup
 	startTimeUnixNano    uint64
-	startTimeMu          sync.Mutex // Changed here: guards startTimeUnixNano (start_time.go).
+	startTimeState       startTimeState // Changed here: guards startTimeUnixNano (start_time.go).
 	componentStatusCh    chan *eventSourcePair
 	readyCh              chan struct{}
 }
@@ -284,13 +284,14 @@ func (o *opampAgent) Register(capability string, opts ...opampcustommessages.Cus
 }
 
 func (o *opampAgent) Ready() error {
+	o.markStarted() // Changed here: a NotReady before is over (start_time.go).
 	o.setHealth(&protobufs.ComponentHealth{Healthy: true})
 	close(o.readyCh)
 	return nil
 }
 
 func (o *opampAgent) NotReady() error {
-	o.clearStartTime() // Changed here: a stopping collector reports no start time (start_time.go).
+	o.markStopped() // Changed here: a stopping collector reports no start time (start_time.go).
 	o.setHealth(&protobufs.ComponentHealth{Healthy: false})
 	return nil
 }

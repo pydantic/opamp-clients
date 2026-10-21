@@ -35,7 +35,10 @@ func TestHealthReportsKeepTheStartTime(t *testing.T) {
 	o.setHealth(&protobufs.ComponentHealth{Healthy: true, StatusTimeUnixNano: at(2 * time.Second)})
 	require.NoError(t, o.NotReady())
 
-	assert.Equal(t, []uint64{0, at(0), at(0), at(0), 0}, reported)
+	// A healthy report after NotReady, from the status loop, doesn't set it again.
+	o.setHealth(&protobufs.ComponentHealth{Healthy: true, StatusTimeUnixNano: at(3 * time.Second)})
+
+	assert.Equal(t, []uint64{0, at(0), at(0), at(0), 0, 0}, reported)
 
 	// Ready carries no status time: the start time is when it was reported.
 	reported = nil

@@ -74,7 +74,7 @@ across restarts (upstream makes up a new one at every start).
   kept reporting the old error).
 - A second `Unregister` of a custom capability is a no-op (upstream's panicked).
 - A health report's start time is the time of the first healthy report, kept while the collector
-  runs, healthy or not, and 0 again from `NotReady` (shutdown). Upstream's never kept it: each
+  runs, healthy or not, and 0 from `NotReady` (shutdown) until `Ready`. Upstream's never kept it: each
   healthy report carried its own status time as the start, and every unhealthy one 0.
 
 The extension is kept close to upstream's so that upstream's changes merge in
