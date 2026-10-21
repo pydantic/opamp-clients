@@ -22,12 +22,20 @@
 // example.feature. While the server says "on", each tick also requests /feature; and each time
 // its settings change it requests /changed, once. Without a server, or until the server says, the
 // flag is its default, "off".
+//
+// With EXAMPLE_PROBE=1 (integrations.py's run 3) each tick also probes redaction: a span of its own,
+// example.probe, with the URL it requests (url.full) on an event and on a link to the tick
+// before's probe, and a log line example.probe with that URL. It probes before or after the request,
+// at random: under a rate limit of one a second, the first record after the token comes takes it,
+// and in a fixed order the probe might never be that one.
 package main
 
 import (
 	"context"
 	"flag"
 	"log"
+	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,6 +45,9 @@ import (
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/pydantic/opamp-clients/go/opampotel"
 )
@@ -83,6 +94,8 @@ func main() {
 
 	logger, noisy := otelslog.NewLogger("app"), otelslog.NewLogger("noisy")
 	settings := os.Getenv("EXAMPLE_SETTINGS") == "1"
+	probing := os.Getenv("EXAMPLE_PROBE") == "1"
+	var lastProbe trace.SpanContext
 	base := strings.TrimSuffix(flag.Arg(0), "/ping")
 	health := base + "/health"
 	// Told on the OpAMP client's goroutine: keep it quick, and do the work in the application's
@@ -100,8 +113,15 @@ func main() {
 		case <-ctx.Done():
 			return
 		case <-tick:
+			early := rand.IntN(2) == 1
+			if probing && early {
+				lastProbe = probe(ctx, logger, flag.Arg(0), lastProbe)
+			}
 			get(ctx, flag.Arg(0))
 			logger.InfoContext(ctx, "requested", "url", flag.Arg(0))
+			if probing && !early {
+				lastProbe = probe(ctx, logger, flag.Arg(0), lastProbe)
+			}
 			if opampotel.AppSetting("example.feature", "off") == "on" {
 				get(ctx, base+"/feature")
 			}
@@ -122,6 +142,22 @@ func main() {
 			}
 		}
 	}
+}
+
+// probe makes a span of its own with url on an event and on a link to last (none while last is
+// the zero value), and a log line with url: what redaction may drop or mask. It returns the span's
+// context, for the next probe to link to.
+func probe(ctx context.Context, logger *slog.Logger, url string, last trace.SpanContext) trace.SpanContext {
+	attrs := []attribute.KeyValue{attribute.String("url.full", url)}
+	var opts []trace.SpanStartOption
+	if last.IsValid() {
+		opts = append(opts, trace.WithLinks(trace.Link{SpanContext: last, Attributes: attrs}))
+	}
+	_, span := otel.Tracer("app").Start(ctx, "example.probe", opts...)
+	span.AddEvent("example.probe", trace.WithAttributes(attrs...))
+	span.End()
+	logger.InfoContext(ctx, "example.probe", "url.full", url)
+	return span.SpanContext()
 }
 
 func get(ctx context.Context, url string) {
