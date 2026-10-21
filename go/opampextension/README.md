@@ -73,6 +73,9 @@ across restarts (upstream makes up a new one at every start).
 - A health update that clears the error is reported though the status stays the same (upstream's
   kept reporting the old error).
 - A second `Unregister` of a custom capability is a no-op (upstream's panicked).
+- A health report's start time is the time of the first healthy report, kept while the collector
+  runs, healthy or not, and 0 again from `NotReady` (shutdown). Upstream's never kept it: each
+  healthy report carried its own status time as the start, and every unhealthy one 0.
 
 The extension is kept close to upstream's so that upstream's changes merge in
 ([AGENTS.md](../../AGENTS.md#the-supervisor-and-collector-extension-forks)). Upstream's files are
