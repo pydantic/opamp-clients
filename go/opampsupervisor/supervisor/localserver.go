@@ -128,6 +128,13 @@ func (l *localConnection) held(conn serverTypes.Connection) (uint64, bool) {
 	return l.n, true
 }
 
+// holdsNth says whether the n-th connection claimed is the collector's still.
+func (l *localConnection) holdsNth(n uint64) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.conn != nil && l.n == n
+}
+
 // count is how many connections have been claimed: a later one has a higher count.
 func (l *localConnection) count() uint64 {
 	l.mu.Lock()
