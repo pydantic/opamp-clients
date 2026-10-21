@@ -20,7 +20,8 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
 
 It writes a remote config policy: the server's configs may use the components a Logfire config
 needs, send only to the OpAMP server's host (or the `--exporter-endpoint`s given), read no file
-(or only the `--log-path`s given), and reference no `${env:...}` or `${file:...}`
+(or only the `--log-path`s given), and reference only locally bound credential environment names instead of arbitrary
+`${env:...}` or `${file:...}`
 ([what the server can do](packaging/README.md#what-the-server-can-do-to-this-host)).
 
 The [macOS .pkg](packaging/README.md#macos) and the [Windows .msi](packaging/README.md#windows)
@@ -57,6 +58,13 @@ agent:
 ```
 
 ## What changes
+
+- **Bound credentials remain usable under the remote config policy.** A remote config can reference
+  exactly the environment names in the local `agent.connection_env` bindings. Other environment
+  names, nested references, defaults, and file providers remain restricted by the policy.
+- **Resumed configs are acknowledged again.** The agent loop reports its existing outcome for a
+  repeated config hash without restarting the Collector. This lets the client complete a resumed
+  offer before it delivers another config.
 
 - **Issued credentials are verified and kept.** With `accepts_opamp_connection_settings`, the
   server may issue new OpAMP connection settings (per-agent credentials replacing an enrollment

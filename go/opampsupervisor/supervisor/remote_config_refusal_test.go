@@ -4,6 +4,7 @@
 package supervisor
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
@@ -88,4 +89,34 @@ func TestSupervisorWarnsWhenTheRemoteConfigIsUnrestricted(t *testing.T) {
 	_, err = NewSupervisor(t.Context(), zap.New(core), cfg)
 	require.NoError(t, err)
 	require.Zero(t, logs.FilterMessageSnippet("remote config is unrestricted").Len())
+}
+
+// The local binding permits the offered credential, while a different host variable still fails.
+func TestSupervisorRemoteConfigUsesOnlyConfiguredConnectionEnv(t *testing.T) {
+	cfg := setupSupervisorConfig(t, configTemplate)
+	cfg.Agent.ConnectionEnv = map[string]string{"example/otlp": "BOUND_TOKEN"}
+	cfg.Agent.RemoteConfigPolicy = config.RemoteConfigPolicy{
+		AllowedComponents:        map[string][]string{"receivers": {"nop"}, "exporters": {"otlphttp"}},
+		AllowedExporterEndpoints: []string{"https://collector.example.com"},
+	}
+	s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
+	require.NoError(t, err)
+	s.persistentState, err = s.clientPersistentState()
+	require.NoError(t, err)
+	s.agentDescription.Store(&protobufs.AgentDescription{})
+	var reported *protobufs.RemoteConfigStatus
+	s.opampClient = &mockOpAMPClient{setRemoteConfigStatusFunc: func(status *protobufs.RemoteConfigStatus) error {
+		reported = status
+		return nil
+	}}
+	body := `receivers: {nop: {}}
+exporters: {otlphttp: {endpoint: https://collector.example.com, headers: {Authorization: 'Bearer ${env:BOUND_TOKEN}'}}}
+service: {pipelines: {logs: {receivers: [nop], exporters: [otlphttp]}}}`
+	require.True(t, s.processRemoteConfigMessage(t.Context(), policyConfig("bound", body)))
+	refused := strings.ReplaceAll(body, "BOUND_TOKEN", "OTHER_TOKEN")
+	require.False(t, s.processRemoteConfigMessage(t.Context(), policyConfig("unbound", refused)))
+	require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, reported.Status)
+	require.Equal(t, []byte("unbound"), reported.LastRemoteConfigHash)
+	require.Contains(t, reported.ErrorMessage, "references the env provider")
+	require.Equal(t, []byte("bound"), s.remoteConfig.Load().GetConfigHash())
 }

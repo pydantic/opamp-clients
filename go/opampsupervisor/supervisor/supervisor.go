@@ -18,7 +18,9 @@
 // OTEL_EXPORTER_OTLP_* variables (telemetry_env.go). The local OpAMP server and the bootstrap
 // one take the collector only with a token made at each start (localserver.go), and its messages
 // only with the Supervisor's instance UID; a request that never became a connection doesn't keep
-// later collectors out. A Restart command is carried out on the agent loop.
+// later collectors out. A Restart command is carried out on the agent loop. Locally bound
+// credential environment names pass the remote config policy. A repeated config hash receives
+// its existing outcome again so a resumed client can deliver the next config.
 
 package supervisor
 
@@ -1631,7 +1633,7 @@ func (s *Supervisor) loadRemoteConfig() {
 func (s *Supervisor) checkRemoteConfigPolicy(rc *protobufs.AgentRemoteConfig) error {
 	files := rc.GetConfig().GetConfigMap()
 	for _, name := range slices.Sorted(maps.Keys(files)) {
-		if err := s.config.Agent.RemoteConfigPolicy.Check(name, files[name].GetBody()); err != nil {
+		if err := s.config.Agent.RemoteConfigPolicy.CheckWithConnectionEnv(name, files[name].GetBody(), s.config.Agent.ConnectionEnv); err != nil {
 			return err
 		}
 	}
@@ -2305,9 +2307,11 @@ func (s *Supervisor) runAgentProcess() {
 				continue
 			}
 			remote := s.cfgState.Load().(*configState).remote
-			if remote == nil || (apply.config != nil && bytes.Equal(remote.GetConfigHash(), apply.config.GetConfigHash())) {
+			if remote == nil {
 				continue
 			}
+			// Changed here: the core asks again about the saved config after a restart. Even the same hash
+			// needs an answer before it can hand over the next config.
 			apply.config, apply.rollback = remote, false
 			switch apply.status {
 			case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_UNSET:
