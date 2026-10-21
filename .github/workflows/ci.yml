@@ -787,7 +787,7 @@ jobs:
   # Go 1.26: what the Collector (v1.69) and ocb need. setup-go pins GOTOOLCHAIN=local for the
   # steps after it, so each job sets up that Go rather than asking the go command to fetch it.
   collector-tests:
-    name: Collector extension and Supervisor, unit tests
+    name: Collector extension, processor and Supervisor, unit tests
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -807,6 +807,7 @@ jobs:
           cache-dependency-path: |
             go/go.sum
             go/opampextension/go.sum
+            go/logfirepolicyprocessor/go.sum
             go/opampsupervisor/go.sum
       - name: Every pin of the collector's modules names one release
         run: python3 scripts/collector_release.py pins
@@ -822,6 +823,12 @@ jobs:
       - name: Collector OpAMP extension, unit and server-backed tests
         if: ${{ !cancelled() }}
         working-directory: go/opampextension
+        run: |
+          go vet ./...
+          go test -race ./...
+      - name: Collector logfirepolicy processor, unit and shared-vector tests
+        if: ${{ !cancelled() }}
+        working-directory: go/logfirepolicyprocessor
         run: |
           go vet ./...
           go test -race ./...
@@ -856,6 +863,7 @@ jobs:
           cache-dependency-path: |
             go/go.sum
             go/opampextension/go.sum
+            go/logfirepolicyprocessor/go.sum
             go/opampsupervisor/go.sum
       - name: A collector with this repository's extension (ocb)
         working-directory: go/opampsupervisor

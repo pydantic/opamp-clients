@@ -20,7 +20,11 @@
 // only with the Supervisor's instance UID; a request that never became a connection doesn't keep
 // later collectors out. A Restart command is carried out on the agent loop. Locally bound
 // credential environment names pass the remote config policy. A repeated config hash receives
-// its existing outcome again so a resumed client can deliver the next config.
+// its existing outcome again so a resumed client can deliver the next config. The Logfire SDK
+// policy entry (logfire-sdk-policy.json) isn't merged as YAML: it is checked by the SDK settings
+// layer and configures the collector's logfirepolicy processor, put first in every pipeline, and
+// the agent description says the collector takes it when the collector has the processor
+// (sdk_policy.go).
 
 package supervisor
 
@@ -1152,6 +1156,8 @@ func (s *Supervisor) forwardCustomMessagesToServerLoop() {
 func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
+	// Changed here: the Logfire SDK policy the collector takes (sdk_policy.go).
+	ad.NonIdentifyingAttributes = s.withSDKPolicyDescription(ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
 }
 
@@ -1167,6 +1173,13 @@ func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
 // setAvailableComponents sets the available components of the OpAMP agent
 func (s *Supervisor) setAvailableComponents(ac *protobufs.AvailableComponents) {
 	s.availableComponents.Store(ac)
+	// Changed here: the description says whether the collector takes the Logfire SDK policy,
+	// which its components decide (sdk_policy.go).
+	if ad, ok := s.agentDescription.Load().(*protobufs.AgentDescription); ok {
+		ad = proto.Clone(ad).(*protobufs.AgentDescription)
+		ad.NonIdentifyingAttributes = s.withSDKPolicyDescription(ad.NonIdentifyingAttributes)
+		s.agentDescription.Store(ad)
+	}
 }
 
 // applyKeyValueOverrides merges the overrides map into the array of key value pairs.
@@ -1306,6 +1319,9 @@ func (s *Supervisor) createRemoteConfigComposers(incomingConfig *protobufs.Agent
 			if name == "" {
 				// skip instance config
 				continue
+			}
+			if name == sdkPolicyFile {
+				continue // Changed here: the Logfire SDK policy isn't YAML (sdk_policy.go).
 			}
 			names = append(names, name)
 		}
@@ -1633,6 +1649,13 @@ func (s *Supervisor) loadRemoteConfig() {
 func (s *Supervisor) checkRemoteConfigPolicy(rc *protobufs.AgentRemoteConfig) error {
 	files := rc.GetConfig().GetConfigMap()
 	for _, name := range slices.Sorted(maps.Keys(files)) {
+		if name == sdkPolicyFile {
+			// The Logfire SDK policy, checked by the SDK settings layer (sdk_policy.go).
+			if err := s.checkSDKPolicy(files[name].GetBody()); err != nil {
+				return err
+			}
+			continue
+		}
 		if err := s.config.Agent.RemoteConfigPolicy.CheckWithConnectionEnv(name, files[name].GetBody(), s.config.Agent.ConnectionEnv); err != nil {
 			return err
 		}
@@ -1899,6 +1922,10 @@ func (s *Supervisor) composeMergedConfig(incomingConfig *protobufs.AgentRemoteCo
 
 	err = config.MergeConfFromYAML(conf, agentConfigBytes)
 	if err != nil {
+		return false, err
+	}
+	// Changed here: the Logfire SDK policy's processor in every pipeline (sdk_policy.go).
+	if err := s.composeSDKPolicy(conf, incomingConfig); err != nil {
 		return false, err
 	}
 

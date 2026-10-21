@@ -9,7 +9,8 @@
 // accepts_packages is refused is gone: the Supervisor installs packages now
 // (e2e_packages_test.go). The remote configs a test starts from are left in the OpAMP client's
 // state file (e2e_state_test.go), and checked as the server hears them: the Supervisor keeps no
-// .dat files.
+// .dat files. The binary size budget is 41 MiB, not 40: the Supervisor carries the SDK settings
+// layer.
 
 //go:build e2e
 
@@ -4183,8 +4184,9 @@ func enableExtensionsFeatureGate(t *testing.T) {
 }
 
 // supervisorBinarySizeLimitBytes is the size budget for the supervisor binary,
-// in bytes. 40 MiB.
-const supervisorBinarySizeLimitBytes = 40 * 1024 * 1024
+// in bytes. 41 MiB. Changed here: 40 MiB upstream; the SDK settings layer (about 0.7 MiB), which
+// checks the Logfire SDK policy as the SDKs do (supervisor/sdk_policy.go), takes it past that.
+const supervisorBinarySizeLimitBytes = 41 * 1024 * 1024
 
 // TestSupervisorBinarySize guards against unintended growth of the supervisor
 // binary. It builds the supervisor with the same flags used for release
