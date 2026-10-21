@@ -266,7 +266,14 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 	cfg := opamp.Config{
 		Endpoint:          a.server.endpoint,
 		InstanceUID:       a.uid,
-		Capabilities:      uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+		// What the integration does and reports, declared: the client takes no status field
+		// whose bit isn't.
+		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsEffectiveConfig |
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents),
 		HeartbeatInterval: a.server.heartbeat,
 		Header:            a.server.header,
 		// A key of its own, offered by the server: taken with a state directory (cfg.StateFile,

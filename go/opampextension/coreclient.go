@@ -133,8 +133,10 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		return errors.New("the OpAMP client was started already")
 	}
 	cfg := opamp.Config{
-		Endpoint:     settings.OpAMPServerURL,
-		Capabilities: uint64(c.caps),
+		Endpoint: settings.OpAMPServerURL,
+		// Heartbeats, as the extension has always sent on this client: a client declares the
+		// bit to send them (ReportsHeartbeat), and upstream's capabilities don't name it.
+		Capabilities: uint64(c.caps | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat),
 		Header:       settings.Header,
 		// Platform mode: net/http carries the requests, so the collector's TLS settings, the
 		// environment's proxies and auth extensions apply as they do to its other clients.
