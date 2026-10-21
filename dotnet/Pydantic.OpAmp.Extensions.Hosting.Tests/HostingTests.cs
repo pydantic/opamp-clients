@@ -390,6 +390,57 @@ public class HostingTests
     }
 
     [Fact]
+    public async Task SpanAndLogAttributesAndLogBodiesAreScrubbedAtExport()
+    {
+        var body = Policy.OfEvery(("scrubbing", """{"defaults":true,"patterns":["*iban*"]}"""));
+        await using var server = new OpAmpServer(Kit.Config(body));
+        await using var collector = new Collector();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
+        b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e =>
+        {
+            e.Endpoint = new Uri(collector.Endpoint + "/v1/logs");
+            e.Protocol = OtlpExportProtocol.HttpProtobuf;
+        }));
+        b.Services.AddOpenTelemetry()
+            .WithTracing(t => t.AddSource("scrubbed").AddOtlpExporter(e =>
+            {
+                e.Endpoint = new Uri(collector.Endpoint + "/v1/traces");
+                e.Protocol = OtlpExportProtocol.HttpProtobuf;
+            }))
+            .WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        var agent = host.Services.GetRequiredService<OpAmpAgent>();
+        Assert.Contains("scrub_defaults", agent.HostNow(providersBuilt: true).Live);
+        Assert.Contains("scrub_patterns", agent.HostNow(providersBuilt: true).Live);
+        await Kit.Until(() => agent.Controls.Policy(Signal.Traces).Redact?.Scrub is not null, "scrubbing in force");
+
+        using (var source = new ActivitySource("scrubbed"))
+        using (var a = source.StartActivity("checkout"))
+        {
+            a!.SetTag("api_key", "span-key-value");
+            a.SetTag("note", "my secret is span-note-value");
+            a.SetTag("customer.iban", "span-iban-value");
+        }
+
+        host.Services.GetRequiredService<ILogger<HostingTests>>().LogWarning("login failed: wrong password for {user}", "bob");
+        host.Services.GetRequiredService<TracerProvider>().ForceFlush();
+        host.Services.GetRequiredService<LoggerProvider>().ForceFlush();
+        string Exported(string path) => string.Concat(collector.Exports.Where(e => e.Path == path).Select(e => System.Text.Encoding.UTF8.GetString(e.Body)));
+        await Kit.Until(() => Exported("/v1/traces").Contains("checkout") && Exported("/v1/logs").Contains("bob"), "the span and the log exported");
+        foreach (var secret in new[] { "span-key-value", "span-note-value", "span-iban-value", "wrong password" })
+        {
+            Assert.DoesNotContain(secret, Exported("/v1/traces") + Exported("/v1/logs"));
+        }
+
+        Assert.Contains("[Scrubbed due to 'api_key']", Exported("/v1/traces"));
+        Assert.Contains("[Scrubbed due to 'secret']", Exported("/v1/traces"));
+        Assert.Contains("[Scrubbed due to '*iban*']", Exported("/v1/traces"));
+        Assert.Contains("[Scrubbed due to 'password']", Exported("/v1/logs")); // the body
+        await host.StopAsync(Cancel);
+    }
+
+    [Fact]
     public async Task DebugModeEndsOnTheTimerAndTheServerIsTold()
     {
         // A window of five seconds from now, by this machine's clock.

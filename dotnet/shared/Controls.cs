@@ -114,7 +114,7 @@ internal sealed class Controls
     {
         this.Sampler.Apply(s.HasSamplingRate ? s.SamplingRate : null, [.. s.SamplingRules], s.HasSamplingTracesPerSecond ? s.SamplingTracesPerSecond : null);
         var levels = new LogLevels(s.HasSendLogsMinSeverity ? s.SendLogsMinSeverity : 0, [.. s.SendLogsScopeLevels]);
-        var redact = Redactor.Of([.. s.DropAttributes], [.. s.MaskAttributes]);
+        var redact = Redactor.Of([.. s.DropAttributes], [.. s.MaskAttributes], Scrubber.Of(s.ScrubDefaults, [.. s.ScrubPatterns]));
         this.gates = new Gates(
             !s.HasSendTraces || s.SendTraces,
             !s.HasSendMetrics || s.SendMetrics,

@@ -11,7 +11,7 @@ namespace Pydantic.OpAmp.Otel;
 /// <summary>What a gate holds one signal's exports to; a part left null does nothing.</summary>
 /// <param name="Levels">Logs: the lowest severity exported, per scope (send_logs_level and send_logs_level_by_scope).</param>
 /// <param name="Cap">Logs: send_logs_per_second, of the records past the levels.</param>
-/// <param name="Redact">Traces and logs: drop_attributes and mask_attributes.</param>
+/// <param name="Redact">Traces and logs: drop_attributes and mask_attributes, then scrubbing.</param>
 internal sealed record ExportPolicy(LogLevels? Levels = null, TokenBucket? Cap = null, Redactor? Redact = null)
 {
     /// <summary>Holds an export to nothing: it goes as it came.</summary>
@@ -68,6 +68,18 @@ internal static class OtlpRewriter
     private const int LinkAttributes = 4;
     private const int LogAttributes = 6;
     private const int Key = 1;
+
+    // LogRecord.body; KeyValue.value; AnyValue.string_value, array_value (ArrayValue.values 1) and
+    // kvlist_value (KeyValueList.values 1).
+    private const int LogBody = 5;
+    private const int Value = 2;
+    private const int StringValue = 1;
+    private const int ArrayValue = 5;
+    private const int KvlistValue = 6;
+    private const int Values = 1;
+
+    /// <summary>How deep lists and maps nest in a value scrubbing walks: protobuf's own parsers' limit.</summary>
+    private const int MaxDepth = 100;
 
     private static readonly byte[] MaskedBytes = Encoding.UTF8.GetBytes(Redactor.Masked);
 
@@ -362,6 +374,39 @@ internal static class OtlpRewriter
                         output.Write(masked);
                         continue;
                 }
+
+                if (redact.Scrub is { } scrub)
+                {
+                    if (!ScrubbedKeyValue(inner, scrub, 0, out var scrubbed))
+                    {
+                        return false;
+                    }
+
+                    if (scrubbed is not null)
+                    {
+                        walk.Changed = true;
+                        output.Write(tag);
+                        WriteVarint(output, (ulong)scrubbed.Length);
+                        output.Write(scrubbed);
+                        continue;
+                    }
+                }
+            }
+            else if (wire == Length && attributes == LogAttributes && number == LogBody && redact.Scrub is { } scrub)
+            {
+                if (!ScrubbedValue(inner, scrub, 0, out var body))
+                {
+                    return false;
+                }
+
+                if (body is not null)
+                {
+                    walk.Changed = true;
+                    output.Write(tag);
+                    WriteVarint(output, (ulong)body.Length);
+                    output.Write(body);
+                    continue;
+                }
             }
             else if (wire == Length && attributes == SpanAttributes && number is SpanEvents or SpanLinks)
             {
@@ -405,12 +450,149 @@ internal static class OtlpRewriter
     }
 
     /// <summary>KeyValue{key, value: AnyValue{string_value: "[REDACTED]"}}.</summary>
-    private static byte[] MaskedKeyValue(byte[] key)
+    private static byte[] MaskedKeyValue(byte[] key) => StringKeyValue(key, MaskedBytes);
+
+    /// <summary>
+    /// A KeyValue (an attribute, or a map's member) as scrubbing leaves it: <paramref name="scrubbed"/>
+    /// its bytes, or null when it stays as it is. Its key decides: kept, its value replaced by a
+    /// string, or its value's strings scrubbed. <paramref name="depth"/>: the lists and maps it is
+    /// in. False if it isn't well formed.
+    /// </summary>
+    private static bool ScrubbedKeyValue(ReadOnlySpan<byte> keyValue, Scrubber scrub, int depth, out byte[]? scrubbed)
+    {
+        scrubbed = null;
+        if (KeyOf(keyValue) is not { } key)
+        {
+            return false;
+        }
+
+        switch (scrub.Key(Encoding.UTF8.GetString(key), out var replacement))
+        {
+            case Scrubber.KeyScrub.Keep:
+                return true;
+            case Scrubber.KeyScrub.Replace:
+                scrubbed = StringKeyValue(key, Encoding.UTF8.GetBytes(replacement));
+                return true;
+        }
+
+        return EachField(keyValue, Value, scrub, depth, ScrubbedValue, out scrubbed);
+    }
+
+    /// <summary>
+    /// An AnyValue (a value, a list's item or a log body) as scrubbing leaves it: a string scrubbed,
+    /// a list's items each, a map's members each as an attribute; <paramref name="scrubbed"/> its
+    /// bytes, or null when it stays as it is. <paramref name="depth"/>: the lists and maps it is in;
+    /// past <see cref="MaxDepth"/>, as protobuf's own parsers have it, it isn't well formed (false).
+    /// </summary>
+    private static bool ScrubbedValue(ReadOnlySpan<byte> anyValue, Scrubber scrub, int depth, out byte[]? scrubbed)
+    {
+        scrubbed = null;
+        if (depth > MaxDepth)
+        {
+            return false;
+        }
+
+        var output = new ArrayBufferWriter<byte>(Math.Max(anyValue.Length, 1));
+        var changed = false;
+        var at = 0;
+        while (at < anyValue.Length)
+        {
+            var start = at;
+            if (!Field(anyValue, ref at, out var number, out var wire, out var payload))
+            {
+                return false;
+            }
+
+            var inner = anyValue.Slice(payload, at - payload);
+            byte[]? field = null;
+            if (wire == Length && number == StringValue)
+            {
+                if (scrub.Text(Encoding.UTF8.GetString(inner)) is { } s)
+                {
+                    field = Encoding.UTF8.GetBytes(s);
+                }
+            }
+            else if (wire == Length && number == ArrayValue)
+            {
+                if (!EachField(inner, Values, scrub, depth + 1, ScrubbedValue, out field))
+                {
+                    return false;
+                }
+            }
+            else if (wire == Length && number == KvlistValue)
+            {
+                if (!EachField(inner, Values, scrub, depth + 1, ScrubbedKeyValue, out field))
+                {
+                    return false;
+                }
+            }
+
+            if (field is null)
+            {
+                output.Write(anyValue[start..at]);
+                continue;
+            }
+
+            changed = true;
+            output.Write(anyValue.Slice(start, TagLength(anyValue[start..])));
+            WriteVarint(output, (ulong)field.Length);
+            output.Write(field);
+        }
+
+        scrubbed = changed ? output.WrittenSpan.ToArray() : null;
+        return true;
+    }
+
+    private delegate bool FieldScrub(ReadOnlySpan<byte> message, Scrubber scrub, int depth, out byte[]? scrubbed);
+
+    /// <summary>
+    /// A message with each of its length-delimited fields <paramref name="number"/> as
+    /// <paramref name="each"/> leaves it: <paramref name="rewritten"/> its bytes, or null when none
+    /// changes. False if it isn't well formed.
+    /// </summary>
+    private static bool EachField(ReadOnlySpan<byte> message, int number, Scrubber scrub, int depth, FieldScrub each, out byte[]? rewritten)
+    {
+        rewritten = null;
+        var output = new ArrayBufferWriter<byte>(Math.Max(message.Length, 1));
+        var changed = false;
+        var at = 0;
+        while (at < message.Length)
+        {
+            var start = at;
+            if (!Field(message, ref at, out var n, out var wire, out var payload))
+            {
+                return false;
+            }
+
+            byte[]? field = null;
+            if (wire == Length && n == (ulong)number && !each(message.Slice(payload, at - payload), scrub, depth, out field))
+            {
+                return false;
+            }
+
+            if (field is null)
+            {
+                output.Write(message[start..at]);
+                continue;
+            }
+
+            changed = true;
+            output.Write(message.Slice(start, TagLength(message[start..])));
+            WriteVarint(output, (ulong)field.Length);
+            output.Write(field);
+        }
+
+        rewritten = changed ? output.WrittenSpan.ToArray() : null;
+        return true;
+    }
+
+    /// <summary>KeyValue{key, value: AnyValue{string_value: <paramref name="value"/>}}.</summary>
+    private static byte[] StringKeyValue(byte[] key, byte[] value)
     {
         var any = new ArrayBufferWriter<byte>();
         any.Write<byte>([0x0a]); // string_value
-        WriteVarint(any, (ulong)MaskedBytes.Length);
-        any.Write(MaskedBytes);
+        WriteVarint(any, (ulong)value.Length);
+        any.Write(value);
         var kv = new ArrayBufferWriter<byte>();
         kv.Write<byte>([0x0a]); // key
         WriteVarint(kv, (ulong)key.Length);

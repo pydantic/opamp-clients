@@ -68,14 +68,14 @@ final class Extension {
   static final List<String> LIVE = List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
       "debug_until", "debug_sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_level",
       "send_logs_level_by_scope", "send_logs_per_second", "debug_send_logs_level", "drop_attributes",
-      "mask_attributes");
+      "mask_attributes", "scrub_defaults", "scrub_patterns");
   static final List<String> NEXT_START = List.of("deactivate_instrumentations", "deactivate_all_instrumentations");
   /** What each signal's gate holds: carried out only where every exporter of the signal is gated. */
   static final Map<String, List<String>> GATED = Map.of(
-      "traces", List.of("send_traces", "drop_attributes", "mask_attributes"),
+      "traces", List.of("send_traces", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns"),
       "metrics", List.of("send_metrics"),
       "logs", List.of("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-          "debug_send_logs_level", "drop_attributes", "mask_attributes"));
+          "debug_send_logs_level", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns"));
   /** What the extension's sampler holds: carried out only where the SDK's sampler is the extension's. */
   static final List<String> SAMPLED = List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
       "debug_sampling_rate");

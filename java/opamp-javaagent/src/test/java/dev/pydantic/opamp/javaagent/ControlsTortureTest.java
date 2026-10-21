@@ -111,6 +111,7 @@ class ControlsTortureTest {
     ATTRS.put("user.password", "hunter2");
     ATTRS.put("DB.Password.Hash", "abc");
     ATTRS.put("x.PASSWORD", 7L);
+    ATTRS.put("note", "the password is p4ss");
   }
 
   /**
@@ -121,6 +122,12 @@ class ControlsTortureTest {
   private static final String PINNED_MASK = "secret.*";
   private static final List<String> DROP_POOL = List.of("r.0", "R.1", "r.2*", "*.3", "r.5");
   private static final List<String> MASK_POOL = List.of("r.4", "r.5", "R.6", "r.*", "*7", "SECRET.TOKEN");
+  /**
+   * Scrub patterns: a key (r.0, r.7) or a string value (v5's) they match whole. A pinned run's
+   * documents all scrub the defaults too, which scrub note by its value, and the keys with secret or
+   * password in them where redaction keeps them.
+   */
+  private static final List<String> SCRUB_POOL = List.of("R.0", "v5", "*.7");
   private static final List<String> SCOPE_PATTERNS = List.of("app.db*", "app.db", "app.web*", "lib", "*", "app*");
   private static final List<String> SCOPES = List.of("app.db", "app.db.pool", "app.web.x", "lib", "libx", "other", "app");
   private static final List<String> LEVELS = List.of("trace", "debug", "info", "warn", "error", "fatal");
@@ -171,9 +178,9 @@ class ControlsTortureTest {
    */
   record Doc(List<String> drop, List<String> mask, List<Rule> rules, Double rate, Boolean sendTraces,
       Boolean sendLogs, Integer level, Map<String, Integer> byScope, String traceCap, String logCap, int debug,
-      Double debugRate, Integer debugLevel) {
+      Double debugRate, Integer debugLevel, boolean scrubDefaults, List<String> scrub) {
     static final Doc EMPTY = new Doc(List.of(), List.of(), List.of(), null, null, null, null, Map.of(), null, null, 0,
-        null, null);
+        null, null, false, List.of());
 
     String json() {
       List<String> set = new ArrayList<>();
@@ -186,6 +193,16 @@ class ControlsTortureTest {
       }
       if (!redaction.isEmpty()) {
         set.addAll(List.of("attribute_redaction", Vectors.override(String.join(",", redaction))));
+      }
+      List<String> scrubbing = new ArrayList<>();
+      if (scrubDefaults) {
+        scrubbing.add("\"defaults\":true");
+      }
+      if (!scrub.isEmpty()) {
+        scrubbing.add("\"patterns\":" + strings(scrub));
+      }
+      if (!scrubbing.isEmpty()) {
+        set.addAll(List.of("scrubbing", Vectors.override(String.join(",", scrubbing))));
       }
       if (!rules.isEmpty()) {
         set.addAll(List.of("sampling_rules", Vectors.override(
@@ -242,9 +259,22 @@ class ControlsTortureTest {
       Map<String, Fate> out = new LinkedHashMap<>();
       for (String k : ATTRS.keySet()) {
         out.put(k, drop.stream().anyMatch(p -> glob(p, true).matcher(k).matches()) ? Fate.DROPPED
-            : mask.stream().anyMatch(p -> glob(p, true).matcher(k).matches()) ? Fate.MASKED : Fate.KEPT);
+            : mask.stream().anyMatch(p -> glob(p, true).matcher(k).matches()) ? Fate.MASKED
+            : scrubs(k, ATTRS.get(k)) ? Fate.SCRUBBED : Fate.KEPT);
       }
       return out;
+    }
+
+    /**
+     * Whether scrubbing changes the attribute: the defaults match its key (secret or password in
+     * it) or its value (note's), or a pattern matches either whole.
+     */
+    boolean scrubs(String k, Object v) {
+      if (scrubDefaults && (k.toLowerCase(java.util.Locale.ROOT).matches(".*(secret|password).*") || k.equals("note"))) {
+        return true;
+      }
+      return scrub.stream().anyMatch(p -> glob(p, true).matcher(k).matches()
+          || v instanceof String t && glob(p, true).matcher(t).matches());
     }
 
     /** Whether a new trace's root is sampled, before the cap (rates are 0 or 1 here). */
@@ -285,7 +315,7 @@ class ControlsTortureTest {
     }
   }
 
-  enum Fate { KEPT, MASKED, DROPPED, WRONG }
+  enum Fate { KEPT, MASKED, DROPPED, SCRUBBED, WRONG }
 
   /** A root span as the sampler sees it start. */
   record Root(String name, SpanKind kind, String path, String tenant) {}
@@ -337,7 +367,7 @@ class ControlsTortureTest {
   static Doc doc(SplittableRandom r, boolean pinned, boolean logsOff, boolean dark, boolean exact) {
     if (dark) {
       return new Doc(List.of(), List.of(), List.of(), null, false, false, null, Map.of(), null, null, 0, null,
-          null);
+          null, false, List.of());
     }
     if (!pinned && !logsOff && r.nextInt(6) == 0) {
       return Doc.EMPTY;
@@ -369,8 +399,10 @@ class ControlsTortureTest {
     int debug = r.nextInt(5) == 0 ? 1 : r.nextInt(8) == 0 ? 2 : 0;
     Double debugRate = debug == 0 || r.nextBoolean() ? null : rates[r.nextInt(rates.length)];
     Integer debugLevel = debug == 0 || r.nextBoolean() ? null : LEVEL_NUMBERS[r.nextInt(LEVEL_NUMBERS.length)];
+    boolean scrubDefaults = pinned || r.nextBoolean();
+    List<String> scrub = SCRUB_POOL.stream().filter(p -> r.nextInt(3) == 0).toList();
     return new Doc(drop, mask, rules, rate, sendTraces, sendLogs, level, byScope, traceCap, logCap, debug,
-        debugRate, debugLevel);
+        debugRate, debugLevel, scrubDefaults, scrub);
   }
 
   static Plan plan(SplittableRandom r) {
@@ -634,7 +666,8 @@ class ControlsTortureTest {
     ATTRS.forEach((k, v) -> {
       Object got = byName.get(k);
       out.put(k, got == null ? Fate.DROPPED : got.equals(v) ? Fate.KEPT
-          : Redaction.MASK.equals(got) ? Fate.MASKED : Fate.WRONG);
+          : Redaction.MASK.equals(got) ? Fate.MASKED
+          : got instanceof String t && t.startsWith("[Scrubbed due to '") ? Fate.SCRUBBED : Fate.WRONG);
     });
     return out;
   }
@@ -701,13 +734,16 @@ class ControlsTortureTest {
       List<Map<String, Fate>> redactions, List<String> wrong) {
     Set<String> dropped = new HashSet<>(ATTRS.keySet());
     Set<String> masked = new HashSet<>(ATTRS.keySet());
+    Set<String> scrubbed = new HashSet<>(ATTRS.keySet());
     for (Map<String, Fate> f : redactions) {
       dropped.removeIf(k -> f.get(k) != Fate.DROPPED);
       masked.removeIf(k -> f.get(k) != Fate.MASKED);
+      scrubbed.removeIf(k -> f.get(k) != Fate.SCRUBBED);
     }
     if (plan.pinned()) {
       assertTrue(dropped.containsAll(Set.of("user.password", "DB.Password.Hash", "x.PASSWORD")), signal);
       assertTrue(redactions.isEmpty() || masked.containsAll(Set.of("secret.token", "Secret.Key")), signal);
+      assertTrue(redactions.isEmpty() || scrubbed.contains("note"), signal);
     }
     return (where, a) -> {
       Map<String, Fate> f = fates(a);
@@ -720,6 +756,12 @@ class ControlsTortureTest {
       for (String k : masked) {
         if (f.get(k) != Fate.MASKED && !redactions.isEmpty()) {
           wrong.add(where + ": " + k + " is masked in every document that sends " + signal + ", exported "
+              + f.get(k));
+        }
+      }
+      for (String k : scrubbed) {
+        if (f.get(k) != Fate.SCRUBBED && !redactions.isEmpty()) {
+          wrong.add(where + ": " + k + " is scrubbed in every document that sends " + signal + ", exported "
               + f.get(k));
         }
       }

@@ -13,5 +13,6 @@
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "override", "values": {"checkout.new_flow": "on", "example.log_level": "debug"}},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }

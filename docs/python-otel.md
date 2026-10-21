@@ -163,7 +163,7 @@ other override above that a process cannot carry out.
   | `head_sampling` | a sampler in place of the configured one (`OTEL_TRACES_SAMPLER`). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the configured sampler. |
   | `signal_exports.traces`, `signal_exports.logs` | every trace and log exporter the package sets up from `OTEL_TRACES_EXPORTER` and `OTEL_LOGS_EXPORTER`, wrapped in the SDK's export processors. `enabled: false` drops what would be exported. Processors passed to `configure()` or added later are not stopped, so then the control is set aside, not answered as done. |
   | `log_levels` (`level`) | live, at the same gated log exporters. A record below the level's SeverityNumber is dropped at its next export, and one with no severity (0) is kept. Local: every record goes. |
-  | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the newer settings](#the-newer-settings). |
+  | `sampling_rules`, `log_levels` (`scopes`), `attribute_redaction`, `scrubbing`, `trace_rate_limit`, `log_rate_limit`, `debug` | live, in the same sampler and gates. See [the newer settings](#the-newer-settings). |
   | `signal_exports.metrics` | the OTLP metric exporter, swapped for a gated one (metrics have no export-processor hook). `otlp` in `OTEL_METRICS_EXPORTER` becomes `opamp`, the same exporter the protocol variables pick, which can stop. Only the name `otlp` does this. With no `otlp` among the metric exporters (`otlp_proto_http` named directly, say), nothing can stop them, and a policy that overrides the control is refused ([the host](sdk-settings.md#the-host)). The same holds with `otlp` beside another exporter (`otlp,prometheus`), because only the OTLP one could stop. |
   | `instrumentations` (`disabled`) | at the next start, added to `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`. Names are the instrumentations' entry points: `flask`, `requests`, `urllib`, and so on. |
   | `instrumentations` (`all_disabled`) | at the next start, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS=*`. |
@@ -262,6 +262,28 @@ the application made is shared with every other processor, and stays as it was, 
 the package doesn't gate (a span processor passed to `configure()`, say) sees the original. What
 nothing matches goes on unchanged. Metrics, resource and scope attributes, span names and log
 bodies are left alone.
+
+### Scrubbing
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}}
+```
+
+The Logfire SDK's scrubbing, its matchers ported character for character and held to the core's
+by the shared vectors. `defaults: true` takes its default patterns (`password`, `secret`, `auth`,
+`api key`, `session`, `cookie`, `jwt` and the others), matched anywhere in a key or a string;
+`patterns` are globs matched, ignoring ASCII case, against a whole key or a whole string. An
+attribute whose key matches is exported with the string `[Scrubbed due to '<match>']` in place
+of its value, whatever its type. Otherwise its string values are scrubbed: a string, each string
+in a list, and each member of a map, as an attribute of its own. The Logfire SDK's safe keys
+(`http.url`, `db.statement`, `exception.message` and the others) are kept as they are.
+[sdk-settings.md](sdk-settings.md#scrubbing) has the rules in full.
+
+At the same gates, on what redaction keeps (a masked value is not scrubbed): span, span event,
+span link and log record attributes, and log record bodies, a string or the strings in a list or
+map. A span or record with something to scrub is exported as a copy, as with redaction, so an
+exporter the package doesn't gate sees the original. Metrics, resource and scope attributes and
+span names are left alone.
 
 ### Rate caps
 

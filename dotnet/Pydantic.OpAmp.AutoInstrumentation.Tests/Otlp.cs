@@ -315,8 +315,9 @@ internal static class Vectors
         Live =
         {
             "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
-            "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
-            "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces",
+            "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns",
+            "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
+            "send_traces",
         },
         NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations" },
     };

@@ -66,7 +66,7 @@ func (c *Controls) apply(s *settingspb.Settings) {
 		logs:    s.SendLogs == nil || *s.SendLogs,
 		levels:  match.LevelsOf(s),
 		logsCap: c.gates.Load().logsCap,
-		redact:  &redaction{*match.RedactionOf(s)},
+		redact:  &redaction{*match.RedactionOf(s), *match.ScrubbingOf(s)},
 	}
 	// A cap applied again (the same document re-delivered, or refreshed) keeps its bucket.
 	if !sameCap(g.logsCap, s.SendLogsPerSecond) {
@@ -90,7 +90,7 @@ type gates struct {
 	traces, metrics, logs bool       // send_traces, send_metrics, send_logs
 	levels                *logLevels // send_logs_level and send_logs_level_by_scope
 	logsCap               *bucket    // send_logs_per_second; nil: none
-	redact                *redaction // drop_attributes and mask_attributes
+	redact                *redaction // drop_attributes and mask_attributes, then scrubbing
 	switches              *switches
 }
 
@@ -307,7 +307,7 @@ func (s *span) TracerProvider() trace.TracerProvider { return s.p }
 
 // Spans gates a span exporter: while traces aren't sent, what would be exported is dropped, and
 // drop_attributes and mask_attributes redact the attributes of each span, its events and its
-// links. A span redaction changes is exported as a view of the SDK's: other processors and
+// links, and scrub_defaults and scrub_patterns scrub what they keep. A span redaction changes is exported as a view of the SDK's: other processors and
 // exporters still see it as it was.
 func (c *Controls) Spans(to sdktrace.SpanExporter) sdktrace.SpanExporter { return &spans{to, c} }
 
@@ -373,7 +373,8 @@ func (e *metrics) Export(ctx context.Context, rm *metricdata.ResourceMetrics) er
 // under (the name given to the bridge, otelslog.NewLogger's), else send_logs_level's. A record
 // with no severity (0) is kept, but under `off`. Then send_logs_per_second: of what is left of a
 // batch, the first records the cap's tokens allow go on, the rest are dropped. Last,
-// drop_attributes and mask_attributes redact each record's attributes, on a copy: other
+// drop_attributes and mask_attributes redact each record's attributes, and scrubbing scrubs what
+// they keep and the record's body, on a copy: other
 // processors and exporters still see the record as it was.
 func (c *Controls) Logs(to sdklog.Exporter) sdklog.Exporter { return &logs{to, c} }
 

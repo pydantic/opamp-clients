@@ -22,7 +22,7 @@ public final class Policy {
   /** The controls of a policy in order: it must send the first two, and may leave out the rest (as local). */
   static final List<String> CONTROLS = List.of("head_sampling", "signal_exports", "sampling_rules",
       "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
-      "instrumentations");
+      "instrumentations", "scrubbing");
 
   /** A policy of the first two controls: {@code set} holds pairs of a control's name and its JSON value. */
   public static String v1(String... set) {

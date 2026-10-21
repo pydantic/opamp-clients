@@ -122,6 +122,7 @@ process running.
   | `log_levels` (`scopes`) | the same log exporters: a level per scope, over `level` ([below](#log-levels-per-scope)). |
   | `log_rate_limit` | the same log exporters: at most this many records a second ([below](#rate-caps)). |
   | `attribute_redaction` | the span and log exporters: attributes removed or masked at export ([below](#redaction)). |
+  | `scrubbing` | the same exporters: values that look secret replaced at export ([below](#scrubbing)). |
   | `debug` | until a time, another sampling ratio and log level, then back on its own ([below](#debug-mode)). |
   | `instrumentations` (`disabled`) | from then on, the named instrumentations' tracers start no span, and their metrics and log records are not exported ([below](#switching-instrumentations-off)). Names are upstream's short ones: `http`, `express`, `pg`, and so on. `http`, `net` and `dns` all trace an outgoing HTTP request. |
   | `instrumentations` (`all_disabled`) | the same, for every instrumentation the package loaded. The application's own tracers are not switched. |
@@ -191,8 +192,8 @@ a tracer, logger or meter provider it builds itself goes past them.
 
   | The application's own | Set aside from then on |
   |---|---|
-  | tracer provider | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `debug` (`sampling_ratio`), `signal_exports.traces`, `attribute_redaction` |
-  | logger provider | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug` (`log_level`), `attribute_redaction` |
+  | tracer provider | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `debug` (`sampling_ratio`), `signal_exports.traces`, `attribute_redaction`, `scrubbing` |
+  | logger provider | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug` (`log_level`), `attribute_redaction`, `scrubbing` |
   | meter provider | `signal_exports.metrics` |
 
 - **The instrumentations keep the SDK's providers.** Each got its providers when NodeSDK started.
@@ -321,6 +322,28 @@ rate have said to sample:
   `none`). With either left to NodeSDK, a policy that overrides `attribute_redaction` is FAILED,
   so the control is never half carried out. The same holds once the application registers a
   tracer or logger provider of its own, and an override already in force is then set aside.
+
+### Scrubbing
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}}
+```
+
+The Logfire SDK's scrubbing, its matchers ported character for character and held to the core's
+by the shared vectors. `defaults: true` takes its default patterns (`password`, `secret`, `auth`,
+`api key`, `session`, `cookie`, `jwt` and the others), matched anywhere in a key or a string;
+`patterns` are globs matched, ignoring ASCII case, against a whole key or a whole string. An
+attribute whose key matches is exported with the string `[Scrubbed due to '<match>']` in place
+of its value, whatever its type. Otherwise its string values are scrubbed: a string, each string
+in a list, and each member of a map, as an attribute of its own. The Logfire SDK's safe keys
+(`http.url`, `db.statement`, `exception.message` and the others) are kept as they are.
+[sdk-settings.md](sdk-settings.md#scrubbing) has the rules in full.
+
+- At the same wrappers, on what redaction keeps (a masked value is not scrubbed): span, span
+  event, span link and log record attributes, and log record bodies (a string, or the strings in
+  an array or a plain object). The application's span or record isn't changed. Names, resource
+  and scope attributes, and metrics are left alone.
+- Declared, and set aside, exactly as `attribute_redaction` is.
 
 ### Rate caps
 

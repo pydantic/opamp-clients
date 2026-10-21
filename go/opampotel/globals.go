@@ -41,7 +41,8 @@ func globalProviders() providers {
 type replaced struct{ traces, metrics, logs bool }
 
 // The settings each replaced provider takes from this package. Redaction goes with the span or
-// the log provider: it must hold for every span and log record, or none is promised. The
+// the log provider: it must hold for every span and log record, or none is promised. So does
+// scrubbing, for the same reason. The
 // instrumentation switches go with the tracer provider, whose spans they no longer stop. With
 // only the meter or the logger provider replaced they still stop spans, and miss that provider's
 // metrics or log records, as they miss a Prometheus reader's. The layer sets the debug rate and
@@ -52,7 +53,7 @@ var (
 	metricsSettings = []string{"send_metrics"}
 	logsSettings    = []string{"send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
 		"debug_send_logs_level"}
-	redactionSettings = []string{"drop_attributes", "mask_attributes"}
+	redactionSettings = []string{"drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns"}
 	switchSettings    = []string{"deactivate_instrumentations", "deactivate_all_instrumentations"}
 )
 

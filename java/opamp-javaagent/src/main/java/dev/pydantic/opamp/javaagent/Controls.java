@@ -94,7 +94,7 @@ final class Controls {
   /**
    * What the gates decide by, all from one document: the send_* switches; {@code logLevels}, which
    * log records to export by severity (send_logs_level, and send_logs_level_by_scope);
-   * {@code redaction}, drop_attributes and mask_attributes, for spans and log records; and
+   * {@code redaction}, drop_attributes, mask_attributes and scrubbing, for spans and log records; and
    * {@code logCap}, send_logs_per_second's bucket (null: no cap).
    */
   record Gates(boolean sendTraces, boolean sendMetrics, boolean sendLogs, LogLevels logLevels,

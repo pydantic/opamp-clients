@@ -136,6 +136,7 @@ WithEndpoint`. The endpoint is logged without user info, a query string or a fra
   | `log_levels` (`scopes`) | the same gate, a level per scope. The scope is the name given to the log bridge ([below](#log-levels-per-scope)). |
   | `log_rate_limit` | the same gate, after the levels. It is a token bucket on the records exported ([below](#rate-caps)). |
   | `attribute_redaction` | the span and log exporters' gates. Attributes are removed or masked as they are exported ([below](#redaction)). |
+  | `scrubbing` | the same gates. Values that look secret are replaced as they are exported ([below](#scrubbing)). |
   | `debug` | until that time, the debug ratio and level take the place of the ratio, the rules and the levels. A timer ends it, with or without the server ([below](#debug-mode)). |
   | `instrumentations` (`disabled`) | from then on, the named instrumentations' tracers start no span, and their metrics and log records are not exported. |
   | `instrumentations` (`all_disabled`) | the same, for every instrumentation. |
@@ -197,9 +198,9 @@ the application's own too. To keep the application's own spans, list the instrum
 
   | Provider set | Set aside |
   |---|---|
-  | tracer | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `signal_exports.traces`, `attribute_redaction`, `instrumentations` (and `debug` `sampling_ratio`) |
+  | tracer | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `signal_exports.traces`, `attribute_redaction`, `scrubbing`, `instrumentations` (and `debug` `sampling_ratio`) |
   | meter | `signal_exports.metrics` |
-  | logger | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `attribute_redaction` (and `debug` `log_level`) |
+  | logger | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `attribute_redaction`, `scrubbing` (and `debug` `log_level`) |
 
   The rest stay in force. With the meter or the logger provider set, the instrumentation switches
   still stop spans and the metrics and log records that go through `Setup`'s providers, but not
@@ -319,6 +320,28 @@ One Go difference: the log SDK can only set a record's attributes all at once, w
 its count of attributes dropped by the SDK's limits to 0. A record that had attributes dropped by
 `OTEL_LOGRECORD_ATTRIBUTE_COUNT_LIMIT` and that redaction changes is exported as if none were.
 Spans keep their count.
+
+### Scrubbing
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}}
+```
+
+The Logfire SDK's scrubbing, its matchers ported character for character and held to the core's
+by the shared vectors. `defaults: true` takes its default patterns (`password`, `secret`, `auth`,
+`api key`, `session`, `cookie`, `jwt` and the others), matched anywhere in a key or a string;
+`patterns` are globs matched, ignoring ASCII case, against a whole key or a whole string. An
+attribute whose key matches is exported with the string `[Scrubbed due to '<match>']` in place
+of its value, whatever its type. Otherwise its string values are scrubbed: a string, each string
+in a list, and each member of a map, as an attribute of its own. The Logfire SDK's safe keys
+(`http.url`, `db.statement`, `exception.message` and the others) are kept as they are.
+[sdk-settings.md](sdk-settings.md#scrubbing) has the rules in full.
+
+In the same gates, on what redaction keeps (a masked value is not scrubbed), and on the same
+view of a span and clone of a log record: span, span event, span link and log record attributes,
+and a log record's body (a string, or the strings in a slice or map). Resource and scope
+attributes, span names and metrics are left alone. The attribute count caveat above holds for a
+log record that scrubbing changes too.
 
 ### Rate caps
 

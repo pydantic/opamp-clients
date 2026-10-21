@@ -643,6 +643,45 @@ java.lang.String defaultValue);
 
     java.lang.String getCustomOrThrow(
         java.lang.String key);
+
+    /**
+     * <pre>
+     * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+     * in a span's, span event's, span link's and log record's attributes and a log record's body,
+     * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+     * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+     * and testdata/scrub.json pin what they do. False and empty: none.
+     * </pre>
+     *
+     * <code>bool scrub_defaults = 18;</code>
+     * @return The scrubDefaults.
+     */
+    boolean getScrubDefaults();
+
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @return A list containing the scrubPatterns.
+     */
+    java.util.List<java.lang.String>
+        getScrubPatternsList();
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @return The count of scrubPatterns.
+     */
+    int getScrubPatternsCount();
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param index The index of the element to return.
+     * @return The scrubPatterns at the given index.
+     */
+    java.lang.String getScrubPatterns(int index);
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param index The index of the element to return.
+     * @return The scrubPatterns at the given index.
+     */
+    com.google.protobuf.ByteString
+        getScrubPatternsBytes(int index);
   }
   /**
    * <pre>
@@ -663,6 +702,7 @@ java.lang.String defaultValue);
       sendLogsScopeLevels_ = emptyProtobufList();
       dropAttributes_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
       maskAttributes_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+      scrubPatterns_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
     }
     private int bitField0_;
     public static final int SAMPLING_RATE_FIELD_NUMBER = 1;
@@ -1813,6 +1853,151 @@ java.lang.String defaultValue) {
     private java.util.Map<java.lang.String, java.lang.String>
     getMutableCustomMap() {
       return internalGetMutableCustom();
+    }
+
+    public static final int SCRUB_DEFAULTS_FIELD_NUMBER = 18;
+    private boolean scrubDefaults_;
+    /**
+     * <pre>
+     * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+     * in a span's, span event's, span link's and log record's attributes and a log record's body,
+     * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+     * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+     * and testdata/scrub.json pin what they do. False and empty: none.
+     * </pre>
+     *
+     * <code>bool scrub_defaults = 18;</code>
+     * @return The scrubDefaults.
+     */
+    @java.lang.Override
+    public boolean getScrubDefaults() {
+      return scrubDefaults_;
+    }
+    /**
+     * <pre>
+     * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+     * in a span's, span event's, span link's and log record's attributes and a log record's body,
+     * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+     * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+     * and testdata/scrub.json pin what they do. False and empty: none.
+     * </pre>
+     *
+     * <code>bool scrub_defaults = 18;</code>
+     * @param value The scrubDefaults to set.
+     */
+    private void setScrubDefaults(boolean value) {
+      
+      scrubDefaults_ = value;
+    }
+    /**
+     * <pre>
+     * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+     * in a span's, span event's, span link's and log record's attributes and a log record's body,
+     * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+     * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+     * and testdata/scrub.json pin what they do. False and empty: none.
+     * </pre>
+     *
+     * <code>bool scrub_defaults = 18;</code>
+     */
+    private void clearScrubDefaults() {
+
+      scrubDefaults_ = false;
+    }
+
+    public static final int SCRUB_PATTERNS_FIELD_NUMBER = 19;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> scrubPatterns_;
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @return A list containing the scrubPatterns.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getScrubPatternsList() {
+      return scrubPatterns_;
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @return The count of scrubPatterns.
+     */
+    @java.lang.Override
+    public int getScrubPatternsCount() {
+      return scrubPatterns_.size();
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param index The index of the element to return.
+     * @return The scrubPatterns at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getScrubPatterns(int index) {
+      return scrubPatterns_.get(index);
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the scrubPatterns at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getScrubPatternsBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          scrubPatterns_.get(index));
+    }
+    private void ensureScrubPatternsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          scrubPatterns_;  if (!tmp.isModifiable()) {
+        scrubPatterns_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param index The index to set the value at.
+     * @param value The scrubPatterns to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setScrubPatterns(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureScrubPatternsIsMutable();
+      scrubPatterns_.set(index, value);
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param value The scrubPatterns to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addScrubPatterns(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureScrubPatternsIsMutable();
+      scrubPatterns_.add(value);
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param values The scrubPatterns to add.
+     */
+    private void addAllScrubPatterns(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureScrubPatternsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, scrubPatterns_);
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     */
+    private void clearScrubPatterns() {
+      scrubPatterns_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <code>repeated string scrub_patterns = 19;</code>
+     * @param value The bytes of the scrubPatterns to add.
+     */
+    private void addScrubPatternsBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureScrubPatternsIsMutable();
+      scrubPatterns_.add(value.toStringUtf8());
     }
 
     public static dev.pydantic.opamp.sdk.SettingsProto.Settings parseFrom(
@@ -3121,6 +3306,150 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+       * in a span's, span event's, span link's and log record's attributes and a log record's body,
+       * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+       * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+       * and testdata/scrub.json pin what they do. False and empty: none.
+       * </pre>
+       *
+       * <code>bool scrub_defaults = 18;</code>
+       * @return The scrubDefaults.
+       */
+      @java.lang.Override
+      public boolean getScrubDefaults() {
+        return instance.getScrubDefaults();
+      }
+      /**
+       * <pre>
+       * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+       * in a span's, span event's, span link's and log record's attributes and a log record's body,
+       * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+       * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+       * and testdata/scrub.json pin what they do. False and empty: none.
+       * </pre>
+       *
+       * <code>bool scrub_defaults = 18;</code>
+       * @param value The scrubDefaults to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScrubDefaults(boolean value) {
+        copyOnWrite();
+        instance.setScrubDefaults(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+       * in a span's, span event's, span link's and log record's attributes and a log record's body,
+       * at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+       * patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+       * and testdata/scrub.json pin what they do. False and empty: none.
+       * </pre>
+       *
+       * <code>bool scrub_defaults = 18;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearScrubDefaults() {
+        copyOnWrite();
+        instance.clearScrubDefaults();
+        return this;
+      }
+
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @return A list containing the scrubPatterns.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getScrubPatternsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getScrubPatternsList());
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @return The count of scrubPatterns.
+       */
+      @java.lang.Override
+      public int getScrubPatternsCount() {
+        return instance.getScrubPatternsCount();
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param index The index of the element to return.
+       * @return The scrubPatterns at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getScrubPatterns(int index) {
+        return instance.getScrubPatterns(index);
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the scrubPatterns at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getScrubPatternsBytes(int index) {
+        return instance.getScrubPatternsBytes(index);
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param index The index to set the value at.
+       * @param value The scrubPatterns to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScrubPatterns(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setScrubPatterns(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param value The scrubPatterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addScrubPatterns(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addScrubPatterns(value);
+        return this;
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param values The scrubPatterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllScrubPatterns(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllScrubPatterns(values);
+        return this;
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearScrubPatterns() {
+        copyOnWrite();
+        instance.clearScrubPatterns();
+        return this;
+      }
+      /**
+       * <code>repeated string scrub_patterns = 19;</code>
+       * @param value The bytes of the scrubPatterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addScrubPatternsBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addScrubPatternsBytes(value);
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Settings)
     }
     @java.lang.Override
@@ -3155,12 +3484,14 @@ java.lang.String defaultValue) {
               "sendLogsPerSecond_",
               "custom_",
               CustomDefaultEntryHolder.defaultEntry,
+              "scrubDefaults_",
+              "scrubPatterns_",
             };
             java.lang.String info =
-                "\u0000\u000e\u0000\u0001\u0001\u0010\u000e\u0001\u0004\u0000\u0001\u1000\u0000\u0002" +
+                "\u0000\u0010\u0000\u0001\u0001\u0013\u0010\u0001\u0005\u0000\u0001\u1000\u0000\u0002" +
                 "\u1007\u0001\u0003\u1007\u0002\u0004\u1007\u0003\u0005\u1009\u0007\u0006\u1007\b" +
                 "\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0005\u000f\u1000" +
-                "\u0006\u00102";
+                "\u0006\u00102\u0012\u0007\u0013\u021a";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -20248,10 +20579,29 @@ java.lang.String defaultValue) {
      * <code>repeated .opamp.proto.v1.KeyValue attributes = 1;</code>
      */
     int getAttributesCount();
+
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     * @return Whether the body field is set.
+     */
+    boolean hasBody();
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     * @return The body.
+     */
+    opamp.proto.v1.Anyvalue.AnyValue getBody();
   }
   /**
    * <pre>
-   * A span's, span event's, span link's or log record's attributes.
+   * A span's, span event's, span link's or log record's attributes, and a log record's body.
    * </pre>
    *
    * Protobuf type {@code opamp.sdk.v1.Attributes}
@@ -20264,6 +20614,7 @@ java.lang.String defaultValue) {
     private Attributes() {
       attributes_ = emptyProtobufList();
     }
+    private int bitField0_;
     public static final int ATTRIBUTES_FIELD_NUMBER = 1;
     private com.google.protobuf.Internal.ProtobufList<opamp.proto.v1.Anyvalue.KeyValue> attributes_;
     /**
@@ -20361,6 +20712,74 @@ java.lang.String defaultValue) {
       attributes_.remove(index);
     }
 
+    public static final int BODY_FIELD_NUMBER = 2;
+    private opamp.proto.v1.Anyvalue.AnyValue body_;
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasBody() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Anyvalue.AnyValue getBody() {
+      return body_ == null ? opamp.proto.v1.Anyvalue.AnyValue.getDefaultInstance() : body_;
+    }
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+      value.getClass();  // minimal bytecode null check
+      body_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+      value.getClass();  // minimal bytecode null check
+      if (body_ != null &&
+          body_ != opamp.proto.v1.Anyvalue.AnyValue.getDefaultInstance()) {
+        body_ =
+          opamp.proto.v1.Anyvalue.AnyValue.newBuilder(body_).mergeFrom(value).buildPartial();
+      } else {
+        body_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * a log record's, if any
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+     */
+    private void clearBody() {
+      body_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
+    }
+
     public static dev.pydantic.opamp.sdk.SettingsProto.Attributes parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
@@ -20446,7 +20865,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * A span's, span event's, span link's or log record's attributes.
+     * A span's, span event's, span link's or log record's attributes, and a log record's body.
      * </pre>
      *
      * Protobuf type {@code opamp.sdk.v1.Attributes}
@@ -20564,6 +20983,77 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasBody() {
+        return instance.hasBody();
+      }
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Anyvalue.AnyValue getBody() {
+        return instance.getBody();
+      }
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      public Builder setBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+        copyOnWrite();
+        instance.setBody(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      public Builder setBody(
+          opamp.proto.v1.Anyvalue.AnyValue.Builder builderForValue) {
+        copyOnWrite();
+        instance.setBody(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      public Builder mergeBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+        copyOnWrite();
+        instance.mergeBody(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * a log record's, if any
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 2;</code>
+       */
+      public Builder clearBody() {  copyOnWrite();
+        instance.clearBody();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Attributes)
     }
     @java.lang.Override
@@ -20580,11 +21070,14 @@ java.lang.String defaultValue) {
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
               "attributes_",
               opamp.proto.v1.Anyvalue.KeyValue.class,
+              "body_",
             };
             java.lang.String info =
-                "\u0000\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0001\u0000\u0001\u001b";
+                "\u0000\u0002\u0000\u0001\u0001\u0002\u0002\u0000\u0001\u0000\u0001\u001b\u0002\u1009" +
+                "\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -22020,7 +22513,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22029,7 +22522,7 @@ java.lang.String defaultValue) {
         getRedactedList();
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22037,12 +22530,31 @@ java.lang.String defaultValue) {
     opamp.proto.v1.Anyvalue.KeyValue getRedacted(int index);
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
      */
     int getRedactedCount();
+
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     * @return Whether the body field is set.
+     */
+    boolean hasBody();
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     * @return The body.
+     */
+    opamp.proto.v1.Anyvalue.AnyValue getBody();
 
     /**
      * <pre>
@@ -22277,7 +22789,7 @@ java.lang.String defaultValue) {
     private com.google.protobuf.Internal.ProtobufList<opamp.proto.v1.Anyvalue.KeyValue> redacted_;
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22288,7 +22800,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22299,7 +22811,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22310,7 +22822,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22321,7 +22833,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22340,7 +22852,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22354,7 +22866,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22367,7 +22879,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22381,7 +22893,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22394,7 +22906,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22404,7 +22916,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * for attributes: as exported, in order
+     * for attributes: as exported (redacted, then scrubbed), in order
      * </pre>
      *
      * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22412,6 +22924,74 @@ java.lang.String defaultValue) {
     private void removeRedacted(int index) {
       ensureRedactedIsMutable();
       redacted_.remove(index);
+    }
+
+    public static final int BODY_FIELD_NUMBER = 6;
+    private opamp.proto.v1.Anyvalue.AnyValue body_;
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     */
+    @java.lang.Override
+    public boolean hasBody() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Anyvalue.AnyValue getBody() {
+      return body_ == null ? opamp.proto.v1.Anyvalue.AnyValue.getDefaultInstance() : body_;
+    }
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+      value.getClass();  // minimal bytecode null check
+      body_ = value;
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+      value.getClass();  // minimal bytecode null check
+      if (body_ != null &&
+          body_ != opamp.proto.v1.Anyvalue.AnyValue.getDefaultInstance()) {
+        body_ =
+          opamp.proto.v1.Anyvalue.AnyValue.newBuilder(body_).mergeFrom(value).buildPartial();
+      } else {
+        body_ = value;
+      }
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * for attributes with a body: the body as exported
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+     */
+    private void clearBody() {
+      body_ = null;
+      bitField0_ = (bitField0_ & ~0x00000004);
     }
 
     public static final int PASSED_FIELD_NUMBER = 5;
@@ -22804,7 +23384,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22816,7 +23396,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22826,7 +23406,7 @@ java.lang.String defaultValue) {
         return instance.getRedactedCount();
       }/**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22837,7 +23417,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22850,7 +23430,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22864,7 +23444,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22876,7 +23456,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22889,7 +23469,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22902,7 +23482,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22916,7 +23496,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22929,7 +23509,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22941,7 +23521,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * for attributes: as exported, in order
+       * for attributes: as exported (redacted, then scrubbed), in order
        * </pre>
        *
        * <code>repeated .opamp.proto.v1.KeyValue redacted = 4;</code>
@@ -22949,6 +23529,77 @@ java.lang.String defaultValue) {
       public Builder removeRedacted(int index) {
         copyOnWrite();
         instance.removeRedacted(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      @java.lang.Override
+      public boolean hasBody() {
+        return instance.hasBody();
+      }
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Anyvalue.AnyValue getBody() {
+        return instance.getBody();
+      }
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      public Builder setBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+        copyOnWrite();
+        instance.setBody(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      public Builder setBody(
+          opamp.proto.v1.Anyvalue.AnyValue.Builder builderForValue) {
+        copyOnWrite();
+        instance.setBody(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      public Builder mergeBody(opamp.proto.v1.Anyvalue.AnyValue value) {
+        copyOnWrite();
+        instance.mergeBody(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * for attributes with a body: the body as exported
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AnyValue body = 6;</code>
+       */
+      public Builder clearBody() {  copyOnWrite();
+        instance.clearBody();
         return this;
       }
 
@@ -23072,10 +23723,11 @@ java.lang.String defaultValue) {
               "redacted_",
               opamp.proto.v1.Anyvalue.KeyValue.class,
               "passed_",
+              "body_",
             };
             java.lang.String info =
-                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0002\u0000\u0001\u0208\u0002\u1009" +
-                "\u0000\u0003\u1007\u0001\u0004\u001b\u0005&";
+                "\u0000\u0006\u0000\u0001\u0001\u0006\u0006\u0000\u0002\u0000\u0001\u0208\u0002\u1009" +
+                "\u0000\u0003\u1007\u0001\u0004\u001b\u0005&\u0006\u1009\u0002";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

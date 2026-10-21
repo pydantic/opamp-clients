@@ -60,7 +60,10 @@ public class ConcurrencyTests(ITestOutputHelper output)
         /// <summary>Anything, every control local too: only what holds of every document can be checked.</summary>
         Anything,
 
-        /// <summary>Every document drops <c>always.drop</c> and masks <c>always.mask</c> (and drops it in none).</summary>
+        /// <summary>
+        /// Every document drops <c>always.drop</c> and masks <c>always.mask</c> (and drops it in none),
+        /// and scrubs the default patterns.
+        /// </summary>
         Redacted,
 
         /// <summary>Every document has <c>send_logs</c> false.</summary>
@@ -79,7 +82,7 @@ public class ConcurrencyTests(ITestOutputHelper output)
     //   run is bounded, and every export the gate let through was one it could read (no failed
     //   export in export health);
     // - Redacted: always.drop (in any ASCII case) is never exported, on a span, event, link or log
-    //   record, and always.mask only ever as [REDACTED];
+    //   record, always.mask only ever as [REDACTED], and note never in the clear (scrubbed, or masked);
     // - a key every document that sends the signal drops is never exported (#343): every document
     //   but the empty one and the quiet ones drops user.password, and a quiet one sends neither
     //   traces nor logs and keeps it, so an export read under a quiet document's policy and
@@ -228,11 +231,36 @@ public class ConcurrencyTests(ITestOutputHelper output)
         /// <summary>Whether the document drops an attribute with this key.</summary>
         public bool Drops(string key) => this.Settings.DropAttributes.Any(p => Like(p, key, ignoreCase: true));
 
-        /// <summary>An attribute list as the document redacts it.</summary>
+        /// <summary>An attribute list as the document redacts it, then scrubs what it keeps.</summary>
         public List<KeyValue> Redact(IEnumerable<(string Key, object Value)> attributes) =>
             [.. from a in attributes
                 where !this.Settings.DropAttributes.Any(p => Like(p, a.Key, ignoreCase: true))
-                select this.Settings.MaskAttributes.Any(p => Like(p, a.Key, ignoreCase: true)) ? Kv(a.Key, Redactor.Masked) : Kv(a.Key, a.Value)];
+                select this.Settings.MaskAttributes.Any(p => Like(p, a.Key, ignoreCase: true)) ? Kv(a.Key, Redactor.Masked) : Kv(a.Key, this.Scrubbed(a.Key, a.Value))];
+
+        /// <summary>A log record's body (a string) as the document's scrubbing leaves it.</summary>
+        public string ScrubBody(string body) =>
+            Scrubber.Of(this.Settings.ScrubDefaults, [.. this.Settings.ScrubPatterns])?.Text(body) ?? body;
+
+        /// <summary>A kept attribute's value as the document's scrubbing leaves it (its matchers are held to the layer by ScrubbingTests).</summary>
+        private object Scrubbed(string key, object value)
+        {
+            if (Scrubber.Of(this.Settings.ScrubDefaults, [.. this.Settings.ScrubPatterns]) is not { } scrub)
+            {
+                return value;
+            }
+
+            return scrub.Key(key, out var replacement) switch
+            {
+                Scrubber.KeyScrub.Keep => value,
+                Scrubber.KeyScrub.Replace => replacement,
+                _ => value switch
+                {
+                    string text => scrub.Text(text) ?? text,
+                    string[] items => items.Select(i => scrub.Text(i) ?? i).ToArray(),
+                    _ => value,
+                },
+            };
+        }
 
         /// <summary>
         /// Whether a record is past the levels: the exact entry for its scope, else the longest
@@ -402,12 +430,15 @@ public class ConcurrencyTests(ITestOutputHelper output)
             ("retries", r => (long)r.Next(5)),
             ("ok", r => r.Next(2) == 0),
             ("tags", r => new[] { "a", "b" + r.Next(10) }),
+            ("note", r => $"the password is p{r.Next(100)}"),
         ];
 
         // Drop patterns that can't match always.mask, and those that can.
         private static readonly string[] SafeDrops = ["user.email", "auth.*", "*token*", "card.number", "DB.SECRET", "tenant.*", "always.drop", "ALWAYS.DROP", "always.d*"];
         private static readonly string[] AnyDrops = [.. SafeDrops, "*", "always.*", "*mask*", "*.*"];
         private static readonly string[] Masks = ["*", "user.*", "card.*", "*secret*", "http.*", "retries", "tags", "OK", "always.mask", "ALWAYS.MASK", "always.m*"];
+        // Scrub patterns: keys and values they match whole.
+        private static readonly string[] ScrubPatterns = ["TENANT.*", "acme", "GET", "t1*", "*@example.com", "retries"];
         private static readonly string[] Ops = ["checkout.cart", "health", "db.query", "GET", "child"];
         private static readonly string[] Categories = ["app", "app.db", "app.dbx", "noisy", "lib.http", "other"];
         private static readonly string[] ScopePatterns = ["app", "app*", "app.db", "app.db*", "noisy", "*", "lib*"];
@@ -611,8 +642,7 @@ public class ConcurrencyTests(ITestOutputHelper output)
                 this.Emit(factory, plan);
                 if (this.last.SendLogs && this.last.Keeps(plan.Category, Severity(plan.Level)))
                 {
-                    wantLogs.Add($"{plan.Category} {Severity(plan.Level)} {Template(this.LogShape(plan.Shape))}: {Text(this.last.Redact(this.LogShape(plan.Shape)))}"
-                        .Replace("{shape}", plan.Shape.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal));
+                    wantLogs.Add($"{plan.Category} {Severity(plan.Level)} {this.last.ScrubBody(this.LogBody(plan.Shape))}: {Text(this.last.Redact(this.LogShape(plan.Shape)))}");
                 }
             }
 
@@ -738,10 +768,13 @@ public class ConcurrencyTests(ITestOutputHelper output)
                 this.Problem($"a logs export with send_logs false in every document: {records.Count} records");
             }
 
-            int ShapeOf(string body) => int.Parse(body.Split(' ')[0][1..], CultureInfo.InvariantCulture);
-            this.Common([.. records.Select(r => (this.LogShape(ShapeOf(r.Body)).Select(a => Kv(a.Key, a.Value)).ToList(), r.Attributes, r.Body))], "logs");
+            this.Common([.. records.Select(r => (new List<KeyValue>(), r.Attributes, r.Body))], "logs");
+            // A record's body is its template, which names its shape; scrubbed (it names its keys,
+            // user.password among them), it may not: then any shape whose body and attributes the
+            // document makes into the record's will do.
             var one = this.docs.Where(d => d.SendLogs && records.All(r =>
-                d.Keeps(r.Scope, r.Severity) && d.Redact(this.LogShape(ShapeOf(r.Body))).SequenceEqual(r.Attributes)));
+                d.Keeps(r.Scope, r.Severity) && Enumerable.Range(0, this.shapes.Count).Any(shape =>
+                    d.ScrubBody(this.LogBody(shape)) == r.Body && d.Redact(this.LogShape(shape)).SequenceEqual(r.Attributes))));
             if (!one.Any())
             {
                 this.Problem($"a logs export no one document makes: {string.Join(" | ", records.Take(3).Select(r => $"{r.Scope} {r.Severity} {r.Body}: {Text(r.Attributes)}"))}");
@@ -780,6 +813,11 @@ public class ConcurrencyTests(ITestOutputHelper output)
                 if (got.Any(a => a.Key == "always.mask" && a.Value.StringValue != Redactor.Masked))
                 {
                     this.Problem($"{signal}: {where} exported always.mask unmasked, masked in every document: {Text(got)}");
+                }
+
+                if (got.Any(a => a.Key == "note" && a.Value.StringValue is not ("[Scrubbed due to 'password']" or Redactor.Masked)))
+                {
+                    this.Problem($"{signal}: {where} exported note in the clear, scrubbed in every document: {Text(got)}");
                 }
             }
         }
@@ -862,6 +900,10 @@ public class ConcurrencyTests(ITestOutputHelper output)
         /// <summary>A record's template: its shape's index (the collector reads it back from the body), then a hole for each attribute.</summary>
         private static string Template(IEnumerable<(string Key, object Value)> attributes) =>
             "r{shape} " + string.Join(" ", attributes.Select(a => "{" + a.Key + "}"));
+
+        /// <summary>The body of a record of the shape: its template, its shape's index in it.</summary>
+        private string LogBody(int shape) =>
+            Template(this.LogShape(shape)).Replace("{shape}", shape.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
         private (string Key, object Value)[] LogShape(int shape) => [.. this.shapes[shape].Where(a => a.Value is not string[])];
 
@@ -976,6 +1018,16 @@ public class ConcurrencyTests(ITestOutputHelper output)
             {
                 drops.Add(Pick(new[] { "always.drop", "ALWAYS.DROP", "always.d*" }));
                 masks.Add(Pick(new[] { "always.mask", "ALWAYS.MASK", "always.m*" }));
+            }
+
+            if (this.Kind == Kind.Redacted || r.Next(2) == 0)
+            {
+                Override("scrubbing")["defaults"] = true;
+            }
+
+            if (Some(ScrubPatterns, 3) is { Count: > 0 } scrubs)
+            {
+                Override("scrubbing")["patterns"] = new JsonArray([.. scrubs.Select(x => (JsonNode)x)]);
             }
 
             if (!quiet)

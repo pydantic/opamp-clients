@@ -90,7 +90,8 @@ Traces carry on.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -136,7 +137,8 @@ connected. Thus the next policy can turn it all back on.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "override", "disabled": ["jdbc", "kafka-clients"]}
+  "instrumentations": {"mode": "override", "disabled": ["jdbc", "kafka-clients"]},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -174,7 +176,8 @@ answers the policy FAILED and nothing changes.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "override", "all_disabled": true}
+  "instrumentations": {"mode": "override", "all_disabled": true},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -198,7 +201,8 @@ No instrumentation runs from the next start. In Go, Node.js and Rust, none runs 
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -228,7 +232,8 @@ differs by instrumentation. For example, an HTTP client span starts without its 
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -259,7 +264,8 @@ the policy ([where each setting applies](../../docs/sdk-settings.md#where-each-s
   "attribute_redaction": {"mode": "override", "mask": ["user.email", "enduser.id"], "drop": ["*password*", "*token*", "http.request.header.authorization"]},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -268,6 +274,42 @@ value with `[REDACTED]` for the keys that match `mask`. The globs ignore case. T
 once. Resource attributes, span names, log bodies and metrics stay as they are. Only an
 integration whose own exporters see every span and log record carries this out. Elsewhere the SDK
 refuses the policy
+([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
+
+## Scrub what looks secret: `scrub-secrets.json`
+
+```json
+{
+  "schema": "logfire-sdk-policy/v1",
+  "head_sampling": {"mode": "local"},
+  "signal_exports": {
+    "traces": {"mode": "local"},
+    "metrics": {"mode": "local"},
+    "logs": {"mode": "local"}
+  },
+  "sampling_rules": {"mode": "local"},
+  "trace_rate_limit": {"mode": "local"},
+  "log_levels": {"mode": "local"},
+  "log_rate_limit": {"mode": "local"},
+  "attribute_redaction": {"mode": "local"},
+  "debug": {"mode": "local"},
+  "app_settings": {"mode": "local"},
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}
+}
+```
+
+At export, the SDK scrubs span, span event, link and log attributes, and log bodies, as the
+Logfire SDK scrubs them. `defaults: true` takes its default patterns (`password`, `secret`,
+`auth`, `api key`, `session`, `cookie`, `jwt` and the others): an attribute whose key contains
+one has its value replaced with `[Scrubbed due to 'password']`, and so does a string value or
+log body in which one appears (a value that is only `password` is kept). Each of `patterns` is a glob, ignoring case,
+matched against a whole key or a whole string value: here any value with an `@` in it, and the
+`card.` attributes. The Logfire SDK's safe keys (`http.url`, `db.statement`,
+`exception.message` and the others) are never scrubbed. This applies at once. Attributes that
+`attribute_redaction` drops or masks are not scrubbed. Resource attributes, span names and
+metrics stay as they are. As with redaction, only an integration whose own exporters see every
+span and log record carries this out
 ([where each setting applies](../../docs/sdk-settings.md#where-each-setting-applies)).
 
 ## Cap the volume: `cap-volume.json`
@@ -288,7 +330,8 @@ refuses the policy
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -315,7 +358,8 @@ buckets.
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "override", "until": "2026-10-14T12:30:00Z", "sampling_ratio": 1, "log_level": "debug"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 
@@ -343,7 +387,8 @@ but a later time does. Every integration ends it on a timer of its own, server o
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "override", "values": {"checkout.new_flow": "on", "example.log_level": "debug"}},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
 ```
 

@@ -339,7 +339,14 @@ type Settings struct {
 	// it is put in force. Keys are ASCII letters, digits, `.`, `_` and `-` (starting with a letter
 	// or digit, up to 128 bytes); values are text as sent (a number or boolean as its JSON text), up
 	// to 4096 bytes; at most 128 entries. Empty: none, and every reader gets its default.
-	Custom        map[string]string `protobuf:"bytes,16,rep,name=custom,proto3" json:"custom,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Custom map[string]string `protobuf:"bytes,16,rep,name=custom,proto3" json:"custom,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// scrub_defaults and scrub_patterns (the policy's `scrubbing`): replace values that look secret
+	// in a span's, span event's, span link's and log record's attributes and a log record's body,
+	// at export, after drop_attributes and mask_attributes. scrub_defaults: Logfire's default
+	// patterns; scrub_patterns: globs as drop_attributes', lowercase, sorted. Evaluate's Attributes
+	// and testdata/scrub.json pin what they do. False and empty: none.
+	ScrubDefaults bool     `protobuf:"varint,18,opt,name=scrub_defaults,json=scrubDefaults,proto3" json:"scrub_defaults,omitempty"`
+	ScrubPatterns []string `protobuf:"bytes,19,rep,name=scrub_patterns,json=scrubPatterns,proto3" json:"scrub_patterns,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -468,6 +475,20 @@ func (x *Settings) GetDeactivateAllInstrumentations() bool {
 func (x *Settings) GetCustom() map[string]string {
 	if x != nil {
 		return x.Custom
+	}
+	return nil
+}
+
+func (x *Settings) GetScrubDefaults() bool {
+	if x != nil {
+		return x.ScrubDefaults
+	}
+	return false
+}
+
+func (x *Settings) GetScrubPatterns() []string {
+	if x != nil {
+		return x.ScrubPatterns
 	}
 	return nil
 }
@@ -2143,10 +2164,11 @@ func (x *CapEvent) GetRecords() uint64 {
 	return 0
 }
 
-// A span's, span event's, span link's or log record's attributes.
+// A span's, span event's, span link's or log record's attributes, and a log record's body.
 type Attributes struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Attributes    []*protobufs.KeyValue  `protobuf:"bytes,1,rep,name=attributes,proto3" json:"attributes,omitempty"`
+	Body          *protobufs.AnyValue    `protobuf:"bytes,2,opt,name=body,proto3" json:"body,omitempty"` // a log record's, if any
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2184,6 +2206,13 @@ func (*Attributes) Descriptor() ([]byte, []int) {
 func (x *Attributes) GetAttributes() []*protobufs.KeyValue {
 	if x != nil {
 		return x.Attributes
+	}
+	return nil
+}
+
+func (x *Attributes) GetBody() *protobufs.AnyValue {
+	if x != nil {
+		return x.Body
 	}
 	return nil
 }
@@ -2315,7 +2344,8 @@ type Evaluated struct {
 	Refused       string                 `protobuf:"bytes,1,opt,name=refused,proto3" json:"refused,omitempty"`       // the settings were refused, and why
 	Sampling      *SpanSampling          `protobuf:"bytes,2,opt,name=sampling,proto3" json:"sampling,omitempty"`     // for a span
 	Kept          *bool                  `protobuf:"varint,3,opt,name=kept,proto3,oneof" json:"kept,omitempty"`      // for a log record: past send_logs and the levels
-	Redacted      []*protobufs.KeyValue  `protobuf:"bytes,4,rep,name=redacted,proto3" json:"redacted,omitempty"`     // for attributes: as exported, in order
+	Redacted      []*protobufs.KeyValue  `protobuf:"bytes,4,rep,name=redacted,proto3" json:"redacted,omitempty"`     // for attributes: as exported (redacted, then scrubbed), in order
+	Body          *protobufs.AnyValue    `protobuf:"bytes,6,opt,name=body,proto3" json:"body,omitempty"`             // for attributes with a body: the body as exported
 	Passed        []uint64               `protobuf:"varint,5,rep,packed,name=passed,proto3" json:"passed,omitempty"` // for a cap run, per event: 1 or 0 for a span, the records kept for logs
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2375,6 +2405,13 @@ func (x *Evaluated) GetKept() bool {
 func (x *Evaluated) GetRedacted() []*protobufs.KeyValue {
 	if x != nil {
 		return x.Redacted
+	}
+	return nil
+}
+
+func (x *Evaluated) GetBody() *protobufs.AnyValue {
+	if x != nil {
+		return x.Body
 	}
 	return nil
 }
@@ -2830,7 +2867,7 @@ var File_opamp_sdk_v1_settings_proto protoreflect.FileDescriptor
 
 const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\xb9\b\n" +
+	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\x87\t\n" +
 	"\bSettings\x12(\n" +
 	"\rsampling_rate\x18\x01 \x01(\x01H\x00R\fsamplingRate\x88\x01\x01\x12$\n" +
 	"\vsend_traces\x18\x02 \x01(\bH\x01R\n" +
@@ -2847,7 +2884,9 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x14send_logs_per_second\x18\x0f \x01(\x01H\x06R\x11sendLogsPerSecond\x88\x01\x01\x12T\n" +
 	"\x1bdeactivate_instrumentations\x18\x05 \x01(\v2\x13.opamp.sdk.v1.NamesR\x1adeactivateInstrumentations\x12K\n" +
 	"\x1fdeactivate_all_instrumentations\x18\x06 \x01(\bH\aR\x1ddeactivateAllInstrumentations\x88\x01\x01\x12:\n" +
-	"\x06custom\x18\x10 \x03(\v2\".opamp.sdk.v1.Settings.CustomEntryR\x06custom\x1a9\n" +
+	"\x06custom\x18\x10 \x03(\v2\".opamp.sdk.v1.Settings.CustomEntryR\x06custom\x12%\n" +
+	"\x0escrub_defaults\x18\x12 \x01(\bR\rscrubDefaults\x12%\n" +
+	"\x0escrub_patterns\x18\x13 \x03(\tR\rscrubPatterns\x1a9\n" +
 	"\vCustomEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x10\n" +
@@ -3003,12 +3042,13 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x05at_ns\x18\x01 \x01(\x04R\x04atNs\x12,\n" +
 	"\x06parent\x18\x02 \x01(\x0e2\x14.opamp.sdk.v1.ParentR\x06parent\x12\x18\n" +
 	"\asampled\x18\x03 \x01(\bR\asampled\x12\x18\n" +
-	"\arecords\x18\x04 \x01(\x04R\arecords\"F\n" +
+	"\arecords\x18\x04 \x01(\x04R\arecords\"t\n" +
 	"\n" +
 	"Attributes\x128\n" +
 	"\n" +
 	"attributes\x18\x01 \x03(\v2\x18.opamp.proto.v1.KeyValueR\n" +
-	"attributes\"=\n" +
+	"attributes\x12,\n" +
+	"\x04body\x18\x02 \x01(\v2\x18.opamp.proto.v1.AnyValueR\x04body\"=\n" +
 	"\tLogRecord\x12\x14\n" +
 	"\x05scope\x18\x01 \x01(\tR\x05scope\x12\x1a\n" +
 	"\bseverity\x18\x02 \x01(\rR\bseverity\"\xb3\x01\n" +
@@ -3018,12 +3058,13 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\n" +
 	"attributes\x18\x03 \x03(\v2\x18.opamp.proto.v1.KeyValueR\n" +
 	"attributes\x12,\n" +
-	"\x06parent\x18\x04 \x01(\x0e2\x14.opamp.sdk.v1.ParentR\x06parent\"\xcd\x01\n" +
+	"\x06parent\x18\x04 \x01(\x0e2\x14.opamp.sdk.v1.ParentR\x06parent\"\xfb\x01\n" +
 	"\tEvaluated\x12\x18\n" +
 	"\arefused\x18\x01 \x01(\tR\arefused\x126\n" +
 	"\bsampling\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.SpanSamplingR\bsampling\x12\x17\n" +
 	"\x04kept\x18\x03 \x01(\bH\x00R\x04kept\x88\x01\x01\x124\n" +
-	"\bredacted\x18\x04 \x03(\v2\x18.opamp.proto.v1.KeyValueR\bredacted\x12\x16\n" +
+	"\bredacted\x18\x04 \x03(\v2\x18.opamp.proto.v1.KeyValueR\bredacted\x12,\n" +
+	"\x04body\x18\x06 \x01(\v2\x18.opamp.proto.v1.AnyValueR\x04body\x12\x16\n" +
 	"\x06passed\x18\x05 \x03(\x04R\x06passedB\a\n" +
 	"\x05_kept\"\xd2\x01\n" +
 	"\fSpanSampling\x120\n" +
@@ -3071,8 +3112,8 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x14PARENT_LOCAL_SAMPLED\x10\x01\x12\x1a\n" +
 	"\x16PARENT_LOCAL_UNSAMPLED\x10\x02\x12\x19\n" +
 	"\x15PARENT_REMOTE_SAMPLED\x10\x03\x12\x1b\n" +
-	"\x17PARENT_REMOTE_UNSAMPLED\x10\x04B~\n" +
-	"\x16dev.pydantic.opamp.sdkB\rSettingsProtoZ9github.com/pydantic/opamp-clients/go/opamp/sdk/settingspb\xaa\x02\x19Pydantic.OpAmp.Client.Sdkb\x06proto3"
+	"\x17PARENT_REMOTE_UNSAMPLED\x10\x04B\x86\x01\n" +
+	"\x16dev.pydantic.opamp.sdkB\rSettingsProtoZAgithub.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb\xaa\x02\x19Pydantic.OpAmp.Client.Sdkb\x06proto3"
 
 var (
 	file_opamp_sdk_v1_settings_proto_rawDescOnce sync.Once
@@ -3133,8 +3174,9 @@ var file_opamp_sdk_v1_settings_proto_goTypes = []any{
 	(*protobufs.RemoteConfigStatus)(nil),  // 41: opamp.proto.v1.RemoteConfigStatus
 	(*protobufs.ComponentHealth)(nil),     // 42: opamp.proto.v1.ComponentHealth
 	(*protobufs.KeyValue)(nil),            // 43: opamp.proto.v1.KeyValue
-	(*protobufs.AgentDescription)(nil),    // 44: opamp.proto.v1.AgentDescription
-	(*protobufs.AvailableComponents)(nil), // 45: opamp.proto.v1.AvailableComponents
+	(*protobufs.AnyValue)(nil),            // 44: opamp.proto.v1.AnyValue
+	(*protobufs.AgentDescription)(nil),    // 45: opamp.proto.v1.AgentDescription
+	(*protobufs.AvailableComponents)(nil), // 46: opamp.proto.v1.AvailableComponents
 }
 var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	6,  // 0: opamp.sdk.v1.Settings.sampling_rules:type_name -> opamp.sdk.v1.SamplingRule
@@ -3178,33 +3220,35 @@ var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	29, // 38: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
 	1,  // 39: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
 	43, // 40: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
-	0,  // 41: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
-	43, // 42: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
-	1,  // 43: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
-	34, // 44: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
-	43, // 45: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
-	4,  // 46: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
-	10, // 47: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
-	12, // 48: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
-	22, // 49: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
-	27, // 50: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
-	16, // 51: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
-	18, // 52: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
-	23, // 53: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
-	14, // 54: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
-	11, // 55: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
-	15, // 56: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
-	44, // 57: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
-	33, // 58: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
-	17, // 59: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
-	21, // 60: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
-	45, // 61: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
-	13, // 62: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
-	63, // [63:63] is the sub-list for method output_type
-	63, // [63:63] is the sub-list for method input_type
-	63, // [63:63] is the sub-list for extension type_name
-	63, // [63:63] is the sub-list for extension extendee
-	0,  // [0:63] is the sub-list for field type_name
+	44, // 41: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
+	0,  // 42: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
+	43, // 43: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
+	1,  // 44: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
+	34, // 45: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
+	43, // 46: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
+	44, // 47: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
+	4,  // 48: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
+	10, // 49: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
+	12, // 50: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
+	22, // 51: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
+	27, // 52: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
+	16, // 53: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
+	18, // 54: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
+	23, // 55: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
+	14, // 56: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
+	11, // 57: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
+	15, // 58: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
+	45, // 59: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
+	33, // 60: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
+	17, // 61: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
+	21, // 62: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
+	46, // 63: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
+	13, // 64: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
+	65, // [65:65] is the sub-list for method output_type
+	65, // [65:65] is the sub-list for method input_type
+	65, // [65:65] is the sub-list for extension type_name
+	65, // [65:65] is the sub-list for extension extendee
+	0,  // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_opamp_sdk_v1_settings_proto_init() }

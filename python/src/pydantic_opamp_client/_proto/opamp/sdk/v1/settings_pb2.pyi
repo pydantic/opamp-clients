@@ -38,7 +38,7 @@ PARENT_REMOTE_SAMPLED: Parent
 PARENT_REMOTE_UNSAMPLED: Parent
 
 class Settings(_message.Message):
-    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "custom")
+    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "custom", "scrub_defaults", "scrub_patterns")
     class CustomEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -60,6 +60,8 @@ class Settings(_message.Message):
     DEACTIVATE_INSTRUMENTATIONS_FIELD_NUMBER: _ClassVar[int]
     DEACTIVATE_ALL_INSTRUMENTATIONS_FIELD_NUMBER: _ClassVar[int]
     CUSTOM_FIELD_NUMBER: _ClassVar[int]
+    SCRUB_DEFAULTS_FIELD_NUMBER: _ClassVar[int]
+    SCRUB_PATTERNS_FIELD_NUMBER: _ClassVar[int]
     sampling_rate: float
     send_traces: bool
     send_metrics: bool
@@ -74,7 +76,9 @@ class Settings(_message.Message):
     deactivate_instrumentations: Names
     deactivate_all_instrumentations: bool
     custom: _containers.ScalarMap[str, str]
-    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., custom: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    scrub_defaults: bool
+    scrub_patterns: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., custom: _Optional[_Mapping[str, str]] = ..., scrub_defaults: bool = ..., scrub_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class SamplingRule(_message.Message):
     __slots__ = ("rate", "name", "kind", "path", "attributes")
@@ -370,10 +374,12 @@ class CapEvent(_message.Message):
     def __init__(self, at_ns: _Optional[int] = ..., parent: _Optional[_Union[Parent, str]] = ..., sampled: bool = ..., records: _Optional[int] = ...) -> None: ...
 
 class Attributes(_message.Message):
-    __slots__ = ("attributes",)
+    __slots__ = ("attributes", "body")
     ATTRIBUTES_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     attributes: _containers.RepeatedCompositeFieldContainer[_anyvalue_pb2.KeyValue]
-    def __init__(self, attributes: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ...) -> None: ...
+    body: _anyvalue_pb2.AnyValue
+    def __init__(self, attributes: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ..., body: _Optional[_Union[_anyvalue_pb2.AnyValue, _Mapping]] = ...) -> None: ...
 
 class LogRecord(_message.Message):
     __slots__ = ("scope", "severity")
@@ -396,18 +402,20 @@ class SpanStart(_message.Message):
     def __init__(self, name: _Optional[str] = ..., kind: _Optional[_Union[SpanKind, str]] = ..., attributes: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ..., parent: _Optional[_Union[Parent, str]] = ...) -> None: ...
 
 class Evaluated(_message.Message):
-    __slots__ = ("refused", "sampling", "kept", "redacted", "passed")
+    __slots__ = ("refused", "sampling", "kept", "redacted", "body", "passed")
     REFUSED_FIELD_NUMBER: _ClassVar[int]
     SAMPLING_FIELD_NUMBER: _ClassVar[int]
     KEPT_FIELD_NUMBER: _ClassVar[int]
     REDACTED_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     PASSED_FIELD_NUMBER: _ClassVar[int]
     refused: str
     sampling: SpanSampling
     kept: bool
     redacted: _containers.RepeatedCompositeFieldContainer[_anyvalue_pb2.KeyValue]
+    body: _anyvalue_pb2.AnyValue
     passed: _containers.RepeatedScalarFieldContainer[int]
-    def __init__(self, refused: _Optional[str] = ..., sampling: _Optional[_Union[SpanSampling, _Mapping]] = ..., kept: bool = ..., redacted: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ..., passed: _Optional[_Iterable[int]] = ...) -> None: ...
+    def __init__(self, refused: _Optional[str] = ..., sampling: _Optional[_Union[SpanSampling, _Mapping]] = ..., kept: bool = ..., redacted: _Optional[_Iterable[_Union[_anyvalue_pb2.KeyValue, _Mapping]]] = ..., body: _Optional[_Union[_anyvalue_pb2.AnyValue, _Mapping]] = ..., passed: _Optional[_Iterable[int]] = ...) -> None: ...
 
 class SpanSampling(_message.Message):
     __slots__ = ("how", "parent_sampled", "rate", "rule")

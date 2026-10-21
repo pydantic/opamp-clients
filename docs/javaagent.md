@@ -74,9 +74,9 @@ extension's customizers run last, and it reads what the SDK is built with:
 - **A processor or reader of its own.** A tracer, logger or meter provider customizer can add a
   span processor, a log record processor or a metric reader. What it exports doesn't go through
   the extension's gate, so that signal's gate controls are set aside, as under a configuration
-  file. For traces these are `signal_exports.traces` and `attribute_redaction`. For logs they are
+  file. For traces these are `signal_exports.traces`, `attribute_redaction` and `scrubbing`. For logs they are
   `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug`
-  (`log_level`) and `attribute_redaction`. For metrics it is `signal_exports.metrics`. The agent
+  (`log_level`), `attribute_redaction` and `scrubbing`. For metrics it is `signal_exports.metrics`. The agent
   logs a WARNING that names what was added and what is set aside. The inventory lists it,
   ungated. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
   counted: the agent adds such processors itself, and one that exported would send spans before
@@ -153,7 +153,7 @@ query string or a fragment. An endpoint without a scheme gets a warning at start
   | `head_sampling` | a sampler in place of the agent's (`otel.traces.sampler`, whatever it names). A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: the agent's own sampler. |
   | `signal_exports` (`traces`, `metrics`, `logs`) | the agent's exporters, wrapped. `enabled: false` drops what would be exported. It is lost, not held, and spans are still made. A pull reader (`otel.metrics.exporter=prometheus`) is wrapped too. With the metrics export off, a scrape gets nothing. |
   | `log_levels` (`level`) | the same log exporters, at once. A record below that severity is dropped at export, one at it or above is exported, and one with no severity (SeverityNumber 0) is always exported. Local: every severity. |
-  | `log_levels` (`scopes`), `attribute_redaction`, `sampling_rules`, `trace_rate_limit`, `log_rate_limit`, `debug` | at once. See [the settings that match telemetry](#the-settings-that-match-telemetry). |
+  | `log_levels` (`scopes`), `attribute_redaction`, `scrubbing`, `sampling_rules`, `trace_rate_limit`, `log_rate_limit`, `debug` | at once. See [the settings that match telemetry](#the-settings-that-match-telemetry). |
   | `instrumentations` (`disabled`) | at the next start, `otel.instrumentation.<name>.enabled=false`. Names are the agent's: `jdbc`, `spring-webmvc` (every version) or `spring-webmvc-6.0` (one), `java-http-client`, and so on. `_` reads as `-`. |
   | `instrumentations` (`all_disabled`) | at the next start, `otel.instrumentation.common.default-enabled=false`. The application's own spans, metrics and logs (through the OpenTelemetry API) stop too. |
   | `app_settings` | at once, to the application ([below](#the-applications-own-settings)). |
@@ -237,6 +237,28 @@ local.
   objects over the application's, so another exporter, or a span processor of another extension,
   sees the original. A dropped attribute isn't counted as dropped by the SDK's limits.
 - Not metrics, resources, scopes, span names or log bodies (sdk-settings.md says why).
+
+### Scrubbing
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}}
+```
+
+The Logfire SDK's scrubbing, its matchers ported character for character and held to the core's
+by the shared vectors. `defaults: true` takes its default patterns (`password`, `secret`, `auth`,
+`api key`, `session`, `cookie`, `jwt` and the others), matched anywhere in a key or a string;
+`patterns` are globs matched, ignoring ASCII case, against a whole key or a whole string. An
+attribute whose key matches is exported with the string `[Scrubbed due to '<match>']` in place
+of its value, whatever its type. Otherwise its string values are scrubbed: a string, each string
+in a list, and each member of a map, as an attribute of its own. The Logfire SDK's safe keys
+(`http.url`, `db.statement`, `exception.message` and the others) are kept as they are.
+[sdk-settings.md](sdk-settings.md#scrubbing) has the rules in full.
+
+- At the same gates, on what redaction keeps (a masked value is not scrubbed): span, span event,
+  span link and log record attributes, and a log record's body (a string, or the strings in an
+  array or key-value list). Exported spans and records are new objects over the application's,
+  as with redaction.
+- Not metrics, resources, scopes or span names.
 
 ### Rate caps
 

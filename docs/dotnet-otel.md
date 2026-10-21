@@ -87,7 +87,7 @@ not conflict with the ones automatic instrumentation ships.
   | `instrumentations` `disabled` | at the next start, `OTEL_DOTNET_AUTO_{TRACES,METRICS,LOGS}_<NAME>_INSTRUMENTATION_ENABLED=false`. Names are upstream's, lowercase: `httpclient`, `aspnetcore`, `sqlclient`, and so on. Upstream's have no punctuation, so `.`, `-` and `_` are dropped: `http_client` and `asp-net-core` are `httpclient` and `aspnetcore`. |
   | `instrumentations` `all_disabled` | at the next start, every instrumentation's variable set to false (one set to true would otherwise win). |
 
-  The newer controls (rules, per-scope levels, redaction, rate caps, debug mode) and export
+  The newer controls (rules, per-scope levels, redaction, scrubbing, rate caps, debug mode) and export
   health are [below](#the-newer-settings). No control changes the SDK's own log level.
 - **Doesn't trace itself.** The OpAMP client runs inside a `SuppressInstrumentationScope`, as the
   SDK's own exporters do, so its requests (and its goodbye) never show up as the application's
@@ -126,7 +126,7 @@ apply the requested override`), rather than answer APPLIED and not do it
   provider exports through, as `WithOpAmp()` does ([below](#in-code-withopamp)). Any exporter
   that isn't the gated OTLP one sends past the gate, so the plugin no longer carries out that
   signal's controls: its `signal_exports`, for logs `log_levels` and `log_rate_limit` too, and
-  `attribute_redaction` for traces or logs. A policy offered from then on that overrides one is
+  `attribute_redaction` and `scrubbing` for traces or logs. A policy offered from then on that overrides one is
   refused, and in the policy already in force each such override is set aside: reported `local`
   in the effective config, with the rest of the policy still in force
   ([the host](sdk-settings.md#the-host)). It reads the tracer and meter providers as it joins the
@@ -137,7 +137,7 @@ apply the requested override`), rather than answer APPLIED and not do it
   again. A logger provider the application disposes exports nothing more, and is no reason from
   then on.
 - `signal_exports.traces`, `signal_exports.metrics`, the sampling controls (`head_sampling`,
-  `sampling_rules`, `trace_rate_limit`, `debug` `sampling_ratio`) and `attribute_redaction`, when
+  `sampling_rules`, `trace_rate_limit`, `debug` `sampling_ratio`), `attribute_redaction` and `scrubbing`, when
   automatic instrumentation leaves the SDK to the application (`OTEL_DOTNET_AUTO_SETUP_SDK=false`).
   It then builds no tracer or meter provider, and the application's own aren't the plugin's. The
   logs are still automatic instrumentation's, and their controls are carried out.
@@ -256,6 +256,28 @@ sees the telemetry as it was: nothing shared is changed. A log record's body (it
 template) is left alone. An export the gate cannot read (another encoding) is not sent while the
 control is overridden: what cannot be read cannot be redacted. Declared only where every span and every log
 record exported goes through a gate (traces and logs each gated, or not exported at all).
+
+### `scrubbing`
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*@*", "card.*"]}}
+```
+
+The Logfire SDK's scrubbing, its matchers ported character for character and held to the core's
+by the shared vectors. `defaults: true` takes its default patterns (`password`, `secret`, `auth`,
+`api key`, `session`, `cookie`, `jwt` and the others), matched anywhere in a key or a string;
+`patterns` are globs matched, ignoring ASCII case, against a whole key or a whole string. An
+attribute whose key matches is exported with the string `[Scrubbed due to '<match>']` in place
+of its value, whatever its type. Otherwise its string values are scrubbed: a string, each string
+in a list, and each member of a map, as an attribute of its own. The Logfire SDK's safe keys
+(`http.url`, `db.statement`, `exception.message` and the others) are kept as they are.
+[sdk-settings.md](sdk-settings.md#scrubbing) has the rules in full.
+
+At the same gates, in the same OTLP bytes, on what redaction keeps (a masked value is not
+scrubbed): a span's attributes, its events' and its links', a log record's attributes, and a log
+record's body (a string, or the strings in an array or key-value list). A body or value nested
+more than 100 deep can't be scrubbed, so that export is not sent. Declared, and set aside,
+exactly as `attribute_redaction` is.
 
 ### `trace_rate_limit`, `log_rate_limit`
 

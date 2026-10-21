@@ -41,8 +41,8 @@ NOW = 1_791_979_200_000
 #: Every live setting, as the package declares them where its Configurator built the SDK with
 #: OTLP exporters (test_the_package_declares_every_setting_it_carries_out).
 LIVE = ["custom", "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
-        "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level",
-        "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
+        "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns", "send_logs",
+        "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
 HOST = pydantic_opamp_otel.sdk_host(["otlp"])
 
 
@@ -486,6 +486,91 @@ def test_log_bodies_resource_and_scope_attributes_are_out_of_scope():
     assert out.log_record.body == {"password": "p"}
     assert out.resource.attributes["password"] == "p"
     assert out.instrumentation_scope.attributes["password"] == "p"
+
+
+# --- scrubbing ------------------------------------------------------------------------------
+
+
+SCRUB = vectors("scrub")
+
+
+def body_value(v: dict):
+    """A vector's body (or a map member's value) as the Python SDK holds it: a map is a dict."""
+    if "map" in v:
+        return {m["key"]: body_value(m) for m in v["map"]}
+    return value(v)
+
+
+@pytest.mark.parametrize("case", SCRUB, ids=ids(SCRUB))
+def test_spans_their_events_links_and_log_records_are_scrubbed_as_the_shared_vectors_say(case):
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import Link
+
+    c = controlled(case["settings"])
+    gated, plain = InMemorySpanExporter(), InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(c.spans(gated)))
+    provider.add_span_processor(SimpleSpanProcessor(plain))
+    attributes = {a["key"]: value(a) for a in case["attributes"]}
+    tracer = provider.get_tracer("t")
+    linked = tracer.start_span("linked")
+    span = tracer.start_span("s", attributes=attributes, links=[Link(linked.get_span_context(), attributes)])
+    span.add_event("e", attributes)
+    span.end()
+    want = [(w["key"], value(w)) for w in case["want"]]
+    [out] = gated.get_finished_spans()
+    assert pairs(out.attributes) == want
+    assert pairs(out.events[0].attributes) == want
+    assert pairs(out.links[0].attributes) == want
+    [original] = plain.get_finished_spans()
+    assert pairs(original.attributes) == pairs(attributes)
+
+    body = body_value(case["body"]) if "body" in case else "m"
+    r = ReadableLogRecord(LogRecord(body=body, severity_number=SeverityNumber(9), attributes=attributes),
+                          Resource.create({}), InstrumentationScope("app"))
+    [logged] = exported(c, [r])
+    assert pairs(logged.log_record.attributes) == want
+    if "body" in case:
+        assert logged.log_record.body == body_value(case["want_body"])
+    assert pairs(r.log_record.attributes) == pairs(attributes)  # the shared record: as it was
+    assert r.log_record.body == body
+
+
+def test_scrubbing_changes_live_and_reverts_when_withdrawn():
+    r = record("app", 9, {"api_key": "k1", "note": "my secret is x", "iban": "DE89"})
+    c = Controls()
+    assert exported(c, [r])[0] is r
+    c.apply(typed({"scrubbing": {"defaults": True}}))
+    assert pairs(exported(c, [r])[0].log_record.attributes) == [
+        ("api_key", "[Scrubbed due to 'api_key']"), ("note", "[Scrubbed due to 'secret']"), ("iban", "DE89")]
+    c.apply(typed({"scrubbing": {"patterns": ["IBAN"]}}))
+    assert pairs(exported(c, [r])[0].log_record.attributes) == [
+        ("api_key", "k1"), ("note", "my secret is x"), ("iban", "[Scrubbed due to 'iban']")]
+    c.apply(typed({}))
+    assert not c.redactor
+    assert exported(c, [r])[0] is r
+
+
+@pytest.mark.parametrize(("text", "want"), [
+    ("the author wrote", None),
+    ("the authors wrote", None),
+    ("authority figure", "auth"),
+    ("my API-KEY here", "API-KEY"),
+    ("apikey=1", "apikey"),
+    ("tok pylf_v12_abc", "pylf_v12_"),
+    ("tok pylf_v_abc", None),
+    ("my_jwt_x", "_jwt_"),
+    ("jwtoken", None),
+    ("the \u212aey: \u017fecret", "\u017fecret"),
+    ("password", None),
+    ("", None),
+])
+def test_the_default_patterns_at_their_edges(text, want):
+    from pydantic_opamp_otel._match import Scrubber, scrubbed
+
+    assert Scrubber(True, ()).text(text) == (None if want is None else scrubbed(want))
 
 
 def test_redaction_after_the_levels_and_the_cap():
@@ -1218,3 +1303,37 @@ def test_redaction_agrees_with_the_layers_reference_on_generated_keys():
         [out] = exported(controlled(settings), [r])
         assert pairs(out.log_record.attributes) == want, (settings, keys)
     assert 30 < changed < 270  # the generated patterns redact some attributes, not all
+
+
+def test_scrubbing_agrees_with_the_layers_reference_on_generated_text():
+    import random
+
+    rng = random.Random(232)
+    pieces = ["pass", "word", "auth", "or", "s", "api", "key", "_", "-", ".", " ", "jwt", "ssn", "pylf_v", "1", "x",
+              "K", "\u212a", "\u017f", "\u0130", "é", "session", "safe"]
+
+    def text() -> str:
+        return "".join(rng.choice(pieces) for _ in range(rng.randrange(6)))
+
+    changed = 0
+    for _ in range(400):
+        scrubbing = {}
+        if rng.random() < 0.75:
+            scrubbing["defaults"] = True
+        patterns = [p for p in (text().strip() + "*" for _ in range(rng.randrange(3))) if p != "*"]
+        if patterns:
+            scrubbing["patterns"] = patterns
+        settings = {"scrubbing": scrubbing} if scrubbing else {}
+        attributes = {(text() or "k"): text() for _ in range(rng.randrange(5))}
+        body = text()
+        ref = evaluate(settings, attributes=settings_pb2.Attributes(attributes=[
+            anyvalue_pb2.KeyValue(key=k, value=anyvalue({"string": v})) for k, v in attributes.items()],
+            body=anyvalue({"string": body})))
+        want = [(kv.key, kv.value.string_value) for kv in ref.redacted]
+        changed += want != list(attributes.items())
+        r = ReadableLogRecord(LogRecord(body=body, severity_number=SeverityNumber(9), attributes=attributes),
+                              Resource.create({}), InstrumentationScope("app"))
+        [out] = exported(controlled(settings), [r])
+        assert pairs(out.log_record.attributes) == want, (settings, attributes)
+        assert out.log_record.body == ref.body.string_value, (settings, body)
+    assert 40 < changed < 360  # some attributes are scrubbed, not all

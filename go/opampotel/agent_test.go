@@ -477,7 +477,7 @@ func TestTheDescriptionNamesThePolicyAndTheControls(t *testing.T) {
 	want := map[string]string{
 		"logfire.opamp.config_format": "logfire-sdk-policy/v1",
 		"logfire.opamp.supported_controls": "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs," +
-			"sampling_rules,trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations",
+			"sampling_rules,trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,scrubbing",
 	}
 	for k, w := range want {
 		if attrs[k] != w {
@@ -632,7 +632,8 @@ func TestTheHostDeclaresEverySettingThisPackageCarriesOut(t *testing.T) {
 	for _, k := range h.GetLive() {
 		seen[k] = true
 	}
-	if len(seen) != 17 || !seen["send_metrics"] || !seen["deactivate_instrumentations"] || !seen["custom"] ||
+	if len(seen) != 19 || !seen["send_metrics"] || !seen["deactivate_instrumentations"] || !seen["custom"] ||
+		!seen["scrub_defaults"] || !seen["scrub_patterns"] ||
 		len(h.GetNextStart()) != 0 {
 		t.Fatalf("live %v, next start %v", h.GetLive(), h.GetNextStart())
 	}
