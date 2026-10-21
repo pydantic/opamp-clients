@@ -20,11 +20,13 @@
 // only with the Supervisor's instance UID; a request that never became a connection doesn't keep
 // later collectors out. A Restart command is carried out on the agent loop. Locally bound
 // credential environment names pass the remote config policy. A repeated config hash receives
-// its existing outcome again so a resumed client can deliver the next config. The Logfire SDK
-// policy entry (logfire-sdk-policy.json) isn't merged as YAML: it is checked by the SDK settings
-// layer and configures the collector's logfirepolicy processor, put first in every pipeline, and
-// the agent description says the collector takes it when the collector has the processor
-// (sdk_policy.go).
+// the running apply's outcome so a resumed client can deliver the next config; the config the
+// Supervisor starts on has none until the collector started on it is healthy. A first start that
+// fails is tried again on the restart backoff. Health counts only while its connection is the
+// collector's. The Logfire SDK policy entry (logfire-sdk-policy.json) isn't merged as YAML: it is
+// checked by the SDK settings layer and configures the collector's logfirepolicy processor, put
+// first in every pipeline, and the agent description says the collector takes it when the
+// collector has the processor (sdk_policy.go).
 
 package supervisor
 
@@ -174,9 +176,8 @@ type Supervisor struct {
 	persistentState *persistentState
 	// Changed here: the OpAMP client opened to read its state, what it resumes, and the status
 	// of the remote config the collector starts on (client_state.go).
-	openedClient  *coreClient
-	resumed       opamp.Resumed
-	startupStatus protobufs.RemoteConfigStatuses
+	openedClient *coreClient
+	resumed      opamp.Resumed
 
 	noopPipelineTemplate         *template.Template
 	opampextensionTemplate       *template.Template
@@ -2209,10 +2210,11 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 }
 
 // healthySince says whether the collector reported healthy on a connection made after the
-// apply began.
+// apply began, and still its connection: health of a collector since gone is not the running
+// one's.
 func (s *Supervisor) healthySince(a *configApply) bool {
 	h := s.lastHealthFromClient.Load()
-	return h != nil && h.Healthy && h.connection > a.since
+	return h != nil && h.Healthy && h.connection > a.since && s.agentConn.holdsNth(h.connection)
 }
 
 // applyStep takes stepApply's step on the apply and does what it says. openWindow (re)starts the
@@ -2238,24 +2240,34 @@ func (s *Supervisor) applyStep(apply **configApply, in applyInput, openWindow, b
 }
 
 func (s *Supervisor) runAgentProcess() {
+	// Changed here: nothing is known of the config the collector starts on, whatever ran before:
+	// the client's hand-over of it opens an apply window (configRetargets).
 	apply := s.newConfigApply()
 	apply.since = 0
-	if apply.config != nil {
-		// Changed here: APPLIED if the collector ran it last (client_state.go).
-		apply.status = s.startupStatus
-	}
+	// Changed here: a first start that fails is tried again on the restart backoff, as a start
+	// the restart timer makes is (stepApply): nothing else would start the collector.
+	firstStartFailed := false
 	if _, err := os.Stat(s.agentConfigFilePath()); err == nil {
 		// We have an effective config file saved previously. Use it to start the agent.
 		s.telemetrySettings.Logger.Debug("Effective config found, starting agent initial time")
-		_, err := s.startAgent()
+		status, err := s.startAgent()
+		if status == agentNotStarting {
+			// Changed here: an empty config map runs no collector, which is all it asks: APPLIED,
+			// as on a new config.
+			apply.status = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
+		}
 		if err != nil {
 			s.telemetrySettings.Logger.Error("starting agent failed", zap.Error(err))
 			s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, err.Error(), false)
+			firstStartFailed = true
 		}
 	}
 
 	restartTimer := time.NewTimer(0)
 	restartTimer.Stop()
+	if firstStartFailed {
+		restartTimer.Reset(5 * time.Second)
+	}
 
 	configApplyTimeoutTimer := time.NewTimer(0)
 	configApplyTimeoutTimer.Stop()

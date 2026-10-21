@@ -61,7 +61,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
 import native_lib  # noqa: E402
 from integrations import (  # noqa: E402
-    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, offered_before, pings, run,
+    MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, ended, main, offer, pings, run, sent_before,
     statuses, stop_container, stop_group, target, opamp_url,
 )
 
@@ -105,6 +105,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         "OTEL_METRICS_EXPORTER": "none",
         "OTEL_LOGS_EXPORTER": "none",
         "OTEL_BSP_SCHEDULE_DELAY": "500",
+        # Program.cs's own activities (run 3's probe): exported only from a source named here.
+        "OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES": "app",
     } | extra
     stderr = open(TARGET / f"{name}.stderr", "w")
     if LOCAL:
@@ -337,22 +339,25 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
         if len(st) == 5:
             offset = next(e["wall"] - e["t"] for e in seven)
             t = [offset + tt for tt, _, _ in st]
+            # Each window ends when the server sent the next config, not when its APPLIED came
+            # back: what the agent exports in between is already held to the next one.
+            sent = sent_before(seven, st, offset)
 
             def served(a: float, b: float = 1e12) -> list[str]:
                 """The paths of the server spans (kind 2) exported between a and b."""
                 return [str(i["attributes"].get("url.path", "")) for i in proxy.items("traces", a + MARGIN, b)
                         if i["kind"] == 2]
 
-            one = served(t[0], t[1])
+            one = served(t[0], sent[1])
             expect(f"sampling_rules: /ping served and traced ({one.count('/ping')}), /health not "
                    f"({one.count('/health')})", "/ping" in one and "/health" not in one)
-            two = proxy.items("logs", t[1] + MARGIN, t[2])
+            two = proxy.items("logs", t[1] + MARGIN, sent[2])
             scopes = {i["scope"] for i in two}
             expect(f"log_levels scopes: app's records exported, app.noisy's not ({sorted(scopes)})",
                    "app" in scopes and "app.noisy" not in scopes)
             before = proxy.items("logs", t[0] + MARGIN, t[1])
             expect("app.noisy's records were exported before", any(i["scope"] == "app.noisy" for i in before))
-            three = proxy.items("traces", t[2] + MARGIN, t[3])
+            three = proxy.items("traces", t[2] + MARGIN, sent[3])
             expect(f"attribute_redaction drop: no span with server.address ({len(three)} spans)",
                    bool(three) and not any("server.address" in i["attributes"] for i in three))
             expect("attribute_redaction mask: every span's http.request.method is [REDACTED]",
@@ -360,11 +365,11 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
             expect("before them, spans had both", any("server.address" in i["attributes"]
                                                       for i in proxy.items("traces", t[0] + MARGIN, t[1])))
             expect("and /health is traced again: the rules went with the config that left them out",
-                   "/health" in served(t[2], t[3]))
-            # The caps' window ends when the server sent the config that lifts them, not when the
-            # answer came back: the agent lifts them before it answers (CI has seen 1.4 s between),
-            # and the log cap applies at export, so records exported in that gap go uncapped (#450).
-            end = offset + offered_before(seven, st[4][0])
+                   "/health" in served(t[2], sent[3]))
+            # The caps' window too: the agent lifts them before it answers (CI has seen 1.4 s
+            # between), and the log cap applies at export, so records exported in that gap go
+            # uncapped.
+            end = sent[4]
             seconds = end - t[3] - MARGIN
             spans_ = len(proxy.items("traces", t[3] + MARGIN, end))
             logs = len(proxy.items("logs", t[3] + MARGIN, end))

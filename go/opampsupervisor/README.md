@@ -62,9 +62,13 @@ agent:
 - **Bound credentials remain usable under the remote config policy.** A remote config can reference
   exactly the environment names in the local `agent.connection_env` bindings. Other environment
   names, nested references, defaults, and file providers remain restricted by the policy.
-- **Resumed configs are acknowledged again.** The agent loop reports its existing outcome for a
-  repeated config hash without restarting the Collector. This lets the client complete a resumed
-  offer before it delivers another config.
+- **Resumed configs are answered again.** The client hands the config it resumes over again at
+  start, and the agent loop answers it as any apply, without restarting the Collector: APPLIED
+  once the Collector started on it reports healthy in the apply window, FAILED if it doesn't.
+  Nothing is known of it before then, even if a Collector ran it healthy before the restart (an
+  empty config map, which runs no Collector, is APPLIED, as a new one is). A
+  later config with the same body gets the running apply's outcome. This lets the client complete
+  a resumed offer before it delivers another config.
 
 - **Issued credentials are verified and kept.** With `accepts_opamp_connection_settings`, the
   server may issue new OpAMP connection settings (per-agent credentials replacing an enrollment
@@ -116,9 +120,11 @@ agent:
   config says what runs.
 - **APPLIED means the running collector is healthy on the config.** It is reported only when, at
   the end of the apply window, the collector runs and reported healthy on a connection made
-  since it was given the config. An exit in the window, or as it ends, is FAILED, and so is an
-  exit after APPLIED. A collector the restart backoff can't start is tried again on the backoff;
-  it stayed down until the next config. The loop's decisions on an exit, a restart and the
+  since it was given the config, and that is still its connection: health from a collector that
+  has since exited is not the running one's. An exit in the window, or as it ends, is FAILED, and
+  so is an exit after APPLIED. A collector the restart backoff can't start is tried again on the
+  backoff, and so is one the Supervisor can't start the first time; both stayed down until the
+  next config. The loop's decisions on an exit, a restart and the
   window's end are one pure step (`supervisor/apply_step.go`), tested rule by rule.
 - **The Logfire SDK policy reaches the collector.** A server sends it in the
   `logfire-sdk-policy.json` entry of the config map, as it sends it to an SDK, beside the

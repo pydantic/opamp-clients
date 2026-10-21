@@ -61,6 +61,5 @@ func TestARemoteConfigSentAsTheClientStartsIsKept(t *testing.T) {
 		require.NoError(t, s.loadAndWriteInitialMergedConfig())
 		require.Equal(t, []byte("sent"), current(s))
 		require.Equal(t, []byte("sent"), s.remoteConfig.Load().GetConfigHash())
-		require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_UNSET, s.startupStatus)
 	}
 }

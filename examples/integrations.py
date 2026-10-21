@@ -28,17 +28,23 @@ In both, the application's requests are traced and the agent's own OpAMP request
 both end with the agent saying goodbye (agent_disconnect).
 
 check_signals runs two more, with a state directory of their own and metrics and logs exported
-(the application writes a log line per request):
+(the application writes a log line per request). In run 3 the application also probes redaction
+(EXAMPLE_PROBE=1): each round a span of its own, `example.probe`, carrying the URL it requests
+(url.full) on an event and on a link to the round before's, and a log record with that URL whose
+body names the probe. The sink reports each probe's URL as it arrived (`probes`, null once dropped).
 Run 3, the policies, in the order the server offers them:
-  1. head_sampling 1: APPLIED; spans, metrics and log records arrive;
+  1. head_sampling 1: APPLIED; spans, metrics and log records arrive, and the probes' URLs as they
+     are;
   2. signal_exports.metrics and signal_exports.logs off: APPLIED; no metrics or log records after
      it, while spans go on;
   3. head_sampling 0.25: APPLIED; metrics and log records come again (local, so the SDK's own
-     value), and some of the application's requests are traced but not all; the effective config
-     the agent reports is this policy (every control listed), as the only file;
-  4. head_sampling 0.25, log_levels warn: APPLIED; the application's INFO log lines stop (the sink
-     counts records, not severities: about none per request, against about one before), and the
-     effective config is now this policy;
+     value), and the share of the application's requests traced is 0.25, within four standard
+     deviations of the binomial; the effective config the agent reports is this policy (every
+     control listed), as the only file;
+  4. head_sampling 1, a sampling rule of rate 0.5 for client spans, log_levels warn: APPLIED; the
+     share of requests traced is 0.5 (as in step 3), the application's INFO log lines stop (the
+     sink counts records, not severities: about none per request, against about one before), and
+     the effective config is now this policy;
   5. head_sampling 0 with debug until 10 s after the offer (the server fills the time in as it
      sends it): APPLIED; the application's requests are traced until then (the debug
      sampling_ratio left out, so 1), and none made after it, with no word from the server; the
@@ -50,11 +56,14 @@ Run 3, the policies, in the order the server offers them:
      none of the requests traced, and about no log record a request;
   7. head_sampling 1, attribute_redaction mask url.full and http.url: APPLIED; spans again (the
      rules local), each URL [REDACTED] in the sink (which names a span by its URL, else its name),
-     and the log lines again (the scopes local);
+     on the probe's span events, links and log records too, and the log lines again (the scopes
+     local);
   8. head_sampling 1, attribute_redaction drop URL.FULL and Http.Url (keys match ignoring case),
      trace_rate_limit 1, log_rate_limit 1: APPLIED; spans arrive, none named by a URL or
-     [REDACTED]; about a span and a log record a second, of some five requests a second;
-  9. instrumentations all_disabled: APPLIED.
+     [REDACTED], and the probe's events, links and log records arrive without one; about a span
+     and a log record a second, of some five requests a second;
+  9. instrumentations all_disabled: APPLIED (where it takes effect at once, no span but the
+     probe's, which no instrumentation makes).
   Throughout, export health: the agent's health carries component_health_map["exporters"], a
   child each for traces, metrics and logs, the application's own `healthy` true in every report;
   a report counts trace exports that succeeded, and log records dropped on purpose (by the level,
@@ -147,6 +156,9 @@ SIGNALS = {"OTEL_METRICS_EXPORTER": "otlp", "OTEL_LOGS_EXPORTER": "otlp", "OTEL_
            "OTEL_BLRP_SCHEDULE_DELAY": "500"}
 # How far ahead of its offer run 3's debug until is, in seconds.
 DEBUG = 10
+# What run 3 adds: the application's redaction probe (the module's docstring).
+PROBE = "example.probe"
+PROBING = {"EXAMPLE_PROBE": "1"}
 # AcceptsOpAMPConnectionSettings and ReportsConnectionSettingsStatus: what an agent declares for the
 # server to hand it a key of its own.
 TAKES_KEYS = 0x100 | 0x8000
@@ -281,13 +293,18 @@ def scenario(instrumentation: str) -> dict:
     ]}}
 
 
+#: Run 3's fourth step: a sampling rule keeping half the client spans (every example's requests).
+RULE_HALF = {"rate": 0.5, "kind": "client"}
+
+
 def signals_scenario(gap: int = 25) -> dict:
     """Run 3's offers, `gap` messages apart: at one a second, time enough for a share of requests."""
     return {"server": {"faults": [
         offer(1, {"head_sampling": {"ratio": 1}}),
         offer(1 + gap, {"signal_exports.metrics": {"enabled": False}, "signal_exports.logs": {"enabled": False}}),
         offer(1 + 2 * gap, {"head_sampling": {"ratio": 0.25}}),
-        offer(1 + 3 * gap, {"head_sampling": {"ratio": 0.25}, "log_levels": {"level": "warn"}}),
+        offer(1 + 3 * gap, {"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [RULE_HALF]},
+                            "log_levels": {"level": "warn"}}),
         # The server fills the time in as it sends the offer.
         offer(1 + 4 * gap, {"head_sampling": {"ratio": 0}, "debug": {"until": f"{{now+{DEBUG}s}}"}}),
         offer(1 + 6 * gap, {"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [{"rate": 0, "kind": "client"}]},
@@ -538,7 +555,8 @@ def effective_configs(events: list[dict], after: float = -1, before: float = 1e9
 def judge_effective(three: list[dict], t3: float, t4: float, end: float) -> list[tuple[str, bool]]:
     """Steps 3 and 4: the effective config reports the policy in force, as the only file. Step 3's
     has head_sampling 0.25 and every other control local (APPLIED at t3, until the next, APPLIED
-    at t4). Step 4's has the log level beside it. `end`: when the offer after that was sent."""
+    at t4). Step 4's has head_sampling 1, the rule and the log level. `end`: when the offer after
+    that was sent."""
     during = effective_configs(three, offered_before(three, t3), offered_before(three, t4))
     after = effective_configs(three, t4 - DRIFT, end)
 
@@ -548,13 +566,15 @@ def judge_effective(three: list[dict], t3: float, t4: float, end: float) -> list
                 and all(overridden(e, c) is None for c in (*(f"signal_exports.{s}" for s in _SIGNALS), *_MORE_CONTROLS)))
 
     def four_in_force(e: dict) -> bool:
+        rules = (overridden(e, "sampling_rules") or {}).get("rules") or []
         return (list(e) == [POLICY_FILE] and policy_in_force(e).get("schema") == POLICY_V1
-                and overridden(e, "head_sampling") == {"ratio": 0.25} and overridden(e, "log_levels") == {"level": "warn"})
+                and overridden(e, "head_sampling") == {"ratio": 1} and overridden(e, "log_levels") == {"level": "warn"}
+                and len(rules) == 1 and all(rules[0].get(k) == v for k, v in RULE_HALF.items()))
 
     return [
         (f"the effective config reports the policy in force, head_sampling 0.25 and every other control local "
          f"({during[-1] if during else 'none reported'})", any(three_in_force(e) for e in during)),
-        (f"then the next policy, with the log level warn beside it ({after[-1] if after else 'none reported'})",
+        (f"then the next policy, the rule and the log level warn ({after[-1] if after else 'none reported'})",
          bool(after) and four_in_force(after[-1])),
     ]
 
@@ -562,6 +582,14 @@ def judge_effective(three: list[dict], t3: float, t4: float, end: float) -> list
 def offered_before(events: list[dict], t: float) -> float:
     """When the server last sent a remote config before `t`."""
     return max((e["t"] for e in events if e["event"] == "s2a" and e.get("offer_config") and e["t"] < t), default=t)
+
+
+def sent_before(events: list[dict], st: list[tuple[float, str, str]], offset: float = 0.0) -> list[float]:
+    """For each status in `st` (statuses()), when the server last sent a remote config before it,
+    shifted by `offset` (the run's wall clock less its own): where a window over what the config
+    before it did ends. The agent puts a config in force before it answers, so what it exports
+    between the server sending a config and that config's APPLIED is already held to it."""
+    return [offset + offered_before(events, t) for t, _, _ in st]
 
 
 def pings(events: list[dict], after: float = -1, before: float = 1e9) -> list[dict]:
@@ -695,11 +723,9 @@ def judge_signals(three: list[dict], service: str, switch_at_once: bool) -> list
         out.append((f"no {name} exported once the {name} export is off ({len(late)} exports)", not late))
         out.append((f"{name} again once the {name} export is local", bool(signal(three, name, t3 + MARGIN, t4))))
     out.append(("spans go on while metrics and logs are off", bool(spans(three, t2 + MARGIN, t3))))
-    made = len(pings(three, t3 + DRIFT, t4 - DRIFT))
-    share = traced(three, t3 + DRIFT, t4 - DRIFT) / made if made else 0
-    # 0.25 of some 100 requests: 0.05 and 0.6 are each more than four standard deviations away.
-    out.append((f"head_sampling 0.25 traces some requests but not all ({share:.2f} of {made})",
-                made > 4 * REQUESTS and 0.05 < share < 0.6))
+    out.append(sampled("head_sampling 0.25", three, t3, t4, 0.25))
+    out.append(sampled("a sampling rule of rate 0.5 for client spans, at head_sampling 1", three, t4,
+                       offered_before(three, t5), RULE_HALF["rate"]))
     # log_levels warn: the application's INFO lines (one a request) stop, and come again once the
     # control is local. Records queued before the floor may still arrive within MARGIN.
     before, made_before = per_request(three, t3 + MARGIN, t4)
@@ -716,12 +742,29 @@ def judge_signals(three: list[dict], service: str, switch_at_once: bool) -> list
     out += judge_telemetry_settings(three, t6, t7, t8, offered_before(three, t9))
     if switch_at_once:
         after = pings(three, t9 + MARGIN)
-        out.append((f"every instrumentation switched off at once: no spans ({len(after)} requests)",
-                    len(after) > REQUESTS and not ended(three, t9 + DRIFT)))
+        late = [n for n in ending(three, t9 + DRIFT, 1e9) if n != PROBE]
+        out.append((f"every instrumentation switched off at once: no spans but the probe's ({len(after)} requests, "
+                    f"{late[:3]})", len(after) > REQUESTS and not late))
     out += judge_health(three)
     a2s = [e for e in three if e["event"] == "a2s"]
     out.append(("goodbye (agent_disconnect) at the end", bool(a2s) and a2s[-1]["disconnect"]))
     return out
+
+
+def binomial(k: int, n: int, p: float, z: float = 4) -> bool:
+    """Whether `k` of `n` is a share `p` would give: within `z` standard deviations of the binomial
+    (four: a false failure about once in 16,000 runs)."""
+    return n > 0 and abs(k / n - p) <= z * (p * (1 - p) / n) ** 0.5
+
+
+def sampled(what: str, three: list[dict], applied: float, end: float, ratio: float) -> tuple[str, bool]:
+    """The share of the application's requests traced between a step APPLIED at `applied` and
+    `end` is `ratio` (binomial()), of more than 4 * REQUESTS requests. A request is traced as it
+    starts, so one made within DRIFT of either end may be the step before's or after's."""
+    made = len(pings(three, applied + DRIFT, end - DRIFT))
+    kept = traced(three, applied + DRIFT, end - DRIFT)
+    return (f"{what} traces {ratio} of the requests ({kept} of {made})",
+            made > 4 * REQUESTS and binomial(kept, made, ratio))
 
 
 def judge_debug(three: list[dict], applied: float, next_offer: float) -> list[tuple[str, bool]]:
@@ -769,6 +812,7 @@ def judge_telemetry_settings(three: list[dict], t6: float, t7: float, t8: float,
     named = [n for n in dropped if "://" in n or n == "[REDACTED]"]
     out.append((f"attribute_redaction drop: spans arrive, none with a URL ({len(dropped)} spans, {named[:3]})",
                 bool(dropped) and not named))
+    out += judge_probes(three, t7, t8, end)
     # The caps: a token bucket of one a second, full to start. Five requests a second (and a log
     # line or two each) without them.
     window = end - DRIFT - (t8 + MARGIN)
@@ -779,6 +823,37 @@ def judge_telemetry_settings(three: list[dict], t6: float, t7: float, t8: float,
                 window > 3 and made > 2 * window and 0 < capped <= window + 3))
     out.append((f"log_rate_limit 1: {logged} log records in {window:.1f} s of {made} requests",
                 window > 3 and made > 2 * window and 0 < logged <= window + 3))
+    return out
+
+
+def probes(events: list[dict], place: str, after: float, before: float) -> list[str | None]:
+    """The URLs of the probes in `place` (`event`, `link`, `log`) that arrived between `after` and
+    `before`, as the sink saw them: None where there was none."""
+    return [p.get("url") for e in events if e["event"] == "otlp" and after < e["t"] < before
+            for p in e.get("probes") or [] if p.get("in") == place]
+
+
+def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tuple[str, bool]]:
+    """Redaction beyond span attributes: the probe's span events, links and log records carry
+    their URL before any redaction (step 1, APPLIED first, until the logs export goes off), each
+    [REDACTED] under the mask (APPLIED at t7) and none under the drop (t8, until `end`).
+    Redaction is at export: a probe counts for a step when it arrived MARGIN after it was APPLIED
+    and before the next was offered."""
+    out = []
+    st = statuses(three)
+    t1, t2 = st[0][0], st[1][0]
+    for place, name in (("event", "span events"), ("link", "span links"), ("log", "log records")):
+        plain = probes(three, place, t1 + MARGIN, offered_before(three, t2))
+        masked = probes(three, place, t7 + MARGIN, offered_before(three, t8))
+        dropped = probes(three, place, t8 + MARGIN, end)
+        out.append((f"the probe's {name} carry the URL ({len(plain)}, {plain[:1]})",
+                    bool(plain) and all(u is not None and "://" in u for u in plain)))
+        out.append((f"attribute_redaction mask: each URL on the probe's {name} [REDACTED] "
+                    f"({len(masked)}, {sorted(set(map(str, masked)))[:3]})",
+                    bool(masked) and all(u == "[REDACTED]" for u in masked)))
+        out.append((f"attribute_redaction drop: the probe's {name} arrive without a URL "
+                    f"({len(dropped)}, {sorted(set(map(str, dropped)))[:3]})",
+                    bool(dropped) and all(u is None for u in dropped)))
     return out
 
 
@@ -978,7 +1053,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
 
     try:
         three = run(launch, signals_scenario(), state, "run3", seconds[0], listen, target_,
-                    until=lambda events: len(statuses(events)) >= 9, settle=10, env=SIGNALS)
+                    until=lambda events: len(statuses(events)) >= 9, settle=10, env=SIGNALS | PROBING)
         print(f"run 3: remote config statuses {[s for _, s, _ in statuses(three)]}, "
               f"{len(signal(three, 'metrics'))} metrics and {len(signal(three, 'logs'))} log exports")
         expect(judge_signals(three, service, switch_at_once))

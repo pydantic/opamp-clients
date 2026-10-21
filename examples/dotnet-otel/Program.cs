@@ -14,8 +14,16 @@
 // example.feature, through OpAmpAppSettings, which the plugin fills. While the server says "on",
 // each round also requests /feature; and each time its settings change it requests /changed,
 // once. Without a server, or until the server says, the flag is its default, "off".
+//
+// With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction: an activity of
+// its own, example.probe (from the source "app", which instrumentation exports when
+// OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES names it), with the URL it requests (url.full) on an
+// event and on a link to the round before's probe, and a log line example.probe with that URL.
+// It probes before or after the request, at random: under a rate limit of one a second, the first
+// record after the token comes takes it, and in a fixed order the probe might never be that one.
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -35,6 +43,9 @@ var ownSdk = Example.Setup.Has("own-sdk") ? Example.OwnSdk.Build() : [];
 using var loggers = LoggerFactory.Create(_ => { });
 var log = loggers.CreateLogger("app");
 var noisy = loggers.CreateLogger("app.noisy");
+var probing = Environment.GetEnvironmentVariable("EXAMPLE_PROBE") == "1";
+using var probes = new ActivitySource("app");
+ActivityContext lastProbe = default;
 
 WebApplication? server = null;
 if (Environment.GetEnvironmentVariable("APP_LISTEN") is { Length: > 0 } listen)
@@ -58,8 +69,18 @@ while (!stop.IsCancellationRequested)
 {
     try
     {
+        var early = Random.Shared.Next(2) == 1;
+        if (probing && early)
+        {
+            lastProbe = Probe(args[0], lastProbe);
+        }
+
         (await http.GetAsync(args[0], stop.Token)).Dispose();
         log.LogInformation("requested {Url}", args[0]);
+        if (probing && !early)
+        {
+            lastProbe = Probe(args[0], lastProbe);
+        }
         noisy.LogInformation("connection pool: {Idle} idle", 3);
         if (OpAmpAppSettings.Get("example.feature", "off") == "on")
         {
@@ -85,6 +106,24 @@ while (!stop.IsCancellationRequested)
 if (server is not null)
 {
     await server.StopAsync();
+}
+
+// An activity of its own with url on an event and on a link to last (none while it is the
+// default), and a log line with url: what redaction may drop or mask. Returns the activity's
+// context, for the next probe to link to (the last one's while none is sampled).
+ActivityContext Probe(string url, ActivityContext last)
+{
+    var tags = new ActivityTagsCollection { ["url.full"] = url };
+    var links = last == default ? null : new[] { new ActivityLink(last, tags) };
+    using (var activity = probes.StartActivity("example.probe", ActivityKind.Internal, default(ActivityContext), links: links))
+    {
+        activity?.AddEvent(new ActivityEvent("example.probe", tags: tags));
+        last = activity?.Context ?? last;
+    }
+
+    KeyValuePair<string, object?>[] state = [new("url.full", url), new("{OriginalFormat}", "example.probe")];
+    log.Log(LogLevel.Information, default, state, null, (_, _) => "example.probe");
+    return last;
 }
 
 foreach (var provider in ownSdk)

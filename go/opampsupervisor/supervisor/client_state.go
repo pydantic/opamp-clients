@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/open-telemetry/opamp-go/client/types"
-	"github.com/open-telemetry/opamp-go/protobufs"
 	"go.opentelemetry.io/collector/component"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -145,7 +144,6 @@ func (s *Supervisor) loadResumedRemoteConfig() {
 		// newer than the one resumed, and what the collector starts on.
 		return
 	}
-	s.startupStatus = st.status
 	if st.config == nil {
 		s.telemetrySettings.Logger.Info("No last received remote config found")
 		return
@@ -157,7 +155,6 @@ func (s *Supervisor) loadResumedRemoteConfig() {
 	if err := s.checkRemoteConfigPolicy(st.config); err != nil {
 		s.telemetrySettings.Logger.Error("Not running the saved remote config", zap.Error(err))
 		s.usingLastWorkingRemoteConfig.Store(false)
-		s.startupStatus = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_UNSET
 		return
 	}
 	s.usingLastWorkingRemoteConfig.Store(st.rolledBack)

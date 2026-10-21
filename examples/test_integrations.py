@@ -20,11 +20,11 @@ import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, POLICY_FILE, POLICY_V1, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+from integrations import (APP_KEY, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
                           judge_truth, key_from_env, key_in_code, policy, scenario, truth_scenario,
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_moved_start, judge_rotation, judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
-                          judge_transport, judge_wrong_key, opamp_url, read_log, server_binary,
+                          judge_transport, judge_wrong_key, opamp_url, read_log, server_binary, binomial,
                           wait_for)
 import integrations  # noqa: E402
 
@@ -114,6 +114,19 @@ class Log:
         self.events.append({"event": "stray_request", "t": t, "path": path, "method": "GET"})
         return self
 
+    def probe(self, t: float, url: str | None, places: tuple[str, ...] = ("event", "link", "log")) -> Log:
+        """The application's probe arriving at `t`, as the sink reports it: its span (an event and
+        a link) and its log record, each with `url` (None: none). The log export counts no
+        record, so the checks that count records don't see it."""
+        traces = [{"in": p, "url": url} for p in places if p != "log"]
+        if traces:
+            self.events.append({"event": "otlp", "t": t, "signal": "traces", "services": ["checkout"], "spans": [PROBE],
+                                "ends": [t - 0.1], "probes": traces})
+        if "log" in places:
+            self.events.append({"event": "otlp", "t": t, "signal": "logs", "services": ["checkout"], "spans": [],
+                                "count": 0, "probes": [{"in": "log", "url": url}]})
+        return self
+
 
 REFUSED_SWITCH = "instrumentations: disabled: this SDK cannot apply the requested override"
 
@@ -144,26 +157,34 @@ def second(uid: str = UID, requests: int = 30, config: bool = True) -> Log:
     return log.a2s(10, uid=uid, disconnect=True)
 
 
-def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, at_once: bool = False,
+def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = PING, masked_url: str | None = "[REDACTED]",
+          dropped_url: str | None = None, probed: tuple[str, ...] = ("event", "link", "log"),
+          metrics_off: bool = True, logs_off: bool = True, at_once: bool = False,
           info_under_floor: bool = False, info_back: bool = True, debug_spans: bool = True,
           ruled: bool = True, scoped: bool = True, scope_back: bool = True, span_name: str = "[REDACTED]",
           dropped_name: str = "GET", spans_a_second: int = 1, records_a_second: int = 1,
           health: bool = True, effective: dict | None = None, effective_after: dict | None = None) -> Log:
     """Run 3 as it should go: every signal; metrics and logs off; back on with `share` of the
-    requests traced; a `warn` floor, under which the INFO lines (one a request) stop; rate 0 with a
+    requests traced; head_sampling 1 with a rule keeping `rule_share` of them and a `warn` floor,
+    under which the INFO lines (one a request) stop; rate 0 with a
     debug window of 10 s, traced until it ends, the floor left out and the INFO lines back; a rule
     of rate 0 for client spans and the application's loggers off: no request traced, no log lines;
     the URLs masked, spans named `span_name` and log lines again; the URLs dropped (spans named
     `dropped_name`) and both caps, `spans_a_second` and `records_a_second`; then every
-    instrumentation off. Export health at start and at 120 s. With the third offer the agent
+    instrumentation off. The probe in `probed` (its event, link and log record) every two seconds:
+    its URL `plain_url` under the first policy, `masked_url` under the mask and `dropped_url` under
+    the drop; and its span after the last. Export health at start and at 120 s. With the third offer the agent
     reports `effective` as its effective config (by default the policy in force), and with the
     fourth `effective_after` (by default the next policy in force)."""
     third_effective = effective or in_force({"head_sampling": {"ratio": 0.25}})
-    fourth_effective = effective_after or in_force({"head_sampling": {"ratio": 0.25}, "log_levels": {"level": "warn"}})
+    fourth_effective = effective_after or in_force({"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [RULE_HALF]},
+                                                    "log_levels": {"level": "warn"}})
     log = Log().a2s(0, config=True)
     if health:
         log.health(0.5, ok=0, filtered=0)
     log.offer(0.5).a2s(1, status="APPLIED").pings(1, 25).exports(1, 25).span(3).span(5)
+    for t in range(5, 25, 2):
+        log.probe(t, plain_url, probed)
     log.offer(24.5).a2s(25, status="APPLIED").pings(25, 50).span(30).span(40)
     if not metrics_off:
         log.exports(30, 50, ("metrics",))
@@ -176,6 +197,11 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
             log.span(t + 0.5, ended=t + 0.05)
         t, n = t + 0.2, n + 1
     log.offer(74.5).a2s(75, status="APPLIED", effective=fourth_effective).pings(75, 100).exports(75, 100, ("metrics",))
+    t, n = 75.0, 0
+    while t < 100:  # every 1/rule_share-th traced
+        if rule_share and n % round(1 / rule_share) == 0:
+            log.span(t + 0.5, ended=t + 0.05)
+        t, n = t + 0.2, n + 1
     if info_under_floor:
         log.exports(75, 100, ("logs",))
     # Debug mode: filled in at 99.4, so over at 109.4; then rate 0 until the next offer.
@@ -197,13 +223,19 @@ def third(share: float = 0.25, metrics_off: bool = True, logs_off: bool = True, 
         log.exports(175, 200, ("logs",))
     for t in range(176, 200, 2):
         log.span(t + 0.5, url=span_name, ended=t)
+        log.probe(t + 0.6, masked_url, probed)
     log.offer(199.5).a2s(200, status="APPLIED").pings(200, 225).exports(200, 225, ("metrics",))
-    for t in range(201, 225):  # each second, as many as the caps let through
+    for t in range(201, 225):  # each second, as many as the caps let through: every other one the probe's
         for n in range(spans_a_second):
-            log.span(t + 0.5, url=dropped_name, ended=t + n * 0.01)
+            if n == 0 and t % 2:
+                log.probe(t + 0.5, dropped_url, tuple(p for p in probed if p != "log"))
+            else:
+                log.span(t + 0.5, url=dropped_name, ended=t + n * 0.01)
         if records_a_second:
             log.export(t + 0.3, "logs", count=records_a_second)
-    log.offer(224.5).a2s(225, status="APPLIED").pings(225, 235)
+            if t % 2 and "log" in probed:
+                log.probe(t + 0.3, dropped_url, ("log",))
+    log.offer(224.5).a2s(225, status="APPLIED").pings(225, 235).probe(229, None)
     if not at_once:
         log.span(230)
     return log.a2s(235, disconnect=True)
@@ -729,6 +761,24 @@ class Signals(unittest.TestCase):
         self.assertTrue(any(f.startswith("head_sampling 0.25")
                             for f in failed(judge_signals(third(share=0).events, "checkout", False))))
 
+    def test_half_traced_at_a_quarter_fails(self):
+        # Within the old bounds (0.05 to 0.6), but not a quarter of some 125 requests.
+        self.assertTrue(fails(third(share=0.5), "head_sampling 0.25"))
+
+    def test_the_rule_keeping_half_passes_and_any_other_share_fails(self):
+        self.assertFalse(fails(third(rule_share=0.5), "a sampling rule of rate 0.5"))
+        for share in (0, 0.25, 1):
+            with self.subTest(share=share):
+                self.assertTrue(fails(third(rule_share=share), "a sampling rule of rate 0.5"))
+
+    def test_the_rule_left_out_of_the_effective_config_fails(self):
+        kept = in_force({"head_sampling": {"ratio": 1}, "log_levels": {"level": "warn"}})
+        self.assertTrue(fails(third(effective_after=kept), "then the next policy"))
+
+    def test_a_probe_after_an_at_once_switch_passes(self):
+        # No instrumentation makes the probe: switching them all off leaves it.
+        self.assertFalse(fails(third(at_once=True), "every instrumentation switched off at once", at_once=True))
+
     def test_spans_after_an_at_once_switch_fail(self):
         self.assertTrue(any(f.startswith("every instrumentation switched off at once")
                             for f in failed(judge_signals(third().events, "checkout", True))))
@@ -1162,6 +1212,28 @@ class AppSettings(unittest.TestCase):
         self.assertNotEqual(failed(judge_app_settings_restart(eighth(changed=True).events)), [])
 
 
+class SentBefore(unittest.TestCase):
+    """The windows the matching checks of the Java agent and .NET count exports in: each ends when the
+    server sent the next config, as the agent may already export under it before it answers."""
+
+    def test_a_window_ends_when_the_next_config_is_sent_not_when_it_is_answered(self) -> None:
+        # Three configs, each answered APPLIED 1.5 s after it was sent.
+        log = Log().offer(10).a2s(11.5, status="APPLIED").offer(20).a2s(21.5, status="APPLIED")
+        log.offer(30).a2s(31.5, status="APPLIED")
+        st = integrations.statuses(log.events)
+        sent = integrations.sent_before(log.events, st, offset=1000)
+        self.assertEqual(sent, [1010, 1020, 1030])
+        # An export at 1021, under the second config, after it was sent but before its APPLIED: in
+        # the first config's window if that ended at the answer, out of it as it ends at the offer.
+        t = [1000 + tt for tt, _, _ in st]
+        self.assertTrue(t[0] + integrations.MARGIN < 1021 < t[1])
+        self.assertFalse(t[0] + integrations.MARGIN < 1021 < sent[1])
+
+    def test_a_status_with_no_offer_before_it_ends_its_window_at_itself(self) -> None:
+        log = Log().a2s(5, status="APPLIED")
+        self.assertEqual(integrations.sent_before(log.events, integrations.statuses(log.events)), [5])
+
+
 class RustLog(unittest.TestCase):
     def test_export_end_times_use_the_server_clock(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1271,3 +1343,51 @@ class Main(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Binomial(unittest.TestCase):
+    def test_within_four_standard_deviations(self):
+        # 125 requests at 0.25: a standard deviation of about 0.039.
+        self.assertTrue(binomial(31, 125, 0.25))
+        self.assertTrue(binomial(12, 125, 0.25))  # 0.096, just inside
+        self.assertFalse(binomial(11, 125, 0.25))  # 0.088
+        self.assertFalse(binomial(63, 125, 0.25))
+
+    def test_no_requests_is_no_share(self):
+        self.assertFalse(binomial(0, 0, 0.5))
+
+
+class SignalsProbes(unittest.TestCase):
+    PLACES = (("event", "span events"), ("link", "span links"), ("log", "log records"))
+
+    def test_a_good_run_passes(self):
+        self.assertEqual([f for f in failed(judge_signals(third().events, "checkout", False)) if "probe" in f], [])
+
+    def test_no_url_before_any_redaction_fails(self):
+        for place, name in self.PLACES:
+            with self.subTest(place=place):
+                self.assertTrue(fails(third(plain_url=None), f"the probe's {name} carry the URL"))
+
+    def test_a_url_shown_or_missing_under_the_mask_fails(self):
+        for url in (PING, None):
+            for place, name in self.PLACES:
+                with self.subTest(url=url, place=place):
+                    self.assertTrue(fails(third(masked_url=url), f"attribute_redaction mask: each URL on the probe's {name}"))
+
+    def test_a_url_shown_or_masked_under_the_drop_fails(self):
+        for url in (PING, "[REDACTED]"):
+            for place, name in self.PLACES:
+                with self.subTest(url=url, place=place):
+                    self.assertTrue(fails(third(dropped_url=url), f"attribute_redaction drop: the probe's {name}"))
+
+    def test_a_place_the_probe_never_reaches_fails_each_of_its_checks(self):
+        for place, name in self.PLACES:
+            with self.subTest(place=place):
+                log = third(probed=tuple(p for p, _ in self.PLACES if p != place))
+                got = [f for f in failed(judge_signals(log.events, "checkout", False)) if "probe" in f]
+                self.assertEqual(len(got), 3, got)
+                self.assertTrue(all(name in f for f in got), got)
+
+    def test_a_probe_from_the_step_before_may_arrive_late_without_counting(self):
+        # Exported under the first policy, arriving just after the mask: within MARGIN, so neither.
+        self.assertFalse(fails(third().probe(176, PING), "attribute_redaction mask"))

@@ -30,6 +30,9 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
     private Agent? agent;
     private Resource? resource;
 
+    /// <summary>Why the core can't be loaded here, or null when it can (a seam for tests).</summary>
+    internal Func<string?> CoreUnavailable { get; init; } = global::Pydantic.OpAmp.Client.OpAmpSetup.Unavailable;
+
     /// <summary>
     /// Before automatic instrumentation reads its settings: load the saved settings, put them in
     /// force, and switch off the instrumentations they name. A plugin that can't start leaves the
@@ -37,7 +40,7 @@ public sealed class Plugin : IPlugin, ITelemetryPlugin, IConfigureTracesOptions<
     /// </summary>
     public void Initializing()
     {
-        if (global::Pydantic.OpAmp.Client.OpAmpSetup.Unavailable() is { } unavailable)
+        if (this.CoreUnavailable() is { } unavailable)
         {
             Log.Warn($"the core can't be loaded on {System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier}; the SDK runs unmanaged: {unavailable}");
             return;
