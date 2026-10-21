@@ -39,7 +39,7 @@ type RemoteConfigPolicy struct {
 	// A kind not listed allows none.
 	AllowedComponents map[string][]string `mapstructure:"allowed_components"`
 	// AllowedProviders are the confmap providers the remote config may reference, by scheme
-	// (env, file, http, ...; ${NAME} is env). None unless listed.
+	// (env, file, http, ...; ${NAME} is env). CheckWithConnectionEnv separately permits bound names.
 	AllowedProviders []string `mapstructure:"allowed_providers"`
 	// AllowedExporterEndpoints are where the remote config's exporters, and the collector's own
 	// telemetry, may send: origins, scheme://host[:port] (http or https; the host's case and the
@@ -108,6 +108,17 @@ func (p RemoteConfigPolicy) Validate() error {
 // Check refuses a remote config file (named name in the config map) that the policy doesn't
 // allow, saying what it uses that isn't allowed.
 func (p RemoteConfigPolicy) Check(name string, body []byte) error {
+	return p.check(name, body, nil)
+}
+
+// CheckWithConnectionEnv also permits references to the environment names that the local
+// agent.connection_env configuration binds to offered credentials. It does not permit other
+// environment variables or change the component, destination, or log path restrictions.
+func (p RemoteConfigPolicy) CheckWithConnectionEnv(name string, body []byte, bindings map[string]string) error {
+	return p.check(name, body, slices.Collect(maps.Values(bindings)))
+}
+
+func (p RemoteConfigPolicy) check(name string, body []byte, connectionEnv []string) error {
 	if !p.Enabled() {
 		return nil
 	}
@@ -116,7 +127,7 @@ func (p RemoteConfigPolicy) Check(name string, body []byte) error {
 		where = fmt.Sprintf("the remote config file %q", name)
 	}
 	// The text as written, then the strings YAML decodes (an escape can spell "${").
-	if err := p.checkReferences(where, string(body)); err != nil {
+	if err := p.checkReferences(where, string(body), connectionEnv); err != nil {
 		return err
 	}
 	var doc any
@@ -126,7 +137,7 @@ func (p RemoteConfigPolicy) Check(name string, body []byte) error {
 	var strs []string
 	collectStrings(doc, &strs)
 	for _, s := range strs {
-		if err := p.checkReferences(where, s); err != nil {
+		if err := p.checkReferences(where, s, connectionEnv); err != nil {
 			return err
 		}
 	}
@@ -401,7 +412,7 @@ func isLetter(c byte) bool { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 
 
 // checkReferences refuses a ${...} reference to a provider not allowed. $$ is a literal $; the
 // collector no longer expands a bare $NAME.
-func (p RemoteConfigPolicy) checkReferences(where, s string) error {
+func (p RemoteConfigPolicy) checkReferences(where, s string, connectionEnv []string) error {
 	for i := 0; i < len(s); i++ {
 		if s[i] != '$' || i+1 == len(s) {
 			continue
@@ -422,6 +433,15 @@ func (p RemoteConfigPolicy) checkReferences(where, s string) error {
 			}
 		default:
 			continue
+		}
+		if scheme == "env" {
+			ref := s[i+2:]
+			if end := strings.IndexByte(ref, '}'); end >= 0 {
+				name := strings.TrimPrefix(ref[:end], "env:")
+				if name != "" && slices.Contains(connectionEnv, name) {
+					continue
+				}
+			}
 		}
 		if !slices.Contains(p.AllowedProviders, scheme) {
 			return fmt.Errorf("%s references the %s provider, which agent::remote_config_policy::allowed_providers doesn't allow", where, scheme)

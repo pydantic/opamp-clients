@@ -321,3 +321,32 @@ func FuzzRemoteConfigPolicyCheck(f *testing.F) {
 		}
 	})
 }
+
+// A local credential binding permits exactly its environment name, not the env provider.
+func TestRemoteConfigPolicyConnectionEnv(t *testing.T) {
+	p := testPolicy()
+	p.AllowedProviders = nil
+	bindings := map[string]string{"example/otlp": "BOUND_TOKEN"}
+	for _, reference := range []string{"${env:BOUND_TOKEN}", "${BOUND_TOKEN}", "Bearer ${env:BOUND_TOKEN}"} {
+		body := []byte(`exporters: {otlphttp: {headers: {Authorization: '` + reference + `'}}}`)
+		require.NoError(t, p.CheckWithConnectionEnv("", body, bindings))
+		require.ErrorContains(t, p.Check("", body), "references the env provider")
+		require.ErrorContains(t, p.CheckWithConnectionEnv("", body, nil), "references the env provider")
+	}
+	for _, reference := range []string{
+		"${env:OTHER_TOKEN}", "${OTHER_TOKEN}", "${env:BOUND_TOKEN_SUFFIX}",
+		"${env:BOUND_TOKEN:-fallback}", "${env:${env:BOUND_TOKEN}}", "${${BOUND_TOKEN}}",
+		"${file:/etc/secret}", "${file:${env:BOUND_TOKEN}}", "${http:example.com}",
+	} {
+		t.Run(reference, func(t *testing.T) {
+			body := []byte(`exporters: {otlphttp: {headers: {Authorization: '` + reference + `'}}}`)
+			require.Error(t, p.CheckWithConnectionEnv("", body, bindings))
+		})
+	}
+	for _, body := range []string{
+		`receivers: {filelog: {include: [/etc/secret]}}`,
+		`exporters: {otlphttp: {endpoint: https://untrusted.example.com, headers: {Authorization: '${env:BOUND_TOKEN}'}}}`,
+	} {
+		require.Error(t, p.CheckWithConnectionEnv("", []byte(body), bindings))
+	}
+}

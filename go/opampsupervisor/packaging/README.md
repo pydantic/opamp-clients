@@ -292,7 +292,7 @@ collector keeps the config it had.
 | Rule | Default | Widen it with |
 |---|---|---|
 | `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
-| `allowed_providers` | none: no `${env:...}`, `${file:...}` or other `${...}` | an edit to the config (not recommended) |
+| `allowed_providers` | none, except environment names explicitly bound by `agent.connection_env`; no other `${env:...}` or `${file:...}` | an edit to the config (not recommended) |
 | `allowed_exporter_endpoints` | the OpAMP endpoint's host and port, over https (http with `--plaintext`) | `--exporter-endpoint` (`-ExporterEndpoint` on Windows) |
 | `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows) |
 
@@ -303,9 +303,11 @@ What each rule checks in a remote config:
   are not in the default list. They read the host's system logs and write files where they're
   configured, so a server's config can't turn them on. Use them in the local config, or add
   them to `allowed_components` on the host.
-- **Providers.** Every `${...}` reference is refused, in values and in keys. `$${...}` is a
-  literal `$` and is allowed. The local config still uses providers: the enrollment token is
-  `${file:...}`.
+- **Providers.** Remote configs may reference exactly the environment names bound by the local
+  `agent.connection_env` configuration. For example, a binding to `LOGFIRE_TOKEN` permits
+  `${env:LOGFIRE_TOKEN}` and `${LOGFIRE_TOKEN}`. Other environment variables, nested references,
+  and default values remain blocked. `$${...}` is a literal `$` and is allowed. The local config
+  still uses providers, such as `${file:...}` for the enrollment token.
 - **Destinations.** Each exporter's `endpoint` and `*_endpoint` setting must be an `http://` or
   `https://` URL with an allowed scheme, host and port. The host's case and the scheme's default
   port don't matter, and any path is allowed (a gRPC `otlp` exporter takes none). A value with

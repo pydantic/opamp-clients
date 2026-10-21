@@ -185,7 +185,7 @@ $agentEnv
       processors: [batch, memory_limiter, resource_detection, resourcedetection]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
       extensions: [health_check]
-    # No `${...}: env and file would read this host's environment and files.
+    # No arbitrary `${...}: only locally bound credential environment names are permitted.
     allowed_providers: []
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
