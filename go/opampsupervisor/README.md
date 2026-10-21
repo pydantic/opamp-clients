@@ -65,7 +65,8 @@ agent:
 - **Resumed configs are answered again.** The client hands the config it resumes over again at
   start, and the agent loop answers it as any apply, without restarting the Collector: APPLIED
   once the Collector started on it reports healthy in the apply window, FAILED if it doesn't.
-  Nothing is known of it before then, even if a Collector ran it healthy before the restart. A
+  Nothing is known of it before then, even if a Collector ran it healthy before the restart (an
+  empty config map, which runs no Collector, is APPLIED, as a new one is). A
   later config with the same body gets the running apply's outcome. This lets the client complete
   a resumed offer before it delivers another config.
 

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -75,6 +76,25 @@ func TestAResumedConfigIsAnsweredOnTheNewCollectorsHealth(t *testing.T) {
 			require.Equal(t, pid, a.commander.Pid(), "answering the resumed config doesn't restart the collector")
 		})
 	}
+}
+
+// A resumed empty config map runs no collector, and that is all it asks: the hand-over of it is
+// APPLIED, as a new empty config is. With nothing known of the config the Supervisor starts on,
+// the window the hand-over opened found no collector running and made it FAILED.
+func TestAResumedEmptyConfigIsApplied(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.config.Agent.ConfigApplyTimeout = 300 * time.Millisecond
+	empty := &protobufs.AgentRemoteConfig{Config: &protobufs.AgentConfigMap{}, ConfigHash: []byte("empty")}
+	a.resumed = opamp.Resumed{RemoteConfig: empty, AppliedRemoteConfig: empty}
+	require.NoError(t, a.loadAndWriteInitialMergedConfig())
+	require.True(t, a.cfgState.Load().(*configState).configMapIsEmpty)
+	startAgentLoop(t, a.Supervisor)
+
+	a.offer(t, empty) // the client's hand-over
+	a.waitFor(t, "empty APPLIED")
+	time.Sleep(time.Second) // past an apply window
+	require.NotContains(t, a.reported(), "empty FAILED")
+	require.False(t, a.commander.IsRunning())
 }
 
 // Health counts for an apply only while the connection it came on is the collector's. A

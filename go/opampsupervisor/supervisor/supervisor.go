@@ -2224,7 +2224,12 @@ func (s *Supervisor) runAgentProcess() {
 	if _, err := os.Stat(s.agentConfigFilePath()); err == nil {
 		// We have an effective config file saved previously. Use it to start the agent.
 		s.telemetrySettings.Logger.Debug("Effective config found, starting agent initial time")
-		_, err := s.startAgent()
+		status, err := s.startAgent()
+		if status == agentNotStarting {
+			// Changed here: an empty config map runs no collector, which is all it asks: APPLIED,
+			// as on a new config.
+			apply.status = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
+		}
 		if err != nil {
 			s.telemetrySettings.Logger.Error("starting agent failed", zap.Error(err))
 			s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, err.Error(), false)
