@@ -49,6 +49,19 @@ jobs:
             echo "::error::$version isn't a version like 0.1.0"; exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"
+      # The Supervisor builds the Go client, which embeds the core: a release waits for the core's own
+      # release when main pins a prerelease (X.Y.Z-dev.N).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: go/opampsupervisor/v${{ steps.v.outputs.version }}
+          sparse-checkout: opamp-core.lock.json
+          sparse-checkout-cone-mode: false
+      - name: The core the lock pins is a release, not a prerelease
+        run: |
+          core=$(python3 -c 'import json; print(json.load(open("opamp-core.lock.json"))["version"])')
+          if [[ $core == *-* ]]; then
+            echo "::error::opamp-core.lock.json pins the core prerelease $core: lock the core's release before a Supervisor release"; exit 1
+          fi
 
   build:
     name: The archive (${{ matrix.goos }}/${{ matrix.goarch }})

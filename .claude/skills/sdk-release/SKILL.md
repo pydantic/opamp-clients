@@ -41,7 +41,11 @@ and tested in CI, not published.
    github.com/pydantic/opamp-clients/go/logfirepolicyprocessor vX.Y.Z` too. Keep each
    `replace ... => ../`: consumers ignore it, but a `v0.0.0` require breaks them. See
    [docs/sdk-registries.md](../../../docs/sdk-registries.md) (Go row). Squash-merge on the maintainer's line.
-2. Hand the maintainer the tags for the merge commit, at most three per push (GitHub sends no push event
+2. Check the merge commit's `opamp-core.lock.json` pins a core **release**, not a prerelease
+   (`X.Y.Z-dev.N`): the module embeds the core, and nothing refuses a Go tag on its own (the
+   Supervisor's `release.yml` and `registries.yml` do refuse). If it pins a prerelease, the core's
+   release and a lock bump to it come first.
+3. Hand the maintainer the tags for the merge commit, at most three per push (GitHub sends no push event
    for more), the client first and the Supervisor alone:
    ```bash
    git fetch origin main
@@ -50,7 +54,7 @@ and tested in CI, not published.
    git push origin go/logfirepolicyprocessor/vX.Y.Z
    git push origin go/opampsupervisor/vX.Y.Z      # alone: it triggers release.yml
    ```
-3. Check that the proxy serves them (each prints Path, Version, Time):
+4. Check that the proxy serves them (each prints Path, Version, Time):
    ```bash
    for m in go go/opampotel go/opampextension go/logfirepolicyprocessor go/opampsupervisor; do
      GOFLAGS=-mod=mod go list -m -json github.com/pydantic/opamp-clients/$m@vX.Y.Z; done
