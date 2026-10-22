@@ -18,7 +18,8 @@
 // With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction: an activity of
 // its own, example.probe (from the source "app", which instrumentation exports when
 // OTEL_DOTNET_AUTO_TRACES_ADDITIONAL_SOURCES names it), with the URL it requests (url.full) on an
-// event and on a link to the round before's probe, and a log line example.probe with that URL.
+// event and on a link to the round before's probe, and a log line example.probe with that URL;
+// each with a note (example.note) that says password, for scrubbing to replace.
 // It probes before or after the request, at random: under a rate limit of one a second, the first
 // record after the token comes takes it, and in a fixed order the probe might never be that one.
 
@@ -110,10 +111,12 @@ if (server is not null)
 
 // An activity of its own with url on an event and on a link to last (none while it is the
 // default), and a log line with url: what redaction may drop or mask. Returns the activity's
-// context, for the next probe to link to (the last one's while none is sampled).
+// context, for the next probe to link to (the last one's while none is sampled). Each carries a
+// note too (example.note), which says password, so scrubbing's default patterns replace it.
 ActivityContext Probe(string url, ActivityContext last)
 {
-    var tags = new ActivityTagsCollection { ["url.full"] = url };
+    const string note = "the password is p4ss";
+    var tags = new ActivityTagsCollection { ["url.full"] = url, ["example.note"] = note };
     var links = last == default ? null : new[] { new ActivityLink(last, tags) };
     using (var activity = probes.StartActivity("example.probe", ActivityKind.Internal, default(ActivityContext), links: links))
     {
@@ -121,7 +124,7 @@ ActivityContext Probe(string url, ActivityContext last)
         last = activity?.Context ?? last;
     }
 
-    KeyValuePair<string, object?>[] state = [new("url.full", url), new("{OriginalFormat}", "example.probe")];
+    KeyValuePair<string, object?>[] state = [new("url.full", url), new("example.note", note), new("{OriginalFormat}", "example.probe")];
     log.Log(LogLevel.Information, default, state, null, (_, _) => "example.probe");
     return last;
 }

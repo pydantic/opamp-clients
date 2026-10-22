@@ -37,13 +37,17 @@ const changedUrl = new URL("/changed", process.argv[2]).href;
 
 // With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction: a span of its
 // own, `example.probe`, with the URL it requests (url.full) on an event and on a link to the round
-// before's probe, and a log record `example.probe` with that URL. It probes before or after the
+// before's probe, and a log record `example.probe` with that URL; each with a note (example.note)
+// that says password, for scrubbing to replace. It probes before or after the
 // request, at random: under a rate limit of one a second, the first record after the token comes
 // takes it, and in a fixed order the probe might never be that one.
 const probing = process.env.EXAMPLE_PROBE === "1";
 let lastProbe;
+// What the probe carries beside its URL (example.note): it says password, so scrubbing's default
+// patterns replace it.
+const note = "the password is p4ss";
 const probe = (url) => {
-  const attributes = { "url.full": url };
+  const attributes = { "url.full": url, "example.note": note };
   const span = trace.getTracer("app").startSpan("example.probe", {
     links: lastProbe ? [{ context: lastProbe, attributes }] : [],
   });

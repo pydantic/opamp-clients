@@ -35,7 +35,8 @@ import io.opentelemetry.api.trace.SpanContext;
  * <p>With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction, through the
  * OpenTelemetry API the agent bridges (its jar on the class path): a span of its own,
  * {@code example.probe}, with the URL it requests (url.full) on an event and on a link to the
- * round before's probe, and a log record {@code example.probe} with that URL. It probes before or
+ * round before's probe, and a log record {@code example.probe} with that URL; each with a note
+ * ({@code example.note}) that says password, for scrubbing to replace. It probes before or
  * after the request, at random: under a rate limit of one a second, the first record after the
  * token comes takes it, and in a fixed order the probe might never be that one.
  */
@@ -82,13 +83,17 @@ public final class App {
     }
   }
 
+  /** What the probe carries beside its URL (example.note): it says password, so scrubbing replaces it. */
+  private static final String NOTE = "the password is p4ss";
+
   /**
    * A span of its own with {@code url} on an event and on a link to {@code last} (none while it is
    * null), and a log record with {@code url}: what redaction may drop or mask. Returns the span's
-   * context, for the next probe to link to.
+   * context, for the next probe to link to. Each carries {@link #NOTE} too, which scrubbing replaces.
    */
   private static SpanContext probe(String url, SpanContext last) {
-    Attributes attributes = Attributes.of(AttributeKey.stringKey("url.full"), url);
+    Attributes attributes = Attributes.of(
+        AttributeKey.stringKey("url.full"), url, AttributeKey.stringKey("example.note"), NOTE);
     SpanBuilder builder = GlobalOpenTelemetry.getTracer("app").spanBuilder("example.probe").setNoParent();
     if (last != null) {
       builder.addLink(last, attributes);

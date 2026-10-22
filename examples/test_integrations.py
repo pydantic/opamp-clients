@@ -20,7 +20,7 @@ import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+from integrations import (APP_KEY, NOTE, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, SCRUBBED_NOTE, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
                           judge_truth, key_from_env, key_in_code, policy, scenario, truth_scenario,
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_moved_start, judge_rotation, judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
@@ -114,17 +114,18 @@ class Log:
         self.events.append({"event": "stray_request", "t": t, "path": path, "method": "GET"})
         return self
 
-    def probe(self, t: float, url: str | None, places: tuple[str, ...] = ("event", "link", "log")) -> Log:
+    def probe(self, t: float, url: str | None, places: tuple[str, ...] = ("event", "link", "log"),
+              note: str | None = NOTE) -> Log:
         """The application's probe arriving at `t`, as the sink reports it: its span (an event and
-        a link) and its log record, each with `url` (None: none). The log export counts no
-        record, so the checks that count records don't see it."""
-        traces = [{"in": p, "url": url} for p in places if p != "log"]
+        a link) and its log record, each with `url` (None: none) and `note`. The log export counts
+        no record, so the checks that count records don't see it."""
+        traces = [{"in": p, "url": url, "note": note} for p in places if p != "log"]
         if traces:
             self.events.append({"event": "otlp", "t": t, "signal": "traces", "services": ["checkout"], "spans": [PROBE],
                                 "ends": [t - 0.1], "probes": traces})
         if "log" in places:
             self.events.append({"event": "otlp", "t": t, "signal": "logs", "services": ["checkout"], "spans": [],
-                                "count": 0, "probes": [{"in": "log", "url": url}]})
+                                "count": 0, "probes": [{"in": "log", "url": url, "note": note}]})
         return self
 
 
@@ -159,6 +160,7 @@ def second(uid: str = UID, requests: int = 30, config: bool = True) -> Log:
 
 def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = PING, masked_url: str | None = "[REDACTED]",
           dropped_url: str | None = None, probed: tuple[str, ...] = ("event", "link", "log"),
+          plain_note: str | None = NOTE, scrubbed_note: str | None = SCRUBBED_NOTE, dropped_note: str | None = NOTE,
           metrics_off: bool = True, logs_off: bool = True, at_once: bool = False,
           info_under_floor: bool = False, info_back: bool = True, debug_spans: bool = True,
           ruled: bool = True, scoped: bool = True, scope_back: bool = True, span_name: str = "[REDACTED]",
@@ -173,7 +175,8 @@ def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = 
     `dropped_name`) and both caps, `spans_a_second` and `records_a_second`; then every
     instrumentation off. The probe in `probed` (its event, link and log record) every two seconds:
     its URL `plain_url` under the first policy, `masked_url` under the mask and `dropped_url` under
-    the drop; and its span after the last. Export health at start and at 120 s. With the third offer the agent
+    the drop, and its note `plain_note`, `scrubbed_note` (under scrubbing) and `dropped_note`; and
+    its span after the last. Export health at start and at 120 s. With the third offer the agent
     reports `effective` as its effective config (by default the policy in force), and with the
     fourth `effective_after` (by default the next policy in force)."""
     third_effective = effective or in_force({"head_sampling": {"ratio": 0.25}})
@@ -184,7 +187,7 @@ def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = 
         log.health(0.5, ok=0, filtered=0)
     log.offer(0.5).a2s(1, status="APPLIED").pings(1, 25).exports(1, 25).span(3).span(5)
     for t in range(5, 25, 2):
-        log.probe(t, plain_url, probed)
+        log.probe(t, plain_url, probed, plain_note)
     log.offer(24.5).a2s(25, status="APPLIED").pings(25, 50).span(30).span(40)
     if not metrics_off:
         log.exports(30, 50, ("metrics",))
@@ -223,18 +226,18 @@ def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = 
         log.exports(175, 200, ("logs",))
     for t in range(176, 200, 2):
         log.span(t + 0.5, url=span_name, ended=t)
-        log.probe(t + 0.6, masked_url, probed)
+        log.probe(t + 0.6, masked_url, probed, scrubbed_note)
     log.offer(199.5).a2s(200, status="APPLIED").pings(200, 225).exports(200, 225, ("metrics",))
     for t in range(201, 225):  # each second, as many as the caps let through: every other one the probe's
         for n in range(spans_a_second):
             if n == 0 and t % 2:
-                log.probe(t + 0.5, dropped_url, tuple(p for p in probed if p != "log"))
+                log.probe(t + 0.5, dropped_url, tuple(p for p in probed if p != "log"), dropped_note)
             else:
                 log.span(t + 0.5, url=dropped_name, ended=t + n * 0.01)
         if records_a_second:
             log.export(t + 0.3, "logs", count=records_a_second)
             if t % 2 and "log" in probed:
-                log.probe(t + 0.3, dropped_url, ("log",))
+                log.probe(t + 0.3, dropped_url, ("log",), dropped_note)
     log.offer(224.5).a2s(225, status="APPLIED").pings(225, 235).probe(229, None)
     if not at_once:
         log.span(230)
@@ -1380,12 +1383,29 @@ class SignalsProbes(unittest.TestCase):
                 with self.subTest(url=url, place=place):
                     self.assertTrue(fails(third(dropped_url=url), f"attribute_redaction drop: the probe's {name}"))
 
+    def test_no_note_or_a_scrubbed_one_before_scrubbing_fails(self):
+        for note in (None, SCRUBBED_NOTE):
+            for place, name in self.PLACES:
+                with self.subTest(note=note, place=place):
+                    self.assertTrue(fails(third(plain_note=note), f"the probe's {name} carry the note"))
+
+    def test_a_note_shown_or_missing_under_scrubbing_fails(self):
+        for note in (NOTE, None, "[Scrubbed due to 'secret']"):
+            for place, name in self.PLACES:
+                with self.subTest(note=note, place=place):
+                    self.assertTrue(fails(third(scrubbed_note=note), f"scrubbing defaults: the note on the probe's {name}"))
+
+    def test_a_note_still_scrubbed_once_scrubbing_is_local_fails(self):
+        for place, name in self.PLACES:
+            with self.subTest(place=place):
+                self.assertTrue(fails(third(dropped_note=SCRUBBED_NOTE), f"scrubbing local: the note on the probe's {name}"))
+
     def test_a_place_the_probe_never_reaches_fails_each_of_its_checks(self):
         for place, name in self.PLACES:
             with self.subTest(place=place):
                 log = third(probed=tuple(p for p, _ in self.PLACES if p != place))
                 got = [f for f in failed(judge_signals(log.events, "checkout", False)) if "probe" in f]
-                self.assertEqual(len(got), 3, got)
+                self.assertEqual(len(got), 6, got)
                 self.assertTrue(all(name in f for f in got), got)
 
     def test_a_probe_from_the_step_before_may_arrive_late_without_counting(self):

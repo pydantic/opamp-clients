@@ -50,6 +50,7 @@ to end:
 | `log_levels` `scopes` | the application's loggers (`app*`, and Rust's target) `off`: about no log records per request; local again, they come back |
 | `attribute_redaction` `mask` | on `url.full` and `http.url`: spans come again, each URL `[REDACTED]` in the sink, none shown |
 | `attribute_redaction` `drop` | on the same keys, in another case: spans arrive, none with a URL |
+| `scrubbing` `defaults` | with the mask: the note the probe carries beside its URL (`example.note`, "the password is p4ss") arrives `[Scrubbed due to 'password']` on its span events, links and log records; local again, as it is |
 | `trace_rate_limit`, `log_rate_limit` | at 1: no more than about a span and a log record a second, of some five requests a second |
 | the effective config | after `head_sampling` 0.25, the agent reports that policy, every control listed, as the only file; after the log level is added, that policy |
 | export health (no control) | the agent's health carries `exporters`, a child per signal, the application's own `healthy` kept; it counts trace exports that succeeded and log records dropped on purpose |
