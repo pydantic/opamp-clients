@@ -198,9 +198,12 @@ const VALUES: KeyScrub = { values: true };
 /** A log body's or an attribute value's map: its members, by key. */
 type Members = { [key: string]: unknown };
 
-const isMembers = (v: unknown): v is Members =>
-  typeof v === "object" && v !== null && !Array.isArray(v) && !ArrayBuffer.isView(v) &&
-  Object.getPrototypeOf(v) === Object.prototype;
+/** A plain object, its prototype Object's or none (Object.create(null)): the OTLP exporter writes either as a map. */
+const isMembers = (v: unknown): v is Members => {
+  if (typeof v !== "object" || v === null || Array.isArray(v) || ArrayBuffer.isView(v)) return false;
+  const proto: unknown = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+};
 
 /**
  * scrub_defaults and scrub_patterns: the Logfire SDK's default patterns, and globs (lowercase, as

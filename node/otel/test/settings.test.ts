@@ -562,6 +562,14 @@ test("scrubbing: the default patterns at their edges", () => {
   assert.deepEqual(new Scrubbing(false, ["*"]).key("url.full"), { keep: true });
   assert.deepEqual(new Scrubbing().key("password"), { keep: true });
   assert.deepEqual(new Scrubbing(false, ["acct-*"]).value("x", ["ACCT-1", 2, true]), ["[Scrubbed due to 'acct-*']", 2, true]);
+  // A map without a prototype (Object.create(null)) is a map all the same: the OTLP exporter writes its members.
+  const bare: { [key: string]: unknown } = Object.create(null);
+  bare.password = "p4ss";
+  bare.note = "the secret is out";
+  bare.ok = "fine";
+  assert.deepEqual({ ...(s.value(undefined, bare) as object) },
+    { password: "[Scrubbed due to 'password']", note: "[Scrubbed due to 'secret']", ok: "fine" });
+  assert.equal(bare.password, "p4ss");
 });
 
 test("scrubbing is declared where redaction is", () => {
