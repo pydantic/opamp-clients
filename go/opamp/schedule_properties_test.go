@@ -1078,7 +1078,7 @@ func runSchedCase(rt *rapid.T, base string, mode Mode) {
 	sc.cfg = Config{
 		Endpoint:          scheme + "://opamp.test/v1/opamp",
 		InstanceUID:       modelUID,
-		Capabilities:      uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+		Capabilities:      uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat),
 		HeartbeatInterval: pick("heartbeat", 30*time.Second, 5*time.Second),
 		RequestTimeout:    pick("request timeout", 30*time.Second, 2*time.Second),
 		ConnectTimeout:    pick("connect timeout", 30*time.Second, 2*time.Second),
@@ -2072,7 +2072,7 @@ func stoppedIsTheLastNotification(t *testing.T, mode Mode) {
 		hs := &http.Server{Handler: srv, ConnContext: pipeConnContext}
 		go func() { _ = hs.Serve(n) }()
 		cfg := Config{Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: 30 * time.Second,
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig)}
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat)}
 		tr := onPipes(&cfg, mode, n)
 		var mu sync.Mutex
 		var heard []NotificationKind
@@ -2149,7 +2149,7 @@ func theCallbacksAnswerComesFirst(t *testing.T, mode Mode, wait func()) {
 			}
 			cfg := Config{Endpoint: "ws://opamp.test/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: 30 * time.Second,
 				StateFile: filepath.Join(base, "state"), tapFile: filepath.Join(dir, "core.tap"),
-				Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig)}
+				Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat)}
 			tr := onPipes(&cfg, mode, n)
 			before := len(srv.messages())
 			var mu sync.Mutex
@@ -2260,7 +2260,7 @@ func stopBoundWithASlowSave(t *testing.T, mode Mode) {
 		go func() { _ = hs.Serve(n) }()
 		cfg := Config{Endpoint: "http://opamp.test/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: 30 * time.Second,
 			StopTimeout: 5 * time.Second, StateFile: filepath.Join(dir, "state"),
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig)}
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat)}
 		tr := onPipes(&cfg, mode, n)
 		saveDelays.Store(cfg.StateFile, 10*time.Second)
 		defer saveDelays.Delete(cfg.StateFile)
@@ -2319,7 +2319,7 @@ func panicClosesEveryConnection(t *testing.T, mode Mode) {
 		go func() { _ = hs.Serve(n) }()
 		cfg := Config{Endpoint: "ws://opamp.test/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: 5 * time.Second,
 			StopTimeout: 5 * time.Second, StateFile: filepath.Join(dir, "state"),
-			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig)}
+			Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat)}
 		tr := onPipes(&cfg, mode, n)
 		saveDelays.Store(cfg.StateFile, 3*time.Second)
 		defer saveDelays.Delete(cfg.StateFile)

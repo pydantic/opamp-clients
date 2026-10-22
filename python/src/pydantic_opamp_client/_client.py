@@ -41,8 +41,10 @@ class Config:
     #: makes one (a UUIDv7, from the clock and the operating system's randomness), and with a
     #: state_file keeps it across restarts. ``Client.instance_uid`` says which is in use.
     instance_uid: bytes | None = None
-    #: Capabilities the agent supports (AgentCapabilities bits). ReportsStatus and ReportsHeartbeat
-    #: are always added, and the Reports* bits for status you set.
+    #: Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
+    #: always added, and the core adds the bits of what it does itself (packages, connection
+    #: settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+    #: set: a status whose bit isn't declared isn't sent.
     capabilities: int = 0
     #: Heartbeat (WebSocket) or polling (HTTP) interval until the server offers one; 0: 30 s.
     heartbeat_interval_ms: int = 0

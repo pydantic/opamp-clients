@@ -11,7 +11,7 @@ import { create, fromBinary } from "@bufbuild/protobuf";
 
 import { Core, TEST_CORE_TAP } from "../src/core.js";
 import { ConfigSchema, type Input, InputSchema, ReplySchema, StepSchema } from "../src/gen/opamp/core/v1/core_pb.js";
-import { Client, type Config } from "../src/index.js";
+import { AgentCapabilities, Client, type Config } from "../src/index.js";
 import { opampServer, sleep, until } from "./disk.js";
 
 const input = (kind: Input["kind"]): Input => create(InputSchema, { kind } as never);
@@ -71,6 +71,7 @@ for (const mode of ["platform", "core"] as const) {
           endpoint: ws ? server.url.replace(/^http/, "ws") : server.url,
           stateFile: join(dir, "state.bin"),
           heartbeatIntervalMs: 50,
+          capabilities: BigInt(AgentCapabilities.AgentCapabilities_ReportsHeartbeat),
           mode,
           proxy: false,
           [TEST_CORE_TAP]: tap,

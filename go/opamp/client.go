@@ -156,8 +156,10 @@ type Config struct {
 	// Zero: none: the core makes one (a UUIDv7), and with a state file keeps it across restarts
 	// (Client.InstanceUID says which).
 	InstanceUID [16]byte
-	// Capabilities the agent supports (AgentCapabilities bits). ReportsStatus and
-	// ReportsHeartbeat are always added, and the Reports* bits for status you set.
+	// Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
+	// always added, and the core adds the bits of what it does itself (packages, connection
+	// settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+	// set: a status whose bit isn't declared isn't sent.
 	Capabilities uint64
 	// HeartbeatInterval until the server offers one; 0: 30 s.
 	HeartbeatInterval time.Duration

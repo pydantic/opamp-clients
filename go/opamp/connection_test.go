@@ -451,7 +451,8 @@ func endpoint(ts *httptest.Server, ws bool) string {
 
 // clientConfig is a platform mode client's settings (checkCombination sets the mode it tests).
 func clientConfig(ts *httptest.Server, ws bool) Config {
-	return Config{Mode: ModePlatform, Endpoint: endpoint(ts, ws), InstanceUID: [16]byte{0x42}, HeartbeatInterval: 50 * time.Millisecond}
+	return Config{Mode: ModePlatform, Endpoint: endpoint(ts, ws), InstanceUID: [16]byte{0x42}, HeartbeatInterval: 50 * time.Millisecond,
+		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat)}
 }
 
 // ---------------------------------------------------------------------------------------------

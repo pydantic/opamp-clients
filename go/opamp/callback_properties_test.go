@@ -518,7 +518,7 @@ func runModelPlan(plan mPlan, dir string, mode Mode) (stats modelStats, err erro
 func (r *modelRun) session(s mSession) error {
 	r.srv.newSession()
 	cfg := Config{Endpoint: r.ts.URL + "/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: modelHeartbeat,
-		RequestTimeout: modelReqTimeout, Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig),
+		RequestTimeout: modelReqTimeout, Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat),
 		Mode: r.mode}
 	if r.mode == ModeCore {
 		cfg.Proxy = Proxy{Direct: true} // the local server, whatever the environment says

@@ -85,8 +85,10 @@ export interface Config {
    * makes one (a UUIDv7 of the time and random bytes), and with a stateFile keeps it across
    * restarts (the one in use is told at start, as instanceUidChanged). */
   instanceUid?: Uint8Array;
-  /** Capabilities the agent supports (AgentCapabilities bits). ReportsStatus and
-   * ReportsHeartbeat are always added, and the Reports* bits for status you set. */
+  /** Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
+   * always added, and the core adds the bits of what it does itself (packages, connection
+   * settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+   * set: a status whose bit isn't declared isn't sent. */
   capabilities?: bigint;
   /** Heartbeat (WebSocket) or polling (HTTP) interval until the server offers one; default 30 s. */
   heartbeatIntervalMs?: number;

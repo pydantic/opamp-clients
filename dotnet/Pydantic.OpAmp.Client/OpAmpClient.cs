@@ -25,8 +25,10 @@ public sealed record OpAmpClientOptions
     public byte[]? InstanceUid { get; init; }
 
     /// <summary>
-    /// Capabilities the agent supports (AgentCapabilities bits). ReportsStatus and ReportsHeartbeat
-    /// are always added, and the Reports* bits for status you set.
+    /// Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
+    /// always added, and the core adds the bits of what it does itself (packages, connection
+    /// settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+    /// set: a status whose bit isn't declared isn't sent.
     /// </summary>
     public ulong Capabilities { get; init; }
 
