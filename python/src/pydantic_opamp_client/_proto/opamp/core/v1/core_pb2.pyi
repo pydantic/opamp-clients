@@ -8,6 +8,12 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class PackageFailure(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    PACKAGE_FAILURE_FINAL: _ClassVar[PackageFailure]
+    PACKAGE_FAILURE_LATER: _ClassVar[PackageFailure]
+    PACKAGE_FAILURE_UNKNOWN: _ClassVar[PackageFailure]
+
 class StatusField(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     STATUS_FIELD_DESCRIPTION: _ClassVar[StatusField]
@@ -30,6 +36,9 @@ class SetupUidFrom(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     SETUP_UID_FROM_MADE: _ClassVar[SetupUidFrom]
     SETUP_UID_FROM_SAVED: _ClassVar[SetupUidFrom]
     SETUP_UID_FROM_GIVEN: _ClassVar[SetupUidFrom]
+PACKAGE_FAILURE_FINAL: PackageFailure
+PACKAGE_FAILURE_LATER: PackageFailure
+PACKAGE_FAILURE_UNKNOWN: PackageFailure
 STATUS_FIELD_DESCRIPTION: StatusField
 STATUS_FIELD_HEALTH: StatusField
 STATUS_FIELD_EFFECTIVE_CONFIG: StatusField
@@ -46,7 +55,7 @@ SETUP_UID_FROM_SAVED: SetupUidFrom
 SETUP_UID_FROM_GIVEN: SetupUidFrom
 
 class Config(_message.Message):
-    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy", "reports_heartbeat")
+    __slots__ = ("instance_uid", "capabilities", "heartbeat_interval_ms", "backoff_initial_ms", "backoff_max_ms", "max_send_bytes", "seed", "endpoint", "headers", "request_timeout_ms", "max_receive_bytes", "persistence", "saved_state", "accept_connection_settings", "verify_timeout_ms", "user_agent", "accept_packages", "max_package_bytes", "download_timeout_ms", "request_instance_uid", "streams", "entropy", "splice_downloads", "unix_ms", "stop_timeout_ms", "connect_timeout_ms", "proxy")
     INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
     CAPABILITIES_FIELD_NUMBER: _ClassVar[int]
     HEARTBEAT_INTERVAL_MS_FIELD_NUMBER: _ClassVar[int]
@@ -74,7 +83,6 @@ class Config(_message.Message):
     STOP_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     CONNECT_TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
     PROXY_FIELD_NUMBER: _ClassVar[int]
-    REPORTS_HEARTBEAT_FIELD_NUMBER: _ClassVar[int]
     instance_uid: bytes
     capabilities: int
     heartbeat_interval_ms: int
@@ -102,8 +110,7 @@ class Config(_message.Message):
     stop_timeout_ms: int
     connect_timeout_ms: int
     proxy: ProxyChoice
-    reports_heartbeat: bool
-    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ..., proxy: _Optional[_Union[ProxyChoice, _Mapping]] = ..., reports_heartbeat: bool = ...) -> None: ...
+    def __init__(self, instance_uid: _Optional[bytes] = ..., capabilities: _Optional[int] = ..., heartbeat_interval_ms: _Optional[int] = ..., backoff_initial_ms: _Optional[int] = ..., backoff_max_ms: _Optional[int] = ..., max_send_bytes: _Optional[int] = ..., seed: _Optional[int] = ..., endpoint: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., request_timeout_ms: _Optional[int] = ..., max_receive_bytes: _Optional[int] = ..., persistence: bool = ..., saved_state: _Optional[bytes] = ..., accept_connection_settings: bool = ..., verify_timeout_ms: _Optional[int] = ..., user_agent: _Optional[str] = ..., accept_packages: bool = ..., max_package_bytes: _Optional[int] = ..., download_timeout_ms: _Optional[int] = ..., request_instance_uid: bool = ..., streams: bool = ..., entropy: _Optional[bytes] = ..., splice_downloads: bool = ..., unix_ms: _Optional[int] = ..., stop_timeout_ms: _Optional[int] = ..., connect_timeout_ms: _Optional[int] = ..., proxy: _Optional[_Union[ProxyChoice, _Mapping]] = ...) -> None: ...
 
 class ProxyChoice(_message.Message):
     __slots__ = ("direct", "url", "headers", "resolve_locally", "environment")
@@ -254,26 +261,30 @@ class Name(_message.Message):
     def __init__(self, name: _Optional[str] = ...) -> None: ...
 
 class PackageInstalled(_message.Message):
-    __slots__ = ("name", "hash", "ok", "detail")
+    __slots__ = ("name", "hash", "ok", "detail", "failure")
     NAME_FIELD_NUMBER: _ClassVar[int]
     HASH_FIELD_NUMBER: _ClassVar[int]
     OK_FIELD_NUMBER: _ClassVar[int]
     DETAIL_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_FIELD_NUMBER: _ClassVar[int]
     name: str
     hash: bytes
     ok: bool
     detail: str
-    def __init__(self, name: _Optional[str] = ..., hash: _Optional[bytes] = ..., ok: bool = ..., detail: _Optional[str] = ...) -> None: ...
+    failure: PackageFailure
+    def __init__(self, name: _Optional[str] = ..., hash: _Optional[bytes] = ..., ok: bool = ..., detail: _Optional[str] = ..., failure: _Optional[_Union[PackageFailure, str]] = ...) -> None: ...
 
 class PackageRemoved(_message.Message):
-    __slots__ = ("name", "failed", "detail")
+    __slots__ = ("name", "failed", "detail", "failure")
     NAME_FIELD_NUMBER: _ClassVar[int]
     FAILED_FIELD_NUMBER: _ClassVar[int]
     DETAIL_FIELD_NUMBER: _ClassVar[int]
+    FAILURE_FIELD_NUMBER: _ClassVar[int]
     name: str
     failed: bool
     detail: str
-    def __init__(self, name: _Optional[str] = ..., failed: bool = ..., detail: _Optional[str] = ...) -> None: ...
+    failure: PackageFailure
+    def __init__(self, name: _Optional[str] = ..., failed: bool = ..., detail: _Optional[str] = ..., failure: _Optional[_Union[PackageFailure, str]] = ...) -> None: ...
 
 class Downloaded(_message.Message):
     __slots__ = ("id", "sha256")
@@ -512,18 +523,20 @@ class StreamOpen(_message.Message):
     def __init__(self, id: _Optional[int] = ..., host: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
 
 class Download(_message.Message):
-    __slots__ = ("id", "url", "headers", "max_bytes", "timeout_ms")
+    __slots__ = ("id", "url", "headers", "max_bytes", "timeout_ms", "server_origin")
     ID_FIELD_NUMBER: _ClassVar[int]
     URL_FIELD_NUMBER: _ClassVar[int]
     HEADERS_FIELD_NUMBER: _ClassVar[int]
     MAX_BYTES_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_MS_FIELD_NUMBER: _ClassVar[int]
+    SERVER_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     id: int
     url: str
     headers: _containers.RepeatedCompositeFieldContainer[Header]
     max_bytes: int
     timeout_ms: int
-    def __init__(self, id: _Optional[int] = ..., url: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., max_bytes: _Optional[int] = ..., timeout_ms: _Optional[int] = ...) -> None: ...
+    server_origin: bool
+    def __init__(self, id: _Optional[int] = ..., url: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., max_bytes: _Optional[int] = ..., timeout_ms: _Optional[int] = ..., server_origin: bool = ...) -> None: ...
 
 class Store(_message.Message):
     __slots__ = ("id", "data")
