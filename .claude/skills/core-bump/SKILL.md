@@ -56,6 +56,12 @@ A lock for a version not yet released fails with
 `GET .../releases/tags/core/v9.9.9: HTTP 404 (the rate limit: set GH_TOKEN)`: the message blames
 the rate limit, but 404 means the release doesn't exist yet. Set `GH_TOKEN` only for a real 403/429.
 
+A **prerelease** (`core/vX.Y.Z-dev.N`, a GitHub prerelease) is locked the same way
+(`lock 0.10.0-dev.1`). It lets main take a core change before the core's release, so an SDK change
+that needs it can merge now. `registries.yml` and the Supervisor's `release.yml` refuse to publish
+while the lock pins one, and a Go tag must not go on such a commit (the `sdk-release` skill): move
+the lock to the release first.
+
 `--from DIR` locks or fetches from a directory of release files (a candidate handed to you); CI
 uses it when called with a candidate (`.github/actions/core`, `CORE_ARTIFACT`).
 
