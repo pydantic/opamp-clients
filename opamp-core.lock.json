@@ -1,7 +1,7 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.10.0-dev.1",
-  "commit": "28f26c1963bc190bf8a40c14a56a0bd64a334602",
+  "version": "0.10.0",
+  "commit": "8ed66ba54cfdeb0f6787cbe986e4b51e19b6f4e5",
   "files": {
     "native-linux-arm64-libopamp_native.so": {
       "sha256": "9ce074057a2ba87cef1e6941cba5f641c38dc0f4127301e509f472ebeaafa181",
@@ -28,25 +28,25 @@
       "lib": "libopamp_native.so"
     },
     "native-osx-arm64-libopamp_native.dylib": {
-      "sha256": "b532bb56cac4d873d62c7dcf1f02674526ba38c7fa8642d8ee5bfecc4ca1cac3",
+      "sha256": "482054c794f3f314370442f75c05e8d73fbefec714fc6f53ceefb322be14912e",
       "kind": "native",
       "target": "osx-arm64",
       "lib": "libopamp_native.dylib"
     },
     "native-osx-x64-libopamp_native.dylib": {
-      "sha256": "d33f27418cd447a6a7840d3de01ac8fed133e43fab5cba312e1c62f4b83bbf91",
+      "sha256": "5dae950d200fdd5e1eeba9f9b72033f4efb21a8017e6c0794ebe0b08fa7415b0",
       "kind": "native",
       "target": "osx-x64",
       "lib": "libopamp_native.dylib"
     },
     "native-win-arm64-opamp_native.dll": {
-      "sha256": "7a4ee08732cd3f32cd4e3130fd97eb2c5dc26b3b8f001bb291898b3387ffab04",
+      "sha256": "4ae4660012d411b0c0d3688251e2dfb69223236cbdf22829316816d0f92daa54",
       "kind": "native",
       "target": "win-arm64",
       "lib": "opamp_native.dll"
     },
     "native-win-x64-opamp_native.dll": {
-      "sha256": "8ec0236a1cd2810e9f3df57e188ca6b1cb0fb72bb6251997b99a062815fc1a27",
+      "sha256": "d75cfe96cdaf36548caaa368c45149efa424d532320260e928541cc49524b747",
       "kind": "native",
       "target": "win-x64",
       "lib": "opamp_native.dll"
@@ -64,11 +64,11 @@
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "9d31c8303abc0f6b9fabc1360a176b1ee523b800cc2fc9483d612e3d8c4cc9a8",
+      "sha256": "b4ed530d78f0028c0bacecd5cafc1a3bba8eb1a0a42d0c4fc828ed0db0006eac",
       "kind": "wasm"
     },
     "tool-linux-x64-opamp-tap": {
-      "sha256": "23cd73c164706a0b54bc8847b7de0e326201f34b25fd4b98063e3771e3dd084b",
+      "sha256": "dccbb40e8682c66683838e9e1a949fad3a45e162832e69033549787eb1a41781",
       "kind": "tool",
       "target": "linux-x64",
       "bin": "opamp-tap"

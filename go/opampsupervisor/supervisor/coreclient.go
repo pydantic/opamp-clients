@@ -39,7 +39,8 @@ const coreClientStateFile = "opamp-state"
 //     Supervisor takes the latest, as upstream); a late answer about one it replaced is dropped.
 //   - The effective config is pushed when the Supervisor says it changed, not pulled.
 //   - Health, the effective config, the remote config status and the available components reach
-//     the server only with their capability, as with opamp-go: the core would declare it for them.
+//     the server only with their capability, as with opamp-go: the core drops a status field whose
+//     capability isn't declared. The setters opamp-go refuses without it still say so.
 //   - An auth extension's headers are asked for at each HTTP request, and at each WebSocket
 //     upgrade.
 //   - Packages (with accepts_packages) are downloaded by the core; the collector itself, the
@@ -209,16 +210,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 			initial.EffectiveConfig = ec
 		}
 	}
-	// What the server isn't to be told: the core would declare the capability for it.
-	if !c.has(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) {
-		initial.Health = nil
-	}
-	if !c.has(protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig) {
-		initial.RemoteConfigStatus = nil
-	}
-	if !c.has(protobufs.AgentCapabilities_AgentCapabilities_ReportsAvailableComponents) {
-		initial.AvailableComponents = nil
-	}
+	// The core drops a field whose capability isn't declared.
 
 	c.uid = c.opened.InstanceUID()
 	started, err := c.opened.Start(initial, c.onNotification)
@@ -402,8 +394,8 @@ func (c *coreClient) SetHealth(health *protobufs.ComponentHealth) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.status.Health = health
-	// opamp-go sends it either way; the core would declare ReportsHealth for it.
-	if cl := c.running(); cl != nil && c.has(protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth) {
+	// Without ReportsHealth the core drops it.
+	if cl := c.running(); cl != nil {
 		cl.SetHealth(health)
 	}
 	return nil

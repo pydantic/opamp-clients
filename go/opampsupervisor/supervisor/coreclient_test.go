@@ -534,3 +534,37 @@ func TestSupervisorRefusesAMissingStateKey(t *testing.T) {
 	_, err := os.Stat(filepath.Join(dir, coreClientStateFile))
 	assert.ErrorIs(t, err, os.ErrNotExist)
 }
+
+// A status field whose capability the Supervisor doesn't declare never reaches the server, set
+// before Start or after: the core drops it (opamp-go would send health either way).
+func TestUndeclaredStatusNeverReachesTheServer(t *testing.T) {
+	ts := newCoreTestServer(t)
+	c := newCoreClient(zaptest.NewLogger(t), filepath.Join(t.TempDir(), coreClientStateFile), nil)
+	require.NoError(t, c.SetAgentDescription(&protobufs.AgentDescription{}))
+	health := &protobufs.ComponentHealth{Healthy: true, Status: "ok"}
+	require.NoError(t, c.SetHealth(health))
+	require.NoError(t, c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
+		LastRemoteConfigHash: []byte("h"), Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
+	}))
+	require.NoError(t, c.SetAvailableComponents(&protobufs.AvailableComponents{
+		Components: map[string]*protobufs.ComponentDetails{"receivers": {}},
+	}))
+	interval := 50 * time.Millisecond
+	require.NoError(t, c.Start(t.Context(), types.StartSettings{
+		OpAMPServerURL:    ts.url,
+		InstanceUid:       types.InstanceUid(uuid.MustParse("018fee23-4a51-7303-a441-73faed7d9deb")),
+		HeartbeatInterval: &interval,
+		Capabilities:      protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat,
+	}))
+	defer func() { assert.NoError(t, c.Stop(context.Background())) }()
+	ts.waitMsg("a first poll", func(*protobufs.AgentToServer) bool { return len(ts.msgs) >= 1 })
+	require.NoError(t, c.SetHealth(&protobufs.ComponentHealth{Healthy: false, Status: "down"}))
+	ts.waitMsg("a few more polls", func(*protobufs.AgentToServer) bool { return len(ts.msgs) >= 4 })
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	for i, m := range ts.msgs {
+		assert.Nil(t, m.GetHealth(), "message %d", i)
+		assert.Nil(t, m.GetRemoteConfigStatus(), "message %d", i)
+		assert.Nil(t, m.GetAvailableComponents(), "message %d", i)
+	}
+}
