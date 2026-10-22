@@ -90,7 +90,9 @@ public class ConnectionSettingsTests
         await RunAgent(server, "none", () => server.Caps.Count >= 2, "two messages");
         lock (server)
         {
-            Assert.All(server.Caps, c => Assert.Equal(0UL, c & TakesKeys));
+            // Without storage the core still declares ReportsConnectionSettingsStatus alone: it answers any
+            // offer FAILED. Only the Accepts bit says it takes a key.
+            Assert.All(server.Caps, c => Assert.Equal(0UL, c & (ulong)AgentCapabilities.AcceptsOpAmpconnectionSettings));
             Assert.All(server.Auth, a => Assert.Equal("Bearer enroll", a));
         }
     }

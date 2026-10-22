@@ -222,8 +222,10 @@ func TestWithoutAStateDirectoryNoKeyIsTaken(t *testing.T) {
 	stopAgent(t, a)
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	// Without storage the core still declares ReportsConnectionSettingsStatus alone: it answers any
+	// offer FAILED. Only the Accepts bit says it takes a key.
 	for i, c := range k.caps {
-		if c&takesKeys != 0 {
+		if c&uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings) != 0 {
 			t.Fatalf("message %d says it takes connection settings (%#x) with nowhere to keep them", i, c)
 		}
 	}

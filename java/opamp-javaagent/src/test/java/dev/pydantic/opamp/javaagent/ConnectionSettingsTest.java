@@ -193,7 +193,10 @@ class ConnectionSettingsTest {
       runAgent(server, dir, "no message reached the server", () -> server.caps.size() >= 2,
           "otel.opamp.state.dir", "none");
       synchronized (server) {
-        assertTrue(server.caps.stream().allMatch(c -> (c & TAKES_KEYS) == 0), server.caps.toString());
+        // Without storage the core still declares ReportsConnectionSettingsStatus alone: it answers any
+        // offer FAILED. Only the Accepts bit says it takes a key.
+        long accepts = Opamp.AgentCapabilities.AgentCapabilities_AcceptsOpAMPConnectionSettings_VALUE;
+        assertTrue(server.caps.stream().allMatch(c -> (c & accepts) == 0), server.caps.toString());
         assertTrue(server.auth.stream().allMatch("Bearer enroll"::equals), server.auth.toString());
       }
     }
