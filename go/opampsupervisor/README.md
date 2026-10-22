@@ -179,13 +179,18 @@ agent:
   server's first reply waits for the loop, and with no config to run the collector stays
   stopped.
 - A bootstrap that finds another instance UID reports the agent unhealthy, and fails.
+- **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
+  Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
+  a server chose. Set one in `agent.env` to pass it
+  ([Using the Supervisor](#using-the-supervisor)).
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
 - `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
-  `localserver.go`, `sdk_policy.go`, `config/remote_config_policy.go` and `verifier/cosign.go`, and the tests
+  `localserver.go`, `sdk_policy.go`, `config/remote_config_policy.go`, `commander/collector_env.go`
+  and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
 - `e2e_packages_test.go`, `e2e_policy_test.go`, `e2e_sdk_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
@@ -340,11 +345,24 @@ while `telemetry.resource.detection/development` is configured.
 
 The Supervisor's own OTLP exporters take their settings only from its
 `telemetry` config. `OTEL_EXPORTER_OTLP_*` environment variables (endpoint,
-insecure, certificates, headers and the rest) are ignored for them and still
-reach the Collector. Without this, an `http://` endpoint or
-`OTEL_EXPORTER_OTLP_INSECURE=true` in the environment would stop the Supervisor
-from starting with an `https` endpoint in its config. To take a value from the
-environment, use `${env:NAME}` in the config.
+insecure, certificates, headers and the rest) are ignored for them. Without
+this, an `http://` endpoint or `OTEL_EXPORTER_OTLP_INSECURE=true` in the
+environment would stop the Supervisor from starting with an `https` endpoint in
+its config. To take a value from the environment, use `${env:NAME}` in the
+config.
+
+The Collector doesn't inherit them either. The server can choose where the
+Collector sends its own telemetry, and the exporter for that reads these
+variables, so a header set on the host (`OTEL_EXPORTER_OTLP_HEADERS` with
+another backend's key, say) would go to the server's endpoint. To give the
+Collector one, move it from the Supervisor's environment to `agent.env`, which
+passes its variables as before:
+
+```yaml
+agent:
+  env:
+    OTEL_EXPORTER_OTLP_ENDPOINT: https://otlp.example.com
+```
 
 Visit [localhost:4321](http://localhost:4321) again to verify that your Collector appears in the Agents list.
 

@@ -65,6 +65,18 @@ jobs:
             echo "::error::sdk/v$version ($GITHUB_SHA) isn't on main"; exit 1
           fi
           echo "version=$version" >>"$GITHUB_OUTPUT"
+      # main may pin a core prerelease (X.Y.Z-dev.N) to take a core change before its release; a
+      # registry keeps what it is given for good, so a release waits for the core's own release.
+      - name: The core the lock pins is a release, not a prerelease
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          core=$(python3 -c 'import json; print(json.load(open("opamp-core.lock.json"))["version"])')
+          if [[ $core == *-* ]]; then
+            kind=error; [ "$EVENT" = pull_request ] && kind=warning
+            echo "::$kind::opamp-core.lock.json pins the core prerelease $core: lock the core's release before an SDK release"
+            [ "$kind" = warning ] || exit 1
+          fi
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"

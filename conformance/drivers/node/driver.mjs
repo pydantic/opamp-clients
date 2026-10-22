@@ -190,8 +190,18 @@ try {
       endpoint,
       // random (the default) or none: the client makes one up, as every driver lets it.
       instanceUid: uid,
+      // What the driver reports, declared: the client takes no status field whose bit isn't.
       capabilities:
-        BigInt(AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig) |
+        BigInt(
+          AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig |
+            AgentCapabilities.AgentCapabilities_ReportsRemoteConfig |
+            AgentCapabilities.AgentCapabilities_ReportsHeartbeat |
+            AgentCapabilities.AgentCapabilities_ReportsHealth |
+            AgentCapabilities.AgentCapabilities_ReportsEffectiveConfig,
+        ) |
+        (process.env.DRIVER_COMPONENTS === "1"
+          ? BigInt(AgentCapabilities.AgentCapabilities_ReportsAvailableComponents)
+          : 0n) |
         (process.env.DRIVER_OWN_TELEMETRY === "1"
           ? BigInt(
               AgentCapabilities.AgentCapabilities_ReportsOwnMetrics |

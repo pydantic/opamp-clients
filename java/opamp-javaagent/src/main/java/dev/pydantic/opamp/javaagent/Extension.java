@@ -850,7 +850,15 @@ final class Extension {
       return;
     }
     OpampClient.Config.Builder b = OpampClient.Config.builder(s.endpoint(), bytes(uid))
-        .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE);
+        // What the integration does and reports, declared: the client takes no status field
+        // whose bit isn't.
+        .capabilities(
+            Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsRemoteConfig_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsHeartbeat_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsHealth_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsEffectiveConfig_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsAvailableComponents_VALUE);
     s.headers().forEach(b::header);
     Duration heartbeat = s.heartbeat();
     if (!heartbeat.isZero()) {

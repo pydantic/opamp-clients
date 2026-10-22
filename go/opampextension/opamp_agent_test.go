@@ -651,6 +651,7 @@ func TestHealthReportingReceiveUpdateFromAggregator(t *testing.T) {
 		},
 		{
 			Healthy:            false,
+			StartTimeUnixNano:  uint64(now.UnixNano()), // Changed here: kept from the first healthy report.
 			Status:             "StatusPermanentError",
 			StatusTimeUnixNano: uint64(now.Add(1 * time.Second).UnixNano()),
 			LastError:          "error A",
@@ -665,6 +666,7 @@ func TestHealthReportingReceiveUpdateFromAggregator(t *testing.T) {
 		},
 		{
 			Healthy:            false,
+			StartTimeUnixNano:  uint64(now.UnixNano()), // Changed here: kept from the first healthy report.
 			Status:             "StatusPermanentError",
 			StatusTimeUnixNano: uint64(now.Add(2 * time.Second).UnixNano()),
 			LastError:          "error B",
@@ -679,6 +681,7 @@ func TestHealthReportingReceiveUpdateFromAggregator(t *testing.T) {
 		},
 		{
 			Healthy:            false,
+			StartTimeUnixNano:  uint64(now.UnixNano()), // Changed here: kept from the first healthy report.
 			Status:             "StatusPermanentError",
 			StatusTimeUnixNano: uint64(now.Add(4 * time.Second).UnixNano()),
 			LastError:          "exporter error",

@@ -29,8 +29,9 @@ var otlpExporterEnvMu sync.Mutex
 // what otelconf sets. otelconf never says "secure" for an https endpoint, so an http:// endpoint
 // or OTEL_EXPORTER_OTLP_INSECURE=true in the environment leaves an https exporter insecure as
 // well as TLS, and it fails to start; a certificate in the environment does the same to an
-// http endpoint. These variables are usually meant for the Collector, or set by the host, so the
-// Supervisor ignores them for its own telemetry and leaves them in place for the Collector.
+// http endpoint. These variables are usually set by the host for something else, so the
+// Supervisor ignores them for its own telemetry, and the Collector doesn't inherit them either
+// (commander/collector_env.go): agent.env passes one to the Collector.
 func withoutOTLPExporterEnv(logger *zap.Logger, build func() error) error {
 	otlpExporterEnvMu.Lock()
 	defer otlpExporterEnvMu.Unlock()
@@ -55,7 +56,7 @@ func withoutOTLPExporterEnv(logger *zap.Logger, build func() error) error {
 	}
 	sort.Strings(names)
 	// Only the names: the values can hold credentials (OTEL_EXPORTER_OTLP_HEADERS).
-	logger.Info("Environment variables are ignored for the Supervisor's own telemetry, which its telemetry config sets; they still reach the Collector",
+	logger.Info("Environment variables are ignored for the Supervisor's own telemetry, which its telemetry config sets; the Collector doesn't inherit them either (set one in agent.env to pass it)",
 		zap.Strings("env_vars", names))
 
 	defer func() {

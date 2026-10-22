@@ -103,10 +103,24 @@ public class Driver {
     // saved by an earlier run is handed over on its first step): it waits for the client.
     CompletableFuture<OpampClient> client = new CompletableFuture<>();
     String endpoint = System.getenv().getOrDefault("OPAMP_ENDPOINT", "");
+    // What the driver reports, declared: the client takes no status field whose bit isn't.
+    long capabilities = Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
+        | Opamp.AgentCapabilities.AgentCapabilities_ReportsRemoteConfig_VALUE
+        | Opamp.AgentCapabilities.AgentCapabilities_ReportsHeartbeat_VALUE
+        | Opamp.AgentCapabilities.AgentCapabilities_ReportsHealth_VALUE
+        | Opamp.AgentCapabilities.AgentCapabilities_ReportsEffectiveConfig_VALUE;
+    if ("1".equals(System.getenv("DRIVER_COMPONENTS"))) {
+      capabilities |= Opamp.AgentCapabilities.AgentCapabilities_ReportsAvailableComponents_VALUE;
+    }
+    if ("1".equals(System.getenv("DRIVER_OWN_TELEMETRY"))) {
+      capabilities |= Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnMetrics_VALUE
+          | Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnTraces_VALUE
+          | Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnLogs_VALUE;
+    }
     OpampClient.Config.Builder builder = (uid == null
         ? OpampClient.Config.builder(endpoint)
         : OpampClient.Config.builder(endpoint, uid))
-        .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
+        .capabilities(capabilities)
         .heartbeatInterval(Duration.ofMillis((long) (envDouble("DRIVER_POLL_S", 2) * 1000)))
         .mode(platform ? OpampClient.Mode.PLATFORM : OpampClient.Mode.CORE);
     String maxSend = System.getenv().getOrDefault("DRIVER_MAX_SEND_BYTES", "");
@@ -148,12 +162,6 @@ public class Driver {
     builder.acceptConnectionSettings("1".equals(System.getenv("DRIVER_ACCEPT_CONNECTION_SETTINGS")));
     builder.acceptPackages("1".equals(System.getenv("DRIVER_PACKAGES")));
     builder.requestInstanceUid("1".equals(System.getenv("DRIVER_REQUEST_UID")));
-    if ("1".equals(System.getenv("DRIVER_OWN_TELEMETRY"))) {
-      builder.capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
-          | Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnMetrics_VALUE
-          | Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnTraces_VALUE
-          | Opamp.AgentCapabilities.AgentCapabilities_ReportsOwnLogs_VALUE);
-    }
     OpampClient.Config config = builder.build();
     // DRIVER_THROW_ON_CONFIG: the callback itself throws on the first remote config (RULE-SHELL-02).
     boolean throwOnConfig = "1".equals(System.getenv("DRIVER_THROW_ON_CONFIG"));
