@@ -25,7 +25,8 @@
 //
 // With EXAMPLE_PROBE=1 (integrations.py's run 3) each tick also probes redaction: a span of its own,
 // example.probe, with the URL it requests (url.full) on an event and on a link to the tick
-// before's probe, and a log line example.probe with that URL. It probes before or after the request,
+// before's probe, and a log line example.probe with that URL; each with a note (example.note) that
+// says password, for scrubbing to replace. It probes before or after the request,
 // at random: under a rate limit of one a second, the first record after the token comes takes it,
 // and in a fixed order the probe might never be that one.
 package main
@@ -144,11 +145,15 @@ func main() {
 	}
 }
 
+// note is what the probe carries beside its URL (example.note): it says password, so scrubbing's
+// default patterns replace it.
+const note = "the password is p4ss"
+
 // probe makes a span of its own with url on an event and on a link to last (none while last is
-// the zero value), and a log line with url: what redaction may drop or mask. It returns the span's
-// context, for the next probe to link to.
+// the zero value), and a log line with url: what redaction may drop or mask. Each carries note too,
+// which scrubbing replaces. It returns the span's context, for the next probe to link to.
 func probe(ctx context.Context, logger *slog.Logger, url string, last trace.SpanContext) trace.SpanContext {
-	attrs := []attribute.KeyValue{attribute.String("url.full", url)}
+	attrs := []attribute.KeyValue{attribute.String("url.full", url), attribute.String("example.note", note)}
 	var opts []trace.SpanStartOption
 	if last.IsValid() {
 		opts = append(opts, trace.WithLinks(trace.Link{SpanContext: last, Attributes: attrs}))
@@ -156,7 +161,7 @@ func probe(ctx context.Context, logger *slog.Logger, url string, last trace.Span
 	_, span := otel.Tracer("app").Start(ctx, "example.probe", opts...)
 	span.AddEvent("example.probe", trace.WithAttributes(attrs...))
 	span.End()
-	logger.InfoContext(ctx, "example.probe", "url.full", url)
+	logger.InfoContext(ctx, "example.probe", "url.full", url, "example.note", note)
 	return span.SpanContext()
 }
 

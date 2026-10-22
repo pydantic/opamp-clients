@@ -31,10 +31,11 @@ check_signals runs two more, with a state directory of their own and metrics and
 (the application writes a log line per request). In run 3 the application also probes redaction
 (EXAMPLE_PROBE=1): each round a span of its own, `example.probe`, carrying the URL it requests
 (url.full) on an event and on a link to the round before's, and a log record with that URL whose
-body names the probe. The sink reports each probe's URL as it arrived (`probes`, null once dropped).
+body names the probe; each with a note beside the URL (example.note, "the password is p4ss"). The
+sink reports each probe's URL as it arrived (`probes`, null once dropped), and its note.
 Run 3, the policies, in the order the server offers them:
-  1. head_sampling 1: APPLIED; spans, metrics and log records arrive, and the probes' URLs as they
-     are;
+  1. head_sampling 1: APPLIED; spans, metrics and log records arrive, and the probes' URLs and
+     notes as they are;
   2. signal_exports.metrics and signal_exports.logs off: APPLIED; no metrics or log records after
      it, while spans go on;
   3. head_sampling 0.25: APPLIED; metrics and log records come again (local, so the SDK's own
@@ -54,13 +55,14 @@ Run 3, the policies, in the order the server offers them:
      its HTTP client's, a root span of kind client), and log_levels scopes switching off the
      application's loggers (app*: app and app.noisy; rust_otel_example*, Rust's target): APPLIED;
      none of the requests traced, and about no log record a request;
-  7. head_sampling 1, attribute_redaction mask url.full and http.url: APPLIED; spans again (the
-     rules local), each URL [REDACTED] in the sink (which names a span by its URL, else its name),
-     on the probe's span events, links and log records too, and the log lines again (the scopes
-     local);
+  7. head_sampling 1, attribute_redaction mask url.full and http.url, scrubbing defaults: APPLIED;
+     spans again (the rules local), each URL [REDACTED] in the sink (which names a span by its URL,
+     else its name), on the probe's span events, links and log records too, each note there
+     [Scrubbed due to 'password'], and the log lines again (the scopes local);
   8. head_sampling 1, attribute_redaction drop URL.FULL and Http.Url (keys match ignoring case),
      trace_rate_limit 1, log_rate_limit 1: APPLIED; spans arrive, none named by a URL or
-     [REDACTED], and the probe's events, links and log records arrive without one; about a span
+     [REDACTED], and the probe's events, links and log records arrive without one, their notes as
+     they are again (scrubbing local, off); about a span
      and a log record a second, of some five requests a second;
   9. instrumentations all_disabled: APPLIED (where it takes effect at once, no span but the
      probe's, which no instrumentation makes).
@@ -233,7 +235,7 @@ POLICY_V1 = "logfire-sdk-policy/v1"
 _SIGNALS = ("traces", "metrics", "logs")
 # The controls a policy may leave out (as local).
 _MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
-                "app_settings", "instrumentations")
+                "app_settings", "instrumentations", "scrubbing")
 
 
 def policy(overrides: dict[str, dict], every: bool | None = None) -> str:
@@ -309,7 +311,8 @@ def signals_scenario(gap: int = 25) -> dict:
         offer(1 + 4 * gap, {"head_sampling": {"ratio": 0}, "debug": {"until": f"{{now+{DEBUG}s}}"}}),
         offer(1 + 6 * gap, {"head_sampling": {"ratio": 1}, "sampling_rules": {"rules": [{"rate": 0, "kind": "client"}]},
                             "log_levels": {"scopes": {"app*": "off", "rust_otel_example*": "off"}}}),
-        offer(1 + 7 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["url.full", "http.url"]}}),
+        offer(1 + 7 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["url.full", "http.url"]},
+                            "scrubbing": {"defaults": True}}),
         offer(1 + 8 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"drop": ["URL.FULL", "Http.Url"]},
                             "trace_rate_limit": {"traces_per_second": 1}, "log_rate_limit": {"records_per_second": 1}}),
         offer(1 + 9 * gap, {"instrumentations": {"all_disabled": True}}),
@@ -826,19 +829,26 @@ def judge_telemetry_settings(three: list[dict], t6: float, t7: float, t8: float,
     return out
 
 
-def probes(events: list[dict], place: str, after: float, before: float) -> list[str | None]:
-    """The URLs of the probes in `place` (`event`, `link`, `log`) that arrived between `after` and
-    `before`, as the sink saw them: None where there was none."""
-    return [p.get("url") for e in events if e["event"] == "otlp" and after < e["t"] < before
+def probes(events: list[dict], place: str, after: float, before: float, key: str = "url") -> list[str | None]:
+    """The URLs (or with `key` "note", the notes) of the probes in `place` (`event`, `link`, `log`)
+    that arrived between `after` and `before`, as the sink saw them: None where there was none."""
+    return [p.get(key) for e in events if e["event"] == "otlp" and after < e["t"] < before
             for p in e.get("probes") or [] if p.get("in") == place]
 
 
+#: What each example application's probe carries beside its URL (example.note), and what
+#: scrubbing's default patterns make of it.
+NOTE = "the password is p4ss"
+SCRUBBED_NOTE = "[Scrubbed due to 'password']"
+
+
 def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tuple[str, bool]]:
-    """Redaction beyond span attributes: the probe's span events, links and log records carry
-    their URL before any redaction (step 1, APPLIED first, until the logs export goes off), each
-    [REDACTED] under the mask (APPLIED at t7) and none under the drop (t8, until `end`).
-    Redaction is at export: a probe counts for a step when it arrived MARGIN after it was APPLIED
-    and before the next was offered."""
+    """Redaction and scrubbing beyond span attributes: the probe's span events, links and log
+    records carry their URL and note before any redaction (step 1, APPLIED first, until the logs
+    export goes off), each URL [REDACTED] and each note scrubbed under the mask and scrubbing
+    defaults (APPLIED at t7), and no URL but the note as it is under the drop (t8, until `end`).
+    Both are at export: a probe counts for a step when it arrived MARGIN after it was APPLIED and
+    before the next was offered."""
     out = []
     st = statuses(three)
     t1, t2 = st[0][0], st[1][0]
@@ -854,6 +864,12 @@ def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tu
         out.append((f"attribute_redaction drop: the probe's {name} arrive without a URL "
                     f"({len(dropped)}, {sorted(set(map(str, dropped)))[:3]})",
                     bool(dropped) and all(u is None for u in dropped)))
+        notes = [probes(three, place, a, b, "note") for a, b in
+                 ((t1 + MARGIN, offered_before(three, t2)), (t7 + MARGIN, offered_before(three, t8)), (t8 + MARGIN, end))]
+        for (what, want), got in zip(((f"the probe's {name} carry the note", NOTE),
+                                      (f"scrubbing defaults: the note on the probe's {name} scrubbed", SCRUBBED_NOTE),
+                                      (f"scrubbing local: the note on the probe's {name} as it is", NOTE)), notes):
+            out.append((f"{what} ({len(got)}, {sorted(set(map(str, got)))[:3]})", bool(got) and all(n == want for n in got)))
     return out
 
 

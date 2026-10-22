@@ -16,7 +16,8 @@ until the server says, the flag is its default, ``off``.
 
 With EXAMPLE_PROBE=1 (integrations.py's run 3) each round also probes redaction: a span of its own,
 ``example.probe``, with the URL it requests (url.full) on an event and on a link to the round
-before's probe, and a log record ``example.probe`` with that URL. It probes before or after the
+before's probe, and a log record ``example.probe`` with that URL; each with a note
+(example.note) that says password, for scrubbing to replace. It probes before or after the
 request, at random: under a rate limit of one a second, the first record after the token comes
 takes it, and in a fixed order the probe might never be that one."""
 
@@ -51,11 +52,16 @@ changes: queue.SimpleQueue = queue.SimpleQueue()
 app_settings.on_change(lambda settings, changed: changes.put(sorted(changed)))
 
 
+#: What the probe carries beside its URL (example.note): it says password, so scrubbing's default
+#: patterns replace it.
+NOTE = "the password is p4ss"
+
+
 def probe(url: str) -> None:
     """A span of its own with `url` on an event and on a link to the last probe, and a log record
-    with `url`: what redaction may drop or mask."""
+    with `url`: what redaction may drop or mask. Each carries NOTE too, which scrubbing replaces."""
     global last
-    attributes = {"url.full": url}
+    attributes = {"url.full": url, "example.note": NOTE}
     links = [trace.Link(last, attributes)] if last else []
     with tracer.start_as_current_span("example.probe", links=links) as span:
         span.add_event("example.probe", attributes)
