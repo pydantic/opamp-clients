@@ -7,7 +7,7 @@ replace github.com/pydantic/opamp-clients/go => ../
 require (
 	github.com/google/uuid v1.6.0
 	github.com/open-telemetry/opamp-go v0.24.0
-	github.com/pydantic/opamp-clients/go v0.1.0
+	github.com/pydantic/opamp-clients/go v0.2.0
 	go.opentelemetry.io/contrib/exporters/autoexport v0.71.0
 	go.opentelemetry.io/contrib/propagators/autoprop v0.71.0
 	go.opentelemetry.io/otel v1.46.0
