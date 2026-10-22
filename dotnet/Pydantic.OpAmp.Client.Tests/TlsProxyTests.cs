@@ -308,6 +308,7 @@ public class TlsProxyTests
                 Endpoint = new Uri(server.Endpoint(transport).Replace("127.0.0.1", "server.test", StringComparison.Ordinal)),
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
+                Capabilities = (ulong)global::OpAmp.Proto.V1.AgentCapabilities.ReportsHeartbeat,
                 Proxy = new UriBuilder(via.Url) { Scheme = scheme }.Uri,
                 ProxyResolveLocally = true,
                 Mode = OpAmpMode.Core,
@@ -395,6 +396,7 @@ public class TlsProxyTests
                 Endpoint = new Uri(server.Endpoint(transport)),
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
+                Capabilities = (ulong)global::OpAmp.Proto.V1.AgentCapabilities.ReportsHeartbeat,
                 HttpClient = app,
             },
             new OpAmpStatus(),
@@ -462,6 +464,7 @@ public class TlsProxyTests
                 Endpoint = new Uri(endpoint),
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
+                Capabilities = (ulong)global::OpAmp.Proto.V1.AgentCapabilities.ReportsHeartbeat,
                 Tls = tls,
                 Proxy = proxy,
                 DirectConnection = proxy is null && mode == OpAmpMode.Core, // the environment's proxies aren't the test's

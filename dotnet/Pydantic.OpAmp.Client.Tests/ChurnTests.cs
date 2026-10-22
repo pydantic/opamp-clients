@@ -113,7 +113,7 @@ public class ChurnTests
             var stopping = new TaskCompletionSource<Task>(TaskCreationOptions.RunContinuationsAsynchronously);
             OpAmpClient? client = null;
             client = OpAmpClient.Start(
-                Options(mode, server.Endpoint(transport)) with { Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig },
+                Options(mode, server.Endpoint(transport)) with { Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsHeartbeat) },
                 new OpAmpStatus(),
                 n =>
                 {
@@ -149,7 +149,7 @@ public class ChurnTests
             {
                 var told = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var client = OpAmpClient.Start(
-                    Options(mode, server.Endpoint(transport)) with { StateFile = state, Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig },
+                    Options(mode, server.Endpoint(transport)) with { StateFile = state, Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsHeartbeat) },
                     new OpAmpStatus(),
                     n =>
                     {
@@ -184,7 +184,7 @@ public class ChurnTests
         {
             var stopped = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var client = OpAmpClient.Start(
-                Options(mode, server.Endpoint(transport)) with { Capabilities = (ulong)AgentCapabilities.AcceptsRemoteConfig },
+                Options(mode, server.Endpoint(transport)) with { Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsHeartbeat) },
                 new OpAmpStatus(),
                 n =>
                 {
@@ -208,6 +208,7 @@ public class ChurnTests
         Endpoint = new Uri(endpoint),
         InstanceUid = new byte[16],
         HeartbeatInterval = TimeSpan.FromMilliseconds(50),
+        Capabilities = (ulong)AgentCapabilities.ReportsHeartbeat,
 
         // Longer than the counts are waited for: anything armed for the stop timeout and left
         // armed after the stop is still there to count.

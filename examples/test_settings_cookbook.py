@@ -27,7 +27,8 @@ SIGNALS = ("traces", "metrics", "logs")
 # The controls every policy sends, then every control.
 V1_CONTROLS = ("head_sampling", "signal_exports")
 ALL_CONTROLS = V1_CONTROLS + ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit",
-                             "attribute_redaction", "debug", "app_settings", "instrumentations")
+                             "attribute_redaction", "debug", "app_settings", "instrumentations",
+                             "scrubbing")
 # The controls every policy sends, a signal's export as `signal_exports.logs`.
 V1_OVERRIDES = {"head_sampling", *(f"signal_exports.{s}" for s in SIGNALS)}
 

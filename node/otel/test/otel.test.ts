@@ -78,14 +78,14 @@ const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv({})).setting
 // Every setting (docs/sdk-settings.md), and those a host built from `env` doesn't declare.
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
   "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
-  "sampling_rules", "sampling_traces_per_second", "send_logs", "send_logs_level", "send_logs_level_by_scope",
-  "send_logs_per_second", "send_metrics", "send_traces"];
+  "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns", "send_logs",
+  "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"];
 const undeclared = (env: NodeJS.ProcessEnv) => {
   const host = hostFromEnv(env);
   return SETTINGS.filter((k) => !host.live!.includes(k));
 };
-const LOG_GATE = ["debug_send_logs_level", "drop_attributes", "mask_attributes", "send_logs", "send_logs_level",
-  "send_logs_level_by_scope", "send_logs_per_second"];
+const LOG_GATE = ["debug_send_logs_level", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns",
+  "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second"];
 const config = (body: string) => policyConfig(body, body);
 /** The controls the agent's effective config reports overridden. */
 const effective = (a: Agent) => overridden(a.effective);
@@ -396,7 +396,8 @@ test("a signal whose exporter NodeSDK builds, ungated, isn't carried out: a poli
   assert.deepEqual(undeclared({ OTEL_METRICS_EXPORTER: "otlp,prometheus" }), ["send_metrics"]);
   // What the log gate holds is carried out where send_logs is, so none of it is where send_logs isn't.
   assert.deepEqual(undeclared({ OTEL_LOGS_EXPORTER: "otlp,custom" }), LOG_GATE);
-  assert.deepEqual(undeclared({ OTEL_TRACES_EXPORTER: "zipkin" }), ["drop_attributes", "mask_attributes", "send_traces"]);
+  assert.deepEqual(undeclared({ OTEL_TRACES_EXPORTER: "zipkin" }), ["drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns",
+    "send_traces"]);
   const ungated = prepared(mkdtempSync(join(tmpdir(), "opamp-otel-")), { OTEL_LOGS_EXPORTER: "custom" }).agent;
   const level = ungated.remoteConfig(config(policy({ log_levels: { level: "error" } })));
   assert.equal(level.errorMessage, "log_levels: level: this SDK cannot apply the requested override");

@@ -31,6 +31,7 @@ import { SdkSettings, type Settings } from "@pydantic/opamp-client/sdk";
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
 import { Agent, Controls, glob, HEALTH_EVERY_MS, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
+import { Scrubbing } from "../src/scrub.js";
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
@@ -447,6 +448,139 @@ test("globs: * alone, leading, trailing, **, the empty pattern, by characters", 
     ["x*y", "x😀y", true], ["x?y", "x😀y", false],
   ];
   for (const [p, t, want] of cases) assert.equal(glob(p, t), want, `${p} ~ ${t}`);
+});
+
+// --- scrub_defaults and scrub_patterns ----------------------------------------------------------
+
+/** A vector's log body: a string (or another typed value), or a map of members (maps nested). */
+type VectorBody = Partial<VectorAttribute> & { map?: VectorBody[] };
+
+function bodyValue(b: VectorBody): unknown {
+  if (b.map) return Object.fromEntries(b.map.map((m) => [m.key, bodyValue(m)]));
+  return value(b as VectorAttribute);
+}
+
+interface ScrubCase extends RedactCase {
+  body?: VectorBody;
+  want_body?: VectorBody;
+}
+
+test("vectors: scrub.json, on a span's, its event's and link's, a log record's attributes, and its body", () => {
+  const cases = vectors<ScrubCase>("scrub");
+  for (const k of cases) {
+    const c = new Controls();
+    c.apply(settings(k.settings));
+    const input: Attributes = Object.fromEntries(k.attributes.map((a) => [a.key, value(a)]));
+    const want = k.want.map((a) => [a.key, value(a)]);
+    assert.deepEqual(Object.entries(c.redaction.attributes(input)), want, k.name);
+    const { gated, plain, tracer } = tracing(c);
+    const link = { context: { traceId: "1".repeat(32), spanId: "2".repeat(16), traceFlags: 1 }, attributes: input };
+    const span = tracer.startSpan("s", { attributes: input, links: [link] });
+    span.addEvent("e", input);
+    span.end();
+    const [exported] = gated.getFinishedSpans();
+    for (const got of [exported!.attributes, exported!.events[0]!.attributes ?? {}, exported!.links[0]!.attributes ?? {}]) {
+      assert.deepEqual(Object.entries(got), want, k.name);
+    }
+    assert.deepEqual(Object.entries(plain.getFinishedSpans()[0]!.attributes), Object.entries(input), k.name);
+    const { gated: logs, plain: plainLogs, logger } = logging(c);
+    const body = k.body ? bodyValue(k.body) : "b";
+    logger.emit({ severityNumber: 9, body: body as never, attributes: input });
+    const [record] = logs.getFinishedLogRecords();
+    assert.deepEqual(Object.entries(record!.attributes), want, k.name);
+    assert.deepEqual(record!.body, k.body ? bodyValue(k.want_body!) : "b", k.name);
+    assert.deepEqual(plainLogs.getFinishedLogRecords()[0]!.body, body, k.name);
+  }
+  if (!RANDOM) assert.ok(cases.length >= 30, `${cases.length} cases: scrub.json was cut short`);
+});
+
+test("scrubbing, live: on at once, changed, off again when left out; other exporters see the application's own", () => {
+  const c = new Controls();
+  const { gated, plain, tracer } = tracing(c);
+  const asIs = { api_key: "k1", note: "my secret is x", iban: "DE89" };
+  const span = () => {
+    tracer.startSpan("s", { attributes: asIs }).end();
+    const got = gated.getFinishedSpans().at(-1)!.attributes;
+    assert.deepEqual(plain.getFinishedSpans().at(-1)!.attributes, asIs);
+    return got;
+  };
+  assert.deepEqual(span(), asIs);
+  c.apply(settings({ scrubbing: { defaults: true } }));
+  assert.deepEqual(span(), { api_key: "[Scrubbed due to 'api_key']", note: "[Scrubbed due to 'secret']", iban: "DE89" });
+  c.apply(settings({ scrubbing: { patterns: ["IBAN"] } }));
+  assert.deepEqual(span(), { ...asIs, iban: "[Scrubbed due to 'iban']" });
+  c.apply(settings({}));
+  assert.equal(c.redaction.on, false);
+  assert.deepEqual(span(), asIs);
+
+  // A map body: each member as an attribute; a list's strings one by one, its other items kept.
+  c.apply(settings({ scrubbing: { defaults: true } }));
+  const { gated: logs, plain: plainLogs, logger } = logging(c);
+  const body = { token: "t", cookie: "c", lines: ["wrong password", 3] };
+  logger.emit({ body: body as never });
+  assert.deepEqual(logs.getFinishedLogRecords()[0]!.body,
+    { token: "t", cookie: "[Scrubbed due to 'cookie']", lines: ["[Scrubbed due to 'password']", 3] });
+  assert.deepEqual(plainLogs.getFinishedLogRecords()[0]!.body, body);
+  assert.deepEqual(body, { token: "t", cookie: "c", lines: ["wrong password", 3] });
+});
+
+test("scrubbing: nothing scrubbed, the span itself; a scrubbed log record keeps the rest, as the OTLP exporter writes it", () => {
+  const c = new Controls();
+  c.apply(settings({ scrubbing: { defaults: true, patterns: ["*iban*"] } }));
+  const out = sink<object>();
+  const span = { attributes: { plain: "v" }, events: [], links: [] } as never;
+  c.spans(out as never).export([span], () => {});
+  assert.equal(out.got[0]![0], span);
+  const { gated, logger } = logging(c);
+  const parent = trace.wrapSpanContext({ traceId: "a".repeat(32), spanId: "b".repeat(16), traceFlags: 1 });
+  logger.emit({ severityNumber: 13, severityText: "WARN", body: "iban GB82", attributes: { secret: "s", n: 1 },
+    context: trace.setSpan(ROOT_CONTEXT, parent) });
+  const [exported] = gated.getFinishedLogRecords();
+  const wire = JSON.parse(new TextDecoder().decode(JsonLogsSerializer.serializeRequest([exported!])));
+  const otlp = wire.resourceLogs[0].scopeLogs[0].logRecords[0];
+  assert.deepEqual([otlp.severityNumber, otlp.severityText, otlp.traceId, otlp.body.stringValue],
+    [13, "WARN", "a".repeat(32), "[Scrubbed due to '*iban*']"]);
+  assert.deepEqual(otlp.attributes.map((a: { key: string; value: { stringValue?: string } }) => [a.key, a.value.stringValue]),
+    [["secret", "[Scrubbed due to 'secret']"], ["n", undefined]]);
+});
+
+test("scrubbing: the default patterns at their edges", () => {
+  const s = new Scrubbing(true);
+  const cases: [string, string | undefined][] = [
+    ["", undefined], ["password", undefined], ["a password", "password"], ["PassWord!", "PassWord"],
+    ["author", undefined], ["authors", undefined], ["authorx", "auth"], ["auth", undefined], ["oauth x", "auth"],
+    ["authors_x", "auth"], ["api_key=1", "api_key"], ["api  key", undefined], ["apikey!", "apikey"],
+    ["my_jwt_", "_jwt_"], ["xjwt", undefined], ["jwt_x", "jwt_"], ["pylf_v1_x", "pylf_v1_"], ["pylf_v_", undefined],
+    ["\u017fecret!", "\u017fecret"], ["api\u212aey!", "api\u212aey"], ["\u0130 \u00e9ssn", "ssn"], ["k\u00e9jwt\u00e9", "jwt"],
+    ["x \u{1F600}secret", "secret"], ["session cookie", "session"],
+  ];
+  for (const [text, match] of cases) {
+    assert.equal(s.text(text), match === undefined ? undefined : `[Scrubbed due to '${match}']`, JSON.stringify(text));
+  }
+  assert.deepEqual(s.key("Exception.Message"), { values: true });
+  assert.deepEqual(s.key("exception.message"), { keep: true });
+  assert.deepEqual(new Scrubbing(false, ["*"]).key("url.full"), { keep: true });
+  assert.deepEqual(new Scrubbing().key("password"), { keep: true });
+  assert.deepEqual(new Scrubbing(false, ["acct-*"]).value("x", ["ACCT-1", 2, true]), ["[Scrubbed due to 'acct-*']", 2, true]);
+  // A map without a prototype (Object.create(null)) is a map all the same: the OTLP exporter writes its members.
+  const bare: { [key: string]: unknown } = Object.create(null);
+  bare.password = "p4ss";
+  bare.note = "the secret is out";
+  bare.ok = "fine";
+  assert.deepEqual({ ...(s.value(undefined, bare) as object) },
+    { password: "[Scrubbed due to 'password']", note: "[Scrubbed due to 'secret']", ok: "fine" });
+  assert.equal(bare.password, "p4ss");
+});
+
+test("scrubbing is declared where redaction is", () => {
+  for (const env of [{}, { OTEL_LOGS_EXPORTER: "custom" }, { OTEL_TRACES_EXPORTER: "zipkin" }]) {
+    const live = hostFromEnv(env).live!;
+    assert.equal(live.includes("scrub_defaults"), live.includes("drop_attributes"), JSON.stringify(env));
+    assert.equal(live.includes("scrub_patterns"), live.includes("drop_attributes"), JSON.stringify(env));
+  }
+  const d = LAYER.decide(config({ scrubbing: { defaults: true } }), EMPTY, EMPTY, hostFromEnv({ OTEL_LOGS_EXPORTER: "custom" }), 0n);
+  assert.match(d.status?.errorMessage ?? "", /^scrubbing: /);
+  assert.equal(d.apply, undefined);
 });
 
 // --- sampling_rules and sampling_traces_per_second ---------------------------------------------

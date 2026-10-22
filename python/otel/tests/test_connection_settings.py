@@ -158,7 +158,9 @@ def test_without_a_state_directory_the_agent_doesnt_say_it_takes_connection_sett
         server.wait(lambda: len(server.caps) >= 2)
     finally:
         agent.stop()
-    assert all(c & TAKES_KEYS == 0 for c in server.caps)
+    # Without storage the core still declares ReportsConnectionSettingsStatus alone: it answers any
+    # offer FAILED. Only the Accepts bit says it takes a key.
+    assert all(c & opamp_pb2.AgentCapabilities_AcceptsOpAMPConnectionSettings == 0 for c in server.caps)
     assert all(a == "Bearer enroll" for a in server.auth)
 
 

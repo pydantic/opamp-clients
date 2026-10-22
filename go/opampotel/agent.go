@@ -57,6 +57,8 @@ var carried = []string{
 	"send_logs_per_second",
 	"drop_attributes",
 	"mask_attributes",
+	"scrub_defaults",
+	"scrub_patterns",
 	"debug_until",
 	"debug_sampling_rate",
 	"debug_send_logs_level",

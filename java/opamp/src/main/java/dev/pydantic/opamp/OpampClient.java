@@ -170,8 +170,10 @@ public final class OpampClient {
       }
 
       /**
-       * Capabilities the agent supports (AgentCapabilities bits). ReportsStatus and
-       * ReportsHeartbeat are always added, and the Reports* bits for status you set.
+       * Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
+       * always added, and the core adds the bits of what it does itself (packages, connection
+       * settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+       * set: a status whose bit isn't declared isn't sent.
        */
       public Builder capabilities(long capabilities) {
         this.capabilities = capabilities;

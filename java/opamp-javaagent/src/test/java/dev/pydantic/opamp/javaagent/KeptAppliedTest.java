@@ -141,7 +141,7 @@ class KeptAppliedTest {
       }
       assertEquals("logfire-sdk-policy/v1", attrs.get("logfire.opamp.config_format"));
       assertEquals("head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
-          + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,instrumentations",
+          + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,instrumentations,scrubbing",
           attrs.get("logfire.opamp.supported_controls"));
     }
   }

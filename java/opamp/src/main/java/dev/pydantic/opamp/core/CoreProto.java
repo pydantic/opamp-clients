@@ -12,6 +12,137 @@ public final class CoreProto {
       com.google.protobuf.ExtensionRegistryLite registry) {
   }
   /**
+   * <pre>
+   * How an installation or a removal failed.
+   * </pre>
+   *
+   * Protobuf enum {@code opamp.core.v1.PackageFailure}
+   */
+  public enum PackageFailure
+      implements com.google.protobuf.Internal.EnumLite {
+    /**
+     * <pre>
+     * For good, leaving what was there: not tried again until another version is offered (or the
+     * package is offered and dropped again).
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_FINAL = 0;</code>
+     */
+    PACKAGE_FAILURE_FINAL(0),
+    /**
+     * <pre>
+     * For now, leaving what was there (an outage, a timeout): tried again after a wait, and not
+     * reported failed meanwhile.
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_LATER = 1;</code>
+     */
+    PACKAGE_FAILURE_LATER(1),
+    /**
+     * <pre>
+     * For good, and what was left is unknown: the package is uncertain from then on.
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_UNKNOWN = 2;</code>
+     */
+    PACKAGE_FAILURE_UNKNOWN(2),
+    UNRECOGNIZED(-1),
+    ;
+
+    /**
+     * <pre>
+     * For good, leaving what was there: not tried again until another version is offered (or the
+     * package is offered and dropped again).
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_FINAL = 0;</code>
+     */
+    public static final int PACKAGE_FAILURE_FINAL_VALUE = 0;
+    /**
+     * <pre>
+     * For now, leaving what was there (an outage, a timeout): tried again after a wait, and not
+     * reported failed meanwhile.
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_LATER = 1;</code>
+     */
+    public static final int PACKAGE_FAILURE_LATER_VALUE = 1;
+    /**
+     * <pre>
+     * For good, and what was left is unknown: the package is uncertain from then on.
+     * </pre>
+     *
+     * <code>PACKAGE_FAILURE_UNKNOWN = 2;</code>
+     */
+    public static final int PACKAGE_FAILURE_UNKNOWN_VALUE = 2;
+
+
+    @java.lang.Override
+    public final int getNumber() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalArgumentException(
+            "Can't get the number of an unknown enum value.");
+      }
+      return value;
+    }
+
+    /**
+     * @param value The number of the enum to look for.
+     * @return The enum associated with the given number.
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static PackageFailure valueOf(int value) {
+      return forNumber(value);
+    }
+
+    public static PackageFailure forNumber(int value) {
+      switch (value) {
+        case 0: return PACKAGE_FAILURE_FINAL;
+        case 1: return PACKAGE_FAILURE_LATER;
+        case 2: return PACKAGE_FAILURE_UNKNOWN;
+        default: return null;
+      }
+    }
+
+    public static com.google.protobuf.Internal.EnumLiteMap<PackageFailure>
+        internalGetValueMap() {
+      return internalValueMap;
+    }
+    private static final com.google.protobuf.Internal.EnumLiteMap<
+        PackageFailure> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<PackageFailure>() {
+            @java.lang.Override
+            public PackageFailure findValueByNumber(int number) {
+              return PackageFailure.forNumber(number);
+            }
+          };
+
+    public static com.google.protobuf.Internal.EnumVerifier 
+        internalGetVerifier() {
+      return PackageFailureVerifier.INSTANCE;
+    }
+
+    private static final class PackageFailureVerifier implements 
+         com.google.protobuf.Internal.EnumVerifier { 
+            static final com.google.protobuf.Internal.EnumVerifier
+                INSTANCE = new PackageFailureVerifier();
+            @java.lang.Override
+            public boolean isInRange(int number) {
+              return PackageFailure.forNumber(number) != null;
+            }
+          };
+
+    private final int value;
+
+    private PackageFailure(int value) {
+      this.value = value;
+    }
+
+    // @@protoc_insertion_point(enum_scope:opamp.core.v1.PackageFailure)
+  }
+
+  /**
    * Protobuf enum {@code opamp.core.v1.StatusField}
    */
   public enum StatusField
@@ -428,6 +559,17 @@ public final class CoreProto {
     com.google.protobuf.ByteString getInstanceUid();
 
     /**
+     * <pre>
+     * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+     * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+     * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+     * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+     * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+     * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+     * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+     * given here, they are dropped.
+     * </pre>
+     *
      * <code>uint64 capabilities = 3;</code>
      * @return The capabilities.
      */
@@ -644,7 +786,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+     * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
      * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
      * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
      * and carries out cancel for saves and downloads.
@@ -732,29 +874,6 @@ public final class CoreProto {
      * @return The proxy.
      */
     dev.pydantic.opamp.core.CoreProto.ProxyChoice getProxy();
-
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     * @return Whether the reportsHeartbeat field is set.
-     */
-    boolean hasReportsHeartbeat();
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     * @return The reportsHeartbeat.
-     */
-    boolean getReportsHeartbeat();
   }
   /**
    * <pre>
@@ -823,6 +942,17 @@ public final class CoreProto {
     public static final int CAPABILITIES_FIELD_NUMBER = 3;
     private long capabilities_;
     /**
+     * <pre>
+     * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+     * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+     * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+     * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+     * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+     * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+     * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+     * given here, they are dropped.
+     * </pre>
+     *
      * <code>uint64 capabilities = 3;</code>
      * @return The capabilities.
      */
@@ -831,6 +961,17 @@ public final class CoreProto {
       return capabilities_;
     }
     /**
+     * <pre>
+     * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+     * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+     * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+     * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+     * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+     * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+     * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+     * given here, they are dropped.
+     * </pre>
+     *
      * <code>uint64 capabilities = 3;</code>
      * @param value The capabilities to set.
      */
@@ -839,6 +980,17 @@ public final class CoreProto {
       capabilities_ = value;
     }
     /**
+     * <pre>
+     * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+     * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+     * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+     * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+     * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+     * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+     * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+     * given here, they are dropped.
+     * </pre>
+     *
      * <code>uint64 capabilities = 3;</code>
      */
     private void clearCapabilities() {
@@ -1677,7 +1829,7 @@ public final class CoreProto {
     private boolean streams_;
     /**
      * <pre>
-     * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+     * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
      * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
      * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
      * and carries out cancel for saves and downloads.
@@ -1692,7 +1844,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+     * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
      * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
      * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
      * and carries out cancel for saves and downloads.
@@ -1707,7 +1859,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+     * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
      * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
      * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
      * and carries out cancel for saves and downloads.
@@ -2005,64 +2157,6 @@ public final class CoreProto {
       bitField0_ = (bitField0_ & ~0x00000001);
     }
 
-    public static final int REPORTS_HEARTBEAT_FIELD_NUMBER = 32;
-    private boolean reportsHeartbeat_;
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     * @return Whether the reportsHeartbeat field is set.
-     */
-    @java.lang.Override
-    public boolean hasReportsHeartbeat() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     * @return The reportsHeartbeat.
-     */
-    @java.lang.Override
-    public boolean getReportsHeartbeat() {
-      return reportsHeartbeat_;
-    }
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     * @param value The reportsHeartbeat to set.
-     */
-    private void setReportsHeartbeat(boolean value) {
-      bitField0_ |= 0x00000002;
-      reportsHeartbeat_ = value;
-    }
-    /**
-     * <pre>
-     * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-     * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-     * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-     * </pre>
-     *
-     * <code>optional bool reports_heartbeat = 32;</code>
-     */
-    private void clearReportsHeartbeat() {
-      bitField0_ = (bitField0_ & ~0x00000002);
-      reportsHeartbeat_ = false;
-    }
-
     public static dev.pydantic.opamp.core.CoreProto.Config parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
@@ -2209,6 +2303,17 @@ public final class CoreProto {
       }
 
       /**
+       * <pre>
+       * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+       * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+       * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+       * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+       * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+       * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+       * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+       * given here, they are dropped.
+       * </pre>
+       *
        * <code>uint64 capabilities = 3;</code>
        * @return The capabilities.
        */
@@ -2217,6 +2322,17 @@ public final class CoreProto {
         return instance.getCapabilities();
       }
       /**
+       * <pre>
+       * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+       * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+       * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+       * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+       * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+       * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+       * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+       * given here, they are dropped.
+       * </pre>
+       *
        * <code>uint64 capabilities = 3;</code>
        * @param value The capabilities to set.
        * @return This builder for chaining.
@@ -2227,6 +2343,17 @@ public final class CoreProto {
         return this;
       }
       /**
+       * <pre>
+       * The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+       * with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+       * Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+       * is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+       * interval the server offers; over plain HTTP it still polls, as it must to hear from the
+       * server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+       * ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+       * given here, they are dropped.
+       * </pre>
+       *
        * <code>uint64 capabilities = 3;</code>
        * @return This builder for chaining.
        */
@@ -3105,7 +3232,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+       * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
        * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
        * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
        * and carries out cancel for saves and downloads.
@@ -3120,7 +3247,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+       * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
        * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
        * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
        * and carries out cancel for saves and downloads.
@@ -3137,7 +3264,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+       * Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
        * on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
        * http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
        * and carries out cancel for saves and downloads.
@@ -3450,66 +3577,6 @@ public final class CoreProto {
         return this;
       }
 
-      /**
-       * <pre>
-       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-       * </pre>
-       *
-       * <code>optional bool reports_heartbeat = 32;</code>
-       * @return Whether the reportsHeartbeat field is set.
-       */
-      @java.lang.Override
-      public boolean hasReportsHeartbeat() {
-        return instance.hasReportsHeartbeat();
-      }
-      /**
-       * <pre>
-       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-       * </pre>
-       *
-       * <code>optional bool reports_heartbeat = 32;</code>
-       * @return The reportsHeartbeat.
-       */
-      @java.lang.Override
-      public boolean getReportsHeartbeat() {
-        return instance.getReportsHeartbeat();
-      }
-      /**
-       * <pre>
-       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-       * </pre>
-       *
-       * <code>optional bool reports_heartbeat = 32;</code>
-       * @param value The reportsHeartbeat to set.
-       * @return This builder for chaining.
-       */
-      public Builder setReportsHeartbeat(boolean value) {
-        copyOnWrite();
-        instance.setReportsHeartbeat(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-       * WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-       * at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-       * </pre>
-       *
-       * <code>optional bool reports_heartbeat = 32;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearReportsHeartbeat() {
-        copyOnWrite();
-        instance.clearReportsHeartbeat();
-        return this;
-      }
-
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Config)
     }
     @java.lang.Override
@@ -3555,14 +3622,13 @@ public final class CoreProto {
               "stopTimeoutMs_",
               "connectTimeoutMs_",
               "proxy_",
-              "reportsHeartbeat_",
             };
             java.lang.String info =
-                "\u0000\u001c\u0000\u0001\u0002 \u001c\u0000\u0001\u0000\u0002\n\u0003\u0003\u0004" +
-                "\u0003\u0005\u0003\u0006\u0003\u0007\u0003\b\u0003\t\u0208\n\u001b\u000b\u0003\f" +
-                "\u0003\r\u0007\u000e\n\u000f\u0007\u0010\u0003\u0011\u0208\u0013\u0007\u0014\u0003" +
+                "\u0000\u001b\u0000\u0001\u0002\u001f\u001b\u0000\u0001\u0000\u0002\n\u0003\u0003" +
+                "\u0004\u0003\u0005\u0003\u0006\u0003\u0007\u0003\b\u0003\t\u0208\n\u001b\u000b\u0003" +
+                "\f\u0003\r\u0007\u000e\n\u000f\u0007\u0010\u0003\u0011\u0208\u0013\u0007\u0014\u0003" +
                 "\u0015\u0003\u0016\u0007\u0017\u0007\u0018\n\u0019\u0007\u001a\u0003\u001c\u0003" +
-                "\u001d\u0003\u001f\u1009\u0000 \u1007\u0001";
+                "\u001d\u0003\u001f\u1009\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -3719,9 +3785,9 @@ public final class CoreProto {
   }
   /**
    * <pre>
-   * The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+   * The proxy for core mode's connections, told once. With no url and not direct, the one the
    * environment names for each destination, by the rule every SDK shares
-   * (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+   * (tests/shell-tables/README.md, "Core mode's proxy rule"), from the variables in environment.
    * </pre>
    *
    * Protobuf type {@code opamp.core.v1.ProxyChoice}
@@ -4261,9 +4327,9 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+     * The proxy for core mode's connections, told once. With no url and not direct, the one the
      * environment names for each destination, by the rule every SDK shares
-     * (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+     * (tests/shell-tables/README.md, "Core mode's proxy rule"), from the variables in environment.
      * </pre>
      *
      * Protobuf type {@code opamp.core.v1.ProxyChoice}
@@ -7005,7 +7071,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -7014,7 +7080,7 @@ public final class CoreProto {
     boolean hasDownloaded();
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -7043,7 +7109,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -7052,7 +7118,7 @@ public final class CoreProto {
     boolean hasProxyAnswer();
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -8772,7 +8838,7 @@ public final class CoreProto {
     public static final int DOWNLOADED_FIELD_NUMBER = 23;
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -8783,7 +8849,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -8797,7 +8863,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -8810,7 +8876,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -8829,7 +8895,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode: answers download_done (the file is complete)
+     * core mode: answers download_done (the file is complete)
      * </pre>
      *
      * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -8916,7 +8982,7 @@ public final class CoreProto {
     public static final int PROXY_ANSWER_FIELD_NUMBER = 25;
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -8927,7 +8993,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -8941,7 +9007,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -8954,7 +9020,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -8973,7 +9039,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams): what happened to the streams the core asked for.
+     * Core mode (Config.streams): what happened to the streams the core asked for.
      * </pre>
      *
      * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11185,7 +11251,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11196,7 +11262,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11207,7 +11273,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11219,7 +11285,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11232,7 +11298,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11244,7 +11310,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode: answers download_done (the file is complete)
+       * core mode: answers download_done (the file is complete)
        * </pre>
        *
        * <code>.opamp.core.v1.Downloaded downloaded = 23;</code>
@@ -11329,7 +11395,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11340,7 +11406,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11351,7 +11417,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11363,7 +11429,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11376,7 +11442,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -11388,7 +11454,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams): what happened to the streams the core asked for.
+       * Core mode (Config.streams): what happened to the streams the core asked for.
        * </pre>
        *
        * <code>.opamp.core.v1.ProxyAnswer proxy_answer = 25;</code>
@@ -14015,6 +14081,25 @@ public final class CoreProto {
      */
     com.google.protobuf.ByteString
         getDetailBytes();
+
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @return The enum numeric value on the wire for failure.
+     */
+    int getFailureValue();
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @return The failure.
+     */
+    dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure();
   }
   /**
    * Protobuf type {@code opamp.core.v1.PackageInstalled}
@@ -14220,6 +14305,69 @@ public final class CoreProto {
       checkByteStringIsUtf8(value);
       detail_ = value.toStringUtf8();
 
+    }
+
+    public static final int FAILURE_FIELD_NUMBER = 5;
+    private int failure_;
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @return The enum numeric value on the wire for failure.
+     */
+    @java.lang.Override
+    public int getFailureValue() {
+      return failure_;
+    }
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @return The failure.
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure() {
+      dev.pydantic.opamp.core.CoreProto.PackageFailure result = dev.pydantic.opamp.core.CoreProto.PackageFailure.forNumber(failure_);
+      return result == null ? dev.pydantic.opamp.core.CoreProto.PackageFailure.UNRECOGNIZED : result;
+    }
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @param value The enum numeric value on the wire for failure to set.
+     * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+     */
+    private void setFailureValue(int value) {
+        failure_ = value;
+    }
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     * @param value The failure to set.
+     */
+    private void setFailure(dev.pydantic.opamp.core.CoreProto.PackageFailure value) {
+      failure_ = value.getNumber();
+
+    }
+    /**
+     * <pre>
+     * not installed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+     */
+    private void clearFailure() {
+
+      failure_ = 0;
     }
 
     public static dev.pydantic.opamp.core.CoreProto.PackageInstalled parseFrom(
@@ -14517,6 +14665,73 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * not installed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+       * @return The enum numeric value on the wire for failure.
+       */
+      @java.lang.Override
+      public int getFailureValue() {
+        return instance.getFailureValue();
+      }
+      /**
+       * <pre>
+       * not installed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+       * @param value The failure to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFailureValue(int value) {
+        copyOnWrite();
+        instance.setFailureValue(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * not installed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+       * @return The failure.
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure() {
+        return instance.getFailure();
+      }
+      /**
+       * <pre>
+       * not installed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+       * @param value The enum numeric value on the wire for failure to set.
+       * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+       * @return This builder for chaining.
+       */
+      public Builder setFailure(dev.pydantic.opamp.core.CoreProto.PackageFailure value) {
+        copyOnWrite();
+        instance.setFailure(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * not installed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFailure() {
+        copyOnWrite();
+        instance.clearFailure();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.PackageInstalled)
     }
     @java.lang.Override
@@ -14537,10 +14752,11 @@ public final class CoreProto {
               "hash_",
               "ok_",
               "detail_",
+              "failure_",
             };
             java.lang.String info =
-                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\n" +
-                "\u0003\u0007\u0004\u0208";
+                "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u0208\u0002\n" +
+                "\u0003\u0007\u0004\u0208\u0005\f";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -14623,7 +14839,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14632,7 +14848,7 @@ public final class CoreProto {
     java.lang.String getDetail();
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14640,6 +14856,25 @@ public final class CoreProto {
      */
     com.google.protobuf.ByteString
         getDetailBytes();
+
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @return The enum numeric value on the wire for failure.
+     */
+    int getFailureValue();
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @return The failure.
+     */
+    dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure();
   }
   /**
    * <pre>
@@ -14747,7 +14982,7 @@ public final class CoreProto {
     private java.lang.String detail_;
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14759,7 +14994,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14772,7 +15007,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14787,7 +15022,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14798,7 +15033,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * it is offered and dropped again
+     * it is offered and dropped again (but see failure)
      * </pre>
      *
      * <code>string detail = 3;</code>
@@ -14809,6 +15044,69 @@ public final class CoreProto {
       checkByteStringIsUtf8(value);
       detail_ = value.toStringUtf8();
 
+    }
+
+    public static final int FAILURE_FIELD_NUMBER = 4;
+    private int failure_;
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @return The enum numeric value on the wire for failure.
+     */
+    @java.lang.Override
+    public int getFailureValue() {
+      return failure_;
+    }
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @return The failure.
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure() {
+      dev.pydantic.opamp.core.CoreProto.PackageFailure result = dev.pydantic.opamp.core.CoreProto.PackageFailure.forNumber(failure_);
+      return result == null ? dev.pydantic.opamp.core.CoreProto.PackageFailure.UNRECOGNIZED : result;
+    }
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @param value The enum numeric value on the wire for failure to set.
+     * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+     */
+    private void setFailureValue(int value) {
+        failure_ = value;
+    }
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     * @param value The failure to set.
+     */
+    private void setFailure(dev.pydantic.opamp.core.CoreProto.PackageFailure value) {
+      failure_ = value.getNumber();
+
+    }
+    /**
+     * <pre>
+     * not removed: how
+     * </pre>
+     *
+     * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+     */
+    private void clearFailure() {
+
+      failure_ = 0;
     }
 
     public static dev.pydantic.opamp.core.CoreProto.PackageRemoved parseFrom(
@@ -15003,7 +15301,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * it is offered and dropped again
+       * it is offered and dropped again (but see failure)
        * </pre>
        *
        * <code>string detail = 3;</code>
@@ -15015,7 +15313,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * it is offered and dropped again
+       * it is offered and dropped again (but see failure)
        * </pre>
        *
        * <code>string detail = 3;</code>
@@ -15028,7 +15326,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * it is offered and dropped again
+       * it is offered and dropped again (but see failure)
        * </pre>
        *
        * <code>string detail = 3;</code>
@@ -15043,7 +15341,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * it is offered and dropped again
+       * it is offered and dropped again (but see failure)
        * </pre>
        *
        * <code>string detail = 3;</code>
@@ -15056,7 +15354,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * it is offered and dropped again
+       * it is offered and dropped again (but see failure)
        * </pre>
        *
        * <code>string detail = 3;</code>
@@ -15067,6 +15365,73 @@ public final class CoreProto {
           com.google.protobuf.ByteString value) {
         copyOnWrite();
         instance.setDetailBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * not removed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+       * @return The enum numeric value on the wire for failure.
+       */
+      @java.lang.Override
+      public int getFailureValue() {
+        return instance.getFailureValue();
+      }
+      /**
+       * <pre>
+       * not removed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+       * @param value The failure to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFailureValue(int value) {
+        copyOnWrite();
+        instance.setFailureValue(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * not removed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+       * @return The failure.
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.PackageFailure getFailure() {
+        return instance.getFailure();
+      }
+      /**
+       * <pre>
+       * not removed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+       * @param value The enum numeric value on the wire for failure to set.
+       * @throws IllegalArgumentException if UNRECOGNIZED is provided.
+       * @return This builder for chaining.
+       */
+      public Builder setFailure(dev.pydantic.opamp.core.CoreProto.PackageFailure value) {
+        copyOnWrite();
+        instance.setFailure(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * not removed: how
+       * </pre>
+       *
+       * <code>.opamp.core.v1.PackageFailure failure = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFailure() {
+        copyOnWrite();
+        instance.clearFailure();
         return this;
       }
 
@@ -15089,10 +15454,11 @@ public final class CoreProto {
               "name_",
               "failed_",
               "detail_",
+              "failure_",
             };
             java.lang.String info =
-                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u0007" +
-                "\u0003\u0208";
+                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0007" +
+                "\u0003\u0208\u0004\f";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -18864,7 +19230,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * the wall clock (Rust mode: for Retry-After dates)
+     * the wall clock (core mode: for Retry-After dates)
      * </pre>
      *
      * <code>uint64 unix_ms = 3;</code>
@@ -18965,7 +19331,7 @@ public final class CoreProto {
     private long unixMs_;
     /**
      * <pre>
-     * the wall clock (Rust mode: for Retry-After dates)
+     * the wall clock (core mode: for Retry-After dates)
      * </pre>
      *
      * <code>uint64 unix_ms = 3;</code>
@@ -18977,7 +19343,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the wall clock (Rust mode: for Retry-After dates)
+     * the wall clock (core mode: for Retry-After dates)
      * </pre>
      *
      * <code>uint64 unix_ms = 3;</code>
@@ -18989,7 +19355,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the wall clock (Rust mode: for Retry-After dates)
+     * the wall clock (core mode: for Retry-After dates)
      * </pre>
      *
      * <code>uint64 unix_ms = 3;</code>
@@ -19177,7 +19543,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * the wall clock (Rust mode: for Retry-After dates)
+       * the wall clock (core mode: for Retry-After dates)
        * </pre>
        *
        * <code>uint64 unix_ms = 3;</code>
@@ -19189,7 +19555,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the wall clock (Rust mode: for Retry-After dates)
+       * the wall clock (core mode: for Retry-After dates)
        * </pre>
        *
        * <code>uint64 unix_ms = 3;</code>
@@ -19203,7 +19569,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the wall clock (Rust mode: for Retry-After dates)
+       * the wall clock (core mode: for Retry-After dates)
        * </pre>
        *
        * <code>uint64 unix_ms = 3;</code>
@@ -22792,7 +23158,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -22801,7 +23167,7 @@ public final class CoreProto {
     boolean hasProxyQuery();
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -23724,7 +24090,7 @@ public final class CoreProto {
     public static final int PROXY_QUERY_FIELD_NUMBER = 10;
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -23735,7 +24101,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -23749,7 +24115,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -23762,7 +24128,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -23781,7 +24147,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * Rust mode (Config.streams).
+     * Core mode (Config.streams).
      * </pre>
      *
      * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25156,7 +25522,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25167,7 +25533,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25178,7 +25544,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25190,7 +25556,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25203,7 +25569,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -25215,7 +25581,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * Rust mode (Config.streams).
+       * Core mode (Config.streams).
        * </pre>
        *
        * <code>.opamp.core.v1.Url proxy_query = 10;</code>
@@ -27930,6 +28296,18 @@ public final class CoreProto {
      * @return The timeoutMs.
      */
     long getTimeoutMs();
+
+    /**
+     * <pre>
+     * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+     * present the client certificate you have for the server, or skip verification if you do so
+     * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+     * </pre>
+     *
+     * <code>bool server_origin = 6;</code>
+     * @return The serverOrigin.
+     */
+    boolean getServerOrigin();
   }
   /**
    * <pre>
@@ -28192,6 +28570,50 @@ public final class CoreProto {
     private void clearTimeoutMs() {
 
       timeoutMs_ = 0L;
+    }
+
+    public static final int SERVER_ORIGIN_FIELD_NUMBER = 6;
+    private boolean serverOrigin_;
+    /**
+     * <pre>
+     * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+     * present the client certificate you have for the server, or skip verification if you do so
+     * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+     * </pre>
+     *
+     * <code>bool server_origin = 6;</code>
+     * @return The serverOrigin.
+     */
+    @java.lang.Override
+    public boolean getServerOrigin() {
+      return serverOrigin_;
+    }
+    /**
+     * <pre>
+     * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+     * present the client certificate you have for the server, or skip verification if you do so
+     * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+     * </pre>
+     *
+     * <code>bool server_origin = 6;</code>
+     * @param value The serverOrigin to set.
+     */
+    private void setServerOrigin(boolean value) {
+      
+      serverOrigin_ = value;
+    }
+    /**
+     * <pre>
+     * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+     * present the client certificate you have for the server, or skip verification if you do so
+     * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+     * </pre>
+     *
+     * <code>bool server_origin = 6;</code>
+     */
+    private void clearServerOrigin() {
+
+      serverOrigin_ = false;
     }
 
     public static dev.pydantic.opamp.core.CoreProto.Download parseFrom(
@@ -28554,6 +28976,52 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+       * present the client certificate you have for the server, or skip verification if you do so
+       * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+       * </pre>
+       *
+       * <code>bool server_origin = 6;</code>
+       * @return The serverOrigin.
+       */
+      @java.lang.Override
+      public boolean getServerOrigin() {
+        return instance.getServerOrigin();
+      }
+      /**
+       * <pre>
+       * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+       * present the client certificate you have for the server, or skip verification if you do so
+       * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+       * </pre>
+       *
+       * <code>bool server_origin = 6;</code>
+       * @param value The serverOrigin to set.
+       * @return This builder for chaining.
+       */
+      public Builder setServerOrigin(boolean value) {
+        copyOnWrite();
+        instance.setServerOrigin(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+       * present the client certificate you have for the server, or skip verification if you do so
+       * for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+       * </pre>
+       *
+       * <code>bool server_origin = 6;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearServerOrigin() {
+        copyOnWrite();
+        instance.clearServerOrigin();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Download)
     }
     @java.lang.Override
@@ -28576,10 +29044,11 @@ public final class CoreProto {
               dev.pydantic.opamp.core.CoreProto.Header.class,
               "maxBytes_",
               "timeoutMs_",
+              "serverOrigin_",
             };
             java.lang.String info =
-                "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u0003\u0002\u0208" +
-                "\u0003\u001b\u0004\u0003\u0005\u0003";
+                "\u0000\u0006\u0000\u0000\u0001\u0006\u0006\u0000\u0001\u0000\u0001\u0003\u0002\u0208" +
+                "\u0003\u001b\u0004\u0003\u0005\u0003\u0006\u0007";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

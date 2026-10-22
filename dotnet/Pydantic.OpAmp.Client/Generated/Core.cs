@@ -25,7 +25,7 @@ namespace Pydantic.OpAmp.Core {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "ChhvcGFtcC9jb3JlL3YxL2NvcmUucHJvdG8SDW9wYW1wLmNvcmUudjEaFG9w",
-            "YW1wL3YxL29wYW1wLnByb3RvIsoGCgZDb25maWcSFAoMaW5zdGFuY2VfdWlk",
+            "YW1wL3YxL29wYW1wLnByb3RvIq0GCgZDb25maWcSFAoMaW5zdGFuY2VfdWlk",
             "GAIgASgMEhQKDGNhcGFiaWxpdGllcxgDIAEoBBIdChVoZWFydGJlYXRfaW50",
             "ZXJ2YWxfbXMYBCABKAQSGgoSYmFja29mZl9pbml0aWFsX21zGAUgASgEEhYK",
             "DmJhY2tvZmZfbWF4X21zGAYgASgEEhYKDm1heF9zZW5kX2J5dGVzGAcgASgE",
@@ -40,212 +40,216 @@ namespace Pydantic.OpAmp.Core {
             "ASgIEg8KB3N0cmVhbXMYFyABKAgSDwoHZW50cm9weRgYIAEoDBIYChBzcGxp",
             "Y2VfZG93bmxvYWRzGBkgASgIEg8KB3VuaXhfbXMYGiABKAQSFwoPc3RvcF90",
             "aW1lb3V0X21zGBwgASgEEhoKEmNvbm5lY3RfdGltZW91dF9tcxgdIAEoBBIp",
-            "CgVwcm94eRgfIAEoCzIaLm9wYW1wLmNvcmUudjEuUHJveHlDaG9pY2USHgoR",
-            "cmVwb3J0c19oZWFydGJlYXQYICABKAhIAIgBAUIUChJfcmVwb3J0c19oZWFy",
-            "dGJlYXRKBAgBEAJKBAgSEBNKBAgbEBxKBAgeEB9SCXRyYW5zcG9ydFIXaW5z",
-            "dGFuY2VfdWlkX2lzX2RlZmF1bHRSDmNhbmNlbF9lZmZlY3RzUg9kb3dubG9h",
-            "ZF9zdGF0dXMilwEKC1Byb3h5Q2hvaWNlEg4KBmRpcmVjdBgBIAEoCBILCgN1",
-            "cmwYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVh",
-            "ZGVyEhcKD3Jlc29sdmVfbG9jYWxseRgEIAEoCBIqCgtlbnZpcm9ubWVudBgF",
-            "IAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyIjQKBk9yaWdpbhIOCgZzY2hl",
-            "bWUYASABKAkSDAoEaG9zdBgCIAEoCRIMCgRwb3J0GAMgASgNIiUKBkhlYWRl",
-            "chIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJIjEKB0hlYWRlcnMSJgoH",
-            "aGVhZGVycxgBIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyIgcKBUVtcHR5",
-            "IhgKBkRldGFpbBIOCgZkZXRhaWwYASABKAkirA4KBUlucHV0EiUKBXN0YXJ0",
-            "GAEgASgLMhQub3BhbXAuY29yZS52MS5FbXB0eUgAEjsKD3NldF9kZXNjcmlw",
-            "dGlvbhgCIAEoCzIgLm9wYW1wLnByb3RvLnYxLkFnZW50RGVzY3JpcHRpb25I",
-            "ABI1CgpzZXRfaGVhbHRoGAMgASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9u",
-            "ZW50SGVhbHRoSAASPwoUc2V0X2VmZmVjdGl2ZV9jb25maWcYBCABKAsyHy5v",
-            "cGFtcC5wcm90by52MS5FZmZlY3RpdmVDb25maWdIABJGChhzZXRfcmVtb3Rl",
-            "X2NvbmZpZ19zdGF0dXMYBSABKAsyIi5vcGFtcC5wcm90by52MS5SZW1vdGVD",
-            "b25maWdTdGF0dXNIABIkCgRzdG9wGAYgASgLMhQub3BhbXAuY29yZS52MS5F",
-            "bXB0eUgAEiUKBXRpbWVyGAcgASgLMhQub3BhbXAuY29yZS52MS5FbXB0eUgA",
-            "EjQKDWh0dHBfcmVzcG9uc2UYCCABKAsyGy5vcGFtcC5jb3JlLnYxLkh0dHBS",
-            "ZXNwb25zZUgAEiwKC2h0dHBfZmFpbGVkGAkgASgLMhUub3BhbXAuY29yZS52",
-            "MS5GYWlsZWRIABImCgl3c19vcGVuZWQYCiABKAsyES5vcGFtcC5jb3JlLnYx",
-            "LklkSAASLAoJd3NfZmFpbGVkGAsgASgLMhcub3BhbXAuY29yZS52MS5Xc0Zh",
-            "aWxlZEgAEi4KCndzX21lc3NhZ2UYDCABKAsyGC5vcGFtcC5jb3JlLnYxLldz",
-            "TWVzc2FnZUgAEiwKCXdzX2Nsb3NlZBgNIAEoCzIXLm9wYW1wLmNvcmUudjEu",
-            "V3NDbG9zZWRIABIoCgd3c19sb3N0GA4gASgLMhUub3BhbXAuY29yZS52MS5G",
-            "YWlsZWRIABIjCgZzdG9yZWQYDyABKAsyES5vcGFtcC5jb3JlLnYxLklkSAAS",
-            "LQoMc3RvcmVfZmFpbGVkGBAgASgLMhUub3BhbXAuY29yZS52MS5GYWlsZWRI",
-            "ABJSCh5zZXRfY29ubmVjdGlvbl9zZXR0aW5nc19zdGF0dXMYESABKAsyKC5v",
-            "cGFtcC5wcm90by52MS5Db25uZWN0aW9uU2V0dGluZ3NTdGF0dXNIABJHChhz",
-            "ZXRfYXZhaWxhYmxlX2NvbXBvbmVudHMYEiABKAsyIy5vcGFtcC5wcm90by52",
-            "MS5BdmFpbGFibGVDb21wb25lbnRzSAASRQoXc2V0X2N1c3RvbV9jYXBhYmls",
-            "aXRpZXMYEyABKAsyIi5vcGFtcC5wcm90by52MS5DdXN0b21DYXBhYmlsaXRp",
-            "ZXNIABI8ChNzZW5kX2N1c3RvbV9tZXNzYWdlGBQgASgLMh0ub3BhbXAucHJv",
-            "dG8udjEuQ3VzdG9tTWVzc2FnZUgAEjwKEXBhY2thZ2VfaW5zdGFsbGVkGBUg",
-            "ASgLMh8ub3BhbXAuY29yZS52MS5QYWNrYWdlSW5zdGFsbGVkSAASOAoPcGFj",
-            "a2FnZV9yZW1vdmVkGBYgASgLMh0ub3BhbXAuY29yZS52MS5QYWNrYWdlUmVt",
-            "b3ZlZEgAEi8KCmRvd25sb2FkZWQYFyABKAsyGS5vcGFtcC5jb3JlLnYxLkRv",
-            "d25sb2FkZWRIABIwCg9kb3dubG9hZF9mYWlsZWQYGCABKAsyFS5vcGFtcC5j",
-            "b3JlLnYxLkZhaWxlZEgAEjIKDHByb3h5X2Fuc3dlchgZIAEoCzIaLm9wYW1w",
-            "LmNvcmUudjEuUHJveHlBbnN3ZXJIABI4Cg9zdHJlYW1fcmVzb2x2ZWQYGiAB",
-            "KAsyHS5vcGFtcC5jb3JlLnYxLlN0cmVhbVJlc29sdmVkSAASKgoNc3RyZWFt",
-            "X29wZW5lZBgbIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItChBzdHJlYW1f",
-            "dGxzX3JlYWR5GBwgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi8KC3N0cmVh",
-            "bV9kYXRhGB0gASgLMhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABInCgpz",
-            "dHJlYW1fZW9mGB4gASgLMhEub3BhbXAuY29yZS52MS5JZEgAEi4KDXN0cmVh",
-            "bV9mYWlsZWQYHyABKAsyFS5vcGFtcC5jb3JlLnYxLkZhaWxlZEgAEisKDnN0",
-            "cmVhbV9zcGxpY2VkGCAgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEjwKEWRv",
-            "d25sb2FkX3Jlc3BvbnNlGCEgASgLMh8ub3BhbXAuY29yZS52MS5Eb3dubG9h",
-            "ZFJlc3BvbnNlSAASMgoQc2V0X2F1dGhfaGVhZGVycxgiIAEoCzIWLm9wYW1w",
-            "LmNvcmUudjEuSGVhZGVyc0gAEiUKBWFib3J0GCMgASgLMhQub3BhbXAuY29y",
-            "ZS52MS5FbXB0eUgAQgYKBGtpbmQiaQoLUHJveHlBbnN3ZXISCgoCaWQYASAB",
-            "KAQSDQoFcHJveHkYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNv",
-            "cmUudjEuSGVhZGVyEhcKD3Jlc29sdmVfbG9jYWxseRgEIAEoCCIvCg5TdHJl",
-            "YW1SZXNvbHZlZBIKCgJpZBgBIAEoBBIRCglhZGRyZXNzZXMYAiADKAkiFAoE",
-            "TmFtZRIMCgRuYW1lGAEgASgJIkoKEFBhY2thZ2VJbnN0YWxsZWQSDAoEbmFt",
-            "ZRgBIAEoCRIMCgRoYXNoGAIgASgMEgoKAm9rGAMgASgIEg4KBmRldGFpbBgE",
-            "IAEoCSI+Cg5QYWNrYWdlUmVtb3ZlZBIMCgRuYW1lGAEgASgJEg4KBmZhaWxl",
-            "ZBgCIAEoCBIOCgZkZXRhaWwYAyABKAkiKAoKRG93bmxvYWRlZBIKCgJpZBgB",
-            "IAEoBBIOCgZzaGEyNTYYAiABKAwigAEKEERvd25sb2FkUmVzcG9uc2USCgoC",
-            "aWQYASABKAQSDgoGc3RhdHVzGAIgASgNEg4KBnNoYTI1NhgDIAEoDBIQCghs",
-            "b2NhdGlvbhgEIAEoCRIuCg9sb2NhdGlvbl9vcmlnaW4YBSABKAsyFS5vcGFt",
-            "cC5jb3JlLnYxLk9yaWdpbiIQCgJJZBIKCgJpZBgBIAEoBCIkCgZGYWlsZWQS",
-            "CgoCaWQYASABKAQSDgoGZGV0YWlsGAIgASgJInEKDEh0dHBSZXNwb25zZRIK",
-            "CgJpZBgBIAEoBBIOCgZzdGF0dXMYAiABKA0SJgoHaGVhZGVycxgDIAMoCzIV",
-            "Lm9wYW1wLmNvcmUudjEuSGVhZGVyEgwKBGJvZHkYBCABKAwSDwoHdW5peF9t",
-            "cxgFIAEoBCJ/CghXc0ZhaWxlZBIKCgJpZBgBIAEoBBITCgZzdGF0dXMYAiAB",
-            "KA1IAIgBARImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFk",
-            "ZXISDgoGZGV0YWlsGAQgASgJEg8KB3VuaXhfbXMYBSABKARCCQoHX3N0YXR1",
-            "cyIlCglXc01lc3NhZ2USCgoCaWQYASABKAQSDAoEZGF0YRgCIAEoDCIkCghX",
-            "c0Nsb3NlZBIKCgJpZBgBIAEoBBIMCgRjb2RlGAIgASgNIkwKBFN0ZXASDgoG",
-            "bm93X21zGAEgASgEEiMKBWlucHV0GAIgASgLMhQub3BhbXAuY29yZS52MS5J",
-            "bnB1dBIPCgd1bml4X21zGAMgASgEIj0KBVJlcGx5EiUKBm91dHB1dBgBIAEo",
-            "CzIVLm9wYW1wLmNvcmUudjEuT3V0cHV0Eg0KBWVycm9yGAIgASgJIs8BCgZP",
-            "dXRwdXQSJgoHZWZmZWN0cxgBIAMoCzIVLm9wYW1wLmNvcmUudjEuRWZmZWN0",
-            "EhcKCndha2VfYXRfbXMYAiABKARIAIgBARIPCgdzdG9wcGVkGAMgASgIEhQK",
-            "DGluc3RhbmNlX3VpZBgEIAEoDBIlCgZsaW1pdHMYBSABKAsyFS5vcGFtcC5j",
-            "b3JlLnYxLkxpbWl0cxInCgdyZXN1bWVkGAYgASgLMhYub3BhbXAuY29yZS52",
-            "MS5SZXN1bWVkQg0KC193YWtlX2F0X21zIo8CCgdSZXN1bWVkEkAKFWFwcGxp",
-            "ZWRfcmVtb3RlX2NvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50",
-            "UmVtb3RlQ29uZmlnEjgKDXJlbW90ZV9jb25maWcYAiABKAsyIS5vcGFtcC5w",
-            "cm90by52MS5BZ2VudFJlbW90ZUNvbmZpZxJBChVyZW1vdGVfY29uZmlnX3Jl",
-            "ZnVzZWQYAyABKAsyIi5vcGFtcC5wcm90by52MS5SZW1vdGVDb25maWdTdGF0",
-            "dXMSRQoTY29ubmVjdGlvbl9zZXR0aW5ncxgEIAEoCzIoLm9wYW1wLnByb3Rv",
-            "LnYxLkNvbm5lY3Rpb25TZXR0aW5nc09mZmVycyKyAgoGTGltaXRzEh0KFWhl",
-            "YXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIaChJiYWNrb2ZmX2luaXRpYWxf",
-            "bXMYBSABKAQSFgoOYmFja29mZl9tYXhfbXMYBiABKAQSFgoObWF4X3NlbmRf",
-            "Ynl0ZXMYByABKAQSGgoScmVxdWVzdF90aW1lb3V0X21zGAsgASgEEhkKEW1h",
-            "eF9yZWNlaXZlX2J5dGVzGAwgASgEEhkKEXZlcmlmeV90aW1lb3V0X21zGBAg",
-            "ASgEEhkKEW1heF9wYWNrYWdlX2J5dGVzGBQgASgEEhsKE2Rvd25sb2FkX3Rp",
-            "bWVvdXRfbXMYFSABKAQSFwoPc3RvcF90aW1lb3V0X21zGBwgASgEEhoKEmNv",
-            "bm5lY3RfdGltZW91dF9tcxgdIAEoBCLUBgoGRWZmZWN0EjIKDGh0dHBfcmVx",
-            "dWVzdBgBIAEoCzIaLm9wYW1wLmNvcmUudjEuSHR0cFJlcXVlc3RIABIoCgd3",
-            "c19vcGVuGAIgASgLMhUub3BhbXAuY29yZS52MS5Xc09wZW5IABIrCgd3c19z",
-            "ZW5kGAMgASgLMhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIlCgh3c19j",
-            "bG9zZRgEIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABItCgZub3RpZnkYBSAB",
-            "KAsyGy5vcGFtcC5jb3JlLnYxLk5vdGlmaWNhdGlvbkgAEiUKBXN0b3JlGAYg",
-            "ASgLMhQub3BhbXAuY29yZS52MS5TdG9yZUgAEisKCGRvd25sb2FkGAcgASgL",
-            "Mhcub3BhbXAuY29yZS52MS5Eb3dubG9hZEgAEiQKB2Rpc2NhcmQYCCABKAsy",
-            "ES5vcGFtcC5jb3JlLnYxLklkSAASIwoGY2FuY2VsGAkgASgLMhEub3BhbXAu",
-            "Y29yZS52MS5JZEgAEikKC3Byb3h5X3F1ZXJ5GAogASgLMhIub3BhbXAuY29y",
-            "ZS52MS5VcmxIABIzCg5zdHJlYW1fcmVzb2x2ZRgLIAEoCzIZLm9wYW1wLmNv",
-            "cmUudjEuU3RyZWFtTmFtZUgAEjAKC3N0cmVhbV9vcGVuGAwgASgLMhkub3Bh",
-            "bXAuY29yZS52MS5TdHJlYW1PcGVuSAASNQoQc3RyZWFtX3N0YXJ0X3RscxgN",
-            "IAEoCzIZLm9wYW1wLmNvcmUudjEuU3RyZWFtTmFtZUgAEjAKDHN0cmVhbV93",
-            "cml0ZRgOIAEoCzIYLm9wYW1wLmNvcmUudjEuV3NNZXNzYWdlSAASMgoMc3Ry",
-            "ZWFtX2Nsb3NlGA8gASgLMhoub3BhbXAuY29yZS52MS5TdHJlYW1DbG9zZUgA",
-            "EjEKDWRvd25sb2FkX2RhdGEYECABKAsyGC5vcGFtcC5jb3JlLnYxLldzTWVz",
-            "c2FnZUgAEioKDWRvd25sb2FkX2RvbmUYESABKAsyES5vcGFtcC5jb3JlLnYx",
-            "LklkSAASNAoNc3RyZWFtX3NwbGljZRgSIAEoCzIbLm9wYW1wLmNvcmUudjEu",
-            "U3RyZWFtU3BsaWNlSABCBgoEa2luZCIoCgtTdHJlYW1DbG9zZRIKCgJpZBgB",
-            "IAEoBBINCgVhYm9ydBgCIAEoCCIeCgNVcmwSCgoCaWQYASABKAQSCwoDdXJs",
-            "GAIgASgJIiYKClN0cmVhbU5hbWUSCgoCaWQYASABKAQSDAoEaG9zdBgCIAEo",
-            "CSI7CgxTdHJlYW1TcGxpY2USCgoCaWQYASABKAQSEAoIZG93bmxvYWQYAiAB",
-            "KAQSDQoFYnl0ZXMYAyABKAQiNAoKU3RyZWFtT3BlbhIKCgJpZBgBIAEoBBIM",
-            "CgRob3N0GAIgASgJEgwKBHBvcnQYAyABKA0icgoIRG93bmxvYWQSCgoCaWQY",
-            "ASABKAQSCwoDdXJsGAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5j",
-            "b3JlLnYxLkhlYWRlchIRCgltYXhfYnl0ZXMYBCABKAQSEgoKdGltZW91dF9t",
-            "cxgFIAEoBCIhCgVTdG9yZRIKCgJpZBgBIAEoBBIMCgRkYXRhGAIgASgMIowB",
-            "CgtIdHRwUmVxdWVzdBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoHaGVh",
-            "ZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEgwKBGJvZHkYBCAB",
-            "KAwSEgoKdGltZW91dF9tcxgFIAEoBBIaChJtYXhfcmVzcG9uc2VfYnl0ZXMY",
-            "BiABKAQieAoGV3NPcGVuEgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCRImCgdo",
-            "ZWFkZXJzGAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISGQoRbWF4X21l",
-            "c3NhZ2VfYnl0ZXMYBCABKAQSEgoKdGltZW91dF9tcxgFIAEoBCK2BwoMTm90",
-            "aWZpY2F0aW9uEikKCWNvbm5lY3RlZBgBIAEoCzIULm9wYW1wLmNvcmUudjEu",
-            "RW1wdHlIABI8Cg5jb25uZWN0X2ZhaWxlZBgCIAEoCzIiLm9wYW1wLmNvcmUu",
-            "djEuTm90aWZ5Q29ubmVjdEZhaWxlZEgAEjYKDmVycm9yX3Jlc3BvbnNlGAMg",
-            "ASgLMhwub3BhbXAuY29yZS52MS5FcnJvclJlc3BvbnNlSAASOgoNcmVtb3Rl",
-            "X2NvbmZpZxgEIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29u",
-            "ZmlnSAASNwoHY29tbWFuZBgFIAEoCzIkLm9wYW1wLnByb3RvLnYxLlNlcnZl",
-            "clRvQWdlbnRDb21tYW5kSAASHgoUaW5zdGFuY2VfdWlkX2NoYW5nZWQYBiAB",
-            "KAxIABIfChVoZWFydGJlYXRfaW50ZXJ2YWxfbXMYByABKARIABI5ChBzdGF0",
-            "dXNfdG9vX2xhcmdlGAkgASgLMh0ub3BhbXAuY29yZS52MS5TdGF0dXNUb29M",
-            "YXJnZUgAEiwKC2JhZF9tZXNzYWdlGAogASgLMhUub3BhbXAuY29yZS52MS5E",
-            "ZXRhaWxIABInCgdzdG9wcGVkGAsgASgLMhQub3BhbXAuY29yZS52MS5FbXB0",
-            "eUgAEkcKE2Nvbm5lY3Rpb25fc2V0dGluZ3MYDCABKAsyKC5vcGFtcC5wcm90",
-            "by52MS5Db25uZWN0aW9uU2V0dGluZ3NPZmZlcnNIABI3Cg5jdXN0b21fbWVz",
-            "c2FnZRgNIAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2VIABJI",
-            "ChpzZXJ2ZXJfY3VzdG9tX2NhcGFiaWxpdGllcxgOIAEoCzIiLm9wYW1wLnBy",
-            "b3RvLnYxLkN1c3RvbUNhcGFiaWxpdGllc0gAEkYKF2N1c3RvbV9tZXNzYWdl",
-            "X25vdF9zZW50GA8gASgLMiMub3BhbXAuY29yZS52MS5DdXN0b21NZXNzYWdl",
-            "Tm90U2VudEgAEjgKD2luc3RhbGxfcGFja2FnZRgQIAEoCzIdLm9wYW1wLmNv",
-            "cmUudjEuSW5zdGFsbFBhY2thZ2VIABItCg5yZW1vdmVfcGFja2FnZRgRIAEo",
-            "CzITLm9wYW1wLmNvcmUudjEuTmFtZUgAEjIKDHNhdmVfc3RhbGxlZBgSIAEo",
-            "CzIaLm9wYW1wLmNvcmUudjEuU2F2ZVN0YWxsZWRIAEIGCgRraW5kSgQICBAJ",
-            "IjEKC1NhdmVTdGFsbGVkEg8KB3N0YWxsZWQYASABKAgSEQoJd2FpdGVkX21z",
-            "GAIgASgEImMKDkluc3RhbGxQYWNrYWdlEgwKBG5hbWUYASABKAkSMQoHcGFj",
-            "a2FnZRgCIAEoCzIgLm9wYW1wLnByb3RvLnYxLlBhY2thZ2VBdmFpbGFibGUS",
-            "EAoIZG93bmxvYWQYAyABKAQiVgoUQ3VzdG9tTWVzc2FnZU5vdFNlbnQSLgoH",
-            "bWVzc2FnZRgBIAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2US",
-            "DgoGcmVhc29uGAIgASgJIkUKE05vdGlmeUNvbm5lY3RGYWlsZWQSEwoGc3Rh",
-            "dHVzGAEgASgNSACIAQESDgoGZGV0YWlsGAIgASgJQgkKB19zdGF0dXMiLgoN",
-            "RXJyb3JSZXNwb25zZRIMCgRraW5kGAEgASgFEg8KB21lc3NhZ2UYAiABKAki",
-            "WAoOU3RhdHVzVG9vTGFyZ2USKQoFZmllbGQYASABKA4yGi5vcGFtcC5jb3Jl",
-            "LnYxLlN0YXR1c0ZpZWxkEg0KBWJ5dGVzGAIgASgEEgwKBG5hbWUYAyABKAki",
-            "cQoJU2V0dXBDYWxsEioKBXN0YXJ0GAEgASgLMhkub3BhbXAuY29yZS52MS5T",
-            "ZXR1cFN0YXJ0SAASMAoIaWRlbnRpdHkYAiABKAsyHC5vcGFtcC5jb3JlLnYx",
-            "LlNldHVwSWRlbnRpdHlIAEIGCgRjYWxsIo0BCgpTZXR1cFJlcGx5Ei4KB3N0",
-            "YXJ0ZWQYASABKAsyGy5vcGFtcC5jb3JlLnYxLlNldHVwU3RhcnRlZEgAEjQK",
-            "CmlkZW50aWZpZWQYAiABKAsyHi5vcGFtcC5jb3JlLnYxLlNldHVwSWRlbnRp",
-            "ZmllZEgAEg8KBWVycm9yGAMgASgJSABCCAoGcmVzdWx0IicKCFZhcmlhYmxl",
-            "EgwKBG5hbWUYASABKAkSDQoFdmFsdWUYAiABKAkingEKClNldHVwU3RhcnQS",
-            "JAoDZW52GAEgAygLMhcub3BhbXAuY29yZS52MS5WYXJpYWJsZRIiCgJvcxgC",
-            "IAEoDjIWLm9wYW1wLmNvcmUudjEuU2V0dXBPcxIPCgdwcm9ncmFtGAMgASgJ",
-            "EgsKA2N3ZBgEIAEoCRIoCgRjb2RlGAUgASgLMhoub3BhbXAuY29yZS52MS5T",
-            "ZXR1cEluQ29kZSKHAgoLU2V0dXBJbkNvZGUSFQoIZW5kcG9pbnQYASABKAlI",
-            "AIgBARIVCg1oZWFkZXJzX2dpdmVuGAIgASgIEiYKB2hlYWRlcnMYAyADKAsy",
-            "FS5vcGFtcC5jb3JlLnYxLkhlYWRlchIWCglzdGF0ZV9kaXIYBCABKAlIAYgB",
-            "ARIZCgxoZWFydGJlYXRfbXMYBSABKBJIAogBARIVCg1lbmRwb2ludF9uYW1l",
-            "GAYgASgJEhQKDGhlYWRlcnNfbmFtZRgHIAEoCRIWCg5oZWFydGJlYXRfbmFt",
-            "ZRgIIAEoCUILCglfZW5kcG9pbnRCDAoKX3N0YXRlX2RpckIPCg1faGVhcnRi",
-            "ZWF0X21zIrACCgxTZXR1cFN0YXJ0ZWQSCwoDb2ZmGAEgASgIEhIKCm9mZl9y",
-            "ZWFzb24YDCABKAkSEAoIZW5kcG9pbnQYAiABKAkSJgoHaGVhZGVycxgDIAMo",
-            "CzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEh0KFWhlYXJ0YmVhdF9pbnRlcnZh",
-            "bF9tcxgEIAEoBBIRCglzdGF0ZV9kaXIYBSABKAkSFQoNZGVmYXVsdF9zbG90",
-            "cxgGIAMoCRIXCg9hbGxfc2xvdHNfdGFrZW4YByABKAkSDwoHc2VydmljZRgI",
-            "IAEoCRIWCg5zaG93bl9lbmRwb2ludBgJIAEoCRIoCgVoaW50cxgKIAEoCzIZ",
-            "Lm9wYW1wLmNvcmUudjEuU2V0dXBIaW50cxIQCgh3YXJuaW5ncxgLIAMoCSJU",
-            "CgpTZXR1cEhpbnRzEg8KB3JlZnVzZWQYASABKAkSEQoJbm90X2ZvdW5kGAIg",
-            "ASgJEhMKC3VucmVhY2hhYmxlGAMgASgJEg0KBWVycm9yGAQgASgJInAKDVNl",
-            "dHVwSWRlbnRpdHkSEQoJc3RhdGVfZGlyGAEgASgIEg0KBXNhdmVkGAIgASgJ",
-            "EhsKE3Jlc291cmNlX2F0dHJpYnV0ZXMYAyABKAkSDwoHZW50cm9weRgEIAEo",
-            "DBIPCgd1bml4X21zGAUgASgEIrYBCg9TZXR1cElkZW50aWZpZWQSFAoMaW5z",
-            "dGFuY2VfdWlkGAEgASgMEikKBGZyb20YAiABKA4yGy5vcGFtcC5jb3JlLnYx",
-            "LlNldHVwVWlkRnJvbRIMCgRzYXZlGAMgASgIEgwKBHRleHQYBCABKAkSEwoL",
-            "dW5zYXZlZF91aWQYBSABKAwSMQoMdW5zYXZlZF9mcm9tGAYgASgOMhsub3Bh",
-            "bXAuY29yZS52MS5TZXR1cFVpZEZyb20qqwIKC1N0YXR1c0ZpZWxkEhwKGFNU",
-            "QVRVU19GSUVMRF9ERVNDUklQVElPThAAEhcKE1NUQVRVU19GSUVMRF9IRUFM",
-            "VEgQARIhCh1TVEFUVVNfRklFTERfRUZGRUNUSVZFX0NPTkZJRxACEiUKIVNU",
-            "QVRVU19GSUVMRF9SRU1PVEVfQ09ORklHX1NUQVRVUxADEisKJ1NUQVRVU19G",
-            "SUVMRF9DT05ORUNUSU9OX1NFVFRJTkdTX1NUQVRVUxAEEiUKIVNUQVRVU19G",
-            "SUVMRF9BVkFJTEFCTEVfQ09NUE9ORU5UUxAFEiQKIFNUQVRVU19GSUVMRF9D",
-            "VVNUT01fQ0FQQUJJTElUSUVTEAYSIQodU1RBVFVTX0ZJRUxEX1BBQ0tBR0Vf",
-            "U1RBVFVTRVMQBypGCgdTZXR1cE9zEhEKDVNFVFVQX09TX1VOSVgQABISCg5T",
-            "RVRVUF9PU19NQUNPUxABEhQKEFNFVFVQX09TX1dJTkRPV1MQAipbCgxTZXR1",
-            "cFVpZEZyb20SFwoTU0VUVVBfVUlEX0ZST01fTUFERRAAEhgKFFNFVFVQX1VJ",
-            "RF9GUk9NX1NBVkVEEAESGAoUU0VUVVBfVUlEX0ZST01fR0lWRU4QAkJ2Chdk",
-            "ZXYucHlkYW50aWMub3BhbXAuY29yZUIJQ29yZVByb3RvWjpnaXRodWIuY29t",
-            "L3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28vb3BhbXAvaW50ZXJuYWwvY29y",
-            "ZXBiqgITUHlkYW50aWMuT3BBbXAuQ29yZWIGcHJvdG8z"));
+            "CgVwcm94eRgfIAEoCzIaLm9wYW1wLmNvcmUudjEuUHJveHlDaG9pY2VKBAgB",
+            "EAJKBAgSEBNKBAgbEBxKBAgeEB9KBAggECFSCXRyYW5zcG9ydFIXaW5zdGFu",
+            "Y2VfdWlkX2lzX2RlZmF1bHRSDmNhbmNlbF9lZmZlY3RzUg9kb3dubG9hZF9z",
+            "dGF0dXNSEXJlcG9ydHNfaGVhcnRiZWF0IpcBCgtQcm94eUNob2ljZRIOCgZk",
+            "aXJlY3QYASABKAgSCwoDdXJsGAIgASgJEiYKB2hlYWRlcnMYAyADKAsyFS5v",
+            "cGFtcC5jb3JlLnYxLkhlYWRlchIXCg9yZXNvbHZlX2xvY2FsbHkYBCABKAgS",
+            "KgoLZW52aXJvbm1lbnQYBSADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlciI0",
+            "CgZPcmlnaW4SDgoGc2NoZW1lGAEgASgJEgwKBGhvc3QYAiABKAkSDAoEcG9y",
+            "dBgDIAEoDSIlCgZIZWFkZXISDAoEbmFtZRgBIAEoCRINCgV2YWx1ZRgCIAEo",
+            "CSIxCgdIZWFkZXJzEiYKB2hlYWRlcnMYASADKAsyFS5vcGFtcC5jb3JlLnYx",
+            "LkhlYWRlciIHCgVFbXB0eSIYCgZEZXRhaWwSDgoGZGV0YWlsGAEgASgJIqwO",
+            "CgVJbnB1dBIlCgVzdGFydBgBIAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlI",
+            "ABI7Cg9zZXRfZGVzY3JpcHRpb24YAiABKAsyIC5vcGFtcC5wcm90by52MS5B",
+            "Z2VudERlc2NyaXB0aW9uSAASNQoKc2V0X2hlYWx0aBgDIAEoCzIfLm9wYW1w",
+            "LnByb3RvLnYxLkNvbXBvbmVudEhlYWx0aEgAEj8KFHNldF9lZmZlY3RpdmVf",
+            "Y29uZmlnGAQgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmln",
+            "SAASRgoYc2V0X3JlbW90ZV9jb25maWdfc3RhdHVzGAUgASgLMiIub3BhbXAu",
+            "cHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzSAASJAoEc3RvcBgGIAEoCzIU",
+            "Lm9wYW1wLmNvcmUudjEuRW1wdHlIABIlCgV0aW1lchgHIAEoCzIULm9wYW1w",
+            "LmNvcmUudjEuRW1wdHlIABI0Cg1odHRwX3Jlc3BvbnNlGAggASgLMhsub3Bh",
+            "bXAuY29yZS52MS5IdHRwUmVzcG9uc2VIABIsCgtodHRwX2ZhaWxlZBgJIAEo",
+            "CzIVLm9wYW1wLmNvcmUudjEuRmFpbGVkSAASJgoJd3Nfb3BlbmVkGAogASgL",
+            "MhEub3BhbXAuY29yZS52MS5JZEgAEiwKCXdzX2ZhaWxlZBgLIAEoCzIXLm9w",
+            "YW1wLmNvcmUudjEuV3NGYWlsZWRIABIuCgp3c19tZXNzYWdlGAwgASgLMhgu",
+            "b3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIsCgl3c19jbG9zZWQYDSABKAsy",
+            "Fy5vcGFtcC5jb3JlLnYxLldzQ2xvc2VkSAASKAoHd3NfbG9zdBgOIAEoCzIV",
+            "Lm9wYW1wLmNvcmUudjEuRmFpbGVkSAASIwoGc3RvcmVkGA8gASgLMhEub3Bh",
+            "bXAuY29yZS52MS5JZEgAEi0KDHN0b3JlX2ZhaWxlZBgQIAEoCzIVLm9wYW1w",
+            "LmNvcmUudjEuRmFpbGVkSAASUgoec2V0X2Nvbm5lY3Rpb25fc2V0dGluZ3Nf",
+            "c3RhdHVzGBEgASgLMigub3BhbXAucHJvdG8udjEuQ29ubmVjdGlvblNldHRp",
+            "bmdzU3RhdHVzSAASRwoYc2V0X2F2YWlsYWJsZV9jb21wb25lbnRzGBIgASgL",
+            "MiMub3BhbXAucHJvdG8udjEuQXZhaWxhYmxlQ29tcG9uZW50c0gAEkUKF3Nl",
+            "dF9jdXN0b21fY2FwYWJpbGl0aWVzGBMgASgLMiIub3BhbXAucHJvdG8udjEu",
+            "Q3VzdG9tQ2FwYWJpbGl0aWVzSAASPAoTc2VuZF9jdXN0b21fbWVzc2FnZRgU",
+            "IAEoCzIdLm9wYW1wLnByb3RvLnYxLkN1c3RvbU1lc3NhZ2VIABI8ChFwYWNr",
+            "YWdlX2luc3RhbGxlZBgVIAEoCzIfLm9wYW1wLmNvcmUudjEuUGFja2FnZUlu",
+            "c3RhbGxlZEgAEjgKD3BhY2thZ2VfcmVtb3ZlZBgWIAEoCzIdLm9wYW1wLmNv",
+            "cmUudjEuUGFja2FnZVJlbW92ZWRIABIvCgpkb3dubG9hZGVkGBcgASgLMhku",
+            "b3BhbXAuY29yZS52MS5Eb3dubG9hZGVkSAASMAoPZG93bmxvYWRfZmFpbGVk",
+            "GBggASgLMhUub3BhbXAuY29yZS52MS5GYWlsZWRIABIyCgxwcm94eV9hbnN3",
+            "ZXIYGSABKAsyGi5vcGFtcC5jb3JlLnYxLlByb3h5QW5zd2VySAASOAoPc3Ry",
+            "ZWFtX3Jlc29sdmVkGBogASgLMh0ub3BhbXAuY29yZS52MS5TdHJlYW1SZXNv",
+            "bHZlZEgAEioKDXN0cmVhbV9vcGVuZWQYGyABKAsyES5vcGFtcC5jb3JlLnYx",
+            "LklkSAASLQoQc3RyZWFtX3Rsc19yZWFkeRgcIAEoCzIRLm9wYW1wLmNvcmUu",
+            "djEuSWRIABIvCgtzdHJlYW1fZGF0YRgdIAEoCzIYLm9wYW1wLmNvcmUudjEu",
+            "V3NNZXNzYWdlSAASJwoKc3RyZWFtX2VvZhgeIAEoCzIRLm9wYW1wLmNvcmUu",
+            "djEuSWRIABIuCg1zdHJlYW1fZmFpbGVkGB8gASgLMhUub3BhbXAuY29yZS52",
+            "MS5GYWlsZWRIABIrCg5zdHJlYW1fc3BsaWNlZBggIAEoCzIRLm9wYW1wLmNv",
+            "cmUudjEuSWRIABI8ChFkb3dubG9hZF9yZXNwb25zZRghIAEoCzIfLm9wYW1w",
+            "LmNvcmUudjEuRG93bmxvYWRSZXNwb25zZUgAEjIKEHNldF9hdXRoX2hlYWRl",
+            "cnMYIiABKAsyFi5vcGFtcC5jb3JlLnYxLkhlYWRlcnNIABIlCgVhYm9ydBgj",
+            "IAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlIAEIGCgRraW5kImkKC1Byb3h5",
+            "QW5zd2VyEgoKAmlkGAEgASgEEg0KBXByb3h5GAIgASgJEiYKB2hlYWRlcnMY",
+            "AyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIXCg9yZXNvbHZlX2xvY2Fs",
+            "bHkYBCABKAgiLwoOU3RyZWFtUmVzb2x2ZWQSCgoCaWQYASABKAQSEQoJYWRk",
+            "cmVzc2VzGAIgAygJIhQKBE5hbWUSDAoEbmFtZRgBIAEoCSJ6ChBQYWNrYWdl",
+            "SW5zdGFsbGVkEgwKBG5hbWUYASABKAkSDAoEaGFzaBgCIAEoDBIKCgJvaxgD",
+            "IAEoCBIOCgZkZXRhaWwYBCABKAkSLgoHZmFpbHVyZRgFIAEoDjIdLm9wYW1w",
+            "LmNvcmUudjEuUGFja2FnZUZhaWx1cmUibgoOUGFja2FnZVJlbW92ZWQSDAoE",
+            "bmFtZRgBIAEoCRIOCgZmYWlsZWQYAiABKAgSDgoGZGV0YWlsGAMgASgJEi4K",
+            "B2ZhaWx1cmUYBCABKA4yHS5vcGFtcC5jb3JlLnYxLlBhY2thZ2VGYWlsdXJl",
+            "IigKCkRvd25sb2FkZWQSCgoCaWQYASABKAQSDgoGc2hhMjU2GAIgASgMIoAB",
+            "ChBEb3dubG9hZFJlc3BvbnNlEgoKAmlkGAEgASgEEg4KBnN0YXR1cxgCIAEo",
+            "DRIOCgZzaGEyNTYYAyABKAwSEAoIbG9jYXRpb24YBCABKAkSLgoPbG9jYXRp",
+            "b25fb3JpZ2luGAUgASgLMhUub3BhbXAuY29yZS52MS5PcmlnaW4iEAoCSWQS",
+            "CgoCaWQYASABKAQiJAoGRmFpbGVkEgoKAmlkGAEgASgEEg4KBmRldGFpbBgC",
+            "IAEoCSJxCgxIdHRwUmVzcG9uc2USCgoCaWQYASABKAQSDgoGc3RhdHVzGAIg",
+            "ASgNEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIM",
+            "CgRib2R5GAQgASgMEg8KB3VuaXhfbXMYBSABKAQifwoIV3NGYWlsZWQSCgoC",
+            "aWQYASABKAQSEwoGc3RhdHVzGAIgASgNSACIAQESJgoHaGVhZGVycxgDIAMo",
+            "CzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEg4KBmRldGFpbBgEIAEoCRIPCgd1",
+            "bml4X21zGAUgASgEQgkKB19zdGF0dXMiJQoJV3NNZXNzYWdlEgoKAmlkGAEg",
+            "ASgEEgwKBGRhdGEYAiABKAwiJAoIV3NDbG9zZWQSCgoCaWQYASABKAQSDAoE",
+            "Y29kZRgCIAEoDSJMCgRTdGVwEg4KBm5vd19tcxgBIAEoBBIjCgVpbnB1dBgC",
+            "IAEoCzIULm9wYW1wLmNvcmUudjEuSW5wdXQSDwoHdW5peF9tcxgDIAEoBCI9",
+            "CgVSZXBseRIlCgZvdXRwdXQYASABKAsyFS5vcGFtcC5jb3JlLnYxLk91dHB1",
+            "dBINCgVlcnJvchgCIAEoCSLPAQoGT3V0cHV0EiYKB2VmZmVjdHMYASADKAsy",
+            "FS5vcGFtcC5jb3JlLnYxLkVmZmVjdBIXCgp3YWtlX2F0X21zGAIgASgESACI",
+            "AQESDwoHc3RvcHBlZBgDIAEoCBIUCgxpbnN0YW5jZV91aWQYBCABKAwSJQoG",
+            "bGltaXRzGAUgASgLMhUub3BhbXAuY29yZS52MS5MaW1pdHMSJwoHcmVzdW1l",
+            "ZBgGIAEoCzIWLm9wYW1wLmNvcmUudjEuUmVzdW1lZEINCgtfd2FrZV9hdF9t",
+            "cyKPAgoHUmVzdW1lZBJAChVhcHBsaWVkX3JlbW90ZV9jb25maWcYASABKAsy",
+            "IS5vcGFtcC5wcm90by52MS5BZ2VudFJlbW90ZUNvbmZpZxI4Cg1yZW1vdGVf",
+            "Y29uZmlnGAIgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25m",
+            "aWcSQQoVcmVtb3RlX2NvbmZpZ19yZWZ1c2VkGAMgASgLMiIub3BhbXAucHJv",
+            "dG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzEkUKE2Nvbm5lY3Rpb25fc2V0dGlu",
+            "Z3MYBCABKAsyKC5vcGFtcC5wcm90by52MS5Db25uZWN0aW9uU2V0dGluZ3NP",
+            "ZmZlcnMisgIKBkxpbWl0cxIdChVoZWFydGJlYXRfaW50ZXJ2YWxfbXMYBCAB",
+            "KAQSGgoSYmFja29mZl9pbml0aWFsX21zGAUgASgEEhYKDmJhY2tvZmZfbWF4",
+            "X21zGAYgASgEEhYKDm1heF9zZW5kX2J5dGVzGAcgASgEEhoKEnJlcXVlc3Rf",
+            "dGltZW91dF9tcxgLIAEoBBIZChFtYXhfcmVjZWl2ZV9ieXRlcxgMIAEoBBIZ",
+            "ChF2ZXJpZnlfdGltZW91dF9tcxgQIAEoBBIZChFtYXhfcGFja2FnZV9ieXRl",
+            "cxgUIAEoBBIbChNkb3dubG9hZF90aW1lb3V0X21zGBUgASgEEhcKD3N0b3Bf",
+            "dGltZW91dF9tcxgcIAEoBBIaChJjb25uZWN0X3RpbWVvdXRfbXMYHSABKAQi",
+            "1AYKBkVmZmVjdBIyCgxodHRwX3JlcXVlc3QYASABKAsyGi5vcGFtcC5jb3Jl",
+            "LnYxLkh0dHBSZXF1ZXN0SAASKAoHd3Nfb3BlbhgCIAEoCzIVLm9wYW1wLmNv",
+            "cmUudjEuV3NPcGVuSAASKwoHd3Nfc2VuZBgDIAEoCzIYLm9wYW1wLmNvcmUu",
+            "djEuV3NNZXNzYWdlSAASJQoId3NfY2xvc2UYBCABKAsyES5vcGFtcC5jb3Jl",
+            "LnYxLklkSAASLQoGbm90aWZ5GAUgASgLMhsub3BhbXAuY29yZS52MS5Ob3Rp",
+            "ZmljYXRpb25IABIlCgVzdG9yZRgGIAEoCzIULm9wYW1wLmNvcmUudjEuU3Rv",
+            "cmVIABIrCghkb3dubG9hZBgHIAEoCzIXLm9wYW1wLmNvcmUudjEuRG93bmxv",
+            "YWRIABIkCgdkaXNjYXJkGAggASgLMhEub3BhbXAuY29yZS52MS5JZEgAEiMK",
+            "BmNhbmNlbBgJIAEoCzIRLm9wYW1wLmNvcmUudjEuSWRIABIpCgtwcm94eV9x",
+            "dWVyeRgKIAEoCzISLm9wYW1wLmNvcmUudjEuVXJsSAASMwoOc3RyZWFtX3Jl",
+            "c29sdmUYCyABKAsyGS5vcGFtcC5jb3JlLnYxLlN0cmVhbU5hbWVIABIwCgtz",
+            "dHJlYW1fb3BlbhgMIAEoCzIZLm9wYW1wLmNvcmUudjEuU3RyZWFtT3BlbkgA",
+            "EjUKEHN0cmVhbV9zdGFydF90bHMYDSABKAsyGS5vcGFtcC5jb3JlLnYxLlN0",
+            "cmVhbU5hbWVIABIwCgxzdHJlYW1fd3JpdGUYDiABKAsyGC5vcGFtcC5jb3Jl",
+            "LnYxLldzTWVzc2FnZUgAEjIKDHN0cmVhbV9jbG9zZRgPIAEoCzIaLm9wYW1w",
+            "LmNvcmUudjEuU3RyZWFtQ2xvc2VIABIxCg1kb3dubG9hZF9kYXRhGBAgASgL",
+            "Mhgub3BhbXAuY29yZS52MS5Xc01lc3NhZ2VIABIqCg1kb3dubG9hZF9kb25l",
+            "GBEgASgLMhEub3BhbXAuY29yZS52MS5JZEgAEjQKDXN0cmVhbV9zcGxpY2UY",
+            "EiABKAsyGy5vcGFtcC5jb3JlLnYxLlN0cmVhbVNwbGljZUgAQgYKBGtpbmQi",
+            "KAoLU3RyZWFtQ2xvc2USCgoCaWQYASABKAQSDQoFYWJvcnQYAiABKAgiHgoD",
+            "VXJsEgoKAmlkGAEgASgEEgsKA3VybBgCIAEoCSImCgpTdHJlYW1OYW1lEgoK",
+            "AmlkGAEgASgEEgwKBGhvc3QYAiABKAkiOwoMU3RyZWFtU3BsaWNlEgoKAmlk",
+            "GAEgASgEEhAKCGRvd25sb2FkGAIgASgEEg0KBWJ5dGVzGAMgASgEIjQKClN0",
+            "cmVhbU9wZW4SCgoCaWQYASABKAQSDAoEaG9zdBgCIAEoCRIMCgRwb3J0GAMg",
+            "ASgNIokBCghEb3dubG9hZBIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoH",
+            "aGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhEKCW1heF9i",
+            "eXRlcxgEIAEoBBISCgp0aW1lb3V0X21zGAUgASgEEhUKDXNlcnZlcl9vcmln",
+            "aW4YBiABKAgiIQoFU3RvcmUSCgoCaWQYASABKAQSDAoEZGF0YRgCIAEoDCKM",
+            "AQoLSHR0cFJlcXVlc3QSCgoCaWQYASABKAQSCwoDdXJsGAIgASgJEiYKB2hl",
+            "YWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIMCgRib2R5GAQg",
+            "ASgMEhIKCnRpbWVvdXRfbXMYBSABKAQSGgoSbWF4X3Jlc3BvbnNlX2J5dGVz",
+            "GAYgASgEIngKBldzT3BlbhIKCgJpZBgBIAEoBBILCgN1cmwYAiABKAkSJgoH",
+            "aGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhkKEW1heF9t",
+            "ZXNzYWdlX2J5dGVzGAQgASgEEhIKCnRpbWVvdXRfbXMYBSABKAQitgcKDE5v",
+            "dGlmaWNhdGlvbhIpCgljb25uZWN0ZWQYASABKAsyFC5vcGFtcC5jb3JlLnYx",
+            "LkVtcHR5SAASPAoOY29ubmVjdF9mYWlsZWQYAiABKAsyIi5vcGFtcC5jb3Jl",
+            "LnYxLk5vdGlmeUNvbm5lY3RGYWlsZWRIABI2Cg5lcnJvcl9yZXNwb25zZRgD",
+            "IAEoCzIcLm9wYW1wLmNvcmUudjEuRXJyb3JSZXNwb25zZUgAEjoKDXJlbW90",
+            "ZV9jb25maWcYBCABKAsyIS5vcGFtcC5wcm90by52MS5BZ2VudFJlbW90ZUNv",
+            "bmZpZ0gAEjcKB2NvbW1hbmQYBSABKAsyJC5vcGFtcC5wcm90by52MS5TZXJ2",
+            "ZXJUb0FnZW50Q29tbWFuZEgAEh4KFGluc3RhbmNlX3VpZF9jaGFuZ2VkGAYg",
+            "ASgMSAASHwoVaGVhcnRiZWF0X2ludGVydmFsX21zGAcgASgESAASOQoQc3Rh",
+            "dHVzX3Rvb19sYXJnZRgJIAEoCzIdLm9wYW1wLmNvcmUudjEuU3RhdHVzVG9v",
+            "TGFyZ2VIABIsCgtiYWRfbWVzc2FnZRgKIAEoCzIVLm9wYW1wLmNvcmUudjEu",
+            "RGV0YWlsSAASJwoHc3RvcHBlZBgLIAEoCzIULm9wYW1wLmNvcmUudjEuRW1w",
+            "dHlIABJHChNjb25uZWN0aW9uX3NldHRpbmdzGAwgASgLMigub3BhbXAucHJv",
+            "dG8udjEuQ29ubmVjdGlvblNldHRpbmdzT2ZmZXJzSAASNwoOY3VzdG9tX21l",
+            "c3NhZ2UYDSABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21NZXNzYWdlSAAS",
+            "SAoac2VydmVyX2N1c3RvbV9jYXBhYmlsaXRpZXMYDiABKAsyIi5vcGFtcC5w",
+            "cm90by52MS5DdXN0b21DYXBhYmlsaXRpZXNIABJGChdjdXN0b21fbWVzc2Fn",
+            "ZV9ub3Rfc2VudBgPIAEoCzIjLm9wYW1wLmNvcmUudjEuQ3VzdG9tTWVzc2Fn",
+            "ZU5vdFNlbnRIABI4Cg9pbnN0YWxsX3BhY2thZ2UYECABKAsyHS5vcGFtcC5j",
+            "b3JlLnYxLkluc3RhbGxQYWNrYWdlSAASLQoOcmVtb3ZlX3BhY2thZ2UYESAB",
+            "KAsyEy5vcGFtcC5jb3JlLnYxLk5hbWVIABIyCgxzYXZlX3N0YWxsZWQYEiAB",
+            "KAsyGi5vcGFtcC5jb3JlLnYxLlNhdmVTdGFsbGVkSABCBgoEa2luZEoECAgQ",
+            "CSIxCgtTYXZlU3RhbGxlZBIPCgdzdGFsbGVkGAEgASgIEhEKCXdhaXRlZF9t",
+            "cxgCIAEoBCJjCg5JbnN0YWxsUGFja2FnZRIMCgRuYW1lGAEgASgJEjEKB3Bh",
+            "Y2thZ2UYAiABKAsyIC5vcGFtcC5wcm90by52MS5QYWNrYWdlQXZhaWxhYmxl",
+            "EhAKCGRvd25sb2FkGAMgASgEIlYKFEN1c3RvbU1lc3NhZ2VOb3RTZW50Ei4K",
+            "B21lc3NhZ2UYASABKAsyHS5vcGFtcC5wcm90by52MS5DdXN0b21NZXNzYWdl",
+            "Eg4KBnJlYXNvbhgCIAEoCSJFChNOb3RpZnlDb25uZWN0RmFpbGVkEhMKBnN0",
+            "YXR1cxgBIAEoDUgAiAEBEg4KBmRldGFpbBgCIAEoCUIJCgdfc3RhdHVzIi4K",
+            "DUVycm9yUmVzcG9uc2USDAoEa2luZBgBIAEoBRIPCgdtZXNzYWdlGAIgASgJ",
+            "IlgKDlN0YXR1c1Rvb0xhcmdlEikKBWZpZWxkGAEgASgOMhoub3BhbXAuY29y",
+            "ZS52MS5TdGF0dXNGaWVsZBINCgVieXRlcxgCIAEoBBIMCgRuYW1lGAMgASgJ",
+            "InEKCVNldHVwQ2FsbBIqCgVzdGFydBgBIAEoCzIZLm9wYW1wLmNvcmUudjEu",
+            "U2V0dXBTdGFydEgAEjAKCGlkZW50aXR5GAIgASgLMhwub3BhbXAuY29yZS52",
+            "MS5TZXR1cElkZW50aXR5SABCBgoEY2FsbCKNAQoKU2V0dXBSZXBseRIuCgdz",
+            "dGFydGVkGAEgASgLMhsub3BhbXAuY29yZS52MS5TZXR1cFN0YXJ0ZWRIABI0",
+            "CgppZGVudGlmaWVkGAIgASgLMh4ub3BhbXAuY29yZS52MS5TZXR1cElkZW50",
+            "aWZpZWRIABIPCgVlcnJvchgDIAEoCUgAQggKBnJlc3VsdCInCghWYXJpYWJs",
+            "ZRIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJIp4BCgpTZXR1cFN0YXJ0",
+            "EiQKA2VudhgBIAMoCzIXLm9wYW1wLmNvcmUudjEuVmFyaWFibGUSIgoCb3MY",
+            "AiABKA4yFi5vcGFtcC5jb3JlLnYxLlNldHVwT3MSDwoHcHJvZ3JhbRgDIAEo",
+            "CRILCgNjd2QYBCABKAkSKAoEY29kZRgFIAEoCzIaLm9wYW1wLmNvcmUudjEu",
+            "U2V0dXBJbkNvZGUihwIKC1NldHVwSW5Db2RlEhUKCGVuZHBvaW50GAEgASgJ",
+            "SACIAQESFQoNaGVhZGVyc19naXZlbhgCIAEoCBImCgdoZWFkZXJzGAMgAygL",
+            "MhUub3BhbXAuY29yZS52MS5IZWFkZXISFgoJc3RhdGVfZGlyGAQgASgJSAGI",
+            "AQESGQoMaGVhcnRiZWF0X21zGAUgASgSSAKIAQESFQoNZW5kcG9pbnRfbmFt",
+            "ZRgGIAEoCRIUCgxoZWFkZXJzX25hbWUYByABKAkSFgoOaGVhcnRiZWF0X25h",
+            "bWUYCCABKAlCCwoJX2VuZHBvaW50QgwKCl9zdGF0ZV9kaXJCDwoNX2hlYXJ0",
+            "YmVhdF9tcyKwAgoMU2V0dXBTdGFydGVkEgsKA29mZhgBIAEoCBISCgpvZmZf",
+            "cmVhc29uGAwgASgJEhAKCGVuZHBvaW50GAIgASgJEiYKB2hlYWRlcnMYAyAD",
+            "KAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRlchIdChVoZWFydGJlYXRfaW50ZXJ2",
+            "YWxfbXMYBCABKAQSEQoJc3RhdGVfZGlyGAUgASgJEhUKDWRlZmF1bHRfc2xv",
+            "dHMYBiADKAkSFwoPYWxsX3Nsb3RzX3Rha2VuGAcgASgJEg8KB3NlcnZpY2UY",
+            "CCABKAkSFgoOc2hvd25fZW5kcG9pbnQYCSABKAkSKAoFaGludHMYCiABKAsy",
+            "GS5vcGFtcC5jb3JlLnYxLlNldHVwSGludHMSEAoId2FybmluZ3MYCyADKAki",
+            "VAoKU2V0dXBIaW50cxIPCgdyZWZ1c2VkGAEgASgJEhEKCW5vdF9mb3VuZBgC",
+            "IAEoCRITCgt1bnJlYWNoYWJsZRgDIAEoCRINCgVlcnJvchgEIAEoCSJwCg1T",
+            "ZXR1cElkZW50aXR5EhEKCXN0YXRlX2RpchgBIAEoCBINCgVzYXZlZBgCIAEo",
+            "CRIbChNyZXNvdXJjZV9hdHRyaWJ1dGVzGAMgASgJEg8KB2VudHJvcHkYBCAB",
+            "KAwSDwoHdW5peF9tcxgFIAEoBCK2AQoPU2V0dXBJZGVudGlmaWVkEhQKDGlu",
+            "c3RhbmNlX3VpZBgBIAEoDBIpCgRmcm9tGAIgASgOMhsub3BhbXAuY29yZS52",
+            "MS5TZXR1cFVpZEZyb20SDAoEc2F2ZRgDIAEoCBIMCgR0ZXh0GAQgASgJEhMK",
+            "C3Vuc2F2ZWRfdWlkGAUgASgMEjEKDHVuc2F2ZWRfZnJvbRgGIAEoDjIbLm9w",
+            "YW1wLmNvcmUudjEuU2V0dXBVaWRGcm9tKmMKDlBhY2thZ2VGYWlsdXJlEhkK",
+            "FVBBQ0tBR0VfRkFJTFVSRV9GSU5BTBAAEhkKFVBBQ0tBR0VfRkFJTFVSRV9M",
+            "QVRFUhABEhsKF1BBQ0tBR0VfRkFJTFVSRV9VTktOT1dOEAIqqwIKC1N0YXR1",
+            "c0ZpZWxkEhwKGFNUQVRVU19GSUVMRF9ERVNDUklQVElPThAAEhcKE1NUQVRV",
+            "U19GSUVMRF9IRUFMVEgQARIhCh1TVEFUVVNfRklFTERfRUZGRUNUSVZFX0NP",
+            "TkZJRxACEiUKIVNUQVRVU19GSUVMRF9SRU1PVEVfQ09ORklHX1NUQVRVUxAD",
+            "EisKJ1NUQVRVU19GSUVMRF9DT05ORUNUSU9OX1NFVFRJTkdTX1NUQVRVUxAE",
+            "EiUKIVNUQVRVU19GSUVMRF9BVkFJTEFCTEVfQ09NUE9ORU5UUxAFEiQKIFNU",
+            "QVRVU19GSUVMRF9DVVNUT01fQ0FQQUJJTElUSUVTEAYSIQodU1RBVFVTX0ZJ",
+            "RUxEX1BBQ0tBR0VfU1RBVFVTRVMQBypGCgdTZXR1cE9zEhEKDVNFVFVQX09T",
+            "X1VOSVgQABISCg5TRVRVUF9PU19NQUNPUxABEhQKEFNFVFVQX09TX1dJTkRP",
+            "V1MQAipbCgxTZXR1cFVpZEZyb20SFwoTU0VUVVBfVUlEX0ZST01fTUFERRAA",
+            "EhgKFFNFVFVQX1VJRF9GUk9NX1NBVkVEEAESGAoUU0VUVVBfVUlEX0ZST01f",
+            "R0lWRU4QAkJ2ChdkZXYucHlkYW50aWMub3BhbXAuY29yZUIJQ29yZVByb3Rv",
+            "WjpnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28vb3BhbXAv",
+            "aW50ZXJuYWwvY29yZXBiqgITUHlkYW50aWMuT3BBbXAuQ29yZWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Core.StatusField), typeof(global::Pydantic.OpAmp.Core.SetupOs), typeof(global::Pydantic.OpAmp.Core.SetupUidFrom), }, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Config), global::Pydantic.OpAmp.Core.Config.Parser, new[]{ "InstanceUid", "Capabilities", "HeartbeatIntervalMs", "BackoffInitialMs", "BackoffMaxMs", "MaxSendBytes", "Seed", "Endpoint", "Headers", "RequestTimeoutMs", "MaxReceiveBytes", "Persistence", "SavedState", "AcceptConnectionSettings", "VerifyTimeoutMs", "UserAgent", "AcceptPackages", "MaxPackageBytes", "DownloadTimeoutMs", "RequestInstanceUid", "Streams", "Entropy", "SpliceDownloads", "UnixMs", "StopTimeoutMs", "ConnectTimeoutMs", "Proxy", "ReportsHeartbeat" }, new[]{ "ReportsHeartbeat" }, null, null, null),
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Core.PackageFailure), typeof(global::Pydantic.OpAmp.Core.StatusField), typeof(global::Pydantic.OpAmp.Core.SetupOs), typeof(global::Pydantic.OpAmp.Core.SetupUidFrom), }, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Config), global::Pydantic.OpAmp.Core.Config.Parser, new[]{ "InstanceUid", "Capabilities", "HeartbeatIntervalMs", "BackoffInitialMs", "BackoffMaxMs", "MaxSendBytes", "Seed", "Endpoint", "Headers", "RequestTimeoutMs", "MaxReceiveBytes", "Persistence", "SavedState", "AcceptConnectionSettings", "VerifyTimeoutMs", "UserAgent", "AcceptPackages", "MaxPackageBytes", "DownloadTimeoutMs", "RequestInstanceUid", "Streams", "Entropy", "SpliceDownloads", "UnixMs", "StopTimeoutMs", "ConnectTimeoutMs", "Proxy" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.ProxyChoice), global::Pydantic.OpAmp.Core.ProxyChoice.Parser, new[]{ "Direct", "Url", "Headers", "ResolveLocally", "Environment" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Origin), global::Pydantic.OpAmp.Core.Origin.Parser, new[]{ "Scheme", "Host", "Port" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Header), global::Pydantic.OpAmp.Core.Header.Parser, new[]{ "Name", "Value" }, null, null, null, null),
@@ -256,8 +260,8 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.ProxyAnswer), global::Pydantic.OpAmp.Core.ProxyAnswer.Parser, new[]{ "Id", "Proxy", "Headers", "ResolveLocally" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamResolved), global::Pydantic.OpAmp.Core.StreamResolved.Parser, new[]{ "Id", "Addresses" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Name), global::Pydantic.OpAmp.Core.Name.Parser, new[]{ "Name_" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageInstalled), global::Pydantic.OpAmp.Core.PackageInstalled.Parser, new[]{ "Name", "Hash", "Ok", "Detail" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageRemoved), global::Pydantic.OpAmp.Core.PackageRemoved.Parser, new[]{ "Name", "Failed", "Detail" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageInstalled), global::Pydantic.OpAmp.Core.PackageInstalled.Parser, new[]{ "Name", "Hash", "Ok", "Detail", "Failure" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.PackageRemoved), global::Pydantic.OpAmp.Core.PackageRemoved.Parser, new[]{ "Name", "Failed", "Detail", "Failure" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Downloaded), global::Pydantic.OpAmp.Core.Downloaded.Parser, new[]{ "Id", "Sha256" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.DownloadResponse), global::Pydantic.OpAmp.Core.DownloadResponse.Parser, new[]{ "Id", "Status", "Sha256", "Location", "LocationOrigin" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Id), global::Pydantic.OpAmp.Core.Id.Parser, new[]{ "Id_" }, null, null, null, null),
@@ -277,7 +281,7 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamName), global::Pydantic.OpAmp.Core.StreamName.Parser, new[]{ "Id", "Host" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamSplice), global::Pydantic.OpAmp.Core.StreamSplice.Parser, new[]{ "Id", "Download", "Bytes" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StreamOpen), global::Pydantic.OpAmp.Core.StreamOpen.Parser, new[]{ "Id", "Host", "Port" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Download), global::Pydantic.OpAmp.Core.Download.Parser, new[]{ "Id", "Url", "Headers", "MaxBytes", "TimeoutMs" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Download), global::Pydantic.OpAmp.Core.Download.Parser, new[]{ "Id", "Url", "Headers", "MaxBytes", "TimeoutMs", "ServerOrigin" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Store), global::Pydantic.OpAmp.Core.Store.Parser, new[]{ "Id", "Data" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.HttpRequest), global::Pydantic.OpAmp.Core.HttpRequest.Parser, new[]{ "Id", "Url", "Headers", "Body", "TimeoutMs", "MaxResponseBytes" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.WsOpen), global::Pydantic.OpAmp.Core.WsOpen.Parser, new[]{ "Id", "Url", "Headers", "MaxMessageBytes", "TimeoutMs" }, null, null, null, null),
@@ -303,6 +307,26 @@ namespace Pydantic.OpAmp.Core {
 
   }
   #region Enums
+  /// <summary>
+  /// How an installation or a removal failed.
+  /// </summary>
+  public enum PackageFailure {
+    /// <summary>
+    /// For good, leaving what was there: not tried again until another version is offered (or the
+    /// package is offered and dropped again).
+    /// </summary>
+    [pbr::OriginalName("PACKAGE_FAILURE_FINAL")] Final = 0,
+    /// <summary>
+    /// For now, leaving what was there (an outage, a timeout): tried again after a wait, and not
+    /// reported failed meanwhile.
+    /// </summary>
+    [pbr::OriginalName("PACKAGE_FAILURE_LATER")] Later = 1,
+    /// <summary>
+    /// For good, and what was left is unknown: the package is uncertain from then on.
+    /// </summary>
+    [pbr::OriginalName("PACKAGE_FAILURE_UNKNOWN")] Unknown = 2,
+  }
+
   public enum StatusField {
     [pbr::OriginalName("STATUS_FIELD_DESCRIPTION")] Description = 0,
     [pbr::OriginalName("STATUS_FIELD_HEALTH")] Health = 1,
@@ -368,7 +392,6 @@ namespace Pydantic.OpAmp.Core {
   {
     private static readonly pb::MessageParser<Config> _parser = new pb::MessageParser<Config>(() => new Config());
     private pb::UnknownFieldSet _unknownFields;
-    private int _hasBits0;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pb::MessageParser<Config> Parser { get { return _parser; } }
@@ -396,7 +419,6 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public Config(Config other) : this() {
-      _hasBits0 = other._hasBits0;
       instanceUid_ = other.instanceUid_;
       capabilities_ = other.capabilities_;
       heartbeatIntervalMs_ = other.heartbeatIntervalMs_;
@@ -424,7 +446,6 @@ namespace Pydantic.OpAmp.Core {
       stopTimeoutMs_ = other.stopTimeoutMs_;
       connectTimeoutMs_ = other.connectTimeoutMs_;
       proxy_ = other.proxy_ != null ? other.proxy_.Clone() : null;
-      reportsHeartbeat_ = other.reportsHeartbeat_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -452,6 +473,16 @@ namespace Pydantic.OpAmp.Core {
     /// <summary>Field number for the "capabilities" field.</summary>
     public const int CapabilitiesFieldNumber = 3;
     private ulong capabilities_;
+    /// <summary>
+    /// The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+    /// with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+    /// Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+    /// is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+    /// interval the server offers; over plain HTTP it still polls, as it must to hear from the
+    /// server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+    /// ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+    /// given here, they are dropped.
+    /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public ulong Capabilities {
@@ -729,7 +760,7 @@ namespace Pydantic.OpAmp.Core {
     public const int StreamsFieldNumber = 23;
     private bool streams_;
     /// <summary>
-    /// Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+    /// Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
     /// on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
     /// http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
     /// and carries out cancel for saves and downloads.
@@ -841,38 +872,6 @@ namespace Pydantic.OpAmp.Core {
       }
     }
 
-    /// <summary>Field number for the "reports_heartbeat" field.</summary>
-    public const int ReportsHeartbeatFieldNumber = 32;
-    private readonly static bool ReportsHeartbeatDefaultValue = false;
-
-    private bool reportsHeartbeat_;
-    /// <summary>
-    /// Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-    /// WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-    /// at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-    /// </summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool ReportsHeartbeat {
-      get { if ((_hasBits0 & 1) != 0) { return reportsHeartbeat_; } else { return ReportsHeartbeatDefaultValue; } }
-      set {
-        _hasBits0 |= 1;
-        reportsHeartbeat_ = value;
-      }
-    }
-    /// <summary>Gets whether the "reports_heartbeat" field is set</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public bool HasReportsHeartbeat {
-      get { return (_hasBits0 & 1) != 0; }
-    }
-    /// <summary>Clears the value of the "reports_heartbeat" field</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public void ClearReportsHeartbeat() {
-      _hasBits0 &= ~1;
-    }
-
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -915,7 +914,6 @@ namespace Pydantic.OpAmp.Core {
       if (StopTimeoutMs != other.StopTimeoutMs) return false;
       if (ConnectTimeoutMs != other.ConnectTimeoutMs) return false;
       if (!object.Equals(Proxy, other.Proxy)) return false;
-      if (ReportsHeartbeat != other.ReportsHeartbeat) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -950,7 +948,6 @@ namespace Pydantic.OpAmp.Core {
       if (StopTimeoutMs != 0UL) hash ^= StopTimeoutMs.GetHashCode();
       if (ConnectTimeoutMs != 0UL) hash ^= ConnectTimeoutMs.GetHashCode();
       if (proxy_ != null) hash ^= Proxy.GetHashCode();
-      if (HasReportsHeartbeat) hash ^= ReportsHeartbeat.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -1074,10 +1071,6 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(250, 1);
         output.WriteMessage(Proxy);
       }
-      if (HasReportsHeartbeat) {
-        output.WriteRawTag(128, 2);
-        output.WriteBool(ReportsHeartbeat);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -1193,10 +1186,6 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(250, 1);
         output.WriteMessage(Proxy);
       }
-      if (HasReportsHeartbeat) {
-        output.WriteRawTag(128, 2);
-        output.WriteBool(ReportsHeartbeat);
-      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -1285,9 +1274,6 @@ namespace Pydantic.OpAmp.Core {
       }
       if (proxy_ != null) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(Proxy);
-      }
-      if (HasReportsHeartbeat) {
-        size += 2 + 1;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -1382,9 +1368,6 @@ namespace Pydantic.OpAmp.Core {
           Proxy = new global::Pydantic.OpAmp.Core.ProxyChoice();
         }
         Proxy.MergeFrom(other.Proxy);
-      }
-      if (other.HasReportsHeartbeat) {
-        ReportsHeartbeat = other.ReportsHeartbeat;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -1514,10 +1497,6 @@ namespace Pydantic.OpAmp.Core {
               Proxy = new global::Pydantic.OpAmp.Core.ProxyChoice();
             }
             input.ReadMessage(Proxy);
-            break;
-          }
-          case 256: {
-            ReportsHeartbeat = input.ReadBool();
             break;
           }
         }
@@ -1650,10 +1629,6 @@ namespace Pydantic.OpAmp.Core {
             input.ReadMessage(Proxy);
             break;
           }
-          case 256: {
-            ReportsHeartbeat = input.ReadBool();
-            break;
-          }
         }
       }
     }
@@ -1662,9 +1637,9 @@ namespace Pydantic.OpAmp.Core {
   }
 
   /// <summary>
-  /// The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+  /// The proxy for core mode's connections, told once. With no url and not direct, the one the
   /// environment names for each destination, by the rule every SDK shares
-  /// (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+  /// (tests/shell-tables/README.md, "Core mode's proxy rule"), from the variables in environment.
   /// </summary>
   [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
   public sealed partial class ProxyChoice : pb::IMessage<ProxyChoice>
@@ -3528,7 +3503,7 @@ namespace Pydantic.OpAmp.Core {
     /// <summary>Field number for the "downloaded" field.</summary>
     public const int DownloadedFieldNumber = 23;
     /// <summary>
-    /// Rust mode: answers download_done (the file is complete)
+    /// core mode: answers download_done (the file is complete)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -3558,7 +3533,7 @@ namespace Pydantic.OpAmp.Core {
     /// <summary>Field number for the "proxy_answer" field.</summary>
     public const int ProxyAnswerFieldNumber = 25;
     /// <summary>
-    /// Rust mode (Config.streams): what happened to the streams the core asked for.
+    /// Core mode (Config.streams): what happened to the streams the core asked for.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -5974,6 +5949,7 @@ namespace Pydantic.OpAmp.Core {
       hash_ = other.hash_;
       ok_ = other.ok_;
       detail_ = other.detail_;
+      failure_ = other.failure_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -6040,6 +6016,21 @@ namespace Pydantic.OpAmp.Core {
       }
     }
 
+    /// <summary>Field number for the "failure" field.</summary>
+    public const int FailureFieldNumber = 5;
+    private global::Pydantic.OpAmp.Core.PackageFailure failure_ = global::Pydantic.OpAmp.Core.PackageFailure.Final;
+    /// <summary>
+    /// not installed: how
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Core.PackageFailure Failure {
+      get { return failure_; }
+      set {
+        failure_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -6059,6 +6050,7 @@ namespace Pydantic.OpAmp.Core {
       if (Hash != other.Hash) return false;
       if (Ok != other.Ok) return false;
       if (Detail != other.Detail) return false;
+      if (Failure != other.Failure) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6070,6 +6062,7 @@ namespace Pydantic.OpAmp.Core {
       if (Hash.Length != 0) hash ^= Hash.GetHashCode();
       if (Ok != false) hash ^= Ok.GetHashCode();
       if (Detail.Length != 0) hash ^= Detail.GetHashCode();
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) hash ^= Failure.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6104,6 +6097,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(34);
         output.WriteString(Detail);
       }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        output.WriteRawTag(40);
+        output.WriteEnum((int) Failure);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -6130,6 +6127,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(34);
         output.WriteString(Detail);
       }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        output.WriteRawTag(40);
+        output.WriteEnum((int) Failure);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -6151,6 +6152,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (Detail.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Detail);
+      }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Failure);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -6175,6 +6179,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (other.Detail.Length != 0) {
         Detail = other.Detail;
+      }
+      if (other.Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        Failure = other.Failure;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -6211,6 +6218,10 @@ namespace Pydantic.OpAmp.Core {
             Detail = input.ReadString();
             break;
           }
+          case 40: {
+            Failure = (global::Pydantic.OpAmp.Core.PackageFailure) input.ReadEnum();
+            break;
+          }
         }
       }
     #endif
@@ -6244,6 +6255,10 @@ namespace Pydantic.OpAmp.Core {
           }
           case 34: {
             Detail = input.ReadString();
+            break;
+          }
+          case 40: {
+            Failure = (global::Pydantic.OpAmp.Core.PackageFailure) input.ReadEnum();
             break;
           }
         }
@@ -6294,6 +6309,7 @@ namespace Pydantic.OpAmp.Core {
       name_ = other.name_;
       failed_ = other.failed_;
       detail_ = other.detail_;
+      failure_ = other.failure_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -6334,7 +6350,7 @@ namespace Pydantic.OpAmp.Core {
     public const int DetailFieldNumber = 3;
     private string detail_ = "";
     /// <summary>
-    /// it is offered and dropped again
+    /// it is offered and dropped again (but see failure)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -6342,6 +6358,21 @@ namespace Pydantic.OpAmp.Core {
       get { return detail_; }
       set {
         detail_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "failure" field.</summary>
+    public const int FailureFieldNumber = 4;
+    private global::Pydantic.OpAmp.Core.PackageFailure failure_ = global::Pydantic.OpAmp.Core.PackageFailure.Final;
+    /// <summary>
+    /// not removed: how
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Core.PackageFailure Failure {
+      get { return failure_; }
+      set {
+        failure_ = value;
       }
     }
 
@@ -6363,6 +6394,7 @@ namespace Pydantic.OpAmp.Core {
       if (Name != other.Name) return false;
       if (Failed != other.Failed) return false;
       if (Detail != other.Detail) return false;
+      if (Failure != other.Failure) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -6373,6 +6405,7 @@ namespace Pydantic.OpAmp.Core {
       if (Name.Length != 0) hash ^= Name.GetHashCode();
       if (Failed != false) hash ^= Failed.GetHashCode();
       if (Detail.Length != 0) hash ^= Detail.GetHashCode();
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) hash ^= Failure.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -6403,6 +6436,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(26);
         output.WriteString(Detail);
       }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        output.WriteRawTag(32);
+        output.WriteEnum((int) Failure);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -6425,6 +6462,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(26);
         output.WriteString(Detail);
       }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        output.WriteRawTag(32);
+        output.WriteEnum((int) Failure);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -6443,6 +6484,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (Detail.Length != 0) {
         size += 1 + pb::CodedOutputStream.ComputeStringSize(Detail);
+      }
+      if (Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Failure);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -6464,6 +6508,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (other.Detail.Length != 0) {
         Detail = other.Detail;
+      }
+      if (other.Failure != global::Pydantic.OpAmp.Core.PackageFailure.Final) {
+        Failure = other.Failure;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -6496,6 +6543,10 @@ namespace Pydantic.OpAmp.Core {
             Detail = input.ReadString();
             break;
           }
+          case 32: {
+            Failure = (global::Pydantic.OpAmp.Core.PackageFailure) input.ReadEnum();
+            break;
+          }
         }
       }
     #endif
@@ -6525,6 +6576,10 @@ namespace Pydantic.OpAmp.Core {
           }
           case 26: {
             Detail = input.ReadString();
+            break;
+          }
+          case 32: {
+            Failure = (global::Pydantic.OpAmp.Core.PackageFailure) input.ReadEnum();
             break;
           }
         }
@@ -8815,7 +8870,7 @@ namespace Pydantic.OpAmp.Core {
     public const int UnixMsFieldNumber = 3;
     private ulong unixMs_;
     /// <summary>
-    /// the wall clock (Rust mode: for Retry-After dates)
+    /// the wall clock (core mode: for Retry-After dates)
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -10889,7 +10944,7 @@ namespace Pydantic.OpAmp.Core {
     /// <summary>Field number for the "proxy_query" field.</summary>
     public const int ProxyQueryFieldNumber = 10;
     /// <summary>
-    /// Rust mode (Config.streams).
+    /// Core mode (Config.streams).
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -13157,6 +13212,7 @@ namespace Pydantic.OpAmp.Core {
       headers_ = other.headers_.Clone();
       maxBytes_ = other.maxBytes_;
       timeoutMs_ = other.timeoutMs_;
+      serverOrigin_ = other.serverOrigin_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -13231,6 +13287,23 @@ namespace Pydantic.OpAmp.Core {
       }
     }
 
+    /// <summary>Field number for the "server_origin" field.</summary>
+    public const int ServerOriginFieldNumber = 6;
+    private bool serverOrigin_;
+    /// <summary>
+    /// The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+    /// present the client certificate you have for the server, or skip verification if you do so
+    /// for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool ServerOrigin {
+      get { return serverOrigin_; }
+      set {
+        serverOrigin_ = value;
+      }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -13251,6 +13324,7 @@ namespace Pydantic.OpAmp.Core {
       if(!headers_.Equals(other.headers_)) return false;
       if (MaxBytes != other.MaxBytes) return false;
       if (TimeoutMs != other.TimeoutMs) return false;
+      if (ServerOrigin != other.ServerOrigin) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -13263,6 +13337,7 @@ namespace Pydantic.OpAmp.Core {
       hash ^= headers_.GetHashCode();
       if (MaxBytes != 0UL) hash ^= MaxBytes.GetHashCode();
       if (TimeoutMs != 0UL) hash ^= TimeoutMs.GetHashCode();
+      if (ServerOrigin != false) hash ^= ServerOrigin.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -13298,6 +13373,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(40);
         output.WriteUInt64(TimeoutMs);
       }
+      if (ServerOrigin != false) {
+        output.WriteRawTag(48);
+        output.WriteBool(ServerOrigin);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -13325,6 +13404,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(40);
         output.WriteUInt64(TimeoutMs);
       }
+      if (ServerOrigin != false) {
+        output.WriteRawTag(48);
+        output.WriteBool(ServerOrigin);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -13347,6 +13430,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (TimeoutMs != 0UL) {
         size += 1 + pb::CodedOutputStream.ComputeUInt64Size(TimeoutMs);
+      }
+      if (ServerOrigin != false) {
+        size += 1 + 1;
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -13372,6 +13458,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (other.TimeoutMs != 0UL) {
         TimeoutMs = other.TimeoutMs;
+      }
+      if (other.ServerOrigin != false) {
+        ServerOrigin = other.ServerOrigin;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -13412,6 +13501,10 @@ namespace Pydantic.OpAmp.Core {
             TimeoutMs = input.ReadUInt64();
             break;
           }
+          case 48: {
+            ServerOrigin = input.ReadBool();
+            break;
+          }
         }
       }
     #endif
@@ -13449,6 +13542,10 @@ namespace Pydantic.OpAmp.Core {
           }
           case 40: {
             TimeoutMs = input.ReadUInt64();
+            break;
+          }
+          case 48: {
+            ServerOrigin = input.ReadBool();
             break;
           }
         }

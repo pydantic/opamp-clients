@@ -47,6 +47,8 @@ import (
 //     that reads one document's send_* and another's redaction leaks what neither would;
 //   - user.email, which no document drops, is on every exported list, and as "[REDACTED]" alone
 //     when every document of the round masks it;
+//   - note, which no document drops or masks, is on every exported list, and never as it was
+//     when every document of the round scrubs it (the defaults or a pattern);
 //   - a child of a span sampled in this process is sampled, whatever the trace cap;
 //   - with send_logs false in every document of the round, no log record is exported;
 //   - flip.a and flip.b, which every document redacts alike, are exported alike in each list:
@@ -93,6 +95,7 @@ type tortureDoc struct {
 	settings    *settingspb.Settings
 	dropsSecret bool // drop_attributes matches secret.token
 	masksEmail  bool // mask_attributes matches user.email (no drop pattern ever does)
+	scrubsNote  bool // scrub_defaults or scrub_patterns scrub note
 	tracesOff   bool // send_traces false
 	logsOff     bool // send_logs false
 }
@@ -134,6 +137,8 @@ func (d tortureDoc) json() []byte {
 	})
 	set("attribute_redaction", "drop_attributes", "drop", func(key string) any { return list(key) })
 	set("attribute_redaction", "mask_attributes", "mask", func(key string) any { return list(key) })
+	set("scrubbing", "scrub_defaults", "defaults", as)
+	set("scrubbing", "scrub_patterns", "patterns", func(key string) any { return list(key) })
 	set("debug", "debug_until", "until", as)
 	set("debug", "debug_sampling_rate", "sampling_ratio", num)
 	set("debug", "debug_send_logs_level", "log_level", as)
@@ -261,6 +266,26 @@ func genDoc(r *rand.Rand, strict, logsOff bool, traceCaps, logCaps []string) tor
 	if len(mask) > 0 {
 		d.doc["mask_attributes"] = strings.Join(mask, ",")
 	}
+	// Scrubbing: the defaults, a pattern that matches note whole, others that match nothing here.
+	var patterns []string
+	if strict || r.IntN(2) == 0 {
+		switch r.IntN(3) {
+		case 0:
+			d.doc["scrub_defaults"] = true
+		case 1:
+			patterns = append(patterns, pick(r, "*P4SS", "the *"))
+		default:
+			d.doc["scrub_defaults"] = true
+			patterns = append(patterns, "*p4ss*")
+		}
+		d.scrubsNote = true
+	}
+	if r.IntN(3) == 0 {
+		patterns = append(patterns, pick(r, "nothing*", "*iban*"))
+	}
+	if len(patterns) > 0 {
+		d.doc["scrub_patterns"] = strings.Join(patterns, ",")
+	}
 	// Debug windows: in force (an hour ahead of the vectors' clock) or over (an hour before).
 	if r.IntN(4) == 0 {
 		d.doc["debug_until"] = pick(r, "2026-10-14T13:00:00Z", "2026-10-14T11:00:00Z")
@@ -274,12 +299,16 @@ func genDoc(r *rand.Rand, strict, logsOff bool, traceCaps, logCaps []string) tor
 	return d
 }
 
+// noteAsIs is note's value, which the defaults scrub (for `password`) and so do some patterns.
+const noteAsIs = "the password is p4ss"
+
 // tortureAttrs are the attributes every span, event, link and record carries: one to drop, one
 // to mask, a pair redacted alike, others redacted now and then, and seq, which nothing redacts.
 func tortureAttrs(r *rand.Rand, seq int64) []attribute.KeyValue {
 	return []attribute.KeyValue{
 		attribute.String("secret.token", "s3cr3t"),
 		attribute.String("user.email", "a@b.c"),
+		attribute.String("note", noteAsIs),
 		attribute.Int64("flip.a", seq),
 		attribute.Int64("flip.b", seq),
 		attribute.String("k.1", "one"),
@@ -323,6 +352,7 @@ type tortureCheck struct {
 	// tracesDropSecret and logsDropSecret: every document sending the signal drops secret.token.
 	tracesDropSecret, logsDropSecret bool
 	alwaysMasksEmail, alwaysLogsOff  bool
+	alwaysScrubsNote                 bool
 	spans, records                   atomic.Int64 // exported and checked
 	mu                               sync.Mutex
 	errs                             []string
@@ -341,6 +371,7 @@ func (c *tortureCheck) reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.tracesDropSecret, c.logsDropSecret, c.alwaysMasksEmail, c.alwaysLogsOff = false, false, false, false
+	c.alwaysScrubsNote = false
 }
 
 func (c *tortureCheck) err() error {
@@ -366,6 +397,11 @@ func (c *tortureCheck) list(what string, dropsSecret bool, attrs []attribute.Key
 		c.fail("%s: user.email missing, no document drops it: %s", what, show(attrs))
 	} else if c.alwaysMasksEmail && email.Emit() != mask {
 		c.fail("%s: user.email exported as %q, every document masks it", what, email.Emit())
+	}
+	if note, ok := values["note"]; !ok {
+		c.fail("%s: note missing, no document drops it: %s", what, show(attrs))
+	} else if c.alwaysScrubsNote && note.Emit() == noteAsIs {
+		c.fail("%s: note exported as it was, every document scrubs it", what)
 	}
 	a, aok := values["flip.a"]
 	b, bok := values["flip.b"]
@@ -490,12 +526,14 @@ func tortureRound(t *testing.T, seed, round uint64) error {
 	for i := range sequence {
 		sequence[i] = r.IntN(len(pool))
 	}
-	check := &tortureCheck{tracesDropSecret: true, logsDropSecret: true, alwaysMasksEmail: true, alwaysLogsOff: true}
+	check := &tortureCheck{tracesDropSecret: true, logsDropSecret: true, alwaysMasksEmail: true, alwaysLogsOff: true,
+		alwaysScrubsNote: true}
 	for _, d := range pool {
 		check.tracesDropSecret = check.tracesDropSecret && (d.dropsSecret || d.tracesOff)
 		check.logsDropSecret = check.logsDropSecret && (d.dropsSecret || d.logsOff)
 		check.alwaysMasksEmail = check.alwaysMasksEmail && d.masksEmail
 		check.alwaysLogsOff = check.alwaysLogsOff && d.logsOff
+		check.alwaysScrubsNote = check.alwaysScrubsNote && d.scrubsNote
 	}
 
 	c := NewControls()
@@ -559,9 +597,9 @@ func tortureRound(t *testing.T, seed, round uint64) error {
 		return fmt.Errorf("while flipping: %w", err)
 	}
 	t.Logf("round %d: %d documents applied, %d spans and %d log records exported and checked (secret.token dropped "+
-		"where traces are sent %v, where logs are %v; user.email always masked %v, logs always off %v)", round, flips+1,
-		check.spans.Load(), check.records.Load(), check.tracesDropSecret, check.logsDropSecret, check.alwaysMasksEmail,
-		check.alwaysLogsOff)
+		"where traces are sent %v, where logs are %v; user.email always masked %v, note always scrubbed %v, logs always "+
+		"off %v)", round, flips+1, check.spans.Load(), check.records.Load(), check.tracesDropSecret, check.logsDropSecret,
+		check.alwaysMasksEmail, check.alwaysScrubsNote, check.alwaysLogsOff)
 
 	// The last document, with caps the flipping never set: everything after it follows it.
 	last := genDoc(r, r.IntN(2) == 0, false, []string{"3", "7"}, []string{"6", "9"})

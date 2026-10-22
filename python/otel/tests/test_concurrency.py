@@ -112,6 +112,9 @@ DROP_POOL = {"free": ["secret.*", "db.*", "k", "auth*", "*email*", "plain", "*.i
              "redacted": ["db.*", "k", "auth*", "tags"]}
 MASK_POOL = {"free": ["user.*", "plain", "n", "*token*", "db.statement", "tags"],
              "redacted": ["plain", "n", "*email*", "db.statement", "*token*"]}
+#: Scrub patterns a run picks from: none matches a log body the workers emit, a masked value
+#: ("[REDACTED]") or a key every document of a redacted run drops or masks.
+SCRUB_POOL = ["p", "k", "*=1", "select *", "/checkout", "tags"]
 RULES = [{"rate": 0, "kind": "server", "path": "/health*"}, {"rate": 0.5, "name": "job*"},
          {"rate": 1, "attributes": {"k": "v*"}}, {"rate": 0}, {"rate": 1, "name": "GET *"},
          {"rate": 0.25, "kind": "internal"}, {"rate": 1, "path": "/checkout"}]
@@ -148,7 +151,7 @@ def generate(rng: random.Random, profile: str, n: int) -> list[dict]:
 
 def change(rng: random.Random, doc: dict, pool: str) -> None:
     what = rng.choice(["rules", "rules", "rate", "trace_cap", "log_cap", "level", "scopes", "drop", "mask",
-                       "send", "debug"])
+                       "send", "scrub", "debug"])
     if what == "rules":
         rules = list(doc.get("sampling_rules", []))
         op = rng.choice(["add", "remove", "shuffle"])
@@ -179,6 +182,16 @@ def change(rng: random.Random, doc: dict, pool: str) -> None:
         else:
             have.append(rng.choice((DROP_POOL if what == "drop" else MASK_POOL)[pool]))
         set_or_drop(doc, key, ",".join(dict.fromkeys(have)))
+    elif what == "scrub":
+        if rng.random() < 0.5:
+            set_or_drop(doc, "scrub_defaults", maybe(rng, ["true"]))
+        else:
+            have = [p for p in doc.get("scrub_patterns", "").split(",") if p]
+            if have and rng.random() < 0.4:
+                have.pop(rng.randrange(len(have)))
+            else:
+                have.append(rng.choice(SCRUB_POOL))
+            set_or_drop(doc, "scrub_patterns", ",".join(dict.fromkeys(have)))
     elif what == "send":
         key = rng.choice(["send_traces", "send_logs", "send_metrics"])
         set_or_drop(doc, key, maybe(rng, ["true", "false"]))
@@ -252,6 +265,13 @@ def policy_of(doc: dict) -> bytes:
     redaction = {k: doc[f"{k}_attributes"].split(",") for k in ("drop", "mask") if f"{k}_attributes" in doc}
     if redaction:
         o["attribute_redaction"] = redaction
+    scrubbing: dict = {}
+    if "scrub_defaults" in doc:
+        scrubbing["defaults"] = True
+    if "scrub_patterns" in doc:
+        scrubbing["patterns"] = doc["scrub_patterns"].split(",")
+    if scrubbing:
+        o["scrubbing"] = scrubbing
     if "debug_until" in doc:
         debug = {"until": doc["debug_until"]}
         if "debug_sampling_rate" in doc:
@@ -288,16 +308,28 @@ def anyvalue(v) -> anyvalue_pb2.AnyValue:
 
 
 KEEP, DROP, MASK = "keep", "drop", "mask"
+#: A fate is KEEP, DROP, MASK or (SCRUB, the value exported): kept and scrubbed.
+SCRUB = "scrub"
 
 
-def fates(doc: dict) -> dict[str, str]:
-    """What `doc` does to each key, by the layer's reference redactor."""
+def plain(v):
+    """An exported or reference value as the workers emit theirs: a list as a tuple."""
+    return tuple(v) if isinstance(v, list) else v
+
+
+def fates(doc: dict) -> dict:
+    """What `doc` does to each key, by the layer's reference redactor and scrubber."""
     ref = evaluate(doc, attributes=settings_pb2.Attributes(attributes=[
         anyvalue_pb2.KeyValue(key=k, value=anyvalue(VALUES[k])) for k in KEYS]))
     out = dict.fromkeys(KEYS, DROP)
     for kv in ref.redacted:
-        masked = kv.value.HasField("string_value") and kv.value.string_value == "[REDACTED]"
-        out[kv.key] = MASK if masked else KEEP
+        got = kv.value.string_value if kv.value.HasField("string_value") else None
+        if got == "[REDACTED]" and VALUES[kv.key] != got:
+            out[kv.key] = MASK
+        elif got is not None and got != VALUES[kv.key]:
+            out[kv.key] = (SCRUB, got)  # the reference scrubs only to a string
+        else:
+            out[kv.key] = KEEP
     return out
 
 
@@ -445,7 +477,7 @@ def emit(p: Pipeline, rng: random.Random, e: Emitted, tag: str, n: int) -> None:
 # --- the checks ----------------------------------------------------------------------------------
 
 
-def seen(original: dict, exported) -> dict[str, str] | str:
+def seen(original: dict, exported) -> dict | str:
     """What was done to each of `original`'s keys, as exported; or what went wrong."""
     exported = dict(exported or {})
     out = {}
@@ -454,8 +486,10 @@ def seen(original: dict, exported) -> dict[str, str] | str:
             out[k] = DROP
         elif exported[k] == "[REDACTED]":
             out[k] = MASK
-        elif exported[k] == v:
+        elif plain(exported[k]) == v:
             out[k] = KEEP
+        elif isinstance(exported[k], str) and exported[k].startswith("[Scrubbed due to "):
+            out[k] = (SCRUB, exported[k])
         else:
             return f"{k} exported as {exported[k]!r}, emitted as {v!r}"
     if extra := set(exported) - set(original):
@@ -463,7 +497,7 @@ def seen(original: dict, exported) -> dict[str, str] | str:
     return out
 
 
-def one_document(lists: list[dict], exported: list, tables: list[dict[str, str]]) -> str | None:
+def one_document(lists: list[dict], exported: list, tables: list[dict]) -> str | None:
     """None when one document's redaction gives all of `exported` from `lists`; else why not."""
     got = {}
     for original, out in zip(lists, exported, strict=True):
@@ -478,7 +512,7 @@ def one_document(lists: list[dict], exported: list, tables: list[dict[str, str]]
     return None
 
 
-def unsent(docs: list[dict], tables: list[dict[str, str]], send: str) -> tuple[set[str], set[str]]:
+def unsent(docs: list[dict], tables: list[dict], send: str) -> tuple[set[str], set[str]]:
     """The keys every document that sends a signal (`send`: its send_* setting) drops, and those
     they all drop or mask: what's never exported on it, and never in the clear. Neither, when no
     document sends it."""
@@ -486,7 +520,7 @@ def unsent(docs: list[dict], tables: list[dict[str, str]], send: str) -> tuple[s
     if not sending:
         return set(), set()
     return ({k for k in KEYS if all(t[k] == DROP for t in sending)},
-            {k for k in KEYS if all(t[k] != KEEP for t in sending)})
+            {k for k in KEYS if all(t[k] in (DROP, MASK) for t in sending)})
 
 
 def held_when_sent(exported: list, what: str, never: tuple[set[str], set[str]]) -> list[str]:
@@ -610,7 +644,8 @@ def check_final(p: Pipeline, doc: dict, seed: int) -> list[str]:
 
 
 def redacted(attrs: dict, table: dict[str, str]) -> dict:
-    return {k: "[REDACTED]" if table[k] == MASK else v for k, v in attrs.items() if table[k] != DROP}
+    return {k: "[REDACTED]" if table[k] == MASK else table[k][1] if isinstance(table[k], tuple) else v
+            for k, v in attrs.items() if table[k] != DROP}
 
 
 # --- the run -------------------------------------------------------------------------------------

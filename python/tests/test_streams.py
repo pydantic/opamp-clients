@@ -900,7 +900,8 @@ def test_the_core_hears_of_an_opamp_server_through_core_mode(tmp_path) -> None:
     async def run() -> None:
         server = await OpampServer().start()
         notes: list[Notification] = []
-        client = Client.start(Config(endpoint=server.endpoint("ws"), mode="core", heartbeat_interval_ms=50),
+        client = Client.start(Config(endpoint=server.endpoint("ws"), mode="core", heartbeat_interval_ms=50,
+                                     capabilities=pb.AgentCapabilities_ReportsHeartbeat),
                               Status(), notes.append)
         await until("messages", lambda: len(server.arrivals) >= 3)
         await client.stop()

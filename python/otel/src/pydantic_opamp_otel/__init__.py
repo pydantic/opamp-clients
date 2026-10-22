@@ -62,7 +62,7 @@ from opentelemetry.sdk.trace.sampling import (ALWAYS_ON, Decision, ParentBased, 
                                               TraceIdRatioBased)
 
 from . import app_settings
-from ._match import Bucket, Redactor, attribute_text, glob, level_keeps, rebucket, threshold
+from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
 __all__ = ["Configurator", "Distro", "GatedOtlpMetricExporter", "app_settings", "configure", "start"]
@@ -534,7 +534,7 @@ class Gates:
     logs_scope_levels: tuple[tuple[str, int], ...] = ()
     #: send_logs_per_second's bucket; None: no cap.
     logs_cap: Bucket | None = None
-    #: drop_attributes and mask_attributes, for spans and log records at export.
+    #: drop_attributes and mask_attributes, then scrubbing, for spans and log records at export.
     redactor: Redactor = field(default_factory=lambda: Redactor((), ()))
 
 
@@ -589,7 +589,10 @@ class Controls:
         cap = rebucket(was.logs_cap, s.send_logs_per_second if s.HasField("send_logs_per_second") else None,
                        self._clock)
         drop, mask = tuple(s.drop_attributes), tuple(s.mask_attributes)
-        redactor = was.redactor if (drop, mask) == (was.redactor.drop, was.redactor.mask) else Redactor(drop, mask)
+        scrub = (s.scrub_defaults, tuple(s.scrub_patterns))
+        r = was.redactor
+        redactor = r if (drop, mask, scrub) == (r.drop, r.mask, (r.scrubber.defaults, r.scrubber.patterns)) \
+            else Redactor(drop, mask, Scrubber(*scrub))
         # One store: an export running meanwhile is held to the last document or to this one, whole.
         self.gates = Gates(
             send_traces=not s.HasField("send_traces") or s.send_traces,
@@ -629,7 +632,7 @@ class _GatedSpanExporter(SpanExporter):
         self._to, self._c = to, controls
 
     def export(self, spans):
-        """send_traces, then redaction."""
+        """send_traces, then redaction and scrubbing."""
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         if not g.send_traces:
             c.traces.filtered(len(spans))
@@ -651,7 +654,8 @@ class _GatedLogExporter(LogRecordExporter):
         self._to, self._c = to, controls
 
     def export(self, batch):
-        """send_logs, then the levels, then the rate cap, then redaction; a batch left empty isn't
+        """send_logs, then the levels, then the rate cap, then redaction and scrubbing (of the
+        attributes and the body); a batch left empty isn't
         exported. What they drop is counted as filtered."""
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         counts, given = c.logs_counts, len(batch)
@@ -694,13 +698,13 @@ def _kept(record, floor: int | None, levels: tuple[tuple[str, int], ...] = ()) -
     return level_keeps(floor, number)
 
 
-def _redacted_attributes(attributes, redactor: Redactor):
-    """Attributes as exported, in a container of their own: the original is shared with every
-    other processor and exporter, and stays as it was. What the SDK's limits dropped still counts
-    (a redaction's drop doesn't)."""
+def _redacted_attributes(attributes, redacted: dict):
+    """Attributes as exported (`redacted`, Redactor.apply's), in a container of their own: the
+    original is shared with every other processor and exporter, and stays as it was. What the
+    SDK's limits dropped still counts (a redaction's drop doesn't)."""
     from opentelemetry.attributes import BoundedAttributes  # noqa: PLC0415
 
-    out = BoundedAttributes(maxlen=None, attributes=redactor.apply(attributes), immutable=True)
+    out = BoundedAttributes(maxlen=None, attributes=redacted, immutable=True)
     out.dropped = getattr(attributes, "dropped", 0)
     return out
 
@@ -726,33 +730,43 @@ class _RedactedSpan(ReadableSpan):
 
 
 def _redacted_span(span: ReadableSpan, redactor: Redactor) -> ReadableSpan:
-    """The span with its attributes, its events' and its links' redacted; the span itself when
-    nothing in it matches. A new span, never the original changed."""
+    """The span with its attributes, its events' and its links' redacted and scrubbed; the span
+    itself when nothing in it changes. A new span, never the original changed."""
     events, links = span.events or (), span.links or ()
-    if not (redactor.touches(span.attributes) or any(redactor.touches(e.attributes) for e in events)
-            or any(redactor.touches(link.attributes) for link in links)):
+    own = redactor.apply(span.attributes)
+    of_events = [redactor.apply(e.attributes) for e in events]
+    of_links = [redactor.apply(link.attributes) for link in links]
+    if own is None and all(r is None for r in of_events) and all(r is None for r in of_links):
         return span
 
-    def redact(attributes):
-        return _redacted_attributes(attributes, redactor) if redactor.touches(attributes) else attributes
+    def redact(attributes, redacted):
+        return attributes if redacted is None else _redacted_attributes(attributes, redacted)
 
     return _RedactedSpan(
         span, name=span.name, context=span.get_span_context(), parent=span.parent, resource=span.resource,
-        attributes=redact(span.attributes),
-        events=tuple(Event(e.name, redact(e.attributes), e.timestamp) for e in events),
-        links=tuple(Link(link.context, redact(link.attributes)) for link in links),
+        attributes=redact(span.attributes, own),
+        events=tuple(Event(e.name, redact(e.attributes, r), e.timestamp) for e, r in zip(events, of_events)),
+        links=tuple(Link(link.context, redact(link.attributes, r)) for link, r in zip(links, of_links)),
         kind=span.kind, status=span.status, start_time=span.start_time, end_time=span.end_time,
         instrumentation_scope=span.instrumentation_scope)
 
 
 def _redacted_record(record, redactor: Redactor):
-    """The log record with its attributes redacted; the record itself when none matches. Its
-    LogRecord is shared with every other processor, and ReadableLogRecord is frozen: a copy."""
+    """The log record with its attributes redacted and scrubbed and its body scrubbed; the record
+    itself when nothing changes. Its LogRecord is shared with every other processor, and
+    ReadableLogRecord is frozen: a copy."""
     inner = getattr(record, "log_record", None)
-    if inner is None or not redactor.touches(inner.attributes):
+    if inner is None:
+        return record
+    redacted = redactor.apply(inner.attributes)
+    body = redactor.body(inner.body)
+    if redacted is None and body is Scrubber._UNCHANGED:
         return record
     inner = copy.copy(inner)
-    inner.attributes = _redacted_attributes(inner.attributes, redactor)
+    if redacted is not None:
+        inner.attributes = _redacted_attributes(inner.attributes, redacted)
+    if body is not Scrubber._UNCHANGED:
+        inner.body = body
     return dataclasses.replace(record, log_record=inner)
 
 
@@ -765,8 +779,8 @@ SAMPLER = ("sampling_rate", "sampling_rules", "sampling_traces_per_second")
 TRACE_GATE = ("send_traces",)
 #: Those of the gate on every log exporter (the export log record processor, likewise).
 LOG_GATE = ("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second")
-#: Redaction, at both: every span and log record exported has to pass one.
-REDACTION = ("drop_attributes", "mask_attributes")
+#: Redaction and scrubbing, at both: every span and log record exported has to pass one.
+REDACTION = ("drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns")
 #: Debug mode: the layer folds it into the rate and the level, which the timer puts in force.
 DEBUG = ("debug_until", "debug_sampling_rate", "debug_send_logs_level")
 #: The instrumentation switches, which only opentelemetry-instrument reads, at start.

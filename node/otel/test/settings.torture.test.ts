@@ -124,6 +124,10 @@ function policyOf(d: Record<string, unknown>): string {
   if (d.drop_attributes !== undefined) redaction.drop = [...new Set(list(d.drop_attributes))];
   if (d.mask_attributes !== undefined) redaction.mask = [...new Set(list(d.mask_attributes))];
   if (Object.keys(redaction).length > 0) o.attribute_redaction = redaction;
+  const scrubbing: Record<string, unknown> = {};
+  if (d.scrub_defaults === "true") scrubbing.defaults = true;
+  if (d.scrub_patterns !== undefined) scrubbing.patterns = [...new Set(list(d.scrub_patterns))];
+  if (Object.keys(scrubbing).length > 0) o.scrubbing = scrubbing;
   if (d.debug_until !== undefined) {
     o.debug = { until: d.debug_until };
     if (d.debug_sampling_rate !== undefined) o.debug.sampling_ratio = Number(d.debug_sampling_rate);
@@ -194,13 +198,21 @@ const LEVELS = ["trace", "debug", "info", "warn", "error"];
 /** Redaction patterns that come and go: none of them matches `id`, nor a *password* key. */
 const DROP_POOL = ["grp.a*", "grp.b.x", "user.email", "grp.*", "tenant", "GRP.C*"];
 const MASK_POOL = ["grp.*", "grp.c*", "user.*", "plain", "tenant", "*.y"];
+/**
+ * Scrub patterns that come and go: keys (plain, grp.?.x) and values (t1, the email) they match
+ * whole; none matches an `id`, nor a log body.
+ */
+const SCRUB_POOL = ["plain", "*.x", "t1", "*@*"];
+/** An attribute the default patterns scrub, by its value: as exported then. */
+const NOTE = "the password is p4ss";
+const NOTE_SCRUBBED = "[Scrubbed due to 'password']";
 
 type Mode = "mixed" | "redacted" | "logs off";
 
 /** What every document of a mode carries: the empty document is this alone. */
-const BASE: Record<Mode, { drop?: string[]; mask?: string[]; send_logs?: string }> = {
+const BASE: Record<Mode, { drop?: string[]; mask?: string[]; send_logs?: string; scrub_defaults?: string }> = {
   mixed: {},
-  redacted: { drop: ["secret.*"], mask: ["*password*"] },
+  redacted: { drop: ["secret.*"], mask: ["*password*"], scrub_defaults: "true" },
   "logs off": { send_logs: "false" },
 };
 
@@ -229,6 +241,9 @@ function documentOf(r: Rng, mode: Mode, wall: number, final = false): Record<str
     if (r.chance(0.4)) d.send_logs_per_second = r.pick(["2", "5", "50"]);
     drop.push(...r.some(DROP_POOL));
     mask.push(...r.some(MASK_POOL));
+    if (r.chance(0.4)) d.scrub_defaults = "true";
+    const scrub = r.chance(0.4) ? r.some(SCRUB_POOL) : [];
+    if (scrub.length) d.scrub_patterns = scrub.join(", ");
     if (r.chance(0.25)) {
       d.debug_until = new Date(wall + r.int(1, 800)).toISOString();
       if (r.chance(0.5)) d.debug_sampling_rate = r.pick(["0", "0.5", "1"]);
@@ -236,6 +251,7 @@ function documentOf(r: Rng, mode: Mode, wall: number, final = false): Record<str
     }
   }
   if (base.send_logs) d.send_logs = base.send_logs;
+  if (base.scrub_defaults) d.scrub_defaults = base.scrub_defaults;
   if (quiet) {
     d.send_traces = "false";
     d.send_logs = "false";
@@ -439,6 +455,7 @@ function attributesOf(r: Rng, id: string): Attributes {
     "user.email": "a@b.c",
     "card.cvv": "123",
     plain: "v",
+    note: NOTE,
   };
 }
 
@@ -538,7 +555,7 @@ function distinct(applied: (Settings | undefined)[]): Controls[] {
   const seen = new Map<string, Controls>();
   for (const s of applied) {
     const key = JSON.stringify([s?.sendTraces, s?.sendLogs, s?.sendLogsMinSeverity, s?.sendLogsScopeLevels,
-      s?.dropAttributes, s?.maskAttributes]);
+      s?.dropAttributes, s?.maskAttributes, s?.scrubDefaults, s?.scrubPatterns]);
     if (!seen.has(key)) seen.set(key, gateOf(s));
   }
   return [...seen.values()];
@@ -721,6 +738,11 @@ async function run(mode: Mode, seed: number): Promise<Reached> {
     }
     for (const list of lists([], allLogs)) {
       for (const k of byLogSenders) assert.ok(!(k in list), `${k}, dropped by every document that sends logs, exported in a log record: ${JSON.stringify(list)}`);
+    }
+    // The default patterns in every document: the note never in the clear.
+    if (mode === "redacted") assert.ok(applied.every((s) => s?.scrubDefaults), "a redacted run's document without scrub_defaults");
+    if (applied.every((s) => s?.scrubDefaults)) {
+      for (const list of lists(allSpans, allLogs)) assert.equal(list.note, NOTE_SCRUBBED, JSON.stringify(list));
     }
     if (mode === "logs off") assert.equal(allLogs.length, 0, "a log record exported with send_logs false in every document");
 

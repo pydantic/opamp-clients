@@ -33,6 +33,61 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// How an installation or a removal failed.
+type PackageFailure int32
+
+const (
+	// For good, leaving what was there: not tried again until another version is offered (or the
+	// package is offered and dropped again).
+	PackageFailure_PACKAGE_FAILURE_FINAL PackageFailure = 0
+	// For now, leaving what was there (an outage, a timeout): tried again after a wait, and not
+	// reported failed meanwhile.
+	PackageFailure_PACKAGE_FAILURE_LATER PackageFailure = 1
+	// For good, and what was left is unknown: the package is uncertain from then on.
+	PackageFailure_PACKAGE_FAILURE_UNKNOWN PackageFailure = 2
+)
+
+// Enum value maps for PackageFailure.
+var (
+	PackageFailure_name = map[int32]string{
+		0: "PACKAGE_FAILURE_FINAL",
+		1: "PACKAGE_FAILURE_LATER",
+		2: "PACKAGE_FAILURE_UNKNOWN",
+	}
+	PackageFailure_value = map[string]int32{
+		"PACKAGE_FAILURE_FINAL":   0,
+		"PACKAGE_FAILURE_LATER":   1,
+		"PACKAGE_FAILURE_UNKNOWN": 2,
+	}
+)
+
+func (x PackageFailure) Enum() *PackageFailure {
+	p := new(PackageFailure)
+	*p = x
+	return p
+}
+
+func (x PackageFailure) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PackageFailure) Descriptor() protoreflect.EnumDescriptor {
+	return file_opamp_core_v1_core_proto_enumTypes[0].Descriptor()
+}
+
+func (PackageFailure) Type() protoreflect.EnumType {
+	return &file_opamp_core_v1_core_proto_enumTypes[0]
+}
+
+func (x PackageFailure) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PackageFailure.Descriptor instead.
+func (PackageFailure) EnumDescriptor() ([]byte, []int) {
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{0}
+}
+
 type StatusField int32
 
 const (
@@ -81,11 +136,11 @@ func (x StatusField) String() string {
 }
 
 func (StatusField) Descriptor() protoreflect.EnumDescriptor {
-	return file_opamp_core_v1_core_proto_enumTypes[0].Descriptor()
+	return file_opamp_core_v1_core_proto_enumTypes[1].Descriptor()
 }
 
 func (StatusField) Type() protoreflect.EnumType {
-	return &file_opamp_core_v1_core_proto_enumTypes[0]
+	return &file_opamp_core_v1_core_proto_enumTypes[1]
 }
 
 func (x StatusField) Number() protoreflect.EnumNumber {
@@ -94,7 +149,7 @@ func (x StatusField) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StatusField.Descriptor instead.
 func (StatusField) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{0}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{1}
 }
 
 // The operating system, for where the user's state directory is.
@@ -131,11 +186,11 @@ func (x SetupOs) String() string {
 }
 
 func (SetupOs) Descriptor() protoreflect.EnumDescriptor {
-	return file_opamp_core_v1_core_proto_enumTypes[1].Descriptor()
+	return file_opamp_core_v1_core_proto_enumTypes[2].Descriptor()
 }
 
 func (SetupOs) Type() protoreflect.EnumType {
-	return &file_opamp_core_v1_core_proto_enumTypes[1]
+	return &file_opamp_core_v1_core_proto_enumTypes[2]
 }
 
 func (x SetupOs) Number() protoreflect.EnumNumber {
@@ -144,7 +199,7 @@ func (x SetupOs) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SetupOs.Descriptor instead.
 func (SetupOs) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{1}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{2}
 }
 
 type SetupUidFrom int32
@@ -180,11 +235,11 @@ func (x SetupUidFrom) String() string {
 }
 
 func (SetupUidFrom) Descriptor() protoreflect.EnumDescriptor {
-	return file_opamp_core_v1_core_proto_enumTypes[2].Descriptor()
+	return file_opamp_core_v1_core_proto_enumTypes[3].Descriptor()
 }
 
 func (SetupUidFrom) Type() protoreflect.EnumType {
-	return &file_opamp_core_v1_core_proto_enumTypes[2]
+	return &file_opamp_core_v1_core_proto_enumTypes[3]
 }
 
 func (x SetupUidFrom) Number() protoreflect.EnumNumber {
@@ -193,7 +248,7 @@ func (x SetupUidFrom) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SetupUidFrom.Descriptor instead.
 func (SetupUidFrom) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{2}
+	return file_opamp_core_v1_core_proto_rawDescGZIP(), []int{3}
 }
 
 // Zero means "the default" for every number.
@@ -202,18 +257,26 @@ func (SetupUidFrom) EnumDescriptor() ([]byte, []int) {
 // decides what a download's response means (the client follows no redirect and reports
 // download_response, whatever the status).
 type Config struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	InstanceUid         []byte                 `protobuf:"bytes,2,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // 16 bytes; empty: the core makes one from entropy
-	Capabilities        uint64                 `protobuf:"varint,3,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
-	HeartbeatIntervalMs uint64                 `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
-	BackoffInitialMs    uint64                 `protobuf:"varint,5,opt,name=backoff_initial_ms,json=backoffInitialMs,proto3" json:"backoff_initial_ms,omitempty"` // the first wait before a retry, doubled each time; default 1000
-	BackoffMaxMs        uint64                 `protobuf:"varint,6,opt,name=backoff_max_ms,json=backoffMaxMs,proto3" json:"backoff_max_ms,omitempty"`             // the longest wait; default 60000
-	MaxSendBytes        uint64                 `protobuf:"varint,7,opt,name=max_send_bytes,json=maxSendBytes,proto3" json:"max_send_bytes,omitempty"`             // at least 1024 (raised if smaller)
-	Seed                uint64                 `protobuf:"varint,8,opt,name=seed,proto3" json:"seed,omitempty"`
-	Endpoint            string                 `protobuf:"bytes,9,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                                             // https://... or wss://...
-	Headers             []*Header              `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty"`                                              // for every request and upgrade (authorization, say)
-	RequestTimeoutMs    uint64                 `protobuf:"varint,11,opt,name=request_timeout_ms,json=requestTimeoutMs,proto3" json:"request_timeout_ms,omitempty"` // default 30 s
-	MaxReceiveBytes     uint64                 `protobuf:"varint,12,opt,name=max_receive_bytes,json=maxReceiveBytes,proto3" json:"max_receive_bytes,omitempty"`    // default 64 MiB
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	InstanceUid []byte                 `protobuf:"bytes,2,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // 16 bytes; empty: the core makes one from entropy
+	// The AgentCapabilities bits the agent declares, final for the run: ReportsStatus is added,
+	// with the status bit an Accepts bit implies; undefined bits are dropped. A status field whose
+	// Reports bit isn't declared is not taken (never sent, never declared for it). ReportsHeartbeat
+	// is the switch for heartbeats: without it, over WebSocket the client sends none, whatever
+	// interval the server offers; over plain HTTP it still polls, as it must to hear from the
+	// server. AcceptsPackages, ReportsPackageStatuses, AcceptsOpAMPConnectionSettings and
+	// ReportsConnectionSettingsStatus are the core's (accept_packages, accept_connection_settings):
+	// given here, they are dropped.
+	Capabilities        uint64    `protobuf:"varint,3,opt,name=capabilities,proto3" json:"capabilities,omitempty"`
+	HeartbeatIntervalMs uint64    `protobuf:"varint,4,opt,name=heartbeat_interval_ms,json=heartbeatIntervalMs,proto3" json:"heartbeat_interval_ms,omitempty"`
+	BackoffInitialMs    uint64    `protobuf:"varint,5,opt,name=backoff_initial_ms,json=backoffInitialMs,proto3" json:"backoff_initial_ms,omitempty"` // the first wait before a retry, doubled each time; default 1000
+	BackoffMaxMs        uint64    `protobuf:"varint,6,opt,name=backoff_max_ms,json=backoffMaxMs,proto3" json:"backoff_max_ms,omitempty"`             // the longest wait; default 60000
+	MaxSendBytes        uint64    `protobuf:"varint,7,opt,name=max_send_bytes,json=maxSendBytes,proto3" json:"max_send_bytes,omitempty"`             // at least 1024 (raised if smaller)
+	Seed                uint64    `protobuf:"varint,8,opt,name=seed,proto3" json:"seed,omitempty"`
+	Endpoint            string    `protobuf:"bytes,9,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                                             // https://... or wss://...
+	Headers             []*Header `protobuf:"bytes,10,rep,name=headers,proto3" json:"headers,omitempty"`                                              // for every request and upgrade (authorization, say)
+	RequestTimeoutMs    uint64    `protobuf:"varint,11,opt,name=request_timeout_ms,json=requestTimeoutMs,proto3" json:"request_timeout_ms,omitempty"` // default 30 s
+	MaxReceiveBytes     uint64    `protobuf:"varint,12,opt,name=max_receive_bytes,json=maxReceiveBytes,proto3" json:"max_receive_bytes,omitempty"`    // default 64 MiB
 	// Connection-settings offers (docs/connection-settings.md).
 	Persistence              bool   `protobuf:"varint,13,opt,name=persistence,proto3" json:"persistence,omitempty"`                                                             // the client can carry out Store; without it, offers are refused
 	SavedState               []byte `protobuf:"bytes,14,opt,name=saved_state,json=savedState,proto3" json:"saved_state,omitempty"`                                              // the data of the last Store, as saved (empty: nothing saved)
@@ -227,7 +290,7 @@ type Config struct {
 	// Ask the server for an instance UID (RequestInstanceUid; docs/instance-uid.md): instance_uid is
 	// the temporary value. With persistence, only until the server assigns one; without, every start.
 	RequestInstanceUid bool `protobuf:"varint,22,opt,name=request_instance_uid,json=requestInstanceUid,proto3" json:"request_instance_uid,omitempty"`
-	// Rust mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
+	// Core mode (the core's own shell): the client gives the core byte streams (TCP, and TLS started
 	// on them) and the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 over them. Instead of
 	// http_request, ws_open, ws_send, ws_close and download, the client gets the stream effects,
 	// and carries out cancel for saves and downloads.
@@ -249,13 +312,9 @@ type Config struct {
 	ConnectTimeoutMs uint64 `protobuf:"varint,29,opt,name=connect_timeout_ms,json=connectTimeoutMs,proto3" json:"connect_timeout_ms,omitempty"` // a WebSocket to open; default 30 s
 	// With streams: which proxy every connection goes through, the core picking it (no
 	// proxy_query). Unset: the core asks (proxy_query) for each connection.
-	Proxy *ProxyChoice `protobuf:"bytes,31,opt,name=proxy,proto3" json:"proxy,omitempty"`
-	// Whether the client reports heartbeats (ReportsHeartbeat; unset: it does). Without, over
-	// WebSocket it sends none, whatever interval the server offers; over plain HTTP it still polls,
-	// at heartbeat_interval_ms or the interval offered, as it must to hear from the server.
-	ReportsHeartbeat *bool `protobuf:"varint,32,opt,name=reports_heartbeat,json=reportsHeartbeat,proto3,oneof" json:"reports_heartbeat,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	Proxy         *ProxyChoice `protobuf:"bytes,31,opt,name=proxy,proto3" json:"proxy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Config) Reset() {
@@ -477,16 +536,9 @@ func (x *Config) GetProxy() *ProxyChoice {
 	return nil
 }
 
-func (x *Config) GetReportsHeartbeat() bool {
-	if x != nil && x.ReportsHeartbeat != nil {
-		return *x.ReportsHeartbeat
-	}
-	return false
-}
-
-// The proxy for Rust mode's connections, told once. With no url and not direct, the one the
+// The proxy for core mode's connections, told once. With no url and not direct, the one the
 // environment names for each destination, by the rule every SDK shares
-// (tests/shell-tables/README.md, "Rust mode's proxy rule"), from the variables in environment.
+// (tests/shell-tables/README.md, "Core mode's proxy rule"), from the variables in environment.
 type ProxyChoice struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Direct  bool                   `protobuf:"varint,1,opt,name=direct,proto3" json:"direct,omitempty"`  // no proxy, whatever the environment says
@@ -1295,7 +1347,7 @@ type Input_PackageRemoved struct {
 }
 
 type Input_Downloaded struct {
-	Downloaded *Downloaded `protobuf:"bytes,23,opt,name=downloaded,proto3,oneof"` // Rust mode: answers download_done (the file is complete)
+	Downloaded *Downloaded `protobuf:"bytes,23,opt,name=downloaded,proto3,oneof"` // core mode: answers download_done (the file is complete)
 }
 
 type Input_DownloadFailed struct {
@@ -1303,7 +1355,7 @@ type Input_DownloadFailed struct {
 }
 
 type Input_ProxyAnswer struct {
-	// Rust mode (Config.streams): what happened to the streams the core asked for.
+	// Core mode (Config.streams): what happened to the streams the core asked for.
 	ProxyAnswer *ProxyAnswer `protobuf:"bytes,25,opt,name=proxy_answer,json=proxyAnswer,proto3,oneof"` // answers proxy_query
 }
 
@@ -1594,9 +1646,10 @@ func (x *Name) GetName() string {
 type PackageInstalled struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Hash          []byte                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`     // the hash of the package the application was given
-	Ok            bool                   `protobuf:"varint,3,opt,name=ok,proto3" json:"ok,omitempty"`        // installed
-	Detail        string                 `protobuf:"bytes,4,opt,name=detail,proto3" json:"detail,omitempty"` // why not
+	Hash          []byte                 `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`                                          // the hash of the package the application was given
+	Ok            bool                   `protobuf:"varint,3,opt,name=ok,proto3" json:"ok,omitempty"`                                             // installed
+	Detail        string                 `protobuf:"bytes,4,opt,name=detail,proto3" json:"detail,omitempty"`                                      // why not
+	Failure       PackageFailure         `protobuf:"varint,5,opt,name=failure,proto3,enum=opamp.core.v1.PackageFailure" json:"failure,omitempty"` // not installed: how
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1659,13 +1712,21 @@ func (x *PackageInstalled) GetDetail() string {
 	return ""
 }
 
+func (x *PackageInstalled) GetFailure() PackageFailure {
+	if x != nil {
+		return x.Failure
+	}
+	return PackageFailure_PACKAGE_FAILURE_FINAL
+}
+
 // The answer to remove_package. Wire-compatible with Name: unset fields say it is removed.
 type PackageRemoved struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Name   string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Failed bool                   `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"` // not removed: reported failed, and not removed again until
-	// it is offered and dropped again
-	Detail        string `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"` // why not
+	// it is offered and dropped again (but see failure)
+	Detail        string         `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`                                      // why not
+	Failure       PackageFailure `protobuf:"varint,4,opt,name=failure,proto3,enum=opamp.core.v1.PackageFailure" json:"failure,omitempty"` // not removed: how
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1719,6 +1780,13 @@ func (x *PackageRemoved) GetDetail() string {
 		return x.Detail
 	}
 	return ""
+}
+
+func (x *PackageRemoved) GetFailure() PackageFailure {
+	if x != nil {
+		return x.Failure
+	}
+	return PackageFailure_PACKAGE_FAILURE_FINAL
 }
 
 type Downloaded struct {
@@ -2210,7 +2278,7 @@ type Step struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NowMs         uint64                 `protobuf:"varint,1,opt,name=now_ms,json=nowMs,proto3" json:"now_ms,omitempty"`
 	Input         *Input                 `protobuf:"bytes,2,opt,name=input,proto3" json:"input,omitempty"`
-	UnixMs        uint64                 `protobuf:"varint,3,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"` // the wall clock (Rust mode: for Retry-After dates)
+	UnixMs        uint64                 `protobuf:"varint,3,opt,name=unix_ms,json=unixMs,proto3" json:"unix_ms,omitempty"` // the wall clock (core mode: for Retry-After dates)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2886,7 +2954,7 @@ type Effect_Cancel struct {
 }
 
 type Effect_ProxyQuery struct {
-	// Rust mode (Config.streams).
+	// Core mode (Config.streams).
 	ProxyQuery *Url `protobuf:"bytes,10,opt,name=proxy_query,json=proxyQuery,proto3,oneof"` // which proxy for this URL (id: the stream); answer with proxy_answer
 }
 
@@ -3238,12 +3306,16 @@ func (x *StreamOpen) GetPort() uint32 {
 
 // An HTTP GET to a file of the client's own, hashed (SHA-256) as it is written.
 type Download struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
-	Headers       []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`
-	MaxBytes      uint64                 `protobuf:"varint,4,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`    // fail a larger file
-	TimeoutMs     uint64                 `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"` // how long it may take (the core cancels it then)
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Url       string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`
+	Headers   []*Header              `protobuf:"bytes,3,rep,name=headers,proto3" json:"headers,omitempty"`
+	MaxBytes  uint64                 `protobuf:"varint,4,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`    // fail a larger file
+	TimeoutMs uint64                 `protobuf:"varint,5,opt,name=timeout_ms,json=timeoutMs,proto3" json:"timeout_ms,omitempty"` // how long it may take (the core cancels it then)
+	// The file is at the OpAMP server's own origin (host and port, TLS both or neither): only then
+	// present the client certificate you have for the server, or skip verification if you do so
+	// for it. Fetch a file from anywhere else with neither (the CAs you trust may still apply).
+	ServerOrigin  bool `protobuf:"varint,6,opt,name=server_origin,json=serverOrigin,proto3" json:"server_origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3311,6 +3383,13 @@ func (x *Download) GetTimeoutMs() uint64 {
 		return x.TimeoutMs
 	}
 	return 0
+}
+
+func (x *Download) GetServerOrigin() bool {
+	if x != nil {
+		return x.ServerOrigin
+	}
+	return false
 }
 
 // Save data, replacing what was saved, all or nothing (write a new file, rename it over the old),
@@ -4984,7 +5063,7 @@ var File_opamp_core_v1_core_proto protoreflect.FileDescriptor
 
 const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\n" +
-	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\xe0\t\n" +
+	"\x18opamp/core/v1/core.proto\x12\ropamp.core.v1\x1a\x14opamp/v1/opamp.proto\"\xb1\t\n" +
 	"\x06Config\x12!\n" +
 	"\finstance_uid\x18\x02 \x01(\fR\vinstanceUid\x12\"\n" +
 	"\fcapabilities\x18\x03 \x01(\x04R\fcapabilities\x122\n" +
@@ -5015,9 +5094,7 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\aunix_ms\x18\x1a \x01(\x04R\x06unixMs\x12&\n" +
 	"\x0fstop_timeout_ms\x18\x1c \x01(\x04R\rstopTimeoutMs\x12,\n" +
 	"\x12connect_timeout_ms\x18\x1d \x01(\x04R\x10connectTimeoutMs\x120\n" +
-	"\x05proxy\x18\x1f \x01(\v2\x1a.opamp.core.v1.ProxyChoiceR\x05proxy\x120\n" +
-	"\x11reports_heartbeat\x18  \x01(\bH\x00R\x10reportsHeartbeat\x88\x01\x01B\x14\n" +
-	"\x12_reports_heartbeatJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fR\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_status\"\xca\x01\n" +
+	"\x05proxy\x18\x1f \x01(\v2\x1a.opamp.core.v1.ProxyChoiceR\x05proxyJ\x04\b\x01\x10\x02J\x04\b\x12\x10\x13J\x04\b\x1b\x10\x1cJ\x04\b\x1e\x10\x1fJ\x04\b \x10!R\ttransportR\x17instance_uid_is_defaultR\x0ecancel_effectsR\x0fdownload_statusR\x11reports_heartbeat\"\xca\x01\n" +
 	"\vProxyChoice\x12\x16\n" +
 	"\x06direct\x18\x01 \x01(\bR\x06direct\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12/\n" +
@@ -5090,16 +5167,18 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x1c\n" +
 	"\taddresses\x18\x02 \x03(\tR\taddresses\"\x1a\n" +
 	"\x04Name\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"b\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x9b\x01\n" +
 	"\x10PackageInstalled\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04hash\x18\x02 \x01(\fR\x04hash\x12\x0e\n" +
 	"\x02ok\x18\x03 \x01(\bR\x02ok\x12\x16\n" +
-	"\x06detail\x18\x04 \x01(\tR\x06detail\"T\n" +
+	"\x06detail\x18\x04 \x01(\tR\x06detail\x127\n" +
+	"\afailure\x18\x05 \x01(\x0e2\x1d.opamp.core.v1.PackageFailureR\afailure\"\x8d\x01\n" +
 	"\x0ePackageRemoved\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06failed\x18\x02 \x01(\bR\x06failed\x12\x16\n" +
-	"\x06detail\x18\x03 \x01(\tR\x06detail\"4\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\x127\n" +
+	"\afailure\x18\x04 \x01(\x0e2\x1d.opamp.core.v1.PackageFailureR\afailure\"4\n" +
 	"\n" +
 	"Downloaded\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x16\n" +
@@ -5208,14 +5287,15 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"StreamOpen\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
-	"\x04port\x18\x03 \x01(\rR\x04port\"\x99\x01\n" +
+	"\x04port\x18\x03 \x01(\rR\x04port\"\xbe\x01\n" +
 	"\bDownload\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12/\n" +
 	"\aheaders\x18\x03 \x03(\v2\x15.opamp.core.v1.HeaderR\aheaders\x12\x1b\n" +
 	"\tmax_bytes\x18\x04 \x01(\x04R\bmaxBytes\x12\x1d\n" +
 	"\n" +
-	"timeout_ms\x18\x05 \x01(\x04R\ttimeoutMs\"+\n" +
+	"timeout_ms\x18\x05 \x01(\x04R\ttimeoutMs\x12#\n" +
+	"\rserver_origin\x18\x06 \x01(\bR\fserverOrigin\"+\n" +
 	"\x05Store\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\"\xc1\x01\n" +
@@ -5345,7 +5425,11 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\x04text\x18\x04 \x01(\tR\x04text\x12\x1f\n" +
 	"\vunsaved_uid\x18\x05 \x01(\fR\n" +
 	"unsavedUid\x12>\n" +
-	"\funsaved_from\x18\x06 \x01(\x0e2\x1b.opamp.core.v1.SetupUidFromR\vunsavedFrom*\xab\x02\n" +
+	"\funsaved_from\x18\x06 \x01(\x0e2\x1b.opamp.core.v1.SetupUidFromR\vunsavedFrom*c\n" +
+	"\x0ePackageFailure\x12\x19\n" +
+	"\x15PACKAGE_FAILURE_FINAL\x10\x00\x12\x19\n" +
+	"\x15PACKAGE_FAILURE_LATER\x10\x01\x12\x1b\n" +
+	"\x17PACKAGE_FAILURE_UNKNOWN\x10\x02*\xab\x02\n" +
 	"\vStatusField\x12\x1c\n" +
 	"\x18STATUS_FIELD_DESCRIPTION\x10\x00\x12\x17\n" +
 	"\x13STATUS_FIELD_HEALTH\x10\x01\x12!\n" +
@@ -5377,187 +5461,190 @@ func file_opamp_core_v1_core_proto_rawDescGZIP() []byte {
 	return file_opamp_core_v1_core_proto_rawDescData
 }
 
-var file_opamp_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_opamp_core_v1_core_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
 var file_opamp_core_v1_core_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
 var file_opamp_core_v1_core_proto_goTypes = []any{
-	(StatusField)(0),                           // 0: opamp.core.v1.StatusField
-	(SetupOs)(0),                               // 1: opamp.core.v1.SetupOs
-	(SetupUidFrom)(0),                          // 2: opamp.core.v1.SetupUidFrom
-	(*Config)(nil),                             // 3: opamp.core.v1.Config
-	(*ProxyChoice)(nil),                        // 4: opamp.core.v1.ProxyChoice
-	(*Origin)(nil),                             // 5: opamp.core.v1.Origin
-	(*Header)(nil),                             // 6: opamp.core.v1.Header
-	(*Headers)(nil),                            // 7: opamp.core.v1.Headers
-	(*Empty)(nil),                              // 8: opamp.core.v1.Empty
-	(*Detail)(nil),                             // 9: opamp.core.v1.Detail
-	(*Input)(nil),                              // 10: opamp.core.v1.Input
-	(*ProxyAnswer)(nil),                        // 11: opamp.core.v1.ProxyAnswer
-	(*StreamResolved)(nil),                     // 12: opamp.core.v1.StreamResolved
-	(*Name)(nil),                               // 13: opamp.core.v1.Name
-	(*PackageInstalled)(nil),                   // 14: opamp.core.v1.PackageInstalled
-	(*PackageRemoved)(nil),                     // 15: opamp.core.v1.PackageRemoved
-	(*Downloaded)(nil),                         // 16: opamp.core.v1.Downloaded
-	(*DownloadResponse)(nil),                   // 17: opamp.core.v1.DownloadResponse
-	(*Id)(nil),                                 // 18: opamp.core.v1.Id
-	(*Failed)(nil),                             // 19: opamp.core.v1.Failed
-	(*HttpResponse)(nil),                       // 20: opamp.core.v1.HttpResponse
-	(*WsFailed)(nil),                           // 21: opamp.core.v1.WsFailed
-	(*WsMessage)(nil),                          // 22: opamp.core.v1.WsMessage
-	(*WsClosed)(nil),                           // 23: opamp.core.v1.WsClosed
-	(*Step)(nil),                               // 24: opamp.core.v1.Step
-	(*Reply)(nil),                              // 25: opamp.core.v1.Reply
-	(*Output)(nil),                             // 26: opamp.core.v1.Output
-	(*Resumed)(nil),                            // 27: opamp.core.v1.Resumed
-	(*Limits)(nil),                             // 28: opamp.core.v1.Limits
-	(*Effect)(nil),                             // 29: opamp.core.v1.Effect
-	(*StreamClose)(nil),                        // 30: opamp.core.v1.StreamClose
-	(*Url)(nil),                                // 31: opamp.core.v1.Url
-	(*StreamName)(nil),                         // 32: opamp.core.v1.StreamName
-	(*StreamSplice)(nil),                       // 33: opamp.core.v1.StreamSplice
-	(*StreamOpen)(nil),                         // 34: opamp.core.v1.StreamOpen
-	(*Download)(nil),                           // 35: opamp.core.v1.Download
-	(*Store)(nil),                              // 36: opamp.core.v1.Store
-	(*HttpRequest)(nil),                        // 37: opamp.core.v1.HttpRequest
-	(*WsOpen)(nil),                             // 38: opamp.core.v1.WsOpen
-	(*Notification)(nil),                       // 39: opamp.core.v1.Notification
-	(*SaveStalled)(nil),                        // 40: opamp.core.v1.SaveStalled
-	(*InstallPackage)(nil),                     // 41: opamp.core.v1.InstallPackage
-	(*CustomMessageNotSent)(nil),               // 42: opamp.core.v1.CustomMessageNotSent
-	(*NotifyConnectFailed)(nil),                // 43: opamp.core.v1.NotifyConnectFailed
-	(*ErrorResponse)(nil),                      // 44: opamp.core.v1.ErrorResponse
-	(*StatusTooLarge)(nil),                     // 45: opamp.core.v1.StatusTooLarge
-	(*SetupCall)(nil),                          // 46: opamp.core.v1.SetupCall
-	(*SetupReply)(nil),                         // 47: opamp.core.v1.SetupReply
-	(*Variable)(nil),                           // 48: opamp.core.v1.Variable
-	(*SetupStart)(nil),                         // 49: opamp.core.v1.SetupStart
-	(*SetupInCode)(nil),                        // 50: opamp.core.v1.SetupInCode
-	(*SetupStarted)(nil),                       // 51: opamp.core.v1.SetupStarted
-	(*SetupHints)(nil),                         // 52: opamp.core.v1.SetupHints
-	(*SetupIdentity)(nil),                      // 53: opamp.core.v1.SetupIdentity
-	(*SetupIdentified)(nil),                    // 54: opamp.core.v1.SetupIdentified
-	(*protobufs.AgentDescription)(nil),         // 55: opamp.proto.v1.AgentDescription
-	(*protobufs.ComponentHealth)(nil),          // 56: opamp.proto.v1.ComponentHealth
-	(*protobufs.EffectiveConfig)(nil),          // 57: opamp.proto.v1.EffectiveConfig
-	(*protobufs.RemoteConfigStatus)(nil),       // 58: opamp.proto.v1.RemoteConfigStatus
-	(*protobufs.ConnectionSettingsStatus)(nil), // 59: opamp.proto.v1.ConnectionSettingsStatus
-	(*protobufs.AvailableComponents)(nil),      // 60: opamp.proto.v1.AvailableComponents
-	(*protobufs.CustomCapabilities)(nil),       // 61: opamp.proto.v1.CustomCapabilities
-	(*protobufs.CustomMessage)(nil),            // 62: opamp.proto.v1.CustomMessage
-	(*protobufs.AgentRemoteConfig)(nil),        // 63: opamp.proto.v1.AgentRemoteConfig
-	(*protobufs.ConnectionSettingsOffers)(nil), // 64: opamp.proto.v1.ConnectionSettingsOffers
-	(*protobufs.ServerToAgentCommand)(nil),     // 65: opamp.proto.v1.ServerToAgentCommand
-	(*protobufs.PackageAvailable)(nil),         // 66: opamp.proto.v1.PackageAvailable
+	(PackageFailure)(0),                        // 0: opamp.core.v1.PackageFailure
+	(StatusField)(0),                           // 1: opamp.core.v1.StatusField
+	(SetupOs)(0),                               // 2: opamp.core.v1.SetupOs
+	(SetupUidFrom)(0),                          // 3: opamp.core.v1.SetupUidFrom
+	(*Config)(nil),                             // 4: opamp.core.v1.Config
+	(*ProxyChoice)(nil),                        // 5: opamp.core.v1.ProxyChoice
+	(*Origin)(nil),                             // 6: opamp.core.v1.Origin
+	(*Header)(nil),                             // 7: opamp.core.v1.Header
+	(*Headers)(nil),                            // 8: opamp.core.v1.Headers
+	(*Empty)(nil),                              // 9: opamp.core.v1.Empty
+	(*Detail)(nil),                             // 10: opamp.core.v1.Detail
+	(*Input)(nil),                              // 11: opamp.core.v1.Input
+	(*ProxyAnswer)(nil),                        // 12: opamp.core.v1.ProxyAnswer
+	(*StreamResolved)(nil),                     // 13: opamp.core.v1.StreamResolved
+	(*Name)(nil),                               // 14: opamp.core.v1.Name
+	(*PackageInstalled)(nil),                   // 15: opamp.core.v1.PackageInstalled
+	(*PackageRemoved)(nil),                     // 16: opamp.core.v1.PackageRemoved
+	(*Downloaded)(nil),                         // 17: opamp.core.v1.Downloaded
+	(*DownloadResponse)(nil),                   // 18: opamp.core.v1.DownloadResponse
+	(*Id)(nil),                                 // 19: opamp.core.v1.Id
+	(*Failed)(nil),                             // 20: opamp.core.v1.Failed
+	(*HttpResponse)(nil),                       // 21: opamp.core.v1.HttpResponse
+	(*WsFailed)(nil),                           // 22: opamp.core.v1.WsFailed
+	(*WsMessage)(nil),                          // 23: opamp.core.v1.WsMessage
+	(*WsClosed)(nil),                           // 24: opamp.core.v1.WsClosed
+	(*Step)(nil),                               // 25: opamp.core.v1.Step
+	(*Reply)(nil),                              // 26: opamp.core.v1.Reply
+	(*Output)(nil),                             // 27: opamp.core.v1.Output
+	(*Resumed)(nil),                            // 28: opamp.core.v1.Resumed
+	(*Limits)(nil),                             // 29: opamp.core.v1.Limits
+	(*Effect)(nil),                             // 30: opamp.core.v1.Effect
+	(*StreamClose)(nil),                        // 31: opamp.core.v1.StreamClose
+	(*Url)(nil),                                // 32: opamp.core.v1.Url
+	(*StreamName)(nil),                         // 33: opamp.core.v1.StreamName
+	(*StreamSplice)(nil),                       // 34: opamp.core.v1.StreamSplice
+	(*StreamOpen)(nil),                         // 35: opamp.core.v1.StreamOpen
+	(*Download)(nil),                           // 36: opamp.core.v1.Download
+	(*Store)(nil),                              // 37: opamp.core.v1.Store
+	(*HttpRequest)(nil),                        // 38: opamp.core.v1.HttpRequest
+	(*WsOpen)(nil),                             // 39: opamp.core.v1.WsOpen
+	(*Notification)(nil),                       // 40: opamp.core.v1.Notification
+	(*SaveStalled)(nil),                        // 41: opamp.core.v1.SaveStalled
+	(*InstallPackage)(nil),                     // 42: opamp.core.v1.InstallPackage
+	(*CustomMessageNotSent)(nil),               // 43: opamp.core.v1.CustomMessageNotSent
+	(*NotifyConnectFailed)(nil),                // 44: opamp.core.v1.NotifyConnectFailed
+	(*ErrorResponse)(nil),                      // 45: opamp.core.v1.ErrorResponse
+	(*StatusTooLarge)(nil),                     // 46: opamp.core.v1.StatusTooLarge
+	(*SetupCall)(nil),                          // 47: opamp.core.v1.SetupCall
+	(*SetupReply)(nil),                         // 48: opamp.core.v1.SetupReply
+	(*Variable)(nil),                           // 49: opamp.core.v1.Variable
+	(*SetupStart)(nil),                         // 50: opamp.core.v1.SetupStart
+	(*SetupInCode)(nil),                        // 51: opamp.core.v1.SetupInCode
+	(*SetupStarted)(nil),                       // 52: opamp.core.v1.SetupStarted
+	(*SetupHints)(nil),                         // 53: opamp.core.v1.SetupHints
+	(*SetupIdentity)(nil),                      // 54: opamp.core.v1.SetupIdentity
+	(*SetupIdentified)(nil),                    // 55: opamp.core.v1.SetupIdentified
+	(*protobufs.AgentDescription)(nil),         // 56: opamp.proto.v1.AgentDescription
+	(*protobufs.ComponentHealth)(nil),          // 57: opamp.proto.v1.ComponentHealth
+	(*protobufs.EffectiveConfig)(nil),          // 58: opamp.proto.v1.EffectiveConfig
+	(*protobufs.RemoteConfigStatus)(nil),       // 59: opamp.proto.v1.RemoteConfigStatus
+	(*protobufs.ConnectionSettingsStatus)(nil), // 60: opamp.proto.v1.ConnectionSettingsStatus
+	(*protobufs.AvailableComponents)(nil),      // 61: opamp.proto.v1.AvailableComponents
+	(*protobufs.CustomCapabilities)(nil),       // 62: opamp.proto.v1.CustomCapabilities
+	(*protobufs.CustomMessage)(nil),            // 63: opamp.proto.v1.CustomMessage
+	(*protobufs.AgentRemoteConfig)(nil),        // 64: opamp.proto.v1.AgentRemoteConfig
+	(*protobufs.ConnectionSettingsOffers)(nil), // 65: opamp.proto.v1.ConnectionSettingsOffers
+	(*protobufs.ServerToAgentCommand)(nil),     // 66: opamp.proto.v1.ServerToAgentCommand
+	(*protobufs.PackageAvailable)(nil),         // 67: opamp.proto.v1.PackageAvailable
 }
 var file_opamp_core_v1_core_proto_depIdxs = []int32{
-	6,   // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
-	4,   // 1: opamp.core.v1.Config.proxy:type_name -> opamp.core.v1.ProxyChoice
-	6,   // 2: opamp.core.v1.ProxyChoice.headers:type_name -> opamp.core.v1.Header
-	6,   // 3: opamp.core.v1.ProxyChoice.environment:type_name -> opamp.core.v1.Header
-	6,   // 4: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
-	8,   // 5: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
-	55,  // 6: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
-	56,  // 7: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
-	57,  // 8: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
-	58,  // 9: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
-	8,   // 10: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
-	8,   // 11: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
-	20,  // 12: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
-	19,  // 13: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
-	18,  // 14: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
-	21,  // 15: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
-	22,  // 16: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
-	23,  // 17: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
-	19,  // 18: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
-	18,  // 19: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
-	19,  // 20: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
-	59,  // 21: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
-	60,  // 22: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
-	61,  // 23: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	62,  // 24: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
-	14,  // 25: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
-	15,  // 26: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.PackageRemoved
-	16,  // 27: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
-	19,  // 28: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
-	11,  // 29: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
-	12,  // 30: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
-	18,  // 31: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
-	18,  // 32: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
-	22,  // 33: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
-	18,  // 34: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
-	19,  // 35: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
-	18,  // 36: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
-	17,  // 37: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
-	7,   // 38: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
-	8,   // 39: opamp.core.v1.Input.abort:type_name -> opamp.core.v1.Empty
-	6,   // 40: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
-	5,   // 41: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
-	6,   // 42: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
-	6,   // 43: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
-	10,  // 44: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
-	26,  // 45: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
-	29,  // 46: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
-	28,  // 47: opamp.core.v1.Output.limits:type_name -> opamp.core.v1.Limits
-	27,  // 48: opamp.core.v1.Output.resumed:type_name -> opamp.core.v1.Resumed
-	63,  // 49: opamp.core.v1.Resumed.applied_remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	63,  // 50: opamp.core.v1.Resumed.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	58,  // 51: opamp.core.v1.Resumed.remote_config_refused:type_name -> opamp.proto.v1.RemoteConfigStatus
-	64,  // 52: opamp.core.v1.Resumed.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
-	37,  // 53: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
-	38,  // 54: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
-	22,  // 55: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
-	18,  // 56: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
-	39,  // 57: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
-	36,  // 58: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
-	35,  // 59: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
-	18,  // 60: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
-	18,  // 61: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
-	31,  // 62: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
-	32,  // 63: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
-	34,  // 64: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
-	32,  // 65: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
-	22,  // 66: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
-	30,  // 67: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
-	22,  // 68: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
-	18,  // 69: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
-	33,  // 70: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
-	6,   // 71: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
-	6,   // 72: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
-	6,   // 73: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
-	8,   // 74: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
-	43,  // 75: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
-	44,  // 76: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
-	63,  // 77: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	65,  // 78: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
-	45,  // 79: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
-	9,   // 80: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
-	8,   // 81: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
-	64,  // 82: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
-	62,  // 83: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
-	61,  // 84: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
-	42,  // 85: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
-	41,  // 86: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
-	13,  // 87: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
-	40,  // 88: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
-	66,  // 89: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
-	62,  // 90: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
-	0,   // 91: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
-	49,  // 92: opamp.core.v1.SetupCall.start:type_name -> opamp.core.v1.SetupStart
-	53,  // 93: opamp.core.v1.SetupCall.identity:type_name -> opamp.core.v1.SetupIdentity
-	51,  // 94: opamp.core.v1.SetupReply.started:type_name -> opamp.core.v1.SetupStarted
-	54,  // 95: opamp.core.v1.SetupReply.identified:type_name -> opamp.core.v1.SetupIdentified
-	48,  // 96: opamp.core.v1.SetupStart.env:type_name -> opamp.core.v1.Variable
-	1,   // 97: opamp.core.v1.SetupStart.os:type_name -> opamp.core.v1.SetupOs
-	50,  // 98: opamp.core.v1.SetupStart.code:type_name -> opamp.core.v1.SetupInCode
-	6,   // 99: opamp.core.v1.SetupInCode.headers:type_name -> opamp.core.v1.Header
-	6,   // 100: opamp.core.v1.SetupStarted.headers:type_name -> opamp.core.v1.Header
-	52,  // 101: opamp.core.v1.SetupStarted.hints:type_name -> opamp.core.v1.SetupHints
-	2,   // 102: opamp.core.v1.SetupIdentified.from:type_name -> opamp.core.v1.SetupUidFrom
-	2,   // 103: opamp.core.v1.SetupIdentified.unsaved_from:type_name -> opamp.core.v1.SetupUidFrom
-	104, // [104:104] is the sub-list for method output_type
-	104, // [104:104] is the sub-list for method input_type
-	104, // [104:104] is the sub-list for extension type_name
-	104, // [104:104] is the sub-list for extension extendee
-	0,   // [0:104] is the sub-list for field type_name
+	7,   // 0: opamp.core.v1.Config.headers:type_name -> opamp.core.v1.Header
+	5,   // 1: opamp.core.v1.Config.proxy:type_name -> opamp.core.v1.ProxyChoice
+	7,   // 2: opamp.core.v1.ProxyChoice.headers:type_name -> opamp.core.v1.Header
+	7,   // 3: opamp.core.v1.ProxyChoice.environment:type_name -> opamp.core.v1.Header
+	7,   // 4: opamp.core.v1.Headers.headers:type_name -> opamp.core.v1.Header
+	9,   // 5: opamp.core.v1.Input.start:type_name -> opamp.core.v1.Empty
+	56,  // 6: opamp.core.v1.Input.set_description:type_name -> opamp.proto.v1.AgentDescription
+	57,  // 7: opamp.core.v1.Input.set_health:type_name -> opamp.proto.v1.ComponentHealth
+	58,  // 8: opamp.core.v1.Input.set_effective_config:type_name -> opamp.proto.v1.EffectiveConfig
+	59,  // 9: opamp.core.v1.Input.set_remote_config_status:type_name -> opamp.proto.v1.RemoteConfigStatus
+	9,   // 10: opamp.core.v1.Input.stop:type_name -> opamp.core.v1.Empty
+	9,   // 11: opamp.core.v1.Input.timer:type_name -> opamp.core.v1.Empty
+	21,  // 12: opamp.core.v1.Input.http_response:type_name -> opamp.core.v1.HttpResponse
+	20,  // 13: opamp.core.v1.Input.http_failed:type_name -> opamp.core.v1.Failed
+	19,  // 14: opamp.core.v1.Input.ws_opened:type_name -> opamp.core.v1.Id
+	22,  // 15: opamp.core.v1.Input.ws_failed:type_name -> opamp.core.v1.WsFailed
+	23,  // 16: opamp.core.v1.Input.ws_message:type_name -> opamp.core.v1.WsMessage
+	24,  // 17: opamp.core.v1.Input.ws_closed:type_name -> opamp.core.v1.WsClosed
+	20,  // 18: opamp.core.v1.Input.ws_lost:type_name -> opamp.core.v1.Failed
+	19,  // 19: opamp.core.v1.Input.stored:type_name -> opamp.core.v1.Id
+	20,  // 20: opamp.core.v1.Input.store_failed:type_name -> opamp.core.v1.Failed
+	60,  // 21: opamp.core.v1.Input.set_connection_settings_status:type_name -> opamp.proto.v1.ConnectionSettingsStatus
+	61,  // 22: opamp.core.v1.Input.set_available_components:type_name -> opamp.proto.v1.AvailableComponents
+	62,  // 23: opamp.core.v1.Input.set_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	63,  // 24: opamp.core.v1.Input.send_custom_message:type_name -> opamp.proto.v1.CustomMessage
+	15,  // 25: opamp.core.v1.Input.package_installed:type_name -> opamp.core.v1.PackageInstalled
+	16,  // 26: opamp.core.v1.Input.package_removed:type_name -> opamp.core.v1.PackageRemoved
+	17,  // 27: opamp.core.v1.Input.downloaded:type_name -> opamp.core.v1.Downloaded
+	20,  // 28: opamp.core.v1.Input.download_failed:type_name -> opamp.core.v1.Failed
+	12,  // 29: opamp.core.v1.Input.proxy_answer:type_name -> opamp.core.v1.ProxyAnswer
+	13,  // 30: opamp.core.v1.Input.stream_resolved:type_name -> opamp.core.v1.StreamResolved
+	19,  // 31: opamp.core.v1.Input.stream_opened:type_name -> opamp.core.v1.Id
+	19,  // 32: opamp.core.v1.Input.stream_tls_ready:type_name -> opamp.core.v1.Id
+	23,  // 33: opamp.core.v1.Input.stream_data:type_name -> opamp.core.v1.WsMessage
+	19,  // 34: opamp.core.v1.Input.stream_eof:type_name -> opamp.core.v1.Id
+	20,  // 35: opamp.core.v1.Input.stream_failed:type_name -> opamp.core.v1.Failed
+	19,  // 36: opamp.core.v1.Input.stream_spliced:type_name -> opamp.core.v1.Id
+	18,  // 37: opamp.core.v1.Input.download_response:type_name -> opamp.core.v1.DownloadResponse
+	8,   // 38: opamp.core.v1.Input.set_auth_headers:type_name -> opamp.core.v1.Headers
+	9,   // 39: opamp.core.v1.Input.abort:type_name -> opamp.core.v1.Empty
+	7,   // 40: opamp.core.v1.ProxyAnswer.headers:type_name -> opamp.core.v1.Header
+	0,   // 41: opamp.core.v1.PackageInstalled.failure:type_name -> opamp.core.v1.PackageFailure
+	0,   // 42: opamp.core.v1.PackageRemoved.failure:type_name -> opamp.core.v1.PackageFailure
+	6,   // 43: opamp.core.v1.DownloadResponse.location_origin:type_name -> opamp.core.v1.Origin
+	7,   // 44: opamp.core.v1.HttpResponse.headers:type_name -> opamp.core.v1.Header
+	7,   // 45: opamp.core.v1.WsFailed.headers:type_name -> opamp.core.v1.Header
+	11,  // 46: opamp.core.v1.Step.input:type_name -> opamp.core.v1.Input
+	27,  // 47: opamp.core.v1.Reply.output:type_name -> opamp.core.v1.Output
+	30,  // 48: opamp.core.v1.Output.effects:type_name -> opamp.core.v1.Effect
+	29,  // 49: opamp.core.v1.Output.limits:type_name -> opamp.core.v1.Limits
+	28,  // 50: opamp.core.v1.Output.resumed:type_name -> opamp.core.v1.Resumed
+	64,  // 51: opamp.core.v1.Resumed.applied_remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	64,  // 52: opamp.core.v1.Resumed.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	59,  // 53: opamp.core.v1.Resumed.remote_config_refused:type_name -> opamp.proto.v1.RemoteConfigStatus
+	65,  // 54: opamp.core.v1.Resumed.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
+	38,  // 55: opamp.core.v1.Effect.http_request:type_name -> opamp.core.v1.HttpRequest
+	39,  // 56: opamp.core.v1.Effect.ws_open:type_name -> opamp.core.v1.WsOpen
+	23,  // 57: opamp.core.v1.Effect.ws_send:type_name -> opamp.core.v1.WsMessage
+	19,  // 58: opamp.core.v1.Effect.ws_close:type_name -> opamp.core.v1.Id
+	40,  // 59: opamp.core.v1.Effect.notify:type_name -> opamp.core.v1.Notification
+	37,  // 60: opamp.core.v1.Effect.store:type_name -> opamp.core.v1.Store
+	36,  // 61: opamp.core.v1.Effect.download:type_name -> opamp.core.v1.Download
+	19,  // 62: opamp.core.v1.Effect.discard:type_name -> opamp.core.v1.Id
+	19,  // 63: opamp.core.v1.Effect.cancel:type_name -> opamp.core.v1.Id
+	32,  // 64: opamp.core.v1.Effect.proxy_query:type_name -> opamp.core.v1.Url
+	33,  // 65: opamp.core.v1.Effect.stream_resolve:type_name -> opamp.core.v1.StreamName
+	35,  // 66: opamp.core.v1.Effect.stream_open:type_name -> opamp.core.v1.StreamOpen
+	33,  // 67: opamp.core.v1.Effect.stream_start_tls:type_name -> opamp.core.v1.StreamName
+	23,  // 68: opamp.core.v1.Effect.stream_write:type_name -> opamp.core.v1.WsMessage
+	31,  // 69: opamp.core.v1.Effect.stream_close:type_name -> opamp.core.v1.StreamClose
+	23,  // 70: opamp.core.v1.Effect.download_data:type_name -> opamp.core.v1.WsMessage
+	19,  // 71: opamp.core.v1.Effect.download_done:type_name -> opamp.core.v1.Id
+	34,  // 72: opamp.core.v1.Effect.stream_splice:type_name -> opamp.core.v1.StreamSplice
+	7,   // 73: opamp.core.v1.Download.headers:type_name -> opamp.core.v1.Header
+	7,   // 74: opamp.core.v1.HttpRequest.headers:type_name -> opamp.core.v1.Header
+	7,   // 75: opamp.core.v1.WsOpen.headers:type_name -> opamp.core.v1.Header
+	9,   // 76: opamp.core.v1.Notification.connected:type_name -> opamp.core.v1.Empty
+	44,  // 77: opamp.core.v1.Notification.connect_failed:type_name -> opamp.core.v1.NotifyConnectFailed
+	45,  // 78: opamp.core.v1.Notification.error_response:type_name -> opamp.core.v1.ErrorResponse
+	64,  // 79: opamp.core.v1.Notification.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	66,  // 80: opamp.core.v1.Notification.command:type_name -> opamp.proto.v1.ServerToAgentCommand
+	46,  // 81: opamp.core.v1.Notification.status_too_large:type_name -> opamp.core.v1.StatusTooLarge
+	10,  // 82: opamp.core.v1.Notification.bad_message:type_name -> opamp.core.v1.Detail
+	9,   // 83: opamp.core.v1.Notification.stopped:type_name -> opamp.core.v1.Empty
+	65,  // 84: opamp.core.v1.Notification.connection_settings:type_name -> opamp.proto.v1.ConnectionSettingsOffers
+	63,  // 85: opamp.core.v1.Notification.custom_message:type_name -> opamp.proto.v1.CustomMessage
+	62,  // 86: opamp.core.v1.Notification.server_custom_capabilities:type_name -> opamp.proto.v1.CustomCapabilities
+	43,  // 87: opamp.core.v1.Notification.custom_message_not_sent:type_name -> opamp.core.v1.CustomMessageNotSent
+	42,  // 88: opamp.core.v1.Notification.install_package:type_name -> opamp.core.v1.InstallPackage
+	14,  // 89: opamp.core.v1.Notification.remove_package:type_name -> opamp.core.v1.Name
+	41,  // 90: opamp.core.v1.Notification.save_stalled:type_name -> opamp.core.v1.SaveStalled
+	67,  // 91: opamp.core.v1.InstallPackage.package:type_name -> opamp.proto.v1.PackageAvailable
+	63,  // 92: opamp.core.v1.CustomMessageNotSent.message:type_name -> opamp.proto.v1.CustomMessage
+	1,   // 93: opamp.core.v1.StatusTooLarge.field:type_name -> opamp.core.v1.StatusField
+	50,  // 94: opamp.core.v1.SetupCall.start:type_name -> opamp.core.v1.SetupStart
+	54,  // 95: opamp.core.v1.SetupCall.identity:type_name -> opamp.core.v1.SetupIdentity
+	52,  // 96: opamp.core.v1.SetupReply.started:type_name -> opamp.core.v1.SetupStarted
+	55,  // 97: opamp.core.v1.SetupReply.identified:type_name -> opamp.core.v1.SetupIdentified
+	49,  // 98: opamp.core.v1.SetupStart.env:type_name -> opamp.core.v1.Variable
+	2,   // 99: opamp.core.v1.SetupStart.os:type_name -> opamp.core.v1.SetupOs
+	51,  // 100: opamp.core.v1.SetupStart.code:type_name -> opamp.core.v1.SetupInCode
+	7,   // 101: opamp.core.v1.SetupInCode.headers:type_name -> opamp.core.v1.Header
+	7,   // 102: opamp.core.v1.SetupStarted.headers:type_name -> opamp.core.v1.Header
+	53,  // 103: opamp.core.v1.SetupStarted.hints:type_name -> opamp.core.v1.SetupHints
+	3,   // 104: opamp.core.v1.SetupIdentified.from:type_name -> opamp.core.v1.SetupUidFrom
+	3,   // 105: opamp.core.v1.SetupIdentified.unsaved_from:type_name -> opamp.core.v1.SetupUidFrom
+	106, // [106:106] is the sub-list for method output_type
+	106, // [106:106] is the sub-list for method input_type
+	106, // [106:106] is the sub-list for extension type_name
+	106, // [106:106] is the sub-list for extension extendee
+	0,   // [0:106] is the sub-list for field type_name
 }
 
 func init() { file_opamp_core_v1_core_proto_init() }
@@ -5565,7 +5652,6 @@ func file_opamp_core_v1_core_proto_init() {
 	if File_opamp_core_v1_core_proto != nil {
 		return
 	}
-	file_opamp_core_v1_core_proto_msgTypes[0].OneofWrappers = []any{}
 	file_opamp_core_v1_core_proto_msgTypes[7].OneofWrappers = []any{
 		(*Input_Start)(nil),
 		(*Input_SetDescription)(nil),
@@ -5660,7 +5746,7 @@ func file_opamp_core_v1_core_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_opamp_core_v1_core_proto_rawDesc), len(file_opamp_core_v1_core_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      4,
 			NumMessages:   52,
 			NumExtensions: 0,
 			NumServices:   0,

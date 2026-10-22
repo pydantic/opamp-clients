@@ -23,6 +23,7 @@ import { WebSocketServer } from "ws";
 import { EffectSchema, type Input } from "../src/gen/opamp/core/v1/core_pb.js";
 import { Executor } from "../src/executor.js";
 import {
+  AgentCapabilities,
   AgentDescriptionSchema,
   type AgentToServer,
   AgentToServerSchema,
@@ -306,7 +307,7 @@ async function run(
   const notes: Notification[] = [];
   const start = server.got.length;
   const client = Client.start(
-    { endpoint: `${scheme}://localhost:${server.port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 50, ...config },
+    { endpoint: `${scheme}://localhost:${server.port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 50, capabilities: BigInt(AgentCapabilities.AgentCapabilities_ReportsHeartbeat), ...config },
     { description },
     (n) => notes.push(n),
   );
@@ -626,7 +627,7 @@ test("with no mode named the client runs in core mode; \"platform\" is platform 
           // this one start clients on proxies with made-up names (`proxy`, `p`, `proxy.example`)
           // and don't wait for them; on a CI runner those lookups hang and fill Node's four
           // lookup threads, and this proxy's lookup of `localhost` had not begun after 10 s.
-          { endpoint: `http://127.0.0.1:${server.port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 50, mode },
+          { endpoint: `http://127.0.0.1:${server.port}/v1/opamp`, instanceUid: UID, heartbeatIntervalMs: 50, capabilities: BigInt(AgentCapabilities.AgentCapabilities_ReportsHeartbeat), mode },
           { description },
           (n) => notes.push(n),
         );

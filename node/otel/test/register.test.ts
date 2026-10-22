@@ -478,7 +478,10 @@ test("without a state directory the agent doesn't say it takes connection settin
     const r = await run("setTimeout(() => {}, 1000);", s.endpoint, undefined, undefined,
       { OTEL_OPAMP_HEADERS: "Authorization=Bearer%20enroll", OTEL_OPAMP_STATE_DIR: "none" });
     assert.ok(s.seen.polls > 0, r.out);
-    assert.ok(s.seen.capabilities.every((c) => (c & s.takesKeys) === 0n));
+    // Without storage the core still declares ReportsConnectionSettingsStatus alone: it answers any
+    // offer FAILED. Only the Accepts bit says it takes a key.
+    const accepts = BigInt(AgentCapabilities.AgentCapabilities_AcceptsOpAMPConnectionSettings);
+    assert.ok(s.seen.capabilities.every((c) => (c & accepts) === 0n));
     assert.ok(s.seen.authorization.every((a) => a === "Bearer enroll"));
   } finally {
     s.close();

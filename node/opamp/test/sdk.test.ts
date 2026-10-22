@@ -38,6 +38,8 @@ const declaring = {
     "sampling_rate",
     "sampling_rules",
     "sampling_traces_per_second",
+    "scrub_defaults",
+    "scrub_patterns",
     "send_logs",
     "send_logs_level",
     "send_logs_level_by_scope",

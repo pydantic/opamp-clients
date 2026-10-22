@@ -13,7 +13,7 @@ V1 = "logfire-sdk-policy/v1"
 SIGNALS = ("traces", "metrics", "logs")
 # The controls a policy may leave out (as local).
 MORE_CONTROLS = ("sampling_rules", "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug",
-               "app_settings", "instrumentations")
+               "app_settings", "instrumentations", "scrubbing")
 
 
 def policy(every: bool | None = None, **overrides: dict) -> str:

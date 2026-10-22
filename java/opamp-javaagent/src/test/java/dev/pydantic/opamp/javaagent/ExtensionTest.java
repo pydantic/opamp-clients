@@ -458,7 +458,8 @@ class ExtensionTest {
     // Where a signal's exporters pass no gate of the agent's, what the gate holds isn't declared.
     dev.pydantic.opamp.sdk.SettingsProto.Host ungated = Extension.host(java.util.Set.of("metrics", "logs"));
     assertFalse(ungated.getLiveList().stream().anyMatch(k -> k.startsWith("send_logs") || k.equals("send_metrics")
-        || k.endsWith("_attributes") || k.equals("debug_send_logs_level")), ungated.toString());
+        || k.endsWith("_attributes") || k.startsWith("scrub_") || k.equals("debug_send_logs_level")),
+        ungated.toString());
     assertTrue(ungated.getLiveList().containsAll(List.of("send_traces", "sampling_rate", "debug_until")));
   }
 

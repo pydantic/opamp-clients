@@ -63,13 +63,13 @@ def build(out: Path) -> None:
     for d in PY_PACKAGES:
         (out / f"{PY}{d}/__init__.py").write_text("")
     # Go: the spec's messages are opamp-go's (their go_package says so). protoc writes the file
-    # where the proto's go_package (.../go/opamp/sdk/settingspb) puts it; it is kept beside the
+    # where the proto's go_package (.../go/opamp/sdksettings/settingspb) puts it: beside the
     # settings layer's package, go/opamp/sdksettings, and imported from there.
     with tempfile.TemporaryDirectory() as tmp:
         run(["protoc", "-I", "spec/proto", "-I", "proto", f"--go_out={tmp}", f"--go_opt=module={GO_MODULE}", PROTO])
         go = out / "go/opamp/sdksettings/settingspb/settings.pb.go"
         go.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(Path(tmp) / "opamp" / "sdk" / "settingspb" / "settings.pb.go", go)
+        shutil.copy(Path(tmp) / "opamp" / "sdksettings" / "settingspb" / "settings.pb.go", go)
 
     # C#: the spec's messages are the client's own (scripts/gen_core.py generates them).
     (out / DOTNET / "Generated").mkdir(parents=True, exist_ok=True)

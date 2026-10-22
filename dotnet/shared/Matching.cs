@@ -157,16 +157,20 @@ internal enum Redaction
 
 /// <summary>
 /// drop_attributes and mask_attributes: globs on attribute keys, matched ignoring ASCII case; a key
-/// both match is dropped.
+/// both match is dropped. Then <see cref="Scrub"/> (scrub_defaults and scrub_patterns), of the
+/// attributes kept and of log bodies; null: none.
 /// </summary>
-internal sealed class Redactor(IReadOnlyList<string> drop, IReadOnlyList<string> mask)
+internal sealed class Redactor(IReadOnlyList<string> drop, IReadOnlyList<string> mask, Scrubber? scrub = null)
 {
     /// <summary>What a masked attribute's value becomes, whatever its type.</summary>
     public const string Masked = "[REDACTED]";
 
-    /// <summary>A redactor for the settings; null when both lists are empty.</summary>
-    public static Redactor? Of(IReadOnlyList<string> drop, IReadOnlyList<string> mask) =>
-        drop.Count == 0 && mask.Count == 0 ? null : new Redactor(drop, mask);
+    /// <summary>Scrubbing, of what redaction keeps; null: none.</summary>
+    public Scrubber? Scrub { get; } = scrub;
+
+    /// <summary>A redactor for the settings; null when both lists are empty and nothing is scrubbed.</summary>
+    public static Redactor? Of(IReadOnlyList<string> drop, IReadOnlyList<string> mask, Scrubber? scrub = null) =>
+        drop.Count == 0 && mask.Count == 0 && scrub is null ? null : new Redactor(drop, mask, scrub);
 
     public Redaction Of(string key) =>
         drop.Any(p => Glob.MatchesIgnoringAsciiCase(p, key)) ? Redaction.Drop

@@ -320,6 +320,8 @@ internal sealed class Agent
         {
             h.Live.Add("drop_attributes");
             h.Live.Add("mask_attributes");
+            h.Live.Add("scrub_defaults");
+            h.Live.Add("scrub_patterns");
         }
 
         if (!providersBuilt || this.samplerWrapped)

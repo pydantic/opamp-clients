@@ -95,6 +95,7 @@ switch instrumentations off).
 | `debug` | `until`, an RFC 3339 time at most 24 h ahead of the instance's clock: debug mode until then. Optionally `sampling_ratio` (as `ratio`, 1 if left out) and `log_level` (as `level`, `debug` if left out). See [debug mode](#debug-mode). | at once, until `until` |
 | `app_settings` | `values`, an object of at most 128 of the application's own keys to strings, numbers or booleans: not the SDK's, handed to the application to read. See [app-settings.md](app-settings.md). | at once |
 | `instrumentations` | `disabled`, an array of instrumentation names. `all_disabled`, `true` or `false`. At least one of the two. | at the next start |
+| `scrubbing` | `defaults`, `true`: scrub what the Logfire SDK scrubs by default. `patterns`, an array of globs matched against a whole key or string value, ignoring ASCII case. Scrubs span, event, link and log attributes, and log bodies, at export. See [scrubbing](#scrubbing). At least one of the two. | at once |
 
 The policy has no control for how often the SDK checks in: the server's OpAMP heartbeat offer
 (`OpAMPConnectionSettings.heartbeat_interval_seconds`) sets that, at once.
@@ -119,6 +120,7 @@ that it carries out by these names ([the host](#the-host), and the inventory in
 | `debug` `until`, `sampling_ratio`, `log_level` | `debug_until`, `debug_sampling_rate`, `debug_send_logs_level` |
 | `app_settings` `values` | `custom` |
 | `instrumentations` `disabled`, `all_disabled` | `deactivate_instrumentations`, `deactivate_all_instrumentations` |
+| `scrubbing` `defaults`, `patterns` | `scrub_defaults`, `scrub_patterns` |
 
 Controls that take effect **at once** are carried out while the SDK runs: a sampler and exporters
 that can be swapped (with the limits in [where each setting applies](#where-each-setting-applies)).
@@ -248,11 +250,59 @@ Here the two headers are removed, and an attribute whose key holds `password` or
 - They apply at export, through the integration's own gates, to span attributes, span event
   attributes, span link attributes and log record attributes. The application's own span or
   record isn't changed: another exporter (one the gate doesn't cover) sees the original.
-- Out of scope: resource and scope attributes, span names, log bodies (map bodies too), and
-  **metrics**, in every language. Removing or masking a data point's attribute would merge
+- Out of scope: resource and scope attributes, span names, log bodies (map bodies too;
+  [scrubbing](#scrubbing) reaches them), and **metrics**, in every language. Removing or masking a data point's attribute would merge
   distinct series into one, so the exported data would be wrong.
 - Up to 128 patterns each, each at most 256 bytes, with no comma. An empty array is refused. The
   effective config reports the patterns lowercase, without repeats, sorted.
+
+### Scrubbing
+
+`scrubbing` scrubs values, as the Logfire SDK's own scrubbing does, where redaction only goes by
+keys:
+
+```json
+{"scrubbing": {"mode": "override", "defaults": true, "patterns": ["*iban*", "sk_live_*"]}}
+```
+
+Here an attribute whose key or value looks secret to the Logfire SDK (`password`, `api_key`,
+`session`, `jwt` and the rest of its default patterns) is exported as
+`"[Scrubbed due to '<what matched>']"`, and so is one whose key or whole string value is like
+`*iban*` or `sk_live_*`.
+
+- `defaults: true` is the Logfire SDK's default patterns and safe keys (logfire 5.2.0): `password`,
+  `passwd`, `mysql_pwd`, `secret`, `auth` (not `author` or `authors`), `credential`,
+  `private key`, `api key`, `session`, `cookie`, `social security`, `credit card`,
+  `logfire token` (each pair with at most one of `.`, `_`, space or `-` between, or none), a
+  Logfire token's prefix (`pylf_v1_`), and `csrf`, `xsrf`, `jwt` and `ssn` as words of their own.
+  They match anywhere in a key or a value, ignoring case as Python does (`ſ` is `s`, the Kelvin
+  sign is `k`, `İ` and `ı` are `i`). A word boundary is ASCII: only ASCII letters, digits and `_`
+  are word characters. A value that is all the match (`password` alone) says nothing secret and
+  is kept, as the Logfire SDK keeps it.
+- `patterns` are globs, as in redaction, matched ignoring ASCII case against a whole key or a
+  whole string value. The default patterns name the match first: with both, a key or value they
+  match names what they matched, and the patterns are tried after.
+- A key that matches has its value replaced by the string, whatever its type (a list becomes one
+  string). Otherwise its string value is scrubbed if it matches, each string in a list one by
+  one, and each member of a map as an attribute of its own. A safe key's value is never touched,
+  at any depth: `exception.message`, `db.statement`, `url.full`, `http.target`,
+  `gen_ai.input.messages` and the rest of the Logfire SDK's list, each matched exactly, case and
+  all.
+- It runs after redaction, on what redaction keeps: a dropped attribute is gone and a masked one
+  stays `[REDACTED]`. It reaches what redaction does (span, span event, span link and log record
+  attributes) and **log bodies** too, a string body or a map body's members. The application's
+  own span or record isn't changed. It adds to the SDK's own scrubbing: a Logfire SDK that
+  scrubs on its own still does.
+- An override needs `defaults: true` or patterns, or both. `defaults: false` adds no defaults; it
+  does not turn off the SDK's own scrubbing. Up to 128 patterns, each at most 256 bytes, with no
+  comma, named lowercase in the replacement. An empty array is refused. The effective config
+  reports the patterns lowercase, without repeats, sorted, and the first of them in that order
+  names a value that several match. The SDK does not add Logfire's `logfire.scrubbed` attribute.
+- The matchers are each language's own, held to the layer's by the shared vectors (`scrub.json`)
+  and its `Evaluate` call, which takes a log body too. They differ from the Logfire SDK where
+  its regular expressions can't be matched the same in every language: a word boundary is ASCII
+  only, a key that matches with a list value gives one string where the Logfire SDK gives a list
+  of one, and a JSON string is one string value, scrubbed whole.
 
 ### Rate caps
 
@@ -375,6 +425,7 @@ reaches the telemetry that goes through them, and nothing else.
 | `sampling_rules` | at once ⁴ ⁵ | at once ³ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ | at once ⁴ ⁵ |
 | `log_levels` `scopes` | at once ¹ ⁴, per logger | at once ¹ ⁴, per logs API logger or bridge | at once ¹ ⁴, per `otelslog` logger | at once ¹ ⁴, per `ILogger` category | at once ¹ ⁴, per `ILogger` category | at once ¹, per logger |
 | `attribute_redaction` | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
+| `scrubbing` | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴, in the OTLP bytes | at once ¹ ⁴, in the OTLP bytes | at once ¹ |
 | `trace_rate_limit`, `log_rate_limit` | at once ¹ ⁴, per process | at once ¹ ³ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
 | `debug` | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then |
 | [export health](#export-health) (no control) | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ |
@@ -384,7 +435,7 @@ reaches the telemetry that goes through them, and nothing else.
 
 A collector under the [Supervisor](collector.md) takes the policy too, through the `logfirepolicy`
 processor: `head_sampling`, `signal_exports`, `log_levels` and `attribute_redaction`, matched as
-the Go integration matches them, and no other control
+the Go integration matches them, and no other control (`scrubbing` is refused there for now)
 ([go/logfirepolicyprocessor](../go/logfirepolicyprocessor/README.md#the-controls)).
 
 ¹ Only for the exporters the integration builds: OTLP and console (and Java's Prometheus reader).
@@ -429,17 +480,17 @@ configurator or `OTEL_CONFIG_FILE`). Node.js declares `debug` (`until`) always, 
 `sampling_rules`, `trace_rate_limit` and `debug` (`sampling_ratio`) unless the application
 registers a tracer provider of its own (footnote ³), the log ones (`log_levels` (`scopes`),
 `log_rate_limit`, `debug` (`log_level`)) only where it builds the log exporters, and
-`attribute_redaction` only where it builds both the span and the log exporters. The .NET plugin
-and `WithOpAmp` declare the log ones where every logs exporter is the gated OTLP one,
-`attribute_redaction` where every span and log record exported goes through a gate (traces and
-logs each gated, or not exported), `sampling_rules` and `trace_rate_limit` where `head_sampling`
+`attribute_redaction` and `scrubbing` only where it builds both the span and the log exporters.
+The .NET plugin and `WithOpAmp` declare the log ones where every logs exporter is the gated OTLP
+one, `attribute_redaction` and `scrubbing` where every span and log record exported goes through
+a gate (traces and logs each gated, or not exported), `sampling_rules` and `trace_rate_limit` where `head_sampling`
 is carried out, and debug mode always (its `sampling_ratio` and `log_level` refused where
 `head_sampling` and `log_levels` (`level`) are not carried out). Go declares every one until the
 application sets a global provider of its own in place of `Setup`'s. Then it no longer carries
 out what that signal needs, and sets those overrides aside: for the tracer provider the sampler's
-controls, `signal_exports.traces`, `attribute_redaction` and `instrumentations`; for the meter
-provider `signal_exports.metrics`; for the logger provider the log controls and
-`attribute_redaction`. The Java agent declares every one but where footnote ¹ says. It also does
+controls, `signal_exports.traces`, `attribute_redaction`, `scrubbing` and `instrumentations`; for
+the meter provider `signal_exports.metrics`; for the logger provider the log controls,
+`attribute_redaction` and `scrubbing`. The Java agent declares every one but where footnote ¹ says. It also does
 not declare the sampler's controls (`head_sampling`, `sampling_rules`, `trace_rate_limit` and
 `debug` (`sampling_ratio`)) where another agent extension sets a sampler of its own in place of
 the extension's.
@@ -535,7 +586,7 @@ them, the layer adds two attributes for the server:
 - `logfire.opamp.supported_controls`: the controls that this host carries out, in the order
   `head_sampling`, `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs`,
   `sampling_rules`, `trace_rate_limit`, `log_levels`, `log_rate_limit`, `attribute_redaction`,
-  `debug`, `app_settings`, `instrumentations`. A control is listed when the
+  `debug`, `app_settings`, `instrumentations`, `scrubbing`. A control is listed when the
   host declares the settings behind it ([the host](#the-host)). `debug` is listed only with a
   clock (`now_unix_ms` not 0). With no host, the list is empty.
 

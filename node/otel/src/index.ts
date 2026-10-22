@@ -141,6 +141,7 @@ import {
 } from "@pydantic/opamp-client/sdk";
 
 import { AppSettings, appSettings } from "./app-settings.js";
+import { asciiLower, globChars, Scrubbing } from "./scrub.js";
 
 export {
   AppSettings,
@@ -806,68 +807,52 @@ export function glob(pattern: string, text: string): boolean {
   return globChars(Array.from(pattern), Array.from(text));
 }
 
-/**
- * The glob a character at a time: on a mismatch the last `*` takes one more character and the
- * pattern after it starts again (at most pattern x text steps, the layer's algorithm).
- */
-function globChars(p: readonly string[], t: readonly string[]): boolean {
-  let pi = 0;
-  let ti = 0;
-  let star: [number, number] | undefined;
-  while (ti < t.length) {
-    if (p[pi] === "*") {
-      pi += 1;
-      star = [pi, ti];
-    } else if (pi < p.length && p[pi] === t[ti]) {
-      pi += 1;
-      ti += 1;
-    } else if (star) {
-      star = [star[0], star[1] + 1];
-      [pi, ti] = star;
-    } else {
-      return false;
-    }
-  }
-  return p.slice(pi).every((c) => c === "*");
-}
-
-/** ASCII letters lowercase, every other character as it is (`É` stays `É`). */
-const asciiLower = (s: string): string => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
-
 /** What a masked attribute's value becomes, whatever its type. */
 export const MASK = "[REDACTED]";
 
 /**
- * drop_attributes and mask_attributes: globs on attribute keys, matched ignoring ASCII case (the
- * layer hands them lowercase). An attribute a drop pattern matches is removed; one only a mask
- * pattern matches has its value replaced by MASK. A copy is made only of what changes: the
- * application's own span or record, which other processors share, is never changed.
+ * drop_attributes and mask_attributes, then scrubbing (scrub_defaults, scrub_patterns). Redaction
+ * patterns are globs on attribute keys, matched ignoring ASCII case (the layer hands them
+ * lowercase). An attribute a drop pattern matches is removed; one only a mask pattern matches has
+ * its value replaced by MASK; every other one is scrubbed (scrub.ts), and so is a log record's
+ * body. A copy is made only of what changes: the application's own span or record, which other
+ * processors share, is never changed.
  */
 export class Redaction {
   readonly #drop: string[][];
   readonly #mask: string[][];
+  readonly #scrub: Scrubbing;
 
-  constructor(drop: readonly string[] = [], mask: readonly string[] = []) {
+  constructor(drop: readonly string[] = [], mask: readonly string[] = [], scrub: Scrubbing = new Scrubbing()) {
     this.#drop = drop.map((p) => Array.from(asciiLower(p)));
     this.#mask = mask.map((p) => Array.from(asciiLower(p)));
+    this.#scrub = scrub;
   }
 
-  /** Whether there is anything to redact. */
+  /** Whether there is anything to redact or scrub. */
   get on(): boolean {
-    return this.#drop.length > 0 || this.#mask.length > 0;
+    return this.#drop.length > 0 || this.#mask.length > 0 || this.#scrub.on;
   }
 
-  /** The attributes as exported: the same object when nothing matched. */
+  /** The attributes as exported: the same object when nothing changed. */
   attributes<T extends Attributes | undefined>(attributes: T): T {
     if (!attributes || !this.on) return attributes;
     let out: Attributes | undefined;
     for (const key of Object.keys(attributes)) {
       const k = Array.from(asciiLower(key));
-      const drop = this.#drop.some((p) => globChars(p, k));
-      if (!drop && !this.#mask.some((p) => globChars(p, k))) continue;
-      out ??= { ...attributes };
-      if (drop) delete out[key];
-      else out[key] = MASK;
+      if (this.#drop.some((p) => globChars(p, k))) {
+        out ??= { ...attributes };
+        delete out[key];
+      } else if (this.#mask.some((p) => globChars(p, k))) {
+        out ??= { ...attributes };
+        out[key] = MASK;
+      } else if (this.#scrub.on) {
+        const v = attributes[key];
+        const s = this.#scrub.value(key, v);
+        if (s === v) continue;
+        out ??= { ...attributes };
+        out[key] = s as AttributeValue;
+      }
     }
     return (out ?? attributes) as T;
   }
@@ -901,11 +886,15 @@ export class Redaction {
     }) as ReadableSpan;
   }
 
-  /** A log record as exported, as `span`: its attributes redacted, its body left as it is. */
+  /** A log record as exported, as `span`: its attributes redacted, its body scrubbed. */
   log(record: ReadableLogRecord): ReadableLogRecord {
     const attributes = this.attributes(record.attributes as Attributes);
-    if (attributes === record.attributes) return record;
-    return Object.create(record, { attributes: { value: attributes, enumerable: true } }) as ReadableLogRecord;
+    const body = record.body === undefined ? undefined : this.#scrub.value(undefined, record.body);
+    if (attributes === record.attributes && body === record.body) return record;
+    return Object.create(record, {
+      attributes: { value: attributes, enumerable: true },
+      body: { value: body, enumerable: true },
+    }) as ReadableLogRecord;
   }
 }
 
@@ -970,7 +959,7 @@ export class Controls {
   sendLogsScopeLevels: readonly ScopeLevel[] = [];
   /** send_logs_per_second: the log records' bucket; undefined, no cap. */
   logsCap: Bucket | undefined;
-  /** drop_attributes and mask_attributes, at the span and log exporters' wrappers. */
+  /** drop_attributes, mask_attributes and scrubbing, at the span and log exporters' wrappers. */
   redaction = new Redaction();
   #clock: () => number = monotonicNs;
 
@@ -1020,7 +1009,8 @@ export class Controls {
     this.sendLogsMinSeverity = s?.sendLogsMinSeverity;
     this.sendLogsScopeLevels = s?.sendLogsScopeLevels ?? [];
     this.logsCap = bucket(this.logsCap, s?.sendLogsPerSecond);
-    this.redaction = new Redaction(s?.dropAttributes, s?.maskAttributes);
+    this.redaction = new Redaction(s?.dropAttributes, s?.maskAttributes,
+      new Scrubbing(s?.scrubDefaults ?? false, s?.scrubPatterns ?? []));
     this.#off = {
       all: s?.deactivateAllInstrumentations === true,
       names: new Set((s?.deactivateInstrumentations?.names ?? []).map((n) => n.trim()).filter((n) => n !== "")),
@@ -1261,7 +1251,7 @@ export function hostFromEnv(env: NodeJS.ProcessEnv = process.env, own: ReadonlyS
     live.push("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "debug_send_logs_level");
   }
   // Redaction is of spans and log records alike: only where both pass through this package.
-  if (spansGated && logsGated) live.push("drop_attributes", "mask_attributes");
+  if (spansGated && logsGated) live.push("drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns");
   return { live };
 }
 

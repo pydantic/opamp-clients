@@ -13,5 +13,6 @@
   "attribute_redaction": {"mode": "local"},
   "debug": {"mode": "local"},
   "app_settings": {"mode": "local"},
-  "instrumentations": {"mode": "local"}
+  "instrumentations": {"mode": "local"},
+  "scrubbing": {"mode": "local"}
 }
