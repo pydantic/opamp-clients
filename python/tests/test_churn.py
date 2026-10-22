@@ -146,6 +146,7 @@ async def churn(sessions: Sessions, cycle: Callable[[], Awaitable[None]]) -> Non
 
 
 def config(mode: str, endpoint: str, **more) -> Config:
+    more.setdefault("capabilities", pb.AgentCapabilities_ReportsHeartbeat)
     return Config(mode=mode, endpoint=endpoint, instance_uid=UID, heartbeat_interval_ms=50, **more)
 
 
@@ -213,7 +214,8 @@ def test_clients_stopped_from_the_remote_config_callback_leave_nothing_behind(mo
                     stopping.append(asyncio.get_running_loop().create_task(client.stop()))
 
             client = Client.start(config(mode, server.endpoint(transport),
-                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig), Status(), notify)
+                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig
+                                         | pb.AgentCapabilities_ReportsHeartbeat), Status(), notify)
             await wait_for(lambda: bool(stopping))
             assert stopping, "no remote config"
             await asyncio.wait_for(stopping[0], 10)
@@ -237,7 +239,8 @@ def test_clients_on_one_state_file_leave_nothing_behind(monkeypatch, tmp_path, m
                     told.set()
 
             client = Client.start(config(mode, server.endpoint(transport), state_file=state,
-                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig), Status(), notify)
+                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig
+                                         | pb.AgentCapabilities_ReportsHeartbeat), Status(), notify)
             await asyncio.wait_for(told.wait(), 10)
             await asyncio.wait_for(client.stop(), 10)
 
@@ -266,7 +269,8 @@ def test_clients_whose_callback_throws_stop_themselves_and_leave_nothing_behind(
                     raise Bug()
 
             client = Client.start(config(mode, server.endpoint(transport),
-                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig), Status(), notify)
+                                         capabilities=pb.AgentCapabilities_AcceptsRemoteConfig
+                                         | pb.AgentCapabilities_ReportsHeartbeat), Status(), notify)
             await asyncio.wait_for(stopped.wait(), 10)
             with pytest.raises(Bug):
                 await asyncio.wait_for(client.stop(), 10)

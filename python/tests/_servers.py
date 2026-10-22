@@ -249,6 +249,7 @@ async def run_client(server: OpampServer, endpoint: str, *, messages: int = 3, *
     """Run a client until the server has `messages` messages from it, or it fails to connect;
     then stop it. The notifications."""
     notes: list[Notification] = []
+    config.setdefault("capabilities", pb.AgentCapabilities_ReportsHeartbeat)  # heartbeats: the messages waited for
     client = Client.start(Config(endpoint=endpoint, instance_uid=UID, heartbeat_interval_ms=50, **config),
                           Status(description=DESCRIPTION), notes.append)
     await wait_for(lambda: len(server.arrivals) >= messages or any(n.kind == "connect_failed" for n in notes))

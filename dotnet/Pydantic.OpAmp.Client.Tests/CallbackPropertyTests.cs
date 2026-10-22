@@ -464,7 +464,7 @@ public class CallbackPropertyTests
                 Mode = mode,
                 DirectConnection = mode == OpAmpMode.Core,
                 Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig
-                    | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig),
+                    | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig | AgentCapabilities.ReportsHeartbeat),
             },
             new OpAmpStatus
             {
