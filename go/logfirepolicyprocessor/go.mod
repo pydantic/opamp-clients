@@ -6,7 +6,7 @@ replace github.com/pydantic/opamp-clients/go => ../
 
 require (
 	github.com/open-telemetry/opamp-go v0.24.0
-	github.com/pydantic/opamp-clients/go v0.1.0
+	github.com/pydantic/opamp-clients/go v0.2.0
 	go.opentelemetry.io/collector/component v1.69.0
 	go.opentelemetry.io/collector/component/componenttest v0.163.0
 	go.opentelemetry.io/collector/consumer v1.69.0
