@@ -50,7 +50,7 @@ Build it into a collector with ocb, beside the Supervisor's [extension](../opamp
 
 ```yaml
 processors:
-  - gomod: github.com/pydantic/opamp-clients/go/logfirepolicyprocessor v0.1.0
+  - gomod: github.com/pydantic/opamp-clients/go/logfirepolicyprocessor v0.2.0
 ```
 
 ## Tests

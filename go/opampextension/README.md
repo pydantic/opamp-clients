@@ -15,7 +15,7 @@ upstream's extension (a collector can have only one `opamp` extension):
 
 ```yaml
 extensions:
-  - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.1.0
+  - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.2.0
 ```
 
 To build from a checkout instead, add `replaces:` for `github.com/pydantic/opamp-clients/go` and
