@@ -110,7 +110,11 @@ def main() -> int:
         print(f"{CONFIG.name}: every ignore has a reason and ends within {IGNORE_DAYS} days")
         return 0
     # -r: every lockfile below the root; files git ignores (node_modules/, target/, the fetched core) are skipped.
-    cmd = [str(binary()), "scan", "source", "-r", "--config", str(CONFIG)]
+    # --no-resolve: a pom.xml's dependencies as it names them, not resolved through Maven: the
+    # resolver can't find this repository's own unpublished modules (dev.pydantic:opamp-client
+    # 0.1.0-SNAPSHOT), and an extraction error fails the whole scan. The other ecosystems are
+    # lockfiles, which list every transitive version anyway.
+    cmd = [str(binary()), "scan", "source", "-r", "--no-resolve", "--config", str(CONFIG)]
     if args.offline:
         cmd += ["--offline-vulnerabilities", "--download-offline-databases"]
     print("+", " ".join(cmd[1:]), flush=True)
