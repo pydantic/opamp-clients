@@ -132,9 +132,9 @@ agent:
   did, and the collector refused the result): the SDK settings layer checks it, as the SDKs' does,
   and the collector's [`logfirepolicy` processor](../logfirepolicyprocessor/README.md), configured
   with it, goes first in every traces, metrics and logs pipeline, local or remote, so the
-  collector redacts, filters by level, switches signals and head-samples as an SDK under the same
-  policy does. A policy that overrides a control the collector can't carry out (`sampling_rules`,
-  the rate caps, `debug`, ...) is FAILED with the layer's reason, and never runs. The agent
+  collector redacts, filters by level and switches signals as an SDK under the same policy does.
+  A policy that overrides a control the collector can't carry out (`head_sampling`,
+  `sampling_rules`, the rate caps, `debug`, ...) is FAILED with the layer's reason, and never runs. The agent
   description carries `logfire.opamp.config_format` and `logfire.opamp.supported_controls` only
   while the collector lists the processor among its available components; without it, only a
   policy with every control local is taken, and changes nothing.

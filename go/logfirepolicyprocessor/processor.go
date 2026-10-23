@@ -11,8 +11,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	"go.opentelemetry.io/collector/processor/processorhelper"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/match"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
@@ -22,11 +20,8 @@ import (
 // new collector config, and new processors.
 type policy struct {
 	sendTraces, sendMetrics, sendLogs bool
-	// sampler is head_sampling's ratio (nil: local, every trace kept), by the OpenTelemetry SDK's
-	// own trace-ID ratio sampler.
-	sampler sdktrace.Sampler
-	levels  *match.Levels
-	redact  *match.Redaction
+	levels                            *match.Levels
+	redact                            *match.Redaction
 }
 
 func newPolicy(ctx context.Context, cfg *Config) (*policy, error) {
@@ -38,58 +33,36 @@ func newPolicy(ctx context.Context, cfg *Config) (*policy, error) {
 }
 
 func policyOf(s *settingspb.Settings) *policy {
-	p := &policy{
+	return &policy{
 		sendTraces:  s.SendTraces == nil || *s.SendTraces,
 		sendMetrics: s.SendMetrics == nil || *s.SendMetrics,
 		sendLogs:    s.SendLogs == nil || *s.SendLogs,
 		levels:      match.LevelsOf(s),
 		redact:      match.RedactionOf(s),
 	}
-	if s.SamplingRate != nil {
-		p.sampler = sdktrace.TraceIDRatioBased(*s.SamplingRate)
-	}
-	return p
 }
 
-// sampled says whether head_sampling keeps the trace: by its trace ID alone, the way an SDK's
-// trace-ID ratio sampler decides a new trace at the same ratio. So an SDK and a collector under
-// the same ratio keep the same traces (0.5 then 0.5 keeps half, not a quarter), and every span of
-// a trace is kept or dropped together, whichever collector it goes through.
-func (p *policy) sampled(id pcommon.TraceID) bool {
-	if p.sampler == nil {
-		return true
-	}
-	r := p.sampler.ShouldSample(sdktrace.SamplingParameters{ParentContext: context.Background(), TraceID: trace.TraceID(id)})
-	return r.Decision == sdktrace.RecordAndSample
-}
-
-// traces carries out send_traces, head_sampling and attribute_redaction (on each span's
-// attributes, its events' and its links'; not the resource's or the scope's, as in an SDK).
+// traces carries out send_traces and attribute_redaction (on each span's attributes, its events'
+// and its links'; not the resource's or the scope's, as in an SDK). It keeps every span.
 func (p *policy) traces(_ context.Context, td ptrace.Traces) (ptrace.Traces, error) {
 	if !p.sendTraces {
 		return td, processorhelper.ErrSkipProcessingData
 	}
-	td.ResourceSpans().RemoveIf(func(rs ptrace.ResourceSpans) bool {
-		rs.ScopeSpans().RemoveIf(func(ss ptrace.ScopeSpans) bool {
-			ss.Spans().RemoveIf(func(s ptrace.Span) bool {
-				if !p.sampled(s.TraceID()) {
-					return true
-				}
+	if p.redact.None() {
+		return td, nil
+	}
+	for _, rs := range td.ResourceSpans().All() {
+		for _, ss := range rs.ScopeSpans().All() {
+			for _, s := range ss.Spans().All() {
 				p.redactAttributes(s.Attributes())
-				for i := 0; i < s.Events().Len(); i++ {
-					p.redactAttributes(s.Events().At(i).Attributes())
+				for _, e := range s.Events().All() {
+					p.redactAttributes(e.Attributes())
 				}
-				for i := 0; i < s.Links().Len(); i++ {
-					p.redactAttributes(s.Links().At(i).Attributes())
+				for _, l := range s.Links().All() {
+					p.redactAttributes(l.Attributes())
 				}
-				return false
-			})
-			return ss.Spans().Len() == 0
-		})
-		return rs.ScopeSpans().Len() == 0
-	})
-	if td.ResourceSpans().Len() == 0 {
-		return td, processorhelper.ErrSkipProcessingData
+			}
+		}
 	}
 	return td, nil
 }

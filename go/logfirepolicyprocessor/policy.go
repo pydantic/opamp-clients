@@ -6,7 +6,7 @@
 // collector as in an SDK. The policy is read and checked by the SDK settings layer, as the SDK
 // integrations read it (package sdkpolicy), and matched with the matchers the Go integration uses
 // (github.com/pydantic/opamp-clients/go/opamp/sdksettings/match), so a collector and an SDK under
-// the same policy redact, filter and sample alike. See README.md.
+// the same policy redact and filter alike. See README.md.
 package logfirepolicyprocessor // import "github.com/pydantic/opamp-clients/go/logfirepolicyprocessor"
 
 import (
