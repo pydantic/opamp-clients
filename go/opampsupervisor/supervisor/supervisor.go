@@ -23,10 +23,8 @@
 // the running apply's outcome so a resumed client can deliver the next config; the config the
 // Supervisor starts on has none until the collector started on it is healthy. A first start that
 // fails is tried again on the restart backoff. Health counts only while its connection is the
-// collector's. The Logfire SDK policy entry (logfire-sdk-policy.json) isn't merged as YAML: it is
-// checked by the SDK settings layer and configures the collector's logfirepolicy processor, put
-// first in every pipeline, and the agent description says the collector takes it when the
-// collector has the processor (sdk_policy.go).
+// collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
+// take, is FAILED: the collector takes YAML.
 
 package supervisor
 
@@ -1157,8 +1155,6 @@ func (s *Supervisor) forwardCustomMessagesToServerLoop() {
 func (s *Supervisor) setAgentDescription(ad *protobufs.AgentDescription) {
 	ad.IdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.IdentifyingAttributes, ad.IdentifyingAttributes)
 	ad.NonIdentifyingAttributes = applyKeyValueOverrides(s.config.Agent.Description.NonIdentifyingAttributes, ad.NonIdentifyingAttributes)
-	// Changed here: the Logfire SDK policy the collector takes (sdk_policy.go).
-	ad.NonIdentifyingAttributes = s.withSDKPolicyDescription(ad.NonIdentifyingAttributes)
 	s.agentDescription.Store(ad)
 }
 
@@ -1174,13 +1170,6 @@ func (s *Supervisor) configuredAgentDescription() *protobufs.AgentDescription {
 // setAvailableComponents sets the available components of the OpAMP agent
 func (s *Supervisor) setAvailableComponents(ac *protobufs.AvailableComponents) {
 	s.availableComponents.Store(ac)
-	// Changed here: the description says whether the collector takes the Logfire SDK policy,
-	// which its components decide (sdk_policy.go).
-	if ad, ok := s.agentDescription.Load().(*protobufs.AgentDescription); ok {
-		ad = proto.Clone(ad).(*protobufs.AgentDescription)
-		ad.NonIdentifyingAttributes = s.withSDKPolicyDescription(ad.NonIdentifyingAttributes)
-		s.agentDescription.Store(ad)
-	}
 }
 
 // applyKeyValueOverrides merges the overrides map into the array of key value pairs.
@@ -1320,9 +1309,6 @@ func (s *Supervisor) createRemoteConfigComposers(incomingConfig *protobufs.Agent
 			if name == "" {
 				// skip instance config
 				continue
-			}
-			if name == sdkPolicyFile {
-				continue // Changed here: the Logfire SDK policy isn't YAML (sdk_policy.go).
 			}
 			names = append(names, name)
 		}
@@ -1646,16 +1632,16 @@ func (s *Supervisor) loadRemoteConfig() {
 	s.loadResumedRemoteConfig()
 }
 
-// checkRemoteConfigPolicy refuses a remote config agent::remote_config_policy doesn't allow.
+// sdkPolicyFile is the config map entry that holds the Logfire SDK policy, for SDKs.
+const sdkPolicyFile = "logfire-sdk-policy.json"
+
+// checkRemoteConfigPolicy refuses a remote config agent::remote_config_policy doesn't allow, and
+// one holding the Logfire SDK policy, whatever the policy.
 func (s *Supervisor) checkRemoteConfigPolicy(rc *protobufs.AgentRemoteConfig) error {
 	files := rc.GetConfig().GetConfigMap()
 	for _, name := range slices.Sorted(maps.Keys(files)) {
 		if name == sdkPolicyFile {
-			// The Logfire SDK policy, checked by the SDK settings layer (sdk_policy.go).
-			if err := s.checkSDKPolicy(files[name].GetBody()); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("the remote config file %q is a Logfire SDK policy, which SDKs take: a collector's remote config is its YAML", name)
 		}
 		if err := s.config.Agent.RemoteConfigPolicy.CheckWithConnectionEnv(name, files[name].GetBody(), s.config.Agent.ConnectionEnv); err != nil {
 			return err
@@ -1923,10 +1909,6 @@ func (s *Supervisor) composeMergedConfig(incomingConfig *protobufs.AgentRemoteCo
 
 	err = config.MergeConfFromYAML(conf, agentConfigBytes)
 	if err != nil {
-		return false, err
-	}
-	// Changed here: the Logfire SDK policy's processor in every pipeline (sdk_policy.go).
-	if err := s.composeSDKPolicy(conf, incomingConfig); err != nil {
 		return false, err
 	}
 

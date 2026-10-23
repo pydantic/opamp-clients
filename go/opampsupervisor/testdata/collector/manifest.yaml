@@ -1,6 +1,6 @@
 # The collector the e2e tests supervise (e2e_test.go wants it at
 # ../../bin/otelcontribcol_<os>_<arch>), with this repository's opamp extension in place of
-# upstream's, and its logfirepolicy processor: the Supervisor and the extension tested together. Build it from go/opampsupervisor:
+# upstream's: the Supervisor and the extension tested together. Build it from go/opampsupervisor:
 #   go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config testdata/collector/manifest.yaml
 # (output_path and the replaces are relative to go/opampsupervisor and bin/e2e-collector).
 dist:
@@ -12,8 +12,6 @@ receivers:
   - gomod: go.opentelemetry.io/collector/receiver/nopreceiver v0.163.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.163.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.163.0
-processors:
-  - gomod: github.com/pydantic/opamp-clients/go/logfirepolicyprocessor v0.0.0
 exporters:
   - gomod: go.opentelemetry.io/collector/exporter/nopexporter v0.163.0
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.163.0
@@ -30,4 +28,3 @@ providers:
 replaces:
   - github.com/pydantic/opamp-clients/go => ../../go
   - github.com/pydantic/opamp-clients/go/opampextension => ../../go/opampextension
-  - github.com/pydantic/opamp-clients/go/logfirepolicyprocessor => ../../go/logfirepolicyprocessor

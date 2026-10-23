@@ -815,7 +815,6 @@ jobs:
           cache-dependency-path: |
             go/go.sum
             go/opampextension/go.sum
-            go/logfirepolicyprocessor/go.sum
             go/opampsupervisor/go.sum
       - name: Every pin of the collector's modules names one release
         run: python3 scripts/collector_release.py pins
@@ -831,12 +830,6 @@ jobs:
       - name: Collector OpAMP extension, unit and server-backed tests
         if: ${{ !cancelled() }}
         working-directory: go/opampextension
-        run: |
-          go vet ./...
-          go test -race ./...
-      - name: Collector logfirepolicy processor, unit and shared-vector tests
-        if: ${{ !cancelled() }}
-        working-directory: go/logfirepolicyprocessor
         run: |
           go vet ./...
           go test -race ./...
@@ -871,7 +864,6 @@ jobs:
           cache-dependency-path: |
             go/go.sum
             go/opampextension/go.sum
-            go/logfirepolicyprocessor/go.sum
             go/opampsupervisor/go.sum
       - name: A collector with this repository's extension (ocb)
         working-directory: go/opampsupervisor
