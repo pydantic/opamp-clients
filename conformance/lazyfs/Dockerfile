@@ -11,7 +11,7 @@ FROM maven:3.9-eclipse-temurin-21 AS maven
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dotnet
 FROM ghcr.io/astral-sh/uv:0.9 AS uv
 
-FROM golang:1.25-bookworm
+FROM golang:1.26-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake git ca-certificates curl xz-utils pkg-config \
