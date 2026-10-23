@@ -269,56 +269,24 @@ func renderOTLP(t *testing.T, attrs string) string {
 	return render(ld.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Attributes())
 }
 
-// idAt is a trace ID whose ratio-sampling value (its low 8 bytes, big-endian, shifted right
-// once, as the SDKs' trace-ID ratio samplers read it) is x.
+// idAt is a trace ID whose low 8 bytes are x.
 func idAt(x uint64) pcommon.TraceID {
 	var id pcommon.TraceID
-	id[0] = 0xab // the high half doesn't count
-	binary.BigEndian.PutUint64(id[8:], x<<1)
+	binary.BigEndian.PutUint64(id[8:], x)
 	return id
 }
 
-// head_sampling keeps a trace by its trace ID, as the SDK's trace-ID ratio sampler decides a new
-// trace at the same ratio: exactly those under the ratio's bound, every span of a trace alike.
-func TestHeadSamplingByTraceID(t *testing.T) {
-	p := policyFor(t, doc("head_sampling", `{"mode":"override","ratio":0.25}`))
-	bound := uint64(0.25 * (1 << 63))
+// The processor doesn't sample: head_sampling overridden is refused (TestRefused), and with it
+// local every span goes on, whatever its trace ID.
+func TestEverySpanKept(t *testing.T) {
+	p := policyFor(t, doc("attribute_redaction", `{"mode":"override","mask":["*token*"]}`))
 	td := ptrace.NewTraces()
 	spans := td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans()
-	kept := map[pcommon.TraceID]bool{idAt(0): true, idAt(bound - 1): true, idAt(bound): false, idAt(1<<63 - 1): false}
-	for id := range kept {
-		for range 3 { // three spans of each trace
-			spans.AppendEmpty().SetTraceID(id)
-		}
+	for _, x := range []uint64{0, 1 << 62, 1<<64 - 1} {
+		spans.AppendEmpty().SetTraceID(idAt(x))
 	}
-	out, err := p.traces(context.Background(), td)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := map[pcommon.TraceID]int{}
-	s := out.ResourceSpans().At(0).ScopeSpans().At(0).Spans()
-	for i := range s.Len() {
-		got[s.At(i).TraceID()]++
-	}
-	for id, want := range kept {
-		if n := got[id]; want && n != 3 || !want && n != 0 {
-			t.Errorf("trace %s: %d of 3 spans kept, want all or none (%v)", id, n, want)
-		}
-	}
-
-	// Every trace dropped: nothing goes on.
-	none := policyFor(t, doc("head_sampling", `{"mode":"override","ratio":0}`))
-	td = ptrace.NewTraces()
-	td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(idAt(0))
-	if _, err := none.traces(context.Background(), td); err == nil {
-		t.Fatal("ratio 0 sent a span on")
-	}
-	// Local: every trace kept.
-	local := policyFor(t, doc())
-	td = ptrace.NewTraces()
-	td.ResourceSpans().AppendEmpty().ScopeSpans().AppendEmpty().Spans().AppendEmpty().SetTraceID(idAt(1<<63 - 1))
-	if out, err := local.traces(context.Background(), td); err != nil || out.SpanCount() != 1 {
-		t.Fatalf("local head_sampling: %d spans, %v", out.SpanCount(), err)
+	if out, err := p.traces(context.Background(), td); err != nil || out.SpanCount() != 3 {
+		t.Fatalf("%d of 3 spans, %v", out.SpanCount(), err)
 	}
 }
 
@@ -361,6 +329,7 @@ func TestSignalExports(t *testing.T) {
 // control's name first, as the layer says it to a server; so is one that isn't a policy.
 func TestRefused(t *testing.T) {
 	for control, value := range map[string]string{
+		"head_sampling":    `{"mode":"override","ratio":0.25}`,
 		"sampling_rules":   `{"mode":"override","rules":[{"rate":0}]}`,
 		"trace_rate_limit": `{"mode":"override","traces_per_second":3}`,
 		"log_rate_limit":   `{"mode":"override","records_per_second":3}`,
@@ -405,7 +374,7 @@ func TestDescription(t *testing.T) {
 	}
 	want := map[string]any{
 		"logfire.opamp.config_format":      "logfire-sdk-policy/v1",
-		"logfire.opamp.supported_controls": "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,log_levels,attribute_redaction",
+		"logfire.opamp.supported_controls": "signal_exports.traces,signal_exports.metrics,signal_exports.logs,log_levels,attribute_redaction",
 	}
 	if g, w := asJSON(got), asJSON(want); g != w {
 		t.Fatalf("%s, want %s", g, w)

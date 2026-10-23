@@ -209,7 +209,7 @@ func TestTheDescriptionSaysTheCollectorTakesThePolicy(t *testing.T) {
 	for _, v := range got["logfire.opamp.supported_controls"].GetArrayValue().GetValues() {
 		controls = append(controls, v.GetStringValue())
 	}
-	require.Equal(t, []string{"head_sampling", "signal_exports.traces", "signal_exports.metrics", "signal_exports.logs",
+	require.Equal(t, []string{"signal_exports.traces", "signal_exports.metrics", "signal_exports.logs",
 		"log_levels", "attribute_redaction"}, controls)
 	require.Equal(t, "linux", got["os.type"].GetStringValue())
 	require.Equal(t, "edge", got["host.role"].GetStringValue())

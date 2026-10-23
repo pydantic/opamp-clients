@@ -27,13 +27,15 @@ const PolicyFile = "logfire-sdk-policy.json"
 const Processor = "logfirepolicy"
 
 // live are the settings this processor carries out, by their setting names
-// (docs/sdk-settings.md, "The controls"): head_sampling, signal_exports, log_levels and
-// attribute_redaction. Not sampling_rules (a collector may see a trace's spans before its root,
-// or not at all), the rate caps (they would cap per collector, and again after an SDK's),
-// debug, app_settings or instrumentations (nothing in a collector to carry them out). A policy
-// that overrides one of those is refused by the layer, with the control's name.
+// (docs/sdk-settings.md, "The controls"): signal_exports, log_levels and attribute_redaction.
+// Not head_sampling or sampling_rules: in an SDK the ratio decides only new traces and a span
+// whose parent was sampled is kept, but a collector sees only finished spans, so it can't tell a
+// trace a rule, a sampled caller or debug mode kept from one the ratio would drop, and the SDKs'
+// trace-ID ratio samplers don't all read the trace ID alike. Not the rate caps (they would cap
+// per collector, and again after an SDK's), debug, app_settings or instrumentations (nothing in a
+// collector to carry them out). A policy that overrides one of those is refused by the layer,
+// with the control's name.
 var live = []string{
-	"sampling_rate",
 	"send_traces",
 	"send_metrics",
 	"send_logs",

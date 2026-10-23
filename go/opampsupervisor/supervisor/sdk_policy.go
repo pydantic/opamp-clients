@@ -8,7 +8,7 @@ package supervisor
 // Supervisor doesn't merge that entry into the collector's config as YAML (it isn't any); it
 // checks the policy with the SDK settings layer, as the SDKs do, and puts the collector's
 // logfirepolicy processor, configured with it, first in every traces, metrics and logs pipeline,
-// so the collector redacts, filters and samples as an SDK under the same policy does. It tells
+// so the collector redacts and filters as an SDK under the same policy does. It tells
 // the server it takes the policy (logfire.opamp.config_format and supported_controls in the agent
 // description) only when the collector lists the processor among its available components.
 

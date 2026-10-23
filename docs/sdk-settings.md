@@ -434,8 +434,9 @@ reaches the telemetry that goes through them, and nothing else.
 | `app_settings` ([app-settings.md](app-settings.md)) | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application |
 
 A collector under the [Supervisor](collector.md) takes the policy too, through the `logfirepolicy`
-processor: `head_sampling`, `signal_exports`, `log_levels` and `attribute_redaction`, matched as
-the Go integration matches them, and no other control (`scrubbing` is refused there for now)
+processor: `signal_exports`, `log_levels` and `attribute_redaction`, matched as the Go
+integration matches them, and no other control. `head_sampling` is refused there: a collector
+can't keep, as an SDK does, a span whose parent was sampled (`scrubbing` is refused there for now)
 ([go/logfirepolicyprocessor](../go/logfirepolicyprocessor/README.md#the-controls)).
 
 ¹ Only for the exporters the integration builds: OTLP and console (and Java's Prometheus reader).
