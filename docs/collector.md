@@ -39,7 +39,7 @@ receivers:
 exporters:
   - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.163.0
 extensions:
-  - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.1.0
+  - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.2.0
 providers:
   - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.69.0
   - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.69.0
@@ -96,9 +96,9 @@ extension), the licenses and a README. `SHA256SUMS` and a build provenance attes
 (`gh attestation verify <file> --repo pydantic/opamp-clients`) check a download.
 
 ```bash
-curl -fsSLO https://github.com/pydantic/opamp-clients/releases/download/go%2Fopampsupervisor%2Fv0.3.0/pydantic-opamp-supervisor_0.3.0_linux_amd64.tar.gz
-tar -xzf pydantic-opamp-supervisor_0.3.0_linux_amd64.tar.gz
-cd pydantic-opamp-supervisor_0.3.0_linux_amd64
+curl -fsSLO https://github.com/pydantic/opamp-clients/releases/download/go%2Fopampsupervisor%2Fv0.4.0/pydantic-opamp-supervisor_0.4.0_linux_amd64.tar.gz
+tar -xzf pydantic-opamp-supervisor_0.4.0_linux_amd64.tar.gz
+cd pydantic-opamp-supervisor_0.4.0_linux_amd64
 ./opampsupervisor --config supervisor.yaml
 ```
 
