@@ -8,7 +8,7 @@ server's settings ([sdk-settings.md](sdk-settings.md)).
 Go has no agent to attach at run time: an application instruments itself (otelhttp, otelgrpc, a
 log bridge) and sets up the SDK in `main`. `Setup` takes the place of that setup. The
 instrumentations and the SDK stay the upstream ones. Checked with `go.opentelemetry.io/otel`
-1.46 and contrib 0.71; it needs Go 1.25 or later.
+1.46 and contrib 0.71; it needs Go 1.26 or later.
 
 ## Use it
 

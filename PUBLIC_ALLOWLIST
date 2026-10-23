@@ -10,6 +10,12 @@ AGENTS.md
 LICENSE
 PUBLIC_ALLOWLIST
 README.md
+SECURITY.md
+CHANGELOG.md
+# The dependency scan and its ignore list.
+osv-scanner.toml
+scripts/deps_scan.py
+scripts/test_deps_scan.py
 opamp-core.lock.json
 scripts/fetch_core.py
 scripts/public_check.py
