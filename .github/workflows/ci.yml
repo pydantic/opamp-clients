@@ -74,7 +74,7 @@ jobs:
           python-version: "3.13"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
@@ -117,9 +117,17 @@ jobs:
           conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
           examples/test_integrations.py examples/test_settings_cookbook.py scripts/test_native_dist.py
           scripts/test_sdk_release.py scripts/test_redact_mutants.py scripts/test_collector_release.py
+          scripts/test_deps_scan.py
       - name: Every dropped-redaction mutant applies
         if: ${{ !cancelled() }}
         run: python3 scripts/redact_mutants.py --check
+      # Every lockfile and manifest against the OSV database (scripts/deps_scan.py, SECURITY.md).
+      # Not on a core candidate: a new advisory in a client's dependency is this repository's to
+      # fix, not a reason to hold the core. The nightly's `dependencies` finds one published since
+      # main last changed.
+      - name: No lockfile holds a version with a known vulnerability (osv-scanner.toml ignores, each for a while and why)
+        if: ${{ !cancelled() && env.CORE_ARTIFACT == '' }}
+        run: python3 scripts/deps_scan.py
 
   # ---------------------------------------------------------------- Python
   python-tests:
@@ -143,7 +151,7 @@ jobs:
         uses: ./.github/actions/core
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: conformance/**/go.sum
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       # The test files, sorted and dealt round-robin: every file in exactly one shard.
@@ -215,7 +223,7 @@ jobs:
         uses: ./.github/actions/core
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: |
             go/go.sum
             conformance/**/go.sum
@@ -272,7 +280,7 @@ jobs:
         uses: ./.github/actions/core
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: |
             go/go.sum
             conformance/**/go.sum
@@ -366,7 +374,7 @@ jobs:
           cache-dependency-path: java/opamp/pom.xml
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: conformance/**/go.sum
       # `mvn package` with surefire told which classes: every *Test class but Fray's (java-fray
       # runs those), sorted and dealt round-robin.
@@ -509,7 +517,7 @@ jobs:
           dotnet-version: "8.0.x"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: conformance/**/go.sum
       - name: dotnet test
         working-directory: dotnet
@@ -579,7 +587,7 @@ jobs:
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         env:
@@ -622,7 +630,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.sdk == 'go'
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: |
             go/go.sum
             go/opampotel/go.sum
@@ -1095,7 +1103,7 @@ jobs:
       # The Go server, whatever the client.
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: conformance/**/go.sum
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: matrix.family == 'node'

@@ -43,6 +43,20 @@ jobs:
           REPORT_ONLY: ${{ github.event_name == 'pull_request' && '--report-only' || '' }}
         run: python3 scripts/collector_release.py latest $REPORT_ONLY
 
+  # Every lockfile and manifest on main against the OSV database as it is tonight
+  # (scripts/deps_scan.py): an advisory published since main last changed. CI's core job runs the
+  # same on every change.
+  dependencies:
+    name: No lockfile holds a version with a known vulnerability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: python3 scripts/deps_scan.py
+
   # Go's native fuzzing of the Go client's own code around the core (scripts/go_fuzz.sh): five
   # minutes for each fuzz test, one after another, each on every core of the runner.
   go-fuzz:
@@ -61,7 +75,7 @@ jobs:
         run: python3 scripts/fetch_core.py fetch
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - name: Each fuzz test, five minutes
         env:
@@ -186,7 +200,7 @@ jobs:
         run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: conformance/**/go.sum
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -251,7 +265,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: ${{ !cancelled() }}
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - name: Go (race detector)
         if: ${{ !cancelled() }}
@@ -318,7 +332,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.part == 'Go and Node.js'
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - name: Go
         if: matrix.part == 'Go and Node.js'
@@ -427,7 +441,7 @@ jobs:
       - if: matrix.sdk == 'go'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: go/go.sum
       - if: matrix.sdk == 'go'
         working-directory: go
@@ -487,7 +501,7 @@ jobs:
         run: python3 scripts/fetch_core.py fetch --all-platforms  # and the Linux library the .NET images take (scripts/native_lib.py)
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.25"
+          go-version: "1.26"
           cache-dependency-path: |
             go/go.sum
             go/opampotel/go.sum

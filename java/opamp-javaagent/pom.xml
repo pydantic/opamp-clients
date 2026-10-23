@@ -111,7 +111,7 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>2.22.2</version>
+      <version>2.22.3</version>
       <scope>test</scope>
     </dependency>
     <!-- The console exporters, for building an SDK from a configuration file in the tests. -->

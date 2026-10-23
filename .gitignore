@@ -6,6 +6,8 @@
 .opamp-core/
 .opamp-core-candidate/
 target/
+# scripts/deps_scan.py's OSV-Scanner
+.cache/
 dist/
 # the conformance runs' taps and reports
 /conformance/out/

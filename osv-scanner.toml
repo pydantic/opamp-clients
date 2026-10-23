@@ -1,0 +1,8 @@
+# Known vulnerabilities this repository's lockfiles may keep for now (scripts/deps_scan.py). Each
+# entry needs an id, a reason (why it doesn't apply, or what it waits on) and an ignoreUntil at most
+# 90 days away.
+#
+# [[IgnoredVulns]]
+# id = "GHSA-xxxx-xxxx-xxxx"
+# ignoreUntil = 2026-12-31
+# reason = "No fixed release yet; the clients never call the affected function."
