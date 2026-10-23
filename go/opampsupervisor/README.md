@@ -193,7 +193,7 @@ header. These files are new, and are this repository's:
   and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
-- `e2e_packages_test.go`, `e2e_policy_test.go`, `e2e_sdk_policy_test.go`, `e2e_sdk_policy_controls_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
+- `e2e_packages_test.go`, `e2e_policy_test.go`, `e2e_sdk_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml`, `supervisor_policy.yaml` and `supervisor_sdk_policy.yaml`);
 - everything under `packaging/`.

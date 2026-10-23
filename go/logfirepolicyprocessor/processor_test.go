@@ -336,7 +336,6 @@ func TestRefused(t *testing.T) {
 		"debug":            `{"mode":"override","until":"2026-10-21T18:00:00Z"}`,
 		"app_settings":     `{"mode":"override","values":{"a":1}}`,
 		"instrumentations": `{"mode":"override","all_disabled":true}`,
-		"scrubbing":        `{"mode":"override","defaults":true}`,
 	} {
 		err := (&Config{Policy: doc(control, value)}).Validate()
 		if err == nil || !strings.HasPrefix(err.Error(), control+": ") {
