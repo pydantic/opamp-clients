@@ -60,11 +60,14 @@ Run 3, the policies, in the order the server offers them:
      else its name), on the probe's span events, links and log records too, each note there
      [Scrubbed due to 'password'], and the log lines again (the scopes local);
   8. head_sampling 1, attribute_redaction drop URL.FULL and Http.Url (keys match ignoring case),
-     trace_rate_limit 1, log_rate_limit 1: APPLIED; spans arrive, none named by a URL or
-     [REDACTED], and the probe's events, links and log records arrive without one, their notes as
-     they are again (scrubbing local, off); about a span
-     and a log record a second, of some five requests a second;
-  9. instrumentations all_disabled: APPLIED (where it takes effect at once, no span but the
+     scrubbing patterns *P4SS (no defaults), trace_rate_limit 1, log_rate_limit 1: APPLIED; spans
+     arrive, none named by a URL or [REDACTED], and the probe's events, links and log records
+     arrive without one, their notes [Scrubbed due to '*p4ss'] (the pattern, named lowercase, in
+     place of the defaults); about a span and a log record a second, of some five requests a
+     second;
+  9. head_sampling 1 alone (the first four controls): APPLIED; redaction and scrubbing are local
+     again, so the probe's events, links and log records carry their URL and note as they are;
+ 10. instrumentations all_disabled: APPLIED (where it takes effect at once, no span but the
      probe's, which no instrumentation makes).
   Throughout, export health: the agent's health carries component_health_map["exporters"], a
   child each for traces, metrics and logs, the application's own `healthy` true in every report;
@@ -131,7 +134,7 @@ import json
 import os
 import re
 import shutil
-import signal
+from signal import SIGKILL, SIGTERM
 import subprocess
 import sys
 import tempfile
@@ -203,16 +206,17 @@ def target(name: str) -> Path:
     return path
 
 
-def stop_group(app: subprocess.Popen, sig: int = signal.SIGTERM) -> None:
+def stop_group(app: subprocess.Popen, sig: int = SIGTERM, grace: float = 20) -> None:
     """Stop an application started in a session of its own (start_new_session): `sig` to its
-    process group, SIGKILL if it hasn't exited 20 s later. One already gone is fine."""
+    process group, SIGKILL if it hasn't exited `grace` seconds later. One already gone is fine.
+    (The signal module isn't imported by name: signal() below, the sink's exports, would hide it.)"""
     with contextlib.suppress(ProcessLookupError):
         os.killpg(app.pid, sig)
     try:
-        app.wait(timeout=20)
+        app.wait(timeout=grace)
     except subprocess.TimeoutExpired:
         with contextlib.suppress(ProcessLookupError):
-            os.killpg(app.pid, signal.SIGKILL)
+            os.killpg(app.pid, SIGKILL)
         app.wait()
 
 
@@ -314,8 +318,12 @@ def signals_scenario(gap: int = 25) -> dict:
         offer(1 + 7 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"mask": ["url.full", "http.url"]},
                             "scrubbing": {"defaults": True}}),
         offer(1 + 8 * gap, {"head_sampling": {"ratio": 1}, "attribute_redaction": {"drop": ["URL.FULL", "Http.Url"]},
+                            "scrubbing": {"patterns": [PATTERN]},
                             "trace_rate_limit": {"traces_per_second": 1}, "log_rate_limit": {"records_per_second": 1}}),
-        offer(1 + 9 * gap, {"instrumentations": {"all_disabled": True}}),
+        # The first four controls alone: redaction and scrubbing (every control but head_sampling)
+        # local again.
+        offer(1 + 9 * gap, {"head_sampling": {"ratio": 1}}),
+        offer(1 + 10 * gap, {"instrumentations": {"all_disabled": True}}),
     ]}}
 
 
@@ -715,10 +723,10 @@ def judge_signals(three: list[dict], service: str, switch_at_once: bool) -> list
     """Run 3's checks: (what, whether it holds)."""
     out = []
     st = statuses(three)
-    out.append(("nine configs answered APPLIED", [s for _, s, _ in st] == ["APPLIED"] * 9))
-    if len(st) != 9:
+    out.append(("ten configs answered APPLIED", [s for _, s, _ in st] == ["APPLIED"] * 10))
+    if len(st) != 10:
         return out
-    t1, t2, t3, t4, t5, t6, t7, t8, t9 = (t for t, _, _ in st)
+    t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 = (t for t, _, _ in st)
     for name in ("metrics", "logs"):
         out.append((f"{name} arrive", any(e.get("services") == [service] for e in signal(three, name, t1, t2))))
         # An export already on its way may arrive; one still queued goes out once switched back.
@@ -742,10 +750,10 @@ def judge_signals(three: list[dict], service: str, switch_at_once: bool) -> list
                 f"{made_again} requests)", made_again > REQUESTS and again >= 0.5))
     out += judge_effective(three, t3, t4, offered_before(three, t5))
     out += judge_debug(three, t5, offered_before(three, t6))
-    out += judge_telemetry_settings(three, t6, t7, t8, offered_before(three, t9))
+    out += judge_telemetry_settings(three, t6, t7, t8, offered_before(three, t9), t9, offered_before(three, t10))
     if switch_at_once:
-        after = pings(three, t9 + MARGIN)
-        late = [n for n in ending(three, t9 + DRIFT, 1e9) if n != PROBE]
+        after = pings(three, t10 + MARGIN)
+        late = [n for n in ending(three, t10 + DRIFT, 1e9) if n != PROBE]
         out.append((f"every instrumentation switched off at once: no spans but the probe's ({len(after)} requests, "
                     f"{late[:3]})", len(after) > REQUESTS and not late))
     out += judge_health(three)
@@ -787,7 +795,7 @@ def judge_debug(three: list[dict], applied: float, next_offer: float) -> list[tu
 
 
 def judge_telemetry_settings(three: list[dict], t6: float, t7: float, t8: float,
-                             end: float) -> list[tuple[str, bool]]:
+                             end: float, t9: float, t9_end: float) -> list[tuple[str, bool]]:
     """Steps 6 to 8: the sampling rule and the loggers off (APPLIED at t6), the mask (t7), and the
     drop with both caps
     (t8), until the next offer, sent at `end`. Redaction is at export: a span counts for a step
@@ -815,7 +823,7 @@ def judge_telemetry_settings(three: list[dict], t6: float, t7: float, t8: float,
     named = [n for n in dropped if "://" in n or n == "[REDACTED]"]
     out.append((f"attribute_redaction drop: spans arrive, none with a URL ({len(dropped)} spans, {named[:3]})",
                 bool(dropped) and not named))
-    out += judge_probes(three, t7, t8, end)
+    out += judge_probes(three, t7, t8, end, t9, t9_end)
     # The caps: a token bucket of one a second, full to start. Five requests a second (and a log
     # line or two each) without them.
     window = end - DRIFT - (t8 + MARGIN)
@@ -840,15 +848,21 @@ def probes(events: list[dict], place: str, after: float, before: float, key: str
 #: scrubbing's default patterns make of it.
 NOTE = "the password is p4ss"
 SCRUBBED_NOTE = "[Scrubbed due to 'password']"
+#: Run 3's eighth step scrubs by a pattern of its own, not the defaults: a glob on the whole note,
+#: in another case than the note's, which the replacement names lowercase.
+PATTERN = "*P4SS"
+PATTERNED_NOTE = "[Scrubbed due to '*p4ss']"
 
 
-def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tuple[str, bool]]:
+def judge_probes(three: list[dict], t7: float, t8: float, end: float, t9: float,
+                 t9_end: float) -> list[tuple[str, bool]]:
     """Redaction and scrubbing beyond span attributes: the probe's span events, links and log
     records carry their URL and note before any redaction (step 1, APPLIED first, until the logs
     export goes off), each URL [REDACTED] and each note scrubbed under the mask and scrubbing
-    defaults (APPLIED at t7), and no URL but the note as it is under the drop (t8, until `end`).
-    Both are at export: a probe counts for a step when it arrived MARGIN after it was APPLIED and
-    before the next was offered."""
+    defaults (APPLIED at t7), no URL and the note scrubbed by PATTERN alone under the drop (t8,
+    until `end`), and the URL and the note as they are once both are local again (t9, until
+    `t9_end`). Both are at export: a probe counts for a step when it arrived MARGIN after it was
+    APPLIED and before the next was offered."""
     out = []
     st = statuses(three)
     t1, t2 = st[0][0], st[1][0]
@@ -856,6 +870,7 @@ def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tu
         plain = probes(three, place, t1 + MARGIN, offered_before(three, t2))
         masked = probes(three, place, t7 + MARGIN, offered_before(three, t8))
         dropped = probes(three, place, t8 + MARGIN, end)
+        local = probes(three, place, t9 + MARGIN, t9_end)
         out.append((f"the probe's {name} carry the URL ({len(plain)}, {plain[:1]})",
                     bool(plain) and all(u is not None and "://" in u for u in plain)))
         out.append((f"attribute_redaction mask: each URL on the probe's {name} [REDACTED] "
@@ -864,10 +879,16 @@ def judge_probes(three: list[dict], t7: float, t8: float, end: float) -> list[tu
         out.append((f"attribute_redaction drop: the probe's {name} arrive without a URL "
                     f"({len(dropped)}, {sorted(set(map(str, dropped)))[:3]})",
                     bool(dropped) and all(u is None for u in dropped)))
+        out.append((f"attribute_redaction local: the probe's {name} carry the URL again "
+                    f"({len(local)}, {sorted(set(map(str, local)))[:3]})",
+                    bool(local) and all(u is not None and "://" in u for u in local)))
         notes = [probes(three, place, a, b, "note") for a, b in
-                 ((t1 + MARGIN, offered_before(three, t2)), (t7 + MARGIN, offered_before(three, t8)), (t8 + MARGIN, end))]
+                 ((t1 + MARGIN, offered_before(three, t2)), (t7 + MARGIN, offered_before(three, t8)), (t8 + MARGIN, end),
+                  (t9 + MARGIN, t9_end))]
         for (what, want), got in zip(((f"the probe's {name} carry the note", NOTE),
                                       (f"scrubbing defaults: the note on the probe's {name} scrubbed", SCRUBBED_NOTE),
+                                      (f"scrubbing patterns: the note on the probe's {name} scrubbed by {PATTERN}",
+                                       PATTERNED_NOTE),
                                       (f"scrubbing local: the note on the probe's {name} as it is", NOTE)), notes):
             out.append((f"{what} ({len(got)}, {sorted(set(map(str, got)))[:3]})", bool(got) and all(n == want for n in got)))
     return out
@@ -1069,7 +1090,7 @@ def check_signals(launch: Launch, target_: Path, service: str = "checkout", list
 
     try:
         three = run(launch, signals_scenario(), state, "run3", seconds[0], listen, target_,
-                    until=lambda events: len(statuses(events)) >= 9, settle=10, env=SIGNALS | PROBING)
+                    until=lambda events: len(statuses(events)) >= 10, settle=10, env=SIGNALS | PROBING)
         print(f"run 3: remote config statuses {[s for _, s, _ in statuses(three)]}, "
               f"{len(signal(three, 'metrics'))} metrics and {len(signal(three, 'logs'))} log exports")
         expect(judge_signals(three, service, switch_at_once))

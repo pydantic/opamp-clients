@@ -20,7 +20,7 @@ import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, NOTE, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, SCRUBBED_NOTE, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+from integrations import (APP_KEY, NOTE, PATTERNED_NOTE, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, SCRUBBED_NOTE, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
                           judge_truth, key_from_env, key_in_code, policy, scenario, truth_scenario,
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_moved_start, judge_rotation, judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
@@ -160,7 +160,8 @@ def second(uid: str = UID, requests: int = 30, config: bool = True) -> Log:
 
 def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = PING, masked_url: str | None = "[REDACTED]",
           dropped_url: str | None = None, probed: tuple[str, ...] = ("event", "link", "log"),
-          plain_note: str | None = NOTE, scrubbed_note: str | None = SCRUBBED_NOTE, dropped_note: str | None = NOTE,
+          plain_note: str | None = NOTE, scrubbed_note: str | None = SCRUBBED_NOTE, dropped_note: str | None = PATTERNED_NOTE,
+          local_url: str | None = PING, local_note: str | None = NOTE,
           metrics_off: bool = True, logs_off: bool = True, at_once: bool = False,
           info_under_floor: bool = False, info_back: bool = True, debug_spans: bool = True,
           ruled: bool = True, scoped: bool = True, scope_back: bool = True, span_name: str = "[REDACTED]",
@@ -174,9 +175,9 @@ def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = 
     the URLs masked, spans named `span_name` and log lines again; the URLs dropped (spans named
     `dropped_name`) and both caps, `spans_a_second` and `records_a_second`; then every
     instrumentation off. The probe in `probed` (its event, link and log record) every two seconds:
-    its URL `plain_url` under the first policy, `masked_url` under the mask and `dropped_url` under
-    the drop, and its note `plain_note`, `scrubbed_note` (under scrubbing) and `dropped_note`; and
-    its span after the last. Export health at start and at 120 s. With the third offer the agent
+    its URL `plain_url` under the first policy, `masked_url` under the mask, `dropped_url` under
+    the drop and `local_url` after it, and its note `plain_note`, `scrubbed_note` (under scrubbing
+    defaults), `dropped_note` (under the pattern) and `local_note` (scrubbing local again). Export health at start and at 120 s. With the third offer the agent
     reports `effective` as its effective config (by default the policy in force), and with the
     fourth `effective_after` (by default the next policy in force)."""
     third_effective = effective or in_force({"head_sampling": {"ratio": 0.25}})
@@ -238,10 +239,15 @@ def third(share: float = 0.25, rule_share: float = 0.5, plain_url: str | None = 
             log.export(t + 0.3, "logs", count=records_a_second)
             if t % 2 and "log" in probed:
                 log.probe(t + 0.3, dropped_url, ("log",), dropped_note)
-    log.offer(224.5).a2s(225, status="APPLIED").pings(225, 235).probe(229, None)
+    # head_sampling 1 alone: everything else local, the probe's URL and note as they are again.
+    log.offer(224.5).a2s(225, status="APPLIED").pings(225, 250).exports(225, 250)
+    for t in range(226, 250, 2):
+        log.span(t + 0.5, ended=t)
+        log.probe(t + 0.6, local_url, probed, local_note)
+    log.offer(249.5).a2s(250, status="APPLIED").pings(250, 260).probe(254, None)
     if not at_once:
-        log.span(230)
-    return log.a2s(235, disconnect=True)
+        log.span(255)
+    return log.a2s(260, disconnect=True)
 
 
 def in_force(overrides: dict[str, dict]) -> dict:
@@ -322,6 +328,22 @@ class Transport(unittest.TestCase):
         os.environ["OPAMP_EXAMPLES_TRANSPORT"] = "grpc"
         with self.assertRaises(SystemExit):
             opamp_url("4320")
+
+
+class StopGroup(unittest.TestCase):
+    def test_an_application_that_ignores_the_signal_is_killed(self):
+        app = subprocess.Popen([sys.executable, "-c", "import signal, sys, time\n"
+                                "signal.signal(signal.SIGTERM, signal.SIG_IGN)\nprint('up', flush=True)\ntime.sleep(60)"],
+                               stdout=subprocess.PIPE, start_new_session=True)
+        try:
+            self.assertEqual(app.stdout.readline(), b"up\n")
+            integrations.stop_group(app, grace=0.5)
+            self.assertEqual(app.returncode, -9)
+        finally:
+            if app.poll() is None:
+                app.kill()
+                app.wait()
+            app.stdout.close()
 
 
 class Wait(unittest.TestCase):
@@ -790,7 +812,7 @@ class Signals(unittest.TestCase):
         log = third()
         answer = next(e for e in log.events if e.get("remote_config_status"))
         answer["remote_config_status"]["status"] = "RemoteConfigStatuses_FAILED"
-        self.assertIn("nine configs answered APPLIED", failed(judge_signals(log.events, "checkout", False)))
+        self.assertIn("ten configs answered APPLIED", failed(judge_signals(log.events, "checkout", False)))
 
 
 def fails(log: Log, start: str, at_once: bool = False) -> bool:
@@ -1395,17 +1417,31 @@ class SignalsProbes(unittest.TestCase):
                 with self.subTest(note=note, place=place):
                     self.assertTrue(fails(third(scrubbed_note=note), f"scrubbing defaults: the note on the probe's {name}"))
 
+    def test_a_note_not_scrubbed_by_the_pattern_alone_fails(self):
+        # As it is, gone, or named by the defaults that step leaves out.
+        for note in (NOTE, None, SCRUBBED_NOTE):
+            for place, name in self.PLACES:
+                with self.subTest(note=note, place=place):
+                    self.assertTrue(fails(third(dropped_note=note), f"scrubbing patterns: the note on the probe's {name}"))
+
     def test_a_note_still_scrubbed_once_scrubbing_is_local_fails(self):
-        for place, name in self.PLACES:
-            with self.subTest(place=place):
-                self.assertTrue(fails(third(dropped_note=SCRUBBED_NOTE), f"scrubbing local: the note on the probe's {name}"))
+        for note in (SCRUBBED_NOTE, PATTERNED_NOTE, None):
+            for place, name in self.PLACES:
+                with self.subTest(note=note, place=place):
+                    self.assertTrue(fails(third(local_note=note), f"scrubbing local: the note on the probe's {name}"))
+
+    def test_a_url_still_redacted_once_redaction_is_local_fails(self):
+        for url in (None, "[REDACTED]"):
+            for place, name in self.PLACES:
+                with self.subTest(url=url, place=place):
+                    self.assertTrue(fails(third(local_url=url), f"attribute_redaction local: the probe's {name}"))
 
     def test_a_place_the_probe_never_reaches_fails_each_of_its_checks(self):
         for place, name in self.PLACES:
             with self.subTest(place=place):
                 log = third(probed=tuple(p for p, _ in self.PLACES if p != place))
                 got = [f for f in failed(judge_signals(log.events, "checkout", False)) if "probe" in f]
-                self.assertEqual(len(got), 6, got)
+                self.assertEqual(len(got), 8, got)
                 self.assertTrue(all(name in f for f in got), got)
 
     def test_a_probe_from_the_step_before_may_arrive_late_without_counting(self):
