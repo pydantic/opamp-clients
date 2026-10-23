@@ -25,7 +25,7 @@ and date. Tests, CI and docs alone don't need a line.
   answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
   processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
   `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
-  carry the processor (#PR).
+  carry the processor (#80).
 
 ### Changed
 
