@@ -41,7 +41,7 @@ and date. Tests, CI and docs alone don't need a line.
   SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
   sampler's own description never returns), and EDOT's span logger no longer sets the trace
   gate's controls aside while EDOT's own OpAMP client is off. Every check of the extension now
-  passes under EDOT Java 1.14 (#PR).
+  passes under EDOT Java 1.14 (#83).
 
 ### Changed
 
