@@ -35,36 +35,47 @@ LOGFIRE_EXPORTER = "logfire"
 _UNGATED = "ungated"
 
 
-def _resolved(kwargs: Mapping[str, Any]) -> tuple[list[str], bool, str | None, bool]:
-    """What the Logfire SDK would resolve from its arguments, its variables and its config file:
-    the tokens it sends with, whether it would send anyway without one (from its credentials
-    file, which only it reads), the base URL given, and whether pending spans are sent."""
-    from logfire._internal.config_params import CONFIG_PARAMS, ParamManager, normalize_token  # noqa: PLC0415
+def _config(kwargs: Mapping[str, Any]) -> Any:
+    """The Logfire SDK's configuration for these arguments, merged with its variables and config
+    file by its own loader, so what is built here goes where it would send: nothing is set up."""
+    import copy  # noqa: PLC0415
+    import inspect  # noqa: PLC0415
+    from pathlib import Path  # noqa: PLC0415
 
-    params = ParamManager.create(kwargs.get("config_dir"))
-    send = params.load_param("send_to_logfire", kwargs.get("send_to_logfire"))
-    token = normalize_token(kwargs.get("token")) or normalize_token(params.load_param("token", None))
+    from logfire._internal.config import LogfireConfig  # noqa: PLC0415
+
+    defaults = {name: p.default for name, p in inspect.signature(LogfireConfig.__init__).parameters.items()
+                if p.default is not inspect.Parameter.empty}
+    names = inspect.signature(LogfireConfig._load_configuration).parameters  # noqa: SLF001
+    args = {name: kwargs.get(name, defaults.get(name)) for name in names if name != "self"}
+    for name in ("config_dir", "data_dir"):
+        args[name] = Path(args[name]) if args[name] else None
+    # The loader fills the advanced options in place: a copy, so the caller's stay as given.
+    if args.get("advanced") is not None and not isinstance(args["advanced"], Mapping):
+        args["advanced"] = copy.copy(args["advanced"])
+    config = object.__new__(LogfireConfig)
+    config._load_configuration(**args)  # noqa: SLF001
+    return config
+
+
+def _resolved(config) -> tuple[list[str], bool, str | None]:
+    """The tokens the Logfire SDK sends with, whether it would send anyway without one (it
+    creates a project when send_to_logfire is True), and its base URL. As the Logfire SDK does,
+    a token or base URL it isn't given comes from its credentials file."""
+    from logfire._internal.config import LogfireCredentials  # noqa: PLC0415
+
+    send, token, base_url = config.send_to_logfire, config.token, config.advanced.base_url
+    if not send:
+        return [], False, base_url
+    try:
+        credentials = LogfireCredentials.load_creds_file(config.data_dir)
+    except Exception:  # noqa: BLE001 - the Logfire SDK raises this itself when it needs the file
+        credentials = None
+    if credentials is not None:
+        token = token or credentials.token
+        base_url = base_url or credentials.logfire_api_url
     tokens = [] if not token else [token] if isinstance(token, str) else list(token)
-    advanced = kwargs.get("advanced")
-    base_url = getattr(advanced, "base_url", None) or params.load_param("base_url", None)
-    pending = getattr(advanced, "pending_spans", None)
-    if pending is None:
-        # Before logfire 5.2 pending spans were always sent, and there was no setting for them.
-        pending = params.load_param("pending_spans", None) if "pending_spans" in CONFIG_PARAMS else True
-    if send is False:
-        return [], False, base_url, bool(pending)
-    return tokens, not tokens, base_url, bool(pending)
-
-
-def _console_on(kwargs: Mapping[str, Any]) -> bool:
-    from logfire._internal.config_params import ParamManager  # noqa: PLC0415
-
-    console = kwargs.get("console")
-    if console is False:
-        return False
-    if console is not None:
-        return True
-    return bool(ParamManager.create(kwargs.get("config_dir")).load_param("console", None))
+    return tokens, not tokens and send is True, base_url
 
 
 def _otlp_variables(signal: str) -> bool:
@@ -75,7 +86,7 @@ def _otlp_variables(signal: str) -> bool:
     return os.environ.get(f"OTEL_{signal.upper()}_EXPORTER", "").lower() in ("otlp", "")
 
 
-def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool, response_hook=None):
+def _logfire_exporters(token: str, base_url: str | None, controls, advanced):
     """For one token: the span processor, the metric reader (its exporter gated) and the log
     record processor, built as the Logfire SDK builds its own, each with the package's gate."""
     from urllib.parse import urljoin  # noqa: PLC0415
@@ -95,17 +106,23 @@ def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool
 
     url = base_url or get_base_url_from_token(token)
     headers = {"User-Agent": f"logfire/{VERSION}", "Authorization": token}
-    session = OTLPExporterHttpSession()
+    # zstd as the Logfire SDK sends it: the session compresses, where it can (else gzip, as it warns).
+    from logfire._internal.exporters import otlp  # noqa: PLC0415
+
+    # logfire before 5.2 has no zstd.
+    zstd = getattr(advanced, "compression", None) == "zstd" and getattr(otlp, "zstd_compress", None) is not None
+    session = OTLPExporterHttpSession(_use_zstd=True) if zstd else OTLPExporterHttpSession()
     session.headers.update(headers)
     # Ingest's responses, as the Logfire SDK reads them: by default its X-Logfire-Warning header.
-    install_logfire_response_hook(session, response_hook)
-    gzip = Compression.Gzip
+    install_logfire_response_hook(session, getattr(advanced, "server_response_hook", None))
+    gzip = Compression.NoCompression if zstd else Compression.Gzip
     # The gate sits under the retry and pending-span handling, so what it drops is never retried
     # and what it lets through is redacted before it is sent, a pending span included.
     spans = BodySizeCheckingOTLPSpanExporter(endpoint=urljoin(url, "/v1/traces"), session=session,
                                              compression=gzip, headers=headers)
     spans = RetryFewerSpansSpanExporter(controls.spans(QuietSpanExporter(spans)))
-    if pending:
+    # Before logfire 5.2 pending spans were always sent, and there was no setting for them.
+    if getattr(advanced, "pending_spans", True):
         spans = RemovePendingSpansExporter(spans)
     metrics = QuietMetricExporter(
         OTLPMetricExporter(endpoint=urljoin(url, "/v1/metrics"), headers=headers, session=session, compression=gzip,
@@ -160,7 +177,7 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     ``logfire.configure(**kwargs)``, unmanaged. It never raises for the server's settings: one it
     can't use is warned about and is the default."""
     import logfire  # noqa: PLC0415
-    from logfire import MetricsOptions, SamplingOptions  # noqa: PLC0415
+    from logfire import AdvancedOptions, MetricsOptions  # noqa: PLC0415
 
     from . import _INSTANCE_ID, AGENT  # noqa: PLC0415
 
@@ -172,36 +189,28 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
         return logfire.configure(**kwargs)
     kwargs = dict(kwargs)
     controls = AGENT.controls
-    # Both as the Logfire SDK resolves them when they aren't given (its variables and config file), as
-    # giving them here replaces what it would have read.
-    from logfire._internal.config_params import ParamManager  # noqa: PLC0415
-
-    params = ParamManager.create(kwargs.get("config_dir"))
-    sampling = kwargs.get("sampling")
-    if isinstance(sampling, Mapping):
-        sampling = SamplingOptions(**sampling)
-    elif sampling is None:
-        sampling = SamplingOptions(head=params.load_param("trace_sample_rate"))
+    # As the Logfire SDK resolves them (its variables and config file included), as what is given
+    # here replaces what it would have read.
+    config = _config(kwargs)
+    sampling = config.sampling
     kwargs["sampling"] = dataclasses.replace(sampling, head=controls.sampler.wrap(_head(sampling)))
-    resource = params.load_param("resource_attributes", kwargs.get("resource_attributes")) or {}
-    kwargs["resource_attributes"] = {**resource, _INSTANCE_ID: str(AGENT.uid)}
+    kwargs["resource_attributes"] = {**config.resource_attributes, _INSTANCE_ID: str(AGENT.uid)}
 
-    tokens, sends_ungated, base_url, pending = _resolved(kwargs)
-    console = _console_on(kwargs)
+    tokens, sends_ungated, base_url = _resolved(config)
+    console = config.console is not False
     given_spans = list(kwargs.get("additional_span_processors") or ())
     advanced = kwargs.get("advanced")
     given_logs = list(getattr(advanced, "log_record_processors", ()) or ())
     metrics = kwargs.get("metrics")
     given_readers = list(getattr(metrics, "additional_readers", ()) or ())
-    hook = getattr(advanced, "server_response_hook", None)
-    built = [_logfire_exporters(t, base_url, controls, pending, hook) for t in tokens]
+    built = [_logfire_exporters(t, base_url, controls, config.advanced) for t in tokens]
     if tokens:
         kwargs["send_to_logfire"] = False
         kwargs["additional_span_processors"] = [*given_spans, *(b[0] for b in built)]
         if advanced is None:
-            from logfire import AdvancedOptions  # noqa: PLC0415
-
             advanced = AdvancedOptions()
+        elif isinstance(advanced, Mapping):
+            advanced = AdvancedOptions(**advanced)
         kwargs["advanced"] = dataclasses.replace(advanced, log_record_processors=[*given_logs, *(b[2] for b in built)])
         if metrics is not False:
             metrics = metrics or MetricsOptions()

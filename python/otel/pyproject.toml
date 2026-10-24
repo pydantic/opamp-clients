@@ -34,7 +34,7 @@ post_sdk_init_function = "pydantic_opamp_otel:start"
 Repository = "https://github.com/pydantic/opamp-clients"
 
 [dependency-groups]
-dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25", "logfire>=5.1,<6"]
+dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25", "logfire>=5.1,<6", "backports.zstd>=1; python_version < '3.14'"]
 
 [tool.uv.sources]
 pydantic-opamp-client = { path = "..", editable = true }

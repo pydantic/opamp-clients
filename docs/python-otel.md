@@ -155,8 +155,8 @@ What it does differently from `logfire.configure()`:
 - The live sampler is the Logfire SDK's head sampler, in front of the one `sampling.head` asks
   for, so the sampling controls and debug mode are carried out. Tail sampling is unchanged.
 - The exporters to Logfire are built here, as the Logfire SDK builds them (its OTLP over HTTP
-  exporters, retries and pending spans, one set per token, to the region the token names or
-  `advanced.base_url`), with the package's gates in front of them, and the Logfire SDK is told
+  exporters, retries, pending spans and compression, gzip or zstd, one set per token, to the
+  region the token names or `advanced.base_url`), with the package's gates in front of them, and the Logfire SDK is told
   not to send itself (`send_to_logfire=False`). So `signal_exports`, the log controls, redaction
   and scrubbing apply to what reaches Logfire. The server's scrubbing adds to the Logfire SDK's.
 - The instance UID is `service.instance.id`, in place of the random one the Logfire SDK makes.
@@ -171,15 +171,16 @@ at start names the settings set aside:
   (`advanced.log_record_processors`) and metric readers (`metrics.additional_readers`) given in the
   arguments;
 - the OTLP exporters the Logfire SDK adds for `OTEL_EXPORTER_OTLP_*ENDPOINT`;
-- an export from the Logfire SDK's credentials file (`.logfire/`), when there is no token, which
-  only the Logfire SDK reads.
+- with `send_to_logfire=True` but no token and no credentials file, the project the Logfire SDK
+  creates and sends to.
 
 The Logfire SDK's logs (`logfire.info(...)`) are spans: the trace controls apply to them. The log
 controls apply to OpenTelemetry log records (Python `logging` through the Logfire SDK's logs
 pipeline).
 
-It reads the Logfire SDK's own settings (the token, `send_to_logfire`, the console, the base URL
-and pending spans, from the arguments, the variables and `pyproject.toml`) and builds its
+It reads the Logfire SDK's settings with the Logfire SDK's own loader (from the arguments, the
+variables and `pyproject.toml`), and, as the Logfire SDK does, takes a token or base URL it isn't
+given from its credentials file (`.logfire/logfire_credentials.json`). It builds its
 exporters from the Logfire SDK's modules, which are not public API: it is checked with the
 versions its extra allows.
 

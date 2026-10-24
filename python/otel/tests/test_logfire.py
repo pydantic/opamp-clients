@@ -3,6 +3,7 @@
 """configure_logfire: the Logfire SDK under the server (docs/python-otel.md, "The Logfire SDK")."""
 
 import gzip
+import json
 import subprocess
 import sys
 import textwrap
@@ -25,13 +26,20 @@ class _Ingest:
     def __init__(self) -> None:
         self.spans: list[tuple[str, dict]] = []
         self.auth: set[str] = set()
-        spans, auth = self.spans, self.auth
+        self.encodings: set[str | None] = set()
+        spans, auth, encodings = self.spans, self.auth, self.encodings
 
         class Ingest(BaseHTTPRequestHandler):
             def do_POST(self):  # noqa: N802
                 body = self.rfile.read(int(self.headers["Content-Length"]))
-                if self.headers.get("Content-Encoding") == "gzip":
+                encoding = self.headers.get("Content-Encoding")
+                if encoding == "gzip":
                     body = gzip.decompress(body)
+                elif encoding == "zstd":
+                    from backports.zstd import decompress  # noqa: PLC0415
+
+                    body = decompress(body)
+                encodings.add(encoding)
                 auth.add(self.headers.get("Authorization", ""))
                 if self.path == "/v1/traces":
                     for rs in ExportTraceServiceRequest.FromString(body).resource_spans:
@@ -61,9 +69,12 @@ class _Ingest:
 
 
 def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool = False, extra: str = "",
-         env: dict | None = None):
+         env: dict | None = None, where: str | None = None):
     """A child that sets the Logfire SDK up with configure_logfire, sends a span "before", waits for
-    the server's answer to `offer`, then sends "after" (with a `user.email` attribute)."""
+    the server's answer to `offer`, then sends "after" (with a `user.email` attribute). `where` is
+    the token and base URL arguments: by default a token, with `ingest` as the base URL."""
+    if where is None:
+        where = f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r})'
     ready, answered = tmp_path / "ready", tmp_path / "answered"
     remote = config(offer)
 
@@ -76,10 +87,9 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
     child = textwrap.dedent(f"""
         import pathlib, time, logfire, pydantic_opamp_otel
         pydantic_opamp_otel.configure_logfire(
-            endpoint={server.endpoint!r}, heartbeat_interval=0.1, token="pylf_v1_us_test",
+            endpoint={server.endpoint!r}, heartbeat_interval=0.1, {where},
             service_name="rocket", console={None if console else False!r}, metrics=False, send_to_logfire=True,
-            inspect_arguments=False,
-            advanced=logfire.AdvancedOptions(base_url={ingest.url!r}){extra})
+            inspect_arguments=False{extra})
         agent = pydantic_opamp_otel.AGENT
         with logfire.span("before"):
             pass
@@ -213,3 +223,63 @@ def test_a_local_logfire_instance_is_described_by_its_own_resource(servers):
     assert described
     names = {a.value.string_value for a in described[0].identifying_attributes if a.key == "service.name"}
     assert names == {"rocket-local"}
+
+
+def _credentials(data_dir, token: str, url: str) -> None:
+    data_dir.mkdir()
+    (data_dir / "logfire_credentials.json").write_text(json.dumps(
+        {"token": token, "project_name": "rocket", "project_url": "https://example.com/rocket", "logfire_api_url": url}))
+
+
+def test_the_logfire_sdks_credentials_file_says_where_it_sends(tmp_path, servers):
+    """As for the Logfire SDK, its credentials file gives the token and base URL it isn't given:
+    what is sent goes there, through the gates, with or without a token argument."""
+    server, ingest = servers
+    data_dir = tmp_path / "logfire"
+    _credentials(data_dir, "pylf_v1_us_file", ingest.url)
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
+               where=f"data_dir={str(data_dir)!r}")
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert ingest.names() == ["before", "after"], run.stderr
+    assert ingest.auth == {"pylf_v1_us_file"}
+    (after,) = [a for n, a in ingest.spans if n == "after"]
+    assert after["user.email"] != "a@example.com"
+
+    (tmp_path / "again").mkdir()
+    run = _run(server, ingest, tmp_path / "again", policy(attribute_redaction={"mask": ["user.email"]}),
+               where=f'token="pylf_v1_us_arg", data_dir={str(data_dir)!r}')
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    assert ingest.names() == ["before", "after"] * 2, run.stderr
+    assert "pylf_v1_us_arg" in ingest.auth
+
+
+def test_zstd_is_sent_as_the_logfire_sdk_sends_it(tmp_path, servers):
+    import logfire  # noqa: PLC0415
+
+    if not hasattr(logfire.AdvancedOptions(), "compression"):
+        pytest.skip("this logfire has no zstd")
+    server, ingest = servers
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
+               where=f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r}, '
+                     f'compression="zstd")')
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    assert ingest.names() == ["before", "after"], run.stderr
+    assert ingest.encodings == {"zstd"}
+
+
+def test_what_the_logfire_sdk_resolves_leaves_the_arguments_as_given(tmp_path, monkeypatch):
+    """Resolving reads the Logfire SDK's variables as it does, without changing the options given;
+    and with send_to_logfire=True but no token or credentials file it would create a project and
+    send to it, past the gates."""
+    import logfire  # noqa: PLC0415
+    from pydantic_opamp_otel._logfire import _config, _resolved  # noqa: PLC0415
+
+    monkeypatch.setenv("LOGFIRE_BASE_URL", "https://ingest.example.com")
+    monkeypatch.delenv("LOGFIRE_TOKEN", raising=False)
+    advanced = logfire.AdvancedOptions()
+    config = _config({"advanced": advanced, "send_to_logfire": True, "data_dir": tmp_path})
+    assert advanced.base_url is None
+    assert _resolved(config) == ([], True, "https://ingest.example.com")
+    config = _config({"send_to_logfire": "if-token-present", "data_dir": tmp_path})
+    assert _resolved(config) == ([], False, "https://ingest.example.com")
