@@ -13,6 +13,11 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.43",
 ]
 
+[project.optional-dependencies]
+# configure_logfire: the Logfire SDK under the server. It builds the exporters to Logfire as the
+# Logfire SDK does, from its own modules, so it is held to the versions checked.
+logfire = ["logfire>=5.1,<6"]
+
 [project.entry-points.opentelemetry_distro]
 opamp = "pydantic_opamp_otel:Distro"
 
@@ -29,7 +34,7 @@ post_sdk_init_function = "pydantic_opamp_otel:start"
 Repository = "https://github.com/pydantic/opamp-clients"
 
 [dependency-groups]
-dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25"]
+dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25", "logfire>=5.1,<6", "backports.zstd>=1; python_version < '3.14'"]
 
 [tool.uv.sources]
 pydantic-opamp-client = { path = "..", editable = true }

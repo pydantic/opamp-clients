@@ -28,5 +28,8 @@ say). When it can't connect, it warns once, with what to check; warnings show wi
 The instance keeps its UID across restarts with no configuration
 ([default-state-dir.md](../../docs/default-state-dir.md)).
 
+An application on the Logfire SDK calls `pydantic_opamp_otel.configure_logfire()` in place of
+`logfire.configure()` (install `./python/otel[logfire]`).
+
 Everything else, including setting the SDK up in code with `pydantic_opamp_otel.configure()`, is in
 [docs/python-otel.md](../../docs/python-otel.md).

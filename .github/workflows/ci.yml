@@ -676,6 +676,8 @@ jobs:
         run: |
           uv lock --check
           uv run --python 3.13 pytest -q
+          # configure_logfire builds on the Logfire SDK's own modules: the oldest version its extra allows too.
+          uv run --python 3.13 --with logfire==5.1.0 pytest -q tests/test_logfire.py
       - name: Java agent extension (java/opamp-javaagent)
         if: matrix.sdk == 'java'
         run: |
