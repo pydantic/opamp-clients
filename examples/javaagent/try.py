@@ -4,6 +4,11 @@
 
     python3 examples/javaagent/try.py            # builds with Maven and runs the JVM in Docker
     python3 examples/javaagent/try.py --local    # this host's Maven and JDK (MAVEN_ARGS is passed on)
+    python3 examples/javaagent/try.py --edot     # the same checks under Elastic's distribution of the agent
+
+With --edot the agent is Elastic's distribution (EDOT Java, from Maven Central) in place of the
+upstream one, the extension the same jar: every check must pass as it does upstream
+(docs/guides/elastic.md). EDOT's own OpAMP client stays off (no ELASTIC_OTEL_OPAMP_ENDPOINT).
 
 App.java has no OpenTelemetry code: the agent traces its HTTP requests and exports its
 java.util.logging lines. The checks are every integration's (examples/integrations.py),
@@ -60,8 +65,15 @@ from integrations import (  # noqa: E402
 )
 
 HERE = Path(__file__).resolve().parent
-TARGET = target("javaagent")
 AGENT_VERSION = "2.31.1"
+EDOT = "--edot" in sys.argv
+TARGET = target("javaagent-edot" if EDOT else "javaagent")
+#: Elastic's distribution of the agent, with --edot (built on agent 2.32).
+EDOT_VERSION = "1.14.0"
+AGENT = (f"co.elastic.otel:elastic-otel-javaagent:{EDOT_VERSION}" if EDOT
+         else f"io.opentelemetry.javaagent:opentelemetry-javaagent:{AGENT_VERSION}")
+#: The agent's jar in TARGET (copied with its version stripped).
+AGENT_JAR = "elastic-otel-javaagent.jar" if EDOT else "opentelemetry-javaagent.jar"
 # Maven's cache, a Docker volume: OPAMP_EXAMPLES_M2_VOLUME names another, for a run beside this one
 # (two builds installing into one at once can leave it half written).
 M2 = ["-v", f"{os.environ.get('OPAMP_EXAMPLES_M2_VOLUME') or 'opamp-clients-m2'}:/root/.m2"]
@@ -74,8 +86,7 @@ def build() -> None:
         for module, goal in [("java/opamp", "install"), ("java/opamp-javaagent", "package")]:
             subprocess.run([*mvn, "-DskipTests", goal, "-f", str(ROOT / module / "pom.xml")], check=True,
                            stdout=subprocess.DEVNULL)
-        artifact = f"io.opentelemetry.javaagent:opentelemetry-javaagent:{AGENT_VERSION}"
-        subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy", f"-Dartifact={artifact}",
+        subprocess.run([*mvn, "org.apache.maven.plugins:maven-dependency-plugin:3.9.0:copy", f"-Dartifact={AGENT}",
                         f"-DoutputDirectory={TARGET}", "-Dmdep.stripVersion=true",
                         "-f", str(ROOT / "java/opamp-javaagent/pom.xml")], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
@@ -95,8 +106,7 @@ def build() -> None:
                            check=True, stdout=subprocess.DEVNULL)
         subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
                         "maven:3.9-eclipse-temurin-21", "mvn", "-q", "-B", "dependency:copy",
-                        f"-Dartifact=io.opentelemetry.javaagent:opentelemetry-javaagent:{AGENT_VERSION}",
-                        "-DoutputDirectory=/out", "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
+                        f"-Dartifact={AGENT}", "-DoutputDirectory=/out", "-Dmdep.stripVersion=true"], check=True, stdout=subprocess.DEVNULL)
         copy_jars()
         for name in SETUPS_CLASSPATH:
             subprocess.run(["docker", "run", "--rm", "--network", "host", *M2, "-v", f"{TARGET}:/out",
@@ -171,12 +181,13 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
     extensions = f"{agent}/opamp-javaagent-extension.jar"
     if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
         extensions += f",{agent}/{SETUPS}"
-    java = ["java", f"-javaagent:{agent}/opentelemetry-javaagent.jar", f"-Dotel.javaagent.extensions={extensions}",
+    java = ["java", f"-javaagent:{agent}/{AGENT_JAR}", f"-Dotel.javaagent.extensions={extensions}",
             "-cp", f"{agent}/app:{agent}/{APP_SETTINGS}:{app_api(agent)}", "App", f"{telemetry}/ping"]
     stderr = open(TARGET / f"{name}.stderr", "w")
+    # EDOT's agent logs to standard output, the upstream agent to standard error: both kept.
+    stdout = stderr if EDOT else subprocess.DEVNULL
     if LOCAL:
-        app = subprocess.Popen(java, env=os.environ | env, start_new_session=True, stdout=subprocess.DEVNULL,
-                               stderr=stderr)
+        app = subprocess.Popen(java, env=os.environ | env, start_new_session=True, stdout=stdout, stderr=stderr)
         return lambda: stop_group(app)
     # By this process too: two runs of one check started in the same second (one per transport,
     # side by side) would otherwise both ask for the same name.
@@ -185,7 +196,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
            "-v", f"{TARGET}:/agent:ro", "-v", f"{state}:/state"]
     for k, v in env.items():
         cmd += ["-e", f"{k}={v}"]
-    app = subprocess.Popen([*cmd, "eclipse-temurin:21-jdk", *java], stdout=subprocess.DEVNULL, stderr=stderr)
+    app = subprocess.Popen([*cmd, "eclipse-temurin:21-jdk", *java], stdout=stdout, stderr=stderr)
     return lambda: stop_container(app, container)
 
 
@@ -469,4 +480,4 @@ CHECKS = {
 }
 
 if __name__ == "__main__":
-    sys.exit(main(CHECKS, build, options=("--local",)))
+    sys.exit(main(CHECKS, build, options=("--local", "--edot")))
