@@ -35,6 +35,14 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
 
+### Fixed
+
+- Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
+  SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
+  sampler's own description never returns), and EDOT's span logger no longer sets the trace
+  gate's controls aside while EDOT's own OpAMP client is off. Every check of the extension now
+  passes under EDOT Java 1.14 (#PR).
+
 ### Changed
 
 - Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted

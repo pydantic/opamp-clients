@@ -3,6 +3,13 @@
 """opentelemetry-instrument with pydantic-opamp-otel, against the reference server.
 
     python3 examples/python-otel/try.py
+    python3 examples/python-otel/try.py --edot   # the same checks with Elastic's distribution installed too
+
+With --edot, Elastic's distribution (EDOT Python, elastic-opentelemetry) is installed beside the
+package, and app.py runs as docs/guides/elastic.md says to: this package's distro and configurator
+chosen (OTEL_PYTHON_DISTRO and OTEL_PYTHON_CONFIGURATOR), EDOT's default sampler and resource
+detectors named. Every check must pass as it does without it. EDOT's own OpAMP client, in its
+configurator, stays off.
 
 app.py has no OpenTelemetry code: the urllib instrumentation traces its requests. The checks are
 every integration's (examples/integrations.py), run for app.py and again for in_code.py, the same
@@ -40,11 +47,19 @@ from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_
                           check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
-TARGET = target("python-otel")
+EDOT = "--edot" in sys.argv
+#: Elastic's distribution, with --edot.
+EDOT_VERSION = "1.18.0"
+TARGET = target("python-otel-edot" if EDOT else "python-otel")
 UV = ["uv", "run", "--quiet", "--no-project", "--python", "3.13",
       "--with", str(ROOT / "python"), "--with", str(ROOT / "python/otel"),
       # aiohttp-client too: the OpAMP client is aiohttp, and its own requests must not be traced.
-      "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client"]
+      "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client",
+      *(["--with", f"elastic-opentelemetry=={EDOT_VERSION}"] if EDOT else [])]
+#: With --edot: this package's distro and configurator, EDOT's sampler and resource detectors.
+EDOT_ENV = {"OTEL_PYTHON_DISTRO": "opamp", "OTEL_PYTHON_CONFIGURATOR": "opamp",
+            "OTEL_TRACES_SAMPLER": "experimental_composite_parentbased_traceidratio",
+            "OTEL_EXPERIMENTAL_RESOURCE_DETECTORS": "process_runtime,os,telemetry_distro,otel"} if EDOT else {}
 APPS = {"app.py": ["opentelemetry-instrument", "python", str(HERE / "app.py")],
         "in_code.py": ["python", str(HERE / "in_code.py")]}
 APP = "app.py"
@@ -59,6 +74,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                OTEL_LOGS_EXPORTER="none",
                OTEL_BSP_SCHEDULE_DELAY="500",
                OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED="true")
+    env.update(EDOT_ENV)
     if APP == "app.py":
         env.update(OTEL_SERVICE_NAME="checkout",
                    OTEL_OPAMP_ENDPOINT=opamp_url(port),
@@ -220,4 +236,5 @@ CHECKS = {
 
 if __name__ == "__main__":
     # Resolve the environment once, so the runs don't spend their time installing.
-    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import pydantic_opamp_otel"], check=True)))
+    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import pydantic_opamp_otel"], check=True),
+                 options=("--edot",)))

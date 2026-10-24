@@ -11,6 +11,9 @@ Run one integration:
 python3 examples/python-otel/try.py   # or node-otel, go-otel, dotnet-otel, javaagent
 ```
 
+The Java agent's, the .NET plugin's and the Python package's also take `--edot`: the same checks
+with Elastic's distribution of the SDK in place ([docs/guides/elastic.md](../docs/guides/elastic.md)).
+
 Node.js runs both CommonJS and ESM applications. Java and .NET require Docker. Go examples also
 require Go, Node.js examples require Node.js, and Python examples use uv.
 
