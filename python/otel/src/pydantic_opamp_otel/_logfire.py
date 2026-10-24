@@ -214,14 +214,17 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     AGENT.listed_exporters = [(signal, LOGFIRE_EXPORTER) for _ in built for signal in
                               ("traces", *(("metrics",) if metrics is not False else ()), "logs")]
     instance = logfire.configure(**kwargs)
-    AGENT.start(_resource())
+    AGENT.start(_resource(instance))
     return instance
 
 
-def _resource() -> Resource:
-    """The resource the Logfire SDK built."""
-    from opentelemetry import trace  # noqa: PLC0415
+def _resource(instance) -> Resource:
+    """The resource the Logfire SDK built for `instance`: its own tracer provider's, which is the
+    global one only when it isn't ``local``."""
+    provider = getattr(getattr(instance, "config", None), "_tracer_provider", None)
+    if provider is None:
+        from opentelemetry import trace  # noqa: PLC0415
 
-    provider = trace.get_tracer_provider()
+        provider = trace.get_tracer_provider()
     provider = getattr(provider, "provider", provider)
     return getattr(provider, "resource", None) or Resource.create({})

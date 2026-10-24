@@ -192,3 +192,21 @@ def test_the_logfire_sdks_own_settings_still_hold_where_the_server_sets_none(tmp
     uid = run.stdout.split("uid ")[-1].split()[0]
     (after,) = [a for n, a in ingest.spans if n == "after"]
     assert after["resource"]["team"] == "rocketeers" and after["resource"]["service.instance.id"] == uid
+
+
+def test_a_local_logfire_instance_is_described_by_its_own_resource(servers):
+    """With local=True the Logfire SDK's providers aren't the global ones: the agent describes
+    itself from the instance's own resource, its service.name included."""
+    server, _ = servers
+    child = textwrap.dedent(f"""
+        import time, pydantic_opamp_otel
+        pydantic_opamp_otel.configure_logfire(endpoint={server.endpoint!r}, heartbeat_interval=0.1, local=True,
+                                              send_to_logfire=False, console=False, service_name="rocket-local")
+        time.sleep(0.5)
+    """)
+    run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=_child_env())
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    described = [m.agent_description for m in server.got if m.HasField("agent_description")]
+    assert described
+    names = {a.value.string_value for a in described[0].identifying_attributes if a.key == "service.name"}
+    assert names == {"rocket-local"}
