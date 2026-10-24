@@ -75,7 +75,7 @@ def _otlp_variables(signal: str) -> bool:
     return os.environ.get(f"OTEL_{signal.upper()}_EXPORTER", "").lower() in ("otlp", "")
 
 
-def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool):
+def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool, response_hook=None):
     """For one token: the span processor, the metric reader (its exporter gated) and the log
     record processor, built as the Logfire SDK builds its own, each with the package's gate."""
     from urllib.parse import urljoin  # noqa: PLC0415
@@ -87,7 +87,7 @@ def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool
         RetryFewerSpansSpanExporter)
     from logfire._internal.exporters.quiet_metrics import QuietMetricExporter  # noqa: PLC0415
     from logfire._internal.exporters.remove_pending import RemovePendingSpansExporter  # noqa: PLC0415
-    from logfire._internal.config import get_base_url_from_token  # noqa: PLC0415
+    from logfire._internal.config import get_base_url_from_token, install_logfire_response_hook  # noqa: PLC0415
     from logfire.version import VERSION  # noqa: PLC0415
     from opentelemetry.exporter.otlp.proto.http import Compression  # noqa: PLC0415
     from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter  # noqa: PLC0415
@@ -97,6 +97,8 @@ def _logfire_exporters(token: str, base_url: str | None, controls, pending: bool
     headers = {"User-Agent": f"logfire/{VERSION}", "Authorization": token}
     session = OTLPExporterHttpSession()
     session.headers.update(headers)
+    # Ingest's responses, as the Logfire SDK reads them: by default its X-Logfire-Warning header.
+    install_logfire_response_hook(session, response_hook)
     gzip = Compression.Gzip
     # The gate sits under the retry and pending-span handling, so what it drops is never retried
     # and what it lets through is redacted before it is sent, a pending span included.
@@ -191,7 +193,8 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     given_logs = list(getattr(advanced, "log_record_processors", ()) or ())
     metrics = kwargs.get("metrics")
     given_readers = list(getattr(metrics, "additional_readers", ()) or ())
-    built = [_logfire_exporters(t, base_url, controls, pending) for t in tokens]
+    hook = getattr(advanced, "server_response_hook", None)
+    built = [_logfire_exporters(t, base_url, controls, pending, hook) for t in tokens]
     if tokens:
         kwargs["send_to_logfire"] = False
         kwargs["additional_span_processors"] = [*given_spans, *(b[0] for b in built)]

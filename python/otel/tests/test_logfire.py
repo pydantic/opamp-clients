@@ -41,6 +41,7 @@ class _Ingest:
                                 attrs = {a.key: a.value.string_value for a in s.attributes}
                                 spans.append((s.name, {**attrs, "resource": resource}))
                 self.send_response(200)
+                self.send_header("X-Logfire-Warning", "this project is over its span quota")
                 self.send_header("Content-Length", "0")
                 self.end_headers()
 
@@ -129,6 +130,8 @@ def test_the_logfire_sdk_takes_the_servers_settings(tmp_path, servers):
     assert after["resource"]["service.instance.id"] == str(uid)
     assert after["resource"]["service.name"] == "rocket"
     assert ingest.auth == {"pylf_v1_us_test"}
+    # Ingest's warnings reach the application, as the Logfire SDK shows them.
+    assert "this project is over its span quota" in run.stderr
     # Every gate, the sampler and redaction are carried out: nothing exports past them.
     for setting in ("send_traces", "send_logs", "sampling_rate", "mask_attributes", "scrub_patterns"):
         assert setting in run.stdout.split("live ")[-1]
