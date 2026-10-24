@@ -170,9 +170,19 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
         return logfire.configure(**kwargs)
     kwargs = dict(kwargs)
     controls = AGENT.controls
-    sampling = kwargs.get("sampling") or SamplingOptions()
+    # Both as the Logfire SDK resolves them when they aren't given (its variables and config file), as
+    # giving them here replaces what it would have read.
+    from logfire._internal.config_params import ParamManager  # noqa: PLC0415
+
+    params = ParamManager.create(kwargs.get("config_dir"))
+    sampling = kwargs.get("sampling")
+    if isinstance(sampling, Mapping):
+        sampling = SamplingOptions(**sampling)
+    elif sampling is None:
+        sampling = SamplingOptions(head=params.load_param("trace_sample_rate"))
     kwargs["sampling"] = dataclasses.replace(sampling, head=controls.sampler.wrap(_head(sampling)))
-    kwargs["resource_attributes"] = {**(kwargs.get("resource_attributes") or {}), _INSTANCE_ID: str(AGENT.uid)}
+    resource = params.load_param("resource_attributes", kwargs.get("resource_attributes")) or {}
+    kwargs["resource_attributes"] = {**resource, _INSTANCE_ID: str(AGENT.uid)}
 
     tokens, sends_ungated, base_url, pending = _resolved(kwargs)
     console = _console_on(kwargs)

@@ -59,7 +59,8 @@ class _Ingest:
         self._http.server_close()
 
 
-def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool = False, extra: str = ""):
+def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool = False, extra: str = "",
+         env: dict | None = None):
     """A child that sets the Logfire SDK up with configure_logfire, sends a span "before", waits for
     the server's answer to `offer`, then sends "after" (with a `user.email` attribute)."""
     ready, answered = tmp_path / "ready", tmp_path / "answered"
@@ -94,7 +95,7 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
         print("live", sorted(agent.host.live))
     """)
     return subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
-                          env=_child_env(LOGFIRE_SEND_TO_LOGFIRE="", LOGFIRE_TOKEN=""))
+                          env=_child_env(LOGFIRE_SEND_TO_LOGFIRE="", LOGFIRE_TOKEN="", **(env or {})))
 
 
 class _ReplyServer(_Server):
@@ -172,3 +173,22 @@ def test_a_logfire_sdk_samples_as_the_server_says(tmp_path, servers):
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == ["before"]
+
+
+def test_the_logfire_sdks_own_settings_still_hold_where_the_server_sets_none(tmp_path, servers):
+    """What the Logfire SDK reads from its variables when the arguments leave them out still holds
+    under the server: its sample rate (here 0, so no trace starts at all until the server says
+    otherwise) and its resource attributes, beside the instance UID."""
+    server, ingest = servers
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
+               env={"LOGFIRE_TRACE_SAMPLE_RATE": "0", "LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"})
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert ingest.names() == []
+    (tmp_path / "again").mkdir()
+    run = _run(server, ingest, tmp_path / "again", policy(attribute_redaction={"mask": ["user.email"]}),
+               env={"LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"})
+    assert run.returncode == 0, run.stderr
+    uid = run.stdout.split("uid ")[-1].split()[0]
+    (after,) = [a for n, a in ingest.spans if n == "after"]
+    assert after["resource"]["team"] == "rocketeers" and after["resource"]["service.instance.id"] == uid
