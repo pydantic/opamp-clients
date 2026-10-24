@@ -4,9 +4,8 @@
 // Package match holds the matchers of the settings that match telemetry (docs/sdk-settings.md,
 // "Settings that match telemetry"): globs, log levels by scope and attribute redaction by key.
 // The settings layer reads and checks the settings; these only match, the layer's way, and run
-// once a span, log record or attribute, so they are native. The Go integration (opampotel) and
-// the Collector's logfirepolicy processor both match with them, and the shared vectors in
-// testdata/sdk-settings hold them to the layer.
+// once a span, log record or attribute, so they are native. The Go integration (opampotel) matches
+// with them, and the shared vectors in testdata/sdk-settings hold them to the layer.
 package match
 
 import (

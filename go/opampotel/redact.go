@@ -15,7 +15,7 @@ import (
 const mask = match.Mask
 
 // redaction is drop_attributes and mask_attributes, then scrub_defaults and scrub_patterns
-// (package match, which the Collector's logfirepolicy processor redacts with too).
+// (package match).
 type redaction struct {
 	match.Redaction
 	scrub match.Scrubbing

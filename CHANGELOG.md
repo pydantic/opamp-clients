@@ -18,11 +18,19 @@ and date. Tests, CI and docs alone don't need a line.
 
 ## Unreleased
 
+### Breaking
+
+- Collector: the `logfirepolicy` processor (`go/logfirepolicyprocessor`) is gone, and collectors
+  no longer take the Logfire SDK policy: a collector's remote config is its YAML. The Supervisor
+  answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
+  processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
+  `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
+  carry the processor (#80).
+
 ### Changed
 
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
-- Collector: the `logfirepolicy` processor no longer head-samples; sample in the SDKs (#77).
 
 ### Security
 

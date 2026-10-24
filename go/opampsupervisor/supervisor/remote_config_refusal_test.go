@@ -120,3 +120,46 @@ service: {pipelines: {logs: {receivers: [nop], exporters: [otlphttp]}}}`
 	require.Contains(t, reported.ErrorMessage, "references the env provider")
 	require.Equal(t, []byte("bound"), s.remoteConfig.Load().GetConfigHash())
 }
+
+// A remote config holding the Logfire SDK policy, alone or beside the collector's YAML, is FAILED
+// with or without a remote config policy, and none of it reaches the collector: the policy is for
+// SDKs, and merged as YAML its keys would make the collector refuse the whole config.
+func TestSupervisorRefusesTheLogfireSDKPolicy(t *testing.T) {
+	const yaml = "receivers: {nop: }\nexporters: {nop: }\nservice: {pipelines: {logs: {receivers: [nop], exporters: [nop]}}}\n"
+	const policy = `{"schema":"logfire-sdk-policy/v1","head_sampling":{"mode":"local"}}`
+	for _, restricted := range []bool{false, true} {
+		cfg := setupSupervisorConfig(t, configTemplate)
+		if restricted {
+			cfg.Agent.RemoteConfigPolicy = config.RemoteConfigPolicy{AllowedComponents: map[string][]string{
+				"receivers": {"nop"}, "exporters": {"nop"},
+			}}
+		}
+		s, err := NewSupervisor(t.Context(), zap.NewNop(), cfg)
+		require.NoError(t, err)
+		s.persistentState, err = s.clientPersistentState()
+		require.NoError(t, err)
+		s.agentDescription.Store(&protobufs.AgentDescription{})
+		var reported *protobufs.RemoteConfigStatus
+		s.opampClient = &mockOpAMPClient{setRemoteConfigStatusFunc: func(status *protobufs.RemoteConfigStatus) error {
+			reported = status
+			return nil
+		}}
+		require.True(t, s.processRemoteConfigMessage(t.Context(), policyConfig("yaml", yaml)), restricted)
+		for hash, files := range map[string]map[string]string{
+			"alone":  {sdkPolicyFile: policy},
+			"beside": {"": yaml, sdkPolicyFile: policy},
+		} {
+			m := map[string]*protobufs.AgentConfigObject{}
+			for name, body := range files {
+				m[name] = &protobufs.AgentConfigObject{Body: []byte(body)}
+			}
+			rc := &protobufs.AgentRemoteConfig{ConfigHash: []byte(hash), Config: &protobufs.AgentConfigMap{ConfigMap: m}}
+			require.False(t, s.processRemoteConfigMessage(t.Context(), rc), hash)
+			require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, reported.Status, hash)
+			require.Equal(t, []byte(hash), reported.LastRemoteConfigHash, hash)
+			require.Contains(t, reported.ErrorMessage, `"logfire-sdk-policy.json" is a Logfire SDK policy`, hash)
+			require.Equal(t, []byte("yaml"), s.remoteConfig.Load().GetConfigHash(), hash)
+			require.NotContains(t, s.cfgState.Load().(*configState).mergedConfig, "head_sampling", hash)
+		}
+	}
+}
