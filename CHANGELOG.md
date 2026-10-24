@@ -50,6 +50,8 @@ and date. Tests, CI and docs alone don't need a line.
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every
   download host (#81).
+- Node.js: undici 7.30.1, for GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685 and GHSA-f72v-6w45-q472
+  (#81).
 - Dependencies with known advisories updated: golang.org/x/net 0.60.0 (`go/opampotel`, the
   examples, the conformance server), google.golang.org/grpc 1.83.1 and OpenTelemetry Go 1.45.0
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1

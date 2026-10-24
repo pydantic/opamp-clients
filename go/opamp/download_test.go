@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -19,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/protobuf/proto"
 
@@ -213,4 +215,43 @@ func TestOnlyTheServersOriginGetsItsTLSSettings(t *testing.T) {
 	if got, why := fetch(t, own, false); got != "certificate agent" {
 		t.Fatalf("the application's own RoundTripper: %q %s", got, why)
 	}
+}
+
+// The copy made for downloads elsewhere is the client's: closing the client drops its idle
+// connections, and leaves the application's transport alone.
+func TestClosingDropsTheElsewhereCopysConnections(t *testing.T) {
+	closed := make(chan struct{}, 4)
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, "file")
+	}))
+	srv.Config.ConnState = func(_ net.Conn, s http.ConnState) {
+		if s == http.StateClosed {
+			closed <- struct{}{}
+		}
+	}
+	srv.Start()
+	defer srv.Close()
+	app := &http.Transport{}
+	conn := connectionFrom(&http.Client{Transport: app})
+	for _, rt := range []http.RoundTripper{app, conn.download(false)} {
+		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+		resp, err := rt.RoundTrip(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+	conn.close()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the copy's idle connection is still open")
+	}
+	select {
+	case <-closed:
+		t.Fatal("the application's idle connection was closed too")
+	case <-time.After(200 * time.Millisecond):
+	}
+	app.CloseIdleConnections()
 }

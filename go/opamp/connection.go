@@ -215,6 +215,7 @@ func connectionFrom(c *http.Client) *connection {
 	other := tr.Clone()
 	other.TLSClientConfig = elsewhereTLS(tr.TLSClientConfig)
 	conn.elsewhere = other
+	conn.own = []*http.Transport{other} // the copy is ours to close; the application's is not
 	conn.wsTLS = http1Only(tr.TLSClientConfig)
 	conn.proxy = tr.Proxy
 	conn.connectHeader = func(ctx context.Context, proxy *url.URL, target string) (http.Header, error) {
