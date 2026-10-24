@@ -73,6 +73,25 @@ public final class Tls {
     max = b.max;
   }
 
+  private Tls(Tls t, List<X509Certificate> chain, PrivateKey key) {
+    trusted = t.trusted;
+    systemCas = t.systemCas;
+    this.chain = chain;
+    this.key = key;
+    min = t.min;
+    max = t.max;
+  }
+
+  /** Whether a client certificate is presented. */
+  boolean hasClientCertificate() {
+    return key != null;
+  }
+
+  /** These settings without the client certificate: for files not at the server's own origin. */
+  Tls withoutClientCertificate() {
+    return new Tls(this, List.of(), null);
+  }
+
   /** Settings to fill in. With none, the client trusts the system's CAs and allows TLS 1.2 and 1.3. */
   public static Builder builder() {
     return new Builder();

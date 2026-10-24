@@ -151,10 +151,16 @@ agent:
   [Collector Executable Updates Flow](specification/README.md#collector-executable-updates-flow).
   An update stays marked unproven until the new collector reports healthy (on the bootstrap's
   config when the server's config runs nothing), and a start that finds the mark undoes it, so
-  a crash during the health wait can't cost the rollback target. A shutdown during the wait, or
-  a rollback that can't put the previous executable back (the configured one then runs), isn't
-  reported: the core asks again at the next start. While a start can't undo an unproven update,
-  nothing more is installed: the core's request isn't answered until a start has undone it.
+  a crash during the health wait can't cost the rollback target. A shutdown during the wait isn't
+  reported: the core asks again at the next start. A rollback that can't put the previous
+  executable back (the configured one then runs) is reported failed, leaving what the host has
+  unknown: the next start tries the rollback again, then the core installs once more. While a
+  start can't undo an unproven update, nothing more is installed: the core's request isn't
+  answered until a start has undone it. A signature Cosign can't check for now (Sigstore's
+  trusted root or the transparency log unreachable) is a failure for now: the version isn't
+  reported failed, and the core tries it again after a wait (30 s, doubling to 10 minutes);
+  nothing was touched. A collector that doesn't report healthy within the health timeout fails
+  for good, as before: trying it again would restart the running collector each time.
   A collector executable that can't be removed when it is no longer offered is reported failed,
   with why; it is removed again only once the server offers it and drops it again.
   `agent.package.verifier.type` must be set,

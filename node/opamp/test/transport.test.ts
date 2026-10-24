@@ -529,8 +529,10 @@ for (const transport of ["http", "ws", "http+core", "ws+core"] as const) {
   }
 }
 
+// The client certificate goes only to a file at the server's own origin, as the core says
+// (Download.serverOrigin): a file anywhere else is fetched without it, still checked against the CA.
 // covers: RULE-TLS-01, RULE-TLS-02, RULE-PROXY-01
-test("downloads go the same way: the CA, the client certificate, the proxy", async () => {
+test("downloads go the same way: the CA, the client certificate (at the server's origin only), the proxy", async () => {
   const file = Buffer.from("package".repeat(1000));
   const server = await opampServer({ ...SERVER, clientAuth: true }, { "/file": file });
   const other = await opampServer(OTHER_SERVER, { "/file": file });
@@ -546,11 +548,12 @@ test("downloads go the same way: the CA, the client certificate, the proxy", asy
     ]) {
       let deliver: (i: Input) => void = () => {};
       const x = new Executor((i) => deliver(i), state, new Transport({ tls: { ca: CA, ...CLIENT }, proxy }));
-      const get = (url: string) =>
+      const get = (url: string, serverOrigin = true) =>
         new Promise<Input>((resolve) => {
           deliver = resolve;
           id++;
-          x.do(create(EffectSchema, { kind: { case: "download", value: { id, url, maxBytes: 1n << 20n, timeoutMs: 5000n } } }));
+          const value = { id, url, maxBytes: 1n << 20n, timeoutMs: 5000n, serverOrigin };
+          x.do(create(EffectSchema, { kind: { case: "download", value } }));
         });
       const ok = await get(`https://localhost:${server.port}/file`);
       assert.equal(ok.kind.case, "downloadResponse", (ok.kind.value as { detail?: string }).detail);
@@ -560,6 +563,13 @@ test("downloads go the same way: the CA, the client certificate, the proxy", asy
       const bad = await get(`https://localhost:${other.port}/file`);
       assert.equal(bad.kind.case, "downloadFailed");
       assert.match((bad.kind.value as { detail: string }).detail, /certificate/i);
+      // Not the server's origin: no client certificate, so the server (which requires one) refuses.
+      const without = await get(`https://localhost:${server.port}/file`, false);
+      assert.equal(without.kind.case, "downloadFailed", "a client certificate went to a file elsewhere");
+      // Elsewhere, the CA still applies.
+      const elsewhere = await get(`https://localhost:${other.port}/file`, false);
+      assert.equal(elsewhere.kind.case, "downloadFailed");
+      assert.match((elsewhere.kind.value as { detail: string }).detail, /certificate/i);
       x.shutdown();
     }
     assert.ok(httpProxy.tunnels.length >= 2);

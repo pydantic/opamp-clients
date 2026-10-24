@@ -67,6 +67,13 @@ internal interface IClientTransport : IDisposable
     Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct);
 
     /// <summary>
+    /// A download's GET: the server's TLS settings (its client certificate) only for a file at the
+    /// server's own origin (<paramref name="serverOrigin"/>, as the core says).
+    /// </summary>
+    Task<HttpResponseMessage> DownloadAsync(HttpRequestMessage request, bool serverOrigin, CancellationToken ct) =>
+        this.SendAsync(request, ct);
+
+    /// <summary>
     /// Open a WebSocket connection to <paramref name="url"/>, with <paramref name="headers"/> on the
     /// upgrade. <paramref name="ct"/> aborts the opening. On failure it throws: a
     /// <see cref="WebSocketConnectException"/> when the server answered (its status and headers),
@@ -100,11 +107,19 @@ internal sealed class ClientTransport : IClientTransport
 
     private readonly bool owned;
 
-    private ClientTransport(HttpClient http, HttpMessageInvoker webSocket, bool owned)
+    /// <summary>
+    /// Downloads of files not at the server's own origin: the same settings without the client
+    /// certificate, which is the server's alone. Null: <see cref="Http"/> serves (no client
+    /// certificate, or the application's HttpClient, which is its own).
+    /// </summary>
+    private readonly HttpClient? elsewhere;
+
+    private ClientTransport(HttpClient http, HttpMessageInvoker webSocket, bool owned, HttpClient? elsewhere = null)
     {
         this.Http = http;
         this.WebSocket = webSocket;
         this.owned = owned;
+        this.elsewhere = elsewhere;
     }
 
     /// <summary>For requests and downloads. It follows no redirect: a 3xx goes to the core as it is.</summary>
@@ -151,10 +166,17 @@ internal sealed class ClientTransport : IClientTransport
     internal static ClientTransport Create(OpAmpTlsOptions? tls, Uri? proxy, bool direct = false)
     {
         var handler = CreateHandler(tls, proxy, direct);
+        var elsewhere = tls?.ClientCertPem is null
+            ? null
+            : new HttpClient(CreateHandler(tls with { ClientCertPem = null, ClientKeyPem = null }, proxy, direct), disposeHandler: true)
+            {
+                Timeout = Timeout.InfiniteTimeSpan,
+            };
         return new ClientTransport(
             new HttpClient(handler, disposeHandler: true) { Timeout = Timeout.InfiniteTimeSpan }, // the core times requests
             new HttpMessageInvoker(handler, disposeHandler: false),
-            owned: true);
+            owned: true,
+            elsewhere);
     }
 
     /// <summary>The application's HttpClient, for everything.</summary>
@@ -205,6 +227,9 @@ internal sealed class ClientTransport : IClientTransport
     public Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
         this.Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
 
+    public Task<HttpResponseMessage> DownloadAsync(HttpRequestMessage request, bool serverOrigin, CancellationToken ct) =>
+        (serverOrigin ? this.Http : this.elsewhere ?? this.Http).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+
     /// <summary>
     /// .NET can't take back a connect cleanly: a cancel cancels it and aborts the socket.
     /// </summary>
@@ -243,6 +268,7 @@ internal sealed class ClientTransport : IClientTransport
         {
             this.WebSocket.Dispose();
             this.Http.Dispose();
+            this.elsewhere?.Dispose();
         }
     }
 

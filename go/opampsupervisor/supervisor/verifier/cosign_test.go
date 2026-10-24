@@ -265,3 +265,36 @@ func TestCosignAcceptsABundleCosignWrote(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorContains(t, ours.Verify(t.Context(), pkg, bundle), "doesn't verify")
 }
+
+// A signature that can't be checked for now (Sigstore's trusted root or the transparency log
+// unreachable) says so, ErrUnavailable, so the install is tried again later. One that doesn't
+// verify, or isn't in the log, is not.
+func TestCosignSaysWhenSigstoreIsUnreachable(t *testing.T) {
+	vs, err := ca.NewVirtualSigstore()
+	require.NoError(t, err)
+	s := sign(t, vs, testSubject, []byte("the collector, v1.2.3"))
+	down := errors.New("connection refused")
+	noRoot, err := NewCosignVerifier(ourSigner(),
+		func(context.Context) (root.TrustedMaterial, error) { return nil, down },
+		func(context.Context, []byte) ([]*tlog.Entry, error) { return s.entries, nil })
+	require.NoError(t, err)
+	noLog, err := NewCosignVerifier(ourSigner(),
+		func(context.Context) (root.TrustedMaterial, error) { return vs, nil },
+		func(context.Context, []byte) ([]*tlog.Entry, error) { return nil, down })
+	require.NoError(t, err)
+	for name, err := range map[string]error{
+		"the trusted root": noRoot.Verify(t.Context(), s.pkg, []byte(s.sig)),
+		"the log":          noLog.Verify(t.Context(), s.pkg, []byte(s.sig)),
+	} {
+		require.ErrorIs(t, err, ErrUnavailable, name)
+		require.ErrorIs(t, err, down, name)
+	}
+	for name, err := range map[string]error{
+		"doesn't verify": testVerifier(t, vs, ourSigner(), s.entries).Verify(t.Context(), []byte("something else"), []byte(s.sig)),
+		"not in the log": testVerifier(t, vs, ourSigner(), nil).Verify(t.Context(), s.pkg, []byte(s.sig)),
+		"not a bundle":   testVerifier(t, vs, ourSigner(), s.entries).Verify(t.Context(), s.pkg, []byte(`{"mediaType": 1}`)),
+	} {
+		require.Error(t, err, name)
+		require.NotErrorIs(t, err, ErrUnavailable, name)
+	}
+}

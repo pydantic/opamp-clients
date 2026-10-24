@@ -23,13 +23,19 @@ import (
 )
 
 // connection is how the client reaches servers: one HTTP transport for OpAMP requests and
-// package downloads, and WebSocket over the same TLS and proxy. It is a function of its options
+// package downloads from the server's own origin, one for downloads from anywhere else, and
+// WebSocket over the same TLS and proxy. It is a function of its options
 // alone, so connection settings a server offers can have one of their own.
 type connection struct {
 	// http carries OpAMP requests and package downloads, one round trip each: a 3xx goes to the
 	// core as it is, which decides. (http.Client, even told to follow no redirect, fails a
 	// response whose Location it can't parse; and it would add cookies from a jar.)
 	http http.RoundTripper
+	// elsewhere carries the downloads of files not at the server's own origin
+	// (Download.server_origin false): http's TLS settings without the client certificate the
+	// client keeps for the server, and verifying the host's certificate even where the server's
+	// isn't (InsecureSkipVerify). The CAs it trusts are http's.
+	elsewhere http.RoundTripper
 
 	// WebSocket. gorilla's own proxy support has no https:// proxies and no CONNECT headers,
 	// so the connection makes its tunnels itself and gorilla only speaks TLS and WebSocket.
@@ -42,7 +48,27 @@ type connection struct {
 	// an address (Proxy.ResolveLocally), over HTTP and WebSocket alike.
 	resolveLocally bool
 
-	own *http.Transport // the transport newConnection made, closed with the client
+	own []*http.Transport // the transports newConnection made, closed with the client
+}
+
+// elsewhereTLS is cfg without what the client keeps for the server alone: its client
+// certificate, and skipping verification of the host's certificate. A copy; nil stays nil.
+func elsewhereTLS(cfg *tls.Config) *tls.Config {
+	if cfg == nil {
+		return nil
+	}
+	c := cfg.Clone()
+	c.Certificates, c.GetClientCertificate = nil, nil
+	c.InsecureSkipVerify = false
+	return c
+}
+
+// download is the transport for a file at the server's own origin or elsewhere.
+func (c *connection) download(serverOrigin bool) http.RoundTripper {
+	if serverOrigin || c.elsewhere == nil {
+		return c.http
+	}
+	return c.elsewhere
 }
 
 // envProxy is the platform's default proxy: the environment's. A variable so tests can stand in
@@ -105,16 +131,18 @@ func newConnection(t TLS, p Proxy) (*connection, error) {
 		IdleConnTimeout:       90 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}
-	var rt http.RoundTripper = tr
+	// Downloads from elsewhere: the same, but for the TLS settings (to an https:// proxy too).
+	other := tr.Clone()
+	other.TLSClientConfig = elsewhereTLS(tr.TLSClientConfig)
+	conn.http, conn.elsewhere = tr, other
 	if p.ResolveLocally && proxy != nil {
-		rt = viaSOCKS5{tr: tr, proxy: proxy}
+		conn.http, conn.elsewhere = viaSOCKS5{tr: tr, proxy: proxy}, viaSOCKS5{tr: other, proxy: proxy}
 	}
-	conn.http = rt
 	conn.wsTLS = http1Only(cfg)
 	conn.connectHeader = func(context.Context, *url.URL, string) (http.Header, error) {
 		return header, nil
 	}
-	conn.own = tr
+	conn.own = []*http.Transport{tr, other}
 	return conn, nil
 }
 
@@ -161,15 +189,17 @@ func (v viaSOCKS5) RoundTrip(req *http.Request) (*http.Response, error) {
 // close drops the idle connections of a transport the client made itself (not the
 // application's).
 func (c *connection) close() {
-	if c.own != nil {
-		c.own.CloseIdleConnections()
+	for _, tr := range c.own {
+		tr.CloseIdleConnections()
 	}
 }
 
 // connectionFrom makes a connection from the application's HTTP client. OpAMP requests and
-// downloads go through its Transport as it is, one round trip each (no redirect followed);
-// WebSocket takes the TLS settings, proxy, CONNECT headers and dialer of its *http.Transport, and
-// can't be used with any other RoundTripper.
+// downloads go through its Transport as it is, one round trip each (no redirect followed), but
+// for downloads from elsewhere through an *http.Transport: a copy of it, with the TLS settings
+// for the server alone taken out. WebSocket takes the TLS settings, proxy, CONNECT headers and
+// dialer of its *http.Transport, and can't be used with any other RoundTripper. Any other
+// RoundTripper is the application's to make, and carries every download as it is.
 func connectionFrom(c *http.Client) *connection {
 	rt := c.Transport
 	if rt == nil {
@@ -182,6 +212,10 @@ func connectionFrom(c *http.Client) *connection {
 			"settings from an *http.Transport only (or use Config.TLS and Config.Proxy)", rt)
 		return conn
 	}
+	other := tr.Clone()
+	other.TLSClientConfig = elsewhereTLS(tr.TLSClientConfig)
+	conn.elsewhere = other
+	conn.own = []*http.Transport{other} // the copy is ours to close; the application's is not
 	conn.wsTLS = http1Only(tr.TLSClientConfig)
 	conn.proxy = tr.Proxy
 	conn.connectHeader = func(ctx context.Context, proxy *url.URL, target string) (http.Header, error) {

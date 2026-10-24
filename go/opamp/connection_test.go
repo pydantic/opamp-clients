@@ -513,14 +513,14 @@ func checkCombination(t *testing.T, client Mode, ws bool, mode, via string) {
 		t.Fatal(err)
 	}
 
-	// A package file, through the same connection options.
+	// A package file at the server's own origin, through the same connection options.
 	conn, err := cfg.connection()
 	if err != nil {
 		t.Fatal(err)
 	}
 	x := newExecutor(conn)
 	x.stateFile = filepath.Join(t.TempDir(), "state")
-	in := x.download(context.Background(), &corepb.Download{Id: 1, Url: ts.URL + "/file", MaxBytes: 1 << 20, TimeoutMs: 5000})
+	in := x.download(context.Background(), &corepb.Download{Id: 1, Url: ts.URL + "/file", MaxBytes: 1 << 20, TimeoutMs: 5000, ServerOrigin: true})
 	if sum := sha256.Sum256(srv.file); in.GetDownloadResponse().GetStatus() != 200 || !bytes.Equal(in.GetDownloadResponse().Sha256, sum[:]) {
 		t.Fatalf("download: %v", in)
 	}

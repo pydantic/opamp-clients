@@ -9,13 +9,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import ssl
 import stat
 
 import pytest
+import trustme
 from aiohttp import web
 
+from pydantic_opamp_client import TLS, Proxy
 from pydantic_opamp_client._executor import Executor, downloads_dir, location
 from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from pydantic_opamp_client._transport import Transport
 
 BODY = b"package" * 100
 
@@ -198,6 +202,54 @@ def test_a_cancelled_download_is_dropped_its_file_deleted_and_never_reported(tmp
         finally:
             server["release"].set()
             await d.x.close()
+            await runner.cleanup()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("server_origin", [True, False])
+def test_only_the_servers_origin_gets_its_client_certificate(tmp_path, server_origin: bool) -> None:
+    """The client certificate kept for the OpAMP server goes only to a file at the server's own
+    origin, as the core says (Download.server_origin). A file anywhere else is fetched without it,
+    still checked against the CAs configured."""
+    async def run() -> None:
+        ca = trustme.CA()
+        server_ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ca.issue_cert("127.0.0.1").configure_cert(server_ssl)
+        ca.configure_trust(server_ssl)
+        server_ssl.verify_mode = ssl.CERT_OPTIONAL
+
+        async def file(request: web.Request) -> web.Response:
+            peer = request.transport.get_extra_info("peercert") if request.transport else None
+            return web.Response(body=b"certificate" if peer else b"no certificate")
+
+        app = web.Application()
+        app.router.add_get("/file", file)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0, ssl_context=server_ssl)
+        await site.start()
+        port = site._server.sockets[0].getsockname()[1]  # type: ignore[union-attr]
+        agent = ca.issue_cert("agent")
+        tls = TLS(ca_pem=ca.cert_pem.bytes(), cert_pem=agent.cert_chain_pems[0].bytes(),
+                  key_pem=agent.private_key_pem.bytes())
+        got: list[corepb.Input] = []
+        arrived = asyncio.Event()
+
+        def deliver(i: corepb.Input) -> None:
+            got.append(i)
+            arrived.set()
+
+        x = Executor(deliver, str(tmp_path / "state"), Transport(tls, Proxy.DIRECT))
+        try:
+            x.do(corepb.Effect(download=corepb.Download(id=1, url=f"https://127.0.0.1:{port}/file", max_bytes=1 << 20,
+                                                        timeout_ms=5000, server_origin=server_origin)))
+            await asyncio.wait_for(arrived.wait(), 10)
+            assert got[-1].WhichOneof("kind") == "download_response", got[-1]
+            with open(x.download_path(1), "rb") as f:
+                assert f.read() == (b"certificate" if server_origin else b"no certificate")
+        finally:
+            await x.close()
             await runner.cleanup()
 
     asyncio.run(run())

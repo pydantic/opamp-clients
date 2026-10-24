@@ -121,6 +121,9 @@ class TransportTest {
       Probe none = new Probe(Transport.build(trusting(CA), null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_FAILED, none.post(origin.url("https")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_FAILED, none.open(origin.url("wss")).getKindCase());
+      // The client certificate goes only to a file at the server's own origin, as the core says
+      // (Download.server_origin): told otherwise, the client presents none, and is refused.
+      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_FAILED, p.download(origin.url("https") + "/file", false).getKindCase());
       assertEquals(3, origin.requests.size());
     }
   }
@@ -360,8 +363,12 @@ class TransportTest {
     }
 
     CoreProto.Input download(String url) throws InterruptedException {
+      return download(url, true);
+    }
+
+    CoreProto.Input download(String url, boolean serverOrigin) throws InterruptedException {
       x.run(CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-          .setId(++id).setUrl(url).setMaxBytes(1 << 20).setTimeoutMs(5000)
+          .setId(++id).setUrl(url).setMaxBytes(1 << 20).setTimeoutMs(5000).setServerOrigin(serverOrigin)
           .addHeaders(CoreProto.Header.newBuilder().setName("Authorization").setValue("t"))).build());
       return next();
     }

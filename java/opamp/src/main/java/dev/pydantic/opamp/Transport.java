@@ -30,20 +30,39 @@ final class Transport {
   private static final AtomicBoolean WARNED = new AtomicBoolean();
 
   final HttpClient http;
+  /**
+   * For downloads of files not at the server's own origin (Download.server_origin false): the
+   * same, without the client certificate, which is the server's alone (made when first used). The
+   * same as {@link #http} without one, or for the application's client, which is its own.
+   */
+  final HttpClient elsewhere;
   /** Headers for every request, upgrade and download: name, value. */
   final List<Map.Entry<String, String>> headers;
   /** The client is ours (built here), not the application's: it goes with the OpAMP client. */
   final boolean owned;
 
-  private Transport(HttpClient http, List<Map.Entry<String, String>> headers, boolean owned) {
+  private Transport(HttpClient http, HttpClient elsewhere, List<Map.Entry<String, String>> headers, boolean owned) {
     this.http = http;
+    this.elsewhere = elsewhere;
     this.headers = headers;
     this.owned = owned;
   }
 
   /** The application's client, as it is. */
   static Transport of(HttpClient http) {
-    return new Transport(http, List.of(), false);
+    return new Transport(http, http, List.of(), false);
+  }
+
+  /** The client for a download: the server's TLS settings only for a file at its own origin. */
+  HttpClient download(boolean serverOrigin) {
+    return serverOrigin ? http : elsewhere;
+  }
+
+  /** {@code http}'s twin for files elsewhere, if {@code tls} has a client certificate. */
+  private static HttpClient elsewhere(HttpClient http, Tls tls, Proxy proxy, boolean direct) {
+    return tls != null && tls.hasClientCertificate()
+        ? new Lazy(() -> build(tls.withoutClientCertificate(), proxy, direct).http)
+        : http;
   }
 
   /**
@@ -54,7 +73,14 @@ final class Transport {
    * caller bounds the wait), or at once where it can't say.
    */
   CompletableFuture<Void> shutdown() {
-    if (!owned || (http instanceof Lazy l && !l.made())) {
+    if (!owned) {
+      return CompletableFuture.completedFuture(null);
+    }
+    return elsewhere == http ? shutdown(http) : CompletableFuture.allOf(shutdown(http), shutdown(elsewhere));
+  }
+
+  private static CompletableFuture<Void> shutdown(HttpClient http) {
+    if (http instanceof Lazy l && !l.made()) {
       return CompletableFuture.completedFuture(null);
     }
     try {
@@ -119,7 +145,8 @@ final class Transport {
         }
       }
     }
-    return new Transport(b.build(), headers, true);
+    HttpClient http = b.build();
+    return new Transport(http, elsewhere(http, tls, proxy, direct), headers, true);
   }
 
   /**
@@ -134,7 +161,8 @@ final class Transport {
     }
     List<Map.Entry<String, String>> headers = proxy != null && proxy.user() != null
         ? List.of(Map.entry("Proxy-Authorization", proxy.authorization())) : List.of();
-    return new Transport(new Lazy(() -> build(tls, proxy, direct).http), headers, true);
+    HttpClient http = new Lazy(() -> build(tls, proxy, direct).http);
+    return new Transport(http, elsewhere(http, tls, proxy, direct), headers, true);
   }
 
   /** An HTTP client made when first used, then used as it is. */

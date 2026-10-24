@@ -595,23 +595,93 @@ func (c *Client) SetConnectionSettingsStatus(s *protobufs.ConnectionSettingsStat
 }
 
 // PackageInstalled answers InstallPackage: the package at hash is installed (err nil), or why
-// it isn't.
+// it isn't. An error is a failure for good (the version is reported failed and not tried again
+// until another is offered) unless wrapped by FailedForNow or FailedLeavingUnknown.
 func (c *Client) PackageInstalled(name string, hash []byte, err error) {
-	p := &corepb.PackageInstalled{Name: name, Hash: hash, Ok: err == nil}
-	if err != nil {
-		p.Detail = err.Error()
-	}
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageInstalled{PackageInstalled: p}})
+	c.send(&corepb.Input{Kind: &corepb.Input_PackageInstalled{PackageInstalled: packageInstalled(name, hash, err)}})
 }
 
 // PackageRemoved answers RemovePackage: the package is removed (err nil), or why it isn't. One
-// that isn't is reported failed, and not removed again until it is offered and dropped again.
+// that isn't is reported failed, and not removed again until it is offered and dropped again,
+// unless its error is wrapped by FailedForNow or FailedLeavingUnknown.
 func (c *Client) PackageRemoved(name string, err error) {
+	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: packageRemoved(name, err)}})
+}
+
+func packageInstalled(name string, hash []byte, err error) *corepb.PackageInstalled {
+	p := &corepb.PackageInstalled{Name: name, Hash: hash, Ok: err == nil}
+	if err != nil {
+		p.Detail, p.Failure = err.Error(), failureOf(err)
+	}
+	return p
+}
+
+func packageRemoved(name string, err error) *corepb.PackageRemoved {
 	p := &corepb.PackageRemoved{Name: name, Failed: err != nil}
 	if err != nil {
-		p.Detail = err.Error()
+		p.Detail, p.Failure = err.Error(), failureOf(err)
 	}
-	c.send(&corepb.Input{Kind: &corepb.Input_PackageRemoved{PackageRemoved: p}})
+	return p
+}
+
+// packageFailure is an install's or a removal's error that says how it failed.
+type packageFailure struct {
+	error
+	how corepb.PackageFailure
+}
+
+func (e packageFailure) Unwrap() error { return e.error }
+
+// FailedForNow marks an install's or a removal's error (for PackageInstalled and PackageRemoved)
+// as a failure for now that left what was there: an outage, a timeout. The package is not
+// reported failed; it waits and is tried again, after 30 s, doubling each time in a row up to
+// 10 minutes, while the other packages go on (a restart tries at once).
+func FailedForNow(err error) error {
+	return packageFailure{err, corepb.PackageFailure_PACKAGE_FAILURE_LATER}
+}
+
+// FailedLeavingUnknown marks an install's or a removal's error (for PackageInstalled and
+// PackageRemoved) as a failure that can't tell what it left: a rollback that failed. It is
+// reported failed, as for good, and what the agent has of the package is uncertain from then on:
+// after a restart it is installed (or removed) again, whatever was saved.
+func FailedLeavingUnknown(err error) error {
+	return packageFailure{err, corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN}
+}
+
+// IsFailedForNow says whether err is marked FailedForNow (and not FailedLeavingUnknown).
+func IsFailedForNow(err error) bool {
+	return err != nil && failureOf(err) == corepb.PackageFailure_PACKAGE_FAILURE_LATER
+}
+
+// IsFailedLeavingUnknown says whether err is marked FailedLeavingUnknown.
+func IsFailedLeavingUnknown(err error) bool {
+	return err != nil && failureOf(err) == corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN
+}
+
+// failureOf is how err says it failed: for good unless marked. Of several marks (a join), what
+// is unknown wins over what is for now.
+func failureOf(err error) corepb.PackageFailure {
+	how := corepb.PackageFailure_PACKAGE_FAILURE_FINAL
+	var walk func(error)
+	walk = func(e error) {
+		switch x := e.(type) {
+		case nil:
+			return
+		case packageFailure:
+			if x.how == corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN || how == corepb.PackageFailure_PACKAGE_FAILURE_FINAL {
+				how = x.how
+			}
+			walk(x.error)
+		case interface{ Unwrap() []error }:
+			for _, e := range x.Unwrap() {
+				walk(e)
+			}
+		case interface{ Unwrap() error }:
+			walk(x.Unwrap())
+		}
+	}
+	walk(err)
+	return how
 }
 
 // Stop sends agent_disconnect if a message can still be sent, then stops. It returns when the

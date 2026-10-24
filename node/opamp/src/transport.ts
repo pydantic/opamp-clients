@@ -292,8 +292,12 @@ export class Transport {
   /** The proxy the options name; else those of the environment, when Node is told to use them. */
   readonly #proxy: Proxy | undefined;
   readonly #env: EnvProxies | undefined;
-  /** For fetch: the plain HTTP requests and downloads. */
+  /** For fetch: the plain HTTP requests and downloads from the server's own origin. */
   readonly dispatcher: Dispatcher;
+  /** For fetch: downloads of files not at the server's own origin (Download.serverOrigin false),
+   * without the client certificate, which is the server's alone. The same as `dispatcher` when
+   * there is none. */
+  readonly elsewhere: Dispatcher;
 
   /** Core mode: the variables core mode's proxy rule reads, as set at the start, when no proxy
    * is named (and not `false`); undefined otherwise. */
@@ -327,8 +331,16 @@ export class Transport {
       env && !coreMode && !cgi && envProxyOn(platform)
         ? envProxies(platform.env, (p && p.resolveLocally) ?? false)
         : undefined;
-    const direct = buildConnector({ secureContext: this.#context });
-    this.dispatcher = new Agent({
+    this.dispatcher = this.#agent(this.#context);
+    const t = options.tls ?? {};
+    this.elsewhere =
+      t.cert === undefined ? this.dispatcher : this.#agent(secureContext({ ...t, cert: undefined, key: undefined }));
+  }
+
+  /** A dispatcher whose TLS to the server (inside a tunnel too) is `context`'s. */
+  #agent(context: tls.SecureContext): Dispatcher {
+    const direct = buildConnector({ secureContext: context });
+    return new Agent({
       connect: (o, callback) => {
         const secure = o.protocol === "https:";
         const port = Number(o.port) || (secure ? 443 : 80);
@@ -337,7 +349,7 @@ export class Transport {
           direct(o, callback);
           return;
         }
-        this.#through(proxy, o.hostname, port, secure).then(
+        this.#through(proxy, o.hostname, port, secure, context).then(
           (socket) => callback(null, socket),
           (err: Error) => callback(err, null),
         );
@@ -412,11 +424,17 @@ export class Transport {
     return this.#through(proxy, host, port, secure);
   }
 
-  async #through(proxy: Proxy, host: string, port: number, secure: boolean): Promise<net.Socket> {
+  async #through(
+    proxy: Proxy,
+    host: string,
+    port: number,
+    secure: boolean,
+    context: tls.SecureContext = this.#context,
+  ): Promise<net.Socket> {
     const raw = await this.#tunnel(proxy, host, port);
     if (!secure) return raw;
     return new Promise((resolve, reject) => {
-      const s = tls.connect({ socket: raw, host, servername: servername(host), secureContext: this.#context });
+      const s = tls.connect({ socket: raw, host, servername: servername(host), secureContext: context });
       const fail = (err: Error) => {
         raw.destroy();
         reject(err);
@@ -498,5 +516,6 @@ export class Transport {
   /** Drop every connection. */
   close(): void {
     void this.dispatcher.destroy().catch(() => {});
+    if (this.elsewhere !== this.dispatcher) void this.elsewhere.destroy().catch(() => {});
   }
 }

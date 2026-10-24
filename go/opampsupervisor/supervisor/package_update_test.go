@@ -4,12 +4,18 @@
 package supervisor
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/stretchr/testify/require"
+
+	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/verifier"
 )
 
 // An update interrupted before the new collector proved healthy (the host lost power during the
@@ -81,8 +87,10 @@ func TestAnUpdateWithNoConfigToRunIsStillChecked(t *testing.T) {
 }
 
 // A rollback that can't put the previous executable back still leaves a collector running, the
-// configured one, and the core isn't told the previous version is in place: the next start tries
-// the rollback again.
+// configured one. The core is told the install failed leaving what the agent has unknown: the
+// version is reported failed, and isn't recorded as in place, and the next start tries the
+// rollback again before the core installs once more. The core was told nothing, so the server
+// never heard the install failed.
 func TestARollbackThatFailsRunsTheConfiguredCollector(t *testing.T) {
 	s := newRemovalTestSupervisor(t)
 	installed := s.installedAgentPath()
@@ -96,7 +104,8 @@ func TestARollbackThatFailsRunsTheConfiguredCollector(t *testing.T) {
 
 	err := s.revertAgentUpdate(installed, true, s.telemetrySettings.Logger)
 	require.Error(t, err)
-	require.True(t, unanswered(err))
+	require.False(t, unanswered(err))
+	require.True(t, opamp.IsFailedLeavingUnknown(err), "%v", err)
 	require.Equal(t, s.packagedAgent, s.commander.Executable())
 	require.FileExists(t, s.unprovenAgentPath(), "the next start tries again")
 }
@@ -137,3 +146,38 @@ func requireNoFile(t *testing.T, path string) {
 	_, err := os.Stat(path)
 	require.ErrorIs(t, err, os.ErrNotExist, path)
 }
+
+// An install whose signature can't be checked for now (Sigstore unreachable) failed for now: the
+// core tries it again later, and doesn't report the version failed. It was failed for good, and
+// a Sigstore outage failed every version offered during it until the server offered another. A
+// signature that doesn't verify fails for good.
+func TestAnInstallSigstoreCannotCheckForNowIsTriedAgain(t *testing.T) {
+	for name, c := range map[string]struct {
+		err    error
+		forNow bool
+	}{
+		"Sigstore unreachable":      {fmt.Errorf("fetch Sigstore's trusted root: %w", verifier.ErrUnavailable), true},
+		"a signature not verifying": {errors.New("the package's signature doesn't verify"), false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newRemovalTestSupervisor(t)
+			s.packageVerifier = verifierFunc(func() error { return c.err })
+			path := filepath.Join(t.TempDir(), "package")
+			require.NoError(t, os.WriteFile(path, []byte("the collector"), 0o600))
+			err := s.installAgentPackage(agentInstall{
+				pkg:  &protobufs.PackageAvailable{Type: protobufs.PackageType_PackageType_TopLevel, Version: "v2"},
+				path: path,
+			})
+			require.ErrorIs(t, err, c.err)
+			require.False(t, unanswered(err))
+			require.Equal(t, c.forNow, opamp.IsFailedForNow(err), "%v", err)
+			require.Equal(t, s.packagedAgent, s.commander.Executable(), "the running collector wasn't touched")
+		})
+	}
+}
+
+// verifierFunc is a package verifier answering with verify's error.
+type verifierFunc func() error
+
+func (f verifierFunc) Verify(context.Context, []byte, []byte) error { return f() }
+func (verifierFunc) Type() string                                   { return "test" }

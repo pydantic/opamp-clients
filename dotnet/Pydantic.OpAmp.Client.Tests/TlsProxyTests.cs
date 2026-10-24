@@ -256,6 +256,12 @@ public class TlsProxyTests
         // Without the client certificate, the same download fails.
         using var bare = ClientTransport.Create(tls with { ClientCertPem = null, ClientKeyPem = null }, url);
         Assert.Equal(Input.KindOneofCase.DownloadFailed, (await DownloadAsync(bare, $"https://localhost:{server.Port}/file")).KindCase);
+
+        // The client certificate goes only to a file at the server's own origin, as the core says
+        // (Download.server_origin): told otherwise, the client presents none, and the download fails.
+        Assert.Equal(
+            Input.KindOneofCase.DownloadFailed,
+            (await DownloadAsync(transport, $"https://localhost:{server.Port}/file", serverOrigin: false)).KindCase);
     }
 
     /// <summary>
@@ -487,7 +493,7 @@ public class TlsProxyTests
     }
 
     /// <summary>Download <paramref name="url"/>, and where a redirect points, as the core would ask.</summary>
-    private static async Task<Input> DownloadAsync(ClientTransport transport, string url)
+    private static async Task<Input> DownloadAsync(ClientTransport transport, string url, bool serverOrigin = true)
     {
         var dir = Directory.CreateTempSubdirectory();
         var loop = new TestLoop(transport, Path.Combine(dir.FullName, "state"));
@@ -495,7 +501,7 @@ public class TlsProxyTests
         ulong id = 0;
         do
         {
-            loop.Run(new Effect { Download = new Download { Id = ++id, Url = url, MaxBytes = 1 << 20, TimeoutMs = 10_000 } });
+            loop.Run(new Effect { Download = new Download { Id = ++id, Url = url, MaxBytes = 1 << 20, TimeoutMs = 10_000, ServerOrigin = serverOrigin } });
             Assert.True(loop.TryTake(out input, TimeSpan.FromSeconds(15)));
             url = input.DownloadResponse?.Location ?? string.Empty;
         }
