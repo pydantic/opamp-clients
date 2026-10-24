@@ -12,6 +12,9 @@ OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 
 [docs/how-it-works.md](docs/how-it-works.md) explains how the clients and the core fit together,
 [docs/sdks.md](docs/sdks.md) compares the SDKs, and [examples/](examples/) runs each one.
+Two guides start from an application as it is: on the Logfire SDK or sending to Logfire
+([docs/guides/logfire.md](docs/guides/logfire.md)), and on Elastic's OpenTelemetry distributions
+([docs/guides/elastic.md](docs/guides/elastic.md)).
 
 The core is the state machine every client wraps. It arrives here compiled, as this repository's
 `core/vX.Y.Z` releases: the WebAssembly modules Go, Node.js and Java load, the native library

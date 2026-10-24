@@ -13,8 +13,14 @@
     <!-- ASP.NET Core, for the requests it serves with APP_LISTEN set (sampling_rules' path). -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
-    <PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.17.0" Condition="'$(Edot)' != 'true'" />
     <ProjectReference Include="../../dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj" />
+  </ItemGroup>
+
+  <!-- With try.py's edot option: Elastic's distribution (EDOT .NET, on automatic instrumentation
+       1.17.0) in place of upstream's package, its plugin listed before ours. -->
+  <ItemGroup Condition="'$(Edot)' == 'true'">
+    <PackageReference Include="Elastic.OpenTelemetry.AutoInstrumentation" Version="1.6.1" />
   </ItemGroup>
 
 </Project>

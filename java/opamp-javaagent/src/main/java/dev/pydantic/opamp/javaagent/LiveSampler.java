@@ -16,6 +16,7 @@ import io.opentelemetry.sdk.trace.samplers.SamplingDecision;
 import io.opentelemetry.sdk.trace.samplers.SamplingResult;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.LongSupplier;
 
 /**
@@ -203,10 +204,24 @@ final class LiveSampler implements Sampler {
   @Override
   public String getDescription() {
     State s = state;
-    String inner = s.rules().isEmpty() && s.rate() == null ? s.configured().getDescription()
+    String inner = s.rules().isEmpty() && s.rate() == null ? describe(s.configured())
         : (s.rules().isEmpty() ? "" : "rules=" + s.rules().size() + ",")
-            + (s.rate() == null ? s.configured().getDescription() : s.rated().getDescription());
+            + (s.rate() == null ? describe(s.configured()) : s.rated().getDescription());
     return "OpampLiveSampler{" + inner + (s.cap() == null ? "" : "," + s.cap()) + "}";
+  }
+
+  /**
+   * Samplers whose {@code getDescription} never returns: Elastic's distribution of the agent (EDOT
+   * Java, 1.14 and earlier) has its default sampler's call itself. They are described by their
+   * {@code toString} instead, which does return, so the SDK's description (which EDOT logs as it
+   * starts) doesn't overflow the stack.
+   */
+  static final Set<String> UNDESCRIBABLE = Set.of(
+      "co.elastic.otel.compositesampling.DynamicCompositeParentBasedTraceIdRatioBasedSampler");
+
+  /** What the agent's sampler says it is. */
+  static String describe(Sampler agents) {
+    return UNDESCRIBABLE.contains(agents.getClass().getName()) ? agents.toString() : agents.getDescription();
   }
 
   @Override
