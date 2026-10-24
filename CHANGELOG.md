@@ -33,14 +33,14 @@ and date. Tests, CI and docs alone don't need a line.
   outage or a timeout: not reported failed, and tried again after a wait) or
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
-  version for good, as before.
+  version for good, as before (#81).
 
 ### Changed
 
 - Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
   root or the transparency log unreachable) is tried again after a wait instead of being reported
   failed for good, and a rollback that can't put the previous executable back is reported failed
-  (what the host has unknown) instead of not being reported at all.
+  (what the host has unknown) instead of not being reported at all (#81).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
 
@@ -49,7 +49,7 @@ and date. Tests, CI and docs alone don't need a line.
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every
-  download host.
+  download host (#81).
 - Dependencies with known advisories updated: golang.org/x/net 0.60.0 (`go/opampotel`, the
   examples, the conformance server), google.golang.org/grpc 1.83.1 and OpenTelemetry Go 1.45.0
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
