@@ -102,6 +102,8 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
         with logfire.span("after", **{{"user.email": "a@example.com"}}):
             pass
         logfire.force_flush()
+        import threading
+        print("threads", sorted({{t.name for t in threading.enumerate()}}))
         print("uid", agent.uid)
         print("live", sorted(agent.host.live))
     """)
@@ -143,6 +145,8 @@ def test_the_logfire_sdk_takes_the_servers_settings(tmp_path, servers):
     # Ingest's warnings reach the application, as the Logfire SDK shows them.
     assert "this project is over its span quota" in run.stderr
     # Every gate, the sampler and redaction are carried out: nothing exports past them.
+    # With metrics=False no metric reader is made: one never registered would still run.
+    assert "OtelPeriodicExportingMetricReader" not in run.stdout
     for setting in ("send_traces", "send_logs", "sampling_rate", "mask_attributes", "scrub_patterns"):
         assert setting in run.stdout.split("live ")[-1]
 

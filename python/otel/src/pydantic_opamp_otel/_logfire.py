@@ -86,9 +86,9 @@ def _otlp_variables(signal: str) -> bool:
     return os.environ.get(f"OTEL_{signal.upper()}_EXPORTER", "").lower() in ("otlp", "")
 
 
-def _logfire_exporters(token: str, base_url: str | None, controls, advanced):
-    """For one token: the span processor, the metric reader (its exporter gated) and the log
-    record processor, built as the Logfire SDK builds its own, each with the package's gate."""
+def _logfire_exporters(token: str, base_url: str | None, controls, advanced, metrics: bool = True):
+    """For one token: the span processor, the metric reader (its exporter gated; None without
+    metrics, as an unregistered reader would still run) and the log record processor, built as the Logfire SDK builds its own, each with the package's gate."""
     from urllib.parse import urljoin  # noqa: PLC0415
 
     from logfire._internal.config import METRICS_PREFERRED_TEMPORALITY  # noqa: PLC0415
@@ -124,14 +124,15 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced):
     # Before logfire 5.2 pending spans were always sent, and there was no setting for them.
     if getattr(advanced, "pending_spans", True):
         spans = RemovePendingSpansExporter(spans)
-    metrics = QuietMetricExporter(
-        OTLPMetricExporter(endpoint=urljoin(url, "/v1/metrics"), headers=headers, session=session, compression=gzip,
-                           preferred_temporality=METRICS_PREFERRED_TEMPORALITY),
-        preferred_temporality=METRICS_PREFERRED_TEMPORALITY)
+    reader = None
+    if metrics:
+        reader = PeriodicExportingMetricReader(GatedMetricExporter(QuietMetricExporter(
+            OTLPMetricExporter(endpoint=urljoin(url, "/v1/metrics"), headers=headers, session=session,
+                               compression=gzip, preferred_temporality=METRICS_PREFERRED_TEMPORALITY),
+            preferred_temporality=METRICS_PREFERRED_TEMPORALITY)))
     logs = QuietLogExporter(OTLPLogExporter(endpoint=urljoin(url, "/v1/logs"), session=session, headers=headers,
                                             compression=gzip))
-    return (DynamicBatchSpanProcessor(spans), PeriodicExportingMetricReader(GatedMetricExporter(metrics)),
-            BatchLogRecordProcessor(controls.logs(logs)))
+    return (DynamicBatchSpanProcessor(spans), reader, BatchLogRecordProcessor(controls.logs(logs)))
 
 
 class GatedMetricExporter(MetricExporter):
@@ -203,7 +204,7 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     given_logs = list(getattr(advanced, "log_record_processors", ()) or ())
     metrics = kwargs.get("metrics")
     given_readers = list(getattr(metrics, "additional_readers", ()) or ())
-    built = [_logfire_exporters(t, base_url, controls, config.advanced) for t in tokens]
+    built = [_logfire_exporters(t, base_url, controls, config.advanced, metrics is not False) for t in tokens]
     if tokens:
         kwargs["send_to_logfire"] = False
         kwargs["additional_span_processors"] = [*given_spans, *(b[0] for b in built)]
