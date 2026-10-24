@@ -29,6 +29,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Python (`pydantic-opamp-otel`): `configure_logfire()`, the Logfire SDK under the server, in place of
+  `logfire.configure()`: the live sampler as its head sampler, and its exporters to Logfire behind
+  the package's gates, so the SDK settings apply to what reaches Logfire (`logfire` extra).
+
 - Go: an install's or a removal's error can say how it failed: `opamp.FailedForNow(err)` (an
   outage or a timeout: not reported failed, and tried again after a wait) or
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with

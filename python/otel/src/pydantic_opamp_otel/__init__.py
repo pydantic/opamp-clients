@@ -65,7 +65,7 @@ from . import app_settings
 from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
-__all__ = ["Configurator", "Distro", "GatedOtlpMetricExporter", "app_settings", "configure", "start"]
+__all__ = ["Configurator", "Distro", "GatedOtlpMetricExporter", "app_settings", "configure", "configure_logfire", "start"]
 
 _log = logging.getLogger(__name__)
 
@@ -929,11 +929,13 @@ def exporters(tracer_provider, meter_provider, logger_provider) -> list[settings
 
 
 def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter_provider=None,
-              logger_provider=None) -> settings_pb2.Inventory:
+              logger_provider=None, listed: list[tuple[str, str]] | None = None) -> settings_pb2.Inventory:
     """What the package lists of itself and the SDK it runs (docs/available-components.md): the
     global providers unless others are given. Under `host`, a signal whose send_* setting it
     can't carry out has no gated exporter: the OTLP metric exporter beside one the package can't
-    stop is gated, but send_metrics is not declared, so nothing reaches it."""
+    stop is gated, but send_metrics is not declared, so nothing reaches it. `listed`: the gated
+    exporters (signal, name) built outside the providers' reach (configure_logfire's), in place of
+    reading them off the providers."""
     from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
 
     from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
@@ -943,8 +945,11 @@ def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter
         own = version(PACKAGE)
     except PackageNotFoundError:
         own = ""
-    built = exporters(tracer_provider or trace.get_tracer_provider(), meter_provider or metrics.get_meter_provider(),
-                      logger_provider or _logs.get_logger_provider())
+    if listed is not None:
+        built = [settings_pb2.Exporter(signal=signal, name=name, gated=True) for signal, name in listed]
+    else:
+        built = exporters(tracer_provider or trace.get_tracer_provider(), meter_provider or metrics.get_meter_provider(),
+                          logger_provider or _logs.get_logger_provider())
     if host is not None:
         carried = {*host.live, *host.next_start}
         for e in built:
@@ -973,6 +978,10 @@ class Agent:
         self.span_processors = False
         self.log_processors = False
         self.extra_metric_exporters: list[str] = []
+        #: The gated exporters configure_logfire built, for the inventory (None: read off the providers).
+        self.listed_exporters: list[tuple[str, str]] | None = None
+        #: configure_logfire built the SDK (the Logfire SDK's own), for what the warnings say.
+        self.logfire = False
         self.client: Client | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         # Reentrant: a decision under it re-arms the timer, which takes it too.
@@ -1106,6 +1115,10 @@ class Agent:
             elif not self.configured:
                 _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
                              "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
+            elif self.logfire:
+                _log.warning("OpAMP: the Logfire SDK's console, or a processor, metric reader or OTLP exporter "
+                             "it was given, exports past this package's gates: %s can't be carried out "
+                             "(console=False keeps the console out)", lost)
             else:
                 _log.warning("OpAMP: the processors or metric exporters passed to the configurator export "
                              "past this package's gates: %s can't be carried out", lost)
@@ -1210,7 +1223,8 @@ class Agent:
         settled by now), so it is sent once; None, unreported, should it fail."""
         assert self.layer is not None
         try:
-            self.components = self.layer.components(inventory(self.host), self.host, self.wall_ms())
+            self.components = self.layer.components(inventory(self.host, listed=self.listed_exporters), self.host,
+                                                     self.wall_ms())
         except Exception:  # noqa: BLE001 - reporting: the instance is managed without it
             _log.warning("OpAMP: can't list what this SDK runs", exc_info=True)
             self.components = None
@@ -1687,3 +1701,6 @@ def configure(*, endpoint: str | None = None, headers: Mapping[str, str] | None 
                   heartbeat_interval=heartbeat_interval)
     # The SDK's configurator starts the client through the package's OpAMP hook (start).
     Configurator().configure(**kwargs)
+
+
+from ._logfire import configure_logfire  # noqa: E402 - it reads the package's AGENT

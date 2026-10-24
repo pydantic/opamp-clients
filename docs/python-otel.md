@@ -130,6 +130,59 @@ What it cannot carry out: the `instrumentations` control, because it instruments
 application names its instrumentors in code. A policy that overrides it is refused, like every
 other override above that a process cannot carry out.
 
+## The Logfire SDK: `configure_logfire()`
+
+An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
+`configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
+SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
+(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
+
+```python
+import logfire
+import pydantic_opamp_otel
+
+pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+logfire.instrument_fastapi(app)  # the Logfire SDK's instrumentations, as before
+```
+
+The server comes from the `OTEL_OPAMP_*` variables above, or from `endpoint`, `headers`,
+`state_dir` and `heartbeat_interval`, as for `configure()`. Without an endpoint it is
+`logfire.configure(**kwargs)`, unmanaged. Everything else is the Logfire SDK's own: its token
+(`LOGFIRE_TOKEN`), scrubbing, `min_level`, tail sampling and instrumentations.
+
+What it does differently from `logfire.configure()`:
+
+- The live sampler is the Logfire SDK's head sampler, in front of the one `sampling.head` asks
+  for, so the sampling controls and debug mode are carried out. Tail sampling is unchanged.
+- The exporters to Logfire are built here, as the Logfire SDK builds them (its OTLP over HTTP
+  exporters, retries and pending spans, one set per token, to the region the token names or
+  `advanced.base_url`), with the package's gates in front of them, and the Logfire SDK is told
+  not to send itself (`send_to_logfire=False`). So `signal_exports`, the log controls, redaction
+  and scrubbing apply to what reaches Logfire. The server's scrubbing adds to the Logfire SDK's.
+- The instance UID is `service.instance.id`, in place of the random one the Logfire SDK makes.
+
+What exports past the gates is declared, so a policy that overrides a setting it would bypass is
+refused (FAILED, naming the setting), as in [the host](sdk-settings.md#the-host), and a warning
+at start names the settings set aside:
+
+- the console (on unless `console=False` or `LOGFIRE_CONSOLE=false`): it shows every span and
+  log, so with it on the trace and log gates and redaction are set aside;
+- span processors (`additional_span_processors`), log record processors
+  (`advanced.log_record_processors`) and metric readers (`metrics.additional_readers`) given in the
+  arguments;
+- the OTLP exporters the Logfire SDK adds for `OTEL_EXPORTER_OTLP_*ENDPOINT`;
+- an export from the Logfire SDK's credentials file (`.logfire/`), when there is no token, which
+  only the Logfire SDK reads.
+
+The Logfire SDK's logs (`logfire.info(...)`) are spans: the trace controls apply to them. The log
+controls apply to OpenTelemetry log records (Python `logging` through the Logfire SDK's logs
+pipeline).
+
+It reads the Logfire SDK's own settings (the token, `send_to_logfire`, the console, the base URL
+and pending spans, from the arguments, the variables and `pyproject.toml`) and builds its
+exporters from the Logfire SDK's modules, which are not public API: it is checked with the
+versions its extra allows.
+
 ## What it does
 
 - **Joins the fleet** with one instance UID: the OpAMP instance UID, and `service.instance.id` in
