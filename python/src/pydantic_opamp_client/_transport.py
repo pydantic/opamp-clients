@@ -16,7 +16,7 @@ import ssl
 import tempfile
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, ClassVar
 from urllib.parse import unquote, urlsplit
 
@@ -327,6 +327,13 @@ class Transport:
                  core_mode: bool = False, _environ: Mapping[str, str] | None = None) -> None:
         # _environ: tests only, the environment to read in place of the process's.
         self.ssl = tls if isinstance(tls, ssl.SSLContext) else (tls or TLS()).context()
+        #: For a package file not at the OpAMP server's own origin (Download.server_origin false):
+        #: the same, without the client certificate, which is the server's alone. An SSLContext
+        #: the application made is its own, used as it is.
+        self.elsewhere_ssl = self.ssl
+        if not isinstance(tls, ssl.SSLContext) and tls is not None and (tls.cert_file or tls.cert_pem):
+            self.elsewhere_ssl = replace(tls, cert_file=None, key_file=None, cert_pem=None, key_pem=None,
+                                         key_password=None).context()
         # The configured proxy (None: direct), or the environment's by scheme.
         self._fixed: _Route | None = None
         self._env: dict[str, str] | None = None

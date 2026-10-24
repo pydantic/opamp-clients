@@ -18,6 +18,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"go.uber.org/zap"
 
+	"github.com/pydantic/opamp-clients/go/opamp"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/archive"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/config"
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor/verifier"
@@ -247,6 +248,10 @@ func (s *Supervisor) installAgentPackage(req agentInstall) error {
 		return fmt.Errorf("read the downloaded package: %w", err)
 	}
 	if err := s.packageVerifier.Verify(s.runCtx, content, []byte(req.pkg.GetFile().GetSignature())); err != nil {
+		if errors.Is(err, verifier.ErrUnavailable) {
+			// Nothing was touched: the core tries again later, and doesn't report the version failed.
+			return opamp.FailedForNow(err)
+		}
 		return err
 	}
 
@@ -442,8 +447,9 @@ func (s *Supervisor) startAgentOnNoopConfig() error {
 }
 
 // revertAgentUpdate puts back the executable that ran before the update and starts it. Changed
-// here: if it can't be put back, the configured one is started, the core isn't told (it would
-// record the previous version as in place), and the next start tries again. No collector ran.
+// here: if it can't be put back, the configured one is started, the core is told the install
+// failed leaving what the agent has unknown (not that the previous version is in place), and the
+// next start tries again. No collector ran.
 func (s *Supervisor) revertAgentUpdate(running string, replaced bool, logger *zap.Logger) error {
 	logger.Warn("Putting the previous collector executable back")
 	if err := s.commander.Stop(s.runCtx); err != nil {
@@ -453,7 +459,9 @@ func (s *Supervisor) revertAgentUpdate(running string, replaced bool, logger *za
 	if _, err := s.undoUnprovenUpdate(); err != nil {
 		logger.Error("Could not put the previous collector executable back: the configured one runs", zap.Error(err))
 		s.commander.SetExecutable(s.packagedAgent)
-		return unansweredError{errors.Join(fmt.Errorf("put the previous executable back: %w", err), s.restartAgentAfterUpdate(logger))}
+		// The core reports the version failed, and keeps what the agent has uncertain: after the
+		// next start, which tries the rollback again, it installs once more.
+		return opamp.FailedLeavingUnknown(errors.Join(fmt.Errorf("put the previous executable back: %w", err), s.restartAgentAfterUpdate(logger)))
 	}
 	s.commander.SetExecutable(running)
 	return s.restartAgentAfterUpdate(logger)

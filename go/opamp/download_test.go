@@ -7,6 +7,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -135,5 +139,78 @@ func TestRedirectLocations(t *testing.T) {
 		if got != c.want || !proto.Equal(origin, c.origin) {
 			t.Errorf("%q: %q %v, want %q %v", c.given, got, origin, c.want, c.origin)
 		}
+	}
+}
+
+// The TLS settings the client keeps for the OpAMP server (its client certificate, skipping
+// verification) go only to a file at the server's own origin, as the core says
+// (Download.server_origin). A file anywhere else is fetched with neither, still checked against
+// the CAs configured.
+func TestOnlyTheServersOriginGetsItsTLSSettings(t *testing.T) {
+	ca := newTestCA(t, "test CA")
+	_, _, pair := ca.issue(t, "files", true)
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if len(r.TLS.PeerCertificates) > 0 {
+			w.Write([]byte("certificate " + r.TLS.PeerCertificates[0].Subject.CommonName))
+			return
+		}
+		w.Write([]byte("no certificate"))
+	}))
+	ts.Config.ErrorLog = log.New(io.Discard, "", 0) // refused handshakes are expected
+	ts.TLS = &tls.Config{Certificates: []tls.Certificate{pair}, ClientAuth: tls.VerifyClientCertIfGiven, ClientCAs: ca.pool}
+	ts.StartTLS()
+	defer ts.Close()
+	certPEM, keyPEM, _ := ca.issue(t, "agent", false)
+
+	fetch := func(t *testing.T, conn *connection, serverOrigin bool) (string, string) {
+		t.Helper()
+		x := newExecutor(conn)
+		x.setStateFile(filepath.Join(t.TempDir(), "state"))
+		in := x.download(context.Background(), &corepb.Download{Id: 1, Url: ts.URL + "/file", MaxBytes: 1 << 20,
+			TimeoutMs: 5000, ServerOrigin: serverOrigin})
+		if f := in.GetDownloadFailed(); f != nil {
+			return "", f.Detail
+		}
+		got, err := os.ReadFile(x.downloadPath(1))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(got), ""
+	}
+	mtls := TLS{CAPEM: ca.pem, CertPEM: certPEM, KeyPEM: keyPEM}
+	insecure := TLS{Config: &tls.Config{InsecureSkipVerify: true}}
+	transport := func(tl TLS) *connection {
+		cfg, err := tl.tlsConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return connectionFrom(&http.Client{Transport: &http.Transport{TLSClientConfig: cfg}})
+	}
+	for name, conn := range map[string]func(TLS) *connection{
+		"options":                     func(tl TLS) *connection { return testConnection(t, tl, Proxy{Direct: true}) },
+		"the application's transport": transport,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got, why := fetch(t, conn(mtls), true); got != "certificate agent" {
+				t.Fatalf("the server's origin: %q %s", got, why)
+			}
+			if got, why := fetch(t, conn(mtls), false); got != "no certificate" {
+				t.Fatalf("elsewhere: %q %s, want no client certificate", got, why)
+			}
+			if got, why := fetch(t, conn(insecure), true); got != "no certificate" {
+				t.Fatalf("the server's origin, unverified: %q %s", got, why)
+			}
+			if got, why := fetch(t, conn(insecure), false); why == "" || !strings.Contains(why, "certificate") {
+				t.Fatalf("elsewhere, unverified: %q, want the server's certificate refused", got)
+			}
+		})
+	}
+	// A RoundTripper of the application's own is the application's: used as it is.
+	own := connectionFrom(&http.Client{Transport: roundTripper(func(r *http.Request) (*http.Response, error) {
+		cfg, _ := mtls.tlsConfig()
+		return (&http.Transport{TLSClientConfig: cfg}).RoundTrip(r)
+	})})
+	if got, why := fetch(t, own, false); got != "certificate agent" {
+		t.Fatalf("the application's own RoundTripper: %q %s", got, why)
 	}
 }

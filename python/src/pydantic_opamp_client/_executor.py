@@ -652,8 +652,10 @@ class Executor:
         if self._fetcher is None:
             self._fetcher = aiohttp.ClientSession(connector=self._transport.connector(), timeout=aiohttp.ClientTimeout())
         timeout = aiohttp.ClientTimeout(total=d.timeout_ms / 1000 or None)
+        # The server's client certificate only for a file at its own origin (the core says which).
+        tls = self._transport.ssl if d.server_origin else self._transport.elsewhere_ssl
         async with self._fetcher.get(_url(d.url), headers=_headers(d.headers), timeout=timeout,
-                                     allow_redirects=False) as resp:
+                                     allow_redirects=False, ssl=tls) as resp:
             where = None
             if 300 <= resp.status < 400 and (given := resp.headers.get("Location")) is not None:
                 where = location(d.url, given)

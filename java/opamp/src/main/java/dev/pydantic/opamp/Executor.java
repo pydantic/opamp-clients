@@ -241,7 +241,8 @@ final class Executor {
       }
       headers(d.getHeadersList(), h -> req.header(h.getName(), h.getValue()));
       extra.forEach(h -> req.header(h.getKey(), h.getValue()));
-      sent = http.sendAsync(req.build(), HttpResponse.BodyHandlers.ofInputStream());
+      // The server's client certificate only for a file at its own origin (the core says which).
+      sent = transport.download(d.getServerOrigin()).sendAsync(req.build(), HttpResponse.BodyHandlers.ofInputStream());
     } catch (IllegalArgumentException e) {
       sent = CompletableFuture.failedFuture(e);
     }

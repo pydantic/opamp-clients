@@ -38,6 +38,10 @@ const rekorURL = "https://rekor.sigstore.dev"
 // lookupTimeout bounds fetching the trusted root and the signature's Rekor entries.
 const lookupTimeout = time.Minute
 
+// ErrUnavailable is in the error of a signature that couldn't be checked for now: Sigstore's
+// trusted root or the transparency log couldn't be reached. Trying again later may work.
+var ErrUnavailable = errors.New("Sigstore couldn't be reached")
+
 // TrustedMaterialFunc returns the Sigstore roots signatures are checked against: Fulcio's
 // certificates, Rekor's and the CT logs' keys.
 type TrustedMaterialFunc func(ctx context.Context) (root.TrustedMaterial, error)
@@ -139,7 +143,7 @@ func (v *cosignVerifier) Verify(ctx context.Context, packageBytes, signature []b
 
 	trusted, err := v.trusted(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrUnavailable, err)
 	}
 	// When it was signed: Rekor's integrated time, or a timestamp authority's, which a bundle
 	// logged in Rekor v2 (which has no integrated time) carries instead.
@@ -163,7 +167,7 @@ func (v *cosignVerifier) Verify(ctx context.Context, packageBytes, signature []b
 	}
 	entries, err := v.lookup(ctx, digest[:])
 	if err != nil {
-		return fmt.Errorf("look the signature up in the transparency log: %w", err)
+		return fmt.Errorf("%w: look the signature up in the transparency log: %w", ErrUnavailable, err)
 	}
 	if len(entries) == 0 {
 		return errors.New("the package's signature isn't in the transparency log")

@@ -399,7 +399,9 @@ export class Executor {
       let answer: Input;
       let made = false;
       try {
-        const r = await fetchTo(this.#p, d, path, this.#transport.dispatcher, abort.signal, this.#ops, () => (made = true));
+        // The server's client certificate only for a file at its own origin (the core says which).
+        const via = d.serverOrigin ? this.#transport.dispatcher : this.#transport.elsewhere;
+        const r = await fetchTo(this.#p, d, path, via, abort.signal, this.#ops, () => (made = true));
         answer = input({ case: "downloadResponse", value: r });
       } catch (e) {
         // fetchTo deleted the file it made.

@@ -333,7 +333,8 @@ internal sealed class Executor
             req.Headers.TryAddWithoutValidation(h.Name, h.Value);
         }
 
-        using var resp = await this.transport.SendAsync(req, ct).ConfigureAwait(false);
+        // The server's client certificate only for a file at its own origin (the core says which).
+        using var resp = await this.transport.DownloadAsync(req, d.ServerOrigin, ct).ConfigureAwait(false);
         var status = (int)resp.StatusCode;
         var response = new DownloadResponse { Id = d.Id, Status = (uint)status };
         if (status is >= 300 and < 400 && resp.Headers.TryGetValues("Location", out var locations) && locations.FirstOrDefault() is { } given)

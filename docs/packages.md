@@ -26,9 +26,10 @@ reporting each package's status, resuming after a crash); the application instal
   again afterwards) gives a fresh try.
 - **Downloading.** The client downloads the file (HTTP GET with the offered headers) to a file of
   its own, computing its SHA-256 as it goes, up to `max_package_bytes` and `download_timeout_ms`.
-  A file whose SHA-256 differs from the content hash fails the package at once (it is the wrong
-  file: TCP and TLS rule out damage on the way); a download that fails is tried three times, 10 s
-  apart. Either way the package is INSTALL_FAILED. A file the agent already has (the content hash
+  A file whose SHA-256 differs from the content hash fails the package at once, INSTALL_FAILED (it
+  is the wrong file: TCP and TLS rule out damage on the way). A download that fails is tried three
+  times, 10 s apart; if every try fails, the network did, not the file: the package fails for now
+  (below) and is tried again later. A file the agent already has (the content hash
   of what it installed) isn't downloaded again: the package just takes the new version. Files
   go beside the state file (its path and `.downloads`), for the agent's user only (see
   [connection-settings.md](connection-settings.md#secrets-at-rest)); what is there at start is deleted.
@@ -43,11 +44,33 @@ reporting each package's status, resuming after a crash); the application instal
   once (RULE-CLIENT-12).
 - **Installing.** The application gets `InstallPackage` with the package (name, type, version,
   hash, signature) and the file's path, installs it (checking the signature is its job), and
-  answers `package_installed` (or with an error). The client deletes the file after the answer:
-  move it if you keep it.
+  answers `package_installed` (or with an error, saying how it failed: below). The client deletes
+  the file after the answer: move it if you keep it.
 - **Removing.** The application gets `RemovePackage` for a package no longer offered, removes
   it, and answers `package_removed`, with an error if it couldn't: the package is then reported
-  failed, and not removed again until the server offers it and drops it again.
+  failed, and not removed again until the server offers it and drops it again (unless it failed
+  for now).
+- **How it failed.** An install's or a removal's error says which of these it is:
+
+  | Failed | Means | The client |
+  |---|---|---|
+  | For good (the default) | it won't work: the file, the version | reports the version failed (INSTALL_FAILED, with the error) and waits for the server to offer another |
+  | For now | it may work later: an outage, a timeout, the agent busy; nothing was changed | reports nothing failed (INSTALL_PENDING), and tries again after 30 s, doubling each time in a row to at most 10 minutes, while the other packages go on; a restart tries at once |
+  | Leaving what it has unknown | it failed and can't tell what it left (a rollback that failed) | as for good, and what the agent has of the package is uncertain from then on (see "A crash") |
+
+  So far only Go's answer says which (wrap the error with `opamp.FailedForNow` or
+  `opamp.FailedLeavingUnknown`); every other client's error is a failure for good.
+- **No offer.** A package offered with no hash names no version: it is never installed or
+  removed, and is reported INSTALL_FAILED. An offer with no aggregate hash is told apart from the
+  last by its packages; the statuses report the aggregate hash the server sent, empty too.
+- **The server's TLS settings stay with the server.** The client certificate configured for the
+  OpAMP server is presented only when a file is at the server's own origin (its scheme, host and
+  port): a file anywhere else (a CDN, storage) is fetched without it, still checked against the
+  CAs configured (Go also stops skipping verification there, if its TLS config skips it for the
+  server). Each redirect hop is judged again. This holds in platform mode in every client. An
+  HTTP client of the application's own is used as it is, except in Go when its transport is an
+  `*http.Transport`: a copy of it, without the certificates, fetches files elsewhere. In core mode
+  the client certificate is still presented to every download host, for now.
 - **A crash.** Before the application is told to install or remove a package, the client saves
   that the package is uncertain: the application may change it. After a restart, an uncertain
   package is downloaded and installed again, or removed again, whatever the saved record says
@@ -63,7 +86,7 @@ reporting each package's status, resuming after a crash); the application instal
 
 | Client | Turn on | Install | Remove |
 |---|---|---|---|
-| Go | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` | kind `RemovePackage`; answer `PackageRemoved` |
+| Go | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` (an error wrapped by `FailedForNow` or `FailedLeavingUnknown` says how it failed) | kind `RemovePackage`; answer `PackageRemoved` (the same) |
 | Node.js | `stateFile`, `acceptPackages` | `installPackage`: `name`, `package`, `path`; answer `packageInstalled` | `removePackage`; answer `packageRemoved` |
 | Python | `state_file`, `accept_packages` | `install_package`: `package_name`, `package`, `path`; answer `package_installed` | `remove_package`; answer `package_removed` |
 | Java | `stateFile`, `acceptPackages` | `Notification.InstallPackage`: `name`, `pkg`, `path`; answer `packageInstalled` | `Notification.RemovePackage`; answer `packageRemoved` |

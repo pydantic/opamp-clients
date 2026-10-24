@@ -395,7 +395,8 @@ func (x *executor) fetch(ctx context.Context, d *corepb.Download, path string) (
 		return nil, made, err
 	}
 	req.Header = toHTTP(d.Headers)
-	resp, err := x.conn.http.RoundTrip(req)
+	// The server's TLS settings only for a file at its own origin (the core says which).
+	resp, err := x.conn.download(d.ServerOrigin).RoundTrip(req)
 	if err != nil {
 		return nil, made, err
 	}
