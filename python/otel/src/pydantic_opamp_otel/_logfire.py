@@ -201,6 +201,8 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     console = config.console is not False
     given_spans = list(kwargs.get("additional_span_processors") or ())
     advanced = kwargs.get("advanced")
+    if isinstance(advanced, Mapping):
+        advanced = AdvancedOptions(**advanced)
     given_logs = list(getattr(advanced, "log_record_processors", ()) or ())
     metrics = kwargs.get("metrics")
     given_readers = list(getattr(metrics, "additional_readers", ()) or ())
@@ -210,8 +212,6 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
         kwargs["additional_span_processors"] = [*given_spans, *(b[0] for b in built)]
         if advanced is None:
             advanced = AdvancedOptions()
-        elif isinstance(advanced, Mapping):
-            advanced = AdvancedOptions(**advanced)
         kwargs["advanced"] = dataclasses.replace(advanced, log_record_processors=[*given_logs, *(b[2] for b in built)])
         if metrics is not False:
             metrics = metrics or MetricsOptions()

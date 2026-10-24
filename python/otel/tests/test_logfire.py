@@ -287,3 +287,21 @@ def test_what_the_logfire_sdk_resolves_leaves_the_arguments_as_given(tmp_path, m
     assert _resolved(config) == ([], True, "https://ingest.example.com")
     config = _config({"send_to_logfire": "if-token-present", "data_dir": tmp_path})
     assert _resolved(config) == ([], False, "https://ingest.example.com")
+
+
+def test_advanced_options_as_a_mapping_keep_their_log_record_processors(servers):
+    """``advanced`` may be a mapping, as for the Logfire SDK: its log record processors are kept
+    beside the gated ones."""
+    server, ingest = servers
+    child = textwrap.dedent(f"""
+        import logfire, pydantic_opamp_otel
+        from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor, ConsoleLogExporter
+        mine = SimpleLogRecordProcessor(ConsoleLogExporter())
+        pydantic_opamp_otel.configure_logfire(
+            endpoint={server.endpoint!r}, heartbeat_interval=0.1, token="pylf_v1_us_test", send_to_logfire=True,
+            console=False, metrics=False, advanced={{"base_url": {ingest.url!r}, "log_record_processors": [mine]}})
+        given = logfire.DEFAULT_LOGFIRE_INSTANCE.config.advanced.log_record_processors
+        assert given[0] is mine and len(given) == 2, given
+    """)
+    run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=_child_env())
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr

@@ -158,7 +158,9 @@ What it does differently from `logfire.configure()`:
   exporters, retries, pending spans and compression, gzip or zstd, one set per token, to the
   region the token names or `advanced.base_url`), with the package's gates in front of them, and the Logfire SDK is told
   not to send itself (`send_to_logfire=False`). So `signal_exports`, the log controls, redaction
-  and scrubbing apply to what reaches Logfire. The server's scrubbing adds to the Logfire SDK's.
+  and scrubbing apply to what reaches Logfire. The server's scrubbing adds to the Logfire SDK's. An export the Logfire SDK keeps on
+  disk to retry has been through the gates already: it is an export on its way, which still
+  arrives when a setting changes ([at once](sdk-settings.md#the-controls)).
 - The instance UID is `service.instance.id`, in place of the random one the Logfire SDK makes.
 
 What exports past the gates is declared, so a policy that overrides a setting it would bypass is
