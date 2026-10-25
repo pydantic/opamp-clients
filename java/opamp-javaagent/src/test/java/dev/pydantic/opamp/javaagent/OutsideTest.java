@@ -246,4 +246,45 @@ class OutsideTest {
       assertEquals(e.controls.sampler, sdk.built().getOpenTelemetrySdk().getSdkTracerProvider().getSampler());
     }
   }
+
+  @Test
+  void elasticsSpanLoggerIsLeftAloneWhileNothingCanSwitchItOn(@TempDir Path dir) {
+    // EDOT Java adds its span logger to every SDK; without its own OpAMP client, nothing switches
+    // it on, so every setting is still carried out.
+    Extension e = Extension.forTest(null);
+    try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> b.addTracerProviderCustomizer((t, c) -> t.addSpanProcessor(
+        SimpleSpanProcessor.create(new co.elastic.otel.logging.AgentLog.DebugLogSpanExporter()))))) {
+      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+    }
+  }
+
+  @Test
+  void elasticsSpanLoggerIsOutsideWithElasticsCentralConfiguration(@TempDir Path dir) {
+    // With EDOT's own OpAMP client, Elastic's central configuration can switch the logger on: the
+    // spans it writes then pass no gate.
+    Extension e = Extension.forTest(null);
+    Map<String, String> props = props(dir);
+    props.put(OpampCustomizerProvider.ELASTIC_OPAMP_ENDPOINT, "http://127.0.0.1:1/v1/opamp");
+    try (InventoryTest.Sdk sdk = sdk(e, props, b -> b.addTracerProviderCustomizer((t, c) -> t.addSpanProcessor(
+        SimpleSpanProcessor.create(new co.elastic.otel.logging.AgentLog.DebugLogSpanExporter()))))) {
+      Set<String> declared = live(e);
+      assertFalse(declared.contains("send_traces"), declared.toString());
+      assertTrue(declared.contains("send_metrics"), declared.toString());
+    }
+  }
+
+  @Test
+  void elasticsDefaultSamplerIsWrappedAndDescribed(@TempDir Path dir) {
+    // EDOT Java's default sampler's description never returns; the extension's, around it, does.
+    Extension e = Extension.forTest(null);
+    try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> b.addSamplerCustomizer((s, c) ->
+        co.elastic.otel.compositesampling.DynamicCompositeParentBasedTraceIdRatioBasedSampler.INSTANCE))) {
+      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      Sampler sampler = sdk.built().getOpenTelemetrySdk().getSdkTracerProvider().getSampler();
+      assertEquals(e.controls.sampler, sampler);
+      assertEquals("OpampLiveSampler{DynamicCompositeParentBasedTraceIdRatioBasedSampler(ratio=1.0)}",
+          sampler.getDescription());
+      assertTrue(sdk.built().toString().contains("DynamicCompositeParentBasedTraceIdRatioBasedSampler(ratio=1.0)"));
+    }
+  }
 }

@@ -35,7 +35,8 @@ import java.util.logging.Logger;
  * each holds a gated exporter, whatever another customizer wrapped around it. Of the rest, one
  * that can't export is left alone: a span processor that isn't told when a span ends (the agent's
  * thread details, or a baggage processor), the agent's baggage log record processor, and a batch
- * or simple processor around one of the extension's gates. Every other one is outside, as the
+ * or simple processor around one of the extension's gates, and EDOT Java's span logger while
+ * nothing can switch it on ({@link #ELASTIC_DEBUG_LOG}). Every other one is outside, as the
  * extension can't tell what it does with the telemetry.
  */
 final class Outside {
@@ -52,15 +53,38 @@ final class Outside {
     return processorOrReader;
   }
 
+  /**
+   * The span logger Elastic's distribution of the agent (EDOT Java) always adds: a simple processor
+   * around an exporter that writes spans to the agent's own log, and does nothing until debug
+   * logging is switched on. EDOT switches it on only from Elastic's central configuration, its own
+   * OpAMP client ({@code elastic.otel.opamp.endpoint}); not at start, whatever the log level.
+   */
+  static final String ELASTIC_DEBUG_LOG = "co.elastic.otel.logging.AgentLog$DebugLogSpanExporter";
+
   /** The span processors in {@code b} that export spans past the gate, by name. */
   List<String> spans(SdkTracerProviderBuilder b) {
+    return spans(b, false);
+  }
+
+  /**
+   * The span processors in {@code b} that export spans past the gate, by name. With {@code
+   * elasticCentralConfig} off, EDOT's span logger ({@link #ELASTIC_DEBUG_LOG}) is left alone, as
+   * nothing can switch it on; with it on, it is outside like any other.
+   */
+  List<String> spans(SdkTracerProviderBuilder b, boolean elasticCentralConfig) {
     List<String> out = new ArrayList<>();
     for (Object o : held(b, "spanProcessors")) {
-      if (o instanceof SpanProcessor p && !agents.contains(p) && p.isEndRequired() && !gated(p)) {
+      if (o instanceof SpanProcessor p && !agents.contains(p) && p.isEndRequired() && !gated(p)
+          && (elasticCentralConfig || !elasticDebugLog(p))) {
         out.add(name(p));
       }
     }
     return out;
+  }
+
+  private static boolean elasticDebugLog(Object p) {
+    Object exporter = p instanceof SimpleSpanProcessor ? exporter(p) : null;
+    return exporter != null && exporter.getClass().getName().equals(ELASTIC_DEBUG_LOG);
   }
 
   /** The log record processors in {@code b} that export log records past the gate, by name. */

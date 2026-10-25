@@ -87,6 +87,11 @@ extension's customizers run last, and it reads what the SDK is built with:
   baggage processors are two. The agent's baggage log record processor only adds attributes. Any
   other log record processor counts as one that exports, as the extension can't tell what it does.
   So does the span processor the agent adds for `otel.javaagent.debug`, which logs every span.
+  Elastic's distribution of the agent (EDOT Java) adds a span logger of its own to every SDK,
+  which writes spans to the agent's log only once Elastic's central configuration switches debug
+  logging on. With EDOT's own OpAMP client off (no `elastic.otel.opamp.endpoint`), nothing can,
+  and it is left alone; with it on, it counts as one that exports
+  ([guides/elastic.md](guides/elastic.md#java)).
 - **A sampler of its own.** A tracer provider customizer can set a sampler in place of the
   extension's. Once the SDK is built, the extension checks its sampler. If it isn't the
   extension's, `head_sampling`, `sampling_rules`, `trace_rate_limit` and `debug`
