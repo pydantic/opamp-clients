@@ -67,8 +67,8 @@ uses it when called with a candidate (`.github/actions/core`, `CORE_ARTIFACT`).
 
 ## 3. What the PR may contain
 
-AGENTS.md and the README say a core move "changes only the lock". In practice the bump PR is the
-lock plus everything the lock deterministically produces, and nothing hand-written:
+A core bump PR is the lock plus everything the lock deterministically produces, and nothing
+hand-written:
 
 - `opamp-core.lock.json`;
 - the module copies `fetch` rewrites (the ten `.wasm` files above plus `testdata/core/opamp_core_adversary.wasm`);
