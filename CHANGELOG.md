@@ -50,6 +50,8 @@ and date. Tests, CI and docs alone don't need a line.
   health check publisher); the first message now carries it (#86).
 - Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
   them (#86).
+- .NET: on Windows, a proxy variable the client refuses (as `ALL_PROXY=socks4://...`) is named as
+  it was set in the error, not in lower case (#86).
 - Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
   SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
   sampler's own description never returns), and EDOT's span logger no longer sets the trace

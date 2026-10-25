@@ -54,7 +54,7 @@ and .NET load the core as a native library, built for these platforms:
 | Linux arm64, musl (Alpine) | `musllinux_1_2_aarch64` | `linux-musl-arm64` | every PR (installed and run) |
 | macOS arm64, 11 or later | `macosx_11_0_arm64` | `osx-arm64` | nightly |
 | macOS x64, 10.12 or later | `macosx_10_12_x86_64` | `osx-x64` | built, not run |
-| Windows x64 | `win_amd64` | `win-x64` | nightly; the Python and .NET clients' own tests don't all pass there yet |
+| Windows x64 | `win_amd64` | `win-x64` | nightly |
 | Windows arm64 | `win_arm64` | `win-arm64` | built, not run |
 
 On a platform without a library, or where it can't be loaded, the SDK says so once and runs
