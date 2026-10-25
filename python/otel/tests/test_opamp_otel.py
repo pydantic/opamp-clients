@@ -290,7 +290,8 @@ def test_one_uid_names_the_instance_is_kept_and_the_metric_exporter_is_gated(tmp
     first, env1 = prepared(tmp_path, OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=prod,service.instance.id=x")
     assert first.uid.version == 7
     assert env1["OTEL_METRICS_EXPORTER"] == "opamp"
-    assert (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+    # The user's only (docs/state-file.md): Windows has no such mode, and Python sets no ACL there.
+    assert os.name == "nt" or (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
     second, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,otlp")
     assert second.uid == first.uid
     # Without state, a UUID the user gave is used.
@@ -746,7 +747,7 @@ def test_a_uid_the_server_assigns_is_kept_for_the_next_start(tmp_path):
         first.start(Resource.create({"service.name": "checkout"}))
         server.wait(lambda: (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(assigned))
         first.stop()
-        assert (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+        assert os.name == "nt" or (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
         second, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
         assert second.uid == assigned
         before = len(server.got)
@@ -787,6 +788,7 @@ def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(ser
         g = gevent.spawn(loop.run_forever)
         g.join(timeout=5)
         assert g.successful() and ran, g.exception
+        loop.close()  # (left to the collector, Windows' proactor loop fails closing under gevent)
         gevent.sleep(0.5)
         agent.stop()
     """)
