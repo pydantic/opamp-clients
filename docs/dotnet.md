@@ -3,7 +3,7 @@
 `Pydantic.OpAmp.Client` is this repository's OpAMP client for .NET, in
 [`dotnet/`](../dotnet/). It runs the shared core natively, as a library called through
 `LibraryImport` ([how-it-works.md](how-it-works.md)), and speaks plain HTTP or WebSocket, with
-TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later. Its
+TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for .NET 8 and .NET 10. Its
 [README](../dotnet/README.md) has the full reference.
 
 ## Install
@@ -141,8 +141,12 @@ The callback gets an `OpAmpNotification`, a record with one nested record for ea
 ```bash
 scripts/fetch_core.py fetch   # the core's library, its test files and the adversary module
 cd dotnet
-dotnet test Pydantic.OpAmp.Client.Tests
+dotnet test --project Pydantic.OpAmp.Client.Tests
 ```
+
+The tests need the .NET 10 SDK (`dotnet/global.json`, which also picks its test runner,
+Microsoft.Testing.Platform) and the .NET 8 runtime beside it: they run on `net8.0` and `net10.0`,
+the frameworks the packages ship (`--framework net8.0` runs one).
 
 The conformance suite runs this client in both modes: `python3 conformance/runner/run.py --client
 dotnet-core-platform,dotnet-core` ([conformance/README.md](../conformance/README.md)).

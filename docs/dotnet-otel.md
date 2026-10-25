@@ -9,7 +9,7 @@ instrumentations stay the upstream ones.
 
 It plugs in through upstream's plugin API (`IPlugin`, `ITelemetryPlugin`, and the OTLP exporter
 options hooks). Checked with automatic instrumentation 1.17.0 (OpenTelemetry .NET 1.19.1) on
-.NET 8, Linux.
+.NET 8 and .NET 10, Linux (and nightly on macOS and Windows).
 
 Automatic instrumentation has an OpAMP client of its own (`OTEL_DOTNET_AUTO_OPAMP_ENABLED`, off by
 default). Leave it off. The plugin brings ours: it keeps its instance UID and state across

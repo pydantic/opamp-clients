@@ -33,10 +33,13 @@ TESTS = {
                "python/tests/test_redaction.py"],
     "go": ["go", "-C", "go", "test", "-count=1", "./opamp", "-run",
            "^(TestSecretsChangeNothingShown|TestWhatIsNotSecretIsStillShown|TestEveryFieldIsPrinted)$"],
-    "dotnet": ["dotnet", "test", "dotnet/Pydantic.OpAmp.Client.Tests", "--nologo", "-v", "quiet",
+    # From dotnet/, where global.json picks the SDK and its test runner (Microsoft.Testing.Platform).
+    "dotnet": ["dotnet", "test", "--project", "Pydantic.OpAmp.Client.Tests", "--framework", "net8.0",
                f"-p:OpAmpNativeLib={NATIVE_LIB}",
-               "--filter", "FullyQualifiedName~Pydantic.OpAmp.Client.Tests.RedactionTests"],
+               "--filter-class", "Pydantic.OpAmp.Client.Tests.RedactionTests"],
 }
+# Where each test runs, under the copy's root.
+TEST_DIRS = {"dotnet": "dotnet"}
 
 
 def mutants(names: list[str] | None = None) -> list[dict[str, str]]:
@@ -88,7 +91,7 @@ def passes(test: str, root: Path) -> tuple[bool, str]:
     # Python's core wheel is built from CARGO_TARGET_DIR/release (python/core/build_backend.py): the
     # repository's, where the fetched core is.
     env = {**os.environ, "CARGO_TARGET_DIR": str(ROOT / "target")}
-    run = subprocess.run(TESTS[test], cwd=root, env=env, capture_output=True, text=True)
+    run = subprocess.run(TESTS[test], cwd=root / TEST_DIRS.get(test, ""), env=env, capture_output=True, text=True)
     return run.returncode == 0, (run.stdout + run.stderr)[-2000:]
 
 
