@@ -46,7 +46,7 @@ def _open_tap() -> int | None:
     name = path if n == 0 else f"{path}.{os.getpid()}.{n}"
     try:
         # Readable by this user only: a Config holds the saved state, secrets included.
-        return os.open(name, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        return os.open(name, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0), 0o600)
     except OSError as e:
         print(f"opamp: OPAMP_CORE_TAP: can't open {name}: {e}; running without the tap", file=sys.stderr)
         return None
