@@ -452,9 +452,29 @@ internal sealed class ClientTransport : IClientTransport
             var end = value.IndexOf("://", StringComparison.Ordinal);
             if (end >= 0)
             {
-                _ = Scheme(value[..end], $"The environment's {name}", socks5h: false); // host:port alone is http://
+                _ = Scheme(value[..end], $"The environment's {AsSet(name)}", socks5h: false); // host:port alone is http://
             }
         }
+    }
+
+    /// <summary>
+    /// Variable <paramref name="name"/> as the environment spells it. On Windows names don't differ
+    /// by case: all_proxy and ALL_PROXY are one variable, and an error names it as it was set.
+    /// </summary>
+    private static string AsSet(string name)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (var key in Environment.GetEnvironmentVariables().Keys)
+            {
+                if (key is string set && string.Equals(set, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return set;
+                }
+            }
+        }
+
+        return name;
     }
 
     /// <summary>

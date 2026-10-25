@@ -98,13 +98,17 @@ public class FileJournalTests
         var create = save.FindIndex(f => f.Field("op") == "create");
         Assert.True(create >= 1, "no create of the temporary file");
         Assert.True(create == 1 || (create == 2 && save[1].Field("op") == "remove" && save[1].Field("path") == "state.tmp"), "only a leftover temporary file's removal comes before");
-        var recipe = save.Skip(create).Take(5).ToList();
+        // Windows can't flush a directory (docs/state-file.md, step 5), so none is journaled there.
+        string[] expected = OperatingSystem.IsWindows()
+            ? ["create state.tmp", "write state.tmp", "sync state.tmp", "rename state.tmp state"]
+            : ["create state.tmp", "write state.tmp", "sync state.tmp", "rename state.tmp state", "syncdir ."];
+        var recipe = save.Skip(create).Take(expected.Length).ToList();
         Assert.Equal(
-            ["create state.tmp", "write state.tmp", "sync state.tmp", "rename state.tmp state", "syncdir ."],
+            expected,
             recipe.Select(f => $"{f.Field("op")} {(f.Field("op") == "rename" ? $"{f.Field("from")} {f.Field("to")}" : f.Field("path"))}"));
         Assert.Equal(Convert.ToHexString(data).ToLowerInvariant(), recipe[1].Field("data"));
         var stored = TapKit.Inputs(records).First(i => i.Input.Stored?.Id_ == id).Record;
-        Assert.True(stored.At > recipe[4].At, "stored before the directory was flushed");
+        Assert.True(stored.At > recipe[^1].At, "stored before the rename was flushed");
 
         // The download: its directory made, its file made new, written, flushed, then answered.
         var name = "state.downloads/" + Path.GetFileName(path);
