@@ -50,6 +50,9 @@ and date. Tests, CI and docs alone don't need a line.
   health check publisher); the first message now carries it (#86).
 - Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
   them (#86).
+- Python and .NET: on Windows, a save's rename is written through to the disk (`MoveFileEx` with
+  `MOVEFILE_WRITE_THROUGH`), since a directory can't be flushed there: a save answered stored
+  survives a power cut (#86).
 - .NET: on Windows, a proxy variable the client refuses (as `ALL_PROXY=socks4://...`) is named as
   it was set in the error, not in lower case (#86).
 - Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
@@ -72,6 +75,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Security
 
+- Python: on Windows, state files, downloads, the downloads directory and the core tap are made
+  with an access-control list allowing the agent's user alone, as the .NET and Java clients make
+  them; a mode of 0600 meant nothing there, so they took the directory's inherited list (#86).
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every

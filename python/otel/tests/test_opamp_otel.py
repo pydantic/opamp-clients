@@ -65,6 +65,15 @@ def prepared(tmp_path, **extra) -> tuple[Agent, dict]:
     return agent, env
 
 
+def private(path) -> bool:
+    """Whether the file is its user's only: a mode of 0600, or on Windows a list allowing the user alone."""
+    if os.name == "nt":
+        from pydantic_opamp_client import _windows
+
+        return _windows.dacl(str(path)) == _windows.canonical(_windows.user_only())
+    return path.stat().st_mode & 0o777 == 0o600
+
+
 def test_the_sdks_sampler_until_a_rate_is_set_and_again_when_it_is_withdrawn():
     c = Controls()
     c.sampler.wrap(ALWAYS_OFF)
@@ -290,8 +299,8 @@ def test_one_uid_names_the_instance_is_kept_and_the_metric_exporter_is_gated(tmp
     first, env1 = prepared(tmp_path, OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=prod,service.instance.id=x")
     assert first.uid.version == 7
     assert env1["OTEL_METRICS_EXPORTER"] == "opamp"
-    # The user's only (docs/state-file.md): Windows has no such mode, and Python sets no ACL there.
-    assert os.name == "nt" or (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+    # The user's only (docs/state-file.md): a mode of 0600, or on Windows an access-control list.
+    assert private(tmp_path / "instance-uid")
     second, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,otlp")
     assert second.uid == first.uid
     # Without state, a UUID the user gave is used.
@@ -747,7 +756,7 @@ def test_a_uid_the_server_assigns_is_kept_for_the_next_start(tmp_path):
         first.start(Resource.create({"service.name": "checkout"}))
         server.wait(lambda: (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(assigned))
         first.stop()
-        assert os.name == "nt" or (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+        assert private(tmp_path / "instance-uid")
         second, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
         assert second.uid == assigned
         before = len(server.got)

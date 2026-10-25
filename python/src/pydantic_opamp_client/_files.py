@@ -16,6 +16,8 @@ import sys
 from collections.abc import Callable, Sequence
 from typing import Any
 
+from . import _windows
+
 Buffer = Any  # bytes, bytearray or memoryview
 
 
@@ -40,7 +42,9 @@ class Files:
     def create(self, path: str) -> int:
         """A new file at `path`, made new (never one already there), readable by this user only:
         its descriptor, open for writing."""
-        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+        if os.name == "nt":
+            return _windows.create_private(path)
+        return os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 
     def write(self, fd: int, bufs: Sequence[Buffer]) -> int:
         """Write some of `bufs` to `fd`, in order: how many bytes (perhaps fewer than all, as
@@ -57,12 +61,15 @@ class Files:
         os.close(fd)
 
     def rename(self, src: str, dst: str) -> None:
-        """Rename `src` over `dst`."""
+        """Rename `src` over `dst` (on Windows, written through: the directory can't be flushed)."""
+        if os.name == "nt":
+            _windows.replace(src, dst)
+            return
         os.replace(src, dst)
 
     def sync_dir(self, path: str) -> bool:
         """Flush directory `path`'s entries to the disk; False where that can't be done (Windows
-        can't open a directory)."""
+        can't open a directory: there `rename` writes the rename through instead)."""
         if os.name == "nt":
             return False
         fd = os.open(path, os.O_RDONLY)
@@ -78,6 +85,8 @@ class Files:
     def mkdir(self, path: str) -> bool:
         """Make directory `path` (and its parents), readable by this user only, unless it is
         there: whether it was made."""
+        if os.name == "nt":
+            return _windows.make_private_dir(path)
         if os.path.isdir(path):
             return False
         os.makedirs(path, mode=0o700, exist_ok=True)

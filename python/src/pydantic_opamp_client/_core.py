@@ -14,7 +14,7 @@ import threading
 import time
 from typing import Any
 
-from . import _native
+from . import _native, _windows
 from ._proto.opamp.core.v1 import core_pb2 as corepb
 
 
@@ -46,7 +46,9 @@ def _open_tap() -> int | None:
     name = path if n == 0 else f"{path}.{os.getpid()}.{n}"
     try:
         # Readable by this user only: a Config holds the saved state, secrets included.
-        return os.open(name, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_BINARY", 0), 0o600)
+        if os.name == "nt":
+            return _windows.create_private(name, append=True)
+        return os.open(name, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
     except OSError as e:
         print(f"opamp: OPAMP_CORE_TAP: can't open {name}: {e}; running without the tap", file=sys.stderr)
         return None

@@ -51,7 +51,7 @@ internal interface IFileOps
 }
 
 /// <summary>The real file system's operations.</summary>
-internal static class FileOps
+internal static partial class FileOps
 {
     /// <summary>The real file system.</summary>
     public static readonly IFileOps Real = new RealFileOps();
@@ -74,7 +74,17 @@ internal static class FileOps
         public IWritingFile CreateNew(string path, bool download) =>
             new RealFile(download ? StateFile.CreateDownload(path) : StateFile.CreatePrivate(path));
 
-        public void Rename(string from, string to) => File.Move(from, to, overwrite: true);
+        public void Rename(string from, string to)
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                Windows.Replace(from, to, Windows.MoveFileExW);
+            }
+            else
+            {
+                File.Move(from, to, overwrite: true);
+            }
+        }
 
         public bool SyncDir(string dir) => Posix.SyncDir(dir);
 
@@ -114,6 +124,32 @@ internal static class FileOps
         public void Sync() => file.Flush(flushToDisk: true);
 
         public void Dispose() => file.Dispose();
+    }
+
+    /// <summary>
+    /// A rename that reaches the disk, on Windows. A directory can't be flushed there: MoveFileEx
+    /// with MOVEFILE_WRITE_THROUGH returns only once the rename has been written out.
+    /// </summary>
+    internal static partial class Windows
+    {
+        internal const uint ReplaceExisting = 0x1; // MOVEFILE_REPLACE_EXISTING
+        internal const uint WriteThrough = 0x8; // MOVEFILE_WRITE_THROUGH
+
+        /// <summary>MoveFileExW's shape: true, or false with the error set.</summary>
+        internal delegate bool MoveFn(string from, string to, uint flags);
+
+        /// <summary>Rename <paramref name="from"/> over <paramref name="to"/>, written through, with <paramref name="move"/>.</summary>
+        internal static void Replace(string from, string to, MoveFn move)
+        {
+            if (!move(from, to, ReplaceExisting | WriteThrough))
+            {
+                throw new IOException($"renaming {from} to {to}: {Marshal.GetPInvokeErrorMessage(Marshal.GetLastPInvokeError())}");
+            }
+        }
+
+        [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static partial bool MoveFileExW(string from, string to, uint flags);
     }
 
     /// <summary>

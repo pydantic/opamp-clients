@@ -50,6 +50,47 @@ public sealed class DirSyncTests
     /// A C library that notes its calls: fcntl answers <paramref name="fullFsync"/> to F_FULLFSYNC
     /// (null: there is none, as off macOS), fsync <paramref name="fsync"/>.
     /// </summary>
+    /// <summary>
+    /// Windows can't flush a directory: a save's rename is written through instead (MoveFileEx
+    /// with MOVEFILE_WRITE_THROUGH returns once the rename is on the disk). With a stand-in.
+    /// </summary>
+    [Fact]
+    public void OnWindowsARenameIsWrittenThrough()
+    {
+        var calls = new List<(string From, string To, uint Flags)>();
+        FileOps.Windows.Replace("a.tmp", "a", (from, to, flags) =>
+        {
+            calls.Add((from, to, flags));
+            return true;
+        });
+        Assert.Equal([("a.tmp", "a", FileOps.Windows.ReplaceExisting | FileOps.Windows.WriteThrough)], calls);
+        Assert.Throws<IOException>(() => FileOps.Windows.Replace("a.tmp", "a", (_, _, _) => false));
+    }
+
+    [Fact]
+    public void OnWindowsASaveReplacesTheStateFile()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("MoveFileExW is Windows'");
+        }
+
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        try
+        {
+            var (tmp, path) = (Path.Combine(dir, "s.tmp"), Path.Combine(dir, "s"));
+            File.WriteAllText(path, "old");
+            File.WriteAllText(tmp, "new");
+            FileOps.Real.Rename(tmp, path);
+            Assert.Equal("new", File.ReadAllText(path));
+            Assert.False(File.Exists(tmp));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     private static FileOps.Posix.Fns Lib(List<string> calls, int? fullFsync, int fsync = 0) => new(
         (path, flags) =>
         {
