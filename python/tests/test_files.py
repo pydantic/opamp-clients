@@ -242,7 +242,8 @@ def test_a_save_is_journaled_step_by_step_and_a_leftover_temporary_file_removed_
             {"op": "write", "path": "state.bin.tmp", "data": None},
             {"op": "sync", "path": "state.bin.tmp"},
             {"op": "rename", "from": "state.bin.tmp", "to": "state.bin"},
-            {"op": "syncdir", "path": "."}]
+            # Windows can't sync a directory (Files.sync_dir), so none is journaled there.
+            *([] if os.name == "nt" else [{"op": "syncdir", "path": "."}])]
 
     def with_data(data: bytes) -> list[dict]:
         return [dict(o, data=data.hex()) if o["op"] == "write" else o for o in save]
