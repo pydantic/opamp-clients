@@ -2,6 +2,13 @@
 
 OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 
+**Start here:** [docs/getting-started.md](docs/getting-started.md) connects an application, a
+host or a Kubernetes cluster to an OpAMP server, such as Logfire's Fleet
+([docs/guides/logfire.md](docs/guides/logfire.md)).
+[docs/supported-versions.md](docs/supported-versions.md) lists the runtimes and platforms each SDK
+supports, and [docs/troubleshooting.md](docs/troubleshooting.md) what to do when something
+doesn't connect.
+
 | Language | Client | OpenTelemetry integration |
 |---|---|---|
 | Python | [`python/`](python/), [docs](docs/python.md) | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) |
