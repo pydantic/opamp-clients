@@ -493,6 +493,7 @@ type modelRun struct {
 	heartbeats map[time.Duration]bool
 	hash       int // the last config hash offered
 	cust       int // the last custom message offered
+	nudges     int // the healths set to make the client poll (HTTP)
 	stats      modelStats
 }
 
@@ -518,7 +519,9 @@ func runModelPlan(plan mPlan, dir string, mode Mode) (stats modelStats, err erro
 func (r *modelRun) session(s mSession) error {
 	r.srv.newSession()
 	cfg := Config{Endpoint: r.ts.URL + "/v1/opamp", InstanceUID: modelUID, HeartbeatInterval: modelHeartbeat,
-		RequestTimeout: modelReqTimeout, Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat),
+		RequestTimeout: modelReqTimeout, Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat |
+			// (The nudges over HTTP are healths: a client that doesn't declare ReportsHealth takes none.)
+			protobufs.AgentCapabilities_AgentCapabilities_ReportsHealth),
 		Mode: r.mode}
 	if r.mode == ModeCore {
 		cfg.Proxy = Proxy{Direct: true} // the local server, whatever the environment says
@@ -631,12 +634,15 @@ func (r *modelRun) session(s mSession) error {
 			time.Sleep(2 * time.Millisecond)
 		}
 	}
-	// offer: the server offers m; over HTTP a call makes the client poll now.
+	// offer: the server offers m; over HTTP a call makes the client poll now: a new health each
+	// time (one it has already is no change, and sends nothing). Without one the offer waits for
+	// the next heartbeat, up to 4 s, which took the nightly's 5,000 runs past their time limit.
 	offer := func(msg *protobufs.ServerToAgent, h handed) {
 		want = append(want, h)
 		r.srv.offer(msg)
 		if !r.plan.ws {
-			c.SetHealth(&protobufs.ComponentHealth{Healthy: true, Status: "nudge"})
+			r.nudges++
+			c.SetHealth(&protobufs.ComponentHealth{Healthy: true, Status: "nudge " + strconv.Itoa(r.nudges)})
 		}
 	}
 	offerCustomMsg := func(arm func(*Client)) {

@@ -495,8 +495,14 @@ public final class OpampClient {
   private final long stopTimeoutMs;
   /** When stop was first asked for (System.nanoTime), or null: all of stop shares one stop timeout from it. */
   private final java.util.concurrent.atomic.AtomicReference<Long> stopAsked = new java.util.concurrent.atomic.AtomicReference<>();
-  /** Once the core has stopped, at least this for what it cancelled to unwind (Go's stopGrace). */
-  private static final long STOP_GRACE_MS = 250;
+  /**
+   * Once the core has stopped, at least this for what it cancelled to unwind (a download's file
+   * deleted once the write in flight is over), however much of the stop timeout the core took: as
+   * Node's and Python's. 250 ms was too little on a loaded runner: a core that took all of its stop
+   * timeout left a download's file to be deleted after stop had returned (the nightly of
+   * 2026-10-23, seed 20749003).
+   */
+  private static final long STOP_GRACE_MS = 1000;
   /** The instance UID in use, as the core last said. */
   private volatile byte[] instanceUid;
   /**

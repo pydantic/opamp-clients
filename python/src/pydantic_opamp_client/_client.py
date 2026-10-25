@@ -566,11 +566,13 @@ class Client:
             left = begun + self._stop_timeout - loop.time()
             released_by = loop.time() + max(left, STOP_GRACE_S)
             # A save still writing lands whole whenever it does: waited for within the stop
-            # timeout only.
-            await self._x.close(max(0.0, left), release=released_by - loop.time())
-            # Core mode: files still being written are deleted once their write in flight is over.
+            # timeout only. Core mode: the streams go at once, beside it (a slow save holds no
+            # connection open), and files still being written are deleted once their write in
+            # flight is over.
+            work = [self._x.close(max(0.0, left), release=released_by - loop.time())]
             if self._streams is not None:
-                await self._streams.shutdown(max(0.0, released_by - loop.time()))
+                work.append(self._streams.shutdown(max(0.0, released_by - loop.time())))
+            await asyncio.gather(*work)
             if not self._done.done():
                 if err is None:
                     self._done.set_result(None)

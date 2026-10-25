@@ -375,8 +375,11 @@ public abstract record OpAmpNotification
 /// </remarks>
 public sealed class OpAmpClient
 {
-    // Once the core has stopped, at least this for the work it cancelled to unwind.
-    private static readonly TimeSpan StopGrace = TimeSpan.FromMilliseconds(250);
+    // Once the core has stopped, at least this for the work it cancelled to unwind (a download's
+    // file deleted once the write in flight is over), however much of the stop timeout the core
+    // took: as every SDK. 250 ms was too little on a loaded runner (Java's, the nightly of
+    // 2026-10-23: a download's file deleted after stop had returned).
+    private static readonly TimeSpan StopGrace = TimeSpan.FromSeconds(1);
 
     // stopCalled before StopAsync.
     private const long NotStopped = long.MinValue;
