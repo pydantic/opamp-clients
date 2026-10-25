@@ -216,7 +216,8 @@ against the lock, and puts each file where the clients load it: the module copie
 Java embed, the native library in `target/release` (and every platform's under `dist/native` with
 `--all-platforms`, for packaging), and the files the clients' tests read (`proto/`, `spec/proto/`,
 `spec/shell-contract.md`, `tests/shell-tables` and the SDK settings' shared test vectors in
-`testdata/sdk-settings`). `fetch_core.py check` fails unless the tree
+`testdata/sdk-settings`), and the settings cookbook's policies, checked in at `examples/settings/`.
+`fetch_core.py check` fails unless the tree
 holds exactly what the lock pins. The generated types are checked in beside each client; `scripts/gen_core.py`
 regenerates them from `core.proto`.
 

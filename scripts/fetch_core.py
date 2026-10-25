@@ -11,6 +11,8 @@ the clients load it. Its lock, opamp-core.lock.json, is at this repository's roo
                                             # (dist/native/runtimes/<rid>/native/, as native_dist.py)
     scripts/fetch_core.py check             # what is in place is what the lock pins (CI)
 
+The tests: python3 -m unittest scripts/test_fetch_core.py
+
 The lock is the trust: fetch checks every byte against the sha256 the lock holds, not against
 anything it downloads, and refuses a file that differs. `lock` takes the hashes from the release's
 opamp-core.json and checks every file against them before writing, so a lock always names files
@@ -69,8 +71,12 @@ MODULES = {
 }
 # The tree's files land at their own paths, which must be under these: the .proto files (the -I
 # paths the type generators use), the contract the clients are held to, and the shells' tables.
-TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "testdata/sdk-settings/", "spec/shell-contract.md",
-               "licenses/core/")
+TREE_PLACES = ("spec/proto/", "proto/", "tests/shell-tables/", "testdata/sdk-settings/", "testdata/settings-examples/",
+               "spec/shell-contract.md", "licenses/core/")
+# The settings cookbook's policies (the core's, which its settings layer and server are tested on),
+# from the tree, are also checked in at examples/settings/, beside the README that shows each one:
+# fetch writes them there and removes any other policy, and check holds them to the tree.
+COOKBOOK, COOKBOOK_COPIES = "testdata/settings-examples/", "examples/settings/"
 # The core's own license and its third-party notices, from the tree: at licenses/core/ (which the
 # root LICENSE names), and a copy of the pair beside each module copy a package or Go module ships,
 # and in each native package's directory, so they travel inside it (go:embed's directories, npm's
@@ -238,6 +244,21 @@ def license_copies() -> dict[str, list[str]]:
     return {name: [f"{d}/{name.rsplit('/', 1)[1]}" for d in LICENSE_COPIES] for name in LICENSES}
 
 
+def cookbook_copies(tree_names: Mapping[str, object]) -> dict[str, str]:
+    """Each of the tree's cookbook policies, and where its checked-in copy goes."""
+    return {n: COOKBOOK_COPIES + n[len(COOKBOOK):] for n in tree_names if n.startswith(COOKBOOK) and n.endswith(".json")}
+
+
+def stale_cookbook(tree_names: Mapping[str, object]) -> list[str]:
+    """Policies in examples/settings/ that the tree hasn't, once it has any (a release before the
+    cookbook was in the tree leaves the directory to this repository)."""
+    copies = set(cookbook_copies(tree_names).values())
+    if not copies:
+        return []
+    return sorted(rel for p in (ROOT / COOKBOOK_COPIES).glob("*.json")
+                  if (rel := p.relative_to(ROOT).as_posix()) not in copies)
+
+
 def unlicensed(names: Mapping[str, object], version: str) -> None:
     """Refuse a tree without the core's license and notices: the packages can't ship it without them."""
     if missing := [n for n in LICENSES if n not in names]:
@@ -283,7 +304,9 @@ def fetch(pinned: dict, directory: Path | None, all_platforms: bool, rid: str) -
     for name, dests in license_copies().items():
         for d in dests:
             write(d, got[name])
-    for rel in stale(pinned):
+    for name, d in cookbook_copies(got).items():
+        write(d, got[name])
+    for rel in stale(pinned) + stale_cookbook(got):
         (ROOT / rel).unlink()
         print(f"- {rel}")
     for name, f in sorted(files.items()):
@@ -336,7 +359,12 @@ def check(pinned: dict, rid: str) -> list[str]:
             path = ROOT / d
             if not path.is_file() or sha256(path.read_bytes()) != pinned["tree"].get(name):
                 problems.append(f"{d}: not {name} of {pinned['version']}")
-    problems += [f"{rel}: not in {pinned['version']} (fetch removes it)" for rel in stale(pinned)]
+    for name, d in cookbook_copies(pinned["tree"]).items():
+        path = ROOT / d
+        if not path.is_file() or sha256(path.read_bytes()) != pinned["tree"][name]:
+            problems.append(f"{d}: not {name} of {pinned['version']}")
+    problems += [f"{rel}: not in {pinned['version']} (fetch removes it)"
+                 for rel in stale(pinned) + stale_cookbook(pinned["tree"])]
     return problems
 
 
