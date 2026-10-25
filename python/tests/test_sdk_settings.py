@@ -224,7 +224,7 @@ def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them(
     plain = layer.decide(config(doc), b"", b"", settings_pb2.Host(live=["sampling_rate"]))
     assert plain.status.status == FAILED and not plain.HasField("apply")
     assert plain.status.error_message == "app_settings: values: this SDK cannot apply the requested override"
-    for case in json.loads((VECTORS / "custom.json").read_text())["cases"]:
+    for case in json.loads((VECTORS / "custom.json").read_text(encoding="utf-8"))["cases"]:
         d = layer.decide(config(case["document"].encode()), b"", b"", host_of(case), NOW, save=lambda doc: None)
         if "refused" in case:
             assert d.status.error_message == case["refused"], case["name"]
@@ -234,7 +234,7 @@ def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them(
         assert d.effective.config_map.config_map[FILE].body.decode() == case["effective"], case["name"]
 
 
-SETTINGS = json.loads((VECTORS / "settings.json").read_text())["cases"]
+SETTINGS = json.loads((VECTORS / "settings.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", SETTINGS, ids=[c["name"] for c in SETTINGS])
@@ -282,7 +282,7 @@ def test_export_health_is_sent_at_the_first_call_and_on_a_failure_and_held_while
     assert failed.exporters.component_health_map["logs"].status == "off"
 
 
-COMPONENTS = json.loads((VECTORS / "components.json").read_text())["cases"]
+COMPONENTS = json.loads((VECTORS / "components.json").read_text(encoding="utf-8"))["cases"]
 
 
 def inventory_of(case: dict):
@@ -341,7 +341,7 @@ def test_the_inventory_without_a_host_lists_no_setting() -> None:
     assert got["settings"] == {}
 
 
-START = json.loads((VECTORS / "start.json").read_text())["cases"]
+START = json.loads((VECTORS / "start.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", START, ids=[c["name"] for c in START])

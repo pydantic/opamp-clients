@@ -744,7 +744,7 @@ def test_a_uid_the_server_assigns_is_kept_for_the_next_start(tmp_path):
     try:
         first, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint, OTEL_OPAMP_HEARTBEAT_INTERVAL="100ms")
         first.start(Resource.create({"service.name": "checkout"}))
-        server.wait(lambda: (tmp_path / "instance-uid").read_text() == str(assigned))
+        server.wait(lambda: (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(assigned))
         first.stop()
         assert (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
         second, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
@@ -762,7 +762,7 @@ def test_the_instance_uid_changed_notification_is_saved(tmp_path):
     agent, _ = prepared(tmp_path)
     new = uuid.uuid4()
     agent._notified(Notification("instance_uid_changed", instance_uid=new.bytes))
-    assert agent.uid == new and (tmp_path / "instance-uid").read_text() == str(new)
+    assert agent.uid == new and (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(new)
 
 
 def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(server):
@@ -1414,7 +1414,7 @@ def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_
     assert reason in said[0], said
 
 
-_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text())["cases"]
+_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _OFF, ids=[c["id"] for c in _OFF])
