@@ -187,14 +187,16 @@ with Fleet's endpoint and a runtime key as its bearer token. Its YAML stays your
 
 ### Replacing a key
 
-SDKs and Supervisors move to a new key on their own before theirs expires. The Operator's bridge
-and upstream's `opamp` extension can't: their key lasts 90 days. Fleet can't yet issue a new key
-for an existing installation, so to replace one:
+A host's Supervisor moves to a new key on its own before its key expires. The rest keep the
+key they were given, which lasts 90 days: an application's (Fleet doesn't renew SDK keys yet),
+the Operator's bridge, and upstream's `opamp` extension. Fleet warns on the key's page in the
+last 14 days. To replace one:
 
-1. Connect a new installation the same way, and keep its runtime key.
-2. Replace the key where the old one was (for the bridge, the `logfire-opamp` Secret), and
-   restart. A restarted bridge is refused for about 30 seconds, until its old connection drops.
-3. Publish the policy to the new installation, then delete the old one.
+1. Open the key in Fleet and choose **Issue a replacement key**. Keep the new key.
+2. Replace the key where the old one was (for an application, `OTEL_OPAMP_HEADERS`; for the
+   bridge, the `logfire-opamp` Secret), and restart. A restarted bridge is refused for about 30
+   seconds, until its old connection drops.
+3. Once everything uses the new key, revoke the old one.
 
 ### Removing an installation
 

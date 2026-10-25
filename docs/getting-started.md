@@ -92,12 +92,15 @@ names the control.
 
 ### 6. Keys after the first start
 
-The key you gave can be one many instances share. A server that issues keys (Logfire's does)
-gives each instance a key of its own on its first connection. The SDK checks the new key works,
-keeps it in the state directory, and uses it from then on, across restarts. Before that key
-expires, the server offers a new one, and the SDK moves to it the same way. Nothing for you to
-do, as long as the state directory survives restarts
-([connection-settings.md](connection-settings.md)).
+The key you gave can be one many instances share. A server that issues keys can give each
+instance a key of its own on its first connection. The SDK checks the new key works, keeps it in
+the state directory, and uses it from then on, across restarts. Before that key expires, the
+server offers a new one, and the SDK moves to it the same way. Nothing for you to do, as long as
+the state directory survives restarts ([connection-settings.md](connection-settings.md)).
+
+Logfire's Fleet issues and renews keys for hosts, not yet for applications: an application keeps
+the key it was given, which works until it expires. Replace it before then
+([guides/logfire.md](guides/logfire.md#replacing-a-key)).
 
 ### 7. Taking it off the server
 
