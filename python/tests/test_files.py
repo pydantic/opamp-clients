@@ -242,7 +242,8 @@ def test_a_save_is_journaled_step_by_step_and_a_leftover_temporary_file_removed_
             {"op": "write", "path": "state.bin.tmp", "data": None},
             {"op": "sync", "path": "state.bin.tmp"},
             {"op": "rename", "from": "state.bin.tmp", "to": "state.bin"},
-            {"op": "syncdir", "path": "."}]
+            # Windows can't sync a directory (Files.sync_dir), so none is journaled there.
+            *([] if os.name == "nt" else [{"op": "syncdir", "path": "."}])]
 
     def with_data(data: bytes) -> list[dict]:
         return [dict(o, data=data.hex()) if o["op"] == "write" else o for o in save]
@@ -423,7 +424,8 @@ def test_a_clients_saves_and_downloads_are_journaled_in_its_tap(mode: str, tmp_p
                             {"op": "write", "path": "state.bin.tmp", "data": data.hex()},
                             {"op": "sync", "path": "state.bin.tmp"},
                             {"op": "rename", "from": "state.bin.tmp", "to": "state.bin"},
-                            {"op": "syncdir", "path": "."}], f"save {id_}"
+                            # Windows can't sync a directory (Files.sync_dir): none is journaled there.
+                            *([] if os.name == "nt" else [{"op": "syncdir", "path": "."}])], f"save {id_}"
         assert Path(state).read_bytes() == [d for i, d in t.stores if ("stored", i) in t.answers()][-1]
 
         # The download's file: its directory made, the file made new, written in full, synced
@@ -975,3 +977,61 @@ def test_elsewhere_a_save_and_its_directory_are_flushed_with_fsync(tmp_path, mon
         REAL.close(fd)
     REAL.sync_dir(str(tmp_path))
     assert calls == (["fsync"] if os.name == "nt" else ["fsync", "fsync"])
+
+
+# Windows: a directory can't be flushed, so a save's rename is written through (MoveFileEx with
+# MOVEFILE_WRITE_THROUGH: it returns once the rename is on the disk). Played on any host with a
+# stand-in for MoveFileExW.
+def test_on_windows_a_saves_rename_is_written_through(tmp_path) -> None:
+    from pydantic_opamp_client import _windows
+
+    calls: list[tuple[str, str, int]] = []
+
+    def move(src: str, dst: str, flags: int) -> bool:
+        calls.append((src, dst, flags))
+        return True
+
+    _windows.replace("a.tmp", "a", move)
+    assert calls == [("a.tmp", "a", _windows.MOVEFILE_REPLACE_EXISTING | _windows.MOVEFILE_WRITE_THROUGH)]
+    with pytest.raises(OSError):
+        _windows.replace("a.tmp", "a", lambda *_: False)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows access-control lists")
+def test_on_windows_a_save_a_download_and_the_tap_allow_the_user_alone(tmp_path, monkeypatch) -> None:
+    from pydantic_opamp_client import _core, _windows
+
+    user = _windows.user_sid()
+    assert _windows.user_only() == f"D:P(A;;FA;;;{user})"
+
+    # A save: its temporary file the user's only from the start, and so the state file it becomes.
+    state = str(tmp_path / "state.bin")
+    _executor._save(REAL, state, b"one")
+    _executor._save(REAL, state, b"two")
+    assert Path(state).read_bytes() == b"two"
+    assert _windows.dacl(state) == _windows.canonical(_windows.user_only())
+    fd = REAL.create(state + ".tmp")
+    REAL.close(fd)
+    with pytest.raises(FileExistsError):
+        REAL.create(state + ".tmp")  # made new: never one already there
+
+    # The downloads directory, inherited by what is made in it; a download's file.
+    d = _executor.downloads_dir(state)
+    assert REAL.mkdir(d)
+    assert not REAL.mkdir(d)
+    assert _windows.dacl(d) == _windows.canonical(_windows.user_only(directory=True))
+    fd = REAL.create(os.path.join(d, "1"))
+    REAL.close(fd)
+    assert _windows.dacl(os.path.join(d, "1")) == _windows.canonical(_windows.user_only())
+
+    # The core tap: appended to, the user's only.
+    tap = tmp_path / "core.tap"
+    monkeypatch.setenv("OPAMP_CORE_TAP", str(tap))
+    for _ in range(2):
+        monkeypatch.setattr(_core, "_taps", 0)  # the first core's tap: the path itself
+        fd = _core._open_tap()
+        assert fd is not None
+        os.write(fd, b"ab")
+        os.close(fd)
+    assert tap.read_bytes() == b"abab"
+    assert _windows.dacl(str(tap)) == _windows.canonical(_windows.user_only())

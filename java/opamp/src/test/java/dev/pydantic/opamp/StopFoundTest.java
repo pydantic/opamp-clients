@@ -63,7 +63,7 @@ class StopFoundTest {
       long t0 = System.nanoTime();
       c.stop().get(20, TimeUnit.SECONDS);
       long ms = (System.nanoTime() - t0) / 1_000_000;
-      assertTrue(ms < 2_000 + 900, "stop took " + ms + " ms: more than its one stop timeout (2 s) and a grace");
+      assertTrue(ms < 2_000 + 1_000 + 500, "stop took " + ms + " ms: more than its one stop timeout (2 s) and the grace (1 s)");
     } finally {
       release.countDown();
       // The save let go writes on after stop returned, and JUnit deletes the directory when this

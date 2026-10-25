@@ -68,6 +68,9 @@ class ChurnTest {
   }
 
   /** The servers: OpAMP over HTTP, over WebSocket, and one that holds whatever it gets. */
+  /** What the test servers' threads are named, so the count of live threads leaves them out. */
+  static final String HARNESS = "test-harness-";
+
   static final class Servers implements AutoCloseable {
     final PropertiesTest.HttpOpamp http = new PropertiesTest.HttpOpamp(ChurnTest::reply);
     final PropertiesTest.WsServer ws = new PropertiesTest.WsServer(ChurnTest::reply);
@@ -194,7 +197,9 @@ class ChurnTest {
     for (int i = 0; i < 3; i++) {
       System.gc();
     }
-    return new Usage(ManagementFactory.getThreadMXBean().getThreadCount(), openFds(), ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed());
+    // The test servers' own threads come and go with the load they took, not with the clients.
+    int threads = (int) Thread.getAllStackTraces().keySet().stream().filter(t -> !t.getName().startsWith(HARNESS)).count();
+    return new Usage(threads, openFds(), ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed());
   }
 
   /**

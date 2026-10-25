@@ -26,7 +26,6 @@ import asyncio
 import os
 import socket
 import ssl
-import struct
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -36,6 +35,7 @@ import pytest
 import trustme
 from _adversary_raw import RawServer
 from _adversary_raw import body as raw_body
+from _adversary_raw import reset
 from _wasm import WasmCore
 from aiohttp import WSMsgType, web
 
@@ -652,10 +652,6 @@ def test_the_raw_server_does_what_its_first_line_says() -> None:
             reader, _ = await dial(f"opamp-raw tag={1000 + tag} ask={tag} wait=5000")
             return await line(reader)
 
-        def reset(writer: asyncio.StreamWriter) -> None:
-            writer.get_extra_info("socket").setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
-            writer.transport.abort()
-
         try:
             # send, in pieces, then its side closed: the pattern, then the end.
             reader, _ = await dial("opamp-raw tag=1 send=1000 chunk=300 gap=1 end=fin")
@@ -672,7 +668,7 @@ def test_the_raw_server_does_what_its_first_line_says() -> None:
             _, writer = await dial("opamp-raw tag=3")
             writer.write(bytes([0, 1, 9]))
             await asyncio.sleep(0.1)
-            reset(writer)
+            reset(writer.transport)
             assert await ask(3) == b"reset 3 1\n", "after three bytes, one wrong, and a reset"
 
             # One still open is said to be, once the wait is over; one never seen is none.

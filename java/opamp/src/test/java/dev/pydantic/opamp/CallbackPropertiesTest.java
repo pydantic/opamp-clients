@@ -264,7 +264,10 @@ class CallbackPropertiesTest {
         .mode(mode)
         // Core mode reads HTTP_PROXY and the like: the local servers are reached directly.
         .environment(java.util.Map.of())
-        .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
+        // The triggers are healths: a client that doesn't declare ReportsHealth sends none, and
+        // each offer then waits for a heartbeat over HTTP.
+        .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
+            | Opamp.AgentCapabilities.AgentCapabilities_ReportsHealth_VALUE)
         .heartbeatInterval(Duration.ofMillis(50))
         .requestTimeout(Duration.ofSeconds(2))
         .stateFile(stateFile)

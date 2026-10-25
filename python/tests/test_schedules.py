@@ -887,3 +887,23 @@ def test_found_stopped_is_the_last_notification(tapped) -> None:
         ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "none", [])))),
         ("server_settles", dict(data=Drawn(0, 0, ("fail",)))),
     ])
+
+
+def test_found_a_connection_is_released_while_a_save_still_writes(tapped) -> None:
+    # Core mode, OPAMP_SCHED_SEED=1430863953 (the nightly of 2026-10-25): stop with a save still
+    # writing. The shell waited for the save before it closed the core's streams, so a connection
+    # the core had given up on stayed open after stop returned.
+    # covers: RULE-SHELL-06
+    replay(CoreMode, [
+        ("start", dict(seed=0, transport="http", tls=False, heartbeat=500, timeouts=1000)),
+        ("server_settles", dict(data=Drawn(0, 0, "accept"))),
+        ("time_passes", dict(seconds=0.001)),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "config", [])))),
+        ("server_settles", dict(data=Drawn(0, 0, "accept"))),
+        ("callback_raises_next", dict(often=0)),
+        ("next_save", dict(how="slow", seconds=3.0)),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, "package", [])))),
+        ("server_settles", dict(data=Drawn(0, 0, ("ok", 200, False, [])))),
+        ("time_passes", dict(seconds=1.0)),
+    ])

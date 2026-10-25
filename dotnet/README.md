@@ -196,7 +196,7 @@ network path, and not in backups or images copied anywhere less protected.
 
 ```
 ../scripts/fetch_core.py fetch             # first: the core's release (the native library in target/release, the modules)
-dotnet test Pydantic.OpAmp.Client.Tests
+dotnet test --project Pydantic.OpAmp.Client.Tests   # needs the .NET 10 SDK, and the .NET 8 runtime: net8.0 and net10.0
 ../scripts/gen_core.py                      # after the core's .proto files change: regenerates the types
 ../scripts/native_dist.py                   # the package, with every platform's native core (CI's native job)
 ```

@@ -639,7 +639,7 @@ final class Extension {
     samplerOutside = true;
     List<String> lost = narrow();
     if (!lost.isEmpty()) {
-      LOG.warning("OpAMP: the SDK samples with " + sdk.getSdkTracerProvider().getSampler().getDescription()
+      LOG.warning("OpAMP: the SDK samples with " + LiveSampler.describe(sdk.getSdkTracerProvider().getSampler())
           + ", which another extension set in place of this extension's sampler; set aside, as it can't carry"
           + " them out: " + String.join(", ", lost));
     }

@@ -4,6 +4,12 @@
 
     python3 examples/dotnet-otel/try.py            # builds and runs in Docker
     python3 examples/dotnet-otel/try.py --local    # this host's .NET SDK, its NuGet cache, and its native core
+    python3 examples/dotnet-otel/try.py --edot     # the same checks on Elastic's distribution
+
+With --edot the application takes Elastic's distribution of automatic instrumentation (EDOT .NET,
+Elastic.OpenTelemetry.AutoInstrumentation, App.csproj's Edot) in place of upstream's package, its
+plugin listed before ours in OTEL_DOTNET_AUTO_PLUGINS: every check must pass as it does without it
+(docs/guides/elastic.md). EDOT's own OpAMP client stays off (no ELASTIC_OTEL_OPAMP_ENDPOINT).
 
 Program.cs has no OpenTelemetry code: the HttpClient instrumentation traces its requests, the
 ILogger instrumentation exports its log lines, and, with APP_LISTEN, the ASP.NET Core
@@ -69,7 +75,15 @@ IMAGE = "mcr.microsoft.com/dotnet/sdk:8.0"
 # NuGet's package folder, a Docker volume: OPAMP_EXAMPLES_NUGET_VOLUME names another, for a run
 # beside this one (two restores writing into one at once can leave it half written).
 NUGET = ["-v", f"{os.environ.get('OPAMP_EXAMPLES_NUGET_VOLUME') or 'opamp-clients-nuget'}:/root/.nuget/packages"]
-TARGET = target("dotnet-otel")
+EDOT = "--edot" in sys.argv
+TARGET = target("dotnet-otel-edot" if EDOT else "dotnet-otel")
+#: Our plugin, after EDOT's with --edot.
+OURS = "Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"
+PLUGIN = ("Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:" if EDOT
+          else "") + OURS
+#: EDOT's instrument.sh sets OTEL_DOTNET_AUTO_PLUGINS to its plugin alone, so with --edot the
+#: application starts under the _instrument.sh it calls, which keeps the plugins given.
+INSTRUMENT = "./_instrument.sh" if EDOT else "./instrument.sh"
 # Not "app": on a case-insensitive disk that is the published "App" of an older layout.
 OUT = TARGET / "publish"
 LOCAL = "--local" in sys.argv
@@ -81,20 +95,21 @@ def build() -> None:
     if LOCAL:
         # The native core is this checkout's (target/release, which the projects take).
         subprocess.run(["dotnet", "publish", str(Path(__file__).resolve().parent / "App.csproj"), "-c", "Release",
-                        "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", "-o", str(OUT)],
+                        "-r", rid, "--self-contained", "false", "--nologo", "-v", "q", f"-p:Edot={str(EDOT).lower()}",
+                        "-o", str(OUT)],
                        check=True, stdout=subprocess.DEVNULL)
         return
     # The native core for Linux whatever the host (scripts/native_lib.py).
     lib = native_lib.build()
     subprocess.run(["docker", "run", "--rm", "--network", "host", "-v", f"{ROOT}:/work", *NUGET, "-w", "/work/examples/dotnet-otel", IMAGE,
                     "dotnet", "publish", "-c", "Release", "-r", rid, "--self-contained", "false", "--nologo", "-v", "q",
-                    f"-p:OpAmpNativeLib=/work/{lib}", "-o", f"/work/{OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
+                    f"-p:OpAmpNativeLib=/work/{lib}", f"-p:Edot={str(EDOT).lower()}", "-o", f"/work/{OUT.relative_to(ROOT)}"], check=True, stdout=subprocess.DEVNULL)
 
 
 def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
     telemetry = f"http://{HOST}:{telemetry_port}"
     env = {
-        "OTEL_DOTNET_AUTO_PLUGINS": "Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation",
+        "OTEL_DOTNET_AUTO_PLUGINS": PLUGIN,
         "OTEL_SERVICE_NAME": "checkout",
         "OTEL_OPAMP_ENDPOINT": opamp_url(port, HOST),
         "OTEL_OPAMP_HEADERS": "Authorization=Bearer%20example",
@@ -113,7 +128,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         listen = env.pop("APP_PORT", None)
         if listen:
             env["APP_LISTEN"] = f"http://127.0.0.1:{listen}"
-        app = subprocess.Popen(["./instrument.sh", "dotnet", "App.dll", f"{telemetry}/ping"], cwd=OUT,
+        app = subprocess.Popen([INSTRUMENT, "dotnet", "App.dll", f"{telemetry}/ping"], cwd=OUT,
                                env=os.environ | env, start_new_session=True, stdout=subprocess.DEVNULL, stderr=stderr)
         return lambda: stop_group(app)
     # By this process too: two runs of one check started in the same second (one per transport,
@@ -126,7 +141,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         env["APP_LISTEN"] = "http://0.0.0.0:8080"
     for k, v in env.items():
         cmd += ["-e", f"{k}={v}"]
-    cmd += [IMAGE, "./instrument.sh", "dotnet", "App.dll", f"{telemetry}/ping"]
+    cmd += [IMAGE, INSTRUMENT, "dotnet", "App.dll", f"{telemetry}/ping"]
     app = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=stderr)
 
     return lambda: stop_container(app, container)
@@ -434,9 +449,9 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
     return ok
 
 
-#: The plugin first, then the application's own (Setups.cs), which automatic instrumentation calls after it.
-PLUGINS = ("Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation:"
-           "Example.ExtraExporters, App")
+#: The plugin first (after EDOT's with --edot), then the application's own (Setups.cs), which automatic
+#: instrumentation calls after it.
+PLUGINS = PLUGIN + ":Example.ExtraExporters, App"
 #: What a span exporter and a log record processor of the application's own plugin take from the
 #: plugin's control: their gates' settings, set aside. The sampler stays the plugin's.
 PLUGIN_EXPORTERS = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
@@ -461,4 +476,4 @@ CHECKS = {
 }
 
 if __name__ == "__main__":
-    sys.exit(main(CHECKS, build, options=("--local",)))
+    sys.exit(main(CHECKS, build, options=("--local", "--edot")))
