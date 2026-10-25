@@ -45,6 +45,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
+  report given while the agent was starting was lost until the next one (30 s on with the default
+  health check publisher); the first message now carries it (#86).
+- Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
+  them (#86).
 - Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
   SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
   sampler's own description never returns), and EDOT's span logger no longer sets the trace
