@@ -177,9 +177,9 @@ python3 -m unittest examples/test_integrations.py examples/test_settings_cookboo
 mvn -q -B -DskipTests install -f java/opamp/pom.xml                                     # ~1 min, first
 mvn -q -B test -f java/opamp-javaagent/pom.xml -Dtest=ControlsTest                      # or ControlsTortureTest
 # .NET (as CI runs it; no dotnet here, CI is the only .NET build):
-#   cd dotnet && dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo
-#   cd dotnet && dotnet test Pydantic.OpAmp.Extensions.Hosting.Tests --nologo
-#   cd dotnet && dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo --filter FullyQualifiedName~ConcurrencyTests
+#   cd dotnet && dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests
+#   cd dotnet && dotnet test --project Pydantic.OpAmp.Extensions.Hosting.Tests
+#   cd dotnet && dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests --filter-class "*ConcurrencyTests"
 python3 examples/python-otel/try.py --list    # the checks; likewise node-otel, go-otel, javaagent, dotnet-otel
 ```
 

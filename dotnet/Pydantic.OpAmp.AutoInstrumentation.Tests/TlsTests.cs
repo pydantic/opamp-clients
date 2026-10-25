@@ -72,7 +72,11 @@ public class TlsTests
             RandomNumberGenerator.Fill(serial);
             using var cert = req.Create(ca, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(12), serial);
             using var withKey = cert.CopyWithPrivateKey(key);
+#if NET9_0_OR_GREATER
+            return X509CertificateLoader.LoadPkcs12(withKey.Export(X509ContentType.Pkcs12), null);
+#else
             return new X509Certificate2(withKey.Export(X509ContentType.Pkcs12));
+#endif
         }
     }
 

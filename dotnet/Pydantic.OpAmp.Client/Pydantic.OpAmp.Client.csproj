@@ -1,7 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- .NET 8 and .NET 10, the supported LTS releases (docs/supported-versions.md). An SDK older
+         than 10 can't build net10.0, so it builds net8.0 alone: the Docker builds of the examples
+         and drivers on the 8.0 SDK image. A package is packed on SDK 10, with both
+         (scripts/native_dist.py check refuses one without). -->
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '10.0'))">net8.0;net10.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

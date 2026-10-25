@@ -6,8 +6,9 @@ name: Nightly
 # that runs a client fetches the core, as CI's do (scripts/fetch_core.py fetch). One more job looks
 # for a contrib Collector release newer than the forked extension and Supervisor.
 #
-# Runners: GitHub-hosted only (ubuntu-24.04), as in CI. Every job stands for itself: none decides
-# for another, and there is no gathering check (nothing requires this workflow).
+# Runners: GitHub-hosted only (ubuntu-24.04, and macos-latest and windows-latest for the runtime
+# matrix), as in CI. Every job stands for itself: none decides for another, and there is no
+# gathering check (nothing requires this workflow).
 #
 # A pull request that changes this file runs it too, each job briefly (about the per-PR counts,
 # 20 s of fuzzing, 10 minutes of torture, one LazyFS seed): a check that every job is wired up, not
@@ -128,7 +129,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       # libFuzzer's runtime (for libfuzzer-dotnet) is clang's libclang-rt-dev.
       - if: matrix.family == 'dotnet'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq clang libclang-rt-dev
@@ -287,11 +290,13 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: .NET (FsCheck)
         if: ${{ !cancelled() }}
         working-directory: dotnet
-        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~PropertyTests"
+        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*PropertyTests"
 
   shells:
     # The schedule-exploring tests make this the longest night's work: one job per part, so a
@@ -410,11 +415,13 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: .NET
         if: matrix.part == '.NET'
         working-directory: dotnet
-        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~CallbackPropertyTests|FullyQualifiedName~AdversaryPropertyTests|FullyQualifiedName~ScheduleTests"
+        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests" --filter-class "*AdversaryPropertyTests" --filter-class "*ScheduleTests*"
 
   # The callback contract (docs/sdk-contract.md) in each SDK's callback model test, 5,000 runs
   # each (100 on a pull request). Each prints its seed; OPAMP_MODEL_SEED=<seed> replays a run.
@@ -475,10 +482,12 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - if: matrix.sdk == 'dotnet'
         working-directory: dotnet
-        run: dotnet test Pydantic.OpAmp.Client.Tests --nologo --filter "FullyQualifiedName~CallbackPropertyTests"
+        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests"
 
   # Each language's Controls flipped through seeded settings documents while workers emit spans and
   # records through the real SDK (the per-PR runs take a few seconds; here 150 runs each). A
@@ -546,11 +555,13 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: .NET
         if: ${{ !cancelled() }}
         working-directory: dotnet
-        run: dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo --filter FullyQualifiedName~ConcurrencyTests
+        run: dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests --framework net8.0 --filter-class "*ConcurrencyTests"
 
   # The crash scenarios on a real file system that loses what wasn't flushed: LazyFS (FUSE) in a
   # container (conformance/lazyfs/), every driver's state file on a mount of its own. Each crash
@@ -590,3 +601,106 @@ jobs:
           retention-days: 7
           path: conformance/out/lazyfs/
           if-no-files-found: ignore
+
+  # The runtimes the SDKs say they support, at the ends the per-PR jobs don't run: each SDK on
+  # the oldest version it declares and on the newest released, and the two SDKs that load the
+  # native core (Python and .NET) on macOS and Windows. CI runs one version of each on Linux,
+  # and .NET 8 and 10 both (docs/supported-versions.md has the table this keeps true).
+  runtimes:
+    name: Runtimes (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Python 3.11, os: ubuntu-24.04, sdk: python, version: "3.11" }
+          - { name: Python 3.14, os: ubuntu-24.04, sdk: python, version: "3.14" }
+          - { name: Node.js 22, os: ubuntu-24.04, sdk: node, version: "22" }
+          - { name: Node.js current, os: ubuntu-24.04, sdk: node, version: "current" }
+          - { name: Java 17, os: ubuntu-24.04, sdk: java, version: "17" }
+          - { name: Java 25, os: ubuntu-24.04, sdk: java, version: "25" }
+          - { name: Go 1.25, os: ubuntu-24.04, sdk: go, version: "1.25" }
+          - { name: Python on macOS, os: macos-latest, sdk: python, version: "3.13" }
+          - { name: Python on Windows, os: windows-latest, sdk: python, version: "3.13" }
+          - { name: .NET on macOS, os: macos-latest, sdk: dotnet }
+          - { name: .NET on Windows, os: windows-latest, sdk: dotnet }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('opamp-core.lock.json') }}
+      - name: The core, fetched and verified against the lock
+        uses: ./.github/actions/core
+      # Go for what the tests build of their own, at CI's version; the Go job sets up its own.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.sdk == 'go' && matrix.version || '1.26' }}
+          cache-dependency-path: |
+            go/go.sum
+            conformance/**/go.sum
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.sdk == 'python'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.sdk == 'node'
+        with:
+          node-version: ${{ matrix.version }}
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: matrix.sdk == 'java'
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.version }}
+          cache: maven
+          cache-dependency-path: |
+            java/opamp/pom.xml
+            java/opamp-javaagent/pom.xml
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        if: matrix.sdk == 'dotnet'
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Python client and auto-instrumentation
+        if: matrix.sdk == 'python'
+        env:
+          PY: ${{ matrix.version }}
+        run: |
+          (cd python && uv run --python "$PY" pytest -q)
+          (cd python/otel && uv run --python "$PY" pytest -q)
+      - name: Node.js client and auto-instrumentation
+        if: matrix.sdk == 'node'
+        run: |
+          node --version
+          (cd node/opamp && npm ci --no-audit --no-fund && npm test)
+          (cd node/otel && npm ci --no-audit --no-fund && npm test)
+      # Every test class but Fray's, as CI runs them (java-fray runs those, on Java 25 and 21).
+      - name: Java client and agent extension
+        if: matrix.sdk == 'java'
+        run: |
+          java -version
+          mvn -q -B install -f java/opamp/pom.xml '-Dtest=!*FrayTest' -Dsurefire.failIfNoSpecifiedTests=false
+          mvn -q -B package -f java/opamp-javaagent/pom.xml
+      - name: Go client
+        if: matrix.sdk == 'go'
+        working-directory: go
+        run: |
+          go version
+          go test -count=1 ./...
+      # Both frameworks, as CI runs them on Linux.
+      - name: .NET client, hosting and automatic instrumentation
+        if: matrix.sdk == 'dotnet'
+        working-directory: dotnet
+        run: |
+          dotnet test --project Pydantic.OpAmp.Client.Tests
+          dotnet test --project Pydantic.OpAmp.Extensions.Hosting.Tests
+          dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests

@@ -391,7 +391,11 @@ internal sealed class ClientTransport : IClientTransport
         {
             // SChannel can't use a key that lives only in memory: give it one it can.
             using var ephemeral = cert;
+#if NET9_0_OR_GREATER
+            cert = X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pkcs12), null);
+#else
             cert = new X509Certificate2(ephemeral.Export(X509ContentType.Pkcs12));
+#endif
         }
 
         chain.RemoveAt(0); // the certificate itself

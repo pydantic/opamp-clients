@@ -26,6 +26,7 @@ import native_dist as nd  # noqa: E402
 nd.TARGETS_ALL = list(nd.TARGETS)  # (OPAMP_NATIVE_TARGETS unset)
 CLIENT = "wheels/pydantic_opamp_client-0.1.0-py3-none-any.whl"
 HOSTING_DLL = "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.dll"
+HOSTING_DLL_10 = "lib/net10.0/Pydantic.OpAmp.Extensions.Hosting.dll"
 
 
 class CompiledOnly(unittest.TestCase):
@@ -68,13 +69,14 @@ class CompiledOnly(unittest.TestCase):
     def packages(self, *client_extra: str, core: tuple[str, ...] = ("runtimes/linux-x64/native/libopamp_native.so",
                                                                      *nd.CORE_LICENSE),
                  core_license: str = '<license type="file">LICENSE.txt</license>', depends: str | None = None,
-                 assembly: str = "lib/net8.0/Pydantic.OpAmp.Client.dll",
-                 hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.xml"),
+                 assembly: tuple[str, ...] = ("lib/net8.0/Pydantic.OpAmp.Client.dll", "lib/net10.0/Pydantic.OpAmp.Client.dll"),
+                 hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.xml", HOSTING_DLL_10,
+                                             "lib/net10.0/Pydantic.OpAmp.Extensions.Hosting.xml"),
                  hosting_depends: str = "Pydantic.OpAmp.Client") -> None:
         nuspec = f'<dependency id="Pydantic.OpAmp.Core.Native" version="{depends or f"[{nd.core_version()}]"}" />'
         with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Client.0.1.0.nupkg", "w") as z:
             z.writestr("Pydantic.OpAmp.Client.nuspec", nuspec)
-            for m in (assembly, *client_extra):
+            for m in (*assembly, *client_extra):
                 z.writestr(m, "")
         with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg", "w") as z:
             z.writestr("Pydantic.OpAmp.Extensions.Hosting.nuspec", f'<dependency id="{hosting_depends}" version="0.1.0" />')
@@ -98,8 +100,16 @@ class CompiledOnly(unittest.TestCase):
 
     def test_a_client_package_without_its_assembly_fails(self) -> None:
         self.core_wheel()
-        self.packages(assembly="lib/net8.0/Other.dll")
+        self.packages(assembly=("lib/net8.0/Other.dll", "lib/net10.0/Pydantic.OpAmp.Client.dll"))
         self.assertIn("Pydantic.OpAmp.Client.0.1.0.nupkg: lacks lib/net8.0/Pydantic.OpAmp.Client.dll", self.problems())
+
+    # Packed on an SDK older than 10, the packages hold net8.0 alone.
+    def test_a_package_without_its_net10_assembly_fails(self) -> None:
+        self.core_wheel()
+        self.packages(assembly=("lib/net8.0/Pydantic.OpAmp.Client.dll",), hosting=(HOSTING_DLL,))
+        problems = self.problems()
+        self.assertIn("Pydantic.OpAmp.Client.0.1.0.nupkg: lacks lib/net10.0/Pydantic.OpAmp.Client.dll", problems)
+        self.assertIn(f"Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg: lacks {HOSTING_DLL_10}", problems)
 
     def test_a_missing_package_fails(self) -> None:
         self.core_wheel()
@@ -147,9 +157,9 @@ class CompiledOnly(unittest.TestCase):
         # The client's assembly, a library, or the shared sources would be shipped twice, or as source.
         for extra in ("lib/net8.0/Pydantic.OpAmp.Client.dll", "runtimes/linux-x64/native/libopamp_native.so",
                       "contentFiles/cs/any/shared/Controls.cs"):
-            self.packages(hosting=(HOSTING_DLL, extra))
+            self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, extra))
             self.assertIn(f"{hosting}: ships {extra}", self.problems())
-        self.packages(hosting=("lib/net8.0/Other.dll",))
+        self.packages(hosting=("lib/net8.0/Other.dll", HOSTING_DLL_10))
         self.assertIn(f"{hosting}: lacks {HOSTING_DLL}", self.problems())
         self.packages(hosting_depends="Pydantic.OpAmp.Core.Native")
         self.assertIn(f"{hosting}: doesn't depend on Pydantic.OpAmp.Client", self.problems())
