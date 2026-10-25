@@ -102,9 +102,9 @@ restarts. An instance that loses its state starts over from the key it was confi
 that one has expired or was revoked, it can't connect (HTTP 401).
 
 A key the server doesn't renew works until it expires, and then its agents disconnect (HTTP 401)
-and run on the settings they have. In Logfire that is an application's key, and the key of the
-Operator's OpAMP bridge or of a collector with upstream's `opamp` extension, which take no new
-keys from a server: each lasts 90 days. Replace it before then and restart what uses it
+and run on the settings they have. In Logfire that is an application's key (it lasts as long as was
+chosen when it was created, up to a year), and the key of the Operator's OpAMP bridge or of a
+collector with upstream's `opamp` extension, which take no new keys from a server (90 days). Replace it before then and restart what uses it
 ([guides/logfire.md](guides/logfire.md#replacing-a-key)).
 
 ## Turning it off

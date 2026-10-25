@@ -98,8 +98,9 @@ the state directory, and uses it from then on, across restarts. Before that key 
 server offers a new one, and the SDK moves to it the same way. Nothing for you to do, as long as
 the state directory survives restarts ([connection-settings.md](connection-settings.md)).
 
-Logfire's Fleet issues and renews keys for hosts, not yet for applications: an application keeps
-the key it was given, which works until it expires. Replace it before then
+Logfire's Fleet issues and renews keys for hosts, not for applications: an application's
+processes often keep no state across restarts, so it keeps the key it was given, which lasts as
+long as you chose when you created it (up to a year). Replace it before then
 ([guides/logfire.md](guides/logfire.md#replacing-a-key)).
 
 ### 7. Taking it off the server
