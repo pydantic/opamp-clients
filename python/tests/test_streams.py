@@ -132,7 +132,9 @@ def test_a_discard_or_cancel_while_a_write_is_pending_leaves_no_file_and_says_no
         await asyncio.sleep(0.02)  # the first write is in flight
         # A cancel goes on to the Executor too (it may be a save's); a discard is only this one's.
         assert s.do(corepb.Effect(**{how: corepb.Id(id=9)})) is (how == "discard")
-        await asyncio.sleep(0.2)
+        # Done with once the write in flight is over and the file is deleted (a slow runner's
+        # thread can take a while).
+        await until("the download dropped", lambda: 9 not in s._files)
         assert got == []
         assert not os.path.exists(download_path(state, "", 9))
         await s.shutdown()
@@ -420,9 +422,12 @@ def test_a_peer_that_stops_reading_is_not_read_until_it_drains_and_past_a_bound_
             await until("opened", lambda: "stream_opened" in kinds(got))
             await until("its bytes", lambda: read() > 1 << 20)
             # Writes it doesn't take: once the transport's buffer is full, we read nothing more.
-            for _ in range(8):
-                s.do(corepb.Effect(stream_write=corepb.WsMessage(id=1, data=b"\2" * (1 << 20))))
-            await asyncio.sleep(0.1)
+            # Two bursts: Windows takes a whole send into the socket's buffer while that holds less
+            # than SO_SNDBUF, so the first can leave asyncio's buffer empty; the second can't.
+            for _ in range(2):
+                for _ in range(8):
+                    s.do(corepb.Effect(stream_write=corepb.WsMessage(id=1, data=b"\2" * (1 << 20))))
+                await asyncio.sleep(0.1)
             before = read()
             await asyncio.sleep(0.3)
             assert read() - before <= 512 << 10, f"read {read() - before} bytes while its writes were stuck"

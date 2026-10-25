@@ -247,6 +247,9 @@ internal sealed class SdkAgent
 
     // Export health: the application's own health, and the layer's last report.
     private ComponentHealth app = new() { Healthy = true };
+
+    // Whether SetHealth has been called: its health is newer than the one Start is given.
+    private bool appSet;
     private HealthReport? lastHealth;
     private Loaded atStart;
     private ByteString current;
@@ -444,7 +447,12 @@ internal sealed class SdkAgent
         lock (this.gate)
         {
             // Export health's first report goes with the first message: no second one at once.
-            this.app = health ?? new ComponentHealth { Healthy = true };
+            // A SetHealth that came while Start was on its way is newer than `health`: keep it.
+            if (!this.appSet && health is not null)
+            {
+                this.app = health;
+            }
+
             first = this.HealthLocked() ?? this.app;
             this.HealthSent = first;
         }
@@ -489,6 +497,7 @@ internal sealed class SdkAgent
         lock (this.gate)
         {
             this.app = health;
+            this.appSet = true;
             merged = this.Merged();
             c = this.client;
             this.HealthSent = merged;

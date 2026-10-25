@@ -31,7 +31,7 @@ TABLES = next(p / "tests" / "shell-tables" for p in Path(__file__).resolve().par
 
 
 def table(name: str) -> dict:
-    return json.loads((TABLES / name).read_text())
+    return json.loads((TABLES / name).read_text(encoding="utf-8"))
 
 
 # URLs.

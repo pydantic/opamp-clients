@@ -29,10 +29,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
+  instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
+  tests run on both. Building from source needs the .NET 10 SDK (#86).
+- Docs: a getting-started guide, the supported runtimes and platforms
+  (`docs/supported-versions.md`), and a troubleshooting page (#86).
 - Python (`pydantic-opamp-otel`): `configure_logfire()`, the Logfire SDK under the server, in place of
   `logfire.configure()`: the live sampler as its head sampler, and its exporters to Logfire behind
   the package's gates, so the SDK settings apply to what reaches Logfire (`logfire` extra).
-
 - Go: an install's or a removal's error can say how it failed: `opamp.FailedForNow(err)` (an
   outage or a timeout: not reported failed, and tried again after a wait) or
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
@@ -41,6 +45,16 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
+  report given while the agent was starting was lost until the next one (30 s on with the default
+  health check publisher); the first message now carries it (#86).
+- Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
+  them (#86).
+- Python and .NET: on Windows, a save's rename is written through to the disk (`MoveFileEx` with
+  `MOVEFILE_WRITE_THROUGH`), since a directory can't be flushed there: a save answered stored
+  survives a power cut (#86).
+- .NET: on Windows, a proxy variable the client refuses (as `ALL_PROXY=socks4://...`) is named as
+  it was set in the error, not in lower case (#86).
 - Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
   SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
   sampler's own description never returns), and EDOT's span logger no longer sets the trace
@@ -61,6 +75,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Security
 
+- Python: on Windows, state files, downloads, the downloads directory and the core tap are made
+  with an access-control list allowing the agent's user alone, as the .NET and Java clients make
+  them; a mode of 0600 meant nothing there, so they took the directory's inherited list (#86).
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every

@@ -168,21 +168,21 @@ def check() -> None:
     for p in (DIST / "nuget").glob("Pydantic.OpAmp.Client.*.nupkg"):
         with zipfile.ZipFile(p) as z:
             problems += [f"{p.name}: ships {n}" for n in z.namelist() if n.startswith("runtimes/") or (n.endswith(BINARY) and not n.startswith("lib/"))]
-            if "lib/net8.0/Pydantic.OpAmp.Client.dll" not in z.namelist():
-                problems.append(f"{p.name}: lacks lib/net8.0/Pydantic.OpAmp.Client.dll")
+            problems += [f"{p.name}: lacks lib/{tfm}/Pydantic.OpAmp.Client.dll" for tfm in FRAMEWORKS
+                         if f"lib/{tfm}/Pydantic.OpAmp.Client.dll" not in z.namelist()]
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
         if f'id="Pydantic.OpAmp.Core.Native" version="[{core_version()}]"' not in spec:
             problems.append(f"{p.name}: doesn't depend on Pydantic.OpAmp.Core.Native {core_version()} exactly")
     # The hosting package: its own assembly (and its docs) alone, on the client's package. What it
     # shares with the plugin (dotnet/shared) is compiled into it, never shipped as source.
     for p in (DIST / "nuget").glob("Pydantic.OpAmp.Extensions.Hosting.*.nupkg"):
-        assembly = "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting"
+        assemblies = [f"lib/{tfm}/Pydantic.OpAmp.Extensions.Hosting" for tfm in FRAMEWORKS]
         with zipfile.ZipFile(p) as z:
             payload = [n for n in z.namelist() if not nuget_meta(n)]
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
-        problems += [f"{p.name}: ships {n}" for n in payload if n not in (f"{assembly}.dll", f"{assembly}.xml")]
-        if f"{assembly}.dll" not in payload:
-            problems.append(f"{p.name}: lacks {assembly}.dll")
+        problems += [f"{p.name}: ships {n}" for n in payload
+                     if n not in [f"{a}.{ext}" for a in assemblies for ext in ("dll", "xml")]]
+        problems += [f"{p.name}: lacks {a}.dll" for a in assemblies if f"{a}.dll" not in payload]
         if 'id="Pydantic.OpAmp.Client"' not in spec:
             problems.append(f"{p.name}: doesn't depend on Pydantic.OpAmp.Client")
     # The cores ship compiled only: no source distribution, and no wheel or package holds Rust
@@ -196,6 +196,12 @@ def check() -> None:
     if problems:
         sys.exit(1)
     print(f"{len(TARGETS)} libraries and {len(wheels)} wheels are what their names say")
+
+
+# The frameworks each .NET package ships an assembly for: .NET 8 and .NET 10, the supported LTS
+# releases (docs/supported-versions.md). Packed on an SDK older than 10, a package holds net8.0
+# alone, and check refuses it.
+FRAMEWORKS = ("net8.0", "net10.0")
 
 
 def nuget_meta(name: str) -> bool:

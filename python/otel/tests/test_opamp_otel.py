@@ -65,6 +65,15 @@ def prepared(tmp_path, **extra) -> tuple[Agent, dict]:
     return agent, env
 
 
+def private(path) -> bool:
+    """Whether the file is its user's only: a mode of 0600, or on Windows a list allowing the user alone."""
+    if os.name == "nt":
+        from pydantic_opamp_client import _windows
+
+        return _windows.dacl(str(path)) == _windows.canonical(_windows.user_only())
+    return path.stat().st_mode & 0o777 == 0o600
+
+
 def test_the_sdks_sampler_until_a_rate_is_set_and_again_when_it_is_withdrawn():
     c = Controls()
     c.sampler.wrap(ALWAYS_OFF)
@@ -290,7 +299,8 @@ def test_one_uid_names_the_instance_is_kept_and_the_metric_exporter_is_gated(tmp
     first, env1 = prepared(tmp_path, OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=prod,service.instance.id=x")
     assert first.uid.version == 7
     assert env1["OTEL_METRICS_EXPORTER"] == "opamp"
-    assert (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+    # The user's only (docs/state-file.md): a mode of 0600, or on Windows an access-control list.
+    assert private(tmp_path / "instance-uid")
     second, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,otlp")
     assert second.uid == first.uid
     # Without state, a UUID the user gave is used.
@@ -744,9 +754,9 @@ def test_a_uid_the_server_assigns_is_kept_for_the_next_start(tmp_path):
     try:
         first, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint, OTEL_OPAMP_HEARTBEAT_INTERVAL="100ms")
         first.start(Resource.create({"service.name": "checkout"}))
-        server.wait(lambda: (tmp_path / "instance-uid").read_text() == str(assigned))
+        server.wait(lambda: (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(assigned))
         first.stop()
-        assert (tmp_path / "instance-uid").stat().st_mode & 0o777 == 0o600
+        assert private(tmp_path / "instance-uid")
         second, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
         assert second.uid == assigned
         before = len(server.got)
@@ -762,7 +772,7 @@ def test_the_instance_uid_changed_notification_is_saved(tmp_path):
     agent, _ = prepared(tmp_path)
     new = uuid.uuid4()
     agent._notified(Notification("instance_uid_changed", instance_uid=new.bytes))
-    assert agent.uid == new and (tmp_path / "instance-uid").read_text() == str(new)
+    assert agent.uid == new and (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(new)
 
 
 def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(server):
@@ -787,6 +797,7 @@ def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(ser
         g = gevent.spawn(loop.run_forever)
         g.join(timeout=5)
         assert g.successful() and ran, g.exception
+        loop.close()  # (left to the collector, Windows' proactor loop fails closing under gevent)
         gevent.sleep(0.5)
         agent.stop()
     """)
@@ -1099,7 +1110,9 @@ def _from_code(tmp_path, option: str, given: dict, variables: dict):
 
 def _expect(tmp_path, read, expected) -> None:
     if expected is DEFAULT_DIR:
-        assert read is not None and read.is_relative_to(tmp_path / "opamp")
+        # Under the base directory each OS has (docs/default-state-dir.md), all set to tmp_path.
+        base = tmp_path / "Library" / "Application Support" if sys.platform == "darwin" else tmp_path
+        assert read is not None and read.is_relative_to(base / "opamp")
     else:
         assert read == expected
 
@@ -1414,7 +1427,7 @@ def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_
     assert reason in said[0], said
 
 
-_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text())["cases"]
+_OFF = json.loads((Path(__file__).parents[3] / "tests" / "shell-tables" / "off.json").read_text(encoding="utf-8"))["cases"]
 
 
 @pytest.mark.parametrize("case", _OFF, ids=[c["id"] for c in _OFF])

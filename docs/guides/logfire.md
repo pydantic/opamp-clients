@@ -11,6 +11,9 @@ redaction and scrubbing, the [Logfire SDK policy](../sdk-settings.md). There are
 
 The Logfire SDKs for JavaScript and Rust have no integration yet: [below](#the-other-logfire-sdks).
 
+In Logfire the OpAMP server is Fleet, in each project: [Logfire Fleet](#logfire-fleet) says how
+to connect an application, a host or a Kubernetes cluster to it.
+
 ## The Logfire SDK for Python
 
 Install the package with its `logfire` extra, and call `configure_logfire()` with the arguments
@@ -104,6 +107,100 @@ what an SDK answers.
 An SDK that can't carry out a control the policy overrides refuses the whole policy: it answers
 FAILED, names the control, and changes nothing. Each integration's page says which controls it
 carries out, and when it sets one aside.
+
+## Logfire Fleet
+
+Fleet is the OpAMP server in each Logfire project. It lists every application, host and cluster
+connected to the project, with its health and what it runs, and sends each its policy: an SDK
+policy to applications, collector YAML to hosts and clusters. Each thing you connect is an
+installation; each process of it is an instance.
+
+### An application
+
+1. On the project's Fleet page, choose **Connect an application**. Name it, optionally give an
+   environment, and pick the **SDK policy to apply**: a new policy starts from the SDK's own
+   settings, and **Just monitor this application** connects it with no policy.
+2. **Create connection** shows the OpAMP endpoint and the runtime key. The key is shown once:
+   store it in your secret manager as `LOGFIRE_OPAMP_TOKEN`.
+3. Start the application with its integration (above), the endpoint and the key:
+
+   ```bash
+   OTEL_OPAMP_ENDPOINT=<the OpAMP endpoint Fleet shows>
+   OTEL_OPAMP_HEADERS="Authorization=Bearer%20${LOGFIRE_OPAMP_TOKEN}"
+   OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp
+   ```
+
+   Give each process its own state directory, so its identity and the key Fleet issues it
+   survive restarts. The telemetry still needs its write token ([above](#where-the-telemetry-goes)).
+4. The dialog moves from **Waiting for connection** to **Connected** when the application
+   reports. Check Live view to see its telemetry arrive.
+
+Edit the policy in Fleet and publish it: every connected instance gets it, and answers APPLIED or
+FAILED ([troubleshooting.md](../troubleshooting.md#a-policy-is-failed)).
+
+### A host
+
+1. Choose **Connect host**. Pick the policy, which says what the host's collector collects, and
+   optionally a host name (left blank, Fleet uses the host's own).
+2. **Create enrollment key**, then choose the host's operating system. Fleet shows one command,
+   with the enrollment key in it:
+
+   ```bash
+   uvx logfire-cli --beta --base-url <...> --org <org> collector install \
+     --project <project> --enrollment-token <enrollment key> --yes
+   ```
+
+   Run it on the host (an administrator PowerShell on Windows; `uvx` comes with
+   [uv](https://docs.astral.sh/uv/getting-started/installation/)). It installs the Supervisor and
+   its collector as a service and enrolls the host. No Logfire sign-in is needed on the host.
+3. The host shows up in Fleet. Its collector runs the policy, within what the host allows
+   ([what the server can do to this host](../../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)).
+
+The enrollment key expires on the date the dialog shows, and can be revoked in Fleet's settings
+to stop new enrollments. Hosts already enrolled have keys of their own, which they renew.
+
+### A Kubernetes cluster
+
+Fleet connects to a cluster through the OpenTelemetry Operator's OpAMP bridge, upstream's. The
+bridge applies the Collector resources in the cluster's Fleet policy and reports their health.
+
+1. Install cert-manager and the
+   [OpenTelemetry Operator](https://github.com/open-telemetry/opentelemetry-operator). On GKE
+   Autopilot, install cert-manager with Helm and its leader election in its own namespace
+   (`--set global.leaderElection.namespace=cert-manager`).
+2. Choose **Connect Kubernetes**. Name the cluster, give the namespaces its collectors run in,
+   pick a policy (or **Just monitor this cluster**), and what to collect. On GKE Autopilot,
+   leave **Container logs** off: Autopilot refuses the host path it reads.
+3. Fleet shows the runtime key and the commands that store it as the `logfire-opamp` Secret and
+   apply the bridge. Save the key: it is shown once.
+4. Publish the policy. The bridge creates the collectors, and Fleet shows the installation
+   connected with its workloads.
+
+Edit the collectors in Fleet and publish: a resource the policy leaves out is deleted. Each
+collector pod counts toward the organization's collector allowance; the bridge doesn't.
+
+### A collector you already run
+
+A collector configured by your own tooling can report to Fleet without Fleet changing it: give it
+an `opamp` extension (upstream's, or [this repository's](../collector.md#a-collector-with-the-extension))
+with Fleet's endpoint and a runtime key as its bearer token. Its YAML stays yours.
+
+### Replacing a key
+
+SDKs and Supervisors move to a new key on their own before theirs expires. The Operator's bridge
+and upstream's `opamp` extension can't: their key lasts 90 days. Fleet can't yet issue a new key
+for an existing installation, so to replace one:
+
+1. Connect a new installation the same way, and keep its runtime key.
+2. Replace the key where the old one was (for the bridge, the `logfire-opamp` Secret), and
+   restart. A restarted bridge is refused for about 30 seconds, until its old connection drops.
+3. Publish the policy to the new installation, then delete the old one.
+
+### Removing an installation
+
+Deleting an installation in Fleet revokes its keys, and any write token issued with it, and
+closes its connections. The telemetry it already sent stays in the project. A disconnected
+instance's record can be deleted on its own.
 
 ## The other Logfire SDKs
 

@@ -105,7 +105,7 @@ All after `fetch` (each SDK loads the fetched core). Representative runs, with t
 | Python | `cd python && uv run --python 3.13 pytest -q tests/test_adversary_properties.py tests/test_sdk_settings.py` | 66 passed, 1 skipped, ~4 min |
 | Node.js | `cd node/opamp && npm ci && npm exec -- tsc -p . && node --test dist/test/adversary*.test.js` | 8 pass, ~3.5 min; full: `npm test` |
 | Java | `cd java/opamp && mvn -q -B package -Dtest=AdversaryRawTest -Dsurefire.failIfNoSpecifiedTests=false` | ~70 s |
-| .NET | `cd dotnet && dotnet test Pydantic.OpAmp.Client.Tests --nologo` (as CI runs it; also `Pydantic.OpAmp.Extensions.Hosting.Tests`) | the .NET SDK download is refused in the sandbox: CI only |
+| .NET | `cd dotnet && dotnet test --project Pydantic.OpAmp.Client.Tests` (as CI runs it; also `Pydantic.OpAmp.Extensions.Hosting.Tests`) | the .NET SDK download is refused in the sandbox: CI only |
 | Collector | `cd go/opampextension && go vet ./... && go test -race ./...`; same in `go/opampsupervisor` (as CI runs it) | |
 | Scripts | `python3 -m unittest scripts/test_native_dist.py scripts/test_sdk_release.py scripts/test_redact_mutants.py scripts/test_collector_release.py scripts/test_public_check.py` | 48 tests, ~2 s |
 

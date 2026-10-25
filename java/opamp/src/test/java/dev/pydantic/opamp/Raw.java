@@ -174,7 +174,7 @@ final class Raw implements AutoCloseable {
   }
 
   private static void start(Runnable r) {
-    Thread t = new Thread(r);
+    Thread t = new Thread(r, ChurnTest.HARNESS + "raw"); // not the client's: ChurnTest leaves it out
     t.setDaemon(true);
     t.start();
   }

@@ -16,6 +16,7 @@ other server and every seed's client share."""
 from __future__ import annotations
 
 import asyncio
+import os
 import socket
 import ssl
 import struct
@@ -32,6 +33,18 @@ MARK_DEADLINE = 30.0
 _CYCLE = bytes(range(251))
 #: The pattern from any offset, for as long as one read is.
 _PATTERN = _CYCLE * (READ // 251 + 2)
+
+
+def reset(transport: asyncio.BaseTransport) -> None:
+    """End `transport`'s connection with a reset (RST) and no FIN: SO_LINGER 0, then closed. On
+    Windows the proactor loop shuts a socket down before it closes it, and the shutdown sends a FIN
+    first, so there the socket is closed here, before the loop gets to it."""
+    sock = transport.get_extra_info("socket")
+    if sock is not None:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+    transport.abort()
+    if os.name == "nt" and sock is not None:
+        getattr(sock, "_sock", sock).close()  # asyncio's TransportSocket, around the socket
 
 
 def body(size: int) -> bytes:
@@ -333,10 +346,7 @@ class RawServer:
                     writer.close()
                 else:
                     self._ended(c, "closed")
-                    sock = transport.get_extra_info("socket")
-                    if sock is not None:
-                        sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
-                    transport.abort()
+                    reset(transport)
             except Exception:  # noqa: BLE001 - the connection went under it: the reading says how
                 pass
 
