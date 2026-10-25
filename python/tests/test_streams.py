@@ -132,7 +132,9 @@ def test_a_discard_or_cancel_while_a_write_is_pending_leaves_no_file_and_says_no
         await asyncio.sleep(0.02)  # the first write is in flight
         # A cancel goes on to the Executor too (it may be a save's); a discard is only this one's.
         assert s.do(corepb.Effect(**{how: corepb.Id(id=9)})) is (how == "discard")
-        await asyncio.sleep(0.2)
+        # Done with once the write in flight is over and the file is deleted (a slow runner's
+        # thread can take a while).
+        await until("the download dropped", lambda: 9 not in s._files)
         assert got == []
         assert not os.path.exists(download_path(state, "", 9))
         await s.shutdown()
