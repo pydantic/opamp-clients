@@ -1099,7 +1099,9 @@ def _from_code(tmp_path, option: str, given: dict, variables: dict):
 
 def _expect(tmp_path, read, expected) -> None:
     if expected is DEFAULT_DIR:
-        assert read is not None and read.is_relative_to(tmp_path / "opamp")
+        # Under the base directory each OS has (docs/default-state-dir.md), all set to tmp_path.
+        base = tmp_path / "Library" / "Application Support" if sys.platform == "darwin" else tmp_path
+        assert read is not None and read.is_relative_to(base / "opamp")
     else:
         assert read == expected
 

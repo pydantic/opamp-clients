@@ -248,7 +248,7 @@ class PropertiesTest {
   }
 
   private static Thread start(Runnable r) {
-    Thread t = new Thread(r);
+    Thread t = new Thread(r, ChurnTest.HARNESS + "server"); // not the client's: ChurnTest leaves it out
     t.setDaemon(true);
     t.start();
     return t;
@@ -262,7 +262,7 @@ class PropertiesTest {
   /** Over plain HTTP. */
   static final class HttpOpamp implements Server {
     private final HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    private final ExecutorService pool = Executors.newCachedThreadPool();
+    private final ExecutorService pool = Executors.newCachedThreadPool(r -> new Thread(r, ChurnTest.HARNESS + "http"));
 
     HttpOpamp(Function<Opamp.AgentToServer, byte[]> reply) throws IOException {
       server.setExecutor(pool);
