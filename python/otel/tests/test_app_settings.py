@@ -26,7 +26,7 @@ APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
 LAYER = SdkSettings()
 VECTORS = json.loads((Path(__file__).resolve().parents[3] / "testdata" / "sdk-settings"
-                      / "custom.json").read_text())
+                      / "custom.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture(autouse=True)

@@ -29,7 +29,7 @@ def _varint(n: int) -> bytes:
 def core_state(document: bytes | None) -> bytes:
     """A client state whose config applied has `document` as its policy (None: a config with no
     policy)."""
-    base = next(c for c in json.loads(START.read_text())["cases"] if c["name"] == BEFORE)["core_state"]
+    base = next(c for c in json.loads(START.read_text(encoding="utf-8"))["cases"] if c["name"] == BEFORE)["core_state"]
     m = config_map(document)
     applied = opamp_pb2.AgentRemoteConfig(config=m, config_hash=b"applied").SerializeToString()
     return bytes.fromhex(base) + b"\x82\x01" + _varint(len(applied)) + applied
