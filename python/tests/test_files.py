@@ -424,7 +424,8 @@ def test_a_clients_saves_and_downloads_are_journaled_in_its_tap(mode: str, tmp_p
                             {"op": "write", "path": "state.bin.tmp", "data": data.hex()},
                             {"op": "sync", "path": "state.bin.tmp"},
                             {"op": "rename", "from": "state.bin.tmp", "to": "state.bin"},
-                            {"op": "syncdir", "path": "."}], f"save {id_}"
+                            # Windows can't sync a directory (Files.sync_dir): none is journaled there.
+                            *([] if os.name == "nt" else [{"op": "syncdir", "path": "."}])], f"save {id_}"
         assert Path(state).read_bytes() == [d for i, d in t.stores if ("stored", i) in t.answers()][-1]
 
         # The download's file: its directory made, the file made new, written in full, synced
