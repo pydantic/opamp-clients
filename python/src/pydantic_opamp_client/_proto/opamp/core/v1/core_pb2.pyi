@@ -495,12 +495,14 @@ class Url(_message.Message):
     def __init__(self, id: _Optional[int] = ..., url: _Optional[str] = ...) -> None: ...
 
 class StreamName(_message.Message):
-    __slots__ = ("id", "host")
+    __slots__ = ("id", "host", "server_origin")
     ID_FIELD_NUMBER: _ClassVar[int]
     HOST_FIELD_NUMBER: _ClassVar[int]
+    SERVER_ORIGIN_FIELD_NUMBER: _ClassVar[int]
     id: int
     host: str
-    def __init__(self, id: _Optional[int] = ..., host: _Optional[str] = ...) -> None: ...
+    server_origin: bool
+    def __init__(self, id: _Optional[int] = ..., host: _Optional[str] = ..., server_origin: bool = ...) -> None: ...
 
 class StreamSplice(_message.Message):
     __slots__ = ("id", "download", "bytes")

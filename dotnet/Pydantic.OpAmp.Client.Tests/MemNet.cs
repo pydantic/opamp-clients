@@ -373,7 +373,10 @@ internal sealed class MemNet : StreamsNet
         Handshake h;
         lock (this.gate)
         {
-            h = new Handshake(inner, options.TargetHost ?? string.Empty, ct, this.Deaf("tls", this.handshakes.Count));
+            h = new Handshake(inner, options.TargetHost ?? string.Empty, ct, this.Deaf("tls", this.handshakes.Count))
+            {
+                PresentsCertificate = options.ClientCertificateContext is not null || options.ClientCertificates is { Count: > 0 },
+            };
             this.handshakes.Add(h);
         }
 
@@ -476,6 +479,9 @@ internal sealed class MemNet : StreamsNet
         public Stream Inner { get; } = inner;
 
         public string Host { get; } = host;
+
+        /// <summary>Whether it would present a client certificate.</summary>
+        public bool PresentsCertificate { get; init; }
 
         public bool Ok() => this.Set(this.Inner);
     }

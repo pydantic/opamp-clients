@@ -670,6 +670,45 @@ def test_a_tls_handshake_that_completes_after_its_close_is_aborted(tmp_path) -> 
     asyncio.run(run())
 
 
+# The client certificate goes only to a TLS handshake the core says is with the server's own
+# origin (stream_start_tls's server_origin): any other gets the context without it, whose CAs are
+# the same.
+# covers: RULE-TLS-02
+def test_the_client_certificate_only_on_a_stream_to_the_servers_origin(tmp_path) -> None:
+    ca = trustme.CA()
+    agent = ca.issue_cert("agent")
+    tls = TLS(ca_pem=ca.cert_pem.bytes(), cert_pem=agent.cert_chain_pems[0].bytes(),
+              key_pem=agent.private_key_pem.bytes())
+
+    async def run() -> None:
+        contexts: list[object] = []
+
+        async def connect(factory, host, port):
+            proto = factory()
+            t = FakeTransport()
+            proto.connection_made(t)
+            return t, proto
+
+        async def start_tls(raw, proto, ctx, server_hostname=None):
+            contexts.append(ctx)
+            return FakeTransport()
+
+        transport = Transport(tls, proxy=Proxy.DIRECT)
+        assert transport.ssl is not transport.elsewhere_ssl
+        got: list[corepb.Input] = []
+        s = Streams(got.append, transport, str(tmp_path / "state"), connect=connect, start_tls=start_tls)
+        for id_, origin in ((1, True), (2, False)):
+            s.do(corepb.Effect(stream_open=corepb.StreamOpen(id=id_, host="h", port=1)))
+            await until("opened", lambda: len(got) == 2 * id_ - 1)
+            s.do(corepb.Effect(stream_start_tls=corepb.StreamName(id=id_, host="h", server_origin=origin)))
+            await until("TLS", lambda: len(got) == 2 * id_)
+            assert got[-1].WhichOneof("kind") == "stream_tls_ready"
+        assert contexts == [transport.ssl, transport.elsewhere_ssl]
+        await s.shutdown()
+
+    asyncio.run(run())
+
+
 def test_shutdown_ends_connects_handshakes_and_lingering_closes_at_once(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(_streams, "LINGER_S", 60)
 

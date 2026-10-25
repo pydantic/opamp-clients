@@ -51,6 +51,12 @@ type streamRig struct {
 
 func newStreamRig(t *testing.T, p *streamPlatform, fsys fileSystem) *streamRig {
 	t.Helper()
+	return newStreamRigTLS(t, &tls.Config{}, p, fsys)
+}
+
+// newStreamRigTLS is newStreamRig with the operator's TLS settings cfg.
+func newStreamRigTLS(t *testing.T, cfg *tls.Config, p *streamPlatform, fsys fileSystem) *streamRig {
+	t.Helper()
 	r := &streamRig{t: t, state: filepath.Join(t.TempDir(), "state")}
 	r.x = newExecutor(&connection{})
 	r.x.setStateFile(r.state)
@@ -64,7 +70,7 @@ func newStreamRig(t *testing.T, p *streamPlatform, fsys fileSystem) *streamRig {
 		r.journal = append(r.journal, m)
 		r.mu.Unlock()
 	})
-	r.s = newStreams(r.x, &tls.Config{}, newCoreProxies(Proxy{Direct: true}, nil), p)
+	r.s = newStreams(r.x, cfg, newCoreProxies(Proxy{Direct: true}, nil), p)
 	r.x.streams = r.s
 	t.Cleanup(func() {
 		if !r.x.fl.closed {
@@ -159,7 +165,12 @@ func sClose(id uint64, abort bool) *corepb.Effect {
 }
 
 func sTLS(id uint64, host string) *corepb.Effect {
-	return &corepb.Effect{Kind: &corepb.Effect_StreamStartTls{StreamStartTls: &corepb.StreamName{Id: id, Host: host}}}
+	return sTLSAt(id, host, true)
+}
+
+// sTLSAt asks for TLS, at the server's own origin or not.
+func sTLSAt(id uint64, host string, serverOrigin bool) *corepb.Effect {
+	return &corepb.Effect{Kind: &corepb.Effect_StreamStartTls{StreamStartTls: &corepb.StreamName{Id: id, Host: host, ServerOrigin: serverOrigin}}}
 }
 
 func sResolve(id uint64, host string) *corepb.Effect {
@@ -340,6 +351,48 @@ func TestStreamsATLSHandshakeAfterItsCloseIsClosed(t *testing.T) {
 	}
 	r.quiet(100 * time.Millisecond)
 	_ = handed
+}
+
+// The operator's TLS settings for the server (its client certificate, skipping verification) go
+// only to a handshake the core says is with the server's own origin (stream_start_tls's
+// server_origin). Any other, a file elsewhere or an https:// proxy, presents no certificate and
+// verifies, against the CAs the operator trusts.
+func TestStreamsTheServersTLSSettingsOnlyAtItsOrigin(t *testing.T) {
+	ca := newTestCA(t, "test CA")
+	_, _, pair := ca.issue(t, "agent", false)
+	operator := &tls.Config{RootCAs: ca.pool, Certificates: []tls.Certificate{pair}, InsecureSkipVerify: true,
+		MinVersion: tls.VersionTLS13}
+	for _, origin := range []bool{true, false} {
+		d := newPipeDialer()
+		asked := make(chan *tls.Config, 1)
+		r := newStreamRigTLS(t, operator, &streamPlatform{dial: d.dial, startTLS: func(_ context.Context, c net.Conn, cfg *tls.Config) (net.Conn, error) {
+			asked <- cfg
+			return c, nil
+		}}, nil)
+		r.do(nil, sOpen(1, "example.com", 443))
+		d.server(t)
+		opened := r.next()
+		r.do(&opened, sTLSAt(1, "example.com", origin))
+		var cfg *tls.Config
+		select {
+		case cfg = <-asked:
+		case <-time.After(10 * time.Second):
+			t.Fatal("no handshake")
+		}
+		if got := r.take(); got.GetStreamTlsReady().GetId() != 1 {
+			t.Fatalf("server_origin %v: %v", origin, got)
+		}
+		if cfg.ServerName != "example.com" || cfg.RootCAs != ca.pool || cfg.MinVersion != tls.VersionTLS13 {
+			t.Errorf("server_origin %v: the CAs, name and versions are the operator's: %+v", origin, cfg)
+		}
+		presents := len(cfg.Certificates) > 0 || cfg.GetClientCertificate != nil
+		if presents != origin || cfg.InsecureSkipVerify != origin {
+			t.Errorf("server_origin %v: certificate %v, skips verification %v", origin, presents, cfg.InsecureSkipVerify)
+		}
+		if operator.InsecureSkipVerify != true || len(operator.Certificates) != 1 {
+			t.Fatal("the operator's settings changed")
+		}
+	}
 }
 
 // A resolution that completes after its close (or stop) is reported to no one.

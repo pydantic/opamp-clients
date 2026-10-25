@@ -2967,7 +2967,7 @@ type Effect_StreamOpen struct {
 }
 
 type Effect_StreamStartTls struct {
-	StreamStartTls *StreamName `protobuf:"bytes,13,opt,name=stream_start_tls,json=streamStartTls,proto3,oneof"` // start TLS on the stream for host, with the operator's TLS settings
+	StreamStartTls *StreamName `protobuf:"bytes,13,opt,name=stream_start_tls,json=streamStartTls,proto3,oneof"` // start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
 }
 
 type Effect_StreamWrite struct {
@@ -3133,9 +3133,15 @@ func (x *Url) GetUrl() string {
 }
 
 type StreamName struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"` // the stream
-	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"` // the stream
+	Host  string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	// stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+	// Download.server_origin says of a file. Only then present the client certificate you have for
+	// the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+	// an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+	// keeps a stream for one or the other: every request it carries is for the same.
+	ServerOrigin  bool `protobuf:"varint,3,opt,name=server_origin,json=serverOrigin,proto3" json:"server_origin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3182,6 +3188,13 @@ func (x *StreamName) GetHost() string {
 		return x.Host
 	}
 	return ""
+}
+
+func (x *StreamName) GetServerOrigin() bool {
+	if x != nil {
+		return x.ServerOrigin
+	}
+	return false
 }
 
 type StreamSplice struct {
@@ -5274,11 +5287,12 @@ const file_opamp_core_v1_core_proto_rawDesc = "" +
 	"\x05abort\x18\x02 \x01(\bR\x05abort\"'\n" +
 	"\x03Url\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x10\n" +
-	"\x03url\x18\x02 \x01(\tR\x03url\"0\n" +
+	"\x03url\x18\x02 \x01(\tR\x03url\"U\n" +
 	"\n" +
 	"StreamName\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x12\n" +
-	"\x04host\x18\x02 \x01(\tR\x04host\"P\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12#\n" +
+	"\rserver_origin\x18\x03 \x01(\bR\fserverOrigin\"P\n" +
 	"\fStreamSplice\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x1a\n" +
 	"\bdownload\x18\x02 \x01(\x04R\bdownload\x12\x14\n" +

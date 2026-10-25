@@ -538,7 +538,7 @@ public final class OpampClient {
     } else {
       transport = Transport.build(config.tls, config.proxy, config.direct);
     }
-    java.util.function.Function<String, javax.net.ssl.SSLEngine> engines = coreMode ? Streams.engines(config.tls) : null;
+    Streams.Engines engines = coreMode ? Streams.originEngines(config.tls) : null;
     // The transport is the endpoint's, as the core reads it: this client carries out whichever
     // effects come. The core keeps every effect's time (this client carries out its cancels),
     // decides what a download's status means, and makes the backoff's jitter seed from the
