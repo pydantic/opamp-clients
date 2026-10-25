@@ -72,10 +72,14 @@ public class TlsTests
             RandomNumberGenerator.Fill(serial);
             using var cert = req.Create(ca, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(12), serial);
             using var withKey = cert.CopyWithPrivateKey(key);
+            // Exportable: the client's key is written out as PEM, which macOS refuses for a key
+            // loaded without it.
 #if NET9_0_OR_GREATER
-            return X509CertificateLoader.LoadPkcs12(withKey.Export(X509ContentType.Pkcs12), null);
+            return X509CertificateLoader.LoadPkcs12(
+                withKey.Export(X509ContentType.Pkcs12), null, X509KeyStorageFlags.Exportable);
 #else
-            return new X509Certificate2(withKey.Export(X509ContentType.Pkcs12));
+            return new X509Certificate2(
+                withKey.Export(X509ContentType.Pkcs12), (string?)null, X509KeyStorageFlags.Exportable);
 #endif
         }
     }
