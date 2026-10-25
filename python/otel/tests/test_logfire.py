@@ -36,7 +36,11 @@ class _Ingest:
                 if encoding == "gzip":
                     body = gzip.decompress(body)
                 elif encoding == "zstd":
-                    from backports.zstd import decompress  # noqa: PLC0415
+                    # In the standard library from 3.14; the backport before.
+                    if sys.version_info >= (3, 14):
+                        from compression.zstd import decompress  # noqa: PLC0415
+                    else:
+                        from backports.zstd import decompress  # noqa: PLC0415
 
                     body = decompress(body)
                 encodings.add(encoding)
