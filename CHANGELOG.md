@@ -58,6 +58,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Node.js (`@pydantic/opamp-otel`): the register runs the instrumentations' loader hook for
+  `import` in the application's thread (`module.registerHooks`) on Node.js 22.22.3, 24.11.1, 25.1.0,
+  26 and later, instead of on a loader thread with a V8 isolate of its own: about 7 MB less
+  resident memory for a small HTTP app, with the same instrumentations. Older Node.js keeps the
+  loader thread (#PR).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
 
