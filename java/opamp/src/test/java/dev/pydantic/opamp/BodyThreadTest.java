@@ -186,7 +186,7 @@ class BodyThreadTest {
     long t0 = System.nanoTime();
     c.stop().get(10, TimeUnit.SECONDS);
     long ms = (System.nanoTime() - t0) / 1_000_000;
-    assertTrue(ms < 2_000 + 900, "stop took " + ms + " ms");
+    assertTrue(ms < 2_000 + 1_000 + 500, "stop took " + ms + " ms: more than its stop timeout (2 s) and the grace (1 s)");
     for (String n = heard.poll(2, TimeUnit.SECONDS); ; n = heard.poll(2, TimeUnit.SECONDS)) {
       assertNotNull(n, "stopped is told");
       if (n.equals("Stopped")) {

@@ -590,6 +590,136 @@ class FilesTest {
     assertEquals("remove", ev.get(ev.size() - 1).file().get("op"), "the removal is the last word");
   }
 
+  /**
+   * A download's file still being flushed when the core says stopped is the shell's to delete (the
+   * core gave up on it), once the flush is over; and by the time stop returns, however much of the
+   * stop timeout the core took (STOP_GRACE_MS at least, after it). With 250 ms, a loaded runner
+   * left the file to be deleted after stop had returned (the nightly of 2026-10-23, seed 20749003);
+   * here the flush takes 600 ms, as Node's test of the same.
+   */
+  // covers: RULE-SHELL-07
+  @ParameterizedTest
+  @EnumSource(OpampClient.Mode.class)
+  void aDownloadsFileBeingFlushedAsTheCoreStopsIsGoneWhenStopReturns(OpampClient.Mode mode, @TempDir Path dir)
+      throws Exception {
+    long flushMs = 600; // longer than the stop timeout, within the grace after it
+    long stopMs = 100;
+    Path state = dir.resolve(STATE);
+    Path downloads = Executor.downloadsDir(state).toAbsolutePath();
+    CountDownLatch flushing = new CountDownLatch(1);
+    CountDownLatch flushed = new CountDownLatch(1);
+    try (Servers s = new Servers(1)) {
+      OpampClient.Config config = OpampClient.Config.builder(LifecycleTest.endpoint(s.opamp), UID)
+          .mode(mode)
+          .environment(Map.of())
+          .heartbeatInterval(Duration.ofSeconds(60))
+          .stopTimeout(Duration.ofMillis(stopMs))
+          .stateFile(state)
+          .acceptPackages(true)
+          .build();
+      List<String> installed = new CopyOnWriteArrayList<>();
+      OpampClient c = OpampClient.start(config, OpampClient.Status.of(null), n -> {
+        if (n instanceof Notification.InstallPackage ip) {
+          installed.add(ip.name());
+        }
+      }, null, dir.resolve("f.tap").toString(), d -> new SlowFlush(d, downloads, flushMs, flushing, flushed));
+      assertTrue(flushing.await(20, TimeUnit.SECONDS), "the download's file is being flushed");
+      long t0 = System.nanoTime();
+      c.stop().get(20, TimeUnit.SECONDS);
+      long took = (System.nanoTime() - t0) / 1_000_000;
+      List<String> atReturn = listing(downloads);
+      assertTrue(flushed.await(flushMs + 5_000, TimeUnit.MILLISECONDS), "the flush ended");
+      Thread.sleep(500);
+      assertEquals(List.of(), atReturn, "stop returned with the file still there (deleted later: "
+          + listing(downloads).isEmpty() + ")");
+      assertEquals(List.of(), listing(downloads));
+      assertTrue(took < stopMs + 1_000 + 500, "stop took " + took + " ms");
+      assertEquals(List.of(), installed);
+    }
+  }
+
+  static List<String> listing(Path d) throws IOException {
+    if (!Files.isDirectory(d)) {
+      return List.of();
+    }
+    try (var files = Files.list(d)) {
+      return files.map(p -> p.getFileName().toString()).sorted().toList();
+    }
+  }
+
+  /** The real disk, but a download's file takes {@code flushMs} to flush. */
+  static final class SlowFlush implements Disk {
+    private final Disk inner;
+    private final Path downloads;
+    private final long flushMs;
+    private final CountDownLatch flushing;
+    private final CountDownLatch flushed;
+
+    SlowFlush(Disk inner, Path downloads, long flushMs, CountDownLatch flushing, CountDownLatch flushed) {
+      this.inner = inner;
+      this.downloads = downloads;
+      this.flushMs = flushMs;
+      this.flushing = flushing;
+      this.flushed = flushed;
+    }
+
+    @Override
+    public Handle create(Path path, boolean inherit) throws IOException {
+      Handle h = inner.create(path, inherit);
+      if (!path.toAbsolutePath().startsWith(downloads)) {
+        return h;
+      }
+      return new Handle() {
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+          h.write(b, off, len);
+        }
+
+        @Override
+        public void sync() throws IOException {
+          flushing.countDown();
+          try {
+            Thread.sleep(flushMs);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+          h.sync();
+          flushed.countDown();
+        }
+
+        @Override
+        public void close() throws IOException {
+          h.close();
+        }
+      };
+    }
+
+    @Override
+    public boolean remove(Path path) throws IOException {
+      return inner.remove(path);
+    }
+
+    @Override
+    public void rename(Path from, Path to) throws IOException {
+      inner.rename(from, to);
+    }
+
+    @Override
+    public boolean syncDir(Path d) throws IOException {
+      return inner.syncDir(d);
+    }
+
+    @Override
+    public boolean mkdir(Path d) throws IOException {
+      return inner.mkdir(d);
+    }
+
+    @Override
+    public boolean clear(Path d) throws IOException {
+      return inner.clear(d);
+    }
+  }
+
   // ---------------------------------------------------------------------------------------------
   // Servers.
 
