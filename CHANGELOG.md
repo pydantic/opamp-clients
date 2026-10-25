@@ -20,12 +20,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
-- Collector: the `logfirepolicy` processor (`go/logfirepolicyprocessor`) is gone, and collectors
-  no longer take the Logfire SDK policy: a collector's remote config is its YAML. The Supervisor
-  answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
-  processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
-  `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
-  carry the processor (#80).
+- Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
 
 ### Added
 
@@ -63,13 +58,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Supervisor: hosts enrolled with `pydantic-opamp-enroll` (Linux, macOS, Windows) accept the server's
-  restart command (`accepts_restart_command`), so the server can restart the host's collector
-  (#88).
-- Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
-  root or the transparency log unreachable) is tried again after a wait instead of being reported
-  failed for good, and a rollback that can't put the previous executable back is reported failed
-  (what the host has unknown) instead of not being reported at all (#81).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
 
@@ -82,7 +70,7 @@ and date. Tests, CI and docs alone don't need a line.
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every
   download host (#81).
-- Go, Python, Node.js, Java, .NET (core mode), and the Supervisor: the same in core mode. Each TLS
+- Go, Python, Node.js, Java, .NET (core mode): the same in core mode. Each TLS
   handshake the core asks for says whether it is with the server's own origin; only then is the
   client certificate presented (and, in Go, verification skipped where it is for the server). A
   file elsewhere, and TLS to an https:// proxy, get neither; the CAs still apply. On core
@@ -94,6 +82,35 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.5.0 (2026-10-25)
+
+`go/opampsupervisor/v0.5.0`, on core 0.11.0. The Go modules are not released with it.
+
+### Breaking
+
+- Collector: the `logfirepolicy` processor (`go/logfirepolicyprocessor`) is gone, and collectors
+  no longer take the Logfire SDK policy: a collector's remote config is its YAML. The Supervisor
+  answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
+  processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
+  `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
+  carry the processor (#80).
+
+### Changed
+
+- Supervisor: hosts enrolled with `pydantic-opamp-enroll` (Linux, macOS, Windows) accept the server's
+  restart command (`accepts_restart_command`), so the server can restart the host's collector
+  (#88).
+- Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
+  root or the transparency log unreachable) is tried again after a wait instead of being reported
+  failed for good, and a rollback that can't put the previous executable back is reported failed
+  (what the host has unknown) instead of not being reported at all (#81).
+
+### Security
+
+- The client certificate configured for the OpAMP server is presented only on TLS with the
+  server's own origin; a package file elsewhere, and TLS to an https:// proxy, get neither (it was
+  presented to every download host). The CAs still apply (#87).
 
 ## Supervisor 0.4.0 and the Go modules 0.2.0 (2026-10-22)
 
