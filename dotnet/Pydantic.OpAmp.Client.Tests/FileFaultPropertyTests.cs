@@ -142,6 +142,10 @@ public class FileFaultPropertyTests
         }
     }
 
+    /// <summary>The steps' inputs, for a failure's message: their kinds, and why each save failed.</summary>
+    private static string Said(List<TapRecord> records) => string.Join(", ", TapKit.Inputs(records).Select(i =>
+        i.Input.KindCase == Input.KindOneofCase.StoreFailed ? $"StoreFailed ({i.Input.StoreFailed.Detail})" : i.Input.KindCase.ToString()));
+
     private static int Answered(List<TapRecord> records, Input.KindOneofCase kind) =>
         TapKit.Inputs(records).Count(i => i.Input.KindCase == kind);
 
@@ -225,7 +229,7 @@ public class FileFaultPropertyTests
 
             if (!await UntilAsync(() => Answered(Records(tapA), Input.KindOneofCase.Stored) > faulty.StoredBefore))
             {
-                throw new InvalidOperationException("no save stored after the fault");
+                throw new InvalidOperationException($"no save stored after the fault (saves stored before it: {faulty.StoredBefore}; the tap's inputs: {Said(Records(tapA))})");
             }
 
             if (plan.Download != DownloadFault.None && !await UntilAsync(() => faulty.DownloadFaulted))

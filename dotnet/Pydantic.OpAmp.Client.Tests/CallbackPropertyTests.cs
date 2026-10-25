@@ -954,7 +954,15 @@ public class CallbackPropertyTests
             {
                 this.open = false;
                 ws.Abort();
-                ctx.Response.Abort();
+                try
+                {
+                    ctx.Response.Abort();
+                }
+                catch (ObjectDisposedException)
+                {
+                    // The listener is closed already, and its requests with it (on Windows, http.sys
+                    // drops its request queue then; a cancel on it throws).
+                }
             }
         }
     }
