@@ -41,6 +41,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor: hosts enrolled with `pydantic-opamp-enroll` (Linux, macOS, Windows) accept the server's
+  restart command (`accepts_restart_command`), so the server can restart the host's collector
+  (#88).
 - Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
   root or the transparency log unreachable) is tried again after a wait instead of being reported
   failed for good, and a rollback that can't put the previous executable back is reported failed
