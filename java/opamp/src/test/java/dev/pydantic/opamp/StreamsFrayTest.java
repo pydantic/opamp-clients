@@ -168,7 +168,7 @@ class StreamsFrayTest {
         dir = Files.createTempDirectory("fray-streams");
         state = dir.resolve("state");
         net.names.put("proxy.example", List.of("192.0.2.1"));
-        x = new Streams(loop, this::admitted, net, host -> {
+        x = new Streams(loop, this::admitted, net, (host, serverOrigin) -> {
           throw new IllegalStateException("no TLS here");
         }, url -> CoreProto.ProxyAnswer.newBuilder(), Disk.REAL, state, id -> Executor.downloadsDir(state).resolve("d" + id));
         network.start();

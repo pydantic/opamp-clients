@@ -15,13 +15,14 @@ import net, { type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { TLSSocket } from "node:tls";
+import tls, { type TLSSocket } from "node:tls";
 
 import fc from "fast-check";
 import { WebSocketServer } from "ws";
 
 import { EffectSchema, type Input } from "../src/gen/opamp/core/v1/core_pb.js";
 import { Executor } from "../src/executor.js";
+import { Streams } from "../src/streams.js";
 import {
   AgentCapabilities,
   AgentDescriptionSchema,
@@ -577,6 +578,43 @@ test("downloads go the same way: the CA, the client certificate (at the server's
     for (const h of server.handshakes) assert.equal(h.peer, "test-agent");
   } finally {
     for (const s of [server, other, httpProxy, socks]) s.close();
+  }
+});
+
+// Core mode: the client certificate goes only to a TLS handshake the core says is with the
+// server's own origin (stream_start_tls's serverOrigin); any other presents none, and the CA still
+// applies.
+// covers: RULE-TLS-02
+test("core mode: the client certificate only on a stream to the server's origin", async () => {
+  const peers: (string | undefined)[] = [];
+  const server = tls.createServer({ ...SERVER, ca: CA, requestCert: true, rejectUnauthorized: false }, (s) => {
+    peers.push((s.getPeerCertificate()?.subject?.CN as string | undefined) || undefined);
+    s.end();
+  });
+  const port = await listen(server);
+  const got: Input[] = [];
+  const state = join(mkdtempSync(join(tmpdir(), "opamp-tls-")), "state");
+  const s = new Streams((i) => got.push(i), new Transport({ tls: { ca: CA, ...CLIENT }, proxy: false }), state);
+  const kind = (id: bigint) => got.find((i) => (i.kind.value as { id?: bigint }).id === id)?.kind.case;
+  try {
+    for (const [id, serverOrigin] of [
+      [1n, true],
+      [2n, false],
+    ] as const) {
+      s.do(create(EffectSchema, { kind: { case: "streamOpen", value: { id, host: "127.0.0.1", port } } }));
+      await until("opened", () => kind(id) === "streamOpened");
+      got.length = 0;
+      const value = { id, host: "localhost", serverOrigin };
+      s.do(create(EffectSchema, { kind: { case: "streamStartTls", value } }));
+      await until("TLS", () => kind(id) !== undefined);
+      assert.equal(kind(id), "streamTlsReady", (got[0]?.kind.value as { detail?: string }).detail);
+      await until("the server's side", () => peers.length === Number(id));
+      assert.equal(peers.at(-1), serverOrigin ? "test-agent" : undefined, `serverOrigin ${serverOrigin}`);
+      got.length = 0;
+    }
+  } finally {
+    await s.shutdown();
+    server.close();
   }
 });
 

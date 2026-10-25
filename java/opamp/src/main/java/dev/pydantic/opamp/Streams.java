@@ -174,6 +174,28 @@ final class Streams {
    * that can't work fail here.
    */
   static Function<String, SSLEngine> engines(Tls tls) {
+    return engine(tls);
+  }
+
+  /**
+   * {@link #engines}, for a handshake with the server's own origin or not (stream_start_tls's
+   * server_origin): only the server's gets the operator's client certificate; any other presents
+   * none, and the CAs and versions are the same.
+   */
+  static Engines originEngines(Tls tls) {
+    Function<String, SSLEngine> own = engine(tls);
+    Function<String, SSLEngine> elsewhere =
+        tls != null && tls.hasClientCertificate() ? engine(tls.withoutClientCertificate()) : own;
+    return (host, serverOrigin) -> (serverOrigin ? own : elsewhere).apply(host);
+  }
+
+  /** A client engine for a host, at the server's own origin or not. */
+  @FunctionalInterface
+  interface Engines {
+    SSLEngine engine(String host, boolean serverOrigin);
+  }
+
+  private static Function<String, SSLEngine> engine(Tls tls) {
     javax.net.ssl.SSLContext ctx;
     String[] protocols;
     if (tls != null) {
@@ -290,7 +312,7 @@ final class Streams {
   private final ScheduledExecutorService loop;
   private final Consumer<CoreProto.Input> deliver;
   private final Platform platform;
-  private final Function<String, SSLEngine> tls;
+  private final Engines tls;
   private final Function<String, CoreProto.ProxyAnswer.Builder> proxies;
   private final Disk disk;
   private final Path stateFile;
@@ -312,10 +334,11 @@ final class Streams {
   /**
    * Core mode's executor. {@code loop}: the client's thread, where effects are carried out and
    * where {@code deliver} feeds the core; {@code tls}: a client engine for a host, with the
-   * operator's settings; {@code proxies}: the answer to proxy_query for a URL.
+   * operator's settings ({@link #originEngines}: the client certificate at the server's own origin
+   * only); {@code proxies}: the answer to proxy_query for a URL.
    */
   Streams(ScheduledExecutorService loop, Consumer<CoreProto.Input> deliver, Platform platform,
-      Function<String, SSLEngine> tls, Function<String, CoreProto.ProxyAnswer.Builder> proxies, Disk disk,
+      Engines tls, Function<String, CoreProto.ProxyAnswer.Builder> proxies, Disk disk,
       Path stateFile, LongFunction<Path> downloadPath) {
     this.loop = loop;
     this.deliver = deliver;
@@ -349,7 +372,8 @@ final class Streams {
       }
       case STREAM_RESOLVE -> resolve(e.getStreamResolve().getId(), e.getStreamResolve().getHost());
       case STREAM_OPEN -> open(e.getStreamOpen().getId(), e.getStreamOpen().getHost(), e.getStreamOpen().getPort());
-      case STREAM_START_TLS -> startTls(e.getStreamStartTls().getId(), e.getStreamStartTls().getHost());
+      case STREAM_START_TLS -> startTls(e.getStreamStartTls().getId(), e.getStreamStartTls().getHost(),
+          e.getStreamStartTls().getServerOrigin());
       case STREAM_WRITE -> write(e.getStreamWrite().getId(), e.getStreamWrite().getData().toByteArray());
       case STREAM_CLOSE -> {
         long id = e.getStreamClose().getId();
@@ -593,7 +617,7 @@ final class Streams {
     }
   }
 
-  private void startTls(long id, String host) {
+  private void startTls(long id, String host, boolean serverOrigin) {
     Stream s = in.streams.get(id);
     if (s == null || s.conn == null || s.pending) {
       return;
@@ -601,7 +625,7 @@ final class Streams {
     // From now on the bytes are TLS's until the handshake is done: the core hears of it first.
     s.pending = true;
     try {
-      SSLEngine engine = tls.apply(host);
+      SSLEngine engine = tls.engine(host, serverOrigin);
       synchronized (s) {
         s.startTls(engine);
       }

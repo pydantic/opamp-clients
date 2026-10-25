@@ -90,6 +90,34 @@ public class StreamsTests
         Assert.Equal(0, r.S.Live);
     }
 
+    // The client certificate goes only to a handshake the core says is with the server's own
+    // origin (stream_start_tls's server_origin); any other presents none, the CAs the same.
+    // covers: RULE-TLS-02
+    [Fact]
+    public void TheClientCertificateOnlyOnAStreamToTheServersOrigin()
+    {
+        var dir = ShellTablesTests.Dir();
+        var tls = new OpAmpTlsOptions
+        {
+            CaPem = File.ReadAllText(Path.Combine(dir, "tls", "ca.pem")),
+            ClientCertPem = File.ReadAllText(Path.Combine(dir, "tls", "client-ec.pem")),
+            ClientKeyPem = File.ReadAllText(Path.Combine(dir, "tls", "client-ec.key")),
+        };
+        using var r = new StreamsRig(tls: tls);
+        r.Net.OnDial = d => d.Accept();
+        r.Net.OnHandshake = h => h.Ok();
+        foreach (var (id, origin) in new[] { (1UL, true), (2UL, false) })
+        {
+            r.Run(Fx.Open(id, "server.test", 443));
+            Assert.Equal(Input.KindOneofCase.StreamOpened, r.Next()!.KindCase);
+            r.Run(Fx.Tls(id, "server.test", origin));
+            Assert.Equal(Input.KindOneofCase.StreamTlsReady, r.Next()!.KindCase);
+            var h = r.Net.Handshakes[(int)id - 1];
+            Assert.Equal("server.test", h.Host);
+            Assert.Equal(origin, h.PresentsCertificate);
+        }
+    }
+
     // covers: RULE-SHELL-04, RULE-SHELL-06
     [Fact]
     public void AResolutionIsToldOnceAndNotAfterItsClose()
@@ -625,7 +653,8 @@ internal static class Fx
 {
     public static Effect Open(ulong id, string host = "server.test", uint port = 80) => new() { StreamOpen = new StreamOpen { Id = id, Host = host, Port = port } };
 
-    public static Effect Tls(ulong id, string host) => new() { StreamStartTls = new StreamName { Id = id, Host = host } };
+    public static Effect Tls(ulong id, string host, bool serverOrigin = true) =>
+        new() { StreamStartTls = new StreamName { Id = id, Host = host, ServerOrigin = serverOrigin } };
 
     public static Effect Resolve(ulong id, string host) => new() { StreamResolve = new StreamName { Id = id, Host = host } };
 
@@ -655,13 +684,13 @@ internal sealed class StreamsRig : IDisposable
     private readonly string? dir;
     private Queued? last;
 
-    public StreamsRig(TimeProvider? time = null, Func<string, ProxyAnswer>? proxy = null, IFileOps? files = null, string? state = null)
+    public StreamsRig(TimeProvider? time = null, Func<string, ProxyAnswer>? proxy = null, IFileOps? files = null, string? state = null, OpAmpTlsOptions? tls = null)
     {
         this.dir = state is null ? Directory.CreateTempSubdirectory("opamp-streams-").FullName : null; // the test's own, if it gives one
         this.State = state ?? Path.Combine(this.dir!, "state");
         this.Files = new HeldFiles(files ?? FileOps.Real);
         this.X = new Executor(new MemoryTransport(), this.Queue.Add, this.State, time, this.Files);
-        this.S = new Streams(this.X, this.Queue.Add, ClientTransport.SslOptions(new OpAmpTlsOptions()), proxy ?? (_ => new ProxyAnswer()), this.Net, time);
+        this.S = new Streams(this.X, this.Queue.Add, ClientTransport.SslOptions(tls ?? new OpAmpTlsOptions()), proxy ?? (_ => new ProxyAnswer()), this.Net, time);
     }
 
     public BlockingCollection<Queued> Queue { get; } = new();
