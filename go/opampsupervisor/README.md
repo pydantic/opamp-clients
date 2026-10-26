@@ -187,8 +187,8 @@ agent:
   `supervisor-status.json` in its storage directory: the OpAMP connection (and, when it can't
   connect, the error and what to check), the collector's health, and the last remote config's
   status, with no credentials. `opampsupervisor status --config supervisor.yaml` (or
-  `--storage DIR`, when the config reads files only the service can) prints it, `--json` as JSON,
-  is, and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
+  `--storage DIR`, when the config reads files only the service can) prints it (`--json`: as JSON),
+  and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
