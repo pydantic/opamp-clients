@@ -28,6 +28,9 @@ param(
     [string[]]$ExporterEndpoint,
     # The files, and directories, the server's configs may read logs from: none by default.
     [string[]]$LogPath,
+    # Let the server's configs read this host's Windows event logs (never a remote host's),
+    # keeping their read positions in ProgramData\pydantic-opamp\var\collector.
+    [switch]$HostLogs,
     # Install the collector the server offers, if this repository's release workflow signed it;
     # by default only the installed collector runs.
     [switch]$AcceptPackages,
@@ -152,6 +155,16 @@ if ($TelemetryTokenStdin) { Write-Atomically $telemetryPath $telemetryToken }
 $agentEnv = if (Test-Path -LiteralPath $telemetryPath -PathType Leaf) {
     "  env:`n    LOGFIRE_TOKEN: '`${file:$(Slashed $telemetryPath)}'`n"
 } else { '' }
+# -HostLogs: the event log receiver, and the file_storage extension that keeps where it got to, in
+# a directory of the Supervisor's own.
+$receivers = '[otlp, host_metrics, hostmetrics, file_log, filelog, nop]'
+$extensions = '[health_check]'
+$storageDirectories = ''
+if ($HostLogs) {
+    $receivers = '[otlp, host_metrics, hostmetrics, file_log, filelog, nop, windows_event_log, windowseventlog]'
+    $extensions = '[health_check, file_storage]'
+    $storageDirectories = "`n    # Where its file_storage extensions may keep files: these directories, and what is under them.`n    allowed_storage_directories: $(YamlList @(Slashed (Join-Path $root 'var\collector')))"
+}
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
 Write-Atomically (Join-Path $root 'supervisor.yaml') @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
@@ -182,16 +195,16 @@ $agentEnv
   remote_config_policy:
     # The component types a Logfire config uses, by their names and their older aliases.
     allowed_components:
-      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
-      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      receivers: $receivers
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
-      extensions: [health_check]
+      extensions: $extensions
     # No arbitrary `${...}: only locally bound credential environment names are permitted.
     allowed_providers: []
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
     # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))$package
+    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))$storageDirectories$package
 
 storage:
   directory: '$(Slashed (Join-Path $root 'var'))'

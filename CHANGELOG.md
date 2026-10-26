@@ -21,12 +21,22 @@ and date. Tests, CI and docs alone don't need a line.
 ### Breaking
 
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
+- Supervisor: with a remote config policy, a `file_storage` extension in the server's config
+  must name a directory under `allowed_storage_directories`. A host that allowed `file_storage`
+  in `allowed_components` by hand needs that list too (#94).
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
   Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
 
 ### Added
 
+- Supervisor installers: `--host-logs` (`-HostLogs` on Windows) lets the server's configs read
+  the host's system logs: `macos_unified_logging` on macOS, `windows_event_log` on Windows, and
+  the files under `/var/log` on Linux, with `file_storage` keeping read positions in the
+  Supervisor's own directory. The remote config policy has `allowed_storage_directories`, and
+  refuses a `remote` event log receiver and a unified logging `archive_path` (#94).
+- Supervisor installers: the collector has the `resource` processor, and the policy allows it,
+  so a server's config can name the service its data comes from (#94).
 - .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
   instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
   tests run on both. Building from source needs the .NET 10 SDK (#86).
@@ -43,6 +53,8 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: the collector it runs before the server sends a config no longer binds
+  `localhost:8888` for its internal metrics, so it no longer exits when that port is taken (#94).
 - .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
   report given while the agent was starting was lost until the next one (30 s on with the default
   health check publisher); the first message now carries it (#86).

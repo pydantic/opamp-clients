@@ -15,8 +15,8 @@ set -eu
 usage() {
 	cat >&2 <<'EOF'
 usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
-                             [--exporter-endpoint URL]... [--log-path PATH]... [--accept-packages]
-                             [--no-start]
+                             [--exporter-endpoint URL]... [--log-path PATH]... [--host-logs]
+                             [--accept-packages] [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
   --telemetry-token-stdin  read the enrollment token, then the telemetry token, on two input lines
@@ -27,6 +27,8 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
                            repeat it for more (default: the --endpoint's host, over https)
   --log-path PATH          a file, or a directory, the server's configs may read logs from;
                            repeat it for more (default: none)
+  --host-logs              let the server's configs read this host's system logs: the files under
+                           /var/log, keeping their read positions in /var/lib/pydantic-opamp/collector
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
   --no-start               write the config and credentials, but don't start the service
@@ -76,6 +78,7 @@ token_file=-
 ca_file=
 plaintext=
 accept_packages=
+host_logs=
 start=yes
 telemetry_stdin=
 while [ $# -gt 0 ]; do
@@ -87,6 +90,7 @@ while [ $# -gt 0 ]; do
 	--plaintext) plaintext=yes; shift ;;
 	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
 	--log-path) [ $# -ge 2 ] || usage; log_paths=$(append "$log_paths" "$2"); shift 2 ;;
+	--host-logs) host_logs=yes; shift ;;
 	--accept-packages) accept_packages=yes; shift ;;
 	--no-start) start=; shift ;;
 	*) usage ;;
@@ -146,6 +150,16 @@ done
 IFS=$old_ifs
 set +f
 [ -n "$root" ] || [ "$(id -u)" = 0 ] || fail "run it as root"
+# --host-logs: the system log files, and the file_storage extension that keeps where a receiver
+# got to, in a directory of the Supervisor's own.
+extensions="[health_check]"
+storage_directories=
+if [ -n "$host_logs" ]; then
+	log_paths=$(append "$log_paths" /var/log)
+	extensions="[health_check, file_storage]"
+	storage_directories="$nl    # Where its file_storage extensions may keep files: these directories, and what is under them.
+    allowed_storage_directories: [\"/var/lib/pydantic-opamp/collector\"]"
+fi
 
 telemetry_token=
 if [ -n "$telemetry_stdin" ]; then
@@ -262,15 +276,15 @@ $agent_env
     # The component types a Logfire config uses, by their names and their older aliases.
     allowed_components:
       receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
-      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
-      extensions: [health_check]
+      extensions: $extensions
     # No arbitrary \${...}: only locally bound credential environment names are permitted.
     allowed_providers: []
     # Where its exporters, and the collector's own telemetry, may send.
     allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
     # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(yaml_list "$log_paths")$package
+    allowed_log_paths: $(yaml_list "$log_paths")$storage_directories$package
 
 storage:
   directory: /var/lib/pydantic-opamp

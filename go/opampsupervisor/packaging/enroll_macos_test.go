@@ -157,3 +157,29 @@ func TestMacEnrollRefuses(t *testing.T) {
 		})
 	}
 }
+
+// --host-logs lets the server read this Mac's unified logs, but not an archive from any path.
+func TestMacEnrollHostLogs(t *testing.T) {
+	enroll := func(args ...string) config.RemoteConfigPolicy {
+		root, tools := t.TempDir(), t.TempDir()
+		out, err := macEnroll(t, root, tools, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--no-start"}, args...)...)
+		require.NoError(t, err, out)
+		etc := filepath.Join(root, "opt/pydantic-opamp/etc")
+		cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))
+		require.NoError(t, err)
+		collector := filepath.Join(t.TempDir(), "otelcol")
+		require.NoError(t, os.WriteFile(collector, nil, 0o755))
+		path := filepath.Join(t.TempDir(), "supervisor.yaml")
+		require.NoError(t, os.WriteFile(path, []byte(strings.NewReplacer(
+			"/opt/pydantic-opamp/etc/enroll-token", filepath.Join(etc, "enroll-token"),
+			"/opt/pydantic-opamp/bin/otelcol", collector,
+			"/opt/pydantic-opamp/var", t.TempDir(),
+		).Replace(string(cfg))), 0o600))
+		loaded, err := config.Load(path)
+		require.NoError(t, err)
+		return loaded.Agent.RemoteConfigPolicy
+	}
+	p := enroll("--host-logs")
+	assertHostLogs(t, p, enroll(), hostLogsConfig(t, "macos"), `configures receiver "macos_unified_logging"`)
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {macos_unified_logging: {archive_path: /tmp/x.logarchive}}`)), "sets archive_path")
+}

@@ -38,7 +38,7 @@ agent:
   remote_config_policy:
     allowed_components:
       receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
-      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
       exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
       extensions: [health_check]
     allowed_providers: []

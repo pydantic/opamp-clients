@@ -115,7 +115,7 @@ func TestEnroll(t *testing.T) {
 // packagedComponents are the component types every enroll script lets a remote config use.
 var packagedComponents = map[string][]string{
 	"receivers":  {"otlp", "host_metrics", "hostmetrics", "file_log", "filelog", "nop"},
-	"processors": {"batch", "memory_limiter", "resource_detection", "resourcedetection"},
+	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection"},
 	"exporters":  {"otlp_grpc", "otlp", "otlp_http", "otlphttp", "debug", "nop"},
 	"extensions": {"health_check"},
 }
@@ -347,4 +347,43 @@ func TestEnrollAcceptsPackages(t *testing.T) {
 	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--no-start")
 	require.NoError(t, err, out)
 	assertPackages(t, e.loadEnrolled(t), false, "")
+}
+
+// hostLogsConfig is testdata/host-logs-<goos>.yaml: a host monitoring config that reads the
+// system's logs, as a Logfire server offers one, with the given replacements made.
+func hostLogsConfig(t *testing.T, goos string, replacements ...string) []byte {
+	t.Helper()
+	body, err := os.ReadFile(filepath.Join("testdata", "host-logs-"+goos+".yaml"))
+	require.NoError(t, err)
+	return []byte(strings.NewReplacer(replacements...).Replace(string(body)))
+}
+
+// assertHostLogs checks a policy enrolled with --host-logs takes the host monitoring config, and
+// one enrolled without refuses it.
+func assertHostLogs(t *testing.T, withHostLogs, without config.RemoteConfigPolicy, body []byte, refusal string) {
+	t.Helper()
+	bindings := map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}
+	require.NoError(t, withHostLogs.CheckWithConnectionEnv("", body, bindings))
+	require.ErrorContains(t, without.CheckWithConnectionEnv("", body, bindings), refusal)
+}
+
+// --host-logs lets the server read the system's logs: the files under /var/log, with
+// file_storage keeping its place in the Supervisor's own directory, and nowhere else.
+func TestEnrollHostLogs(t *testing.T) {
+	enroll := func(args ...string) config.RemoteConfigPolicy {
+		e := newEnrollment(t)
+		out, err := e.run(t, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--no-start"}, args...)...)
+		require.NoError(t, err, out)
+		return e.loadEnrolled(t).Agent.RemoteConfigPolicy
+	}
+	p := enroll("--host-logs", "--log-path", "/srv/app/logs")
+	assert.Equal(t, []string{"/srv/app/logs", "/var/log"}, p.AllowedLogPaths)
+	// The test's stand-in for /var/lib/pydantic-opamp, as loadEnrolled makes it.
+	require.Len(t, p.AllowedStorageDirectories, 1)
+	storage := p.AllowedStorageDirectories[0]
+	assert.Equal(t, "collector", filepath.Base(storage))
+	body := hostLogsConfig(t, "linux", "/var/lib/pydantic-opamp/collector", storage)
+	assertHostLogs(t, p, enroll(), body, `configures extension "file_storage/host_logs"`)
+	require.ErrorContains(t, p.Check("", []byte(`extensions: {file_storage: {directory: /etc/cron.d}}`)), "allowed_storage_directories doesn't allow")
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {filelog: {include: [/etc/shadow]}}`)), "allowed_log_paths doesn't allow")
 }

@@ -1,0 +1,92 @@
+extensions:
+  file_storage/host_logs:
+    directory: C:/ProgramData/pydantic-opamp/var/collector
+    create_directory: true
+receivers:
+  host_metrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      disk: {}
+      filesystem:
+        exclude_fs_types:
+          fs_types:
+            - overlay
+            - tmpfs
+            - devtmpfs
+            - proc
+            - sysfs
+            - cgroup2fs
+            - autofs
+            - squashfs
+            - nsfs
+            - pipefs
+            - fuse
+          match_type: strict
+      network: {}
+      paging: {}
+  windows_event_log/application:
+    channel: Application
+    start_at: end
+    storage: file_storage/host_logs
+    retry_on_failure:
+      enabled: true
+  windows_event_log/system:
+    channel: System
+    start_at: end
+    storage: file_storage/host_logs
+    retry_on_failure:
+      enabled: true
+processors:
+  resource_detection/host:
+    detectors:
+      - system
+    override: false
+    system:
+      hostname_sources:
+        - os
+      resource_attributes:
+        host.id:
+          enabled: true
+        host.arch:
+          enabled: true
+        os.description:
+          enabled: true
+  resource/service:
+    attributes:
+      - key: service.name
+        value: windows-host
+        action: insert
+  batch: {}
+exporters:
+  otlp_http/logfire:
+    endpoint: https://logfire-us.pydantic.dev
+    headers:
+      Authorization: Bearer ${env:LOGFIRE_TOKEN}
+service:
+  extensions:
+    - file_storage/host_logs
+  pipelines:
+    metrics:
+      receivers:
+        - host_metrics
+      processors: &a1
+        - resource_detection/host
+        - resource/service
+        - batch
+      exporters:
+        - otlp_http/logfire
+    logs:
+      receivers:
+        - windows_event_log/application
+        - windows_event_log/system
+      processors: *a1
+      exporters:
+        - otlp_http/logfire

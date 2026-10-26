@@ -106,7 +106,9 @@ agent:
 - **The remote config can be limited** (`agent.remote_config_policy`), and the packages limit
   it: to the component types listed for each kind and the confmap providers listed; the
   exporters (and the collector's own telemetry) to the endpoints listed, with no proxy or TLS
-  setting of their own; and `filelog` receivers to the paths listed. So a server can't point a
+  setting of their own; `filelog` receivers to the paths listed; `file_storage` extensions to
+  the storage directories listed; and the system log receivers to this host's own logs (no
+  `remote` event logs, no `archive_path`). So a server can't point a
   `filelog` receiver at any file the collector reads, `${file:...}` a secret into an exporter,
   or send what it collects anywhere. A config refused is FAILED, with the reason, and never
   runs. The policy is read with confmap, as the config is merged (a `receivers::filelog` key is a
@@ -195,12 +197,17 @@ agent:
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
   ([Using the Supervisor](#using-the-supervisor)).
+- **The Collector run without a remote config doesn't bind `localhost:8888`.** It runs only the
+  no-op pipeline, so its internal metrics are off (`level: none`) unless a config sets them (the
+  own metrics the server offers, say) or local `agent.config_files` are run. Upstream's left the
+  Collector's default Prometheus reader on, and the Collector exited when another process held
+  the port (`supervisor/idle_telemetry.go`).
 
 Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE)); the import
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `reachability.go`, `status.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `idle_telemetry.go`, `reachability.go`, `status.go`,
   `localserver.go`, `config/remote_config_policy.go`, `commander/collector_env.go`
   and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and

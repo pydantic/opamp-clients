@@ -32,7 +32,9 @@ var providerScheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.\-]*$`)
 // configures must have an allowed type; each ${...} reference must name an allowed provider;
 // each destination its exporters (and the collector's own telemetry) send to must be an allowed
 // endpoint, over checked TLS and no proxy it sets; and each file a filelog receiver reads must be
-// an allowed log path or under one. Every list allows nothing unless it is set.
+// an allowed log path or under one; each directory a file_storage extension keeps its files in
+// must be an allowed storage directory or under one; and the system log receivers may read only
+// this host's own logs. Every list allows nothing unless it is set.
 type RemoteConfigPolicy struct {
 	// AllowedComponents are the component types (the part of an ID before any "/") the remote
 	// config may configure, by kind (receivers, processors, exporters, connectors, extensions).
@@ -49,6 +51,10 @@ type RemoteConfigPolicy struct {
 	// read: each path it includes (a glob) must be one of them or lie under one. Absolute paths,
 	// with no glob characters; compared case and all. None unless listed.
 	AllowedLogPaths []string `mapstructure:"allowed_log_paths"`
+	// AllowedStorageDirectories are where a file_storage extension in the remote config may keep
+	// its files: its directory, and its compaction directory, must be one of them or lie under
+	// one. Absolute paths, with no glob characters. None unless listed.
+	AllowedStorageDirectories []string `mapstructure:"allowed_storage_directories"`
 	// prevent unkeyed literal initialization
 	_ struct{}
 }
@@ -91,11 +97,17 @@ func (p RemoteConfigPolicy) Validate() error {
 			return err
 		}
 	}
+	for _, dir := range p.AllowedStorageDirectories {
+		if _, err := cleanLogPath(runtime.GOOS, dir, false); err != nil {
+			return fmt.Errorf("agent::remote_config_policy::allowed_storage_directories: %q %w", dir, err)
+		}
+	}
 	if !p.Enabled() {
 		for name, set := range map[string]bool{
-			"allowed_providers":          len(p.AllowedProviders) > 0,
-			"allowed_exporter_endpoints": len(p.AllowedExporterEndpoints) > 0,
-			"allowed_log_paths":          len(p.AllowedLogPaths) > 0,
+			"allowed_providers":           len(p.AllowedProviders) > 0,
+			"allowed_exporter_endpoints":  len(p.AllowedExporterEndpoints) > 0,
+			"allowed_log_paths":           len(p.AllowedLogPaths) > 0,
+			"allowed_storage_directories": len(p.AllowedStorageDirectories) > 0,
 		} {
 			if set {
 				return fmt.Errorf("agent::remote_config_policy::%s has no effect without allowed_components", name)
@@ -188,8 +200,83 @@ func (p RemoteConfigPolicy) check(name string, body []byte, connectionEnv []stri
 				return err
 			}
 		}
+		if err := checkSystemLogs(where, id, sections["receivers"][id]); err != nil {
+			return err
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(sections["extensions"])) {
+		if t, _, _ := strings.Cut(id, "/"); t == fileStorageType {
+			if err := p.checkFileStorage(where, id, sections["extensions"][id]); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+// fileStorageType is the file_storage extension's type.
+const fileStorageType = "file_storage"
+
+// systemLogSettings are the settings of the system log receivers that reach past this host's own
+// logs: a Windows event log receiver's remote servers (and the credentials for them), and a macOS
+// unified logging receiver's archive, read from any path. Only the local config may set them.
+var systemLogSettings = map[string][]string{
+	"windows_event_log":     {"remote"},
+	"windowseventlog":       {"remote"},
+	"macos_unified_logging": {"archive_path"},
+}
+
+// checkSystemLogs refuses a system log receiver set to read past this host's own logs.
+func checkSystemLogs(where, id string, cfg any) error {
+	t, _, _ := strings.Cut(id, "/")
+	m, _ := cfg.(map[string]any)
+	for _, key := range systemLogSettings[t] {
+		if v := m[key]; v != nil && v != "" {
+			return fmt.Errorf("%s: receiver %q sets %s, which only the local config may", where, id, key)
+		}
+	}
+	return nil
+}
+
+// checkFileStorage refuses a file_storage extension that keeps its files, or compacts them,
+// outside the allowed storage directories. Its default directory isn't one: it must name it.
+func (p RemoteConfigPolicy) checkFileStorage(where, id string, cfg any) error {
+	m, ok := cfg.(map[string]any)
+	if !ok {
+		return fmt.Errorf("%s: extension %q sets no directory, which agent::remote_config_policy::allowed_storage_directories needs", where, id)
+	}
+	dirs := map[string]any{"directory": m["directory"]}
+	if compaction, ok := m["compaction"].(map[string]any); ok && compaction["directory"] != nil {
+		dirs["compaction::directory"] = compaction["directory"]
+	}
+	for _, key := range slices.Sorted(maps.Keys(dirs)) {
+		dir, ok := dirs[key].(string)
+		if !ok || dir == "" {
+			return fmt.Errorf("%s: extension %q sets no %s, which agent::remote_config_policy::allowed_storage_directories needs", where, id, key)
+		}
+		if err := storageDirectoryAllowed(runtime.GOOS, p.AllowedStorageDirectories, dir); err != nil {
+			return fmt.Errorf("%s: extension %q keeps files in %q, which %w", where, id, dir, err)
+		}
+	}
+	return nil
+}
+
+// storageDirectoryAllowed says whether a directory is an allowed one or lies under one, on goos.
+func storageDirectoryAllowed(goos string, allowed []string, dir string) error {
+	clean, err := cleanLogPath(goos, dir, false)
+	if err != nil {
+		return err
+	}
+	for _, a := range allowed {
+		root, err := cleanLogPath(goos, a, false)
+		if err != nil {
+			continue
+		}
+		if clean == root || strings.HasPrefix(clean, strings.TrimSuffix(root, "/")+"/") {
+			return nil
+		}
+	}
+	return errors.New("agent::remote_config_policy::allowed_storage_directories doesn't allow")
 }
 
 // The collector's names for the filelog receiver and the gRPC OTLP exporter: v0.163.0 names them

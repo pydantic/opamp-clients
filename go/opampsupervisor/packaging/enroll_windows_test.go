@@ -182,3 +182,29 @@ Set-Acl -LiteralPath $root -AclObject $acl
 	require.NoError(t, err)
 	assert.Equal(t, "write-token", string(telemetry))
 }
+
+// -HostLogs lets the server read this host's event logs, with file_storage keeping its place in
+// the Supervisor's own directory, but not a remote host's logs.
+func TestWinEnrollHostLogs(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	enroll := func(args ...string) config.RemoteConfigPolicy {
+		out, err := winEnroll(t, root, "t", append([]string{"-Endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "-NoStart"}, args...)...)
+		require.NoError(t, err, out)
+		cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
+		require.NoError(t, err)
+		collector := filepath.Join(t.TempDir(), "otelcol.exe")
+		require.NoError(t, os.WriteFile(collector, nil, 0o755))
+		programs := filepath.ToSlash(filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "otelcol.exe"))
+		path := filepath.Join(t.TempDir(), "supervisor.yaml")
+		require.NoError(t, os.WriteFile(path, []byte(strings.Replace(string(cfg), programs, filepath.ToSlash(collector), 1)), 0o600))
+		loaded, err := config.Load(path)
+		require.NoError(t, err)
+		return loaded.Agent.RemoteConfigPolicy
+	}
+	p := enroll("-HostLogs")
+	storage := filepath.ToSlash(filepath.Join(root, "var", "collector"))
+	assert.Equal(t, []string{storage}, p.AllowedStorageDirectories)
+	body := hostLogsConfig(t, "windows", "C:/ProgramData/pydantic-opamp/var/collector", storage)
+	assertHostLogs(t, p, enroll(), body, `configures receiver "windows_event_log/application"`)
+	require.ErrorContains(t, p.Check("", []byte(`receivers: {windows_event_log: {channel: System, remote: {server: dc1}}}`)), "sets remote")
+}
