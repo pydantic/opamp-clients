@@ -39,7 +39,7 @@ and date. Tests, CI and docs alone don't need a line.
   version for good, as before (#81).
 - Supervisor: a container image, `ghcr.io/pydantic/opamp-supervisor`, for amd64 and arm64, with
   the collector, configured with environment variables and keeping its state on a volume; each
-  Supervisor release publishes it, signed with Cosign (#PR).
+  Supervisor release publishes it, signed with Cosign (#93).
 
 ### Fixed
 
@@ -71,7 +71,7 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor: a server it can't reach is logged once a run of failures, naming what to check
   (`server.endpoint`, `server.headers` or `server.auth`, by the server's answer) and the endpoint
   without credentials; the retries go at debug, and getting through again is logged once. Before,
-  every retry logged an error (#PR).
+  every retry logged an error (#93).
 
 ### Security
 
