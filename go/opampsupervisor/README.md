@@ -178,6 +178,11 @@ agent:
   server's first reply waits for the loop, and with no config to run the collector stays
   stopped.
 - A bootstrap that finds another instance UID reports the agent unhealthy, and fails.
+- **A server it can't reach is said once, with what to check.** Upstream's logged an error for
+  every failed connect, with the client's detail alone. The first failure of a run is an error
+  naming the setting to check (`server.endpoint`, `server.headers` or `server.auth`, by the
+  answer), the endpoint without credentials; the retries go at debug, and getting through again
+  is said once.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
@@ -187,7 +192,7 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `reachability.go`,
   `localserver.go`, `config/remote_config_policy.go`, `commander/collector_env.go`
   and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and

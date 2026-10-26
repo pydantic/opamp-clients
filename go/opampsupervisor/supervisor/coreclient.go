@@ -69,6 +69,9 @@ type coreClient struct {
 	// installPackage installs a package the server offers, set before Start; it answers through
 	// the request's done, from any goroutine. nil: packages aren't accepted.
 	installPackage func(agentInstall)
+	// reach says when the server can't be reached, once a run of failures (set in Start; used on
+	// the client's goroutine).
+	reach *reachability
 }
 
 var _ client.OpAMPClient = (*coreClient)(nil)
@@ -213,6 +216,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	// The core drops a field whose capability isn't declared.
 
 	c.uid = c.opened.InstanceUID()
+	c.reach = newReachability(c.logger, settings.OpAMPServerURL)
 	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err
@@ -249,12 +253,15 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 	}
 	switch n.Kind {
 	case opamp.Connected:
+		c.reach.connected()
 		if cb.OnConnect != nil {
 			cb.OnConnect(ctx)
 		}
 	case opamp.ConnectFailed:
-		if cb.OnConnectFailed != nil {
-			cb.OnConnectFailed(ctx, fmt.Errorf("connecting to the OpAMP server failed (HTTP status %d): %s", n.Status, n.Detail))
+		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
+		// config; the retries that follow go at debug, not an error each (reachability).
+		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
+			cb.OnConnectFailed(ctx, err)
 		}
 	case opamp.ErrorResponse:
 		if cb.OnError != nil {

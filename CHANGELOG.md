@@ -65,6 +65,10 @@ and date. Tests, CI and docs alone don't need a line.
   loader thread (#91).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
+- Supervisor: a server it can't reach is logged once a run of failures, naming what to check
+  (`server.endpoint`, `server.headers` or `server.auth`, by the server's answer) and the endpoint
+  without credentials; the retries go at debug, and getting through again is logged once. Before,
+  every retry logged an error (#PR).
 
 ### Security
 
