@@ -2,7 +2,8 @@
 
 Each `go/opampsupervisor/vX.Y.Z` tag gets a
 [GitHub Release](https://github.com/pydantic/opamp-clients/releases) with portable archives and
-native installers for Linux, macOS and Windows on amd64 and arm64 (see [Releases](#releases)).
+native installers for Linux, macOS and Windows on amd64 and arm64 (see [Releases](#releases)),
+and a [container image](#container).
 
 The installers are a deb and an rpm for Linux, a [.pkg for macOS](#macos), and an
 [.msi for Windows](#windows). Each installs the Supervisor and a collector for it to run.
@@ -274,6 +275,51 @@ Build it on Windows with WiX 5 (`dotnet tool install --global wix --version 5.0.
 `-CertificateThumbprint` signs the executables and the `.msi` with `signtool`, using that
 certificate from the machine's store.
 
+## Container
+
+The image holds the Supervisor and the collector, from the Linux release archives, on distroless
+(no shell), running as a non-root user (65532). Each Supervisor release publishes it for amd64
+and arm64 as `ghcr.io/pydantic/opamp-supervisor:<version>`, signed with Cosign and attested like
+the archives. Environment variables configure it ([container/supervisor.yaml](container/supervisor.yaml)):
+
+| Variable | What it is |
+|---|---|
+| `OPAMP_ENDPOINT` | the OpAMP server, as `wss://host/v1/opamp` or `https://host/v1/opamp` (required) |
+| `OPAMP_TOKEN` | the enrollment token (required for the first start) |
+| `OPAMP_EXPORTER_ENDPOINTS` | where the server's configs may send telemetry, a YAML list of `scheme://host[:port]`; Logfire's US and EU regions by default |
+| `OPAMP_LOG_PATHS` | the files and directories the server's configs may read logs from, a YAML list; none by default |
+| `OPAMP_STATE_KEY` | `file:PATH`, a 32-byte key (raw or base64) the issued credentials are sealed with, readable by the container's user only; none by default |
+| `LOGFIRE_TOKEN` | a telemetry token for the collector, when the server doesn't issue one |
+
+```sh
+docker run -d --name opamp-supervisor \
+  -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
+  -v opamp-state:/var/lib/pydantic-opamp -p 4318:4318 \
+  ghcr.io/pydantic/opamp-supervisor:0.6.0
+```
+
+Mount a volume at `/var/lib/pydantic-opamp`. It keeps the agent's instance UID, the credentials
+the server issued and the last config, so a new container on it is the same agent and uses the
+issued credentials. Without one, every container is a new agent that enrolls again with
+`OPAMP_TOKEN`. On Kubernetes that means a StatefulSet with a volume claim, or a Deployment of
+one replica with a persistent volume.
+
+The policy is the packages' [default policy](#the-default-policy), with the variables above in
+place of the enroll script's options. The server can't install a collector in the container
+(`accepts_packages` is off): a new collector comes with a new image. To change anything else,
+mount your own config at `/etc/pydantic-opamp/supervisor.yaml`: one that reads the token from a
+mounted secret with `${file:...}`, say, rather than from the environment. The collector's OTLP receiver,
+when the server's config turns it on, listens in the container: publish its ports as you would
+any collector's.
+
+Build it from archives `archive.sh` made, for one architecture (loaded into the local Docker) or
+both (`PUSH=1`, pushed as `IMAGE`):
+
+```sh
+VERSION=0.1.0 GOOS=linux GOARCH=amd64 go/opampsupervisor/packaging/archive.sh
+VERSION=0.1.0 ARCHES=amd64 go/opampsupervisor/packaging/container/build.sh
+```
+
 ## What the server can do to this host
 
 Every enroll script turns on `accepts_remote_config`, so the OpAMP server configures the
@@ -423,6 +469,9 @@ checks out.
   2. enrolls with a server that issues a token;
   3. checks that the token is used and that the state file is sealed;
   4. restarts the Supervisor and checks it connects with the issued token.
+- [container_test.go](container_test.go) (`-tags=container`, with Docker and the image in
+  `OPAMP_IMAGE`) does the same for the container image: a container enrolls, its state in the
+  volume is sealed, and a new container on the volume connects with the issued token.
 
 CI runs them all, on Linux (with a throwaway signing key), macOS and Windows, and keeps the
 packages as artifacts.

@@ -923,6 +923,14 @@ jobs:
           VERSION: 0.0.0-ci
           ARCH: amd64
         run: go/opampsupervisor/packaging/build.sh
+      - name: The container image, from those binaries, run against a server that issues a token
+        working-directory: go/opampsupervisor/packaging
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cp dist/opampsupervisor dist/otelcol/otelcol "$RUNNER_TEMP/bin/"
+          VERSION=0.0.0-ci ARCHES=amd64 BINARIES="$RUNNER_TEMP/bin" IMAGE=pydantic-opamp-supervisor:ci container/build.sh
+          go vet -tags=container .
+          OPAMP_IMAGE=pydantic-opamp-supervisor:ci go test -tags=container -run Container -timeout 10m -v .
       # gcloud, which publish.sh uploads with: the runner image has none.
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
         with:

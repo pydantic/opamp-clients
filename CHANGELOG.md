@@ -37,6 +37,9 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
+- Supervisor: a container image, `ghcr.io/pydantic/opamp-supervisor`, for amd64 and arm64, with
+  the collector, configured with environment variables and keeping its state on a volume; each
+  Supervisor release publishes it, signed with Cosign (#PR).
 
 ### Fixed
 
