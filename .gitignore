@@ -15,6 +15,7 @@ dist/
 /proto/
 /tests/shell-tables/
 /testdata/sdk-settings/
+/testdata/settings-examples/
 
 # Node.js
 node_modules/

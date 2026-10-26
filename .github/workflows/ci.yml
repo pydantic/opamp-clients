@@ -117,7 +117,7 @@ jobs:
           conformance/torture/test_jvm_memory.py conformance/torture/test_dotnet_memory.py
           examples/test_integrations.py examples/test_settings_cookbook.py scripts/test_native_dist.py
           scripts/test_sdk_release.py scripts/test_redact_mutants.py scripts/test_collector_release.py
-          scripts/test_deps_scan.py
+          scripts/test_deps_scan.py scripts/test_fetch_core.py
       - name: Every dropped-redaction mutant applies
         if: ${{ !cancelled() }}
         run: python3 scripts/redact_mutants.py --check

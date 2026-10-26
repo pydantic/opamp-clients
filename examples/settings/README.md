@@ -1,6 +1,8 @@
 # Remote settings, by example
 
-Each file here is a whole Logfire SDK policy. Send it as the remote config's only file,
+Each file here is a whole Logfire SDK policy. The files come with the core
+(`scripts/fetch_core.py fetch` puts them here, and `check` holds them to the lock), so the core's
+settings layer and server are tested on the same policies. Send it as the remote config's only file,
 `logfire-sdk-policy.json` (`application/json`), to any of the six SDK integrations.
 [docs/sdk-settings.md](../../docs/sdk-settings.md#the-policy) describes the policy and what each
 control does.

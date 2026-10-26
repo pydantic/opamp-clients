@@ -144,8 +144,11 @@ git show --stat 2a14a08   # #21: every integration declares only what reaches th
      `TestSettingsFlippedWhileTelemetryFlows` (`go/opampotel/torture_test.go`), Node
      `node/otel/test/settings.torture.test.ts`, Java `ControlsTortureTest`, .NET
      `ConcurrencyTests.cs`.
-5. **Cookbook.** Add `examples/settings/<use>.json` (a whole policy) and a README section that
-   shows it byte for byte in a json block. `examples/test_settings_cookbook.py` reads the controls
+5. **Cookbook.** The policies come with the core: pydantic/opamp's `testdata/settings-examples`
+   holds them (its settings layer and server are tested on them), and `fetch_core.py fetch` puts
+   them in `examples/settings/`, where `check` holds them to the lock. So a new example lands in
+   the core with the setting, and here you add its README section, which shows the file byte for
+   byte in a json block. `examples/test_settings_cookbook.py` reads the controls
    table in `docs/sdk-settings.md` and fails when a control (live or next start) has no example
    file or the README doesn't show a file exactly.
 6. **End to end.** In `examples/integrations.py`, add the setting to `check_signals` (measured at
