@@ -86,6 +86,15 @@ tar -xzf pydantic-opamp-supervisor_0.1.0_linux_amd64.tar.gz
 Use REST (`gh api`): `gh release view` and `gh release download` go through GraphQL and get 403
 in sessions. The archives are ~42-48 MB each.
 
+After the release, the `container` job pushes `ghcr.io/pydantic/opamp-supervisor:<version>` and
+`:latest` (amd64, arm64) from the Linux archives (`packaging/container/build.sh`), signs it with
+Cosign and attests it. CI's packages job already runs the image (`container_test.go`). Check a
+published one:
+```bash
+docker buildx imagetools inspect ghcr.io/pydantic/opamp-supervisor:0.6.0
+gh attestation verify oci://ghcr.io/pydantic/opamp-supervisor:0.6.0 --repo pydantic/opamp-clients
+```
+
 ## 4. Before moving the collector pins
 
 The extension and Supervisor are forks of contrib's `extension/opampextension` and
