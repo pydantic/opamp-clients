@@ -62,7 +62,11 @@ internal sealed class OtlpTls
         {
             // Through PKCS #12: on Windows, SslStream can't use the ephemeral key a PEM load gives.
             using var pem = X509Certificate2.CreateFromPemFile(certPath, keyPath);
+#if NET9_0_OR_GREATER
+            client = X509CertificateLoader.LoadPkcs12(pem.Export(X509ContentType.Pkcs12), null);
+#else
             client = new X509Certificate2(pem.Export(X509ContentType.Pkcs12));
+#endif
         }
 
         return new OtlpTls(ca, client);

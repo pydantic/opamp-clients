@@ -11,11 +11,12 @@ A save of `data` to the state file `S`:
 1. delete `S.tmp` if it is there (left by a save that failed, or a run that crashed: it could be
    anyone's file, with any mode);
 2. make `S.tmp` new (exclusively: `O_EXCL`, create-new), readable by the agent's user only
-   (mode 0600; on Windows, an ACL of the user alone in Java and .NET);
+   (mode 0600; on Windows, an ACL of the user alone in Java, .NET and Python);
 3. write `data` to it, and flush it (`fsync`);
 4. rename it over `S`;
-5. flush `S`'s directory, so the rename reaches the disk (not on Windows, where a directory can't
-   be flushed);
+5. flush `S`'s directory, so the rename reaches the disk (on Windows, where a directory can't be
+   flushed, .NET and Python write the rename through instead: `MoveFileEx` with
+   `MOVEFILE_WRITE_THROUGH`);
 6. only then feed the core `stored`; on any failure, `store_failed`, and delete `S.tmp`.
 
 On macOS `fsync` only hands the data to the drive, which may keep it in its cache: steps 3 and 5
@@ -137,7 +138,8 @@ LoadCredentialEncrypted=opamp-state-key:/etc/otelcol/opamp-state-key.cred
 ## Not covered
 
 - Windows: a directory can't be flushed, and the ACLs and `MoveFileEx` aren't modelled. The seamed
-  tests run where each SDK's Windows CI does.
+  tests run where each SDK's Windows CI does; .NET's and Python's check the flags of the
+  written-through rename on any host, with a stand-in for `MoveFileExW`.
 - A disk that lies (a flush that returns before the data is on it): no client can tell.
 - On a real file system, a lost rename (a directory not flushed): LazyFS doesn't drop metadata;
   only the core taps' model of the disk checks it.

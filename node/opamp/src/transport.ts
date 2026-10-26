@@ -289,6 +289,9 @@ export class Transport {
   /** Trust, client certificate and versions: for every TLS handshake, the server's and an
    * https:// proxy's alike. */
   readonly #context: tls.SecureContext;
+  /** The same without the client certificate, which is the server's alone: for a TLS handshake
+   * that isn't with the server's own origin (a file elsewhere, an https:// proxy in core mode). */
+  readonly #elsewhereContext: tls.SecureContext;
   /** The proxy the options name; else those of the environment, when Node is told to use them. */
   readonly #proxy: Proxy | undefined;
   readonly #env: EnvProxies | undefined;
@@ -333,8 +336,9 @@ export class Transport {
         : undefined;
     this.dispatcher = this.#agent(this.#context);
     const t = options.tls ?? {};
-    this.elsewhere =
-      t.cert === undefined ? this.dispatcher : this.#agent(secureContext({ ...t, cert: undefined, key: undefined }));
+    this.#elsewhereContext =
+      t.cert === undefined ? this.#context : secureContext({ ...t, cert: undefined, key: undefined });
+    this.elsewhere = t.cert === undefined ? this.dispatcher : this.#agent(this.#elsewhereContext);
   }
 
   /** A dispatcher whose TLS to the server (inside a tunnel too) is `context`'s. */
@@ -364,9 +368,11 @@ export class Transport {
     return proxy && !bypassed(this.#env.noProxy, host, port) ? proxy : undefined;
   }
 
-  /** Trust, client certificate and versions, for core mode's TLS on a stream. */
-  get secureContext(): tls.SecureContext {
-    return this.#context;
+  /** Trust, client certificate and versions, for core mode's TLS on a stream: the client
+   * certificate only for a handshake with the server's own origin (stream_start_tls's
+   * serverOrigin). */
+  secureContextFor(serverOrigin: boolean): tls.SecureContext {
+    return serverOrigin ? this.#context : this.#elsewhereContext;
   }
 
   /** Core mode: what the core is told about proxies, once (Config.proxy): the configured proxy

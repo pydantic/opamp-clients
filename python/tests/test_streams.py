@@ -132,7 +132,9 @@ def test_a_discard_or_cancel_while_a_write_is_pending_leaves_no_file_and_says_no
         await asyncio.sleep(0.02)  # the first write is in flight
         # A cancel goes on to the Executor too (it may be a save's); a discard is only this one's.
         assert s.do(corepb.Effect(**{how: corepb.Id(id=9)})) is (how == "discard")
-        await asyncio.sleep(0.2)
+        # Done with once the write in flight is over and the file is deleted (a slow runner's
+        # thread can take a while).
+        await until("the download dropped", lambda: 9 not in s._files)
         assert got == []
         assert not os.path.exists(download_path(state, "", 9))
         await s.shutdown()
@@ -420,9 +422,12 @@ def test_a_peer_that_stops_reading_is_not_read_until_it_drains_and_past_a_bound_
             await until("opened", lambda: "stream_opened" in kinds(got))
             await until("its bytes", lambda: read() > 1 << 20)
             # Writes it doesn't take: once the transport's buffer is full, we read nothing more.
-            for _ in range(8):
-                s.do(corepb.Effect(stream_write=corepb.WsMessage(id=1, data=b"\2" * (1 << 20))))
-            await asyncio.sleep(0.1)
+            # Two bursts: Windows takes a whole send into the socket's buffer while that holds less
+            # than SO_SNDBUF, so the first can leave asyncio's buffer empty; the second can't.
+            for _ in range(2):
+                for _ in range(8):
+                    s.do(corepb.Effect(stream_write=corepb.WsMessage(id=1, data=b"\2" * (1 << 20))))
+                await asyncio.sleep(0.1)
             before = read()
             await asyncio.sleep(0.3)
             assert read() - before <= 512 << 10, f"read {read() - before} bytes while its writes were stuck"
@@ -660,6 +665,45 @@ def test_a_tls_handshake_that_completes_after_its_close_is_aborted(tmp_path) -> 
         await asyncio.sleep(0.01)
         assert kinds(got) == ["stream_opened"]
         assert tls_made and tls_made[0].aborted
+        await s.shutdown()
+
+    asyncio.run(run())
+
+
+# The client certificate goes only to a TLS handshake the core says is with the server's own
+# origin (stream_start_tls's server_origin): any other gets the context without it, whose CAs are
+# the same.
+# covers: RULE-TLS-02
+def test_the_client_certificate_only_on_a_stream_to_the_servers_origin(tmp_path) -> None:
+    ca = trustme.CA()
+    agent = ca.issue_cert("agent")
+    tls = TLS(ca_pem=ca.cert_pem.bytes(), cert_pem=agent.cert_chain_pems[0].bytes(),
+              key_pem=agent.private_key_pem.bytes())
+
+    async def run() -> None:
+        contexts: list[object] = []
+
+        async def connect(factory, host, port):
+            proto = factory()
+            t = FakeTransport()
+            proto.connection_made(t)
+            return t, proto
+
+        async def start_tls(raw, proto, ctx, server_hostname=None):
+            contexts.append(ctx)
+            return FakeTransport()
+
+        transport = Transport(tls, proxy=Proxy.DIRECT)
+        assert transport.ssl is not transport.elsewhere_ssl
+        got: list[corepb.Input] = []
+        s = Streams(got.append, transport, str(tmp_path / "state"), connect=connect, start_tls=start_tls)
+        for id_, origin in ((1, True), (2, False)):
+            s.do(corepb.Effect(stream_open=corepb.StreamOpen(id=id_, host="h", port=1)))
+            await until("opened", lambda: len(got) == 2 * id_ - 1)
+            s.do(corepb.Effect(stream_start_tls=corepb.StreamName(id=id_, host="h", server_origin=origin)))
+            await until("TLS", lambda: len(got) == 2 * id_)
+            assert got[-1].WhichOneof("kind") == "stream_tls_ready"
+        assert contexts == [transport.ssl, transport.elsewhere_ssl]
         await s.shutdown()
 
     asyncio.run(run())

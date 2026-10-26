@@ -39,7 +39,12 @@ internal static class TapKit
 
     public static List<TapRecord> Read(string path)
     {
-        var file = File.ReadAllBytes(FileOf(path));
+        // Shared for writing: the client may still have it open, and Windows refuses a reader
+        // that doesn't share with its writer.
+        using var stream = new FileStream(FileOf(path), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var copy = new MemoryStream();
+        stream.CopyTo(copy);
+        var file = copy.ToArray();
         var records = new List<TapRecord>();
         for (var at = 0; at < file.Length;)
         {

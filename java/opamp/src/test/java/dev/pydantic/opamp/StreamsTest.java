@@ -57,10 +57,15 @@ class StreamsTest {
     volatile Consumer<CoreProto.Input> core = in -> {};
 
     Harness(Streams.Platform platform, Disk disk, Path state) {
+      this(platform, disk, state, TransportTest.trusting(TransportTest.CA));
+    }
+
+    /** With the operator's TLS settings {@code tls}. */
+    Harness(Streams.Platform platform, Disk disk, Path state, Tls tls) {
       x = new Streams(loop, in -> {
         got.add(in);
         core.accept(in);
-      }, platform, Streams.engines(TransportTest.trusting(TransportTest.CA)),
+      }, platform, Streams.originEngines(tls),
           url -> CoreProto.ProxyAnswer.newBuilder(), disk, state, id -> Executor.downloadsDir(state).resolve("d" + id));
     }
 
@@ -112,7 +117,13 @@ class StreamsTest {
   }
 
   static CoreProto.Effect startTls(long id, String host) {
-    return CoreProto.Effect.newBuilder().setStreamStartTls(CoreProto.StreamName.newBuilder().setId(id).setHost(host)).build();
+    return startTls(id, host, true);
+  }
+
+  /** TLS, at the server's own origin or not. */
+  static CoreProto.Effect startTls(long id, String host, boolean serverOrigin) {
+    return CoreProto.Effect.newBuilder()
+        .setStreamStartTls(CoreProto.StreamName.newBuilder().setId(id).setHost(host).setServerOrigin(serverOrigin)).build();
   }
 
   static CoreProto.Effect resolve(long id, String host) {
@@ -747,6 +758,73 @@ class StreamsTest {
 
   // ---------------------------------------------------------------------------------------------
   // TLS, over real sockets.
+
+  /**
+   * The client certificate goes only to a handshake the core says is with the server's own origin
+   * (stream_start_tls's server_origin); any other presents none, and the CA still applies.
+   */
+  // covers: RULE-TLS-02
+  @Test
+  void theClientCertificateOnlyAtTheServersOrigin(@TempDir Path dir) throws Exception {
+    SSLContext server = Tls.builder().trustedCa(TransportTest.CA)
+        .clientCertificate(TransportTest.pem("server.pem"), TransportTest.pem("server-key.pem")).build().context();
+    try (ServerSocket listener = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"));
+        Harness h = new Harness(new Streams.Platform() {
+          @Override
+          public Streams.Conn connect(String host, int port, Streams.Attempt attempt) throws IOException {
+            return Streams.SOCKETS.connect("127.0.0.1", listener.getLocalPort(), attempt);
+          }
+
+          @Override
+          public List<String> resolve(String host) {
+            return List.of();
+          }
+        }, Disk.REAL, dir.resolve("state"), TransportTest.withClientCert())) {
+      List<String> peers = new CopyOnWriteArrayList<>();
+      Thread t = new Thread(() -> {
+        try {
+          for (int i = 0; i < 2; i++) {
+            Socket raw = listener.accept();
+            SSLSocket s = (SSLSocket) server.getSocketFactory().createSocket(raw, null, raw.getPort(), true);
+            s.setUseClientMode(false);
+            s.setWantClientAuth(true);
+            try (s) {
+              s.startHandshake();
+              String peer;
+              try {
+                peer = ((java.security.cert.X509Certificate) s.getSession().getPeerCertificates()[0])
+                    .getSubjectX500Principal().getName();
+              } catch (javax.net.ssl.SSLPeerUnverifiedException none) {
+                peer = "none";
+              }
+              peers.add(peer);
+              s.getInputStream().read(); // until the client goes
+            }
+          }
+        } catch (Exception e) {
+          peers.add("failed: " + e);
+        }
+      });
+      t.start();
+      for (long id : new long[] {1, 2}) {
+        boolean origin = id == 1;
+        h.run(open(id));
+        CoreProto.Input opened = h.next();
+        assertTrue(opened.hasStreamOpened(), opened.toString());
+        h.run(startTls(id, "127.0.0.1", origin));
+        CoreProto.Input ready = h.next();
+        assertEquals(id, ready.getStreamTlsReady().getId(), ready.toString());
+        for (int i = 0; i < 500 && peers.size() < id; i++) {
+          Thread.sleep(10);
+        }
+        String peer = peers.get((int) id - 1);
+        assertEquals(origin, peer.contains("test-agent"), "server_origin " + origin + ": " + peer);
+        assertTrue(origin || peer.equals("none"), peer);
+        h.run(close(id, false));
+      }
+      t.join(10_000);
+    }
+  }
 
   /** TLS up, bytes both ways under it; a handshake still going when its stream is closed says nothing. */
   @Test

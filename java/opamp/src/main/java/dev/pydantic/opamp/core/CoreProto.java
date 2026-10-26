@@ -23215,7 +23215,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -23224,7 +23224,7 @@ public final class CoreProto {
     boolean hasStreamStartTls();
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -24306,7 +24306,7 @@ public final class CoreProto {
     public static final int STREAM_START_TLS_FIELD_NUMBER = 13;
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -24317,7 +24317,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -24331,7 +24331,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -24344,7 +24344,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -24363,7 +24363,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * start TLS on the stream for host, with the operator's TLS settings
+     * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
      * </pre>
      *
      * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25738,7 +25738,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25749,7 +25749,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25760,7 +25760,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25772,7 +25772,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25785,7 +25785,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -25797,7 +25797,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * start TLS on the stream for host, with the operator's TLS settings
+       * start TLS on the stream for host, with the operator's TLS settings (server_origin says which)
        * </pre>
        *
        * <code>.opamp.core.v1.StreamName stream_start_tls = 13;</code>
@@ -26963,6 +26963,20 @@ public final class CoreProto {
      */
     com.google.protobuf.ByteString
         getHostBytes();
+
+    /**
+     * <pre>
+     * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+     * Download.server_origin says of a file. Only then present the client certificate you have for
+     * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+     * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+     * keeps a stream for one or the other: every request it carries is for the same.
+     * </pre>
+     *
+     * <code>bool server_origin = 3;</code>
+     * @return The serverOrigin.
+     */
+    boolean getServerOrigin();
   }
   /**
    * Protobuf type {@code opamp.core.v1.StreamName}
@@ -27059,6 +27073,56 @@ public final class CoreProto {
       checkByteStringIsUtf8(value);
       host_ = value.toStringUtf8();
 
+    }
+
+    public static final int SERVER_ORIGIN_FIELD_NUMBER = 3;
+    private boolean serverOrigin_;
+    /**
+     * <pre>
+     * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+     * Download.server_origin says of a file. Only then present the client certificate you have for
+     * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+     * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+     * keeps a stream for one or the other: every request it carries is for the same.
+     * </pre>
+     *
+     * <code>bool server_origin = 3;</code>
+     * @return The serverOrigin.
+     */
+    @java.lang.Override
+    public boolean getServerOrigin() {
+      return serverOrigin_;
+    }
+    /**
+     * <pre>
+     * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+     * Download.server_origin says of a file. Only then present the client certificate you have for
+     * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+     * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+     * keeps a stream for one or the other: every request it carries is for the same.
+     * </pre>
+     *
+     * <code>bool server_origin = 3;</code>
+     * @param value The serverOrigin to set.
+     */
+    private void setServerOrigin(boolean value) {
+      
+      serverOrigin_ = value;
+    }
+    /**
+     * <pre>
+     * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+     * Download.server_origin says of a file. Only then present the client certificate you have for
+     * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+     * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+     * keeps a stream for one or the other: every request it carries is for the same.
+     * </pre>
+     *
+     * <code>bool server_origin = 3;</code>
+     */
+    private void clearServerOrigin() {
+
+      serverOrigin_ = false;
     }
 
     public static dev.pydantic.opamp.core.CoreProto.StreamName parseFrom(
@@ -27247,6 +27311,58 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+       * Download.server_origin says of a file. Only then present the client certificate you have for
+       * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+       * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+       * keeps a stream for one or the other: every request it carries is for the same.
+       * </pre>
+       *
+       * <code>bool server_origin = 3;</code>
+       * @return The serverOrigin.
+       */
+      @java.lang.Override
+      public boolean getServerOrigin() {
+        return instance.getServerOrigin();
+      }
+      /**
+       * <pre>
+       * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+       * Download.server_origin says of a file. Only then present the client certificate you have for
+       * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+       * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+       * keeps a stream for one or the other: every request it carries is for the same.
+       * </pre>
+       *
+       * <code>bool server_origin = 3;</code>
+       * @param value The serverOrigin to set.
+       * @return This builder for chaining.
+       */
+      public Builder setServerOrigin(boolean value) {
+        copyOnWrite();
+        instance.setServerOrigin(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * stream_start_tls only: the handshake is with the OpAMP server's own origin, as
+       * Download.server_origin says of a file. Only then present the client certificate you have for
+       * the server, or skip verification if you do so for it. Any other handshake (a file elsewhere,
+       * an https:// proxy) presents no certificate and verifies, against the CAs you trust. The core
+       * keeps a stream for one or the other: every request it carries is for the same.
+       * </pre>
+       *
+       * <code>bool server_origin = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearServerOrigin() {
+        copyOnWrite();
+        instance.clearServerOrigin();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.StreamName)
     }
     @java.lang.Override
@@ -27265,10 +27381,11 @@ public final class CoreProto {
             java.lang.Object[] objects = new java.lang.Object[] {
               "id_",
               "host_",
+              "serverOrigin_",
             };
             java.lang.String info =
-                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001\u0003\u0002\u0208" +
-                "";
+                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0003\u0002\u0208" +
+                "\u0003\u0007";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

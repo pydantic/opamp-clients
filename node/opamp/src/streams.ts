@@ -185,7 +185,7 @@ export class Streams {
         return true;
       }
       case "streamStartTls": {
-        const { id, host } = k.value;
+        const { id, host, serverOrigin } = k.value;
         const raw = this.#sockets.get(id);
         if (!raw) return true;
         // From now on the bytes are TLS's, not the core's.
@@ -197,7 +197,8 @@ export class Streams {
           socket: raw,
           host,
           servername: net.isIP(host) ? undefined : host,
-          secureContext: this.#transport.secureContext,
+          // The client certificate only at the server's own origin; the CAs everywhere.
+          secureContext: this.#transport.secureContextFor(serverOrigin),
         });
         // The handshake is the stream's again (a proxy's answer to CONNECT let the socket go).
         this.#under.set(s, raw);

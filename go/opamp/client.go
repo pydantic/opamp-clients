@@ -882,8 +882,11 @@ type loop struct {
 	saidStopped bool
 }
 
-// stopGrace: once the core has stopped, at least this for the work it cancelled to unwind.
-const stopGrace = 250 * time.Millisecond
+// stopGrace: once the core has stopped, at least this for the work it cancelled to unwind (a
+// download's file deleted once the write in flight is over), however much of the stop timeout the
+// core took: as every SDK. 250 ms was too little on a loaded runner (Java's, the nightly of
+// 2026-10-23: a download's file deleted after stop had returned).
+const stopGrace = time.Second
 
 // shutdownBound is how long to wait, once the core has stopped, for what it started to end:
 // what is left of Stop's bound (Stop returns within StopTimeout, though the core may have taken

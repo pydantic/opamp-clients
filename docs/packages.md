@@ -67,10 +67,12 @@ reporting each package's status, resuming after a crash); the application instal
   OpAMP server is presented only when a file is at the server's own origin (its scheme, host and
   port): a file anywhere else (a CDN, storage) is fetched without it, still checked against the
   CAs configured (Go also stops skipping verification there, if its TLS config skips it for the
-  server). Each redirect hop is judged again. This holds in platform mode in every client. An
+  server). Each redirect hop is judged again. This holds in both modes in every client. An
   HTTP client of the application's own is used as it is, except in Go when its transport is an
   `*http.Transport`: a copy of it, without the certificates, fetches files elsewhere. In core mode
-  the client certificate is still presented to every download host, for now.
+  the core says, for each TLS handshake, whether it is with the server's own origin, and keeps a
+  connection for the one or the other; only the server's gets the client certificate (and Go's
+  skipped verification). TLS to an https:// proxy in core mode gets neither.
 - **A crash.** Before the application is told to install or remove a package, the client saves
   that the package is uncertain: the application may change it. After a restart, an uncertain
   package is downloaded and installed again, or removed again, whatever the saved record says

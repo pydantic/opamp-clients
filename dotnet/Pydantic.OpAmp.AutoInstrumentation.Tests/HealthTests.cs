@@ -233,6 +233,25 @@ public class HealthTests
         Assert.Empty(failed);
     }
 
+    // The hosting package's health check publisher can report before the agent starts, or while
+    // it starts: the first message carries that health, not a healthy default.
+    [Fact]
+    public void HealthSetBeforeTheStartGoesWithTheFirstMessage()
+    {
+        var agent = this.Prepared();
+        agent.Sdk.SetHealth(new ComponentHealth { Healthy = false, Status = "early" });
+        agent.Start([new("service.name", "health-test")]);
+        try
+        {
+            Assert.False(agent.Sdk.HealthSent!.Healthy);
+            Assert.Equal("early", agent.Sdk.HealthSent.Status);
+        }
+        finally
+        {
+            agent.Stop(TimeSpan.FromSeconds(1));
+        }
+    }
+
     [Fact]
     public void TheApplicationsHealthAndExportHealthGoTogether()
     {

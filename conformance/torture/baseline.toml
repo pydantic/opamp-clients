@@ -16,6 +16,14 @@
 # 0.5 MB a minute for the whole hour (75 -> 120 MB) with no GC forced. Nightlies 2026-09-29, 10-02.
 known = ["resources_bounded"]
 
+[go."go/ws"]
+# opamp-go has no tap, so it is judged by the server's log alone: under a proxy latency of 2 s a
+# heartbeat it sent before it had read an assigned UID reaches the server 2 s after the assignment,
+# on the old UID. Seed 20261025, replayed: the server wrote the UID at 005.18 s, the driver got it
+# at 007.18 s, the server read old-UID heartbeats at 007.18 s and 009.18 s (the second sent as the
+# driver got it), and every message after on the new UID. Nightlies 10-22 and 10-25.
+known = ["adopts_assigned_uid"]
+
 [go."dotnet/ws"]
 # Never reconnects after a dropped connection (README, Results): offline from the first drop to
 # the end of the run, so no quiet window converges and nothing is sent in any. Its failed sends

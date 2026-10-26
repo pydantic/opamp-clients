@@ -54,7 +54,7 @@ def _own_state_home(tmp_path_factory, monkeypatch):
 
 
 def vectors(name: str) -> list[dict]:
-    return json.loads(vectors_file(name).read_text())["cases"]
+    return json.loads(vectors_file(name).read_text(encoding="utf-8"))["cases"]
 
 
 def ids(cases: list[dict]) -> list[str]:

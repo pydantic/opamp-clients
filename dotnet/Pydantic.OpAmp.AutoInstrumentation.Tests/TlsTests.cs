@@ -30,11 +30,11 @@ public class TlsTests
             caReq.CertificateExtensions.Add(new X509BasicConstraintsExtension(true, false, 0, true));
             caReq.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.KeyCertSign, true));
             this.Ca = caReq.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
-            this.Server = Issue(this.Ca, "CN=localhost", server: true);
-            this.Client = Issue(this.Ca, "CN=opamp client", server: false);
+            this.Server = Issue(this.Ca, "CN=localhost", server: true, out _);
+            this.Client = Issue(this.Ca, "CN=opamp client", server: false, out var clientKey);
             File.WriteAllText(this.CaPath, this.Ca.ExportCertificatePem());
             File.WriteAllText(this.CertPath, this.Client.ExportCertificatePem());
-            File.WriteAllText(this.KeyPath, this.Client.GetRSAPrivateKey()!.ExportPkcs8PrivateKeyPem());
+            File.WriteAllText(this.KeyPath, clientKey);
         }
 
         public string Dir { get; }
@@ -58,7 +58,11 @@ public class TlsTests
             ["OTEL_EXPORTER_OTLP_CLIENT_KEY"] = this.KeyPath,
         };
 
-        private static X509Certificate2 Issue(X509Certificate2 ca, string subject, bool server)
+        /// <summary>
+        /// A certificate <paramref name="ca"/> signed, and its key as PEM (written out from the key as
+        /// made: Windows won't export a loaded key in plain text).
+        /// </summary>
+        private static X509Certificate2 Issue(X509Certificate2 ca, string subject, bool server, out string keyPem)
         {
             using var key = RSA.Create(2048);
             var req = new CertificateRequest(subject, key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -72,7 +76,16 @@ public class TlsTests
             RandomNumberGenerator.Fill(serial);
             using var cert = req.Create(ca, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(12), serial);
             using var withKey = cert.CopyWithPrivateKey(key);
-            return new X509Certificate2(withKey.Export(X509ContentType.Pkcs12));
+            keyPem = key.ExportPkcs8PrivateKeyPem();
+
+            // Reloaded from PKCS #12: SChannel (Windows) can't use a key that lives only in memory.
+#if NET9_0_OR_GREATER
+            return X509CertificateLoader.LoadPkcs12(
+                withKey.Export(X509ContentType.Pkcs12), null, X509KeyStorageFlags.Exportable);
+#else
+            return new X509Certificate2(
+                withKey.Export(X509ContentType.Pkcs12), (string?)null, X509KeyStorageFlags.Exportable);
+#endif
         }
     }
 

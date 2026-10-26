@@ -1072,7 +1072,7 @@ class Agent:
         saved = ""
         if path is not None:
             try:
-                saved = path.read_text()
+                saved = path.read_text(encoding="utf-8")
             except (OSError, ValueError):  # UnicodeDecodeError is one
                 pass
         identity = setup.SetupIdentity(state_dir=path is not None, saved=saved,

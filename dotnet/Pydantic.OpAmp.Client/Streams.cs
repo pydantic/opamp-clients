@@ -283,7 +283,7 @@ internal sealed class Streams
                 this.Open(e.StreamOpen.Id, e.StreamOpen.Host, (int)e.StreamOpen.Port);
                 return true;
             case Effect.KindOneofCase.StreamStartTls:
-                this.StartTls(e.StreamStartTls.Id, e.StreamStartTls.Host);
+                this.StartTls(e.StreamStartTls.Id, e.StreamStartTls.Host, e.StreamStartTls.ServerOrigin);
                 return true;
             case Effect.KindOneofCase.StreamWrite:
                 this.Write(e.StreamWrite.Id, e.StreamWrite.Data.ToByteArray());
@@ -426,7 +426,7 @@ internal sealed class Streams
         this.In.Track(c.Driver);
     }
 
-    private void StartTls(ulong id, string host)
+    private void StartTls(ulong id, string host, bool serverOrigin)
     {
         if (this.Find(id) is not { } c)
         {
@@ -444,6 +444,7 @@ internal sealed class Streams
             // it, after what was written before it; what is written after it waits for it.
             c.Ready = false;
             c.TlsHost = host;
+            c.TlsServerOrigin = serverOrigin;
             c.BeforeTls = c.Chain;
             c.TlsUp = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var up = c.TlsUp.Task;
@@ -736,11 +737,13 @@ internal sealed class Streams
             while (true)
             {
                 string? tlsHost;
+                bool serverOrigin;
                 TaskCompletionSource? up;
                 Task before;
                 lock (c.Gate)
                 {
                     tlsHost = c.TlsHost;
+                    serverOrigin = c.TlsServerOrigin;
                     up = c.TlsUp;
                     before = c.BeforeTls;
                     c.TlsHost = null;
@@ -748,7 +751,7 @@ internal sealed class Streams
 
                 if (tlsHost is not null)
                 {
-                    if (!await this.HandshakeAsync(c, tlsHost, up!, before).ConfigureAwait(false))
+                    if (!await this.HandshakeAsync(c, tlsHost, serverOrigin, up!, before).ConfigureAwait(false))
                     {
                         return;
                     }
@@ -841,13 +844,13 @@ internal sealed class Streams
     }
 
     /// <summary>TLS on the stream, once what was written before it has gone; then tell the core.</summary>
-    private async Task<bool> HandshakeAsync(Conn c, string host, TaskCompletionSource up, Task before)
+    private async Task<bool> HandshakeAsync(Conn c, string host, bool serverOrigin, TaskCompletionSource up, Task before)
     {
         Stream tlsStream;
         try
         {
             await before.WaitAsync(c.Token).ConfigureAwait(false);
-            tlsStream = await this.net.AuthenticateAsync(c.Stream!, this.Options(host), c.Token).ConfigureAwait(false);
+            tlsStream = await this.net.AuthenticateAsync(c.Stream!, this.Options(host, serverOrigin), c.Token).ConfigureAwait(false);
         }
         catch (Exception e)
         {
@@ -888,14 +891,19 @@ internal sealed class Streams
         return await this.TellAsync(c, new Input { StreamTlsReady = new Id { Id_ = c.Id } }).ConfigureAwait(false);
     }
 
-    /// <summary>The operator's TLS settings, for a handshake with <paramref name="host"/> (its certificate verified for it; SNI unless it is an address).</summary>
-    private SslClientAuthenticationOptions Options(string host) => new()
+    /// <summary>
+    /// The operator's TLS settings, for a handshake with <paramref name="host"/> (its certificate
+    /// verified for it; SNI unless it is an address). The client certificate only when the core
+    /// says the handshake is with the server's own origin (<paramref name="serverOrigin"/>); the
+    /// CAs and versions for every one.
+    /// </summary>
+    private SslClientAuthenticationOptions Options(string host, bool serverOrigin) => new()
     {
         TargetHost = host,
         EnabledSslProtocols = this.tls.EnabledSslProtocols,
         CertificateChainPolicy = this.tls.CertificateChainPolicy?.Clone(),
         RemoteCertificateValidationCallback = this.tls.RemoteCertificateValidationCallback,
-        ClientCertificateContext = this.tls.ClientCertificateContext,
+        ClientCertificateContext = serverOrigin ? this.tls.ClientCertificateContext : null,
         CertificateRevocationCheckMode = this.tls.CertificateRevocationCheckMode,
     };
 
@@ -1391,6 +1399,9 @@ internal sealed class Streams
 
         /// <summary>The core asked for TLS for this host: the task starts it next.</summary>
         public string? TlsHost { get; set; }
+
+        /// <summary>And the handshake is with the server's own origin: the client certificate goes.</summary>
+        public bool TlsServerOrigin { get; set; }
 
         /// <summary>The writes before the TLS asked for, and what the writes after it wait for.</summary>
         public Task BeforeTls { get; set; } = Task.CompletedTask;

@@ -136,10 +136,13 @@ func goStreams(p *streamPlatform) streamPlatform {
 // whose channel its reports go out on, and whose file system, state file and download paths its
 // files use.
 type streams struct {
-	x       *executor
-	tls     *tls.Config // the operator's, HTTP/1.1 only: each handshake takes a copy for its host
-	proxies *coreProxies
-	p       streamPlatform
+	x   *executor
+	tls *tls.Config // the operator's, HTTP/1.1 only: each handshake takes a copy for its host
+	// elsewhere is tls without what the operator gives for the server alone (its client
+	// certificate, skipping verification): for a handshake not with the server's own origin.
+	elsewhere *tls.Config
+	proxies   *coreProxies
+	p         streamPlatform
 
 	// reg holds every stream and resolution by stream id (the shell's ids), and runs every
 	// goroutine of core mode; files holds each download file under way by download id (the
@@ -159,7 +162,8 @@ type streams struct {
 }
 
 func newStreams(x *executor, cfg *tls.Config, proxies *coreProxies, p *streamPlatform) *streams {
-	return &streams{x: x, tls: http1Only(cfg), proxies: proxies, p: goStreams(p), reg: newInFlight(), files: newInFlight(),
+	own := http1Only(cfg)
+	return &streams{x: x, tls: own, elsewhere: elsewhereTLS(own), proxies: proxies, p: goStreams(p), reg: newInFlight(), files: newInFlight(),
 		live: map[*stream]bool{}, fileOf: map[uint64]*dlFile{}, answered: map[uint64]bool{}}
 }
 
@@ -178,6 +182,7 @@ type stream struct {
 	conn    net.Conn // what the bytes go through: raw, or TLS on it; nil until ready, and in a handshake
 	tlsHost string   // the core asked for TLS on it, for this host (the reader starts it)
 	tlsAsk  bool
+	tlsOwn  bool          // and the handshake is with the server's own origin: the server's TLS settings
 	inRead  bool          // the reader is in a Read
 	splice  *spliceTo     // its next bytes go to a download's file
 	holds   int           // reasons not to read: files it waits for, and a full write queue
@@ -291,7 +296,7 @@ func (s *streams) do(eff *corepb.Effect) (bool, *report) {
 	case *corepb.Effect_StreamOpen:
 		s.open(k.StreamOpen.Id, k.StreamOpen.Host, k.StreamOpen.Port)
 	case *corepb.Effect_StreamStartTls:
-		s.startTLS(k.StreamStartTls.Id, k.StreamStartTls.Host)
+		s.startTLS(k.StreamStartTls.Id, k.StreamStartTls.Host, k.StreamStartTls.ServerOrigin)
 	case *corepb.Effect_StreamWrite:
 		return true, s.write(k.StreamWrite.Id, k.StreamWrite.Data)
 	case *corepb.Effect_StreamClose:
@@ -416,8 +421,8 @@ func (st *stream) read() {
 		if st.isEnded() {
 			return // failed, or shut down: its report (if any) is on its way
 		}
-		if host, ok := st.tlsAsked(); ok {
-			if !st.handshake(host) {
+		if host, own, ok := st.tlsAsked(); ok {
+			if !st.handshake(host, own) {
 				st.linger()
 				return
 			}
@@ -520,24 +525,26 @@ func (st *stream) waitReadable() bool {
 	}
 }
 
-// tlsAsked takes the core's ask for TLS, if there is one.
-func (st *stream) tlsAsked() (string, bool) {
+// tlsAsked takes the core's ask for TLS, if there is one: the host, and whether it is the
+// server's own origin.
+func (st *stream) tlsAsked() (string, bool, bool) {
 	st.s.mu.Lock()
 	defer st.s.mu.Unlock()
 	if !st.tlsAsk {
-		return "", false
+		return "", false, false
 	}
 	st.tlsAsk = false
 	if st.conn != nil {
 		_ = st.conn.SetReadDeadline(time.Time{})
 	}
-	return st.tlsHost, true
+	return st.tlsHost, st.tlsOwn, true
 }
 
 // handshake starts TLS for host on the stream, once what was written before has gone (a CONNECT,
 // say): TLS inside TLS on a stream that is TLS to an https:// proxy already. False if it failed or
-// the stream was closed meanwhile.
-func (st *stream) handshake(host string) bool {
+// the stream was closed meanwhile. own: the server's own origin, whose TLS settings it gets; any
+// other handshake presents no client certificate and verifies.
+func (st *stream) handshake(host string, own bool) bool {
 	if !st.waitDrained() {
 		return false
 	}
@@ -548,7 +555,10 @@ func (st *stream) handshake(host string) bool {
 	if conn == nil {
 		return false
 	}
-	cfg := st.s.tls.Clone()
+	cfg := st.s.elsewhere.Clone()
+	if own {
+		cfg = st.s.tls.Clone()
+	}
 	cfg.ServerName = host // crypto/tls sends no SNI for an address, and verifies it as one
 	tc, err := st.s.p.startTLS(st.e.ctx, conn, cfg)
 	if err != nil {
@@ -674,7 +684,7 @@ func (st *stream) finish(conn, raw net.Conn) {
 	st.end(false)
 }
 
-func (s *streams) startTLS(id uint64, host string) {
+func (s *streams) startTLS(id uint64, host string, serverOrigin bool) {
 	st := s.stream(id)
 	if st == nil {
 		return
@@ -684,7 +694,7 @@ func (s *streams) startTLS(id uint64, host string) {
 	if st.conn == nil || st.ended {
 		return // not ready: the core asks only once it is
 	}
-	st.tlsHost, st.tlsAsk = host, true
+	st.tlsHost, st.tlsAsk, st.tlsOwn = host, true, serverOrigin
 	if st.inRead {
 		// The reader is in a Read (it isn't, when the core asks in answer to what it read): it
 		// stops, and starts TLS.

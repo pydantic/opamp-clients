@@ -514,7 +514,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: "1.26"
@@ -523,7 +525,7 @@ jobs:
         working-directory: dotnet
         env:
           PROJECT: ${{ matrix.project }}
-        run: dotnet test "$PROJECT" --nologo
+        run: dotnet test --project "$PROJECT"
 
   dotnet-fuzz:
     name: .NET client, fuzzed
@@ -544,7 +546,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       # Each SharpFuzz target of the .NET client's own code (ClientFuzz, CoreFuzz) for 20 seconds,
       # one after another; a crash fails the job and its input is kept in the job's artifacts.
       # libFuzzer's runtime (for libfuzzer-dotnet) is clang's libclang-rt-dev.
@@ -593,7 +597,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Each mutant fails its test, which passes without it
         run: python3 scripts/redact_mutants.py
 
@@ -658,7 +664,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - name: Go SDK setup (go/opampotel)
         if: matrix.sdk == 'go'
         working-directory: go/opampotel
@@ -686,7 +694,7 @@ jobs:
       - name: .NET automatic instrumentation plugin
         if: matrix.sdk == 'dotnet'
         working-directory: dotnet
-        run: dotnet test Pydantic.OpAmp.AutoInstrumentation.Tests --nologo
+        run: dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests
       - name: Keep the test reports
         if: (failure() || cancelled()) && matrix.sdk == 'java'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -724,7 +732,9 @@ jobs:
         env:
           DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq file
       # The wheels of `native_dist.py build`, made from the fetched libraries rather than built ones.
       # (Inline until native_dist.py has a step of its own for it.)

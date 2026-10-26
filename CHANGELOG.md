@@ -20,40 +20,61 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
-- Collector: the `logfirepolicy` processor (`go/logfirepolicyprocessor`) is gone, and collectors
-  no longer take the Logfire SDK policy: a collector's remote config is its YAML. The Supervisor
-  answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
-  processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
-  `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
-  carry the processor (#80).
+- Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
 
 ### Added
 
+- .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
+  instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
+  tests run on both. Building from source needs the .NET 10 SDK (#86).
+- Docs: a getting-started guide, the supported runtimes and platforms
+  (`docs/supported-versions.md`), and a troubleshooting page (#86).
 - Python (`pydantic-opamp-otel`): `configure_logfire()`, the Logfire SDK under the server, in place of
   `logfire.configure()`: the live sampler as its head sampler, and its exporters to Logfire behind
   the package's gates, so the SDK settings apply to what reaches Logfire (`logfire` extra).
-
 - Go: an install's or a removal's error can say how it failed: `opamp.FailedForNow(err)` (an
   outage or a timeout: not reported failed, and tried again after a wait) or
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
 
+### Fixed
+
+- .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
+  report given while the agent was starting was lost until the next one (30 s on with the default
+  health check publisher); the first message now carries it (#86).
+- Python: on Windows, the core tap (`OPAMP_CORE_TAP`) wrote its records in text mode, which broke
+  them (#86).
+- Python and .NET: on Windows, a save's rename is written through to the disk (`MoveFileEx` with
+  `MOVEFILE_WRITE_THROUGH`), since a directory can't be flushed there: a save answered stored
+  survives a power cut (#86).
+- .NET: on Windows, a proxy variable the client refuses (as `ALL_PROXY=socks4://...`) is named as
+  it was set in the error, not in lower case (#86).
+- Java agent extension: under Elastic's distribution of the agent (EDOT Java), describing the
+  SDK's sampler no longer overflows the stack when EDOT logs the SDK at start (EDOT's default
+  sampler's own description never returns), and EDOT's span logger no longer sets the trace
+  gate's controls aside while EDOT's own OpAMP client is off. Every check of the extension now
+  passes under EDOT Java 1.14 (#83).
+
 ### Changed
 
-- Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
-  root or the transparency log unreachable) is tried again after a wait instead of being reported
-  failed for good, and a rollback that can't put the previous executable back is reported failed
-  (what the host has unknown) instead of not being reported at all (#81).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
 
 ### Security
 
+- Python: on Windows, state files, downloads, the downloads directory and the core tap are made
+  with an access-control list allowing the agent's user alone, as the .NET and Java clients make
+  them; a mode of 0600 meant nothing there, so they took the directory's inherited list (#86).
 - Go, Python, Node.js, Java, .NET (platform mode): the client certificate configured for the OpAMP
   server is presented only when a package file is at the server's own origin; a file anywhere else
   is fetched without it (and, in Go, without skipping verification). It was presented to every
   download host (#81).
+- Go, Python, Node.js, Java, .NET (core mode): the same in core mode. Each TLS
+  handshake the core asks for says whether it is with the server's own origin; only then is the
+  client certificate presented (and, in Go, verification skipped where it is for the server). A
+  file elsewhere, and TLS to an https:// proxy, get neither; the CAs still apply. On core
+  0.11.0, which the clients now pin (#87).
 - Node.js: undici 7.30.1, for GHSA-xjj6-f33q-929c, GHSA-4qv8-2p9j-2685 and GHSA-f72v-6w45-q472
   (#81).
 - Dependencies with known advisories updated: golang.org/x/net 0.60.0 (`go/opampotel`, the
@@ -61,6 +82,35 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.5.0 (2026-10-25)
+
+`go/opampsupervisor/v0.5.0`, on core 0.11.0. The Go modules are not released with it.
+
+### Breaking
+
+- Collector: the `logfirepolicy` processor (`go/logfirepolicyprocessor`) is gone, and collectors
+  no longer take the Logfire SDK policy: a collector's remote config is its YAML. The Supervisor
+  answers FAILED to a remote config holding `logfire-sdk-policy.json`, no longer puts the
+  processor in the collector's pipelines, and no longer sets `logfire.opamp.config_format` or
+  `logfire.opamp.supported_controls` in the agent description. The packaged collector doesn't
+  carry the processor (#80).
+
+### Changed
+
+- Supervisor: hosts enrolled with `pydantic-opamp-enroll` (Linux, macOS, Windows) accept the server's
+  restart command (`accepts_restart_command`), so the server can restart the host's collector
+  (#88).
+- Supervisor: a collector package whose signature Cosign can't check for now (Sigstore's trusted
+  root or the transparency log unreachable) is tried again after a wait instead of being reported
+  failed for good, and a rollback that can't put the previous executable back is reported failed
+  (what the host has unknown) instead of not being reported at all (#81).
+
+### Security
+
+- The client certificate configured for the OpAMP server is presented only on TLS with the
+  server's own origin; a package file elsewhere, and TLS to an https:// proxy, get neither (it was
+  presented to every download host). The CAs still apply (#87).
 
 ## Supervisor 0.4.0 and the Go modules 0.2.0 (2026-10-22)
 

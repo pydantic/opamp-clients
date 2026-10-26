@@ -380,7 +380,8 @@ class Streams:
             o = e.stream_open
             self._open(o.id, o.host, o.port)
         elif kind == "stream_start_tls":
-            self._tls(e.stream_start_tls.id, e.stream_start_tls.host)
+            t = e.stream_start_tls
+            self._tls(t.id, t.host, t.server_origin)
         elif kind == "stream_write":
             self._write(e.stream_write.id, e.stream_write.data)
         elif kind == "stream_close":
@@ -469,7 +470,7 @@ class Streams:
 
         s.task = self._in.spawn(run())
 
-    def _tls(self, id_: int, host: str) -> None:
+    def _tls(self, id_: int, host: str, server_origin: bool) -> None:
         s = self._in.streams.get(id_)
         if s is None or s.transport is None or s.pending:
             return
@@ -481,7 +482,9 @@ class Streams:
 
         async def run() -> None:
             try:
-                tls = await self._start_tls(raw, s, self._transport.ssl, server_hostname=host)
+                # The client certificate only at the server's own origin; the CAs everywhere.
+                ctx = self._transport.ssl if server_origin else self._transport.elsewhere_ssl
+                tls = await self._start_tls(raw, s, ctx, server_hostname=host)
                 if tls is None:
                     raise ConnectionError("the connection closed during the TLS handshake")
             except Exception as e:  # noqa: BLE001 - whatever it is, the stream is gone

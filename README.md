@@ -2,6 +2,13 @@
 
 OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 
+**Start here:** [docs/getting-started.md](docs/getting-started.md) connects an application, a
+host or a Kubernetes cluster to an OpAMP server, such as Logfire's Fleet
+([docs/guides/logfire.md](docs/guides/logfire.md)).
+[docs/supported-versions.md](docs/supported-versions.md) lists the runtimes and platforms each SDK
+supports, and [docs/troubleshooting.md](docs/troubleshooting.md) what to do when something
+doesn't connect.
+
 | Language | Client | OpenTelemetry integration |
 |---|---|---|
 | Python | [`python/`](python/), [docs](docs/python.md) | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) |
@@ -12,6 +19,9 @@ OpAMP client SDKs for Python, Go, Node.js, Java and .NET, on one shared core.
 
 [docs/how-it-works.md](docs/how-it-works.md) explains how the clients and the core fit together,
 [docs/sdks.md](docs/sdks.md) compares the SDKs, and [examples/](examples/) runs each one.
+Two guides start from an application as it is: on the Logfire SDK or sending to Logfire
+([docs/guides/logfire.md](docs/guides/logfire.md)), and on Elastic's OpenTelemetry distributions
+([docs/guides/elastic.md](docs/guides/elastic.md)).
 
 The core is the state machine every client wraps. It arrives here compiled, as this repository's
 `core/vX.Y.Z` releases: the WebAssembly modules Go, Node.js and Java load, the native library

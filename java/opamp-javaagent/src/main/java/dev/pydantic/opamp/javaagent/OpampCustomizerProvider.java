@@ -14,6 +14,9 @@ import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvide
  * then set aside. With no {@code otel.opamp.endpoint} it changes nothing.
  */
 public final class OpampCustomizerProvider implements AutoConfigurationCustomizerProvider {
+  /** Where EDOT Java's own OpAMP client takes Elastic's central configuration from, when given. */
+  static final String ELASTIC_OPAMP_ENDPOINT = "elastic.otel.opamp.endpoint";
+
   private final Extension e;
 
   /** The agent's: the extension's one instance. */
@@ -66,7 +69,7 @@ public final class OpampCustomizerProvider implements AutoConfigurationCustomize
         // Then, the providers as every other extension left them.
         .addTracerProviderCustomizer((builder, config) -> {
           if (e.on()) {
-            e.outside("traces", e.outside.spans(builder));
+            e.outside("traces", e.outside.spans(builder, !config.getString(ELASTIC_OPAMP_ENDPOINT, "").isEmpty()));
           }
           return builder;
         })

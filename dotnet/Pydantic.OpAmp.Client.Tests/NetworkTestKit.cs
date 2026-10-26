@@ -19,6 +19,9 @@ namespace Pydantic.OpAmp.Client.Tests;
 /// <summary>Certificates made for the tests: two CAs, a server's and an agent's.</summary>
 internal static class Pki
 {
+    /// <summary>The keys <see cref="Issue"/> made, as PEM, by certificate thumbprint (first: the fields below use it).</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> Keys = new();
+
     public static readonly X509Certificate2 Ca = NewCa("test CA");
     public static readonly X509Certificate2 OtherCa = NewCa("other CA");
     public static readonly X509Certificate2 Server = Issue(Ca, "server", ["127.0.0.1", "localhost"]);
@@ -26,7 +29,9 @@ internal static class Pki
 
     public static string Pem(X509Certificate2 cert) => cert.ExportCertificatePem();
 
-    public static string KeyPem(X509Certificate2 cert) => cert.GetECDsaPrivateKey()!.ExportPkcs8PrivateKeyPem();
+    /// <summary>The key of a certificate <see cref="Issue"/> made, as PEM (kept as it was made: Windows won't export a loaded key in plain text).</summary>
+    public static string KeyPem(X509Certificate2 cert) => Keys[cert.Thumbprint];
+
 
     public static X509Certificate2 NewCa(string name)
     {
@@ -41,7 +46,7 @@ internal static class Pki
     /// <summary>A server certificate for <paramref name="hosts"/>, or (none) a client one.</summary>
     public static X509Certificate2 Issue(X509Certificate2 ca, string name, string[]? hosts)
     {
-        var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         var req = new CertificateRequest($"CN={name}", key, HashAlgorithmName.SHA256);
         req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
         req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, true));
@@ -69,7 +74,17 @@ internal static class Pki
         var serial = RandomNumberGenerator.GetBytes(16);
         serial[0] &= 0x7f;
         using var cert = req.Create(ca, DateTimeOffset.UtcNow.AddHours(-1), DateTimeOffset.UtcNow.AddHours(12), serial);
-        return cert.CopyWithPrivateKey(key);
+        using var withKey = cert.CopyWithPrivateKey(key);
+
+        Keys[withKey.Thumbprint] = key.ExportPkcs8PrivateKeyPem();
+
+        // Reloaded from PKCS #12: SChannel (Windows) can't use a key that lives only in memory,
+        // for a server or a client.
+#if NET9_0_OR_GREATER
+        return X509CertificateLoader.LoadPkcs12(withKey.Export(X509ContentType.Pkcs12), null);
+#else
+        return new X509Certificate2(withKey.Export(X509ContentType.Pkcs12));
+#endif
     }
 
     public static bool SignedBy(X509Certificate2 ca, X509Certificate cert)
