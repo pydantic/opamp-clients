@@ -96,14 +96,15 @@ The application and its telemetry carry on. Run on a supported platform to have 
 
 ## Keys that expire
 
-SDKs and the Supervisor take a key of their own on their first connection and move to a new one
-before it expires, as long as their state directory survives restarts. An instance that loses
-its state starts over from the key it was configured with: if that one has expired or was
-revoked, it can't connect (HTTP 401).
+SDKs and the Supervisor take a key of their own on their first connection, from a server that
+issues them, and move to a new one before it expires, as long as their state directory survives
+restarts. An instance that loses its state starts over from the key it was configured with: if
+that one has expired or was revoked, it can't connect (HTTP 401).
 
-The collector `opamp` extension from upstream's contrib release and the Operator's OpAMP bridge
-don't take new keys from the server. Their key works until it expires (in Logfire, 90 days),
-and then they disconnect: replace the key before then and restart them
+A key the server doesn't renew works until it expires, and then its agents disconnect (HTTP 401)
+and run on the settings they have. In Logfire that is an application's key (it lasts as long as was
+chosen when it was created, up to a year), and the key of the Operator's OpAMP bridge or of a
+collector with upstream's `opamp` extension, which take no new keys from a server (90 days). Replace it before then and restart what uses it
 ([guides/logfire.md](guides/logfire.md#replacing-a-key)).
 
 ## Turning it off
