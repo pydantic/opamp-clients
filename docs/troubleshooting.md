@@ -42,6 +42,19 @@ meanwhile. Once it's back you see `connected to ... again`.
 The warning names what you configured: with the endpoint or headers given in code, it says so
 instead of naming the variable.
 
+For the Supervisor, `opampsupervisor status` says the same at any time, with the collector's
+health and the last remote config's status. Run it as root or an administrator:
+
+| Where it runs | Command |
+|---|---|
+| Linux packages | `sudo /usr/lib/pydantic-opamp/opampsupervisor status --storage /var/lib/pydantic-opamp` |
+| macOS package | `sudo /opt/pydantic-opamp/bin/opampsupervisor status --storage /opt/pydantic-opamp/var` |
+| Windows `.msi` | `& "$env:ProgramFiles\pydantic-opamp\opampsupervisor.exe" status --storage "$env:ProgramData\pydantic-opamp\var"` |
+| Container image | `docker exec <container> /usr/lib/pydantic-opamp/opampsupervisor status --config /etc/pydantic-opamp/supervisor.yaml` |
+
+It exits 0 when connected, healthy and the last remote config isn't FAILED, and 1 otherwise, so a
+script or a probe can use it.
+
 ## Connected, but no telemetry arrives
 
 The OpAMP connection and the telemetry are separate: the key that connects the agent doesn't
@@ -96,14 +109,15 @@ The application and its telemetry carry on. Run on a supported platform to have 
 
 ## Keys that expire
 
-SDKs and the Supervisor take a key of their own on their first connection and move to a new one
-before it expires, as long as their state directory survives restarts. An instance that loses
-its state starts over from the key it was configured with: if that one has expired or was
-revoked, it can't connect (HTTP 401).
+SDKs and the Supervisor take a key of their own on their first connection, from a server that
+issues them, and move to a new one before it expires, as long as their state directory survives
+restarts. An instance that loses its state starts over from the key it was configured with: if
+that one has expired or was revoked, it can't connect (HTTP 401).
 
-The collector `opamp` extension from upstream's contrib release and the Operator's OpAMP bridge
-don't take new keys from the server. Their key works until it expires (in Logfire, 90 days),
-and then they disconnect: replace the key before then and restart them
+A key the server doesn't renew works until it expires, and then its agents disconnect (HTTP 401)
+and run on the settings they have. In Logfire that is an application's key (it lasts as long as was
+chosen when it was created, up to a year), and the key of the Operator's OpAMP bridge or of a
+collector with upstream's `opamp` extension, which take no new keys from a server (90 days). Replace it before then and restart what uses it
 ([guides/logfire.md](guides/logfire.md#replacing-a-key)).
 
 ## Turning it off

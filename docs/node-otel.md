@@ -9,7 +9,9 @@ package sets up. A provider the application builds on its own isn't managed: whe
 registers it as the global one, the package sets aside the settings it can no longer carry out
 ([below](#a-provider-of-the-applications-own)). The application needs no code. It works for CommonJS and ES modules alike:
 the register installs the instrumentations' loader hook for `import`, which upstream leaves to a
-separate `--experimental-loader` flag.
+separate `--experimental-loader` flag. The hook runs in the application's thread where Node.js
+can run it there (22.22.3, 24.11.1, 25.1.0, 26 and later), and on a loader thread of its own
+before that, which costs about 7 MB more.
 
 Checked with `@opentelemetry/sdk-node` 0.222, `auto-instrumentations-node` 0.80 and Node.js 22 and
 later.

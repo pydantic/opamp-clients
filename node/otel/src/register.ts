@@ -20,7 +20,17 @@ await import(pathToFileURL(fromInstrumentation.resolve("import-in-the-middle/lib
 // loads only through import-in-the-middle's loader hook. Upstream's register leaves that to a
 // separate --experimental-loader flag; one --import here installs both the require hooks and
 // import-in-the-middle's loader hook, so the application needs no --experimental-loader flag.
-registerHooks("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
+// Where Node.js can run it in the application's thread (module.registerHooks: 22.22.3, 24.11.1,
+// 25.1.0, 26 and later), it runs there; otherwise on a loader thread of its own (module.register),
+// which holds a second V8 isolate, about 11 MB, and passes every module resolved over a channel.
+const syncHooks = (await import(
+  pathToFileURL(fromInstrumentation.resolve("import-in-the-middle/register-hooks.mjs")).href
+)) as { supportsSyncHooks(): boolean; register(): void };
+if (syncHooks.supportsSyncHooks()) {
+  syncHooks.register();
+} else {
+  registerHooks("@opentelemetry/instrumentation/hook.mjs", import.meta.url);
+}
 
 const { shutdown } = register();
 let stopped: Promise<void> | undefined;
