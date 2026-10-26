@@ -114,13 +114,14 @@ func waitConnected(dir string, wait time.Duration, since time.Time, jsonOut bool
 		}
 		current := err == nil && !st.Started.Before(since) && st.Running()
 		connected := current && st.Server != nil && st.Server.Connected
+		late := time.Now().After(deadline)
 		switch {
 		case connected:
 			return printStatus(st, jsonOut, stdout, stderr)
-		case time.Now().After(deadline) && !current:
+		case late && !current:
 			fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
 			return 1
-		case time.Now().After(deadline):
+		case late:
 			if code := printStatus(st, jsonOut, stdout, stderr); code != 0 {
 				return code
 			}
