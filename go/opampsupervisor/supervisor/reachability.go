@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap"
 
@@ -51,11 +52,16 @@ func (r *reachability) failed(status int, detail string) error {
 		why = fmt.Sprintf("HTTP %d", status)
 	}
 	return fmt.Errorf("can't reach %s (%s): %s. Retrying in the background; the collector keeps its current config meanwhile",
-		r.endpoint, why, connectHint(status, r.ever))
+		r.endpoint, why, connectHint(status, r.ever, detail))
 }
 
-// connectHint is what to check, by the HTTP status the server answered with (0: none).
-func connectHint(status int, ever bool) string {
+// connectHint is what to check, by the HTTP status the server answered with (0: none) and the
+// error the connection failed with.
+func connectHint(status int, ever bool, detail string) string {
+	if status == 0 && strings.Contains(detail, "x509: ") {
+		return "this host doesn't trust the server's certificate: enroll again with --ca-file naming the CA that " +
+			"signed it (server.tls.ca_file), or add that CA to the system's trust store"
+	}
 	switch status {
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return "the server refused the credentials: check the Authorization header in server.headers (or the auth extension " +

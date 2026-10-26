@@ -23,6 +23,11 @@ import (
 // directory. It exits 0 when all is well, 1 when something isn't, and 2 when there is no status
 // to read.
 //
+// With --wait DURATION it waits, for at most that long, for a Supervisor started at or after --since
+// (Unix seconds) to connect, and then says how it is: 0 once it is connected, 1 when it isn't by
+// then. The enrollment helpers run it after they start the service, so an install that can't
+// reach its server (an untrusted certificate, say) says so instead of succeeding.
+//
 // It is a new file rather than a change to upstream's main.go: the command is taken here, before
 // main runs.
 func init() {
@@ -37,6 +42,8 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	configPath := flags.String("config", "", "Path to the Supervisor's configuration file")
 	storage := flags.String("storage", "", "The Supervisor's storage directory, in place of --config")
 	jsonOut := flags.Bool("json", false, "Print the status as JSON, as the status file holds it")
+	wait := flags.Duration("wait", 0, "Wait this long for the Supervisor to connect to its OpAMP server")
+	since := flags.Int64("since", 0, "With --wait: only a Supervisor started at or after this Unix time counts")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -49,6 +56,9 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 			return 2
 		}
 		dir = cfg.Storage.Directory
+	}
+	if *wait > 0 {
+		return waitConnected(dir, *wait, time.Unix(*since, 0), stdout, stderr)
 	}
 	st, err := supervisor.ReadStatus(dir)
 	switch {
@@ -77,4 +87,27 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// waitConnected polls the status file until a Supervisor started at or after since is connected,
+// or wait is up; it then prints the status as the plain command does.
+func waitConnected(dir string, wait time.Duration, since time.Time, stdout, stderr io.Writer) int {
+	deadline := time.Now().Add(wait)
+	for {
+		st, err := supervisor.ReadStatus(dir)
+		current := err == nil && !st.Started.Before(since) && st.Running()
+		if current && st.Server != nil && st.Server.Connected {
+			st.Print(stdout, time.Now())
+			return 0
+		}
+		if time.Now().After(deadline) {
+			if !current {
+				fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
+				return 1
+			}
+			st.Print(stdout, time.Now())
+			return 1
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
 }

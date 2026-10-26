@@ -188,6 +188,8 @@ agent:
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
+  # A remote config the Collector fails on is replaced by the last one that ran healthy, and stays FAILED.
+  automatic_config_rollback: true
 $agentEnv
 
   # What the server's remote config may do to this host. The server can't change this file;
@@ -216,6 +218,16 @@ if ($NoStart) {
     Write-Output "enrolled with $Endpoint; start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
 } else {
     Set-Service -Name $service -StartupType Automatic
+    $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     Restart-Service -Name $service
-    Write-Output "enrolled with $Endpoint; the Supervisor is running ($service)"
+    # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
+    # with what to check, instead of reporting success; the service keeps retrying.
+    $supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path $programs 'opampsupervisor.exe' }
+    $storage = Join-Path $root 'var'
+    & $supervisor status --storage $storage --wait 30s --since $started
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
+        exit 1
+    }
+    Write-Output "enrolled with $Endpoint; the Supervisor is running and connected ($service)"
 }

@@ -191,6 +191,8 @@ agent:
   status, with no credentials. `opampsupervisor status --config supervisor.yaml` (or
   `--storage DIR`, when the config reads files only the service can) prints it (`--json`: as JSON),
   and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
+  `--wait DURATION --since UNIX` waits for a Supervisor started since then to connect (0 once it
+  has, 1 with its status when it hasn't): the enrollment helpers run it after starting the service.
   The command is taken in a file of its own (`status_command.go`) before `main` runs, so
   upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the

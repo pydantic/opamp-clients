@@ -50,6 +50,9 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
+- Supervisor: `opampsupervisor status --wait 30s --since UNIX` waits for a freshly started
+  Supervisor to connect, and a connection refused for a certificate the host doesn't trust says to
+  pass `--ca-file` (#PR).
 
 ### Fixed
 
@@ -73,6 +76,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor installers (`pydantic-opamp-enroll` on Linux, macOS and Windows): enrolling waits up
+  to 30 seconds for the Supervisor to connect, and fails with its status and what to check when it
+  can't (an untrusted server certificate, a refused key), instead of reporting success. The service
+  keeps retrying (#PR).
+- Supervisor installers: the config turns on `agent.automatic_config_rollback`. A remote config the
+  Collector fails on is replaced by the last one that ran healthy, and stays FAILED, so a bad policy
+  no longer stops a host's telemetry until a fix is published (#PR).
 - Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
   saves nothing), and the client says so once with the new `state_from_newer_version`
   notification, which every integration and the collector extension log as a warning (#92).

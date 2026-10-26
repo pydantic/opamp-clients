@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -32,10 +33,25 @@ echo "$@" >>"`+filepath.Join(dir, "systemctl.log")+`"
 	return creds, systemctl
 }
 
+// fakeSupervisor stands in for `opampsupervisor status`: it logs its arguments to
+// dir/supervisor.log, and prints and exits as dir/status says ("0" when it is missing).
+func fakeSupervisor(t *testing.T, dir string) string {
+	t.Helper()
+	supervisor := filepath.Join(dir, "opampsupervisor")
+	require.NoError(t, os.WriteFile(supervisor, []byte(`#!/bin/sh
+echo "$@" >>"`+filepath.Join(dir, "supervisor.log")+`"
+code=$(cat "`+filepath.Join(dir, "status")+`" 2>/dev/null || echo 0)
+[ "$code" = 0 ] || echo "OpAMP server   can't reach it: this host doesn't trust the server's certificate"
+exit "$code"
+`), 0o755))
+	return supervisor
+}
+
 type enrollment struct {
 	root, tools string
 	creds       string
 	systemctl   string
+	supervisor  string
 }
 
 func newEnrollment(t *testing.T) enrollment {
@@ -45,13 +61,14 @@ func newEnrollment(t *testing.T) enrollment {
 	}
 	e := enrollment{root: t.TempDir(), tools: t.TempDir()}
 	e.creds, e.systemctl = fakeSystemd(t, e.tools)
+	e.supervisor = fakeSupervisor(t, e.tools)
 	return e
 }
 
 func (e enrollment) run(t *testing.T, stdin string, args ...string) (string, error) {
 	t.Helper()
 	cmd := exec.Command("./pydantic-opamp-enroll", args...)
-	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root, "SYSTEMD_CREDS="+e.creds, "SYSTEMCTL="+e.systemctl)
+	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+e.root, "SYSTEMD_CREDS="+e.creds, "SYSTEMCTL="+e.systemctl, "OPAMP_SUPERVISOR="+e.supervisor)
 	cmd.Stdin = strings.NewReader(stdin)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -239,6 +256,8 @@ func TestEnrollBindsTheExporterCredential(t *testing.T) {
 	assert.Equal(t, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, loaded.Agent.ConnectionEnv)
 	assert.True(t, loaded.Capabilities.AcceptsOtherConnectionSettings)
 	assert.True(t, loaded.Capabilities.AcceptsRestartCommand)
+	// A remote config the Collector fails on doesn't leave the host collecting nothing.
+	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	out, err = newEnrollment(t).run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp", "--instance-id", "f0cff0a3-08e5-4c49-96ce-1366b14525ed")
 	require.Error(t, err, "enrollment no longer takes an instance UID")
 	assert.NotContains(t, out, "bootstrap-token")
@@ -386,4 +405,23 @@ func TestEnrollHostLogs(t *testing.T) {
 	assertHostLogs(t, p, enroll(), body, `configures extension "file_storage/host_logs"`)
 	require.ErrorContains(t, p.Check("", []byte(`extensions: {file_storage: {directory: /etc/cron.d}}`)), "allowed_storage_directories doesn't allow")
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {filelog: {include: [/etc/shadow]}}`)), "allowed_log_paths doesn't allow")
+}
+
+// Started, enrollment waits for the Supervisor to connect: one that can't (a server certificate
+// this host doesn't trust, say) fails the install with what to check, instead of reporting success.
+func TestEnrollWaitsForTheConnection(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "the Supervisor is running and connected")
+	calls, err := os.ReadFile(filepath.Join(e.tools, "supervisor.log"))
+	require.NoError(t, err)
+	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+\n$`, string(calls))
+
+	require.NoError(t, os.WriteFile(filepath.Join(e.tools, "status"), []byte("1"), 0o600))
+	out, err = e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.Error(t, err)
+	assert.Contains(t, out, "doesn't trust the server's certificate")
+	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
+	assert.NotContains(t, out, "running and connected")
 }
