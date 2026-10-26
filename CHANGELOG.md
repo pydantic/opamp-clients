@@ -21,6 +21,9 @@ and date. Tests, CI and docs alone don't need a line.
 ### Breaking
 
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
+- Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
+  is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
+  Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
 
 ### Added
 
@@ -65,6 +68,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
+  saves nothing), and the client says so once with the new `state_from_newer_version`
+  notification, which every integration, the collector extension and the Supervisor log as a
+  warning (#92).
 - Node.js (`@pydantic/opamp-otel`): the register runs the instrumentations' loader hook for
   `import` in the application's thread (`module.registerHooks`) on Node.js 22.22.3, 24.11.1, 25.1.0,
   26 and later, instead of on a loader thread with a V8 isolate of its own: about 7 MB less
