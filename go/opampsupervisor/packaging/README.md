@@ -69,10 +69,14 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   state.
 - **Writes the config.** `/etc/pydantic-opamp/supervisor.yaml` turns on
   `accepts_remote_config`, `accepts_opamp_connection_settings` and
-  `storage.state_key: systemd-creds`, and limits what the server's remote config may do (see
+  `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
+  Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and limits what the server's remote config may do (see
   [What the server can do to this host](#what-the-server-can-do-to-this-host)).
-- **Starts the service.** It enables and starts `pydantic-opamp-supervisor.service`. Pass
-  `--no-start` to skip this step.
+- **Starts the service and waits for it to connect.** It enables and starts
+  `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect
+  (`opampsupervisor status --wait`). If it can't, for example because the host doesn't trust the
+  server's certificate (pass `--ca-file`), the command prints the Supervisor's status with what to
+  check and exits 1. The service keeps retrying. Pass `--no-start` to skip this step.
 
 With `--accept-packages`, the config also lets the server update the collector (see
 [Collector updates from the server](#collector-updates-from-the-server)).

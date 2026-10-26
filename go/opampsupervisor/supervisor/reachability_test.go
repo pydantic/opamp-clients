@@ -60,8 +60,12 @@ func TestConnectHintsNameTheSupervisorsSettings(t *testing.T) {
 		http.StatusInternalServerError: "the server answered HTTP 500",
 		0:                              "HTTPS_PROXY",
 	} {
-		assert.Contains(t, connectHint(status, false), want, "HTTP %d", status)
+		assert.Contains(t, connectHint(status, false, ""), want, "HTTP %d", status)
 	}
 	r := newReachability(zap.NewNop(), "https://opamp.example.com/v1/opamp")
 	assert.Contains(t, r.failed(http.StatusUnauthorized, "").Error(), "(HTTP 401)", "the status when there is no detail")
+	// A root service doesn't see a CA trusted only in a user's keychain (a local dev proxy's, say).
+	untrusted := "tls: failed to verify certificate: x509: certificate signed by unknown authority"
+	assert.Contains(t, connectHint(0, false, untrusted), "--ca-file")
+	assert.Contains(t, newReachability(zap.NewNop(), "wss://opamp.example.com/v1/opamp").failed(0, untrusted).Error(), "--ca-file")
 }

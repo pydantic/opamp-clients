@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,4 +68,61 @@ func TestStatusCommand(t *testing.T) {
 	code, _, errOut = run("--config", filepath.Join(t.TempDir(), "missing.yaml"))
 	assert.Equal(t, 2, code)
 	assert.Contains(t, errOut, "--storage DIR")
+}
+
+// `status --wait` waits for a Supervisor started since --since to connect: 0 once it is, 1 with
+// the status (and what to check) when it isn't by then.
+func TestStatusCommandWaitsForTheConnection(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) (int, string, string) {
+		var out, errOut bytes.Buffer
+		code := statusCommand(append([]string{"--storage", dir}, args...), &out, &errOut)
+		return code, out.String(), errOut.String()
+	}
+	now := time.Now()
+	since := fmt.Sprint(now.Unix())
+
+	code, _, errOut := run("--wait", "300ms", "--since", since)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, errOut, "hasn't reported its status")
+
+	untrusted := supervisor.Status{PID: os.Getpid(), Started: now, Updated: now, Endpoint: "wss://opamp.example.com/v1/opamp",
+		Server: &supervisor.ServerStatus{Since: now, Error: "tls: failed to verify certificate: x509: certificate signed by unknown authority"}}
+	writeStatusFile(t, dir, untrusted)
+	code, out, _ := run("--wait", "300ms", "--since", since)
+	assert.Equal(t, 1, code)
+	assert.Contains(t, out, "--ca-file")
+
+	// A status left by the Supervisor that ran before doesn't count, connected or not.
+	old := untrusted
+	old.Started = now.Add(-time.Hour)
+	old.Server = &supervisor.ServerStatus{Connected: true, Since: old.Started}
+	writeStatusFile(t, dir, old)
+	code, _, _ = run("--wait", "300ms", "--since", since)
+	assert.Equal(t, 1, code)
+
+	go func() {
+		time.Sleep(200 * time.Millisecond)
+		connected := untrusted
+		connected.Server = &supervisor.ServerStatus{Connected: true, Since: time.Now()}
+		writeStatusFile(t, dir, connected)
+	}()
+	code, out, _ = run("--wait", "5s", "--since", since)
+	assert.Equal(t, 0, code, out)
+	assert.Contains(t, out, "connected since")
+
+	// --json holds with --wait, connected or not.
+	code, out, _ = run("--wait", "300ms", "--since", since, "--json")
+	assert.Equal(t, 0, code, out)
+	var printed supervisor.Status
+	require.NoError(t, json.Unmarshal([]byte(out), &printed))
+	assert.True(t, printed.Server.Connected)
+
+	// A status that is there but can't be read fails at once: waiting won't fix it.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, supervisor.StatusFile), []byte("{"), 0o600))
+	started := time.Now()
+	code, _, errOut = run("--wait", "5s", "--since", since)
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errOut, "can't read the status")
+	assert.Less(t, time.Since(started), 2*time.Second)
 }

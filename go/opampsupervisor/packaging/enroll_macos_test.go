@@ -27,7 +27,7 @@ func macEnroll(t *testing.T, root, tools, stdin string, args ...string) (string,
 	launchctl := filepath.Join(tools, "launchctl")
 	require.NoError(t, os.WriteFile(launchctl, []byte("#!/bin/sh\necho \"$@\" >>\""+filepath.Join(tools, "launchctl.log")+"\"\n"), 0o755))
 	cmd := exec.Command("./macos/pydantic-opamp-enroll", args...)
-	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl)
+	cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "LAUNCHCTL="+launchctl, "OPAMP_SUPERVISOR="+fakeSupervisor(t, tools))
 	cmd.Stdin = strings.NewReader(stdin)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -72,6 +72,7 @@ func TestMacEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "keychain", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
+	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
 }
 

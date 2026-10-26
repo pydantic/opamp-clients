@@ -256,7 +256,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		}
 		line("OpAMP server", "%s: can't reach it since %s", st.Endpoint, ago(s.Since))
 		line("", "%s", why)
-		line("", "%s", connectHint(s.HTTPStatus, false))
+		line("", "%s", connectHint(s.HTTPStatus, false, s.Error))
 	}
 	switch c := st.Collector; {
 	case c == nil:

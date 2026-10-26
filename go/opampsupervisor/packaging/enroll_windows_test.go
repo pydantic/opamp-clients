@@ -56,6 +56,7 @@ func TestWinEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "dpapi", loaded.Storage.StateKey)
 	assert.Equal(t, filepath.ToSlash(filepath.Join(root, "var")), loaded.Storage.Directory)
+	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
 }
 

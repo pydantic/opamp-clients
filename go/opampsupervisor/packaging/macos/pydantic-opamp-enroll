@@ -69,6 +69,8 @@ yaml_list() {
 
 root=${OPAMP_ENROLL_ROOT:-}
 launchctl=${LAUNCHCTL:-launchctl}
+supervisor=${OPAMP_SUPERVISOR:-/opt/pydantic-opamp/bin/opampsupervisor}
+storage=$root/opt/pydantic-opamp/var
 etc=$root/opt/pydantic-opamp/etc
 label=dev.pydantic.opamp-supervisor
 plist=/Library/LaunchDaemons/$label.plist
@@ -251,6 +253,8 @@ agent:
   connection_env:
     logfire/otlp: LOGFIRE_TOKEN
   executable: /opt/pydantic-opamp/bin/otelcol
+  # A remote config the Collector fails on is replaced by the last one that ran healthy, and stays FAILED.
+  automatic_config_rollback: true
 $agent_env
 
   # What the server's remote config may do to this host. The server can't change this file;
@@ -276,11 +280,24 @@ storage:
 CONFIG
 mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
 
+# wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect.
+# An install that can't reach its server (an untrusted certificate, a refused key) fails here,
+# with what to check, instead of reporting success; the service keeps retrying.
+wait_connected() {
+	if "$supervisor" status --storage "$storage" --wait 30s --since "$1"; then
+		return 0
+	fi
+	echo "enrolled, but the Supervisor can't connect to $endpoint yet; it keeps retrying. Fix what is above, then check with: sudo $supervisor status --storage $storage" >&2
+	exit 1
+}
+
 if [ -n "$start" ]; then
 	# Loaded already (enrolling again): unload it first, so it reads the new config.
 	"$launchctl" bootout "system/$label" 2>/dev/null || true
+	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
-	echo "enrolled with $endpoint; the Supervisor is running ($label)"
+	wait_connected "$started"
+	echo "enrolled with $endpoint; the Supervisor is running and connected ($label)"
 else
 	echo "enrolled with $endpoint; start the Supervisor with: sudo launchctl bootstrap system $plist"
 fi
