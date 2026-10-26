@@ -350,6 +350,14 @@ public abstract record OpAmpNotification
     public sealed record SaveStalled(bool Stalled, TimeSpan Waited) : OpAmpNotification;
 
     /// <summary>
+    /// The saved state is a newer core's, in a format (<paramref name="Version"/>) this one can't
+    /// read: the client starts from its configuration, as on first use, and saves nothing (no
+    /// offered connection settings, no packages), leaving that state as it is. Worth a warning: an
+    /// older release was started on a newer one's state file.
+    /// </summary>
+    public sealed record StateFromNewerVersion(uint Version) : OpAmpNotification;
+
+    /// <summary>
     /// The client has stopped: after <see cref="OpAmpClient.StopAsync"/>, or on its own because of
     /// <paramref name="Error"/> (which <c>StopAsync</c> throws too). Null after <c>StopAsync</c>.
     /// </summary>
@@ -798,6 +806,7 @@ public sealed class OpAmpClient
         Notification.KindOneofCase.BadMessage => new OpAmpNotification.BadMessage(n.BadMessage.Detail_),
         Notification.KindOneofCase.SaveStalled => new OpAmpNotification.SaveStalled(n.SaveStalled.Stalled,
             n.SaveStalled.WaitedMs > MaxSpanMs ? TimeSpan.MaxValue : TimeSpan.FromMilliseconds(n.SaveStalled.WaitedMs)),
+        Notification.KindOneofCase.StateFromNewerVersion => new OpAmpNotification.StateFromNewerVersion(n.StateFromNewerVersion.Version),
         Notification.KindOneofCase.Stopped => new OpAmpNotification.Stopped(),
         _ => null,
     };

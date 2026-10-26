@@ -112,6 +112,7 @@ The callback gets a `Notification`, a union discriminated by `kind`.
 | `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` | `customMessage`, `customCapabilities`, `detail` | |
 | `instanceUidChanged`, `heartbeatInterval`, `command` | `instanceUid`, `heartbeatIntervalMs`, `command` | |
 | `errorResponse`, `badMessage`, `statusTooLarge`, `saveStalled` | `errorType`, `message`, `detail`, `field`, `bytes`, `stalled`, `waitedMs` | |
+| `stateFromNewerVersion` | `version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `stopped` | `error`: why it stopped on its own, or `undefined` after `stop()` | |
 
 ## The event loop and stop

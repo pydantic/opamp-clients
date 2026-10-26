@@ -368,6 +368,9 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		} else {
 			c.logger.Info("The stalled save of the OpAMP state has ended", zap.Duration("waited", n.Waited))
 		}
+	case opamp.StateFromNewerVersion:
+		c.logger.Warn("The saved OpAMP state was written by a newer version, which this one can't read: "+
+			"it is kept as it is, and this run saves nothing", zap.Uint32("state_format", n.StateVersion))
 	case opamp.Stopped:
 		c.report.stopped(c.logger)
 		if n.Err != nil {

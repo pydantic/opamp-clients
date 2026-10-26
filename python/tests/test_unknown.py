@@ -65,3 +65,25 @@ def test_a_stalled_save_is_told_as_the_core_says():
 
     assert told(True, 30_000) == Notification("save_stalled", stalled=True, waited_ms=30_000)
     assert told(False, 2**64 - 1) == Notification("save_stalled", stalled=False, waited_ms=2**64 - 1)
+
+
+def test_a_state_from_a_newer_version_is_told_once_and_kept(tmp_path):
+    # A state a newer core saved (format 2): the client starts from its configuration, is told
+    # once, and leaves the state as it is.
+    state = tmp_path / "state.bin"
+    state.write_bytes(b"\x08\x02")
+
+    async def run() -> None:
+        notes: list[Notification] = []
+        client = Client.start(Config(mode="platform", endpoint="http://127.0.0.1:1", state_file=str(state)), Status(),
+                              notes.append)
+        for _ in range(500):
+            if any(n.kind == "state_from_newer_version" for n in notes):
+                break
+            await asyncio.sleep(0.01)
+        await client.stop()
+        assert [n for n in notes if n.kind == "state_from_newer_version"] == [
+            Notification("state_from_newer_version", state_version=2)]
+
+    asyncio.run(run())
+    assert state.read_bytes() == b"\x08\x02"

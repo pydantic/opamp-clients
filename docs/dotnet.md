@@ -116,6 +116,7 @@ The callback gets an `OpAmpNotification`, a record with one nested record for ea
 | `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `Message`, `Capabilities`, `Reason` | |
 | `InstanceUidChanged`, `HeartbeatInterval`, `Command` | `InstanceUid`, `Interval`, `Value` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `Type`, `Message`, `Detail`, `Field`, `Bytes`, `Stalled`, `Waited` | |
+| `StateFromNewerVersion` | `Version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `Error`: why it stopped on its own, or null after `StopAsync` | |
 
 ## Threads and stop

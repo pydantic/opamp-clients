@@ -981,22 +981,60 @@ public class HostingTests
         await host.StopAsync(Cancel);
     }
 
-    [Theory]
-    [InlineData("OpAmp:Endpoint", "OpAmp:Endpoint is not a URL")]
-    // Taken as http:// (the core's rule, with its warning), it is still no URL.
-    [InlineData("OTEL_OPAMP_ENDPOINT", "OTEL_OPAMP_ENDPOINT is not a URL (Invalid URI: ")]
-    public async Task AnEndpointThatIsNotAUrlLeavesTheHostRunningUnmanaged(string key, string why)
+    [Fact]
+    public async Task AnEndpointThatIsNotAUrlLeavesTheHostRunningUnmanaged()
     {
         var said = new Said();
-        var b = Builder(new() { [key] = "opamp server, please" });
+        var b = Builder(new() { ["OpAmp:Endpoint"] = "opamp server, please" });
         b.Logging.AddProvider(said);
         b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s").AddOtlpExporter()).WithOpAmp();
         using var host = b.Build();
         await host.StartAsync(Cancel); // the host runs
         Assert.Null(host.Services.GetRequiredService<OpAmpAgent>().Agent);
         Assert.False(Gated(Exporter(host)));
-        Assert.Contains(said.Lines, l => l.StartsWith($"Error: OpAMP: the client did not start; the SDK runs unmanaged: {why}", StringComparison.Ordinal));
+        Assert.Contains(said.Lines, l => l.StartsWith("Error: OpAMP: the client did not start; the SDK runs unmanaged: OpAmp:Endpoint is not a URL", StringComparison.Ordinal));
         await host.StopAsync(Cancel);
+    }
+
+    [Fact]
+    public async Task AnEndpointWithoutASchemeIsRefusedAndTheHostRunsUnmanaged()
+    {
+        // Taken as http://, its key would go in the clear: no client starts, and the warning says
+        // why, without the endpoint's secrets.
+        var said = new Said();
+        var b = Builder(new() { ["OTEL_OPAMP_ENDPOINT"] = "u:p@opamp.example.com:4320/v1/opamp?k=v" });
+        b.Logging.AddProvider(said);
+        b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s").AddOtlpExporter()).WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel); // the host runs
+        Assert.Null(host.Services.GetRequiredService<OpAmpAgent>().Agent);
+        Assert.False(Gated(Exporter(host)));
+        Assert.Contains("Warning: OpAMP: off, as OTEL_OPAMP_ENDPOINT \"opamp.example.com:4320/v1/opamp\" has no scheme: no OpAMP " +
+            "client is started; name it in full, as https://host/v1/opamp or wss://host/v1/opamp", said.Lines);
+        Assert.DoesNotContain(said.Lines, l => l.StartsWith("Error:", StringComparison.Ordinal));
+        await host.StopAsync(Cancel);
+    }
+
+    [Fact]
+    public async Task AStateANewerVersionSavedIsWarnedAboutAndKept()
+    {
+        await using var server = new OpAmpServer();
+        var dir = Kit.TempDir();
+        // The client's state, as a newer core saved it (format 2).
+        File.WriteAllBytes(Path.Combine(dir, "opamp-state"), [0x08, 0x02]);
+        var said = new Said();
+        var b = Builder(new() { ["OTEL_OPAMP_ENDPOINT"] = server.Endpoint, ["OTEL_OPAMP_STATE_DIR"] = dir });
+        b.Logging.AddProvider(said);
+        b.Services.AddOpenTelemetry().WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        const string Warned = "Warning: OpAMP: the saved state was written by a newer version of this SDK (state format 2), which this " +
+            "one can't read: it is kept as it is, and this run saves nothing";
+        await Kit.Until(() => said.Lines.Contains(Warned), "the warning");
+        await Kit.Until(() => !server.Messages.IsEmpty, "the first message");
+        await host.StopAsync(Cancel);
+        Assert.Single(said.Lines, l => l == Warned);
+        Assert.Equal(new byte[] { 0x08, 0x02 }, File.ReadAllBytes(Path.Combine(dir, "opamp-state")));
     }
 
     [Fact]

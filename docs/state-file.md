@@ -36,6 +36,13 @@ tells the application, once (the notification `save_stalled`, with `stalled` and
 has run), and tells it again when the save ends at last (not `stalled`); then it saves what is
 owed. A disk that hangs is for the application, or its operator, to see to.
 
+A state file a newer release saved (an older one started on its state directory, as after a
+rollback) is in a format this core can't read. The core doesn't save over it: the client starts
+from its configuration, as on first use, saves nothing that run (so it takes no offered connection
+settings and no packages), and tells the application once (the notification
+`state_from_newer_version`, with the state's format), which the SDK integrations log as a warning.
+The newer release, run again, finds its instance UID and its key where it left them.
+
 A download's file (`S.downloads/...`) is made new too, written, and flushed before its result is fed
 to the core; it is deleted when the download fails or is cancelled (by the code that writes it,
 never under a write still going), or when the core says to discard it. The downloads left by a run

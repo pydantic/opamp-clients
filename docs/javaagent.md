@@ -123,7 +123,7 @@ in the background; the SDK keeps its current settings meanwhile
 ```
 
 and at INFO, `connected to ... again` once it's back. The endpoint is logged without user info, a
-query string or a fragment. An endpoint without a scheme gets a warning at start: it is taken as `http://`.
+query string or a fragment. An endpoint without a scheme is refused at start: no OpAMP client starts, the agent runs unmanaged, and the warning says why.
 
 ## What it does
 

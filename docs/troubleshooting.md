@@ -37,7 +37,7 @@ meanwhile. Once it's back you see `connected to ... again`.
 | `(HTTP 404)`: `nothing serves OpAMP at that path: check OTEL_OPAMP_ENDPOINT` | the host answered, but not at that path | Use the endpoint exactly as the server gives it (it usually ends in `/v1/opamp`). |
 | `(connection refused)`, a DNS error, or a timeout: `check OTEL_OPAMP_ENDPOINT and that the server is up` | nothing answered | Check the host and port, and that the network (a firewall, an egress policy) lets the process reach it. Behind a proxy, set `HTTPS_PROXY` ([sdks.md](sdks.md) says how each language reads it). |
 | a certificate error | the server's certificate isn't trusted | Behind a TLS-inspecting proxy, give the proxy's CA (each client's TLS options, or the Supervisor's `--ca-file`). |
-| at start: `has no scheme, so it is taken as http://` | `opamp.example.com/v1/opamp` was given | Write the scheme: `https://` or `wss://`. Over plain HTTP the key goes in the clear. |
+| at start: `off, as ... has no scheme: no OpAMP client is started` | `opamp.example.com/v1/opamp` was given | Write the scheme: `https://` or `wss://`. Until then the SDK runs unmanaged. |
 
 The warning names what you configured: with the endpoint or headers given in code, it says so
 instead of naming the variable.

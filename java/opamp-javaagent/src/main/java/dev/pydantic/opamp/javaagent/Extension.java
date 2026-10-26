@@ -239,9 +239,10 @@ final class Extension {
         LOG.warning("OpAMP: " + named(warning, false));
       }
       if (s.getOff()) {
-        // Turned off by a property (said once, here); off for want of an endpoint says nothing.
+        // Turned off by a property, or an endpoint without a scheme refused (said once, here); off for
+        // want of an endpoint says nothing.
         if (!s.getOffReason().isEmpty()) {
-          LOG.warning("OpAMP: " + s.getOffReason());
+          LOG.warning("OpAMP: " + named(s.getOffReason(), false));
         }
         return null;
       }
@@ -950,6 +951,9 @@ final class Extension {
       LOG.log(Level.SEVERE, "OpAMP: the client stopped; the agent runs unmanaged", st.error());
     } else if (n instanceof Notification.InstanceUidChanged changed) {
       uidChanged(changed.instanceUid());
+    } else if (n instanceof Notification.StateFromNewerVersion newer) {
+      LOG.warning("OpAMP: the saved state was written by a newer version of this agent (state format "
+          + newer.version() + "), which this one can't read: it is kept as it is, and this run saves nothing");
     }
   }
 

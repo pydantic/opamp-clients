@@ -93,7 +93,7 @@ the SDK keeps its current settings meanwhile
 
 and at INFO, `connected to ... again` once it's back. The warning names what to check as it was
 given: with `WithHeaders`, it says `check WithHeaders`, and with `WithEndpoint`, `check
-WithEndpoint`. The endpoint is logged without user info, a query string or a fragment. An endpoint without a scheme gets a warning at start: it is taken as `http://`.
+WithEndpoint`. The endpoint is logged without user info, a query string or a fragment. An endpoint without a scheme is refused at start: no OpAMP client starts, the SDK runs unmanaged, and the warning says why.
 
 ## What it does
 
