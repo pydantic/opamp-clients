@@ -492,3 +492,25 @@ checks out.
 
 CI runs them all, on Linux (with a throwaway signing key), macOS and Windows, and keeps the
 packages as artifacts.
+
+## Remove the installed Collector
+
+Run `pydantic-opamp-uninstall` as root on Linux, or
+`/opt/pydantic-opamp/bin/pydantic-opamp-uninstall` as root on macOS.
+On Windows, run `pydantic-opamp-uninstall.ps1` from the installed program directory
+in an Administrator terminal. These helpers stop the service and remove the native
+package. They do not contact the OpAMP server or revoke any remote credentials.
+
+Use `--dry-run` (`-DryRun` on Windows) to preview the operation. The default keeps
+configuration, credentials, downloaded packages, and log read positions for a
+reinstall. It retains a protected recovery helper at `/etc/pydantic-opamp/uninstall`
+on Linux, `/opt/pydantic-opamp/etc/uninstall` on macOS, or
+`ProgramFiles\pydantic-opamp\uninstall.ps1` on Windows. Run that helper to repeat
+removal after the native package is gone.
+
+Use `--purge` (`-Purge` on Windows) to also delete the package's configuration and
+state directories, including the recovery helper. A purge deletes the macOS
+System Keychain item for `/opt/pydantic-opamp/var/opamp-state` only.
+Custom storage directories, system log files, package repository settings, and
+shared system users stay untouched. A service-stop or package-removal failure
+aborts the purge and keeps local data.

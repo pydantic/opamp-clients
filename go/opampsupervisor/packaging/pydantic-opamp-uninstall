@@ -1,0 +1,156 @@
+#!/bin/sh
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
+# Removes the installed service and package. Keep data and a recovery helper unless --purge.
+set -eu
+umask 077
+fail() { echo "pydantic-opamp-uninstall: $*" >&2; exit 1; }
+purge=
+dry_run=
+for arg in "$@"; do
+    case $arg in
+        --purge) purge=yes ;;
+        --dry-run) dry_run=yes ;;
+        --help) echo 'usage: pydantic-opamp-uninstall [--dry-run] [--purge]'; exit 0 ;;
+        *) fail "unknown option: $arg" ;;
+    esac
+done
+root=${OPAMP_UNINSTALL_ROOT:-}
+case $root in
+    '') ;;
+    /|*..*) fail 'OPAMP_UNINSTALL_ROOT must name a test directory, not a filesystem root or traversal' ;;
+    /*) ;;
+    *) fail 'OPAMP_UNINSTALL_ROOT must be absolute' ;;
+esac
+os=${OPAMP_UNINSTALL_OS:-$(uname -s)}
+package=pydantic-opamp-supervisor
+case $os in
+    Linux)
+        config=$root/etc/pydantic-opamp
+        state=$root/var/lib/pydantic-opamp
+        extra_state=$root/var/lib/pydantic-otelcol
+        programs=$root/usr/lib/pydantic-opamp
+        ;;
+    Darwin)
+        config=$root/opt/pydantic-opamp/etc
+        state=$root/opt/pydantic-opamp/var
+        extra_state=
+        programs=$root/opt/pydantic-opamp/bin
+        ;;
+    *) fail "unsupported operating system: $os" ;;
+esac
+recovery=$config/uninstall
+if [ -n "$dry_run" ]; then
+    echo "Stop the Collector service and remove the $package package and programs."
+    if [ -n "$purge" ]; then
+        echo "Delete $config, $state${extra_state:+, $extra_state} and this installation's state key."
+    else
+        echo "Keep $config, $state${extra_state:+, $extra_state} and the state key for reinstall."
+        echo "Keep $recovery to allow a later purge."
+    fi
+    exit 0
+fi
+[ -n "$root" ] || [ "$(id -u)" -eq 0 ] || fail 'run as root'
+# Do not follow a redirected parent into another installation or filesystem.
+set -- "$config" "$state" "$programs"
+if [ "$os" = Darwin ]; then
+    set -- "$@" "$root/opt/pydantic-opamp/share/doc" "$root/Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist"
+else
+    set -- "$@" "$extra_state"
+fi
+for directory in "$@"; do
+    parent=$directory
+    while [ "$parent" != / ] && [ "$parent" != . ]; do
+        [ ! -L "$parent" ] || fail "refusing symbolic link: $parent"
+        parent=$(dirname "$parent")
+    done
+done
+
+stop_macos() {
+    label=system/dev.pydantic.opamp-supervisor
+    code=0
+    launchctl print "$label" >/dev/null 2>&1 || code=$?
+    case $code in
+        0) launchctl bootout "$label" ;;
+        113) return ;;
+        *) fail "cannot inspect the Collector service (launchctl $code)" ;;
+    esac
+    remaining=30
+    while :; do
+        code=0
+        launchctl print "$label" >/dev/null 2>&1 || code=$?
+        case $code in
+            113) break ;;
+            0) [ "$remaining" -gt 0 ] || fail 'Collector service did not stop' ;;
+            *) fail "cannot inspect the Collector service (launchctl $code)" ;;
+        esac
+        sleep 1
+        remaining=$((remaining - 1))
+    done
+}
+
+uninstall() {
+    if [ "$os" = Darwin ]; then
+        stop_macos
+    elif [ -d "$root/run/systemd/system" ]; then
+        for unit in pydantic-opamp-supervisor.service pydantic-otelcol.service; do
+            load=$(systemctl show --property=LoadState --value "$unit")
+            if [ "$load" != not-found ]; then
+                systemctl disable --now "$unit"
+            fi
+        done
+    fi
+    # The package manager removes the installed helper. Keep a root-only copy for repeat calls.
+    mkdir -p "$config"
+    [ ! -L "$recovery" ] || fail "refusing symbolic link: $recovery"
+    if [ "$0" != "$recovery" ]; then
+        install -m 0700 "$0" "$recovery"
+    fi
+    if [ "$os" = Darwin ]; then
+        # Only the payload from macos/build.sh. Data and the recovery helper stay separate.
+        rm -f "$programs/opampsupervisor" "$programs/otelcol" \
+            "$programs/pydantic-opamp-enroll" "$programs/pydantic-opamp-uninstall"
+        rmdir "$programs" 2>/dev/null || :
+        rm -rf "$root/opt/pydantic-opamp/share/doc"
+        rm -f "$root/Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist"
+        code=0
+        pkgutil --pkg-info dev.pydantic.opamp-supervisor >/dev/null 2>&1 || code=$?
+        case $code in
+            0) pkgutil --forget dev.pydantic.opamp-supervisor ;;
+            1) ;;
+            *) fail "cannot inspect package receipt (pkgutil $code)" ;;
+        esac
+    elif command -v dpkg-query >/dev/null 2>&1; then
+        query_code=0
+        status=$(dpkg-query -W -f='${db:Status-Status}' "$package" 2>/dev/null) || query_code=$?
+        case $query_code in 0|1) ;; *) fail "cannot inspect package status ($query_code)" ;; esac
+        case $status in
+            installed|half-*|unpacked|triggers-*) dpkg --remove "$package" ;;
+            ''|not-installed|config-files) ;;
+            *) fail "unexpected package status: $status" ;;
+        esac
+    elif command -v rpm >/dev/null 2>&1; then
+        query_code=0
+        rpm -q "$package" >/dev/null 2>&1 || query_code=$?
+        case $query_code in
+            0) rpm --erase "$package" ;;
+            1) ;;
+            *) fail "cannot inspect package status ($query_code)" ;;
+        esac
+    else
+        fail 'no supported package database found (dpkg or rpm)'
+    fi
+    [ ! -e "$programs/opampsupervisor" ] || fail 'package removal left the Supervisor installed; local data was kept'
+    if [ -n "$purge" ]; then
+        if [ "$os" = Darwin ]; then
+            code=0
+            security delete-generic-password -s opamp-state-key -a /opt/pydantic-opamp/var/opamp-state \
+                /Library/Keychains/System.keychain >/dev/null 2>&1 || code=$?
+            case $code in 0|44) ;; *) fail "could not delete the installation state key (security $code)" ;; esac
+        fi
+        rm -rf "$config" "$state"
+        if [ -n "$extra_state" ]; then rm -rf "$extra_state"; fi
+    fi
+}
+# Parse the function before it removes this script from the package.
+uninstall

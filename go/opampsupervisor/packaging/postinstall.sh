@@ -9,6 +9,7 @@ if ! getent passwd pydantic-opamp >/dev/null; then
 	useradd --system --gid pydantic-opamp --home-dir /var/lib/pydantic-opamp --no-create-home \
 		--shell /usr/sbin/nologin pydantic-opamp
 fi
+chgrp pydantic-opamp /etc/pydantic-opamp
 if [ -d /run/systemd/system ]; then
 	systemctl daemon-reload
 fi
