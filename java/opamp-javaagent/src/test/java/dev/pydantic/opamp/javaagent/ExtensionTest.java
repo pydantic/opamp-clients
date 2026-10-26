@@ -11,6 +11,7 @@ import static dev.pydantic.opamp.javaagent.Vectors.sorted;
 import static dev.pydantic.opamp.javaagent.Vectors.v1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ByteString;
@@ -812,17 +813,24 @@ class ExtensionTest {
     assertEquals("https://[::1/v1/opamp", Extension.shown("https://u:p@[::1/v1/opamp?k=v", "?"));
     assertEquals("https://[::1/v1/opamp", Extension.shown("https://[::1/v1/opamp?k=v", "?"));
     assertEquals("https://opamp.example.com", Extension.shown("https://a@b@opamp.example.com#x", "?"));
-    assertEquals("http://opamp.example.com/v1/opamp", Extension.shown("u:p@opamp.example.com/v1/opamp?k=v", "?"));
   }
 
   @Test
-  void anEndpointWithoutASchemeIsWarnedAboutAndTakenAsHttp() {
-    // Taken as http://, as the warning says: the client refuses an endpoint without a scheme.
-    List<String> said = logged(Level.WARNING, () -> assertEquals("http://u:p@opamp.example.com:4320/v1/opamp?k=v",
-        Extension.Setup.from(DefaultConfigProperties.createFromMap(
-            Map.of("otel.opamp.endpoint", " u:p@opamp.example.com:4320/v1/opamp?k=v ")), Map.of(), null).endpoint()));
-    assertEquals(List.of("WARNING OpAMP: otel.opamp.endpoint \"opamp.example.com:4320/v1/opamp\" has no scheme, so "
-        + "it is taken as http://; name it in full, as https://host/v1/opamp or wss://host/v1/opamp"), said);
+  void anEndpointWithoutASchemeIsRefusedAndTheAgentRunsUnmanaged() {
+    // Taken as http://, its key would go in the clear: no client starts, and the warning says why,
+    // without the endpoint's secrets.
+    List<String> said = logged(Level.WARNING, () -> assertNull(Extension.Setup.from(DefaultConfigProperties.createFromMap(
+        Map.of("otel.opamp.endpoint", " u:p@opamp.example.com:4320/v1/opamp?k=v ")), Map.of(), null)));
+    assertEquals(List.of("WARNING OpAMP: off, as otel.opamp.endpoint \"opamp.example.com:4320/v1/opamp\" has no scheme: "
+        + "no OpAMP client is started; name it in full, as https://host/v1/opamp or wss://host/v1/opamp"), said);
+  }
+
+  @Test
+  void aStateFromANewerVersionIsWarnedAbout() {
+    Extension e = new Extension();
+    List<String> said = logged(Level.WARNING, () -> e.notified(new Notification.StateFromNewerVersion(2)));
+    assertEquals(List.of("WARNING OpAMP: the saved state was written by a newer version of this agent (state format 2), "
+        + "which this one can't read: it is kept as it is, and this run saves nothing"), said);
   }
 
   /** A user's state directory under {@code base}, whatever the OS; never the real home. */

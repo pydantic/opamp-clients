@@ -25,12 +25,12 @@ func TestServerFromEnv(t *testing.T) {
 		len(s.header) != 2 {
 		t.Fatalf("%+v", s)
 	}
-	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "soon"})); s.heartbeat != 0 {
+	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "soon"})); s.heartbeat != 0 {
 		t.Fatal("a bad interval: the client's default")
 	}
 	// 307445735 minutes is more nanoseconds than an int64 holds: multiplied out, it wrapped to 26 s.
 	// The core's rule: longer than a day is a day.
-	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "307445735m"})); s.heartbeat != 24*time.Hour {
+	if s := serverFromEnv(env(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://x", "OTEL_OPAMP_HEARTBEAT_INTERVAL": "307445735m"})); s.heartbeat != 24*time.Hour {
 		t.Fatalf("an interval over a day: a day, not %v", s.heartbeat)
 	}
 }
@@ -194,7 +194,8 @@ func TestTheStateDirectoryInCodeOrNone(t *testing.T) {
 	}
 }
 
-// A setting that can't be used warns, is left out or is the default, and never stops the package.
+// A setting that can't be used warns, is left out or is the default, and never stops the package; an
+// endpoint without a scheme is refused, so OpAMP is off (the SDK runs unmanaged).
 func TestAnUnusableSettingWarnsAndIsTheDefault(t *testing.T) {
 	for _, c := range []struct {
 		name    string
@@ -227,15 +228,14 @@ func TestAnUnusableSettingWarnsAndIsTheDefault(t *testing.T) {
 		{"a header value HTTP can't carry in code", nil, []Option{WithHeaders(map[string]string{"X-Bad": "a\r\nb", "X-Ok": "1"})},
 			"headers", "X-Ok=1", `WithHeaders: "X-Bad" isn't a header HTTP can carry`},
 		{"an endpoint without a scheme in code", nil, []Option{WithEndpoint("opamp.example.com:4320/v1/opamp")},
-			"endpoint", "http://opamp.example.com:4320/v1/opamp", `WithEndpoint "opamp.example.com:4320/v1/opamp" has no scheme`},
+			"endpoint", "off", `WithEndpoint "opamp.example.com:4320/v1/opamp" has no scheme: no OpAMP client is started`},
+		{"an endpoint without a scheme in the variable", map[string]string{"OTEL_OPAMP_ENDPOINT": "opamp.example.com/v1/opamp"}, nil,
+			"endpoint", "off", `OTEL_OPAMP_ENDPOINT "opamp.example.com/v1/opamp" has no scheme: no OpAMP client is started`},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			said := records(t)
 			vars := with(map[string]string{"OTEL_OPAMP_ENDPOINT": "https://base.example.com", "OTEL_OPAMP_STATE_DIR": "none"}, c.vars)
 			s := serverFromEnv(env(vars), c.opts...)
-			if s == nil {
-				t.Fatal("still on")
-			}
 			if got := shown(s, c.setting, ""); got != c.want {
 				t.Fatalf("got %q, want %q", got, c.want)
 			}

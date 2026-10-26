@@ -131,6 +131,7 @@ The callback gets a `Notification`, a sealed interface of records.
 | `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `message`, `capabilities`, `reason` | |
 | `InstanceUidChanged`, `HeartbeatInterval`, `Command` | `instanceUid`, `interval`, `command` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `type`, `message`, `detail`, `field`, `bytes`, `stalled`, `waited` | |
+| `StateFromNewerVersion` | `version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `error`: why it stopped on its own, or null after `stop()` | |
 
 ## Threads and stop

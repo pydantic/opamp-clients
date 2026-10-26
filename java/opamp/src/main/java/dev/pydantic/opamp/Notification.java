@@ -84,6 +84,14 @@ public sealed interface Notification {
   record SaveStalled(boolean stalled, Duration waited) implements Notification {}
 
   /**
+   * The saved state is a newer core's, in a format ({@code version}) this one can't read: the client
+   * starts from its configuration, as on first use, and saves nothing (no offered connection
+   * settings, no packages), leaving that state as it is. Worth a warning: an older release was
+   * started on a newer one's state file.
+   */
+  record StateFromNewerVersion(long version) implements Notification {}
+
+  /**
    * The client has stopped: after {@link OpampClient#stop}, or on its own because of {@code error}
    * (which {@code stop()} completes with too). {@code error} is null after {@code stop()}.
    */

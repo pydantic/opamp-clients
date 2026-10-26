@@ -1838,6 +1838,9 @@ export class Agent {
       this.client.setRemoteConfigStatus(answer);
     } else if (n.kind === "instanceUidChanged") {
       this.instanceUidChanged(n.instanceUid);
+    } else if (n.kind === "stateFromNewerVersion") {
+      say.warn(`OpAMP: the saved state was written by a newer version of this SDK (state format ${n.version}), `
+        + "which this one can't read: it is kept as it is, and this run saves nothing");
     } else if (n.kind === "stopped" && n.error !== undefined) {
       say.error(`OpAMP: the client stopped; the SDK runs unmanaged: ${String(n.error)}`);
     }

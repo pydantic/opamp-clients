@@ -56,7 +56,8 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp
 ```
 
 - `OTEL_OPAMP_ENDPOINT`: `https://` polls, `wss://` keeps a connection open. Give the scheme:
-  an endpoint without one is taken as `http://`, so the key would go in the clear.
+  an endpoint without one is refused (taken as `http://`, the key would go in the clear), and the
+  SDK runs unmanaged.
 - `OTEL_OPAMP_HEADERS`: as `OTEL_EXPORTER_OTLP_HEADERS`, values percent-encoded (`%20` for the
   space after `Bearer`).
 - `OTEL_OPAMP_STATE_DIR`: where the agent keeps its identity and the key the server issues it,

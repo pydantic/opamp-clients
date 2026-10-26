@@ -168,7 +168,7 @@ namespace Pydantic.OpAmp.Core {
             "BBIaChJtYXhfcmVzcG9uc2VfYnl0ZXMYBiABKAQieAoGV3NPcGVuEgoKAmlk",
             "GAEgASgEEgsKA3VybBgCIAEoCRImCgdoZWFkZXJzGAMgAygLMhUub3BhbXAu",
             "Y29yZS52MS5IZWFkZXISGQoRbWF4X21lc3NhZ2VfYnl0ZXMYBCABKAQSEgoK",
-            "dGltZW91dF9tcxgFIAEoBCK2BwoMTm90aWZpY2F0aW9uEikKCWNvbm5lY3Rl",
+            "dGltZW91dF9tcxgFIAEoBCKACAoMTm90aWZpY2F0aW9uEikKCWNvbm5lY3Rl",
             "ZBgBIAEoCzIULm9wYW1wLmNvcmUudjEuRW1wdHlIABI8Cg5jb25uZWN0X2Zh",
             "aWxlZBgCIAEoCzIiLm9wYW1wLmNvcmUudjEuTm90aWZ5Q29ubmVjdEZhaWxl",
             "ZEgAEjYKDmVycm9yX3Jlc3BvbnNlGAMgASgLMhwub3BhbXAuY29yZS52MS5F",
@@ -189,64 +189,67 @@ namespace Pydantic.OpAmp.Core {
             "cGFja2FnZRgQIAEoCzIdLm9wYW1wLmNvcmUudjEuSW5zdGFsbFBhY2thZ2VI",
             "ABItCg5yZW1vdmVfcGFja2FnZRgRIAEoCzITLm9wYW1wLmNvcmUudjEuTmFt",
             "ZUgAEjIKDHNhdmVfc3RhbGxlZBgSIAEoCzIaLm9wYW1wLmNvcmUudjEuU2F2",
-            "ZVN0YWxsZWRIAEIGCgRraW5kSgQICBAJIjEKC1NhdmVTdGFsbGVkEg8KB3N0",
-            "YWxsZWQYASABKAgSEQoJd2FpdGVkX21zGAIgASgEImMKDkluc3RhbGxQYWNr",
-            "YWdlEgwKBG5hbWUYASABKAkSMQoHcGFja2FnZRgCIAEoCzIgLm9wYW1wLnBy",
-            "b3RvLnYxLlBhY2thZ2VBdmFpbGFibGUSEAoIZG93bmxvYWQYAyABKAQiVgoU",
-            "Q3VzdG9tTWVzc2FnZU5vdFNlbnQSLgoHbWVzc2FnZRgBIAEoCzIdLm9wYW1w",
-            "LnByb3RvLnYxLkN1c3RvbU1lc3NhZ2USDgoGcmVhc29uGAIgASgJIkUKE05v",
-            "dGlmeUNvbm5lY3RGYWlsZWQSEwoGc3RhdHVzGAEgASgNSACIAQESDgoGZGV0",
-            "YWlsGAIgASgJQgkKB19zdGF0dXMiLgoNRXJyb3JSZXNwb25zZRIMCgRraW5k",
-            "GAEgASgFEg8KB21lc3NhZ2UYAiABKAkiWAoOU3RhdHVzVG9vTGFyZ2USKQoF",
-            "ZmllbGQYASABKA4yGi5vcGFtcC5jb3JlLnYxLlN0YXR1c0ZpZWxkEg0KBWJ5",
-            "dGVzGAIgASgEEgwKBG5hbWUYAyABKAkicQoJU2V0dXBDYWxsEioKBXN0YXJ0",
-            "GAEgASgLMhkub3BhbXAuY29yZS52MS5TZXR1cFN0YXJ0SAASMAoIaWRlbnRp",
-            "dHkYAiABKAsyHC5vcGFtcC5jb3JlLnYxLlNldHVwSWRlbnRpdHlIAEIGCgRj",
-            "YWxsIo0BCgpTZXR1cFJlcGx5Ei4KB3N0YXJ0ZWQYASABKAsyGy5vcGFtcC5j",
-            "b3JlLnYxLlNldHVwU3RhcnRlZEgAEjQKCmlkZW50aWZpZWQYAiABKAsyHi5v",
-            "cGFtcC5jb3JlLnYxLlNldHVwSWRlbnRpZmllZEgAEg8KBWVycm9yGAMgASgJ",
-            "SABCCAoGcmVzdWx0IicKCFZhcmlhYmxlEgwKBG5hbWUYASABKAkSDQoFdmFs",
-            "dWUYAiABKAkingEKClNldHVwU3RhcnQSJAoDZW52GAEgAygLMhcub3BhbXAu",
-            "Y29yZS52MS5WYXJpYWJsZRIiCgJvcxgCIAEoDjIWLm9wYW1wLmNvcmUudjEu",
-            "U2V0dXBPcxIPCgdwcm9ncmFtGAMgASgJEgsKA2N3ZBgEIAEoCRIoCgRjb2Rl",
-            "GAUgASgLMhoub3BhbXAuY29yZS52MS5TZXR1cEluQ29kZSKHAgoLU2V0dXBJ",
-            "bkNvZGUSFQoIZW5kcG9pbnQYASABKAlIAIgBARIVCg1oZWFkZXJzX2dpdmVu",
-            "GAIgASgIEiYKB2hlYWRlcnMYAyADKAsyFS5vcGFtcC5jb3JlLnYxLkhlYWRl",
-            "chIWCglzdGF0ZV9kaXIYBCABKAlIAYgBARIZCgxoZWFydGJlYXRfbXMYBSAB",
-            "KBJIAogBARIVCg1lbmRwb2ludF9uYW1lGAYgASgJEhQKDGhlYWRlcnNfbmFt",
-            "ZRgHIAEoCRIWCg5oZWFydGJlYXRfbmFtZRgIIAEoCUILCglfZW5kcG9pbnRC",
-            "DAoKX3N0YXRlX2RpckIPCg1faGVhcnRiZWF0X21zIrACCgxTZXR1cFN0YXJ0",
-            "ZWQSCwoDb2ZmGAEgASgIEhIKCm9mZl9yZWFzb24YDCABKAkSEAoIZW5kcG9p",
-            "bnQYAiABKAkSJgoHaGVhZGVycxgDIAMoCzIVLm9wYW1wLmNvcmUudjEuSGVh",
-            "ZGVyEh0KFWhlYXJ0YmVhdF9pbnRlcnZhbF9tcxgEIAEoBBIRCglzdGF0ZV9k",
-            "aXIYBSABKAkSFQoNZGVmYXVsdF9zbG90cxgGIAMoCRIXCg9hbGxfc2xvdHNf",
-            "dGFrZW4YByABKAkSDwoHc2VydmljZRgIIAEoCRIWCg5zaG93bl9lbmRwb2lu",
-            "dBgJIAEoCRIoCgVoaW50cxgKIAEoCzIZLm9wYW1wLmNvcmUudjEuU2V0dXBI",
-            "aW50cxIQCgh3YXJuaW5ncxgLIAMoCSJUCgpTZXR1cEhpbnRzEg8KB3JlZnVz",
-            "ZWQYASABKAkSEQoJbm90X2ZvdW5kGAIgASgJEhMKC3VucmVhY2hhYmxlGAMg",
-            "ASgJEg0KBWVycm9yGAQgASgJInAKDVNldHVwSWRlbnRpdHkSEQoJc3RhdGVf",
-            "ZGlyGAEgASgIEg0KBXNhdmVkGAIgASgJEhsKE3Jlc291cmNlX2F0dHJpYnV0",
-            "ZXMYAyABKAkSDwoHZW50cm9weRgEIAEoDBIPCgd1bml4X21zGAUgASgEIrYB",
-            "Cg9TZXR1cElkZW50aWZpZWQSFAoMaW5zdGFuY2VfdWlkGAEgASgMEikKBGZy",
-            "b20YAiABKA4yGy5vcGFtcC5jb3JlLnYxLlNldHVwVWlkRnJvbRIMCgRzYXZl",
-            "GAMgASgIEgwKBHRleHQYBCABKAkSEwoLdW5zYXZlZF91aWQYBSABKAwSMQoM",
-            "dW5zYXZlZF9mcm9tGAYgASgOMhsub3BhbXAuY29yZS52MS5TZXR1cFVpZEZy",
-            "b20qYwoOUGFja2FnZUZhaWx1cmUSGQoVUEFDS0FHRV9GQUlMVVJFX0ZJTkFM",
-            "EAASGQoVUEFDS0FHRV9GQUlMVVJFX0xBVEVSEAESGwoXUEFDS0FHRV9GQUlM",
-            "VVJFX1VOS05PV04QAiqrAgoLU3RhdHVzRmllbGQSHAoYU1RBVFVTX0ZJRUxE",
-            "X0RFU0NSSVBUSU9OEAASFwoTU1RBVFVTX0ZJRUxEX0hFQUxUSBABEiEKHVNU",
-            "QVRVU19GSUVMRF9FRkZFQ1RJVkVfQ09ORklHEAISJQohU1RBVFVTX0ZJRUxE",
-            "X1JFTU9URV9DT05GSUdfU1RBVFVTEAMSKwonU1RBVFVTX0ZJRUxEX0NPTk5F",
-            "Q1RJT05fU0VUVElOR1NfU1RBVFVTEAQSJQohU1RBVFVTX0ZJRUxEX0FWQUlM",
-            "QUJMRV9DT01QT05FTlRTEAUSJAogU1RBVFVTX0ZJRUxEX0NVU1RPTV9DQVBB",
-            "QklMSVRJRVMQBhIhCh1TVEFUVVNfRklFTERfUEFDS0FHRV9TVEFUVVNFUxAH",
-            "KkYKB1NldHVwT3MSEQoNU0VUVVBfT1NfVU5JWBAAEhIKDlNFVFVQX09TX01B",
-            "Q09TEAESFAoQU0VUVVBfT1NfV0lORE9XUxACKlsKDFNldHVwVWlkRnJvbRIX",
-            "ChNTRVRVUF9VSURfRlJPTV9NQURFEAASGAoUU0VUVVBfVUlEX0ZST01fU0FW",
-            "RUQQARIYChRTRVRVUF9VSURfRlJPTV9HSVZFThACQnYKF2Rldi5weWRhbnRp",
-            "Yy5vcGFtcC5jb3JlQglDb3JlUHJvdG9aOmdpdGh1Yi5jb20vcHlkYW50aWMv",
-            "b3BhbXAtY2xpZW50cy9nby9vcGFtcC9pbnRlcm5hbC9jb3JlcGKqAhNQeWRh",
-            "bnRpYy5PcEFtcC5Db3JlYgZwcm90bzM="));
+            "ZVN0YWxsZWRIABJIChhzdGF0ZV9mcm9tX25ld2VyX3ZlcnNpb24YEyABKAsy",
+            "JC5vcGFtcC5jb3JlLnYxLlN0YXRlRnJvbU5ld2VyVmVyc2lvbkgAQgYKBGtp",
+            "bmRKBAgIEAkiKAoVU3RhdGVGcm9tTmV3ZXJWZXJzaW9uEg8KB3ZlcnNpb24Y",
+            "ASABKA0iMQoLU2F2ZVN0YWxsZWQSDwoHc3RhbGxlZBgBIAEoCBIRCgl3YWl0",
+            "ZWRfbXMYAiABKAQiYwoOSW5zdGFsbFBhY2thZ2USDAoEbmFtZRgBIAEoCRIx",
+            "CgdwYWNrYWdlGAIgASgLMiAub3BhbXAucHJvdG8udjEuUGFja2FnZUF2YWls",
+            "YWJsZRIQCghkb3dubG9hZBgDIAEoBCJWChRDdXN0b21NZXNzYWdlTm90U2Vu",
+            "dBIuCgdtZXNzYWdlGAEgASgLMh0ub3BhbXAucHJvdG8udjEuQ3VzdG9tTWVz",
+            "c2FnZRIOCgZyZWFzb24YAiABKAkiRQoTTm90aWZ5Q29ubmVjdEZhaWxlZBIT",
+            "CgZzdGF0dXMYASABKA1IAIgBARIOCgZkZXRhaWwYAiABKAlCCQoHX3N0YXR1",
+            "cyIuCg1FcnJvclJlc3BvbnNlEgwKBGtpbmQYASABKAUSDwoHbWVzc2FnZRgC",
+            "IAEoCSJYCg5TdGF0dXNUb29MYXJnZRIpCgVmaWVsZBgBIAEoDjIaLm9wYW1w",
+            "LmNvcmUudjEuU3RhdHVzRmllbGQSDQoFYnl0ZXMYAiABKAQSDAoEbmFtZRgD",
+            "IAEoCSJxCglTZXR1cENhbGwSKgoFc3RhcnQYASABKAsyGS5vcGFtcC5jb3Jl",
+            "LnYxLlNldHVwU3RhcnRIABIwCghpZGVudGl0eRgCIAEoCzIcLm9wYW1wLmNv",
+            "cmUudjEuU2V0dXBJZGVudGl0eUgAQgYKBGNhbGwijQEKClNldHVwUmVwbHkS",
+            "LgoHc3RhcnRlZBgBIAEoCzIbLm9wYW1wLmNvcmUudjEuU2V0dXBTdGFydGVk",
+            "SAASNAoKaWRlbnRpZmllZBgCIAEoCzIeLm9wYW1wLmNvcmUudjEuU2V0dXBJ",
+            "ZGVudGlmaWVkSAASDwoFZXJyb3IYAyABKAlIAEIICgZyZXN1bHQiJwoIVmFy",
+            "aWFibGUSDAoEbmFtZRgBIAEoCRINCgV2YWx1ZRgCIAEoCSKeAQoKU2V0dXBT",
+            "dGFydBIkCgNlbnYYASADKAsyFy5vcGFtcC5jb3JlLnYxLlZhcmlhYmxlEiIK",
+            "Am9zGAIgASgOMhYub3BhbXAuY29yZS52MS5TZXR1cE9zEg8KB3Byb2dyYW0Y",
+            "AyABKAkSCwoDY3dkGAQgASgJEigKBGNvZGUYBSABKAsyGi5vcGFtcC5jb3Jl",
+            "LnYxLlNldHVwSW5Db2RlIocCCgtTZXR1cEluQ29kZRIVCghlbmRwb2ludBgB",
+            "IAEoCUgAiAEBEhUKDWhlYWRlcnNfZ2l2ZW4YAiABKAgSJgoHaGVhZGVycxgD",
+            "IAMoCzIVLm9wYW1wLmNvcmUudjEuSGVhZGVyEhYKCXN0YXRlX2RpchgEIAEo",
+            "CUgBiAEBEhkKDGhlYXJ0YmVhdF9tcxgFIAEoEkgCiAEBEhUKDWVuZHBvaW50",
+            "X25hbWUYBiABKAkSFAoMaGVhZGVyc19uYW1lGAcgASgJEhYKDmhlYXJ0YmVh",
+            "dF9uYW1lGAggASgJQgsKCV9lbmRwb2ludEIMCgpfc3RhdGVfZGlyQg8KDV9o",
+            "ZWFydGJlYXRfbXMisAIKDFNldHVwU3RhcnRlZBILCgNvZmYYASABKAgSEgoK",
+            "b2ZmX3JlYXNvbhgMIAEoCRIQCghlbmRwb2ludBgCIAEoCRImCgdoZWFkZXJz",
+            "GAMgAygLMhUub3BhbXAuY29yZS52MS5IZWFkZXISHQoVaGVhcnRiZWF0X2lu",
+            "dGVydmFsX21zGAQgASgEEhEKCXN0YXRlX2RpchgFIAEoCRIVCg1kZWZhdWx0",
+            "X3Nsb3RzGAYgAygJEhcKD2FsbF9zbG90c190YWtlbhgHIAEoCRIPCgdzZXJ2",
+            "aWNlGAggASgJEhYKDnNob3duX2VuZHBvaW50GAkgASgJEigKBWhpbnRzGAog",
+            "ASgLMhkub3BhbXAuY29yZS52MS5TZXR1cEhpbnRzEhAKCHdhcm5pbmdzGAsg",
+            "AygJIlQKClNldHVwSGludHMSDwoHcmVmdXNlZBgBIAEoCRIRCglub3RfZm91",
+            "bmQYAiABKAkSEwoLdW5yZWFjaGFibGUYAyABKAkSDQoFZXJyb3IYBCABKAki",
+            "cAoNU2V0dXBJZGVudGl0eRIRCglzdGF0ZV9kaXIYASABKAgSDQoFc2F2ZWQY",
+            "AiABKAkSGwoTcmVzb3VyY2VfYXR0cmlidXRlcxgDIAEoCRIPCgdlbnRyb3B5",
+            "GAQgASgMEg8KB3VuaXhfbXMYBSABKAQitgEKD1NldHVwSWRlbnRpZmllZBIU",
+            "CgxpbnN0YW5jZV91aWQYASABKAwSKQoEZnJvbRgCIAEoDjIbLm9wYW1wLmNv",
+            "cmUudjEuU2V0dXBVaWRGcm9tEgwKBHNhdmUYAyABKAgSDAoEdGV4dBgEIAEo",
+            "CRITCgt1bnNhdmVkX3VpZBgFIAEoDBIxCgx1bnNhdmVkX2Zyb20YBiABKA4y",
+            "Gy5vcGFtcC5jb3JlLnYxLlNldHVwVWlkRnJvbSpjCg5QYWNrYWdlRmFpbHVy",
+            "ZRIZChVQQUNLQUdFX0ZBSUxVUkVfRklOQUwQABIZChVQQUNLQUdFX0ZBSUxV",
+            "UkVfTEFURVIQARIbChdQQUNLQUdFX0ZBSUxVUkVfVU5LTk9XThACKqsCCgtT",
+            "dGF0dXNGaWVsZBIcChhTVEFUVVNfRklFTERfREVTQ1JJUFRJT04QABIXChNT",
+            "VEFUVVNfRklFTERfSEVBTFRIEAESIQodU1RBVFVTX0ZJRUxEX0VGRkVDVElW",
+            "RV9DT05GSUcQAhIlCiFTVEFUVVNfRklFTERfUkVNT1RFX0NPTkZJR19TVEFU",
+            "VVMQAxIrCidTVEFUVVNfRklFTERfQ09OTkVDVElPTl9TRVRUSU5HU19TVEFU",
+            "VVMQBBIlCiFTVEFUVVNfRklFTERfQVZBSUxBQkxFX0NPTVBPTkVOVFMQBRIk",
+            "CiBTVEFUVVNfRklFTERfQ1VTVE9NX0NBUEFCSUxJVElFUxAGEiEKHVNUQVRV",
+            "U19GSUVMRF9QQUNLQUdFX1NUQVRVU0VTEAcqRgoHU2V0dXBPcxIRCg1TRVRV",
+            "UF9PU19VTklYEAASEgoOU0VUVVBfT1NfTUFDT1MQARIUChBTRVRVUF9PU19X",
+            "SU5ET1dTEAIqWwoMU2V0dXBVaWRGcm9tEhcKE1NFVFVQX1VJRF9GUk9NX01B",
+            "REUQABIYChRTRVRVUF9VSURfRlJPTV9TQVZFRBABEhgKFFNFVFVQX1VJRF9G",
+            "Uk9NX0dJVkVOEAJCdgoXZGV2LnB5ZGFudGljLm9wYW1wLmNvcmVCCUNvcmVQ",
+            "cm90b1o6Z2l0aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29w",
+            "YW1wL2ludGVybmFsL2NvcmVwYqoCE1B5ZGFudGljLk9wQW1wLkNvcmViBnBy",
+            "b3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Core.PackageFailure), typeof(global::Pydantic.OpAmp.Core.StatusField), typeof(global::Pydantic.OpAmp.Core.SetupOs), typeof(global::Pydantic.OpAmp.Core.SetupUidFrom), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -286,7 +289,8 @@ namespace Pydantic.OpAmp.Core {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Store), global::Pydantic.OpAmp.Core.Store.Parser, new[]{ "Id", "Data" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.HttpRequest), global::Pydantic.OpAmp.Core.HttpRequest.Parser, new[]{ "Id", "Url", "Headers", "Body", "TimeoutMs", "MaxResponseBytes" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.WsOpen), global::Pydantic.OpAmp.Core.WsOpen.Parser, new[]{ "Id", "Url", "Headers", "MaxMessageBytes", "TimeoutMs" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Notification), global::Pydantic.OpAmp.Core.Notification.Parser, new[]{ "Connected", "ConnectFailed", "ErrorResponse", "RemoteConfig", "Command", "InstanceUidChanged", "HeartbeatIntervalMs", "StatusTooLarge", "BadMessage", "Stopped", "ConnectionSettings", "CustomMessage", "ServerCustomCapabilities", "CustomMessageNotSent", "InstallPackage", "RemovePackage", "SaveStalled" }, new[]{ "Kind" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.Notification), global::Pydantic.OpAmp.Core.Notification.Parser, new[]{ "Connected", "ConnectFailed", "ErrorResponse", "RemoteConfig", "Command", "InstanceUidChanged", "HeartbeatIntervalMs", "StatusTooLarge", "BadMessage", "Stopped", "ConnectionSettings", "CustomMessage", "ServerCustomCapabilities", "CustomMessageNotSent", "InstallPackage", "RemovePackage", "SaveStalled", "StateFromNewerVersion" }, new[]{ "Kind" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.StateFromNewerVersion), global::Pydantic.OpAmp.Core.StateFromNewerVersion.Parser, new[]{ "Version" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.SaveStalled), global::Pydantic.OpAmp.Core.SaveStalled.Parser, new[]{ "Stalled", "WaitedMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.InstallPackage), global::Pydantic.OpAmp.Core.InstallPackage.Parser, new[]{ "Name", "Package", "Download" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Core.CustomMessageNotSent), global::Pydantic.OpAmp.Core.CustomMessageNotSent.Parser, new[]{ "Message", "Reason" }, null, null, null, null),
@@ -14639,6 +14643,9 @@ namespace Pydantic.OpAmp.Core {
         case KindOneofCase.SaveStalled:
           SaveStalled = other.SaveStalled.Clone();
           break;
+        case KindOneofCase.StateFromNewerVersion:
+          StateFromNewerVersion = other.StateFromNewerVersion.Clone();
+          break;
       }
 
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
@@ -14913,6 +14920,24 @@ namespace Pydantic.OpAmp.Core {
       }
     }
 
+    /// <summary>Field number for the "state_from_newer_version" field.</summary>
+    public const int StateFromNewerVersionFieldNumber = 19;
+    /// <summary>
+    /// The saved state is from a newer version of the core, which this one can't read: the client
+    /// starts from its configuration, as on first use, and runs without saving (no offered
+    /// connection settings, no packages), leaving the state as the newer version saved it. Nothing
+    /// to answer; worth a warning, as an older client was started on a newer one's state.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Core.StateFromNewerVersion StateFromNewerVersion {
+      get { return kindCase_ == KindOneofCase.StateFromNewerVersion ? (global::Pydantic.OpAmp.Core.StateFromNewerVersion) kind_ : null; }
+      set {
+        kind_ = value;
+        kindCase_ = value == null ? KindOneofCase.None : KindOneofCase.StateFromNewerVersion;
+      }
+    }
+
     private object kind_;
     /// <summary>Enum of possible cases for the "kind" oneof.</summary>
     public enum KindOneofCase {
@@ -14934,6 +14959,7 @@ namespace Pydantic.OpAmp.Core {
       InstallPackage = 16,
       RemovePackage = 17,
       SaveStalled = 18,
+      StateFromNewerVersion = 19,
     }
     private KindOneofCase kindCase_ = KindOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -14981,6 +15007,7 @@ namespace Pydantic.OpAmp.Core {
       if (!object.Equals(InstallPackage, other.InstallPackage)) return false;
       if (!object.Equals(RemovePackage, other.RemovePackage)) return false;
       if (!object.Equals(SaveStalled, other.SaveStalled)) return false;
+      if (!object.Equals(StateFromNewerVersion, other.StateFromNewerVersion)) return false;
       if (KindCase != other.KindCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -15006,6 +15033,7 @@ namespace Pydantic.OpAmp.Core {
       if (kindCase_ == KindOneofCase.InstallPackage) hash ^= InstallPackage.GetHashCode();
       if (kindCase_ == KindOneofCase.RemovePackage) hash ^= RemovePackage.GetHashCode();
       if (kindCase_ == KindOneofCase.SaveStalled) hash ^= SaveStalled.GetHashCode();
+      if (kindCase_ == KindOneofCase.StateFromNewerVersion) hash ^= StateFromNewerVersion.GetHashCode();
       hash ^= (int) kindCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -15093,6 +15121,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(146, 1);
         output.WriteMessage(SaveStalled);
       }
+      if (kindCase_ == KindOneofCase.StateFromNewerVersion) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(StateFromNewerVersion);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -15171,6 +15203,10 @@ namespace Pydantic.OpAmp.Core {
         output.WriteRawTag(146, 1);
         output.WriteMessage(SaveStalled);
       }
+      if (kindCase_ == KindOneofCase.StateFromNewerVersion) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(StateFromNewerVersion);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -15231,6 +15267,9 @@ namespace Pydantic.OpAmp.Core {
       }
       if (kindCase_ == KindOneofCase.SaveStalled) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(SaveStalled);
+      }
+      if (kindCase_ == KindOneofCase.StateFromNewerVersion) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(StateFromNewerVersion);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -15340,6 +15379,12 @@ namespace Pydantic.OpAmp.Core {
             SaveStalled = new global::Pydantic.OpAmp.Core.SaveStalled();
           }
           SaveStalled.MergeFrom(other.SaveStalled);
+          break;
+        case KindOneofCase.StateFromNewerVersion:
+          if (StateFromNewerVersion == null) {
+            StateFromNewerVersion = new global::Pydantic.OpAmp.Core.StateFromNewerVersion();
+          }
+          StateFromNewerVersion.MergeFrom(other.StateFromNewerVersion);
           break;
       }
 
@@ -15505,6 +15550,15 @@ namespace Pydantic.OpAmp.Core {
             SaveStalled = subBuilder;
             break;
           }
+          case 154: {
+            global::Pydantic.OpAmp.Core.StateFromNewerVersion subBuilder = new global::Pydantic.OpAmp.Core.StateFromNewerVersion();
+            if (kindCase_ == KindOneofCase.StateFromNewerVersion) {
+              subBuilder.MergeFrom(StateFromNewerVersion);
+            }
+            input.ReadMessage(subBuilder);
+            StateFromNewerVersion = subBuilder;
+            break;
+          }
         }
       }
     #endif
@@ -15667,6 +15721,216 @@ namespace Pydantic.OpAmp.Core {
             SaveStalled = subBuilder;
             break;
           }
+          case 154: {
+            global::Pydantic.OpAmp.Core.StateFromNewerVersion subBuilder = new global::Pydantic.OpAmp.Core.StateFromNewerVersion();
+            if (kindCase_ == KindOneofCase.StateFromNewerVersion) {
+              subBuilder.MergeFrom(StateFromNewerVersion);
+            }
+            input.ReadMessage(subBuilder);
+            StateFromNewerVersion = subBuilder;
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class StateFromNewerVersion : pb::IMessage<StateFromNewerVersion>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<StateFromNewerVersion> _parser = new pb::MessageParser<StateFromNewerVersion>(() => new StateFromNewerVersion());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<StateFromNewerVersion> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[37]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StateFromNewerVersion() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StateFromNewerVersion(StateFromNewerVersion other) : this() {
+      version_ = other.version_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public StateFromNewerVersion Clone() {
+      return new StateFromNewerVersion(this);
+    }
+
+    /// <summary>Field number for the "version" field.</summary>
+    public const int VersionFieldNumber = 1;
+    private uint version_;
+    /// <summary>
+    /// the version of the state's format
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public uint Version {
+      get { return version_; }
+      set {
+        version_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as StateFromNewerVersion);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(StateFromNewerVersion other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Version != other.Version) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Version != 0) hash ^= Version.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Version != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(Version);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Version != 0) {
+        output.WriteRawTag(8);
+        output.WriteUInt32(Version);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Version != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeUInt32Size(Version);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(StateFromNewerVersion other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Version != 0) {
+        Version = other.Version;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 8: {
+            Version = input.ReadUInt32();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 8: {
+            Version = input.ReadUInt32();
+            break;
+          }
         }
       }
     }
@@ -15689,7 +15953,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[37]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[38]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -15927,7 +16191,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[38]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[39]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16214,7 +16478,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[39]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[40]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16459,7 +16723,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[40]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[41]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16710,7 +16974,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[41]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[42]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -16948,7 +17212,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[42]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[43]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -17223,7 +17487,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[43]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[44]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -17517,7 +17781,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[44]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[45]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -17871,7 +18135,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[45]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[46]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -18109,7 +18373,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[46]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[47]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -18472,7 +18736,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[47]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[48]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -18974,7 +19238,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[48]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[49]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -19598,7 +19862,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[49]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[50]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -19922,7 +20186,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[50]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[51]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -20283,7 +20547,7 @@ namespace Pydantic.OpAmp.Core {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[51]; }
+      get { return global::Pydantic.OpAmp.Core.CoreReflection.Descriptor.MessageTypes[52]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

@@ -426,6 +426,17 @@ func TestAUIDTheServerAssignsIsTheNextStarts(t *testing.T) {
 	}
 }
 
+// A state a newer release saved: said once, as a warning, naming the state's format.
+func TestAStateFromANewerVersionIsWarnedAbout(t *testing.T) {
+	a := newTestAgent(t, t.TempDir())
+	said := records(t)
+	a.notified(nil, opamp.Notification{Kind: opamp.StateFromNewerVersion, StateVersion: 2})
+	if len(*said) != 1 || !strings.HasPrefix((*said)[0], "WARN opamp: the saved state was written by a newer version") ||
+		!strings.Contains((*said)[0], "(state format 2)") {
+		t.Fatalf("said %q", *said)
+	}
+}
+
 // The description the agent sends at start names the policy format the layer reads and the
 // controls this package carries out, beside the resource's attributes.
 func TestTheDescriptionNamesThePolicyAndTheControls(t *testing.T) {

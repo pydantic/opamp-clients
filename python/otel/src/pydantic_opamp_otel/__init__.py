@@ -1384,6 +1384,9 @@ class Agent:
             self.client.set_remote_config_status(answer)
         elif n.kind == "instance_uid_changed":
             self.renamed(uuid.UUID(bytes=n.instance_uid))
+        elif n.kind == "state_from_newer_version":
+            _log.warning("OpAMP: the saved state was written by a newer version of this SDK (state format %d), which "
+                         "this one can't read: it is kept as it is, and this run saves nothing", n.state_version)
         elif n.kind == "stopped" and n.error is not None:
             _log.error("OpAMP: the client stopped; the SDK runs unmanaged: %s", n.error)
 

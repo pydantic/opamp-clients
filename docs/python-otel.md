@@ -67,7 +67,7 @@ the SDK keeps its current settings meanwhile
 and at INFO, `connected to ... again` once it's back. The warning names what to check as it was
 given: with the headers given to `configure()`, it says `check the headers given to configure()`,
 and likewise for the endpoint. The endpoint is logged without user info or a query string. An
-endpoint without a scheme gets a warning at start: it is taken as `http://`. Warnings reach stderr even
+endpoint without a scheme is refused at start: no OpAMP client starts, the SDK runs unmanaged, and the warning says why. Warnings reach stderr even
 when the only handler on the root logger is OpenTelemetry's (with
 `OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true`), where Python would otherwise only export
 them as log records; a handler of the application's own shows them instead, once.

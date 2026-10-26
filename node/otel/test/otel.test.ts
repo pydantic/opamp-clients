@@ -542,6 +542,31 @@ test("a register right after its shutdown starts from a config applied just befo
   await agent.stop();
 });
 
+test("a state a newer version saved is warned about once, and kept", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
+  // The client's state, as a newer core saved it (format 2).
+  writeFileSync(join(dir, "opamp-state"), Buffer.from([0x08, 0x02]));
+  const { agent } = prepared(dir, { OTEL_OPAMP_ENDPOINT: "http://127.0.0.1:1/v1/opamp" });
+  const warned: string[] = [];
+  const ignore = () => {};
+  diag.setLogger({ error: ignore, warn: (m: string) => void warned.push(m), info: ignore, debug: ignore, verbose: ignore },
+    DiagLogLevel.ALL);
+  const before = say.console;
+  say.console = false;
+  try {
+    agent.start(resourceFromAttributes({}));
+    const newer = () => warned.filter((m) => m.includes("written by a newer version"));
+    for (let i = 0; i < 500 && newer().length === 0; i++) await new Promise((r) => setTimeout(r, 10));
+    await agent.stop();
+    assert.deepEqual(newer(), ["OpAMP: the saved state was written by a newer version of this SDK (state format 2), "
+      + "which this one can't read: it is kept as it is, and this run saves nothing"]);
+  } finally {
+    say.console = before;
+    diag.disable();
+  }
+  assert.deepEqual([...readFileSync(join(dir, "opamp-state"))], [0x08, 0x02]);
+});
+
 test("a register that failed, then another at once: the second keeps the slot the first gave back", async () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const env: NodeJS.ProcessEnv = { OTEL_OPAMP_ENDPOINT: "http://127.0.0.1:1/v1/opamp", OTEL_SERVICE_NAME: "web",
@@ -786,13 +811,6 @@ const ENV: NodeJS.ProcessEnv = {
 const FROM_ENV = { endpoint: "http://env/v1/opamp", headers: { a: "env" }, stateDir: "/state/env", heartbeatMs: 5000 };
 const notMs = (v: string) => `OpAMP: heartbeatIntervalMs ${v} is not a number of milliseconds: it is not used`;
 const INVALID: [string, unknown, string | undefined, Partial<Setup>][] = [
-  ["an endpoint without a scheme", { endpoint: "opamp.example.com:4320/v1/opamp" },
-    'OpAMP: the endpoint given to register() "opamp.example.com:4320/v1/opamp" has no scheme, so it is taken as http://; name it in full, '
-      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://opamp.example.com:4320/v1/opamp" }],
-  // Its secrets are kept out of the warning.
-  ["an endpoint without a scheme, with user info and a query", { endpoint: "user:secret@opamp.example.com/v1/opamp?token=x" },
-    'OpAMP: the endpoint given to register() "opamp.example.com/v1/opamp" has no scheme, so it is taken as http://; name it in full, '
-      + "as https://host/v1/opamp or wss://host/v1/opamp", { endpoint: "http://user:secret@opamp.example.com/v1/opamp?token=x" }],
   // Kept: the client refuses it when it starts, and the SDK runs unmanaged; nothing stops.
   ["an endpoint with a scheme the client doesn't speak", { endpoint: "ftp://opamp.example.com/v1/opamp" },
     undefined, { endpoint: "ftp://opamp.example.com/v1/opamp" }],
@@ -996,15 +1014,27 @@ test("a bad heartbeat interval warns and is the default; a header with a bad esc
   });
 });
 
-test("an endpoint without a scheme is warned about, and taken as http://", () => {
-  let setup: Setup | undefined;
-  const lines = said(() => {
-    setup = setupFromEnv({ OTEL_OPAMP_ENDPOINT: "opamp.example.com:4320/v1/opamp" });
-  });
-  assert.ok(setup);
-  assert.ok(lines.some(([level, m]) => level === "warn" && m.includes("has no scheme")));
-  // Taken as http://, as the warning says: the client refuses an endpoint without a scheme.
-  assert.equal(setup!.endpoint, "http://opamp.example.com:4320/v1/opamp");
+// Taken as http://, its key would go in the clear: no client starts, and the warning says why,
+// without the endpoint's secrets.
+test("an endpoint without a scheme is refused: off, with a warning", () => {
+  const refused = (from: string, shown: string) =>
+    `OpAMP: off, as ${from} "${shown}" has no scheme: no OpAMP client is started; name it in full, `
+      + "as https://host/v1/opamp or wss://host/v1/opamp";
+  for (const [env, options, warning] of [
+    [{ OTEL_OPAMP_ENDPOINT: "opamp.example.com:4320/v1/opamp" }, {},
+      refused("OTEL_OPAMP_ENDPOINT", "opamp.example.com:4320/v1/opamp")],
+    [ENV, { endpoint: "opamp.example.com:4320/v1/opamp" },
+      refused("the endpoint given to register()", "opamp.example.com:4320/v1/opamp")],
+    [ENV, { endpoint: "user:secret@opamp.example.com/v1/opamp?token=x" },
+      refused("the endpoint given to register()", "opamp.example.com/v1/opamp")],
+  ] as [Record<string, string>, Options, string][]) {
+    let setup: Setup | undefined;
+    const lines = said(() => {
+      setup = setupFromEnv(env, options);
+    });
+    assert.equal(setup, undefined, warning);
+    assert.deepEqual(lines.filter(([level]) => level === "warn"), [["warn", warning]]);
+  }
 });
 
 test("the endpoint is logged without its secrets, whatever it is", () => {

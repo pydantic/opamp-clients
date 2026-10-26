@@ -579,7 +579,7 @@ class WsOpen(_message.Message):
     def __init__(self, id: _Optional[int] = ..., url: _Optional[str] = ..., headers: _Optional[_Iterable[_Union[Header, _Mapping]]] = ..., max_message_bytes: _Optional[int] = ..., timeout_ms: _Optional[int] = ...) -> None: ...
 
 class Notification(_message.Message):
-    __slots__ = ("connected", "connect_failed", "error_response", "remote_config", "command", "instance_uid_changed", "heartbeat_interval_ms", "status_too_large", "bad_message", "stopped", "connection_settings", "custom_message", "server_custom_capabilities", "custom_message_not_sent", "install_package", "remove_package", "save_stalled")
+    __slots__ = ("connected", "connect_failed", "error_response", "remote_config", "command", "instance_uid_changed", "heartbeat_interval_ms", "status_too_large", "bad_message", "stopped", "connection_settings", "custom_message", "server_custom_capabilities", "custom_message_not_sent", "install_package", "remove_package", "save_stalled", "state_from_newer_version")
     CONNECTED_FIELD_NUMBER: _ClassVar[int]
     CONNECT_FAILED_FIELD_NUMBER: _ClassVar[int]
     ERROR_RESPONSE_FIELD_NUMBER: _ClassVar[int]
@@ -597,6 +597,7 @@ class Notification(_message.Message):
     INSTALL_PACKAGE_FIELD_NUMBER: _ClassVar[int]
     REMOVE_PACKAGE_FIELD_NUMBER: _ClassVar[int]
     SAVE_STALLED_FIELD_NUMBER: _ClassVar[int]
+    STATE_FROM_NEWER_VERSION_FIELD_NUMBER: _ClassVar[int]
     connected: Empty
     connect_failed: NotifyConnectFailed
     error_response: ErrorResponse
@@ -614,7 +615,14 @@ class Notification(_message.Message):
     install_package: InstallPackage
     remove_package: Name
     save_stalled: SaveStalled
-    def __init__(self, connected: _Optional[_Union[Empty, _Mapping]] = ..., connect_failed: _Optional[_Union[NotifyConnectFailed, _Mapping]] = ..., error_response: _Optional[_Union[ErrorResponse, _Mapping]] = ..., remote_config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., command: _Optional[_Union[_opamp_pb2.ServerToAgentCommand, _Mapping]] = ..., instance_uid_changed: _Optional[bytes] = ..., heartbeat_interval_ms: _Optional[int] = ..., status_too_large: _Optional[_Union[StatusTooLarge, _Mapping]] = ..., bad_message: _Optional[_Union[Detail, _Mapping]] = ..., stopped: _Optional[_Union[Empty, _Mapping]] = ..., connection_settings: _Optional[_Union[_opamp_pb2.ConnectionSettingsOffers, _Mapping]] = ..., custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., server_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., custom_message_not_sent: _Optional[_Union[CustomMessageNotSent, _Mapping]] = ..., install_package: _Optional[_Union[InstallPackage, _Mapping]] = ..., remove_package: _Optional[_Union[Name, _Mapping]] = ..., save_stalled: _Optional[_Union[SaveStalled, _Mapping]] = ...) -> None: ...
+    state_from_newer_version: StateFromNewerVersion
+    def __init__(self, connected: _Optional[_Union[Empty, _Mapping]] = ..., connect_failed: _Optional[_Union[NotifyConnectFailed, _Mapping]] = ..., error_response: _Optional[_Union[ErrorResponse, _Mapping]] = ..., remote_config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., command: _Optional[_Union[_opamp_pb2.ServerToAgentCommand, _Mapping]] = ..., instance_uid_changed: _Optional[bytes] = ..., heartbeat_interval_ms: _Optional[int] = ..., status_too_large: _Optional[_Union[StatusTooLarge, _Mapping]] = ..., bad_message: _Optional[_Union[Detail, _Mapping]] = ..., stopped: _Optional[_Union[Empty, _Mapping]] = ..., connection_settings: _Optional[_Union[_opamp_pb2.ConnectionSettingsOffers, _Mapping]] = ..., custom_message: _Optional[_Union[_opamp_pb2.CustomMessage, _Mapping]] = ..., server_custom_capabilities: _Optional[_Union[_opamp_pb2.CustomCapabilities, _Mapping]] = ..., custom_message_not_sent: _Optional[_Union[CustomMessageNotSent, _Mapping]] = ..., install_package: _Optional[_Union[InstallPackage, _Mapping]] = ..., remove_package: _Optional[_Union[Name, _Mapping]] = ..., save_stalled: _Optional[_Union[SaveStalled, _Mapping]] = ..., state_from_newer_version: _Optional[_Union[StateFromNewerVersion, _Mapping]] = ...) -> None: ...
+
+class StateFromNewerVersion(_message.Message):
+    __slots__ = ("version",)
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    version: int
+    def __init__(self, version: _Optional[int] = ...) -> None: ...
 
 class SaveStalled(_message.Message):
     __slots__ = ("stalled", "waited_ms")

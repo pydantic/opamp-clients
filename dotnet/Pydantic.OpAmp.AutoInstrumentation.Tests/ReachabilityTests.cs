@@ -94,18 +94,18 @@ public class ReachabilityTests
     [InlineData("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x", "https://opamp.example.com:notaport/v1/opamp")]
     [InlineData("https://[::1/v1/opamp?k=v", "https://[::1/v1/opamp")]
     [InlineData("https://[::1]:4320", "https://[::1]:4320")]
-    [InlineData("user:secret@opamp.example.com/v1/opamp?token=x", "http://opamp.example.com/v1/opamp")]
     public void TheEndpointIsLoggedWithoutUserInfoOrQuery(string endpoint, string logged) => Assert.Equal(logged, Reachability.Shown(endpoint, "?"));
 
     [Fact]
-    public void AnEndpointWithoutASchemeIsWarnedAbout()
+    public void AnEndpointWithoutASchemeIsRefused()
     {
+        // Taken as http://, its key would go in the clear: no client starts, and the warning says
+        // why, without the endpoint's secrets.
         var said = new Said();
-        var server = Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? "opamp.example.com/v1/opamp" : null, said.Log.Warn)!;
-        Assert.Equal("http://opamp.example.com/v1/opamp", server.Endpoint.OriginalString); // as the warning says
+        Assert.Null(Server.FromEnv(n => n == "OTEL_OPAMP_ENDPOINT" ? "user:secret@opamp.example.com/v1/opamp?token=x" : null, said.Log.Warn));
         Assert.Equal(
-            ["Warn: OTEL_OPAMP_ENDPOINT \"opamp.example.com/v1/opamp\" has no scheme, so it is taken as http://; name it in full, as " +
-             "https://host/v1/opamp or wss://host/v1/opamp"],
+            ["Warn: off, as OTEL_OPAMP_ENDPOINT \"opamp.example.com/v1/opamp\" has no scheme: no OpAMP client is started; name it in " +
+             "full, as https://host/v1/opamp or wss://host/v1/opamp"],
             said.Lines);
     }
 }

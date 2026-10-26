@@ -124,6 +124,7 @@ The callback gets a `Notification`; `Kind` says which, and the fields that go wi
 | `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `CustomMessage`, `CustomCapabilities`, `Detail` | |
 | `InstanceUIDChanged`, `HeartbeatInterval`, `Command` | `InstanceUID`, `HeartbeatInterval`, `Command` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `ErrorType`, `Message`, `Detail`, `Field`, `FieldName`, `Bytes`, `Stalled`, `Waited` | |
+| `StateFromNewerVersion` | `StateVersion`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `Err`: why it stopped on its own, or nil after `Stop` | |
 
 ## Goroutines and stop

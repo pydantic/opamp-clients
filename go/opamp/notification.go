@@ -60,6 +60,11 @@ const (
 	// the client waits on it still, saving nothing else meanwhile; or it has ended at last (not
 	// Stalled). Waited: how long it had run. A disk that hangs is the application's to see to.
 	SaveStalled
+	// StateFromNewerVersion: the saved state is a newer core's, in a format this one can't read
+	// (StateVersion). The client starts from its configuration, as on first use, and runs without
+	// saving (no offered connection settings, no packages), leaving that state as it is. Worth a
+	// warning: an older release was started on a newer one's state directory.
+	StateFromNewerVersion
 )
 
 // StatusField names a status field.
@@ -108,6 +113,8 @@ type Notification struct {
 	Stalled bool
 	// Waited: how long the save had run (SaveStalled).
 	Waited time.Duration
+	// StateVersion: the version of the saved state's format (StateFromNewerVersion).
+	StateVersion uint32
 	// Err: why the client stopped on its own (Stopped); nil after Stop. Stop returns it too.
 	Err error
 }
@@ -153,6 +160,8 @@ func fromCore(n *corepb.Notification) Notification {
 	case *corepb.Notification_SaveStalled:
 		return Notification{Kind: SaveStalled, Stalled: k.SaveStalled.Stalled,
 			Waited: time.Duration(min(k.SaveStalled.WaitedMs, maxMillis)) * time.Millisecond}
+	case *corepb.Notification_StateFromNewerVersion:
+		return Notification{Kind: StateFromNewerVersion, StateVersion: k.StateFromNewerVersion.Version}
 	case *corepb.Notification_Stopped:
 		return Notification{Kind: Stopped}
 	default:

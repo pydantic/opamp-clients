@@ -131,6 +131,28 @@ class StateFileTest {
     assertEquals(9, got.get(2).getStoreFailed().getId());
   }
 
+  /**
+   * A state a newer core saved (format 2): the client starts from its configuration, is told once,
+   * and leaves the state as it is.
+   */
+  @Test
+  void aStateFromANewerVersionIsToldOnceAndKept() throws Exception {
+    Path path = dir.resolve("state.bin");
+    byte[] newer = {0x08, 0x02};
+    Files.write(path, newer);
+    List<Notification> told = new java.util.concurrent.CopyOnWriteArrayList<>();
+    OpampClient client = OpampClient.start(
+        OpampClient.Config.builder("http://127.0.0.1:1", new byte[16]).mode(OpampClient.Mode.PLATFORM).stateFile(path).build(),
+        OpampClient.Status.of(null), told::add);
+    for (int i = 0; i < 500 && told.stream().noneMatch(n -> n instanceof Notification.StateFromNewerVersion); i++) {
+      Thread.sleep(10);
+    }
+    client.stop().get(10, java.util.concurrent.TimeUnit.SECONDS);
+    assertEquals(List.of(new Notification.StateFromNewerVersion(2)),
+        told.stream().filter(n -> n instanceof Notification.StateFromNewerVersion).toList());
+    assertArrayEquals(newer, Files.readAllBytes(path));
+  }
+
   @Test
   void anUnreadableStateFileStopsTheClientStarting() {
     for (OpampClient.Mode mode : OpampClient.Mode.values()) {

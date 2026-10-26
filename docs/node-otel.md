@@ -225,7 +225,7 @@ the SDK keeps its current settings meanwhile
 and at INFO, `connected to ... again` once it's back. The warning names what to check as it was
 given: with the headers given to `register()`, it says `check the headers given to register()`,
 and likewise for the endpoint. The endpoint is logged without user info or a query string. An
-endpoint without a scheme gets a warning at start: it is taken as `http://`.
+endpoint without a scheme is refused at start: no OpAMP client starts, the SDK runs unmanaged, and the warning says why.
 
 ## The settings that match telemetry
 
