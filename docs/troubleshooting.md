@@ -42,6 +42,19 @@ meanwhile. Once it's back you see `connected to ... again`.
 The warning names what you configured: with the endpoint or headers given in code, it says so
 instead of naming the variable.
 
+For the Supervisor, `opampsupervisor status` says the same at any time, with the collector's
+health and the last remote config's status. Run it as root or an administrator:
+
+| Where it runs | Command |
+|---|---|
+| Linux packages | `sudo /usr/lib/pydantic-opamp/opampsupervisor status --storage /var/lib/pydantic-opamp` |
+| macOS package | `sudo /opt/pydantic-opamp/bin/opampsupervisor status --storage /opt/pydantic-opamp/var` |
+| Windows `.msi` | `& "$env:ProgramFiles\pydantic-opamp\opampsupervisor.exe" status --storage "$env:ProgramData\pydantic-opamp\var"` |
+| Container image | `docker exec <container> /usr/lib/pydantic-opamp/opampsupervisor status --config /etc/pydantic-opamp/supervisor.yaml` |
+
+It exits 0 when connected, healthy and the last remote config isn't FAILED, and 1 otherwise, so a
+script or a probe can use it.
+
 ## Connected, but no telemetry arrives
 
 The OpAMP connection and the telemetry are separate: the key that connects the agent doesn't

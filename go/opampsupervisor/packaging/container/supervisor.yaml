@@ -1,0 +1,52 @@
+# The Supervisor's config in the container image. Every setting a deployment changes is an
+# environment variable; to change anything else, mount your own config over this file.
+#
+#   OPAMP_ENDPOINT            the OpAMP server, as wss://host/v1/opamp or https://host/v1/opamp
+#   OPAMP_TOKEN               the enrollment token; once the server issues the agent its own
+#                             credentials, they're used instead, kept in the state volume
+#   OPAMP_EXPORTER_ENDPOINTS  where the server's configs may send telemetry, a YAML list of
+#                             scheme://host[:port] (default: Logfire's US and EU regions)
+#   OPAMP_LOG_PATHS           the files and directories the server's configs may read logs from,
+#                             a YAML list (default: none)
+#   OPAMP_STATE_KEY           the key that seals the issued credentials, as file:PATH: a
+#                             mounted secret, readable by the container's user only (default:
+#                             none, the state file is plain on the volume)
+server:
+  endpoint: ${env:OPAMP_ENDPOINT}
+  headers:
+    Authorization: "Bearer ${env:OPAMP_TOKEN}"
+
+capabilities:
+  accepts_remote_config: true
+  accepts_opamp_connection_settings: true
+  accepts_other_connection_settings: true
+  accepts_restart_command: true
+  reports_effective_config: true
+  reports_health: true
+  reports_available_components: true
+  # No packages: a new collector comes with a new image.
+
+agent:
+  executable: /usr/lib/pydantic-opamp/otelcol
+  # The telemetry token the server issues the collector, as LOGFIRE_TOKEN. One set on the
+  # container reaches the collector too.
+  connection_env:
+    logfire/otlp: LOGFIRE_TOKEN
+
+  # What the server's remote config may do in this container, as the packages' enroll scripts
+  # write it (packaging/README.md, "What the server can do to this host").
+  remote_config_policy:
+    allowed_components:
+      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      processors: [batch, memory_limiter, resource_detection, resourcedetection]
+      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
+      extensions: [health_check]
+    allowed_providers: []
+    allowed_exporter_endpoints: ${env:OPAMP_EXPORTER_ENDPOINTS:-["https://logfire-us.pydantic.dev", "https://logfire-eu.pydantic.dev"]}
+    allowed_log_paths: ${env:OPAMP_LOG_PATHS:-[]}
+
+storage:
+  # A volume: the agent's instance UID, the credentials the server issued and the last config.
+  # Without one, each new container is a new agent that enrolls again.
+  directory: /var/lib/pydantic-opamp
+  state_key: ${env:OPAMP_STATE_KEY:-}

@@ -98,6 +98,18 @@ cd pydantic-opamp-supervisor_0.5.0_linux_amd64
 ./opampsupervisor --config supervisor.yaml
 ```
 
+### Container image
+
+Each release also publishes `ghcr.io/pydantic/opamp-supervisor:<version>` for amd64 and arm64:
+the Supervisor and this collector, configured with environment variables, with its state on a
+volume. The [packaging README](../go/opampsupervisor/packaging/README.md#container) has the
+variables and how to run it.
+
+```bash
+docker run -d -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
+  -v opamp-state:/var/lib/pydantic-opamp ghcr.io/pydantic/opamp-supervisor:0.6.0
+```
+
 ### From source
 
 ```bash
