@@ -312,6 +312,11 @@ mounted secret with `${file:...}`, say, rather than from the environment. The co
 when the server's config turns it on, listens in the container: publish its ports as you would
 any collector's.
 
+`docker exec <container> /usr/lib/pydantic-opamp/opampsupervisor status --config
+/etc/pydantic-opamp/supervisor.yaml` says how it is: connected or not (and what to check), the
+collector's health and the last remote config's status. It exits 0 when all is well, so it can
+serve as an exec probe.
+
 Build it from archives `archive.sh` made, for one architecture (loaded into the local Docker) or
 both (`PUSH=1`, pushed as `IMAGE`):
 

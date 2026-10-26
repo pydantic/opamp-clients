@@ -40,6 +40,10 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor: a container image, `ghcr.io/pydantic/opamp-supervisor`, for amd64 and arm64, with
   the collector, configured with environment variables and keeping its state on a volume; each
   Supervisor release publishes it, signed with Cosign (#93).
+- Supervisor: `opampsupervisor status` prints how the running Supervisor is: the OpAMP
+  connection (with what to check when it can't connect), the collector's health and the last
+  remote config's status, from a status file it keeps in its storage directory. It exits 0 when
+  all is well, so scripts and probes can use it (#93).
 
 ### Fixed
 

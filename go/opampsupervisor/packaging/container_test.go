@@ -68,6 +68,12 @@ func TestContainerEnrollRestart(t *testing.T) {
 		assert.Contains(c, auths, "Bearer issued-token")
 		assert.Contains(c, statuses, protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED)
 	})
+	// `status` in the running container says it's connected, to the endpoint configured.
+	connected(t, ctr, func(c *assert.CollectT) {
+		out, _ := exec.Command("docker", "exec", ctr, "/usr/lib/pydantic-opamp/opampsupervisor", "status",
+			"--config", "/etc/pydantic-opamp/supervisor.yaml").CombinedOutput()
+		assert.Contains(c, string(out), srv.endpoint+": connected since")
+	})
 	docker(t, "stop", ctr)
 
 	dir := t.TempDir()

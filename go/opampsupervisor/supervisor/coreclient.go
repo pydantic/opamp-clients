@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sync"
 
 	"github.com/open-telemetry/opamp-go/client"
@@ -72,6 +73,8 @@ type coreClient struct {
 	// reach says when the server can't be reached, once a run of failures (set in Start; used on
 	// the client's goroutine).
 	reach *reachability
+	// report keeps the status file `opampsupervisor status` reads (set in newCoreClient).
+	report *statusReport
 }
 
 var _ client.OpAMPClient = (*coreClient)(nil)
@@ -80,7 +83,7 @@ var _ client.OpAMPClient = (*coreClient)(nil)
 // directory: two clients on one state file would overwrite each other's), sealed with sealer
 // unless it is nil.
 func newCoreClient(logger *zap.Logger, stateFile string, sealer opamp.StateSealer) *coreClient {
-	return &coreClient{logger: logger, stateFile: stateFile, sealer: sealer}
+	return &coreClient{logger: logger, stateFile: stateFile, sealer: sealer, report: newStatusReport(filepath.Dir(stateFile))}
 }
 
 // errNotRunning: a call that needs the client running, before Start or after Stop.
@@ -217,6 +220,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 
 	c.uid = c.opened.InstanceUID()
 	c.reach = newReachability(c.logger, settings.OpAMPServerURL)
+	c.report.started(c.logger, c.reach.endpoint, c.uid)
 	started, err := c.opened.Start(initial, c.onNotification)
 	if err != nil {
 		return err
@@ -238,7 +242,10 @@ func (c *coreClient) Stop(ctx context.Context) error {
 		}
 		return errors.New("cannot stop because not started")
 	}
-	return started.Stop(ctx)
+	err := started.Stop(ctx)
+	// The status file says stopped, and nothing changes it after Stop returns.
+	c.report.close(c.logger)
+	return err
 }
 
 // onNotification turns what the core says into the Supervisor's callbacks. It runs on the
@@ -254,12 +261,14 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 	switch n.Kind {
 	case opamp.Connected:
 		c.reach.connected()
+		c.report.connected(c.logger)
 		if cb.OnConnect != nil {
 			cb.OnConnect(ctx)
 		}
 	case opamp.ConnectFailed:
 		// Changed here: the Supervisor hears the first failure of a run, with what to check in its
 		// config; the retries that follow go at debug, not an error each (reachability).
+		c.report.connectFailed(c.logger, n.Status, n.Detail)
 		if err := c.reach.failed(n.Status, n.Detail); err != nil && cb.OnConnectFailed != nil {
 			cb.OnConnectFailed(ctx, err)
 		}
@@ -299,6 +308,7 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			return
 		}
 		c.uid = uid
+		c.report.instanceUID(c.logger, uid)
 		message(&types.MessageData{AgentIdentification: &protobufs.AgentIdentification{NewInstanceUid: uid[:]}})
 	case opamp.Command:
 		if cb.OnCommand != nil {
@@ -359,6 +369,7 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			c.logger.Info("The stalled save of the OpAMP state has ended", zap.Duration("waited", n.Waited))
 		}
 	case opamp.Stopped:
+		c.report.stopped(c.logger)
 		if n.Err != nil {
 			c.logger.Error("The OpAMP client stopped", zap.Error(n.Err))
 		}
@@ -399,6 +410,7 @@ func (c *coreClient) SetHealth(health *protobufs.ComponentHealth) error {
 		return errors.New("health is nil")
 	}
 	health = proto.Clone(health).(*protobufs.ComponentHealth)
+	c.report.health(c.logger, health)
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.status.Health = health
@@ -444,6 +456,7 @@ func (c *coreClient) SetRemoteConfigStatus(status *protobufs.RemoteConfigStatus)
 		return errReportsRemoteConfigNotSet
 	}
 	c.status.RemoteConfigStatus = status
+	c.report.remoteConfig(c.logger, status)
 	if cl := c.running(); cl != nil {
 		cl.SetRemoteConfigStatus(status)
 	}

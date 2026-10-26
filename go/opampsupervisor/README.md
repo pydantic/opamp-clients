@@ -183,6 +183,14 @@ agent:
   naming the setting to check (`server.endpoint`, `server.headers` or `server.auth`, by the
   answer), the endpoint without credentials; the retries go at debug, and getting through again
   is said once.
+- **`opampsupervisor status` says how it is.** The running Supervisor keeps
+  `supervisor-status.json` in its storage directory: the OpAMP connection (and, when it can't
+  connect, the error and what to check), the collector's health, and the last remote config's
+  status, with no credentials. `opampsupervisor status --config supervisor.yaml` (or
+  `--storage DIR`, when the config reads files only the service can) prints it, `--json` as it
+  is, and exits 0 when connected, healthy and not FAILED, 1 otherwise, 2 with no status to read.
+  The command is taken in a file of its own (`status_command.go`) before `main` runs, so
+  upstream's `main.go` is unchanged.
 - **The Collector doesn't inherit `OTEL_EXPORTER_OTLP_*`.** Upstream's passed the
   Supervisor's whole environment, so headers set on the host reached the own-telemetry endpoint
   a server chose. Set one in `agent.env` to pass it
@@ -192,11 +200,12 @@ Every file from upstream keeps its license header (Apache-2.0, [LICENSE](LICENSE
 paths were rewritten to this module's. The files changed beyond that say what changed in their
 header. These files are new, and are this repository's:
 
-- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `reachability.go`,
+- `supervisor/coreclient.go`, `agent_update.go`, `apply_step.go`, `client_state.go`, `startup.go`, `sealed_storage.go`, `telemetry_env.go`, `reachability.go`, `status.go`,
   `localserver.go`, `config/remote_config_policy.go`, `commander/collector_env.go`
   and `verifier/cosign.go`, and the tests
   beside them (with `supervisor/remote_config_refusal_test.go`, `restart_command_test.go` and
   `supervisor/config/core_test.go`, and the Cosign release fixture in `verifier/testdata/`);
+- `status_command.go`, and its test;
 - `e2e_packages_test.go`, `e2e_policy_test.go` and `e2e_state_test.go`, and their configs in `testdata/`
   (`testdata/collector/manifest.yaml`, `testdata/supervisor/supervisor_auth_bearer_ws.yaml`,
   `supervisor_packages.yaml` and `supervisor_policy.yaml`);
