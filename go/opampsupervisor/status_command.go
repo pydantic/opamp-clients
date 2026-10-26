@@ -4,13 +4,13 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/pydantic/opamp-clients/go/opampsupervisor/supervisor"
@@ -36,7 +36,7 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(stderr)
 	configPath := flags.String("config", "", "Path to the Supervisor's configuration file")
 	storage := flags.String("storage", "", "The Supervisor's storage directory, in place of --config")
-	jsonOut := flags.Bool("json", false, "Print the status file as it is")
+	jsonOut := flags.Bool("json", false, "Print the status as JSON, as the status file holds it")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
@@ -63,8 +63,13 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if *jsonOut {
-		b, _ := os.ReadFile(filepath.Join(dir, supervisor.StatusFile))
-		_, _ = stdout.Write(b)
+		// The status read once: what is printed is what the exit code says.
+		b, err := json.MarshalIndent(st, "", "  ")
+		if err != nil {
+			fmt.Fprintf(stderr, "can't print the status: %v\n", err)
+			return 2
+		}
+		_, _ = stdout.Write(append(b, '\n'))
 	} else {
 		st.Print(stdout, time.Now())
 	}
