@@ -40,13 +40,6 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
-- Supervisor: a container image, `ghcr.io/pydantic/opamp-supervisor`, for amd64 and arm64, with
-  the collector, configured with environment variables and keeping its state on a volume; each
-  Supervisor release publishes it, signed with Cosign (#93).
-- Supervisor: `opampsupervisor status` prints how the running Supervisor is: the OpAMP
-  connection (with what to check when it can't connect), the collector's health and the last
-  remote config's status, from a status file it keeps in its storage directory. It exits 0 when
-  all is well, so scripts and probes can use it (#93).
 
 ### Fixed
 
@@ -70,8 +63,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 - Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
   saves nothing), and the client says so once with the new `state_from_newer_version`
-  notification, which every integration, the collector extension and the Supervisor log as a
-  warning (#92).
+  notification, which every integration and the collector extension log as a warning (#92).
 - Node.js (`@pydantic/opamp-otel`): the register runs the instrumentations' loader hook for
   `import` in the application's thread (`module.registerHooks`) on Node.js 22.22.3, 24.11.1, 25.1.0,
   26 and later, instead of on a loader thread with a V8 isolate of its own: about 7 MB less
@@ -79,10 +71,6 @@ and date. Tests, CI and docs alone don't need a line.
   loader thread (#91).
 - Go: `go/opampotel` needs Go 1.26 or later (Go 1.25 is out of support), to take golang.org/x/net
   0.60.0.
-- Supervisor: a server it can't reach is logged once a run of failures, naming what to check
-  (`server.endpoint`, `server.headers` or `server.auth`, by the server's answer) and the endpoint
-  without credentials; the retries go at debug, and getting through again is logged once. Before,
-  every retry logged an error (#93).
 
 ### Security
 
@@ -105,6 +93,29 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.6.0 (2026-10-26)
+
+`go/opampsupervisor/v0.6.0`, on core 0.12.0. The Go modules are not released with it.
+
+### Added
+
+- Supervisor: a container image, `ghcr.io/pydantic/opamp-supervisor`, for amd64 and arm64, with
+  the collector, configured with environment variables and keeping its state on a volume; each
+  Supervisor release publishes it, signed with Cosign (#93).
+- Supervisor: `opampsupervisor status` prints how the running Supervisor is: the OpAMP
+  connection (with what to check when it can't connect), the collector's health and the last
+  remote config's status, from a status file it keeps in its storage directory. It exits 0 when
+  all is well, so scripts and probes can use it (#93).
+
+### Changed
+
+- Supervisor: a server it can't reach is logged once a run of failures, naming what to check
+  (`server.endpoint`, `server.headers` or `server.auth`, by the server's answer) and the endpoint
+  without credentials; the retries go at debug, and getting through again is logged once. Before,
+  every retry logged an error (#93).
+- Supervisor: a state file saved by a newer version is left as it was (that run saves nothing),
+  and the Supervisor logs a warning saying so, once (#92).
 
 ## Supervisor 0.5.0 (2026-10-25)
 
