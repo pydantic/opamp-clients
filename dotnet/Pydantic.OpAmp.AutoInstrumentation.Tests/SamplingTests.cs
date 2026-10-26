@@ -273,8 +273,8 @@ public class SamplingTests
 
         foreach (var r in api)
         {
+            Assert.Equal(3, await rig.Spans.OfAtLeast(r.TraceId, 3)); // the request, "work" and the /echo it called
             Assert.Equal(1, rig.Spans.RootsOf(r.TraceId));
-            Assert.Equal(3, rig.Spans.Of(r.TraceId)); // the request, "work" and the /echo it called
             Assert.True(r.ChildRecorded);
             Assert.EndsWith("-01", r.Downstream);
         }
@@ -285,7 +285,7 @@ public class SamplingTests
         rig.Agent.RemoteConfig(Vectors.Config(Policy.HeadSampling(1)));
         var now = await rig.App.Get("/health");
         rig.Flush();
-        Assert.Equal(3, rig.Spans.Of(now.TraceId));
+        Assert.Equal(3, await rig.Spans.OfAtLeast(now.TraceId, 3));
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class SamplingTests
         var a = await rig.App.Get("/zero", $"00-{sampled}-{ActivitySpanId.CreateRandom()}-01");
         var b = await rig.App.Get("/one", $"00-{unsampled}-{ActivitySpanId.CreateRandom()}-00");
         rig.Flush();
-        Assert.Equal(3, rig.Spans.Of(sampled.ToString()));
+        Assert.Equal(3, await rig.Spans.OfAtLeast(sampled.ToString(), 3));
         Assert.True(a.ChildRecorded);
         Assert.Equal(0, rig.Spans.Of(unsampled.ToString()));
         Assert.EndsWith("-00", b.Downstream);
@@ -342,8 +342,8 @@ public class SamplingTests
         var second = await rig.App.Get("/b");
         var third = await rig.App.Get("/c");
         rig.Flush();
-        Assert.Equal(3, rig.Spans.Of(first.TraceId));
-        Assert.Equal(3, rig.Spans.Of(second.TraceId));
+        Assert.Equal(3, await rig.Spans.OfAtLeast(first.TraceId, 3));
+        Assert.Equal(3, await rig.Spans.OfAtLeast(second.TraceId, 3));
         Assert.Equal(0, rig.Spans.Of(third.TraceId));
         Assert.EndsWith("-00", third.Downstream);
         Assert.Equal(1, refused);
