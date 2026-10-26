@@ -110,4 +110,19 @@ func TestStatusCommandWaitsForTheConnection(t *testing.T) {
 	code, out, _ = run("--wait", "5s", "--since", since)
 	assert.Equal(t, 0, code, out)
 	assert.Contains(t, out, "connected since")
+
+	// --json holds with --wait, connected or not.
+	code, out, _ = run("--wait", "300ms", "--since", since, "--json")
+	assert.Equal(t, 0, code, out)
+	var printed supervisor.Status
+	require.NoError(t, json.Unmarshal([]byte(out), &printed))
+	assert.True(t, printed.Server.Connected)
+
+	// A status that is there but can't be read fails at once: waiting won't fix it.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, supervisor.StatusFile), []byte("{"), 0o600))
+	started := time.Now()
+	code, _, errOut = run("--wait", "5s", "--since", since)
+	assert.Equal(t, 2, code)
+	assert.Contains(t, errOut, "can't read the status")
+	assert.Less(t, time.Since(started), 2*time.Second)
 }

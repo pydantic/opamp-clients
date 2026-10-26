@@ -58,30 +58,14 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 		dir = cfg.Storage.Directory
 	}
 	if *wait > 0 {
-		return waitConnected(dir, *wait, time.Unix(*since, 0), stdout, stderr)
+		return waitConnected(dir, *wait, time.Unix(*since, 0), *jsonOut, stdout, stderr)
 	}
 	st, err := supervisor.ReadStatus(dir)
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		fmt.Fprintf(stderr, "no status in %s: the Supervisor hasn't run on this config yet\n", dir)
-		return 2
-	case errors.Is(err, fs.ErrPermission):
-		fmt.Fprintf(stderr, "can't read the status in %s: run this as the Supervisor's user, or as root or an administrator\n", dir)
-		return 2
-	case err != nil:
-		fmt.Fprintf(stderr, "can't read the status in %s: %v\n", dir, err)
-		return 2
+	if err != nil {
+		return readFailed(dir, err, stderr)
 	}
-	if *jsonOut {
-		// The status read once: what is printed is what the exit code says.
-		b, err := json.MarshalIndent(st, "", "  ")
-		if err != nil {
-			fmt.Fprintf(stderr, "can't print the status: %v\n", err)
-			return 2
-		}
-		_, _ = stdout.Write(append(b, '\n'))
-	} else {
-		st.Print(stdout, time.Now())
+	if code := printStatus(st, *jsonOut, stdout, stderr); code != 0 {
+		return code
 	}
 	if !st.OK() {
 		return 1
@@ -89,23 +73,57 @@ func statusCommand(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// readFailed says why the status in dir can't be read, and returns the exit code for it (2).
+func readFailed(dir string, err error, stderr io.Writer) int {
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		fmt.Fprintf(stderr, "no status in %s: the Supervisor hasn't run on this config yet\n", dir)
+	case errors.Is(err, fs.ErrPermission):
+		fmt.Fprintf(stderr, "can't read the status in %s: run this as the Supervisor's user, or as root or an administrator\n", dir)
+	default:
+		fmt.Fprintf(stderr, "can't read the status in %s: %v\n", dir, err)
+	}
+	return 2
+}
+
+// printStatus prints the status read once, as text or JSON, so what is printed is what the exit
+// code says; it returns 2 when the JSON can't be written.
+func printStatus(st *supervisor.Status, jsonOut bool, stdout, stderr io.Writer) int {
+	if !jsonOut {
+		st.Print(stdout, time.Now())
+		return 0
+	}
+	b, err := json.MarshalIndent(st, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "can't print the status: %v\n", err)
+		return 2
+	}
+	_, _ = stdout.Write(append(b, '\n'))
+	return 0
+}
+
 // waitConnected polls the status file until a Supervisor started at or after since is connected,
-// or wait is up; it then prints the status as the plain command does.
-func waitConnected(dir string, wait time.Duration, since time.Time, stdout, stderr io.Writer) int {
+// or wait is up; it then prints the status as the plain command does. A status file that exists
+// but can't be read (permissions, say) fails at once, since waiting won't change it.
+func waitConnected(dir string, wait time.Duration, since time.Time, jsonOut bool, stdout, stderr io.Writer) int {
 	deadline := time.Now().Add(wait)
 	for {
 		st, err := supervisor.ReadStatus(dir)
-		current := err == nil && !st.Started.Before(since) && st.Running()
-		if current && st.Server != nil && st.Server.Connected {
-			st.Print(stdout, time.Now())
-			return 0
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return readFailed(dir, err, stderr)
 		}
-		if time.Now().After(deadline) {
-			if !current {
-				fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
-				return 1
+		current := err == nil && !st.Started.Before(since) && st.Running()
+		connected := current && st.Server != nil && st.Server.Connected
+		switch {
+		case connected:
+			return printStatus(st, jsonOut, stdout, stderr)
+		case time.Now().After(deadline) && !current:
+			fmt.Fprintf(stderr, "the Supervisor hasn't reported its status in %s within %s: check its log\n", dir, wait)
+			return 1
+		case time.Now().After(deadline):
+			if code := printStatus(st, jsonOut, stdout, stderr); code != 0 {
+				return code
 			}
-			st.Print(stdout, time.Now())
 			return 1
 		}
 		time.Sleep(250 * time.Millisecond)
