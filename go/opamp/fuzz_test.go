@@ -232,6 +232,8 @@ func toCore(n Notification) *corepb.Notification {
 		k = &corepb.Notification_BadMessage{BadMessage: &corepb.Detail{Detail: n.Detail}}
 	case SaveStalled:
 		k = &corepb.Notification_SaveStalled{SaveStalled: &corepb.SaveStalled{Stalled: n.Stalled, WaitedMs: uint64(n.Waited / time.Millisecond)}}
+	case StateFromNewerVersion:
+		k = &corepb.Notification_StateFromNewerVersion{StateFromNewerVersion: &corepb.StateFromNewerVersion{Version: n.StateVersion}}
 	case Stopped:
 		k = &corepb.Notification_Stopped{Stopped: &corepb.Empty{}}
 	default:
@@ -256,6 +258,7 @@ func FuzzNotificationFromCore(f *testing.F) {
 			Package: &protobufs.PackageAvailable{Version: "1", Hash: []byte{1}}}}},
 		{Kind: &corepb.Notification_Stopped{Stopped: &corepb.Empty{}}},
 		{Kind: &corepb.Notification_SaveStalled{SaveStalled: &corepb.SaveStalled{Stalled: true, WaitedMs: math.MaxUint64}}},
+		{Kind: &corepb.Notification_StateFromNewerVersion{StateFromNewerVersion: &corepb.StateFromNewerVersion{Version: math.MaxUint32}}},
 		{Kind: &corepb.Notification_ServerCustomCapabilities{ServerCustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{"a", "b"}}}},
 		{Kind: &corepb.Notification_CustomMessageNotSent{CustomMessageNotSent: &corepb.CustomMessageNotSent{
 			Message: &protobufs.CustomMessage{Capability: "c", Type: "t", Data: []byte{1}}, Reason: "r"}}},
@@ -265,7 +268,7 @@ func FuzzNotificationFromCore(f *testing.F) {
 		b, _ := proto.Marshal(s)
 		f.Add(b)
 	}
-	f.Add([]byte{0x9a, 0x01, 0x00}) // field 19: a kind from a newer core
+	f.Add([]byte{0xa2, 0x01, 0x00}) // field 20: a kind from a newer core
 	f.Fuzz(func(t *testing.T, raw []byte) {
 		orig := &corepb.Notification{}
 		if err := (proto.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(raw, orig); err != nil {
@@ -1004,6 +1007,8 @@ func setKind(n *corepb.Notification, k any) *corepb.Notification {
 	case *corepb.Notification_BadMessage:
 		n.Kind = v
 	case *corepb.Notification_SaveStalled:
+		n.Kind = v
+	case *corepb.Notification_StateFromNewerVersion:
 		n.Kind = v
 	case *corepb.Notification_Stopped:
 		n.Kind = v

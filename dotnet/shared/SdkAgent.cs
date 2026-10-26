@@ -141,7 +141,8 @@ internal sealed record Server(
 
         if (s.Off)
         {
-            // Turned off by a variable (said once, here); off for want of an endpoint says nothing.
+            // Turned off by a variable, or an endpoint without a scheme refused (said once, here); off for
+            // want of an endpoint says nothing.
             if (s.OffReason.Length > 0)
             {
                 warn(s.OffReason);
@@ -862,6 +863,10 @@ internal sealed class SdkAgent
                 break;
             case OpAmpNotification.InstanceUidChanged { InstanceUid: var uid }:
                 this.Keep(uid);
+                break;
+            case OpAmpNotification.StateFromNewerVersion { Version: var version }:
+                this.log.Warn($"the saved state was written by a newer version of this SDK (state format {version}), which " +
+                    "this one can't read: it is kept as it is, and this run saves nothing");
                 break;
             case OpAmpNotification.Stopped { Error: { } e }:
                 this.log.Error($"the client stopped; the SDK runs unmanaged: {e.Message}");

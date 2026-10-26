@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 import assert from "node:assert/strict";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import { create } from "@bufbuild/protobuf";
@@ -65,4 +68,19 @@ test("a callback that throws undefined stops the client, and says so (RULE-SHELL
   });
   assert.ok(stopped.kind === "stopped" && /threw undefined/.test(String(stopped.error)));
   await assert.rejects(client.stop(), /threw undefined/);
+});
+
+test("a state from a newer version is told once, and kept", async () => {
+  // A state a newer core saved (format 2): the client starts from its configuration, is told
+  // once, and leaves the state as it is.
+  const state = join(mkdtempSync(join(tmpdir(), "opamp-")), "state.bin");
+  writeFileSync(state, Buffer.from([0x08, 0x02]));
+  const notes: Notification[] = [];
+  const client = Client.start({ endpoint: "http://127.0.0.1:1", stateFile: state, mode: "platform" }, {}, (n) => notes.push(n));
+  for (let i = 0; i < 500 && !notes.some((n) => n.kind === "stateFromNewerVersion"); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  await client.stop();
+  assert.deepEqual(notes.filter((n) => n.kind === "stateFromNewerVersion"), [{ kind: "stateFromNewerVersion", version: 2 }]);
+  assert.deepEqual([...readFileSync(state)], [0x08, 0x02]);
 });

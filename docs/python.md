@@ -107,6 +107,7 @@ The callback gets a `Notification`; `kind` says which, and the fields that go wi
 | `custom_message`, `server_custom_capabilities`, `custom_message_not_sent` | `custom_message`, `custom_capabilities`, `detail` | |
 | `instance_uid_changed`, `heartbeat_interval`, `command` | `instance_uid`, `heartbeat_interval_ms`, `command` | |
 | `error_response`, `bad_message`, `status_too_large`, `save_stalled` | `error_type`, `message`, `detail`, `field`, `bytes`, `stalled`, `waited_ms` | |
+| `state_from_newer_version` | `state_version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `stopped` | `error`: why it stopped on its own, or `None` after `stop()` | |
 
 ## Threads and stop

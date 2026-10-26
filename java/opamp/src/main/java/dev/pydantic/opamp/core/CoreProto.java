@@ -31339,6 +31339,31 @@ public final class CoreProto {
      */
     dev.pydantic.opamp.core.CoreProto.SaveStalled getSaveStalled();
 
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     * @return Whether the stateFromNewerVersion field is set.
+     */
+    boolean hasStateFromNewerVersion();
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     * @return The stateFromNewerVersion.
+     */
+    dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion getStateFromNewerVersion();
+
     public dev.pydantic.opamp.core.CoreProto.Notification.KindCase getKindCase();
   }
   /**
@@ -31372,6 +31397,7 @@ public final class CoreProto {
       INSTALL_PACKAGE(16),
       REMOVE_PACKAGE(17),
       SAVE_STALLED(18),
+      STATE_FROM_NEWER_VERSION(19),
       KIND_NOT_SET(0);
       private final int value;
       private KindCase(int value) {
@@ -31404,6 +31430,7 @@ public final class CoreProto {
           case 16: return INSTALL_PACKAGE;
           case 17: return REMOVE_PACKAGE;
           case 18: return SAVE_STALLED;
+          case 19: return STATE_FROM_NEWER_VERSION;
           case 0: return KIND_NOT_SET;
           default: return null;
         }
@@ -32469,6 +32496,93 @@ public final class CoreProto {
      */
     private void clearSaveStalled() {
       if (kindCase_ == 18) {
+        kindCase_ = 0;
+        kind_ = null;
+      }
+    }
+
+    public static final int STATE_FROM_NEWER_VERSION_FIELD_NUMBER = 19;
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     */
+    @java.lang.Override
+    public boolean hasStateFromNewerVersion() {
+      return kindCase_ == 19;
+    }
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion getStateFromNewerVersion() {
+      if (kindCase_ == 19) {
+         return (dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion) kind_;
+      }
+      return dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStateFromNewerVersion(dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion value) {
+      value.getClass();  // minimal bytecode null check
+      kind_ = value;
+      kindCase_ = 19;
+    }
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeStateFromNewerVersion(dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion value) {
+      value.getClass();  // minimal bytecode null check
+      if (kindCase_ == 19 &&
+          kind_ != dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.getDefaultInstance()) {
+        kind_ = dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.newBuilder((dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion) kind_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        kind_ = value;
+      }
+      kindCase_ = 19;
+    }
+    /**
+     * <pre>
+     * The saved state is from a newer version of the core, which this one can't read: the client
+     * starts from its configuration, as on first use, and runs without saving (no offered
+     * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+     * to answer; worth a warning, as an older client was started on a newer one's state.
+     * </pre>
+     *
+     * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+     */
+    private void clearStateFromNewerVersion() {
+      if (kindCase_ == 19) {
         kindCase_ = 0;
         kind_ = null;
       }
@@ -33599,6 +33713,96 @@ public final class CoreProto {
         return this;
       }
 
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      @java.lang.Override
+      public boolean hasStateFromNewerVersion() {
+        return instance.hasStateFromNewerVersion();
+      }
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion getStateFromNewerVersion() {
+        return instance.getStateFromNewerVersion();
+      }
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      public Builder setStateFromNewerVersion(dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion value) {
+        copyOnWrite();
+        instance.setStateFromNewerVersion(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      public Builder setStateFromNewerVersion(
+          dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.Builder builderForValue) {
+        copyOnWrite();
+        instance.setStateFromNewerVersion(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      public Builder mergeStateFromNewerVersion(dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion value) {
+        copyOnWrite();
+        instance.mergeStateFromNewerVersion(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The saved state is from a newer version of the core, which this one can't read: the client
+       * starts from its configuration, as on first use, and runs without saving (no offered
+       * connection settings, no packages), leaving the state as the newer version saved it. Nothing
+       * to answer; worth a warning, as an older client was started on a newer one's state.
+       * </pre>
+       *
+       * <code>.opamp.core.v1.StateFromNewerVersion state_from_newer_version = 19;</code>
+       */
+      public Builder clearStateFromNewerVersion() {
+        copyOnWrite();
+        instance.clearStateFromNewerVersion();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.core.v1.Notification)
     }
     @java.lang.Override
@@ -33632,12 +33836,13 @@ public final class CoreProto {
               dev.pydantic.opamp.core.CoreProto.InstallPackage.class,
               dev.pydantic.opamp.core.CoreProto.Name.class,
               dev.pydantic.opamp.core.CoreProto.SaveStalled.class,
+              dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.class,
             };
             java.lang.String info =
-                "\u0000\u0011\u0001\u0000\u0001\u0012\u0011\u0000\u0000\u0000\u0001<\u0000\u0002<" +
+                "\u0000\u0012\u0001\u0000\u0001\u0013\u0012\u0000\u0000\u0000\u0001<\u0000\u0002<" +
                 "\u0000\u0003<\u0000\u0004<\u0000\u0005<\u0000\u0006=\u0000\u00076\u0000\t<\u0000" +
                 "\n<\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000\u000f<\u0000\u0010<\u0000\u0011" +
-                "<\u0000\u0012<\u0000";
+                "<\u0000\u0012<\u0000\u0013<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -33688,6 +33893,279 @@ public final class CoreProto {
     private static volatile com.google.protobuf.Parser<Notification> PARSER;
 
     public static com.google.protobuf.Parser<Notification> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface StateFromNewerVersionOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.core.v1.StateFromNewerVersion)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * the version of the state's format
+     * </pre>
+     *
+     * <code>uint32 version = 1;</code>
+     * @return The version.
+     */
+    int getVersion();
+  }
+  /**
+   * Protobuf type {@code opamp.core.v1.StateFromNewerVersion}
+   */
+  public  static final class StateFromNewerVersion extends
+      com.google.protobuf.GeneratedMessageLite<
+          StateFromNewerVersion, StateFromNewerVersion.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.core.v1.StateFromNewerVersion)
+      StateFromNewerVersionOrBuilder {
+    private StateFromNewerVersion() {
+    }
+    public static final int VERSION_FIELD_NUMBER = 1;
+    private int version_;
+    /**
+     * <pre>
+     * the version of the state's format
+     * </pre>
+     *
+     * <code>uint32 version = 1;</code>
+     * @return The version.
+     */
+    @java.lang.Override
+    public int getVersion() {
+      return version_;
+    }
+    /**
+     * <pre>
+     * the version of the state's format
+     * </pre>
+     *
+     * <code>uint32 version = 1;</code>
+     * @param value The version to set.
+     */
+    private void setVersion(int value) {
+      
+      version_ = value;
+    }
+    /**
+     * <pre>
+     * the version of the state's format
+     * </pre>
+     *
+     * <code>uint32 version = 1;</code>
+     */
+    private void clearVersion() {
+
+      version_ = 0;
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.core.v1.StateFromNewerVersion}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.core.v1.StateFromNewerVersion)
+        dev.pydantic.opamp.core.CoreProto.StateFromNewerVersionOrBuilder {
+      // Construct using dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * the version of the state's format
+       * </pre>
+       *
+       * <code>uint32 version = 1;</code>
+       * @return The version.
+       */
+      @java.lang.Override
+      public int getVersion() {
+        return instance.getVersion();
+      }
+      /**
+       * <pre>
+       * the version of the state's format
+       * </pre>
+       *
+       * <code>uint32 version = 1;</code>
+       * @param value The version to set.
+       * @return This builder for chaining.
+       */
+      public Builder setVersion(int value) {
+        copyOnWrite();
+        instance.setVersion(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the version of the state's format
+       * </pre>
+       *
+       * <code>uint32 version = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearVersion() {
+        copyOnWrite();
+        instance.clearVersion();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.core.v1.StateFromNewerVersion)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "version_",
+            };
+            java.lang.String info =
+                "\u0000\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0000\u0000\u0001\u000b";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.core.v1.StateFromNewerVersion)
+    private static final dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion DEFAULT_INSTANCE;
+    static {
+      StateFromNewerVersion defaultInstance = new StateFromNewerVersion();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        StateFromNewerVersion.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.core.CoreProto.StateFromNewerVersion getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<StateFromNewerVersion> PARSER;
+
+    public static com.google.protobuf.Parser<StateFromNewerVersion> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }

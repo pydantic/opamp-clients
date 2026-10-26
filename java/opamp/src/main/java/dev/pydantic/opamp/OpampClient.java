@@ -1088,6 +1088,8 @@ public final class OpampClient {
       case BAD_MESSAGE -> new Notification.BadMessage(n.getBadMessage().getDetail());
       case SAVE_STALLED -> new Notification.SaveStalled(n.getSaveStalled().getStalled(),
           Duration.ofMillis(n.getSaveStalled().getWaitedMs() < 0 ? Long.MAX_VALUE : n.getSaveStalled().getWaitedMs()));
+      case STATE_FROM_NEWER_VERSION -> new Notification.StateFromNewerVersion(
+          Integer.toUnsignedLong(n.getStateFromNewerVersion().getVersion()));
       case STOPPED -> new Notification.Stopped(null);
       default -> null;
     };

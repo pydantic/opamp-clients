@@ -406,11 +406,20 @@ func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
 		a.mu.Unlock()
 	case opamp.InstanceUIDChanged:
 		a.instanceUIDChanged(n.InstanceUID)
+	case opamp.StateFromNewerVersion:
+		slog.Warn(stateFromNewerVersion(n.StateVersion))
 	case opamp.Stopped:
 		if n.Err != nil {
 			slog.Error("opamp: the client stopped; the SDK runs unmanaged", "error", n.Err)
 		}
 	}
+}
+
+// stateFromNewerVersion is the warning for a saved state a newer release wrote: an older one was
+// started on its state directory.
+func stateFromNewerVersion(version uint32) string {
+	return fmt.Sprintf("opamp: the saved state was written by a newer version of this SDK (state format %d), "+
+		"which this one can't read: it is kept as it is, and this run saves nothing", version)
 }
 
 // reachability says when the client connects, when it can't (once a run of failures, with what

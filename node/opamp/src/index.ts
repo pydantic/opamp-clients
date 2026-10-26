@@ -226,6 +226,11 @@ export type Notification =
    * waits on it still, saving nothing else meanwhile; or it has ended at last (not `stalled`).
    * `waitedMs`: how long it had run. A disk that hangs is the application's to see to. */
   | { kind: "saveStalled"; stalled: boolean; waitedMs: number }
+  /** The saved state is a newer core's, in a format (`version`) this one can't read: the client
+   * starts from its configuration, as on first use, and saves nothing (no offered connection
+   * settings, no packages), leaving that state as it is. Worth a warning: an older release was
+   * started on a newer one's state file. */
+  | { kind: "stateFromNewerVersion"; version: number }
   /** The client has stopped: after stop(), or on its own because of `error` (which stop() throws too). */
   | { kind: "stopped"; error?: unknown };
 
@@ -284,6 +289,8 @@ function fromCore(n: CoreNotification, stateFile: string | undefined): Notificat
       return { kind: "badMessage", detail: k.value.detail };
     case "saveStalled":
       return { kind: "saveStalled", stalled: k.value.stalled, waitedMs: Number(k.value.waitedMs) };
+    case "stateFromNewerVersion":
+      return { kind: "stateFromNewerVersion", version: k.value.version };
     case "stopped":
       return { kind: "stopped" };
     default:

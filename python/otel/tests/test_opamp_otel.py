@@ -775,6 +775,14 @@ def test_the_instance_uid_changed_notification_is_saved(tmp_path):
     assert agent.uid == new and (tmp_path / "instance-uid").read_text(encoding="utf-8") == str(new)
 
 
+def test_a_state_from_a_newer_version_is_warned_about(tmp_path, caplog):
+    agent, _ = prepared(tmp_path)
+    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+        agent._notified(Notification("state_from_newer_version", state_version=2))
+    assert caplog.messages == ["OpAMP: the saved state was written by a newer version of this SDK (state format 2), "
+                               "which this one can't read: it is kept as it is, and this run saves nothing"]
+
+
 def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(server):
     """Locust's model: gevent patches threading, so a thread is a greenlet on the one OS thread,
     and asyncio runs one loop there at a time. The client's loop must not be that one: an asyncio
@@ -1186,9 +1194,10 @@ def test_blank_in_code_is_not_given(tmp_path, caplog, option, blank):
     ("endpoint", "ftp://code/v1/opamp", "ftp://code/v1/opamp",
      'OpAMP: the endpoint given to configure() "ftp://code/v1/opamp" is not http(s):// or ws(s)://, so the '
      "client can't reach it"),
-    ("endpoint", "code:4320/v1/opamp", "http://code:4320/v1/opamp",
-     ('OpAMP: the endpoint given to configure() "code:4320/v1/opamp" has no scheme, so it is taken as http://; name it in full, as '
-      "https://host/v1/opamp or wss://host/v1/opamp")),
+    # Without a scheme: refused, as taken as http:// its key would go in the clear.
+    ("endpoint", "code:4320/v1/opamp", None,
+     ('OpAMP: off, as the endpoint given to configure() "code:4320/v1/opamp" has no scheme: no OpAMP client is started; '
+      "name it in full, as https://host/v1/opamp or wss://host/v1/opamp")),
     *[("headers", bad, {}, "OpAMP: headers should map names to values, all strings: none are sent")
       for bad in ["Authorization=Bearer k", [("Authorization", "Bearer k")], {"Authorization": b"Bearer k"},
                   {"Authorization": None}, {"Retries": 3}, {1: "Bearer k"}]],
@@ -1354,12 +1363,12 @@ def test_a_malformed_endpoint_is_logged_not_raised(endpoint, logged):
     assert pydantic_opamp_otel.shown_endpoint(endpoint, "?") == logged
 
 
-def test_an_endpoint_without_a_scheme_or_with_one_the_client_cannot_speak_is_warned_about(caplog):
-    setup = pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "opamp.example.com:4320/v1/opamp"})
-    assert setup is not None
-    assert "has no scheme" in caplog.text
-    # Taken as http://, as the warning says: the client refuses an endpoint without a scheme.
-    assert setup.endpoint == "http://opamp.example.com:4320/v1/opamp"
+def test_an_endpoint_without_a_scheme_is_refused_and_one_the_client_cannot_speak_is_warned_about(caplog):
+    # Without a scheme: no client starts, and the warning says why (taken as http://, the key would
+    # go in the clear).
+    assert pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "u:p@opamp.example.com:4320/v1/opamp?k=v"}) is None
+    assert caplog.messages == ['OpAMP: off, as OTEL_OPAMP_ENDPOINT "opamp.example.com:4320/v1/opamp" has no scheme: no '
+                               "OpAMP client is started; name it in full, as https://host/v1/opamp or wss://host/v1/opamp"]
     # A scheme the client doesn't speak: warned about at start, not only at each failed connect.
     caplog.clear()
     assert pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None

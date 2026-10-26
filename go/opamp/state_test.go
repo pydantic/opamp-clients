@@ -6,11 +6,17 @@ package opamp
 import (
 	"bytes"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
 )
@@ -145,5 +151,55 @@ func TestStartRefusesAStateItCantOpen(t *testing.T) {
 		StateSealer: prefixSealer{openErr: errors.New("wrong key")}}, Status{}, nil)
 	if err == nil || !strings.Contains(err.Error(), "wrong key") {
 		t.Fatalf("Start = %v", err)
+	}
+}
+
+// A state a newer core saved (format 2): the client is told once, starts from its configuration,
+// and saves nothing, so the newer release finds its identity again. The server's new UID, which
+// would be saved, isn't.
+func TestAStateFromANewerVersionIsKeptNotSavedOver(t *testing.T) {
+	newer := []byte{0x08, 0x02}
+	state := filepath.Join(t.TempDir(), "state.bin")
+	if err := os.WriteFile(state, newer, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := proto.Marshal(&protobufs.ServerToAgent{AgentIdentification: &protobufs.AgentIdentification{
+			NewInstanceUid: bytes.Repeat([]byte{7}, 16)}})
+		w.Header().Set("Content-Type", "application/x-protobuf")
+		_, _ = w.Write(b)
+	}))
+	defer ts.Close()
+	told := make(chan Notification, 16)
+	c, err := Start(t.Context(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StateFile: state},
+		Status{}, func(_ *Client, n Notification) { told <- n })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var newerTold int
+	for uid := false; !uid; {
+		select {
+		case n := <-told:
+			switch n.Kind {
+			case StateFromNewerVersion:
+				if n.StateVersion != 2 {
+					t.Fatalf("told format %d, want 2", n.StateVersion)
+				}
+				newerTold++
+			case InstanceUIDChanged:
+				uid = true
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the server's UID never came")
+		}
+	}
+	if err := c.Stop(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if newerTold != 1 {
+		t.Fatalf("told %d times, want once", newerTold)
+	}
+	if got, _ := os.ReadFile(state); !bytes.Equal(got, newer) {
+		t.Fatalf("the newer state was saved over: %x", got)
 	}
 }

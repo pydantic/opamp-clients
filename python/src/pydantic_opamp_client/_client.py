@@ -173,6 +173,10 @@ class Notification:
     - ``save_stalled``: ``stalled`` (True: the save under way has run for its stall time, and the
       client waits on it still, saving nothing else meanwhile; False: it has ended at last),
       ``waited_ms`` (how long it had run). A disk that hangs is the application's to see to.
+    - ``state_from_newer_version``: ``state_version`` (the saved state's format, a newer core's,
+      which this one can't read): the client starts from its configuration, as on first use, and
+      saves nothing (no offered connection settings, no packages), leaving that state as it is.
+      Worth a warning: an older release was started on a newer one's state file.
     - ``stopped``: ``error`` (why the client stopped on its own, which stop() raises too; None
       after stop())
     """
@@ -196,6 +200,7 @@ class Notification:
     bytes: int = 0
     stalled: bool = False
     waited_ms: int = 0
+    state_version: int = 0
     error: BaseException | None = None
 
 
@@ -255,6 +260,8 @@ def _notification(n: corepb.Notification, download_path: Callable[[int], str]) -
         return Notification("bad_message", detail=n.bad_message.detail)
     if kind == "save_stalled":
         return Notification("save_stalled", stalled=n.save_stalled.stalled, waited_ms=n.save_stalled.waited_ms)
+    if kind == "state_from_newer_version":
+        return Notification("state_from_newer_version", state_version=n.state_from_newer_version.version)
     if kind == "stopped":
         return Notification("stopped")
     return None

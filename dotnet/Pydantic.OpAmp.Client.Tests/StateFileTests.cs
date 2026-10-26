@@ -49,6 +49,30 @@ public sealed class StateFileTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// A state a newer core saved (format 2): the client starts from its configuration, is told
+    /// once, and leaves the state as it is.
+    /// </summary>
+    [Fact]
+    public async Task AStateFromANewerVersionIsToldOnceAndKept()
+    {
+        var path = Path.Combine(this.dir, "state.bin");
+        byte[] newer = [0x08, 0x02];
+        File.WriteAllBytes(path, newer);
+        var told = new System.Collections.Concurrent.ConcurrentQueue<OpAmpNotification>();
+        var client = OpAmpClient.Start(
+            new OpAmpClientOptions { Endpoint = new Uri("http://127.0.0.1:1/v1/opamp"), StateFile = path, Mode = OpAmpMode.Platform },
+            new OpAmpStatus(), told.Enqueue);
+        for (var i = 0; i < 500 && !told.Any(n => n is OpAmpNotification.StateFromNewerVersion); i++)
+        {
+            await Task.Delay(10);
+        }
+
+        await client.StopAsync();
+        Assert.Equal([new OpAmpNotification.StateFromNewerVersion(2)], told.Where(n => n is OpAmpNotification.StateFromNewerVersion));
+        Assert.Equal(newer, File.ReadAllBytes(path));
+    }
+
     [Fact]
     public void DownloadsArePrivate()
     {
