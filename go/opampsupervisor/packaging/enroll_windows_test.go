@@ -205,6 +205,6 @@ func TestWinEnrollHostLogs(t *testing.T) {
 	storage := filepath.ToSlash(filepath.Join(root, "var", "collector"))
 	assert.Equal(t, []string{storage}, p.AllowedStorageDirectories)
 	body := hostLogsConfig(t, "windows", "C:/ProgramData/pydantic-opamp/var/collector", storage)
-	assertHostLogs(t, p, enroll(), body, `configures extension "file_storage/host_logs"`)
+	assertHostLogs(t, p, enroll(), body, `configures receiver "windows_event_log/application"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {windows_event_log: {channel: System, remote: {server: dc1}}}`)), "sets remote")
 }
