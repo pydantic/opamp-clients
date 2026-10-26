@@ -350,3 +350,60 @@ func TestRemoteConfigPolicyConnectionEnv(t *testing.T) {
 		require.Error(t, p.CheckWithConnectionEnv("", []byte(body), bindings))
 	}
 }
+
+// file_storage keeps its files only in the allowed storage directories, and must name its directory.
+func TestRemoteConfigPolicyStorageDirectories(t *testing.T) {
+	p := hostPolicy()
+	p.AllowedComponents["extensions"] = []string{"file_storage"}
+	p.AllowedStorageDirectories = []string{"/var/lib/pydantic-opamp/collector"}
+	storage := func(settings string) string { return `extensions: {file_storage/logs: ` + settings + `}` }
+	for name, body := range map[string]string{
+		"the directory itself": storage(`{directory: /var/lib/pydantic-opamp/collector}`),
+		"one under it":         storage(`{directory: /var/lib/pydantic-opamp/collector/logs, create_directory: true}`),
+		"compaction under it": storage(`{directory: /var/lib/pydantic-opamp/collector, compaction: ` +
+			`{directory: /var/lib/pydantic-opamp/collector/tmp, on_start: true}}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NoError(t, p.Check("", []byte(body)))
+		})
+	}
+	const notAllowed = "which agent::remote_config_policy::allowed_storage_directories doesn't allow"
+	for name, tc := range map[string]struct{ body, wantErr string }{
+		"elsewhere":            {storage(`{directory: /etc}`), `extension "file_storage/logs" keeps files in "/etc", ` + notAllowed},
+		"a sibling":            {storage(`{directory: /var/lib/pydantic-opamp/collector2}`), notAllowed},
+		"climbing out":         {storage(`{directory: /var/lib/pydantic-opamp/collector/../../../etc}`), "climb out with .."},
+		"compaction elsewhere": {storage(`{directory: /var/lib/pydantic-opamp/collector, compaction: {directory: /tmp}}`), `keeps files in "/tmp"`},
+		"no directory":         {storage(`{create_directory: true}`), `extension "file_storage/logs" sets no directory`},
+		"no settings":          {`extensions: {file_storage: }`, `extension "file_storage" sets no directory`},
+		"a relative directory": {storage(`{directory: collector}`), "isn't absolute"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, p.Check("", []byte(tc.body)), tc.wantErr)
+		})
+	}
+	p.AllowedStorageDirectories = nil
+	require.ErrorContains(t, p.Check("", []byte(storage(`{directory: /var/lib/pydantic-opamp/collector}`))), notAllowed, "none listed: none allowed")
+
+	require.ErrorContains(t, RemoteConfigPolicy{AllowedStorageDirectories: []string{"/x"}}.Validate(), "allowed_storage_directories has no effect without allowed_components")
+	p.AllowedStorageDirectories = []string{"/var/lib/*"}
+	require.ErrorContains(t, p.Validate(), `allowed_storage_directories: "/var/lib/*" has a glob character`)
+}
+
+// The system log receivers read this host's own logs, not a remote host's or an archive's.
+func TestRemoteConfigPolicySystemLogs(t *testing.T) {
+	p := hostPolicy()
+	p.AllowedComponents["receivers"] = append(p.AllowedComponents["receivers"], "windows_event_log", "windowseventlog", "macos_unified_logging")
+	for _, body := range []string{
+		`receivers: {windows_event_log/system: {channel: System, start_at: end}}`,
+		`receivers: {macos_unified_logging: {max_log_age: 1m, predicate: "logType == 'error'"}}`,
+	} {
+		require.NoError(t, p.Check("", []byte(body)), body)
+	}
+	for body, wantErr := range map[string]string{
+		`receivers: {windows_event_log/x: {channel: System, remote: {server: dc1, username: a, password: b}}}`: `receiver "windows_event_log/x" sets remote, which only the local config may`,
+		`receivers: {windowseventlog: {channel: System, remote: {server: dc1}}}`:                               `receiver "windowseventlog" sets remote`,
+		`receivers: {macos_unified_logging: {archive_path: /Users/a/system_logs.logarchive}}`:                  `receiver "macos_unified_logging" sets archive_path, which only the local config may`,
+	} {
+		require.ErrorContains(t, p.Check("", []byte(body)), wantErr, body)
+	}
+}

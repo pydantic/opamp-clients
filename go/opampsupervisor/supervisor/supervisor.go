@@ -24,7 +24,8 @@
 // Supervisor starts on has none until the collector started on it is healthy. A first start that
 // fails is tried again on the restart backoff. Health counts only while its connection is the
 // collector's. A remote config holding the Logfire SDK policy (logfire-sdk-policy.json), which SDKs
-// take, is FAILED: the collector takes YAML.
+// take, is FAILED: the collector takes YAML. The Collector run without a remote config has its internal
+// metrics off unless a config sets them (idle_telemetry.go).
 
 package supervisor
 
@@ -1909,6 +1910,10 @@ func (s *Supervisor) composeMergedConfig(incomingConfig *protobufs.AgentRemoteCo
 
 	err = config.MergeConfFromYAML(conf, agentConfigBytes)
 	if err != nil {
+		return false, err
+	}
+	// Changed here: the Collector run without a remote config doesn't bind localhost:8888.
+	if err = s.disablePlaceholderMetrics(conf, s.config.Capabilities.AcceptsRemoteConfig && !hasIncomingConfigMap); err != nil {
 		return false, err
 	}
 

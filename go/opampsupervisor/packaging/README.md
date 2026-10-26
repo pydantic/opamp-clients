@@ -95,6 +95,8 @@ Other options:
   more). The default is the `--endpoint`'s host and port, over https.
 - `--log-path PATH` lets the server's configs read the logs in a file or a directory (repeat it
   for more). The default is none.
+- `--host-logs` lets the server's configs read the host's system logs
+  ([the default policy](#the-default-policy)). The default is no.
 
 ### Telemetry credentials for managed Collectors
 
@@ -259,7 +261,7 @@ msiexec /i pydantic-opamp-supervisor-0.5.0-windows-amd64.msi /qn
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
-It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-ExporterEndpoint`, `-LogPath`, `-AcceptPackages` and `-NoStart`,
+It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-ExporterEndpoint`, `-LogPath`, `-HostLogs`, `-AcceptPackages` and `-NoStart`,
 like the Linux one's options (give several endpoints or paths as a list:
 `-LogPath 'C:\ProgramData\app\logs','D:\logs'`). It
 writes to `ProgramData\pydantic-opamp`, which only SYSTEM and Administrators can read:
@@ -342,18 +344,25 @@ collector keeps the config it had.
 
 | Rule | Default | Widen it with |
 |---|---|---|
-| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
+| `allowed_components` | receivers `otlp`, `host_metrics`, `file_log`, `nop`; processors `batch`, `memory_limiter`, `resource`, `resource_detection`; exporters `otlp_grpc`, `otlp_http`, `debug`, `nop`; extension `health_check` (and the older names `hostmetrics`, `filelog`, `resourcedetection`, `otlp` and `otlphttp`) | an edit to the config |
 | `allowed_providers` | none, except environment names explicitly bound by `agent.connection_env`; no other `${env:...}` or `${file:...}` | an edit to the config (not recommended) |
 | `allowed_exporter_endpoints` | the OpAMP endpoint's host and port, over https (http with `--plaintext`) | `--exporter-endpoint` (`-ExporterEndpoint` on Windows) |
-| `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows) |
+| `allowed_log_paths` | none | `--log-path` (`-LogPath` on Windows); `--host-logs` adds `/var/log` on Linux |
+| `allowed_storage_directories` | none | `--host-logs` (`-HostLogs` on Windows) adds the Supervisor's `collector` directory: `/var/lib/pydantic-opamp/collector` on Linux, `ProgramData\pydantic-opamp\var\collector` on Windows |
 
 What each rule checks in a remote config:
 - **Components.** Each receiver, processor, exporter, connector and extension must have a type
   in the list. A kind that isn't listed allows none.
   The Windows event log and macOS unified log receivers and the `file_storage` extension
-  are not in the default list. They read the host's system logs and write files where they're
-  configured, so a server's config can't turn them on. Use them in the local config, or add
-  them to `allowed_components` on the host.
+  are not in the default list. They read the host's system logs and write files, so a server's
+  config can turn them on only where the host's operator allowed it: `--host-logs` adds them
+  where the system has them (`windows_event_log` and `file_storage` on Windows,
+  `macos_unified_logging` on macOS, `file_storage` on Linux).
+- **System logs.** A Windows event log receiver's `remote` (other hosts' logs, with their
+  credentials) and a macOS unified logging receiver's `archive_path` (an archive read from any
+  path) are refused: the local config can set them, the server can't.
+- **Storage.** A `file_storage` extension must name its `directory`, and it and any
+  `compaction::directory` must be an allowed storage directory or lie under one.
 - **Providers.** Remote configs may reference exactly the environment names bound by the local
   `agent.connection_env` configuration. For example, a binding to `LOGFIRE_TOKEN` permits
   `${env:LOGFIRE_TOKEN}` and `${LOGFIRE_TOKEN}`. Other environment variables, nested references,
@@ -376,7 +385,10 @@ The Supervisor reads the config as it merges it, with confmap: a key spelled
 
 Why no log files by default: host logs often hold secrets and personal data, and only the
 host's operator knows which files are fit to send. A Logfire config doesn't need them to
-receive OTLP and collect host metrics.
+receive OTLP and collect host metrics. `--host-logs` is that operator's choice, made on the
+command line they run: Logfire's host monitoring configs read the system logs, and need it.
+On Linux the collector runs as `pydantic-opamp`: add that user to the group that can read the
+log files (`adm` on Debian and Ubuntu) for it to read the ones only that group can.
 
 ### Widening it
 

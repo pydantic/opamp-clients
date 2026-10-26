@@ -18,6 +18,7 @@ processors:
   - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.163.0
   - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.163.0
   - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourcedetectionprocessor v0.163.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.163.0
 exporters:
   - gomod: go.opentelemetry.io/collector/exporter/nopexporter v0.163.0
   - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.163.0

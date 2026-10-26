@@ -131,7 +131,7 @@ components, send telemetry only to its own host, and read no log files
   ```
 
   [The packages' README](../go/opampsupervisor/packaging/README.md) covers each platform, and
-  the options that widen the policy (`--exporter-endpoint`, `--log-path`).
+  the options that widen the policy (`--exporter-endpoint`, `--log-path`, `--host-logs`).
 
 Like an SDK, the Supervisor takes a key of its own and renews it, so the enrollment key is only
 needed once. Install each host separately, and keep the Supervisor's state directory out of
