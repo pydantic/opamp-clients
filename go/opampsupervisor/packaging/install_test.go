@@ -63,7 +63,11 @@ func TestInstallEnrollRestart(t *testing.T) {
 
 	srv.forget()
 	stop = startService(t)
-	defer stop()
+	defer func() {
+		if stop != nil {
+			stop()
+		}
+	}()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		auths, _ := srv.seen()
 		if assert.NotEmpty(c, auths) {
@@ -72,6 +76,36 @@ func TestInstallEnrollRestart(t *testing.T) {
 	}, 30*time.Second, 200*time.Millisecond)
 	auths, _ := srv.seen()
 	assert.NotContains(t, auths, "Bearer enroll-token")
+	// Linux's fixture runs the process itself when systemd is absent.
+	if runtime.GOOS == "linux" {
+		stop()
+		stop = nil
+	}
+	retained, err := os.ReadFile(filepath.Join(storage, "opamp-state"))
+	require.NoError(t, err)
+	uninstall(t, false)
+	stop = nil
+	uninstall(t, false)
+	after, err := os.ReadFile(filepath.Join(storage, "opamp-state"))
+	require.NoError(t, err)
+	assert.Equal(t, retained, after, "removal preserves the sealed credentials and identity")
+	srv.forget()
+	install(t)
+	stop = startService(t)
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		auths, _ := srv.seen()
+		if assert.NotEmpty(c, auths) {
+			assert.Equal(c, "Bearer issued-token", auths[0])
+		}
+	}, 30*time.Second, 200*time.Millisecond)
+	if runtime.GOOS == "linux" {
+		stop()
+		stop = nil
+	}
+	uninstall(t, true)
+	stop = nil
+	_, err = os.Stat(storage)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestInstallBuiltCollectorHostLogs(t *testing.T) {

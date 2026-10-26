@@ -40,6 +40,9 @@ contents:
   - src: pydantic-opamp-enroll
     dst: /usr/sbin/pydantic-opamp-enroll
     file_info: {mode: 0755}
+  - src: pydantic-opamp-uninstall
+    dst: /usr/sbin/pydantic-opamp-uninstall
+    file_info: {mode: 0755}
   - src: pydantic-otelcol-configure
     dst: /usr/sbin/pydantic-otelcol-configure
     file_info: {mode: 0755}

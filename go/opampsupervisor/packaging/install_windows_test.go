@@ -66,3 +66,16 @@ func startService(t *testing.T) func() {
 		t.Logf("Supervisor output:\n%s", out)
 	}
 }
+
+func uninstall(t *testing.T, purge bool) {
+	t.Helper()
+	helper := filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "pydantic-opamp-uninstall.ps1")
+	if _, err := os.Stat(helper); os.IsNotExist(err) {
+		helper = filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "uninstall.ps1")
+	}
+	args := []string{"-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", helper}
+	if purge {
+		args = append(args, "-Purge")
+	}
+	run(t, "", "powershell", args...)
+}

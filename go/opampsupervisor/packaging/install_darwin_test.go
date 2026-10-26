@@ -44,7 +44,9 @@ func enroll(t *testing.T, endpoint string) {
 // for the Supervisor to exit) is the returned function.
 func startService(t *testing.T) func() {
 	t.Helper()
-	run(t, "", "launchctl", "bootstrap", "system", "/Library/LaunchDaemons/"+label+".plist")
+	if exec.Command("launchctl", "print", "system/"+label).Run() != nil {
+		run(t, "", "launchctl", "bootstrap", "system", "/Library/LaunchDaemons/"+label+".plist")
+	}
 	return func() {
 		out, err := exec.Command("launchctl", "bootout", "system/"+label).CombinedOutput()
 		require.NoError(t, err, "launchctl bootout: %s", out)
@@ -55,5 +57,28 @@ func startService(t *testing.T) func() {
 		}, 30*time.Second, 100*time.Millisecond, "launchd still has %s after bootout", label)
 		log, _ := os.ReadFile(storage + "/log/supervisor.log")
 		t.Logf("Supervisor output:\n%s", log)
+	}
+}
+
+func uninstall(t *testing.T, purge bool) {
+	t.Helper()
+	helper := "/opt/pydantic-opamp/bin/pydantic-opamp-uninstall"
+	if _, err := os.Stat(helper); os.IsNotExist(err) {
+		helper = "/opt/pydantic-opamp/etc/uninstall"
+	}
+	args := []string{}
+	if purge {
+		args = append(args, "--purge")
+	}
+	run(t, "", helper, args...)
+	key := exec.Command("security", "find-generic-password", "-s", "opamp-state-key", "-a",
+		"/opt/pydantic-opamp/var/opamp-state", "/Library/Keychains/System.keychain")
+	err := key.Run()
+	if purge {
+		exit, ok := err.(*exec.ExitError)
+		require.True(t, ok, "purge must remove the installation key")
+		require.Equal(t, 44, exit.ExitCode())
+	} else {
+		require.NoError(t, err, "normal removal must keep the installation key")
 	}
 }

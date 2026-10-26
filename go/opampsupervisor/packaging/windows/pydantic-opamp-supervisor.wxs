@@ -44,6 +44,9 @@
         <File Source="pydantic-opamp-enroll.ps1" KeyPath="yes" />
       </Component>
       <Component>
+        <File Source="pydantic-opamp-uninstall.ps1" KeyPath="yes" />
+      </Component>
+      <Component>
         <File Source="..\..\..\..\LICENSE" Name="LICENSE.txt" KeyPath="yes" />
       </Component>
       <Component>

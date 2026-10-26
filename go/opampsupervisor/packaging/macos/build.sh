@@ -23,7 +23,7 @@ mkdir -p "$bin" "$doc" "$stage/root/Library/LaunchDaemons"
 (cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config packaging/collector.yaml)
 cp dist/otelcol/otelcol "$bin/otelcol"
 (cd .. && go build -trimpath -o "packaging/$bin/opampsupervisor" .)
-install -m 0755 macos/pydantic-opamp-enroll "$bin/"
+install -m 0755 macos/pydantic-opamp-enroll pydantic-opamp-uninstall "$bin/"
 install -m 0644 macos/dev.pydantic.opamp-supervisor.plist "$stage/root/Library/LaunchDaemons/"
 install -m 0644 ../../../LICENSE "$doc/LICENSE"
 install -m 0644 ../LICENSE "$doc/LICENSE.Apache-2.0"

@@ -75,3 +75,16 @@ func startService(t *testing.T) func() {
 		t.Logf("Supervisor output:\n%s", out.String())
 	}
 }
+
+func uninstall(t *testing.T, purge bool) {
+	t.Helper()
+	helper := "/usr/sbin/pydantic-opamp-uninstall"
+	if _, err := os.Stat(helper); os.IsNotExist(err) {
+		helper = "/etc/pydantic-opamp/uninstall"
+	}
+	args := []string{}
+	if purge {
+		args = append(args, "--purge")
+	}
+	run(t, "", helper, args...)
+}
