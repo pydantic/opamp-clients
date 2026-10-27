@@ -604,8 +604,10 @@ class Controls:
         # Last: a callback the application gave sees the SDK's settings already in force.
         self.app.put(s.custom)
 
-    def spans(self, to: SpanExporter) -> SpanExporter:
-        return _GatedSpanExporter(to, self)
+    def spans(self, to: SpanExporter, log_spans: bool = False) -> SpanExporter:
+        """The trace gate in front of `to`. With `log_spans`, the Logfire SDK's logs (spans whose
+        `logfire.span_type` is `log`) go through the log controls in its place."""
+        return _GatedSpanExporter(to, self, log_spans)
 
     def logs(self, to: LogRecordExporter) -> LogRecordExporter:
         return _GatedLogExporter(to, self)
@@ -627,20 +629,85 @@ def disabled_instrumentations(s: settings_pb2.Settings, local: str) -> str | Non
     return ",".join(dict.fromkeys(own + names))
 
 
+#: The attribute the Logfire SDK marks its spans' kind with: `log` for logfire.info() and its logging handler.
+_LOGFIRE_SPAN_TYPE = "logfire.span_type"
+#: A Logfire log's SeverityNumber (the Logfire SDK's levels are OpenTelemetry's).
+_LOGFIRE_LEVEL = "logfire.level_num"
+#: The Python logger a Logfire log came from, through the Logfire SDK's logging handler.
+_LOGFIRE_LOGGER = "logfire.logger_name"
+
+
+def _is_log_span(span) -> bool:
+    return (span.attributes or {}).get(_LOGFIRE_SPAN_TYPE) == "log"
+
+
+def _log_span_kept(span, floor: int | None, levels: tuple[tuple[str, int], ...]) -> bool:
+    """_kept for a Logfire log: its level, and as its scope the Python logger it came from, else
+    the scope it is exported under (`logfire`, or `logfire.<suffix>`)."""
+    attributes = span.attributes or {}
+    number = attributes.get(_LOGFIRE_LEVEL)
+    number = number if isinstance(number, int) else 0
+    if levels:
+        scope = attributes.get(_LOGFIRE_LOGGER)
+        if not isinstance(scope, str):
+            scope = getattr(getattr(span, "instrumentation_scope", None), "name", None) or ""
+        floor = threshold(levels, floor, scope)
+    return level_keeps(floor, number)
+
+
+def _logs_gated(batch, g: Gates, kept) -> list:
+    """send_logs, then the levels (`kept`), then the rate cap: what of `batch` is exported."""
+    if not g.send_logs:
+        return []
+    floor, levels, cap = g.logs_min_severity, g.logs_scope_levels, g.logs_cap
+    if floor is not None or levels:
+        batch = [r for r in batch if kept(r, floor, levels)]
+    if cap is not None and batch:
+        # The first records the tokens allow; the rest are dropped from the end.
+        batch = list(batch)[:cap.take(len(batch))]
+    return list(batch)
+
+
+def _export_parts(parts: list[tuple[Counts, int]], export):
+    """_export for one export that carries several signals' items: each signal's counts see it."""
+    try:
+        result = export()
+    except Exception as e:
+        for counts, items in parts:
+            if items:
+                counts.failed(items, str(e) or type(e).__name__)
+        raise
+    for counts, items in parts:
+        if items:
+            counts.exported(items, result)
+    return result
+
+
 class _GatedSpanExporter(SpanExporter):
-    def __init__(self, to: SpanExporter, controls: Controls) -> None:
-        self._to, self._c = to, controls
+    def __init__(self, to: SpanExporter, controls: Controls, log_spans: bool = False) -> None:
+        self._to, self._c, self._log_spans = to, controls, log_spans
 
     def export(self, spans):
-        """send_traces, then redaction and scrubbing."""
+        """send_traces (the log controls, for a Logfire log), then redaction and scrubbing. What
+        the gates drop is counted as filtered; a batch left empty isn't exported."""
         c, g = self._c, self._c.gates  # one document's gates for the whole export
+        logs = [s for s in spans if _is_log_span(s)] if self._log_spans else []
+        traces = [s for s in spans if not _is_log_span(s)] if logs else list(spans)
+        if logs:
+            kept = _logs_gated(logs, g, _log_span_kept)
+            c.logs_counts.filtered(len(logs) - len(kept))
+            logs = kept
         if not g.send_traces:
-            c.traces.filtered(len(spans))
+            c.traces.filtered(len(traces))
+            traces = []
+        # In the batch's order, less what was dropped.
+        keep = {id(s) for s in (*logs, *traces)}
+        out = [s for s in spans if id(s) in keep] if logs else traces
+        if not out:
             return SpanExportResult.SUCCESS
-        redactor = g.redactor
-        if redactor:
-            spans = [_redacted_span(span, redactor) for span in spans]
-        return _export(c.traces, len(spans), lambda: self._to.export(spans))
+        if g.redactor:
+            out = [_redacted_span(span, g.redactor) for span in out]
+        return _export_parts([(c.traces, len(traces)), (c.logs_counts, len(logs))], lambda: self._to.export(out))
 
     def shutdown(self) -> None:
         self._to.shutdown()
@@ -659,22 +726,15 @@ class _GatedLogExporter(LogRecordExporter):
         exported. What they drop is counted as filtered."""
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         counts, given = c.logs_counts, len(batch)
-        if g.send_logs:
-            floor, levels, cap, redactor = g.logs_min_severity, g.logs_scope_levels, g.logs_cap, g.redactor
-            if floor is None and not levels and cap is None and not redactor:
-                return _export(counts, given, lambda: self._to.export(batch))
-            if floor is not None or levels:
-                batch = [r for r in batch if _kept(r, floor, levels)]
-            if cap is not None and batch:
-                # The first records the tokens allow; the rest are dropped from the end.
-                batch = list(batch)[:cap.take(len(batch))]
-            if redactor and batch:
-                batch = [_redacted_record(r, redactor) for r in batch]
-            counts.filtered(given - len(batch))
-            if batch:
-                return _export(counts, len(batch), lambda: self._to.export(batch))
-        else:
-            counts.filtered(given)
+        if g.send_logs and g.logs_min_severity is None and not g.logs_scope_levels and g.logs_cap is None \
+                and not g.redactor:
+            return _export(counts, given, lambda: self._to.export(batch))
+        batch = _logs_gated(batch, g, _kept)
+        if g.redactor and batch:
+            batch = [_redacted_record(r, g.redactor) for r in batch]
+        counts.filtered(given - len(batch))
+        if batch:
+            return _export(counts, len(batch), lambda: self._to.export(batch))
         from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
 
         return LogRecordExportResult.SUCCESS

@@ -381,6 +381,53 @@ def test_logs_stop_and_start_with_send_logs():
     assert inner.batches == [["a"]]
 
 
+def test_the_logfire_sdks_logs_go_through_the_log_controls_not_the_trace_ones():
+    """Regression: the Logfire SDK's logs are spans (logfire.span_type log), so the log controls
+    did nothing to them while Fleet said Applied. With log_spans they pass the log gate: off,
+    the level (per scope by the Python logger), the rate cap; and send_traces leaves them be."""
+    from opentelemetry.sdk.trace import ReadableSpan
+    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
+
+    def span(name, level=None, logger=None, kind="log"):
+        attrs = {"logfire.span_type": kind}
+        if level is not None:
+            attrs["logfire.level_num"] = level
+        if logger is not None:
+            attrs["logfire.logger_name"] = logger
+        return ReadableSpan(name=name, attributes=attrs, instrumentation_scope=InstrumentationScope("logfire"))
+
+    request = span("GET /", kind="span")
+    info, warn, noisy_error = span("info", 9), span("warn", 13), span("noisy", 17, logger="noisy.lib")
+    batch = [request, info, warn, noisy_error]
+    c = Controls()
+    inner = _Recording()
+    gated = c.spans(inner, log_spans=True)
+
+    c.apply(settings(policy(log_levels={"level": "warn", "scopes": {"noisy.lib": "off"}})))
+    gated.export(batch)
+    assert [s.name for s in inner.batches[-1]] == ["GET /", "warn"]
+    assert c.counts().logs.items_filtered == 2
+
+    c.apply(settings(policy(signal_exports=off("logs"))))
+    gated.export(batch)
+    assert [s.name for s in inner.batches[-1]] == ["GET /"]
+
+    c.apply(settings(policy(signal_exports=off("traces"))))
+    gated.export(batch)
+    assert [s.name for s in inner.batches[-1]] == ["info", "warn", "noisy"]
+
+    c.apply(settings(policy(log_rate_limit={"records_per_second": 1})))
+    gated.export(batch)
+    assert [s.name for s in inner.batches[-1]] == ["GET /", "info"]
+
+    # The OpenTelemetry SDK's own span gate has no Logfire logs: everything is a span to it.
+    plain = Controls()
+    plain_inner = _Recording()
+    plain.apply(settings(policy(signal_exports=off("logs"))))
+    plain.spans(plain_inner).export(batch)
+    assert plain_inner.batches == [batch]
+
+
 def test_send_logs_level_drops_records_below_it_live():
     from opentelemetry._logs import LogRecord, SeverityNumber
     from opentelemetry.sdk._logs import ReadableLogRecord

@@ -120,7 +120,7 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced, met
     # and what it lets through is redacted before it is sent, a pending span included.
     spans = BodySizeCheckingOTLPSpanExporter(endpoint=urljoin(url, "/v1/traces"), session=session,
                                              compression=gzip, headers=headers)
-    spans = RetryFewerSpansSpanExporter(controls.spans(QuietSpanExporter(spans)))
+    spans = RetryFewerSpansSpanExporter(controls.spans(QuietSpanExporter(spans), log_spans=True))
     # Before logfire 5.2 pending spans were always sent, and there was no setting for them.
     if getattr(advanced, "pending_spans", True):
         spans = RemovePendingSpansExporter(spans)
