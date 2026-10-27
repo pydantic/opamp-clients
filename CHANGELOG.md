@@ -56,6 +56,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Python: with `configure_logfire`, the log controls (the logs export, `log_levels`,
+  `log_rate_limit`) apply to the Logfire SDK's logs, which are spans; before, they did nothing to
+  them while the policy was answered as applied. Pausing traces leaves those logs be (#98).
 - Supervisor: the collector it runs before the server sends a config no longer binds
   `localhost:8888` for its internal metrics, so it no longer exits when that port is taken (#94).
 - .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
