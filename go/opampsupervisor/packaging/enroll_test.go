@@ -126,10 +126,23 @@ func TestEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "systemd-creds", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
-	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
 }
 
-// packagedComponents are the component types every enroll script lets a remote config use.
+// Without --restricted, any config the server sends runs: a host monitoring config reading the
+// system's logs, and an exporter to another vendor with its key from the environment.
+func TestEnrollAllowsAnyConfigByDefault(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "t", "--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--no-start")
+	require.NoError(t, err, out)
+	assert.Contains(t, e.read(t, "supervisor.yaml"), "run pydantic-opamp-enroll again with --restricted")
+	p := e.loadEnrolled(t).Agent.RemoteConfigPolicy
+	require.NoError(t, p.Check("", hostLogsConfig(t, "linux")))
+	require.NoError(t, p.Check("", []byte(`exporters: {datadog: {api: {key: "${env:DD_API_KEY}", site: datadoghq.com}}}`)))
+}
+
+// packagedComponents are the component types every enroll script's --restricted policy lets a
+// remote config use.
 var packagedComponents = map[string][]string{
 	"receivers":  {"otlp", "host_metrics", "hostmetrics", "file_log", "filelog", "nop"},
 	"processors": {"batch", "memory_limiter", "resource", "resource_detection", "resourcedetection"},
@@ -172,10 +185,10 @@ func (e enrollment) loadEnrolled(t *testing.T) config.Supervisor {
 	return loaded
 }
 
-// The policy widened locally: the destinations and log paths given replace the defaults.
+// A --restricted policy widened locally: the destinations and log paths given replace the defaults.
 func TestEnrollWidensThePolicyLocally(t *testing.T) {
 	e := newEnrollment(t)
-	out, err := e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp",
+	out, err := e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp", "--restricted",
 		"--exporter-endpoint", "https://logfire-us.pydantic.dev", "--exporter-endpoint", "https://logfire-eu.pydantic.dev:443/",
 		"--log-path", "/var/log/app", "--log-path", "/var/log/syslog", "--no-start")
 	require.NoError(t, err, out)
@@ -184,20 +197,20 @@ func TestEnrollWidensThePolicyLocally(t *testing.T) {
 
 	// By default, the OpAMP server's host and port, over https or (with --plaintext) http.
 	e = newEnrollment(t)
-	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp?x=1", "--no-start")
+	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com:8443/v1/opamp?x=1", "--restricted", "--no-start")
 	require.NoError(t, err, out)
 	assertPackagedPolicy(t, e.loadEnrolled(t).Agent.RemoteConfigPolicy, []string{"https://opamp.example.com:8443"}, nil)
 	e = newEnrollment(t)
-	out, err = e.run(t, "t", "--endpoint", "ws://127.0.0.1:4320/v1/opamp", "--plaintext", "--no-start")
+	out, err = e.run(t, "t", "--endpoint", "ws://127.0.0.1:4320/v1/opamp", "--plaintext", "--restricted", "--no-start")
 	require.NoError(t, err, out)
 	assertPackagedPolicy(t, e.loadEnrolled(t).Agent.RemoteConfigPolicy, []string{"http://127.0.0.1:4320"}, nil)
 }
 
-// What the packaged policy lets a server do: a Logfire config, but not what turns the
+// What a --restricted policy lets a server do: a Logfire config, but not what turns the
 // collector against the host (SEC-4's file and environment reads, and sends elsewhere).
 func TestPackagedPolicy(t *testing.T) {
 	e := newEnrollment(t)
-	out, err := e.run(t, "t", "--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--log-path", "/var/log/app", "--no-start")
+	out, err := e.run(t, "t", "--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--restricted", "--log-path", "/var/log/app", "--no-start")
 	require.NoError(t, err, out)
 	p := e.loadEnrolled(t).Agent.RemoteConfigPolicy
 	require.NoError(t, p.Check("", []byte(`receivers:
@@ -308,16 +321,19 @@ func TestEnrollRefuses(t *testing.T) {
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"--endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"--endpoint", "wss://x", "--ca-file", "enroll_test.go"}},
 		{"a missing CA file", "t", "can't read", []string{"--endpoint", "wss://x", "--ca-file", "/nonexistent/ca.pem"}},
-		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--exporter-endpoint", "http://x"}},
-		{"an exporter endpoint not a URL", "t", "must be an https:// or http:// URL", []string{"--endpoint", "wss://x", "--exporter-endpoint", "x:443"}},
-		{"an exporter endpoint with a path", "t", "scheme://host[:port], with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x/v1/traces"}},
-		{"an exporter endpoint with user info", "t", "with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x@y"}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "http://x"}},
+		{"an exporter endpoint not a URL", "t", "must be an https:// or http:// URL", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "x:443"}},
+		{"an exporter endpoint with a path", "t", "scheme://host[:port], with nothing else", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "https://x/v1/traces"}},
+		{"an exporter endpoint with user info", "t", "with nothing else", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "https://x@y"}},
+		{"an exporter endpoint without --restricted", "t", "widen a --restricted policy", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x"}},
+		{"a log path without --restricted", "t", "widen a --restricted policy", []string{"--endpoint", "wss://x", "--log-path", "/var/log/app"}},
+		{"host logs without --restricted", "t", "widen a --restricted policy", []string{"--endpoint", "wss://x", "--host-logs"}},
 		{"user info in the endpoint", "t", "with nothing else", []string{"--endpoint", "wss://u@x/v1/opamp"}},
-		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--log-path", "var/log"}},
-		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--log-path", "/var/log/*"}},
-		{"a log path climbing out", "t", "..", []string{"--endpoint", "wss://x", "--log-path", "/var/log/../../etc"}},
-		{"a log path with a quote", "t", "can't hold quotes", []string{"--endpoint", "wss://x", "--log-path", `/var/log/"`}},
-		{"a log path with a newline", "t", "can't hold a newline", []string{"--endpoint", "wss://x", "--log-path", "/var/log/a\n/b"}},
+		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "var/log"}},
+		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "/var/log/*"}},
+		{"a log path climbing out", "t", "..", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "/var/log/../../etc"}},
+		{"a log path with a quote", "t", "can't hold quotes", []string{"--endpoint", "wss://x", "--restricted", "--log-path", `/var/log/"`}},
+		{"a log path with a newline", "t", "can't hold a newline", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "/var/log/a\n/b"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -360,6 +376,12 @@ func TestEnrollAcceptsPackages(t *testing.T) {
 	require.NoError(t, err, out)
 	cfg := e.loadEnrolled(t)
 	assertPackages(t, cfg, true, "otelcol")
+	assert.False(t, cfg.Agent.RemoteConfigPolicy.Enabled())
+	e = newEnrollment(t)
+	out, err = e.run(t, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--restricted", "--no-start")
+	require.NoError(t, err, out)
+	cfg = e.loadEnrolled(t)
+	assertPackages(t, cfg, true, "otelcol")
 	assertPackagedPolicy(t, cfg.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
 
 	e = newEnrollment(t)
@@ -377,7 +399,7 @@ func hostLogsConfig(t *testing.T, goos string, replacements ...string) []byte {
 	return []byte(strings.NewReplacer(replacements...).Replace(string(body)))
 }
 
-// assertHostLogs checks a policy enrolled with --host-logs takes the host monitoring config, and
+// assertHostLogs checks a --restricted policy enrolled with --host-logs takes the host monitoring config, and
 // one enrolled without refuses it.
 func assertHostLogs(t *testing.T, withHostLogs, without config.RemoteConfigPolicy, body []byte, refusal string) {
 	t.Helper()
@@ -386,12 +408,12 @@ func assertHostLogs(t *testing.T, withHostLogs, without config.RemoteConfigPolic
 	require.ErrorContains(t, without.CheckWithConnectionEnv("", body, bindings), refusal)
 }
 
-// --host-logs lets the server read the system's logs: the files under /var/log, with
+// With --restricted, --host-logs lets the server read the system's logs: the files under /var/log, with
 // file_storage keeping its place in the Supervisor's own directory, and nowhere else.
 func TestEnrollHostLogs(t *testing.T) {
 	enroll := func(args ...string) config.RemoteConfigPolicy {
 		e := newEnrollment(t)
-		out, err := e.run(t, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--no-start"}, args...)...)
+		out, err := e.run(t, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--restricted", "--no-start"}, args...)...)
 		require.NoError(t, err, out)
 		return e.loadEnrolled(t).Agent.RemoteConfigPolicy
 	}

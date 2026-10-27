@@ -21,6 +21,12 @@ and date. Tests, CI and docs alone don't need a line.
 ### Breaking
 
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
+- Supervisor installers: a host runs any config the server sends, with any component, exporter
+  or destination. The remote config policy is now opt-in: `--restricted` (`-Restricted` on
+  Windows) writes it, and `--exporter-endpoint`, `--log-path` and `--host-logs` are refused
+  without it. The container image runs open too; `--config
+  /etc/pydantic-opamp/supervisor-restricted.yaml` restricts it. Enroll again with `--restricted`
+  to keep a host's policy (#99).
 - Supervisor: with a remote config policy, a `file_storage` extension in the server's config
   must name a directory under `allowed_storage_directories`. A host that allowed `file_storage`
   in `allowed_components` by hand needs that list too (#94).

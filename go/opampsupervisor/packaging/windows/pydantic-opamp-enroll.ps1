@@ -23,13 +23,17 @@ param(
     [string]$CaFile,
     # Allow ws:// or http:// (the token then crosses the network in the clear).
     [switch]$Plaintext,
-    # Where the server's configs may send telemetry, as scheme://host[:port]: the -Endpoint's
-    # host, over https, by default.
+    # Limit what the server's configs may do: a few Logfire components, sending only to the
+    # -Endpoint's host, no environment or file references. By default any config it sends runs.
+    [switch]$Restricted,
+    # With -Restricted, where the server's configs may send telemetry, as scheme://host[:port]:
+    # the -Endpoint's host, over https, by default.
     [string[]]$ExporterEndpoint,
-    # The files, and directories, the server's configs may read logs from: none by default.
+    # With -Restricted, the files, and directories, the server's configs may read logs from: none
+    # by default.
     [string[]]$LogPath,
-    # Let the server's configs read this host's Windows event logs (never a remote host's),
-    # keeping their read positions in ProgramData\pydantic-opamp\var\collector.
+    # With -Restricted, let the server's configs read this host's Windows event logs (never a
+    # remote host's), keeping their read positions in ProgramData\pydantic-opamp\var\collector.
     [switch]$HostLogs,
     # Install the collector the server offers, if this repository's release workflow signed it;
     # by default only the installed collector runs.
@@ -61,9 +65,14 @@ if ($CaFile) {
     if ($CaFile -match "'") { Fail "-CaFile can't contain a single quote" }
 }
 
+$authority = ($Endpoint -replace '^[a-z]+://', '') -replace '[/?#].*$', ''
+if ($authority.Contains('@')) { Fail "the endpoint is scheme://host[:port]/path, with nothing else: $Endpoint" }
+# The policy's options only widen what -Restricted allows: without it, everything is allowed.
+if (-not $Restricted -and ($ExporterEndpoint -or $LogPath -or $HostLogs)) {
+    Fail '-ExporterEndpoint, -LogPath and -HostLogs widen a -Restricted policy; without -Restricted the server''s configs may already send anywhere and read any log'
+}
 # Where the remote config's exporters may send: the OpAMP server's host unless given.
-if (-not $ExporterEndpoint) {
-    $authority = ($Endpoint -replace '^[a-z]+://', '') -replace '[/?#].*$', ''
+if ($Restricted -and -not $ExporterEndpoint) {
     $ExporterEndpoint = @($(if ($Endpoint -match '^(wss|https)://') { "https://$authority" } else { "http://$authority" }))
 }
 foreach ($e in $ExporterEndpoint) {
@@ -165,6 +174,29 @@ if ($HostLogs) {
     $extensions = '[health_check, file_storage]'
     $storageDirectories = "`n    # Where its file_storage extensions may keep files: these directories, and what is under them.`n    allowed_storage_directories: $(YamlList @(Slashed (Join-Path $root 'var\collector')))"
 }
+# The policy: none unless -Restricted, so every config the server sends runs.
+$policy = if ($Restricted) {
+@"
+  # What the server's remote config may do to this host (-Restricted). The server can't change
+  # this file; widen it here, or run pydantic-opamp-enroll.ps1 again with -ExporterEndpoint,
+  # -LogPath or -HostLogs.
+  remote_config_policy:
+    # The component types a Logfire config uses, by their names and their older aliases.
+    allowed_components:
+      receivers: $receivers
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
+      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
+      extensions: $extensions
+    # No arbitrary `${...}: only locally bound credential environment names are permitted.
+    allowed_providers: []
+    # Where its exporters, and the collector's own telemetry, may send.
+    allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
+    # What its filelog receivers may read: these files, and what is under these directories.
+    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))$storageDirectories
+"@
+} else {
+    "  # Any config the OpAMP server sends runs here. To limit what it may configure, and where it may`n  # send, run pydantic-opamp-enroll.ps1 again with -Restricted."
+}
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
 Write-Atomically (Join-Path $root 'supervisor.yaml') @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
@@ -192,21 +224,7 @@ agent:
   automatic_config_rollback: true
 $agentEnv
 
-  # What the server's remote config may do to this host. The server can't change this file;
-  # widen it here, or run pydantic-opamp-enroll.ps1 again with -ExporterEndpoint or -LogPath.
-  remote_config_policy:
-    # The component types a Logfire config uses, by their names and their older aliases.
-    allowed_components:
-      receivers: $receivers
-      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
-      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
-      extensions: $extensions
-    # No arbitrary `${...}: only locally bound credential environment names are permitted.
-    allowed_providers: []
-    # Where its exporters, and the collector's own telemetry, may send.
-    allowed_exporter_endpoints: $(YamlList $ExporterEndpoint)
-    # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(YamlList @($LogPath | Where-Object { $_ } | ForEach-Object { Slashed $_ }))$storageDirectories$package
+$policy$package
 
 storage:
   directory: '$(Slashed (Join-Path $root 'var'))'

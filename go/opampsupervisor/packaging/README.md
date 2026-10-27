@@ -95,12 +95,14 @@ Other options:
 - `--token-file PATH` reads the token from a file instead of standard input.
 - `--ca-file PATH` sets the CA bundle to trust for the server.
 - `--plaintext` allows a `ws://` or `http://` endpoint.
-- `--exporter-endpoint URL` sets where the server's configs may send telemetry (repeat it for
-  more). The default is the `--endpoint`'s host and port, over https.
-- `--log-path PATH` lets the server's configs read the logs in a file or a directory (repeat it
-  for more). The default is none.
-- `--host-logs` lets the server's configs read the host's system logs
-  ([the default policy](#the-default-policy)). The default is no.
+- `--restricted` limits what the server's configs may do ([the restricted
+  policy](#the-restricted-policy)). The default is no: any config the server sends runs.
+- `--exporter-endpoint URL`, with `--restricted`, sets where the server's configs may send
+  telemetry (repeat it for more). The default is the `--endpoint`'s host and port, over https.
+- `--log-path PATH`, with `--restricted`, lets the server's configs read the logs in a file or a
+  directory (repeat it for more). The default is none.
+- `--host-logs`, with `--restricted`, lets the server's configs read the host's system logs. The
+  default is no.
 
 ### Telemetry credentials for managed Collectors
 
@@ -265,7 +267,7 @@ msiexec /i pydantic-opamp-supervisor-0.6.0-windows-amd64.msi /qn
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
-It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-ExporterEndpoint`, `-LogPath`, `-HostLogs`, `-AcceptPackages` and `-NoStart`,
+It takes `-TokenFile`, `-CaFile`, `-Plaintext`, `-Restricted`, `-ExporterEndpoint`, `-LogPath`, `-HostLogs`, `-AcceptPackages` and `-NoStart`,
 like the Linux one's options (give several endpoints or paths as a list:
 `-LogPath 'C:\ProgramData\app\logs','D:\logs'`). It
 writes to `ProgramData\pydantic-opamp`, which only SYSTEM and Administrators can read:
@@ -286,14 +288,18 @@ certificate from the machine's store.
 The image holds the Supervisor and the collector, from the Linux release archives, on distroless
 (no shell), running as a non-root user (65532). Each Supervisor release publishes it for amd64
 and arm64 as `ghcr.io/pydantic/opamp-supervisor:<version>`, signed with Cosign and attested like
-the archives. Environment variables configure it ([container/supervisor.yaml](container/supervisor.yaml)):
+the archives. Environment variables configure it ([container/supervisor.yaml](container/supervisor.yaml)).
+It runs any config the server sends. To restrict it, run the image with
+`--config /etc/pydantic-opamp/supervisor-restricted.yaml`
+([container/supervisor-restricted.yaml](container/supervisor-restricted.yaml)), the enroll
+scripts' `--restricted` policy:
 
 | Variable | What it is |
 |---|---|
 | `OPAMP_ENDPOINT` | the OpAMP server, as `wss://host/v1/opamp` or `https://host/v1/opamp` (required) |
 | `OPAMP_TOKEN` | the enrollment token (required for the first start) |
-| `OPAMP_EXPORTER_ENDPOINTS` | where the server's configs may send telemetry, a YAML list of `scheme://host[:port]`; Logfire's US and EU regions by default |
-| `OPAMP_LOG_PATHS` | the files and directories the server's configs may read logs from, a YAML list; none by default |
+| `OPAMP_EXPORTER_ENDPOINTS` | restricted only: where the server's configs may send telemetry, a YAML list of `scheme://host[:port]`; Logfire's US and EU regions by default |
+| `OPAMP_LOG_PATHS` | restricted only: the files and directories the server's configs may read logs from, a YAML list; none by default |
 | `OPAMP_STATE_KEY` | `file:PATH`, a 32-byte key (raw or base64) the issued credentials are sealed with, readable by the container's user only; none by default |
 | `LOGFIRE_TOKEN` | a telemetry token for the collector, when the server doesn't issue one |
 
@@ -310,8 +316,8 @@ issued credentials. Without one, every container is a new agent that enrolls aga
 `OPAMP_TOKEN`. On Kubernetes that means a StatefulSet with a volume claim, or a Deployment of
 one replica with a persistent volume.
 
-The policy is the packages' [default policy](#the-default-policy), with the variables above in
-place of the enroll script's options. The server can't install a collector in the container
+`supervisor-restricted.yaml`'s policy is the packages' [restricted policy](#the-restricted-policy),
+with the variables above in place of the enroll script's options. The server can't install a collector in the container
 (`accepts_packages` is off): a new collector comes with a new image. To change anything else,
 mount your own config at `/etc/pydantic-opamp/supervisor.yaml`: one that reads the token from a
 mounted secret with `${file:...}`, say, rather than from the environment. The collector's OTLP receiver,
@@ -335,16 +341,23 @@ VERSION=0.1.0 ARCHES=amd64 go/opampsupervisor/packaging/container/build.sh
 
 Every enroll script turns on `accepts_remote_config`, so the OpAMP server configures the
 collector. That includes anyone who holds the server's operator credentials, or who takes the
-server over. The collector can read files and environment variables and send data anywhere, so
-each script also writes a policy, `agent.remote_config_policy` in the Supervisor's config. The
-server can't change it: it is in the local config, and a remote config can't touch that.
+server over. The collector can read files and environment variables and send data anywhere.
+
+By default that is all allowed: any config the server sends runs, with any component the
+collector has, sending anywhere. That is what lets a server deploy any pipeline, to any
+exporter. The collector runs as `pydantic-opamp` on Linux, and as root on macOS and LocalSystem
+on Windows, so it reads what that user can.
+
+With `--restricted` (`-Restricted` on Windows), each script also writes a policy,
+`agent.remote_config_policy` in the Supervisor's config. The server can't change it: it is in
+the local config, and a remote config can't touch that.
 
 The Supervisor refuses a remote config that breaks the policy, the whole config. It reports the
 config FAILED to the server with the reason, for example `the remote config: receiver "filelog"
 reads "/etc/shadow", which agent::remote_config_policy::allowed_log_paths doesn't allow`. The
 collector keeps the config it had.
 
-### The default policy
+### The restricted policy
 
 | Rule | Default | Widen it with |
 |---|---|---|
@@ -387,12 +400,11 @@ What each rule checks in a remote config:
 The Supervisor reads the config as it merges it, with confmap: a key spelled
 `receivers::filelog`, an anchor or a merge key is checked like any other.
 
-Why no log files by default: host logs often hold secrets and personal data, and only the
-host's operator knows which files are fit to send. A Logfire config doesn't need them to
-receive OTLP and collect host metrics. `--host-logs` is that operator's choice, made on the
+Why no log files in it: host logs often hold secrets and personal data, and only the host's
+operator knows which files are fit to send. `--host-logs` is that operator's choice, made on the
 command line they run: Logfire's host monitoring configs read the system logs, and need it.
-On Linux the collector runs as `pydantic-opamp`: add that user to the group that can read the
-log files (`adm` on Debian and Ubuntu) for it to read the ones only that group can.
+Either way, on Linux the collector runs as `pydantic-opamp`: add that user to the group that can
+read the log files (`adm` on Debian and Ubuntu) for it to read the ones only that group can.
 
 ### Widening it
 
@@ -400,7 +412,7 @@ Only on the host. Run the enroll script again with the options above, which rewr
 and keeps the state key:
 
 ```sh
-echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp \
+echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp --restricted \
   --exporter-endpoint https://logfire-us.pydantic.dev --log-path /var/log/myapp
 ```
 

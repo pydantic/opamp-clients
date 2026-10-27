@@ -57,13 +57,14 @@ func TestWinEnroll(t *testing.T) {
 	assert.Equal(t, "dpapi", loaded.Storage.StateKey)
 	assert.Equal(t, filepath.ToSlash(filepath.Join(root, "var")), loaded.Storage.Directory)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
-	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+	// Without -Restricted, any config the server sends runs.
+	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without -Restricted")
 }
 
-// The policy widened locally, as on Linux; the log path with forward slashes.
+// A -Restricted policy widened locally, as on Linux; the log path with forward slashes.
 func TestWinEnrollWidensThePolicyLocally(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "pydantic-opamp")
-	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp",
+	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-Restricted",
 		"-ExporterEndpoint", "https://logfire-us.pydantic.dev", "-LogPath", `C:\ProgramData\app\logs`, "-NoStart")
 	require.NoError(t, err, out)
 	cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
@@ -81,7 +82,7 @@ func TestWinEnrollWidensThePolicyLocally(t *testing.T) {
 // -AcceptPackages, as on Linux; the executable in the release's .zip is otelcol.exe.
 func TestWinEnrollAcceptsPackages(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "pydantic-opamp")
-	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-AcceptPackages", "-NoStart")
+	out, err := winEnroll(t, root, "t", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-AcceptPackages", "-Restricted", "-NoStart")
 	require.NoError(t, err, out)
 	cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
 	require.NoError(t, err)
@@ -110,11 +111,13 @@ func TestWinEnrollRefuses(t *testing.T) {
 		{"an empty token", "\r\n", "token is empty", []string{"-Endpoint", "wss://x"}},
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"-Endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"-Endpoint", "wss://x", "-CaFile", "enroll_test.go"}},
-		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"-Endpoint", "wss://x", "-ExporterEndpoint", "http://x"}},
-		{"an exporter endpoint with a path", "t", "with nothing else", []string{"-Endpoint", "wss://x", "-ExporterEndpoint", "https://x/v1/traces"}},
-		{"a relative log path", "t", "absolute path", []string{"-Endpoint", "wss://x", "-LogPath", `logs\app`}},
-		{"a log path with a glob", "t", "glob characters", []string{"-Endpoint", "wss://x", "-LogPath", `C:\logs\*`}},
-		{"a log path climbing out", "t", "..", []string{"-Endpoint", "wss://x", "-LogPath", `C:\logs\..\secret`}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"-Endpoint", "wss://x", "-Restricted", "-ExporterEndpoint", "http://x"}},
+		{"an exporter endpoint with a path", "t", "with nothing else", []string{"-Endpoint", "wss://x", "-Restricted", "-ExporterEndpoint", "https://x/v1/traces"}},
+		{"user info in the endpoint", "t", "with nothing else", []string{"-Endpoint", "wss://u@x/v1/opamp"}},
+		{"host logs without -Restricted", "t", "widen a -Restricted policy", []string{"-Endpoint", "wss://x", "-HostLogs"}},
+		{"a relative log path", "t", "absolute path", []string{"-Endpoint", "wss://x", "-Restricted", "-LogPath", `logs\app`}},
+		{"a log path with a glob", "t", "glob characters", []string{"-Endpoint", "wss://x", "-Restricted", "-LogPath", `C:\logs\*`}},
+		{"a log path climbing out", "t", "..", []string{"-Endpoint", "wss://x", "-Restricted", "-LogPath", `C:\logs\..\secret`}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "pydantic-opamp")
@@ -184,12 +187,12 @@ Set-Acl -LiteralPath $root -AclObject $acl
 	assert.Equal(t, "write-token", string(telemetry))
 }
 
-// -HostLogs lets the server read this host's event logs, with file_storage keeping its place in
+// With -Restricted, -HostLogs lets the server read this host's event logs, with file_storage keeping its place in
 // the Supervisor's own directory, but not a remote host's logs.
 func TestWinEnrollHostLogs(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "pydantic-opamp")
 	enroll := func(args ...string) config.RemoteConfigPolicy {
-		out, err := winEnroll(t, root, "t", append([]string{"-Endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "-NoStart"}, args...)...)
+		out, err := winEnroll(t, root, "t", append([]string{"-Endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "-Restricted", "-NoStart"}, args...)...)
 		require.NoError(t, err, out)
 		cfg, err := os.ReadFile(filepath.Join(root, "supervisor.yaml"))
 		require.NoError(t, err)
