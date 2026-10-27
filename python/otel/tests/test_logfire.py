@@ -72,11 +72,15 @@ class _Ingest:
         self._http.server_close()
 
 
+_AFTER = 'with logfire.span("after", **{"user.email": "a@example.com"}):\n    pass'
+
+
 def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool = False, extra: str = "",
-         env: dict | None = None, where: str | None = None):
+         env: dict | None = None, where: str | None = None, after: str = _AFTER):
     """A child that sets the Logfire SDK up with configure_logfire, sends a span "before", waits for
-    the server's answer to `offer`, then sends "after" (with a `user.email` attribute). `where` is
-    the token and base URL arguments: by default a token, with `ingest` as the base URL."""
+    the server's answer to `offer`, then runs `after` (by default a span "after", with a
+    `user.email` attribute). `where` is the token and base URL arguments: by default a token, with
+    `ingest` as the base URL."""
     if where is None:
         where = f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r})'
     ready, answered = tmp_path / "ready", tmp_path / "answered"
@@ -103,11 +107,10 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
         time.sleep(0.2)
-        with logfire.span("after", **{{"user.email": "a@example.com"}}):
-            pass
+    """) + after + textwrap.dedent("""
         logfire.force_flush()
         import threading
-        print("threads", sorted({{t.name for t in threading.enumerate()}}))
+        print("threads", sorted({t.name for t in threading.enumerate()}))
         print("uid", agent.uid)
         print("live", sorted(agent.host.live))
     """)
@@ -161,6 +164,26 @@ def test_a_logfire_sdk_stops_sending_traces_when_the_server_says(tmp_path, serve
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == ["before"]
+
+
+def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers):
+    """Regression: logfire.info() and the Logfire SDK's logging handler make spans, which the log
+    controls passed untouched while the policy was answered as applied."""
+    server, ingest = servers
+    after = textwrap.dedent("""
+        import logging
+        logging.basicConfig(handlers=[logfire.LogfireLoggingHandler()], level=logging.DEBUG, force=True)
+        logfire.info("quiet info")
+        logfire.warn("loud warning")
+        logging.getLogger("app").info("quiet stdlib")
+        logging.getLogger("app").error("loud stdlib")
+        with logfire.span("request"):
+            pass
+    """)
+    run = _run(server, ingest, tmp_path, policy(log_levels={"level": "warn"}), after=after)
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert sorted(ingest.names()) == ["before", "loud stdlib", "loud warning", "request"], run.stderr
 
 
 def test_console_output_is_past_the_gates_so_a_policy_that_needs_them_is_refused(tmp_path, servers):

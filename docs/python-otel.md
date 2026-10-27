@@ -176,9 +176,12 @@ at start names the settings set aside:
 - with `send_to_logfire=True` but no token and no credentials file, the project the Logfire SDK
   creates and sends to.
 
-The Logfire SDK's logs (`logfire.info(...)`) are spans: the trace controls apply to them. The log
-controls apply to OpenTelemetry log records (Python `logging` through the Logfire SDK's logs
-pipeline).
+The Logfire SDK's logs (`logfire.info(...)`, and Python `logging` through its
+`LogfireLoggingHandler`) are spans whose `logfire.span_type` is `log`. The log controls apply to
+them, not the trace controls: the logs export, `log_levels` (by their `logfire.level_num`; for
+`scopes`, the Python logger's name, else the scope they are exported under, such as `logfire`) and
+`log_rate_limit`. Pausing traces leaves them be. Their counts are the logs'. The log controls also
+apply to OpenTelemetry log records (the Logfire SDK's logs pipeline).
 
 It reads the Logfire SDK's settings with the Logfire SDK's own loader (from the arguments, the
 variables and `pyproject.toml`), and, as the Logfire SDK does, takes a token or base URL it isn't
