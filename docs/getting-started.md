@@ -131,8 +131,9 @@ components, send telemetry only to its own host, and read no log files
   echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
   ```
 
-  [The packages' README](../go/opampsupervisor/packaging/README.md) covers each platform, and
-  the options that widen the policy (`--exporter-endpoint`, `--log-path`, `--host-logs`).
+  The host then runs any config your server sends. [The packages'
+  README](../go/opampsupervisor/packaging/README.md) covers each platform, and `--restricted`,
+  which limits what the server's configs may do.
 
 Like an SDK, the Supervisor takes a key of its own and renews it, so the enrollment key is only
 needed once. Install each host separately, and keep the Supervisor's state directory out of

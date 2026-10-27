@@ -15,7 +15,7 @@ set -eu
 usage() {
 	cat >&2 <<'EOF'
 usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH] [--plaintext]
-                             [--exporter-endpoint URL]... [--log-path PATH]... [--host-logs]
+                             [--restricted [--exporter-endpoint URL]... [--log-path PATH]... [--host-logs]]
                              [--accept-packages] [--no-start]
 
   --endpoint URL           the OpAMP server: wss:// or https:// (ws:// and http:// need --plaintext)
@@ -23,12 +23,16 @@ usage: pydantic-opamp-enroll --endpoint URL [--token-file PATH] [--ca-file PATH]
   --token-file PATH        where to read the enrollment token (default: standard input)
   --ca-file PATH           a CA bundle to trust for the server, in place of the system's
   --plaintext              allow ws:// or http:// (the token then crosses the network in the clear)
-  --exporter-endpoint URL  where the server's configs may send telemetry, as scheme://host[:port];
-                           repeat it for more (default: the --endpoint's host, over https)
-  --log-path PATH          a file, or a directory, the server's configs may read logs from;
-                           repeat it for more (default: none)
-  --host-logs              let the server's configs read this host's system logs: the files under
-                           /var/log, keeping their read positions in /var/lib/pydantic-opamp/collector
+  --restricted             limit what the server's configs may do: a few Logfire components, sending
+                           only to the --endpoint's host, no environment or file references
+                           (default: any config the server sends runs)
+  --exporter-endpoint URL  with --restricted, where the server's configs may send telemetry, as
+                           scheme://host[:port]; repeat it for more (default: the --endpoint's host)
+  --log-path PATH          with --restricted, a file, or a directory, the server's configs may read
+                           logs from; repeat it for more (default: none)
+  --host-logs              with --restricted, let the server's configs read this host's system logs:
+                           the files under /var/log, with read positions kept in
+                           /var/lib/pydantic-opamp/collector
   --accept-packages        install the collector the server offers, if this repository's release
                            workflow signed it (default: only the installed collector runs)
   --no-start               write the config and credentials, but don't start the service
@@ -81,6 +85,7 @@ ca_file=
 plaintext=
 accept_packages=
 host_logs=
+restricted=
 start=yes
 telemetry_stdin=
 while [ $# -gt 0 ]; do
@@ -93,6 +98,7 @@ while [ $# -gt 0 ]; do
 	--exporter-endpoint) [ $# -ge 2 ] || usage; exporter_endpoints=$(append "$exporter_endpoints" "$2"); shift 2 ;;
 	--log-path) [ $# -ge 2 ] || usage; log_paths=$(append "$log_paths" "$2"); shift 2 ;;
 	--host-logs) host_logs=yes; shift ;;
+	--restricted) restricted=yes; shift ;;
 	--accept-packages) accept_packages=yes; shift ;;
 	--no-start) start=; shift ;;
 	*) usage ;;
@@ -108,6 +114,13 @@ esac
 case $endpoint in
 *'"'* | *'\'* | *' '*) fail "the endpoint can't contain quotes, backslashes or spaces" ;;
 esac
+authority=${endpoint#*://}
+authority=${authority%%/*}
+authority=${authority%%\?*}
+authority=${authority%%#*}
+case $authority in
+*@*) fail "the endpoint is scheme://host[:port]/path, with nothing else: $endpoint" ;;
+esac
 if [ -n "$ca_file" ]; then
 	[ -r "$ca_file" ] || fail "can't read $ca_file"
 	case $ca_file in
@@ -115,12 +128,12 @@ if [ -n "$ca_file" ]; then
 	*) fail "--ca-file needs an absolute path" ;;
 	esac
 fi
+# The policy's options only narrow what --restricted allows: without it, everything is allowed.
+if [ -z "$restricted" ] && [ -n "$exporter_endpoints$log_paths$host_logs" ]; then
+	fail "--exporter-endpoint, --log-path and --host-logs widen a --restricted policy; without --restricted the server's configs may already send anywhere and read any log"
+fi
 # Where the remote config's exporters may send: the OpAMP server's host unless given.
-if [ -z "$exporter_endpoints" ]; then
-	authority=${endpoint#*://}
-	authority=${authority%%/*}
-	authority=${authority%%\?*}
-	authority=${authority%%#*}
+if [ -n "$restricted" ] && [ -z "$exporter_endpoints" ]; then
 	case $endpoint in
 	wss://* | https://*) exporter_endpoints="https://$authority" ;;
 	*) exporter_endpoints="http://$authority" ;;
@@ -248,6 +261,27 @@ if [ -n "$accept_packages" ]; then
 PACKAGE
 	)
 fi
+# The policy: none unless --restricted, so every config the server sends runs.
+policy="  # Any config the OpAMP server sends runs here. To limit what it may configure, and where it may
+  # send, run pydantic-opamp-enroll again with --restricted."
+if [ -n "$restricted" ]; then
+	policy="  # What the server's remote config may do to this host (--restricted). The server can't change
+  # this file; widen it here, or run pydantic-opamp-enroll again with --exporter-endpoint,
+  # --log-path or --host-logs.
+  remote_config_policy:
+    # The component types a Logfire config uses, by their names and their older aliases.
+    allowed_components:
+      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
+      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
+      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
+      extensions: $extensions
+    # No arbitrary \${...}: only locally bound credential environment names are permitted.
+    allowed_providers: []
+    # Where its exporters, and the collector's own telemetry, may send.
+    allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
+    # What its filelog receivers may read: these files, and what is under these directories.
+    allowed_log_paths: $(yaml_list "$log_paths")$storage_directories"
+fi
 cat >"$etc/supervisor.yaml.tmp" <<EOF
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
 server:
@@ -274,21 +308,7 @@ agent:
   automatic_config_rollback: true
 $agent_env
 
-  # What the server's remote config may do to this host. The server can't change this file;
-  # widen it here, or run pydantic-opamp-enroll again with --exporter-endpoint or --log-path.
-  remote_config_policy:
-    # The component types a Logfire config uses, by their names and their older aliases.
-    allowed_components:
-      receivers: [otlp, host_metrics, hostmetrics, file_log, filelog, nop]
-      processors: [batch, memory_limiter, resource, resource_detection, resourcedetection]
-      exporters: [otlp_grpc, otlp, otlp_http, otlphttp, debug, nop]
-      extensions: $extensions
-    # No arbitrary \${...}: only locally bound credential environment names are permitted.
-    allowed_providers: []
-    # Where its exporters, and the collector's own telemetry, may send.
-    allowed_exporter_endpoints: $(yaml_list "$exporter_endpoints")
-    # What its filelog receivers may read: these files, and what is under these directories.
-    allowed_log_paths: $(yaml_list "$log_paths")$storage_directories$package
+$policy$package
 
 storage:
   directory: /var/lib/pydantic-opamp

@@ -18,7 +18,7 @@ LABEL org.opencontainers.image.title="pydantic OpAMP Supervisor" \
 
 COPY linux_${TARGETARCH}/opampsupervisor linux_${TARGETARCH}/otelcol /usr/lib/pydantic-opamp/
 COPY licenses/ /usr/share/doc/pydantic-opamp/
-COPY supervisor.yaml /etc/pydantic-opamp/supervisor.yaml
+COPY supervisor.yaml supervisor-restricted.yaml /etc/pydantic-opamp/
 # The state directory, the container's user's: a volume mounted here starts with its owner.
 COPY --chown=65532:65532 state/ /var/lib/pydantic-opamp/
 

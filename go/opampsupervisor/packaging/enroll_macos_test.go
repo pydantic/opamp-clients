@@ -73,13 +73,15 @@ func TestMacEnroll(t *testing.T) {
 	assert.Equal(t, "keychain", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
-	assertPackagedPolicy(t, loaded.Agent.RemoteConfigPolicy, []string{"https://opamp.example.com"}, nil)
+	// Without --restricted, any config the server sends runs.
+	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
+	require.NoError(t, loaded.Agent.RemoteConfigPolicy.Check("", hostLogsConfig(t, "macos")))
 }
 
-// The policy widened locally, as on Linux.
+// A --restricted policy widened locally, as on Linux.
 func TestMacEnrollWidensThePolicyLocally(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
-	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp",
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--restricted",
 		"--exporter-endpoint", "https://logfire-us.pydantic.dev", "--log-path", "/Library/Logs/app", "--no-start")
 	require.NoError(t, err, out)
 	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
@@ -101,7 +103,7 @@ func TestMacEnrollWidensThePolicyLocally(t *testing.T) {
 // --accept-packages, as on Linux.
 func TestMacEnrollAcceptsPackages(t *testing.T) {
 	root, tools := t.TempDir(), t.TempDir()
-	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--no-start")
+	out, err := macEnroll(t, root, tools, "t", "--endpoint", "wss://opamp.example.com/v1/opamp", "--accept-packages", "--restricted", "--no-start")
 	require.NoError(t, err, out)
 	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
 	cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))
@@ -143,10 +145,12 @@ func TestMacEnrollRefuses(t *testing.T) {
 		{"an empty token", "\n", "token is empty", []string{"--endpoint", "wss://x"}},
 		{"a token that isn't one line of token characters", "a b", "characters a bearer token can't", []string{"--endpoint", "wss://x"}},
 		{"a relative CA file", "t", "absolute path", []string{"--endpoint", "wss://x", "--ca-file", "enroll_test.go"}},
-		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--exporter-endpoint", "http://x"}},
-		{"an exporter endpoint with a path", "t", "with nothing else", []string{"--endpoint", "wss://x", "--exporter-endpoint", "https://x/v1/traces"}},
-		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--log-path", "Logs/app"}},
-		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--log-path", "/Library/Logs/*"}},
+		{"a plaintext exporter endpoint", "t", "isn't encrypted", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "http://x"}},
+		{"an exporter endpoint with a path", "t", "with nothing else", []string{"--endpoint", "wss://x", "--restricted", "--exporter-endpoint", "https://x/v1/traces"}},
+		{"user info in the endpoint", "t", "with nothing else", []string{"--endpoint", "wss://u@x/v1/opamp"}},
+		{"host logs without --restricted", "t", "widen a --restricted policy", []string{"--endpoint", "wss://x", "--host-logs"}},
+		{"a relative log path", "t", "absolute path", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "Logs/app"}},
+		{"a log path with a glob", "t", "glob characters", []string{"--endpoint", "wss://x", "--restricted", "--log-path", "/Library/Logs/*"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -159,11 +163,11 @@ func TestMacEnrollRefuses(t *testing.T) {
 	}
 }
 
-// --host-logs lets the server read this Mac's unified logs, but not an archive from any path.
+// With --restricted, --host-logs lets the server read this Mac's unified logs, but not an archive from any path.
 func TestMacEnrollHostLogs(t *testing.T) {
 	enroll := func(args ...string) config.RemoteConfigPolicy {
 		root, tools := t.TempDir(), t.TempDir()
-		out, err := macEnroll(t, root, tools, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--no-start"}, args...)...)
+		out, err := macEnroll(t, root, tools, "t", append([]string{"--endpoint", "wss://logfire-us.pydantic.dev/v1/opamp", "--restricted", "--no-start"}, args...)...)
 		require.NoError(t, err, out)
 		etc := filepath.Join(root, "opt/pydantic-opamp/etc")
 		cfg, err := os.ReadFile(filepath.Join(etc, "supervisor.yaml"))

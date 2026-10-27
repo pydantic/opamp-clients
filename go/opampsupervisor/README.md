@@ -18,10 +18,11 @@ extension and a systemd unit, and enrolls the host in one step:
 echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
-It writes a remote config policy: the server's configs may use the components a Logfire config
-needs, send only to the OpAMP server's host (or the `--exporter-endpoint`s given), read no file
-(or only the `--log-path`s given), and reference only locally bound credential environment names instead of arbitrary
-`${env:...}` or `${file:...}`
+By default any config the server sends runs, with any component, exporter or destination.
+`--restricted` writes a remote config policy instead: the server's configs may use the components
+a Logfire config needs, send only to the OpAMP server's host (or the `--exporter-endpoint`s
+given), read no file (or only the `--log-path`s given), and reference only locally bound
+credential environment names instead of arbitrary `${env:...}` or `${file:...}`
 ([what the server can do](packaging/README.md#what-the-server-can-do-to-this-host)).
 
 The [macOS .pkg](packaging/README.md#macos) and the [Windows .msi](packaging/README.md#windows)

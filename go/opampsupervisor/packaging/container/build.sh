@@ -39,7 +39,7 @@ for arch in $ARCHES; do
 	cp -R "$ctx/$name/LICENSE" "$ctx/$name/LICENSE.Apache-2.0" "$ctx/$name/licenses" "$ctx/licenses/"
 	rm -rf "${ctx:?}/$name"
 done
-cp Dockerfile supervisor.yaml "$ctx/"
+cp Dockerfile supervisor.yaml supervisor-restricted.yaml "$ctx/"
 
 if [ "${PUSH:-}" = 1 ]; then
 	output=--push
