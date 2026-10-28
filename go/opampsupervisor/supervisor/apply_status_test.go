@@ -207,6 +207,32 @@ func TestACollectorExitAfterAPPLIEDIsFAILED(t *testing.T) {
 	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
 }
 
+// A rolled-back config's status carries the Collector's log tail, and still ends with the
+// rollback sentence, which servers recognize it by (Fleet e2e 2026-10-28).
+func TestARollbackStatusCarriesTheLogTailFirst(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.config.Agent.AutomaticConfigRollback = true
+	a.config.Agent.CollectorCrashLogSnippetKiB = 4
+	startAgentLoop(t, a.Supervisor)
+
+	a.offer(t, receiversConfig("W", "nop"))
+	require.Eventually(t, a.commander.IsRunning, 5*time.Second, 10*time.Millisecond)
+	a.health(a.connect(), true)
+	a.waitFor(t, "W APPLIED")
+
+	a.offer(t, receiversConfig("R", "nop/2"))
+	// The collector's start on R rewrites its log, so the line is written until R fails.
+	require.Eventually(t, func() bool {
+		_ = os.WriteFile(a.agentLogFilePath(), []byte("invalid port 99999\n"), 0o600)
+		r := a.reported()
+		return r[len(r)-1] == "R FAILED"
+	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
+	a.mu.Lock()
+	last := a.statuses[len(a.statuses)-1]
+	a.mu.Unlock()
+	require.Equal(t, "Config apply timeout exceeded.\nCollector log tail:\ninvalid port 99999\nThe last working remote config runs in its place.", last.ErrorMessage)
+}
+
 // After a config fails and the last working one is restored, the server is told the failed one
 // is FAILED, and that the last working one runs in its place. Nothing is reported about the
 // last working config itself: the core drops statuses about any config but the latest.

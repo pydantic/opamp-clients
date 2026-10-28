@@ -2563,7 +2563,7 @@ func TestSupervisor_reportApply(t *testing.T) {
 		apply := &configApply{config: remoteConfig}
 		require.False(t, s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, "Config apply timeout exceeded", true))
 		require.Len(t, *reported, 1)
-		require.Equal(t, "Config apply timeout exceeded\nCollector log tail:\ninvalid port 99999", (*reported)[0].ErrorMessage)
+		require.Equal(t, "Config apply timeout exceeded.\nCollector log tail:\ninvalid port 99999", (*reported)[0].ErrorMessage)
 	})
 
 	// The restored last working config's outcomes aren't reported (the core drops statuses about

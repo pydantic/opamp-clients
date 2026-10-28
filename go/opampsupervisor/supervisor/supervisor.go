@@ -2181,15 +2181,21 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 	restored := false
 	switch status {
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
-		// Changed here: every FAILED status carries the Collector's log tail (when configured). It is
-		// read first, as the restored config's start rewrites the log, and goes after the rollback
-		// sentence.
-		details := s.appendCollectorCrashDetails("")
-		if restore && s.restoreLastWorkingRemoteConfig() {
-			restored = true
-			message = strings.TrimSuffix(message, ".") + ". The last working remote config runs in its place."
+		// Changed here: every FAILED status carries the Collector's log tail (when configured), read
+		// before the restored config's start rewrites the log. The rollback sentence stays last:
+		// servers (Logfire's Fleet) recognize a rollback by how the message ends.
+		tail := s.appendCollectorCrashDetails("")
+		restored = restore && s.restoreLastWorkingRemoteConfig()
+		if tail != "" || restored {
+			message = strings.TrimSuffix(message, ".") + "." + tail
 		}
-		message += details
+		if restored {
+			sep := " "
+			if tail != "" {
+				sep = "\n" // on a line of its own after the log tail
+			}
+			message += sep + "The last working remote config runs in its place."
+		}
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
 		if s.config.Agent.AutomaticConfigRollback {
 			if err := s.saveLastWorkingRemoteConfig(a.config); err != nil {
