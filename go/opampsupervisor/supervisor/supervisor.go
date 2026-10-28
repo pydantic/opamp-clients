@@ -2137,6 +2137,9 @@ type configApply struct {
 	// is known (the config the Supervisor started with).
 	status  protobufs.RemoteConfigStatuses
 	message string
+	// Changed here: reported is the FAILED message as sent, with its log tail and rollback
+	// sentence. A replay sends it again rather than a newer log tail.
+	reported string
 	// retry: the apply window a restart after an exit reopened. It rolls nothing back.
 	retry bool
 	// connection is the hash of the connection settings the apply's outcome answers, if any.
@@ -2196,6 +2199,7 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 			}
 			message += sep + "The last working remote config runs in its place."
 		}
+		a.reported = message
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
 		if s.config.Agent.AutomaticConfigRollback {
 			if err := s.saveLastWorkingRemoteConfig(a.config); err != nil {
@@ -2351,6 +2355,13 @@ func (s *Supervisor) runAgentProcess() {
 				// Nothing is known about the body the collector runs: its health decides.
 				openApplyWindow()
 				s.reportApply(apply, apply.status, "", false)
+			case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
+				// Changed here: the failure as first reported, log tail included.
+				if s.config.Capabilities.AcceptsRemoteConfig && apply.reported != "" {
+					s.reportConfigStatus(apply.config.GetConfigHash(), apply.status, apply.reported)
+				} else {
+					s.reportApply(apply, apply.status, apply.message, false)
+				}
 			default:
 				s.reportApply(apply, apply.status, apply.message, false)
 			}

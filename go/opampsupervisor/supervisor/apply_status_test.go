@@ -221,9 +221,12 @@ func TestARollbackStatusCarriesTheLogTailFirst(t *testing.T) {
 	a.waitFor(t, "W APPLIED")
 
 	a.offer(t, receiversConfig("R", "nop/2"))
-	// The collector's start on R rewrites its log, so the line is written until R fails.
+	// The collector's start on R rewrites its log, so the line is written until R fails. It is
+	// renamed into place: a plain write truncates first, and a failure read then sees no line.
+	logPath := a.agentLogFilePath()
 	require.Eventually(t, func() bool {
-		_ = os.WriteFile(a.agentLogFilePath(), []byte("invalid port 99999\n"), 0o600)
+		_ = os.WriteFile(logPath+".next", []byte("invalid port 99999\n"), 0o600)
+		_ = os.Rename(logPath+".next", logPath)
 		r := a.reported()
 		return r[len(r)-1] == "R FAILED"
 	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
@@ -231,6 +234,38 @@ func TestARollbackStatusCarriesTheLogTailFirst(t *testing.T) {
 	last := a.statuses[len(a.statuses)-1]
 	a.mu.Unlock()
 	require.Equal(t, "Config apply timeout exceeded.\nCollector log tail:\ninvalid port 99999\nThe last working remote config runs in its place.", last.ErrorMessage)
+}
+
+// A FAILED config asked about again (the same body offered after a restart) is reported as it
+// was first, log tail included: not with whatever the log holds by then.
+func TestAReplayedFailureKeepsItsFirstLogTail(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.config.Agent.CollectorCrashLogSnippetKiB = 4
+	startAgentLoop(t, a.Supervisor)
+
+	a.offer(t, receiversConfig("R", "nop"))
+	require.Eventually(t, a.commander.IsRunning, 5*time.Second, 10*time.Millisecond)
+	logPath := a.agentLogFilePath()
+	require.Eventually(t, func() bool {
+		_ = os.WriteFile(logPath+".next", []byte("invalid port 99999\n"), 0o600)
+		_ = os.Rename(logPath+".next", logPath)
+		r := a.reported()
+		return r[len(r)-1] == "R FAILED"
+	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
+	a.mu.Lock()
+	first := a.statuses[len(a.statuses)-1].ErrorMessage
+	a.mu.Unlock()
+	require.Contains(t, first, "invalid port 99999")
+
+	require.NoError(t, os.WriteFile(logPath, []byte("a later line\n"), 0o600))
+	n := len(a.reported())
+	a.configRetargets <- struct{}{}
+	require.Eventually(t, func() bool { return len(a.reported()) > n }, 5*time.Second, 10*time.Millisecond)
+	a.mu.Lock()
+	last := a.statuses[len(a.statuses)-1]
+	a.mu.Unlock()
+	require.Equal(t, "R", string(last.LastRemoteConfigHash))
+	require.Equal(t, first, last.ErrorMessage)
 }
 
 // After a config fails and the last working one is restored, the server is told the failed one
