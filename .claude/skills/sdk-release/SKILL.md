@@ -91,8 +91,8 @@ After the release, the `container` job pushes `ghcr.io/pydantic/opamp-supervisor
 Cosign and attests it. CI's packages job already runs the image (`container_test.go`). Check a
 published one:
 ```bash
-docker buildx imagetools inspect ghcr.io/pydantic/opamp-supervisor:0.6.0
-gh attestation verify oci://ghcr.io/pydantic/opamp-supervisor:0.6.0 --repo pydantic/opamp-clients
+docker buildx imagetools inspect ghcr.io/pydantic/opamp-supervisor:0.7.0
+gh attestation verify oci://ghcr.io/pydantic/opamp-supervisor:0.7.0 --repo pydantic/opamp-clients
 ```
 
 ## 4. Before moving the collector pins
