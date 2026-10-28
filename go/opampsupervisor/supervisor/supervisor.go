@@ -2181,10 +2181,15 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 	restored := false
 	switch status {
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
+		// Changed here: every FAILED status carries the Collector's log tail (when configured). It is
+		// read first, as the restored config's start rewrites the log, and goes after the rollback
+		// sentence.
+		details := s.appendCollectorCrashDetails("")
 		if restore && s.restoreLastWorkingRemoteConfig() {
 			restored = true
-			message += " The last working remote config runs in its place."
+			message = strings.TrimSuffix(message, ".") + ". The last working remote config runs in its place."
 		}
+		message += details
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
 		if s.config.Agent.AutomaticConfigRollback {
 			if err := s.saveLastWorkingRemoteConfig(a.config); err != nil {
@@ -2214,11 +2219,7 @@ func (s *Supervisor) applyStep(apply **configApply, in applyInput, openWindow, b
 	}
 	restored := false
 	if r := fx.report; r != nil {
-		message := r.message
-		if in.event == applyCollectorExited {
-			message = s.appendCollectorCrashDetails(message)
-		}
-		restored = s.reportApply(*apply, r.status, message, r.restore)
+		restored = s.reportApply(*apply, r.status, r.message, r.restore)
 	}
 	if fx.backoff && !restored {
 		// Wait 5 seconds before starting again.

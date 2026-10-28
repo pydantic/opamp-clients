@@ -263,6 +263,11 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 		line("Collector", "no health reported yet")
 	case c.Healthy:
 		line("Collector", "healthy since %s", ago(c.Since))
+	case c.Error == "" && st.RemoteConfig == nil:
+		// A managed host's Collector is unhealthy, with no reason, until its first config arrives.
+		line("Collector", "waiting for its first remote config since %s", ago(c.Since))
+	case c.Error == "":
+		line("Collector", "unhealthy since %s", ago(c.Since))
 	default:
 		line("Collector", "unhealthy since %s: %s", ago(c.Since), c.Error)
 	}

@@ -70,7 +70,9 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
 - **Writes the config.** `/etc/pydantic-opamp/supervisor.yaml` turns on
   `accepts_remote_config`, `accepts_opamp_connection_settings` and
   `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
-  Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and limits what the server's remote config may do (see
+  Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and
+  `agent.collector_crash_log_snippet_kib: 4` (the FAILED status carries the end of the Collector's
+  log, so the server can show why), and limits what the server's remote config may do (see
   [What the server can do to this host](#what-the-server-can-do-to-this-host)).
 - **Starts the service and waits for it to connect.** It enables and starts
   `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect
@@ -403,8 +405,12 @@ The Supervisor reads the config as it merges it, with confmap: a key spelled
 Why no log files in it: host logs often hold secrets and personal data, and only the host's
 operator knows which files are fit to send. `--host-logs` is that operator's choice, made on the
 command line they run: Logfire's host monitoring configs read the system logs, and need it.
-Either way, on Linux the collector runs as `pydantic-opamp`: add that user to the group that can
-read the log files (`adm` on Debian and Ubuntu) for it to read the ones only that group can.
+Either way, on Linux the collector runs as `pydantic-opamp`. The package adds that user to `adm`
+(which can read /var/log/syslog and auth.log on Debian and Ubuntu) and `systemd-journal` (the
+journal) where those groups exist, once per host. To opt out, remove it from them, for example
+`sudo gpasswd -d pydantic-opamp adm`, and restart the service; upgrades leave it out
+(`/etc/pydantic-opamp/log-groups` records that the groups were added). On RHEL-family hosts
+/var/log/messages is root's alone; read the journal instead.
 
 ### Widening it
 

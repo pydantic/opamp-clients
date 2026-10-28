@@ -225,7 +225,7 @@ func TestARollbackReportsOnlyTheFailedConfig(t *testing.T) {
 	a.mu.Lock()
 	last := a.statuses[len(a.statuses)-1]
 	a.mu.Unlock()
-	require.Contains(t, last.ErrorMessage, "The last working remote config runs in its place.")
+	require.Contains(t, last.ErrorMessage, ". The last working remote config runs in its place.", "a sentence of its own")
 	require.Eventually(t, func() bool {
 		return bytes.Equal(a.cfgState.Load().(*configState).remote.GetConfigHash(), []byte("W"))
 	}, 5*time.Second, 10*time.Millisecond)
