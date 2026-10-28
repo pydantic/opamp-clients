@@ -21,28 +21,12 @@ and date. Tests, CI and docs alone don't need a line.
 ### Breaking
 
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
-- Supervisor installers: a host runs any config the server sends, with any component, exporter
-  or destination. The remote config policy is now opt-in: `--restricted` (`-Restricted` on
-  Windows) writes it, and `--exporter-endpoint`, `--log-path` and `--host-logs` are refused
-  without it. The container image runs open too; `--config
-  /etc/pydantic-opamp/supervisor-restricted.yaml` restricts it. Enroll again with `--restricted`
-  to keep a host's policy (#99).
-- Supervisor: with a remote config policy, a `file_storage` extension in the server's config
-  must name a directory under `allowed_storage_directories`. A host that allowed `file_storage`
-  in `allowed_components` by hand needs that list too (#94).
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
   Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
 
 ### Added
 
-- Supervisor installers: `--host-logs` (`-HostLogs` on Windows) lets the server's configs read
-  the host's system logs: `macos_unified_logging` on macOS, `windows_event_log` on Windows, and
-  the files under `/var/log` on Linux, with `file_storage` keeping read positions in the
-  Supervisor's own directory. The remote config policy has `allowed_storage_directories`, and
-  refuses a `remote` event log receiver and a unified logging `archive_path` (#94).
-- Supervisor installers: the collector has the `resource` processor, and the policy allows it,
-  so a server's config can name the service its data comes from (#94).
 - .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
   instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
   tests run on both. Building from source needs the .NET 10 SDK (#86).
@@ -56,17 +40,12 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.FailedLeavingUnknown(err)` (reported failed, and what the agent has is uncertain), with
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
-- Supervisor: `opampsupervisor status --wait 30s --since UNIX` waits for a freshly started
-  Supervisor to connect, and a connection refused for a certificate the host doesn't trust says to
-  pass `--ca-file` (#97).
 
 ### Fixed
 
 - Python: with `configure_logfire`, the log controls (the logs export, `log_levels`,
   `log_rate_limit`) apply to the Logfire SDK's logs, which are spans; before, they did nothing to
   them while the policy was answered as applied. Pausing traces leaves those logs be (#98).
-- Supervisor: the collector it runs before the server sends a config no longer binds
-  `localhost:8888` for its internal metrics, so it no longer exits when that port is taken (#94).
 - .NET (`Pydantic.OpAmp.Extensions.Hosting`, the automatic instrumentation plugin): a health
   report given while the agent was starting was lost until the next one (30 s on with the default
   health check publisher); the first message now carries it (#86).
@@ -85,13 +64,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Supervisor installers (`pydantic-opamp-enroll` on Linux, macOS and Windows): enrolling waits up
-  to 30 seconds for the Supervisor to connect, and fails with its status and what to check when it
-  can't (an untrusted server certificate, a refused key), instead of reporting success. The service
-  keeps retrying (#97).
-- Supervisor installers: the config turns on `agent.automatic_config_rollback`. A remote config the
-  Collector fails on is replaced by the last one that ran healthy, and stays FAILED, so a bad policy
-  no longer stops a host's telemetry until a fix is published (#97).
 - Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
   saves nothing), and the client says so once with the new `state_from_newer_version`
   notification, which every integration and the collector extension log as a warning (#92).
@@ -124,6 +96,57 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.7.0 (2026-10-28)
+
+`go/opampsupervisor/v0.7.0`, on core 0.12.0. The Go modules are not released with it.
+
+### Breaking
+
+- Supervisor installers: a host runs any config the server sends, with any component, exporter
+  or destination. The remote config policy is now opt-in: `--restricted` (`-Restricted` on
+  Windows) writes it, and `--exporter-endpoint`, `--log-path` and `--host-logs` are refused
+  without it. The container image runs open too; `--config
+  /etc/pydantic-opamp/supervisor-restricted.yaml` restricts it. Enroll again with `--restricted`
+  to keep a host's policy (#99).
+- Supervisor: with a remote config policy, a `file_storage` extension in the server's config
+  must name a directory under `allowed_storage_directories`. A host that allowed `file_storage`
+  in `allowed_components` by hand needs that list too (#94).
+
+### Added
+
+- Supervisor installers: `--host-logs` (`-HostLogs` on Windows) lets the server's configs read
+  the host's system logs: `macos_unified_logging` on macOS, `windows_event_log` on Windows, and
+  the files under `/var/log` on Linux, with `file_storage` keeping read positions in the
+  Supervisor's own directory. The remote config policy has `allowed_storage_directories`, and
+  refuses a `remote` event log receiver and a unified logging `archive_path` (#94).
+- Supervisor installers: the collector has the `resource` processor, and the policy allows it,
+  so a server's config can name the service its data comes from (#94).
+- Supervisor: `opampsupervisor status --wait 30s --since UNIX` waits for a freshly started
+  Supervisor to connect, and a connection refused for a certificate the host doesn't trust says to
+  pass `--ca-file` (#97).
+- Supervisor installers: `pydantic-opamp-uninstall` (`pydantic-opamp-uninstall.ps1` on
+  Windows) stops the service and removes the package; it keeps the config and state for a
+  reinstall unless given `--purge` (`-Purge`), and `--dry-run` shows what it would do (#96).
+
+### Fixed
+
+- Supervisor: the collector it runs before the server sends a config no longer binds
+  `localhost:8888` for its internal metrics, so it no longer exits when that port is taken (#94).
+
+### Changed
+
+- Supervisor installers (`pydantic-opamp-enroll` on Linux, macOS and Windows): enrolling waits up
+  to 30 seconds for the Supervisor to connect, and fails with its status and what to check when it
+  can't (an untrusted server certificate, a refused key), instead of reporting success. The service
+  keeps retrying (#97).
+- Supervisor installers: the config turns on `agent.automatic_config_rollback`. A remote config the
+  Collector fails on is replaced by the last one that ran healthy, and stays FAILED, so a bad policy
+  no longer stops a host's telemetry until a fix is published (#97).
+
+### Security
+
+- Supervisor: go-jose 4.1.6, for GHSA-mgcc-cww5-fp2q (#100).
 
 ## Supervisor 0.6.0 (2026-10-26)
 
