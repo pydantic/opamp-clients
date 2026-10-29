@@ -43,14 +43,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
-- Supervisor installers: a FAILED remote config's status carries the end of the Collector's log
-  (`agent.collector_crash_log_snippet_kib: 4`), for a timeout as well as a crash, so the server can
-  show why it failed; before, the restored config's start overwrote the log. Its rollback note is
-  its own sentence (#102).
-- Supervisor: `opampsupervisor status` no longer prints "unhealthy since …: " with an empty
-  reason; before the first remote config it says the Collector is waiting for it (#102).
-- Supervisor: `pydantic-opamp-uninstall` says what it removed and kept, and how to purge; a macOS
-  purge also removes the empty /opt/pydantic-opamp (#102).
 - Python: with `configure_logfire`, the log controls (the logs export, `log_levels`,
   `log_rate_limit`) apply to the Logfire SDK's logs, which are spans; before, they did nothing to
   them while the policy was answered as applied. Pausing traces leaves those logs be (#98).
@@ -72,9 +64,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Supervisor Linux packages: the `pydantic-opamp` user joins `adm` and `systemd-journal` where
-  they exist, once per host, so host configs can read /var/log/syslog, auth.log and the journal.
-  Remove it from a group to opt out; upgrades leave it out (#102).
 - Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
   saves nothing), and the client says so once with the new `state_from_newer_version`
   notification, which every integration and the collector extension log as a warning (#92).
@@ -107,6 +96,27 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.8.0 (2026-10-29)
+
+`go/opampsupervisor/v0.8.0`, on core 0.12.0. The Go modules are not released with it.
+
+### Fixed
+
+- Supervisor installers: a FAILED remote config's status carries the end of the Collector's log
+  (`agent.collector_crash_log_snippet_kib: 4`), for a timeout as well as a crash, so the server can
+  show why it failed; before, the restored config's start overwrote the log. Its rollback note is
+  its own sentence (#102).
+- Supervisor: `opampsupervisor status` no longer prints "unhealthy since …: " with an empty
+  reason; before the first remote config it says the Collector is waiting for it (#102).
+- Supervisor: `pydantic-opamp-uninstall` says what it removed and kept, and how to purge; a macOS
+  purge also removes the empty /opt/pydantic-opamp (#102).
+
+### Changed
+
+- Supervisor Linux packages: the `pydantic-opamp` user joins `adm` and `systemd-journal` where
+  they exist, once per host, so host configs can read /var/log/syslog, auth.log and the journal.
+  Remove it from a group to opt out; upgrades leave it out (#102).
 
 ## Supervisor 0.7.0 (2026-10-28)
 
