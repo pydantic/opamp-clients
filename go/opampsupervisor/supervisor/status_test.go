@@ -100,6 +100,21 @@ func TestAStatusFromAGoneProcessIsNotRunning(t *testing.T) {
 	assert.Contains(t, out.String(), "none received")
 }
 
+// An unhealthy Collector with no reason reads as waiting for its config, or unhealthy, never
+// with a dangling ": " (Fleet e2e 2026-10-28).
+func TestAnUnhealthyCollectorWithoutAReason(t *testing.T) {
+	now := time.Now()
+	st := &Status{PID: os.Getpid(), Collector: &CollectorStatus{Since: now}}
+	var out bytes.Buffer
+	st.Print(&out, now)
+	assert.Contains(t, out.String(), "waiting for its first remote config since")
+	st.RemoteConfig = &RemoteConfigState{Hash: "abc", Status: "APPLYING", Since: now}
+	out.Reset()
+	st.Print(&out, now)
+	assert.Contains(t, out.String(), "unhealthy since")
+	assert.NotContains(t, out.String(), "ago): ")
+}
+
 // A nil report (a client made without newCoreClient) does nothing.
 func TestANilStatusReportDoesNothing(t *testing.T) {
 	var r *statusReport

@@ -2553,6 +2553,19 @@ func TestSupervisor_reportApply(t *testing.T) {
 		require.Equal(t, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED, apply.status)
 	})
 
+	// Changed here: any FAILED status, a timeout too, carries the Collector's log tail, so the
+	// server can show why (Fleet e2e 2026-10-28: the restored config's start rewrites the log).
+	t.Run("failed carries the log tail", func(t *testing.T) {
+		s, reported := newSupervisor(t)
+		s.config.Agent.CollectorCrashLogSnippetKiB = 4
+		logPath := filepath.Join(s.config.Storage.Directory, agentLogFileName)
+		require.NoError(t, os.WriteFile(logPath, []byte("invalid port 99999\n"), 0o600))
+		apply := &configApply{config: remoteConfig}
+		require.False(t, s.reportApply(apply, protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED, "Config apply timeout exceeded", true))
+		require.Len(t, *reported, 1)
+		require.Equal(t, "Config apply timeout exceeded.\nCollector log tail:\ninvalid port 99999", (*reported)[0].ErrorMessage)
+	})
+
 	// The restored last working config's outcomes aren't reported (the core drops statuses about
 	// any config but the latest), and the failed config's status stays persisted: the next start
 	// runs the last working config again.

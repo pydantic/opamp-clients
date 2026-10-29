@@ -207,6 +207,67 @@ func TestACollectorExitAfterAPPLIEDIsFAILED(t *testing.T) {
 	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
 }
 
+// A rolled-back config's status carries the Collector's log tail, and still ends with the
+// rollback sentence, which servers recognize it by (Fleet e2e 2026-10-28).
+func TestARollbackStatusCarriesTheLogTailFirst(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.config.Agent.AutomaticConfigRollback = true
+	a.config.Agent.CollectorCrashLogSnippetKiB = 4
+	startAgentLoop(t, a.Supervisor)
+
+	a.offer(t, receiversConfig("W", "nop"))
+	require.Eventually(t, a.commander.IsRunning, 5*time.Second, 10*time.Millisecond)
+	a.health(a.connect(), true)
+	a.waitFor(t, "W APPLIED")
+
+	a.offer(t, receiversConfig("R", "nop/2"))
+	// The collector's start on R rewrites its log, so the line is written until R fails. It is
+	// renamed into place: a plain write truncates first, and a failure read then sees no line.
+	logPath := a.agentLogFilePath()
+	require.Eventually(t, func() bool {
+		_ = os.WriteFile(logPath+".next", []byte("invalid port 99999\n"), 0o600)
+		_ = os.Rename(logPath+".next", logPath)
+		r := a.reported()
+		return r[len(r)-1] == "R FAILED"
+	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
+	a.mu.Lock()
+	last := a.statuses[len(a.statuses)-1]
+	a.mu.Unlock()
+	require.Equal(t, "Config apply timeout exceeded.\nCollector log tail:\ninvalid port 99999\nThe last working remote config runs in its place.", last.ErrorMessage)
+}
+
+// A FAILED config asked about again (the same body offered after a restart) is reported as it
+// was first, log tail included: not with whatever the log holds by then.
+func TestAReplayedFailureKeepsItsFirstLogTail(t *testing.T) {
+	a := newApplyTestSupervisor(t, "sleep")
+	a.config.Agent.CollectorCrashLogSnippetKiB = 4
+	startAgentLoop(t, a.Supervisor)
+
+	a.offer(t, receiversConfig("R", "nop"))
+	require.Eventually(t, a.commander.IsRunning, 5*time.Second, 10*time.Millisecond)
+	logPath := a.agentLogFilePath()
+	require.Eventually(t, func() bool {
+		_ = os.WriteFile(logPath+".next", []byte("invalid port 99999\n"), 0o600)
+		_ = os.Rename(logPath+".next", logPath)
+		r := a.reported()
+		return r[len(r)-1] == "R FAILED"
+	}, 10*time.Second, 10*time.Millisecond, "%v", a.reported())
+	a.mu.Lock()
+	first := a.statuses[len(a.statuses)-1].ErrorMessage
+	a.mu.Unlock()
+	require.Contains(t, first, "invalid port 99999")
+
+	require.NoError(t, os.WriteFile(logPath, []byte("a later line\n"), 0o600))
+	n := len(a.reported())
+	a.configRetargets <- struct{}{}
+	require.Eventually(t, func() bool { return len(a.reported()) > n }, 5*time.Second, 10*time.Millisecond)
+	a.mu.Lock()
+	last := a.statuses[len(a.statuses)-1]
+	a.mu.Unlock()
+	require.Equal(t, "R", string(last.LastRemoteConfigHash))
+	require.Equal(t, first, last.ErrorMessage)
+}
+
 // After a config fails and the last working one is restored, the server is told the failed one
 // is FAILED, and that the last working one runs in its place. Nothing is reported about the
 // last working config itself: the core drops statuses about any config but the latest.
@@ -225,7 +286,7 @@ func TestARollbackReportsOnlyTheFailedConfig(t *testing.T) {
 	a.mu.Lock()
 	last := a.statuses[len(a.statuses)-1]
 	a.mu.Unlock()
-	require.Contains(t, last.ErrorMessage, "The last working remote config runs in its place.")
+	require.Contains(t, last.ErrorMessage, ". The last working remote config runs in its place.", "a sentence of its own")
 	require.Eventually(t, func() bool {
 		return bytes.Equal(a.cfgState.Load().(*configState).remote.GetConfigHash(), []byte("W"))
 	}, 5*time.Second, 10*time.Millisecond)

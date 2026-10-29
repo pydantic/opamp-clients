@@ -2137,6 +2137,9 @@ type configApply struct {
 	// is known (the config the Supervisor started with).
 	status  protobufs.RemoteConfigStatuses
 	message string
+	// Changed here: reported is the FAILED message as sent, with its log tail and rollback
+	// sentence. A replay sends it again rather than a newer log tail.
+	reported string
 	// retry: the apply window a restart after an exit reopened. It rolls nothing back.
 	retry bool
 	// connection is the hash of the connection settings the apply's outcome answers, if any.
@@ -2181,10 +2184,22 @@ func (s *Supervisor) reportApply(a *configApply, status protobufs.RemoteConfigSt
 	restored := false
 	switch status {
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
-		if restore && s.restoreLastWorkingRemoteConfig() {
-			restored = true
-			message += " The last working remote config runs in its place."
+		// Changed here: every FAILED status carries the Collector's log tail (when configured), read
+		// before the restored config's start rewrites the log. The rollback sentence stays last:
+		// servers (Logfire's Fleet) recognize a rollback by how the message ends.
+		tail := s.appendCollectorCrashDetails("")
+		restored = restore && s.restoreLastWorkingRemoteConfig()
+		if tail != "" || restored {
+			message = strings.TrimSuffix(message, ".") + "." + tail
 		}
+		if restored {
+			sep := " "
+			if tail != "" {
+				sep = "\n" // on a line of its own after the log tail
+			}
+			message += sep + "The last working remote config runs in its place."
+		}
+		a.reported = message
 	case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED:
 		if s.config.Agent.AutomaticConfigRollback {
 			if err := s.saveLastWorkingRemoteConfig(a.config); err != nil {
@@ -2214,11 +2229,7 @@ func (s *Supervisor) applyStep(apply **configApply, in applyInput, openWindow, b
 	}
 	restored := false
 	if r := fx.report; r != nil {
-		message := r.message
-		if in.event == applyCollectorExited {
-			message = s.appendCollectorCrashDetails(message)
-		}
-		restored = s.reportApply(*apply, r.status, message, r.restore)
+		restored = s.reportApply(*apply, r.status, r.message, r.restore)
 	}
 	if fx.backoff && !restored {
 		// Wait 5 seconds before starting again.
@@ -2344,6 +2355,13 @@ func (s *Supervisor) runAgentProcess() {
 				// Nothing is known about the body the collector runs: its health decides.
 				openApplyWindow()
 				s.reportApply(apply, apply.status, "", false)
+			case protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED:
+				// Changed here: the failure as first reported, log tail included.
+				if s.config.Capabilities.AcceptsRemoteConfig && apply.reported != "" {
+					s.reportConfigStatus(apply.config.GetConfigHash(), apply.status, apply.reported)
+				} else {
+					s.reportApply(apply, apply.status, apply.message, false)
+				}
 			default:
 				s.reportApply(apply, apply.status, apply.message, false)
 			}

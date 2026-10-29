@@ -150,7 +150,19 @@ uninstall() {
         fi
         rm -rf "$config" "$state"
         if [ -n "$extra_state" ]; then rm -rf "$extra_state"; fi
+        if [ "$os" = Darwin ]; then
+            # The package's own directories, once empty. Anything else put there stays.
+            rmdir "$root/opt/pydantic-opamp/share" 2>/dev/null || :
+            rmdir "$root/opt/pydantic-opamp" 2>/dev/null || :
+        fi
     fi
 }
 # Parse the function before it removes this script from the package.
 uninstall
+if [ -n "$purge" ]; then
+    echo "Removed the Collector service, the $package package and its data."
+else
+    echo "Removed the Collector service and the $package package. Kept $config, $state and the state key for a reinstall."
+    echo "To delete them too, run: $recovery --purge"
+fi
+echo "The OpAMP server still lists this host until its credentials are revoked there."

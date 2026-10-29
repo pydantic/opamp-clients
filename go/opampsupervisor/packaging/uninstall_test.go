@@ -72,8 +72,13 @@ func TestUninstallRetainsDataAndCanPurgeLater(t *testing.T) {
 				t.Fatal(err)
 			}
 			for range 2 {
-				if out, err := invoke(); err != nil {
+				out, err := invoke()
+				if err != nil {
 					t.Fatalf("%v: %s", err, out)
+				}
+				// Fleet e2e 2026-10-28: the default run said only what pkgutil or dpkg printed.
+				if !strings.Contains(out, "Kept "+config) || !strings.Contains(out, filepath.Join(config, "uninstall")+" --purge") {
+					t.Fatalf("no summary of what was kept: %s", out)
 				}
 				for _, path := range []string{filepath.Join(config, "keep"), filepath.Join(state, "keep"), filepath.Join(config, "uninstall")} {
 					if _, err := os.Stat(path); err != nil {
@@ -95,6 +100,12 @@ func TestUninstallRetainsDataAndCanPurgeLater(t *testing.T) {
 				for _, path := range []string{config, state} {
 					if _, err := os.Stat(path); !os.IsNotExist(err) {
 						t.Fatalf("purge left %s: %v", path, err)
+					}
+				}
+				if platform == "Darwin" {
+					// The empty /opt/pydantic-opamp goes too.
+					if _, err := os.Stat(filepath.Dir(config)); !os.IsNotExist(err) {
+						t.Fatalf("purge left %s: %v", filepath.Dir(config), err)
 					}
 				}
 			}

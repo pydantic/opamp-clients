@@ -222,6 +222,8 @@ agent:
   executable: '$(Slashed (Join-Path $programs 'otelcol.exe'))'
   # A remote config the Collector fails on is replaced by the last one that ran healthy, and stays FAILED.
   automatic_config_rollback: true
+  # The Collector's last 4 KiB of log goes with a FAILED config's status, so the server shows why.
+  collector_crash_log_snippet_kib: 4
 $agentEnv
 
 $policy$package
