@@ -73,7 +73,7 @@ and date. Tests, CI and docs alone don't need a line.
 
 - Collector extension and Supervisor: forked from contrib v0.164.1 (the Collector's v0.164.0 modules,
   v1.70.0 for the stable ones), was v0.163.0. The extension takes upstream's `reports_heartbeat`
-  (default true) and health attributes; the Supervisor upstream's `agent::stop_grace_period` (#PR).
+  (default true) and health attributes; the Supervisor upstream's `agent::stop_grace_period` (#105).
 - Go, Python, Node.js, Java, .NET: a state file saved by a newer core is left as it was (that run
   saves nothing), and the client says so once with the new `state_from_newer_version`
   notification, which every integration and the collector extension log as a warning (#92).
