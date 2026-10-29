@@ -43,6 +43,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.13.0, which the clients now pin
+  (#104). Over WebSocket, a connection the server has said nothing on for two heartbeat intervals
+  (60 s with heartbeats off) is given up and made again, as after a drop, with a
+  `ConnectFailed`; before, a client behind a proxy that lost its upstream could stay on a dead
+  link for hours. Telemetry settings the application refused are offered to it again when the
+  server sends them again (once per connection), and after a restart the client starts from the
+  settings it last applied and keeps reporting the refusal.
 - Python: with `configure_logfire`, the log controls (the logs export, `log_levels`,
   `log_rate_limit`) apply to the Logfire SDK's logs, which are spans; before, they did nothing to
   them while the policy was answered as applied. Pausing traces leaves those logs be (#98).
