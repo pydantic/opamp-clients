@@ -34,9 +34,9 @@ OpAMP:
 - `pydantic-opamp-enroll`.
 
 Download the deb or rpm for your architecture from the GitHub Release. On Debian or Ubuntu,
-install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.7.0_amd64.deb`.
+install the local deb with `sudo apt install ./pydantic-opamp-supervisor_0.8.0_amd64.deb`.
 On RHEL or Fedora, install the unsigned local rpm with
-`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.7.0-1.x86_64.rpm`.
+`sudo dnf install --nogpgcheck ./pydantic-opamp-supervisor-0.8.0-1.x86_64.rpm`.
 The host needs systemd 250 or later. Verify the download against `SHA256SUMS.installers` first.
 
 Once a signed apt and yum repository is published (none is yet, see [Publishing](#publishing)),
@@ -222,11 +222,11 @@ Check a download with either:
 ```sh
 sha256sum --check --ignore-missing SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS.installers
-gh attestation verify pydantic-opamp-supervisor_0.7.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
-cosign verify-blob --bundle pydantic-opamp-supervisor_0.7.0_linux_amd64.tar.gz.sigstore.json \
+gh attestation verify pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz --repo pydantic/opamp-clients
+cosign verify-blob --bundle pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz.sigstore.json \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github\.com/pydantic/opamp-clients/\.github/workflows/release\.yml@' \
-  pydantic-opamp-supervisor_0.7.0_linux_amd64.tar.gz
+  pydantic-opamp-supervisor_0.8.0_linux_amd64.tar.gz
 ```
 
 ## macOS
@@ -239,7 +239,7 @@ The `.pkg` installs everything under `/opt/pydantic-opamp`:
   root and logs to `/opt/pydantic-opamp/var/log/supervisor.log`.
 
 ```sh
-sudo installer -pkg pydantic-opamp-supervisor-0.7.0-darwin-arm64.pkg -target /
+sudo installer -pkg pydantic-opamp-supervisor-0.8.0-darwin-arm64.pkg -target /
 echo "$ENROLLMENT_TOKEN" | sudo /opt/pydantic-opamp/bin/pydantic-opamp-enroll --endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -265,7 +265,7 @@ runs as LocalSystem, logs to the Application event log, and stays stopped until 
 administrator:
 
 ```powershell
-msiexec /i pydantic-opamp-supervisor-0.7.0-windows-amd64.msi /qn
+msiexec /i pydantic-opamp-supervisor-0.8.0-windows-amd64.msi /qn
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 
@@ -309,7 +309,7 @@ scripts' `--restricted` policy:
 docker run -d --name opamp-supervisor \
   -e OPAMP_ENDPOINT=wss://opamp.example.com/v1/opamp -e OPAMP_TOKEN="$ENROLLMENT_TOKEN" \
   -v opamp-state:/var/lib/pydantic-opamp -p 4318:4318 \
-  ghcr.io/pydantic/opamp-supervisor:0.7.0
+  ghcr.io/pydantic/opamp-supervisor:0.8.0
 ```
 
 Mount a volume at `/var/lib/pydantic-opamp`. It keeps the agent's instance UID, the credentials
