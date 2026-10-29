@@ -72,8 +72,9 @@ func newHelperCommander(t *testing.T, helper string, env ...string) *commander.C
 		agentEnv[env[i]] = env[i+1]
 	}
 	cmdr, err := commander.NewCommander(zap.NewNop(), filepath.Join(t.TempDir(), agentLogFileName), config.Agent{
-		Executable: os.Args[0],
-		Env:        agentEnv,
+		Executable:      os.Args[0],
+		Env:             agentEnv,
+		StopGracePeriod: 10 * time.Second,
 	})
 	require.NoError(t, err)
 	return cmdr

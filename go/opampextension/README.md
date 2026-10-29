@@ -70,8 +70,8 @@ across restarts (upstream makes up a new one at every start).
 - The available components' hash is the core's.
 - With upstream's `socket` setting, the client dials the socket for each connection, over `http`
   and `ws` alike, and uses no proxy for it.
-- A health update that clears the error is reported though the status stays the same (upstream's
-  kept reporting the old error).
+- Over `http`, an offered heartbeat interval is the polling interval whether or not
+  `reports_heartbeat` is on, as the spec requires (upstream's ignores it without the capability).
 - A second `Unregister` of a custom capability is a no-op (upstream's panicked).
 - A health report's start time is the time of the first healthy report, kept while the collector
   runs, healthy or not, and 0 from `NotReady` (shutdown) until `Ready`. Upstream's never kept it: each

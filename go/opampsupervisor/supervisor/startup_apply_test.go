@@ -29,8 +29,9 @@ func TestAFirstStartThatFailsIsTriedAgain(t *testing.T) {
 	a := newApplyTestSupervisor(t, "sleep")
 	exe := filepath.Join(t.TempDir(), "collector")
 	cmdr, err := commander.NewCommander(zap.NewNop(), filepath.Join(t.TempDir(), agentLogFileName), config.Agent{
-		Executable: exe,
-		Env:        map[string]string{supervisorRestartHelperEnv: "sleep"},
+		Executable:      exe,
+		Env:             map[string]string{supervisorRestartHelperEnv: "sleep"},
+		StopGracePeriod: 10 * time.Second,
 	})
 	require.NoError(t, err)
 	a.commander = cmdr

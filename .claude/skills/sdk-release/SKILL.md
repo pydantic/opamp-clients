@@ -100,8 +100,8 @@ gh attestation verify oci://ghcr.io/pydantic/opamp-supervisor:0.8.0 --repo pydan
 The extension and Supervisor are forks of contrib's `extension/opampextension` and
 `cmd/opampsupervisor` at one release; ocb needs every component on that release.
 ```bash
-python3 scripts/collector_release.py pins                  # "every pin names contrib v0.163.0" (offline)
-python3 scripts/collector_release.py latest --report-only  # "contrib v0.163.0 is the newest release" (~1 s)
+python3 scripts/collector_release.py pins                  # "every pin names contrib v0.164.1" (offline)
+python3 scripts/collector_release.py latest --report-only  # "contrib v0.164.1 is the newest release" (~1 s)
 ```
 `latest` without `--report-only` fails when contrib is newer and prints the upstream files changed
 since our release: port that diff, then move every pin together (the `go.mod` requires under `go/`,

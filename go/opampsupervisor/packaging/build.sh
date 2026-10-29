@@ -16,7 +16,7 @@ export VERSION ARCH GOOS=linux GOARCH="$ARCH" CGO_ENABLED=0
 export NFPM_PASSPHRASE="${SIGNING_KEY_PASSPHRASE:-}"
 
 mkdir -p dist
-(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config packaging/collector.yaml)
+(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config packaging/collector.yaml)
 (cd .. && go build -trimpath -o packaging/dist/opampsupervisor .)
 for packager in deb rpm; do
 	GOOS= GOARCH= go run github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0 package \

@@ -10,7 +10,9 @@
 `extension/opampextension` and `cmd/opampsupervisor` at one release. ocb puts every component of a
 collector on one release, so each pin of the collector's modules moves together: the go.mod
 requires under go/, the ocb manifests, and each `builder@` that builds them. `pins` fails when
-they name more than one 0.x release, or more than one 1.x release of the core's stable modules.
+they name more than one release of contrib's modules, of the core's 0.x modules or of its 1.x
+(stable) ones, or when contrib's and the core's 0.x releases aren't the same minor release: contrib
+ships patch releases (v0.164.1) on the core's (v0.164.0), and upstream's go.mod pins them so.
 
 `latest` fails when contrib has a release newer than the pins. It prints the files of the forked
 directories that upstream changed since our release, which is the diff to port before the pins
@@ -73,31 +75,40 @@ def version(tag: str) -> tuple[int, ...]:
 
 
 def pins(root: Path) -> dict[str, dict[str, list[str]]]:
-    """Each release pinned, by series ("0.x" or "1.x"): the places that pin it, as path:line."""
-    found: dict[str, dict[str, list[str]]] = {"0.x": {}, "1.x": {}}
+    """Each release pinned, by series ("contrib", the core's "0.x" or "1.x"): the places that pin
+    it, as path:line."""
+    found: dict[str, dict[str, list[str]]] = {"contrib": {}, "0.x": {}, "1.x": {}}
     paths = sorted({path for pattern in PINNING for path in root.glob(pattern) if path.is_file()})
     for path in paths:
         for number, line in enumerate(path.read_text(errors="replace").splitlines(), start=1):
             for match in MODULE.finditer(line):
                 tag = match.group(2)
-                series = "0.x" if tag.startswith("v0.") else "1.x"
+                if "opentelemetry-collector-contrib" in match.group(1):
+                    series = "contrib"
+                else:
+                    series = "0.x" if tag.startswith("v0.") else "1.x"
                 found[series].setdefault(tag, []).append(f"{path.relative_to(root)}:{number}")
     return found
 
 
 def base(found: dict[str, dict[str, list[str]]]) -> str:
-    """The one 0.x release pinned. Exits with every pin listed when the pins disagree."""
+    """The one contrib release pinned (else the core's one 0.x release). Exits with every pin
+    listed when the pins disagree."""
     problems = []
     for series, tags in found.items():
         if len(tags) > 1:
             lines = [f"  {tag}: {', '.join(places[:5])}{' ...' if len(places) > 5 else ''}"
                      for tag, places in sorted(tags.items(), key=lambda item: version(item[0]))]
             problems.append(f"the collector's {series} modules are pinned at {len(tags)} releases:\n" + "\n".join(lines))
-    if not found["0.x"]:
+    if not found["0.x"] and not found["contrib"]:
         problems.append("no pin of the collector's 0.x modules found")
+    if len(found["contrib"]) == 1 and len(found["0.x"]) == 1:
+        contrib, core = next(iter(found["contrib"])), next(iter(found["0.x"]))
+        if version(contrib)[:2] != version(core)[:2]:
+            problems.append(f"contrib's modules are at {contrib} and the core's at {core}: not one minor release")
     if problems:
         sys.exit("refused: " + "\n".join(problems) + "\nMove every pin to one release together.")
-    return next(iter(found["0.x"]))
+    return next(iter(found["contrib"] or found["0.x"]))
 
 
 def git(cwd: Path, *args: str) -> str:

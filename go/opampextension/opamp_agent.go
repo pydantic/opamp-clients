@@ -3,8 +3,7 @@
 //
 // Derived from opentelemetry-collector-contrib's extension/opampextension. Changed here: the OpAMP
 // client is go/opamp's (the shared core, in platform mode) behind opamp-go's client interface
-// (coreclient.go), and a health update that clears the error is reported even when the status
-// stays. Health reports keep the start time from the first healthy one until NotReady
+// (coreclient.go). Health reports keep the start time from the first healthy one until NotReady
 // (start_time.go).
 
 package opampextension // import "github.com/pydantic/opamp-clients/go/opampextension"
@@ -39,7 +38,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/service"
 	"go.opentelemetry.io/collector/service/hostcapabilities"
-	conventions "go.opentelemetry.io/otel/semconv/v1.40.0"
+	conventions "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.uber.org/zap"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -727,8 +726,9 @@ func (o *opampAgent) statusAggregatorEventLoop(unsubscribeFunc status.Unsubscrib
 	var (
 		lastStatus componentstatus.Status
 		lastErr    string
-		currentErr string
+		lastAttrs  pcommon.Map
 	)
+	lastAttrs = pcommon.NewMap()
 
 	for {
 		select {
@@ -744,17 +744,18 @@ func (o *opampAgent) statusAggregatorEventLoop(unsubscribeFunc status.Unsubscrib
 			}
 
 			currentStatus := statusUpdate.Status()
-			currentErr = "" // Changed here: an update that clears the error is one to report.
+			currentErr := ""
 			if statusUpdate.Err() != nil {
 				currentErr = statusUpdate.Err().Error()
 			}
 
-			if currentStatus == lastStatus && currentErr == lastErr {
+			if currentStatus == lastStatus && currentErr == lastErr && statusUpdate.Attributes().Equal(lastAttrs) {
 				continue
 			}
 
 			lastStatus = currentStatus
 			lastErr = currentErr
+			statusUpdate.Attributes().CopyTo(lastAttrs)
 
 			componentHealth := convertComponentHealth(statusUpdate)
 
@@ -779,6 +780,10 @@ func convertComponentHealth(statusUpdate *status.AggregateStatus) *protobufs.Com
 
 	if statusUpdate.Err() != nil {
 		componentHealth.LastError = statusUpdate.Err().Error()
+	}
+
+	if attrs := pcommonMapToKeyValues(statusUpdate.Attributes()); len(attrs) > 0 {
+		componentHealth.Attributes = attrs
 	}
 
 	if len(statusUpdate.ComponentStatusMap) > 0 {

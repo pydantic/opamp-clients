@@ -36,7 +36,7 @@ declares.
 | Node.js auto-instrumentation ([node-otel.md](node-otel.md)) | `@opentelemetry/sdk-node` 0.222, `auto-instrumentations-node` 0.80 | those exact versions |
 | Java agent extension ([javaagent.md](javaagent.md)) | the OpenTelemetry Java agent 2.31.1 (SDK 1.66) | built against agent 2.31.1; other agent versions aren't tested |
 | .NET automatic instrumentation plugin ([dotnet-otel.md](dotnet-otel.md)) | automatic instrumentation 1.17.0 (OpenTelemetry .NET 1.19.1) | automatic instrumentation 1.17.x, as upstream requires of plugins |
-| Collector extension and Supervisor ([collector.md](collector.md)) | the Collector v0.163.0 (v1.69.0 for the stable modules) | that release |
+| Collector extension and Supervisor ([collector.md](collector.md)) | the Collector v0.164.0 (v1.70.0 for the stable modules; contrib v0.164.1) | that release |
 
 Elastic's distributions are checked too ([guides/elastic.md](guides/elastic.md)): EDOT Java
 1.14.0, EDOT .NET 1.6.1 and EDOT Python 1.18.0, with `try.py --edot`.

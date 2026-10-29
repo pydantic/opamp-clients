@@ -134,9 +134,9 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	}
 	cfg := opamp.Config{
 		Endpoint: settings.OpAMPServerURL,
-		// Heartbeats, as the extension has always sent on this client: a client declares the
-		// bit to send them (ReportsHeartbeat), and upstream's capabilities don't name it.
-		Capabilities: uint64(c.caps | protobufs.AgentCapabilities_AgentCapabilities_ReportsHeartbeat),
+		// Upstream's capabilities, ReportsHeartbeat among them (`reports_heartbeat`, default
+		// true): the core sends heartbeats only with the bit.
+		Capabilities: uint64(c.caps),
 		Header:       settings.Header,
 		// Platform mode: net/http carries the requests, so the collector's TLS settings, the
 		// environment's proxies and auth extensions apply as they do to its other clients.

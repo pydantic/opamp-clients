@@ -7,7 +7,7 @@ Collector's TLS settings and the environment's proxies apply as they do to its o
 | | What it is | What the server can do |
 |---|---|---|
 | The `opamp` extension, [`go/opampextension`](../go/opampextension/) | The Collector's `opamp` extension with the client underneath replaced. The component type, the config and the custom-message API (`opampcustommessages`) are upstream's | see the collector: its description, effective config, health and available components; exchange custom messages with its components; restart it; issue it new OpAMP credentials |
-| The Supervisor, [`go/opampsupervisor`](../go/opampsupervisor/) | A fork of upstream's `opampsupervisor` at `cmd/opampsupervisor/v0.163.0`, on this client. It runs any vendor's collector as a child process | everything above, plus configure the collector (remote config, within the policy the host sets: [what the server can do](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)), and install a new collector executable (packages) |
+| The Supervisor, [`go/opampsupervisor`](../go/opampsupervisor/) | A fork of upstream's `opampsupervisor` at `cmd/opampsupervisor/v0.164.1`, on this client. It runs any vendor's collector as a child process | everything above, plus configure the collector (remote config, within the policy the host sets: [what the server can do](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)), and install a new collector executable (packages) |
 
 The extension alone reports the collector it runs in. To have the server change what the
 collector runs, run it under the Supervisor, which configures it with the extension. A collector's remote config is its YAML: the Logfire SDK
@@ -31,21 +31,21 @@ dist:
   name: otelcol-opamp
   output_path: ./otelcol-opamp
 receivers:
-  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.163.0
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.164.0
 exporters:
-  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.163.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.164.0
 extensions:
   - gomod: github.com/pydantic/opamp-clients/go/opampextension v0.2.0
 providers:
-  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.69.0
-  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.69.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.70.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.70.0
 ```
 
 ```bash
-go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config manifest.yaml
+go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config manifest.yaml
 ```
 
-The extension is built against the Collector's v0.163.0 modules (v1.69.0 for the stable ones), so
+The extension is built against the Collector's v0.164.0 modules (v1.70.0 for the stable ones), so
 take the other components at that version, and ocb with them.
 
 To build from a checkout instead of a tag, add these to the manifest, with the checkout's path.
@@ -137,7 +137,7 @@ extension, which it looks for in `bin/` at the repository's root:
 ```bash
 cd go/opampsupervisor
 mkdir -p ../../bin
-go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config testdata/collector/manifest.yaml
+go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config testdata/collector/manifest.yaml
 cp ../../bin/e2e-collector/otelcontribcol "../../bin/otelcontribcol_$(go env GOOS)_$(go env GOARCH)"
 go test -tags=e2e -timeout 20m .
 ```
