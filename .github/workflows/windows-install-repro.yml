@@ -7,12 +7,12 @@ permissions:
   contents: read
 jobs:
   installer-windows:
-    name: Windows install (core ${{ matrix.core }}, ${{ matrix.n }})
+    name: Windows install (${{ matrix.go }}, ${{ matrix.n }})
     strategy:
       fail-fast: false
       matrix:
-        core: ["0.14.0"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        go: ["before-105", "main"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -22,9 +22,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Core 0.13.0's lock and module copies (main before #106)
-        if: matrix.core == '0.13.0'
-        run: git checkout 9c1b8fcda9835a3456709b5e262ffdcd369064ce -- opamp-core.lock.json go/opamp/internal/core/opamp_core.wasm go/opamp/sdksettings/opamp_sdk_settings.wasm
+      - name: The Go modules as they were before #105 (contrib v0.163)
+        if: matrix.go == 'before-105'
+        run: git checkout 9c1b8fcda9835a3456709b5e262ffdcd369064ce^ -- go/opampextension/README.md go/opampextension/attributes.go go/opampextension/attributes_test.go go/opampextension/config.go go/opampextension/config_test.go go/opampextension/coreclient.go go/opampextension/factory.go go/opampextension/go.mod go/opampextension/go.sum go/opampextension/heartbeat_test.go go/opampextension/opamp_agent.go go/opampextension/opamp_agent_test.go go/opampsupervisor/README.md go/opampsupervisor/go.mod go/opampsupervisor/go.sum go/opampsupervisor/packaging/archive.sh go/opampsupervisor/packaging/build.sh go/opampsupervisor/packaging/collector.yaml go/opampsupervisor/packaging/macos/build.sh go/opampsupervisor/packaging/windows/build.ps1 go/opampsupervisor/specification/README.md go/opampsupervisor/supervisor/commander/commander.go go/opampsupervisor/supervisor/commander/commander_test.go go/opampsupervisor/supervisor/config/config.go go/opampsupervisor/supervisor/config/config_test.go go/opampsupervisor/supervisor/resource_config.go go/opampsupervisor/supervisor/restart_command_test.go go/opampsupervisor/supervisor/startup_apply_test.go go/opampsupervisor/supervisor/supervisor_metrics_test.go go/opampsupervisor/supervisor/supervisor_test.go go/opampsupervisor/testdata/collector/manifest.yaml 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
@@ -60,7 +60,5 @@ jobs:
         shell: pwsh
         run: |
           Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Id, Name, CPU, WorkingSet64 | Format-Table -AutoSize | Out-String -Width 300
-          sc.exe queryex pydantic-opamp-supervisor; $global:LASTEXITCODE = 0
           Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'opamp|otelcol|msiexec|install.test|powershell|go' } | Format-Table -AutoSize -Wrap ProcessId, ParentProcessId, Name, CommandLine | Out-String -Width 400
-          Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='pydantic-opamp-supervisor'} -MaxEvents 100 -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated, Message | Out-String -Width 400
-          Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 40 -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated, ProviderName, Message | Out-String -Width 400
+                    Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 40 -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated, ProviderName, Message | Out-String -Width 400
