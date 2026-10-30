@@ -7,11 +7,12 @@ permissions:
   contents: read
 jobs:
   installer-windows:
-    name: Windows install (${{ matrix.n }})
+    name: Windows install (core ${{ matrix.core }}, ${{ matrix.n }})
     strategy:
       fail-fast: false
       matrix:
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        core: ["0.13.0", "0.14.0"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -19,6 +20,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Core 0.13.0's lock and module copies (main before #106)
+        if: matrix.core == '0.13.0'
+        run: git checkout 9c1b8fcda9835a3456709b5e262ffdcd369064ce -- opamp-core.lock.json go/opamp/internal/core/opamp_core.wasm go/opamp/sdksettings/opamp_sdk_settings.wasm
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
@@ -39,4 +45,17 @@ jobs:
       - working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m &
+          pid=$!
+          # Every 15 s while it runs: the busiest processes, so a starved runner shows who starved it.
+          while kill -0 $pid 2>/dev/null; do
+            sleep 15
+            powershell -NoProfile -Command "Get-Process | Sort-Object CPU -Descending | Select-Object -First 6 Id, Name, CPU | Format-Table -HideTableHeaders | Out-String -Width 200" | tr -s "\n" | sed "s/^/[cpu] /"
+          done
+          wait $pid
+      - name: What runs and how busy, after the test
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Id, Name, CPU, WorkingSet64 | Format-Table -AutoSize | Out-String -Width 300
+          sc.exe queryex pydantic-opamp-supervisor
