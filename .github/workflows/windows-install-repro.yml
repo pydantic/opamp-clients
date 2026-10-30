@@ -11,8 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["before-105", "main"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        go: ["before-105"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -24,7 +24,9 @@ jobs:
           fetch-depth: 0
       - name: The Go modules as they were before #105 (contrib v0.163)
         if: matrix.go == 'before-105'
-        run: git checkout 9c1b8fcda9835a3456709b5e262ffdcd369064ce^ -- go/opampextension/README.md go/opampextension/attributes.go go/opampextension/attributes_test.go go/opampextension/config.go go/opampextension/config_test.go go/opampextension/coreclient.go go/opampextension/factory.go go/opampextension/go.mod go/opampextension/go.sum go/opampextension/heartbeat_test.go go/opampextension/opamp_agent.go go/opampextension/opamp_agent_test.go go/opampsupervisor/README.md go/opampsupervisor/go.mod go/opampsupervisor/go.sum go/opampsupervisor/packaging/archive.sh go/opampsupervisor/packaging/build.sh go/opampsupervisor/packaging/collector.yaml go/opampsupervisor/packaging/macos/build.sh go/opampsupervisor/packaging/windows/build.ps1 go/opampsupervisor/specification/README.md go/opampsupervisor/supervisor/commander/commander.go go/opampsupervisor/supervisor/commander/commander_test.go go/opampsupervisor/supervisor/config/config.go go/opampsupervisor/supervisor/config/config_test.go go/opampsupervisor/supervisor/resource_config.go go/opampsupervisor/supervisor/restart_command_test.go go/opampsupervisor/supervisor/startup_apply_test.go go/opampsupervisor/supervisor/supervisor_metrics_test.go go/opampsupervisor/supervisor/supervisor_test.go go/opampsupervisor/testdata/collector/manifest.yaml 
+        run: |
+          git rm -q go/opampextension/attributes.go go/opampextension/attributes_test.go go/opampextension/heartbeat_test.go
+          git checkout 9c1b8fcda9835a3456709b5e262ffdcd369064ce^ -- go/opampextension/README.md go/opampextension/config.go go/opampextension/config_test.go go/opampextension/coreclient.go go/opampextension/factory.go go/opampextension/go.mod go/opampextension/go.sum go/opampextension/opamp_agent.go go/opampextension/opamp_agent_test.go go/opampsupervisor/README.md go/opampsupervisor/go.mod go/opampsupervisor/go.sum go/opampsupervisor/packaging/archive.sh go/opampsupervisor/packaging/build.sh go/opampsupervisor/packaging/collector.yaml go/opampsupervisor/packaging/macos/build.sh go/opampsupervisor/packaging/windows/build.ps1 go/opampsupervisor/specification/README.md go/opampsupervisor/supervisor/commander/commander.go go/opampsupervisor/supervisor/commander/commander_test.go go/opampsupervisor/supervisor/config/config.go go/opampsupervisor/supervisor/config/config_test.go go/opampsupervisor/supervisor/resource_config.go go/opampsupervisor/supervisor/restart_command_test.go go/opampsupervisor/supervisor/startup_apply_test.go go/opampsupervisor/supervisor/supervisor_metrics_test.go go/opampsupervisor/supervisor/supervisor_test.go go/opampsupervisor/testdata/collector/manifest.yaml 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
