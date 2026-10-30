@@ -11,8 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        core: ["0.13.0", "0.14.0"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8]
+        core: ["0.14.0"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -43,6 +43,8 @@ jobs:
           dotnet tool install --global wix --version 5.0.2
           go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
       - working-directory: go/opampsupervisor/packaging
+        # A stuck step is stopped here, so the steps after it still run and the log is kept.
+        timeout-minutes: 8
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
           OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m &
@@ -58,4 +60,7 @@ jobs:
         shell: pwsh
         run: |
           Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Id, Name, CPU, WorkingSet64 | Format-Table -AutoSize | Out-String -Width 300
-          sc.exe queryex pydantic-opamp-supervisor
+          sc.exe queryex pydantic-opamp-supervisor; $global:LASTEXITCODE = 0
+          Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'opamp|otelcol|msiexec|install.test|powershell|go' } | Format-Table -AutoSize -Wrap ProcessId, ParentProcessId, Name, CommandLine | Out-String -Width 400
+          Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='pydantic-opamp-supervisor'} -MaxEvents 100 -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated, Message | Out-String -Width 400
+          Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 40 -ErrorAction SilentlyContinue | Sort-Object TimeCreated | Format-List TimeCreated, ProviderName, Message | Out-String -Width 400
