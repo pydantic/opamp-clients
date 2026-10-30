@@ -43,8 +43,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
-- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.13.0, which the clients now pin
-  (#104). Over WebSocket, a connection the server has said nothing on for two heartbeat intervals
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
+  A WebSocket connection given up after the server said nothing for two heartbeat intervals now
+  says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the
+  server saw it end without one.
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.13.0 (#104). Over WebSocket, a connection the server has said nothing on for two heartbeat intervals
   (60 s with heartbeats off) is given up and made again, as after a drop, with a
   `ConnectFailed`; before, a client behind a proxy that lost its upstream could stay on a dead
   link for hours. Telemetry settings the application refused are offered to it again when the

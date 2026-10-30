@@ -1,52 +1,52 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.13.0",
-  "commit": "5d6199cd3e22e92ea36bb322538bbc2d944da09f",
+  "version": "0.14.0",
+  "commit": "b374cb5a3c02e58145311390c9ba6f862bd8c4fd",
   "files": {
     "native-linux-arm64-libopamp_native.so": {
-      "sha256": "9483ad696e8762ab222dd9d20ed024b9944852f921e83b625354e0a0d566126c",
+      "sha256": "b3be533c20da28b507bdf41f884790fcf3c1edd344f7af422c6a5fdcd0e389d3",
       "kind": "native",
       "target": "linux-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-arm64-libopamp_native.so": {
-      "sha256": "49690b862dfa56846f11b0f743e464cf5babaf991adeb3251b0914315f711fc2",
+      "sha256": "395ed87718fc9c7066d35ecc4cb3a16b1f5e304cf0ec332843506e742045d395",
       "kind": "native",
       "target": "linux-musl-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-x64-libopamp_native.so": {
-      "sha256": "00e43ebd50cda4af147b1c0acda67874c9298eaf8441dc66453e2ce25dd7f3c1",
+      "sha256": "54567eb3d9c2557b9021ddcea16203c3aaa5b17b5532e8a6609fa5e6ea6c6f2c",
       "kind": "native",
       "target": "linux-musl-x64",
       "lib": "libopamp_native.so"
     },
     "native-linux-x64-libopamp_native.so": {
-      "sha256": "5d72ca3afa0b5b437f67fa02a0773cc76ae8326d17fc950974a92bf1a0d1b658",
+      "sha256": "6c65bfb83d43818d4a4810e5bb58cf39f930cc2bade5eb3e5eae3427b46df0f8",
       "kind": "native",
       "target": "linux-x64",
       "lib": "libopamp_native.so"
     },
     "native-osx-arm64-libopamp_native.dylib": {
-      "sha256": "5efaed81b3fc735be14a63ad3d5de9521edddc99ebf822174f2b25c2339e6e9d",
+      "sha256": "776cbc64f9e03603cb03b29a01c130ee6b26a8122f6fa2926bfcf9ccbd96ce8c",
       "kind": "native",
       "target": "osx-arm64",
       "lib": "libopamp_native.dylib"
     },
     "native-osx-x64-libopamp_native.dylib": {
-      "sha256": "be60f81511299c6dc6bc1e8b362cc95e3e8793da635f17f97dca21fcb4725989",
+      "sha256": "d9c7d616d689de7bade44f61fdd5027dc962466254be78db948a2046f248a856",
       "kind": "native",
       "target": "osx-x64",
       "lib": "libopamp_native.dylib"
     },
     "native-win-arm64-opamp_native.dll": {
-      "sha256": "189bf26ad5c0d111cf6182359248360c306c31cea66509bb6373bf4bae921448",
+      "sha256": "076465a14bb2116625f8728e50fd46259b77e9d05721679bb1695406659827d3",
       "kind": "native",
       "target": "win-arm64",
       "lib": "opamp_native.dll"
     },
     "native-win-x64-opamp_native.dll": {
-      "sha256": "49a11a0d1b60e2bd77739454bd064a4a2f646f124e6fc4bdfbd3b311c986c54f",
+      "sha256": "0116d7e2965f04c84c1dc24dac18d45bf68eedc353f22dad07ae7233f13d6435",
       "kind": "native",
       "target": "win-x64",
       "lib": "opamp_native.dll"
@@ -56,7 +56,7 @@
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "2e9d5dad8cb121db923860dd1616c88142d87d495ecdb6e1ae2f985c138b7c1c",
+      "sha256": "3e1e668ac03f805da7b3d576f961b5fbc1638963666d2f1d2c58de7824463232",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
@@ -64,11 +64,11 @@
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "2f68348291b39bcdf3a6ad77f3eb0270a335094d90d8272db746be469a614e52",
+      "sha256": "633f3b8a5ff27d7f7d6a59efbcd45ce7295d92b268f1ce9f56f28290b12444c1",
       "kind": "wasm"
     },
     "tool-linux-x64-opamp-tap": {
-      "sha256": "b9dfdd1c0072b6f90f97a41e9bd68cbea7d6e4e24a654d4bc76a51b9924e7ec1",
+      "sha256": "cdde8c8b072dc6b17c7f1a098176e9a6ea95251f55f31c62eab0e66ac8647d24",
       "kind": "tool",
       "target": "linux-x64",
       "bin": "opamp-tap"
