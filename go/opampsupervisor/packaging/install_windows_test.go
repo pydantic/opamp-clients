@@ -14,8 +14,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf16"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
@@ -43,11 +46,39 @@ func install(t *testing.T) {
 	msi := os.Getenv("OPAMP_MSI")
 	require.NotEmpty(t, msi, "OPAMP_MSI names the installer to run")
 	log := filepath.Join(t.TempDir(), "msiexec.log")
-	out, err := timed(t, "", "msiexec", "/i", msi, "/qn", "/l*v", log)
+	// /norestart: a quiet install that wants a restart (a file in use) otherwise restarts the
+	// machine at once, which takes the CI runner down with no word of why.
+	out, err := timed(t, "", "msiexec", "/i", msi, "/qn", "/norestart", "/l*v", log)
 	if err != nil {
-		text, _ := os.ReadFile(log)
-		t.Fatalf("msiexec: %v: %s\n%s", err, out, text)
+		t.Fatalf("msiexec: %v: %s\n%s", err, out, notable(msiLog(log)))
 	}
+}
+
+// notable is the lines of an msiexec log that say why it failed or wants a restart.
+func notable(log string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(log, "\n") {
+		if regexp.MustCompile(`(?i)reboot|restart|in use|return value 3|error|1603|3010`).MatchString(line) {
+			b.WriteString(line + "\n")
+		}
+	}
+	return b.String()
+}
+
+// msiLog is msiexec's verbose log as text (it writes UTF-16).
+func msiLog(path string) string {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err.Error()
+	}
+	if len(raw) >= 2 && raw[0] == 0xff && raw[1] == 0xfe {
+		units := make([]uint16, (len(raw)-2)/2)
+		for i := range units {
+			units[i] = uint16(raw[2+2*i]) | uint16(raw[3+2*i])<<8
+		}
+		return string(utf16.Decode(units))
+	}
+	return string(raw)
 }
 
 func enroll(t *testing.T, endpoint string) {
