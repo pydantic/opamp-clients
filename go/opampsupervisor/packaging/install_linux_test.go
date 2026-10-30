@@ -12,11 +12,13 @@ package packaging
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -87,4 +89,14 @@ func uninstall(t *testing.T, purge bool) {
 		args = append(args, "--purge")
 	}
 	run(t, "", helper, args...)
+}
+
+// diagnose reports the service's state and the end of its journal.
+func diagnose() string {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	status, _ := exec.CommandContext(ctx, "systemctl", "status", "--no-pager", unit).CombinedOutput()
+	journal, _ := exec.CommandContext(ctx, "journalctl", "--no-pager", "-n", "200", "-u", unit).CombinedOutput()
+	ps, _ := exec.CommandContext(ctx, "ps", "-eo", "pid,ppid,stat,args").CombinedOutput()
+	return string(status) + "\n" + string(journal) + "\n" + string(ps)
 }

@@ -9,6 +9,7 @@
 package packaging
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"testing"
@@ -81,4 +82,14 @@ func uninstall(t *testing.T, purge bool) {
 	} else {
 		require.NoError(t, err, "normal removal must keep the installation key")
 	}
+}
+
+// diagnose reports what launchd has of the service and the end of the Supervisor's log.
+func diagnose() string {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	print, _ := exec.CommandContext(ctx, "launchctl", "print", "system/"+label).CombinedOutput()
+	ps, _ := exec.CommandContext(ctx, "ps", "-axo", "pid,ppid,stat,args").CombinedOutput()
+	log, _ := exec.CommandContext(ctx, "tail", "-n", "200", storage+"/log/supervisor.log").CombinedOutput()
+	return string(print) + "\n" + string(ps) + "\n" + string(log)
 }
