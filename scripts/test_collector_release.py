@@ -45,10 +45,29 @@ class Pins(unittest.TestCase):
     def test_one_release_everywhere(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             found = cr.pins(tree(Path(tmp)))
+        self.assertEqual(set(found["contrib"]), {"v0.162.0"})
         self.assertEqual(set(found["0.x"]), {"v0.162.0"})
         self.assertEqual(set(found["1.x"]), {"v1.68.0"})
-        self.assertEqual(len(found["0.x"]["v0.162.0"]), 4, "go.mod twice, the manifest, the builder")
+        self.assertEqual(len(found["0.x"]["v0.162.0"]), 3, "go.mod, the manifest, the builder")
         self.assertEqual(cr.base(found), "v0.162.0")
+
+    def test_a_contrib_patch_release_on_the_cores_is_one_release(self) -> None:
+        # contrib v0.164.1 is built on the core's v0.164.0, and upstream's go.mod pins them so.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(Path(tmp))
+            mod = root / "go/ext/go.mod"
+            mod.write_text(mod.read_text().replace("pkg/status v0.162.0", "pkg/status v0.162.1"))
+            found = cr.pins(root)
+        self.assertEqual(cr.base(found), "v0.162.1", "the forks track contrib's release")
+
+    def test_contrib_on_another_minor_release_is_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(Path(tmp))
+            mod = root / "go/ext/go.mod"
+            mod.write_text(mod.read_text().replace("pkg/status v0.162.0", "pkg/status v0.163.0"))
+            found = cr.pins(root)
+        with self.assertRaisesRegex(SystemExit, "not one minor release"):
+            cr.base(found)
 
     def test_other_modules_are_not_pins(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -60,7 +79,7 @@ class Pins(unittest.TestCase):
             found = cr.pins(tree(Path(tmp), unstable="v0.163.0"))
         with self.assertRaises(SystemExit) as refused:
             cr.base(found)
-        self.assertIn("v0.163.0: go/ext/go.mod:4", str(refused.exception))
+        self.assertIn("v0.163.0: go/ext/go.mod:6", str(refused.exception))
 
     def test_a_builder_on_another_release_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

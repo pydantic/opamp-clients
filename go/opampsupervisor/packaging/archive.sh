@@ -19,7 +19,7 @@ rm -rf "$work" dist/otelcol
 mkdir -p "$work"
 
 # ocb itself runs here, so it is built for this machine; it then builds the collector for GOOS/GOARCH.
-GOOS= GOARCH= GOBIN="$PWD/dist/bin" go install go.opentelemetry.io/collector/cmd/builder@v0.163.0
+GOOS= GOARCH= GOBIN="$PWD/dist/bin" go install go.opentelemetry.io/collector/cmd/builder@v0.164.0
 (cd .. && packaging/dist/bin/builder --config packaging/collector.yaml)
 cp "dist/otelcol/otelcol$exe" "$work/otelcol$exe"
 (cd .. && go build -trimpath -ldflags "-s -w" -o "packaging/$work/opampsupervisor$exe" .)

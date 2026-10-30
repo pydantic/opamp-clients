@@ -804,7 +804,7 @@ jobs:
           EOF
 
   # ---------------------------------------------------------------- Collector and Supervisor
-  # Go 1.26: what the Collector (v1.69) and ocb need. setup-go pins GOTOOLCHAIN=local for the
+  # Go 1.26: what the Collector (v1.70) and ocb need. setup-go pins GOTOOLCHAIN=local for the
   # steps after it, so each job sets up that Go rather than asking the go command to fetch it.
   collector-tests:
     name: Collector extension, processor and Supervisor, unit tests
@@ -882,7 +882,7 @@ jobs:
         run: |
           # ocb makes the output directory but not its parent.
           mkdir -p ../../bin
-          go run go.opentelemetry.io/collector/cmd/builder@v0.163.0 --config testdata/collector/manifest.yaml
+          go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config testdata/collector/manifest.yaml
           cp ../../bin/e2e-collector/otelcontribcol ../../bin/otelcontribcol_linux_amd64
       - name: Supervisor e2e, upstream's suite against that collector
         working-directory: go/opampsupervisor

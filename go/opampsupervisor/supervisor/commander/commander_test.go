@@ -142,10 +142,10 @@ func TestStopKillsAgentThatIgnoresShutdownSignals(t *testing.T) {
 			Env: map[string]string{
 				passthroughTestModeEnv: "ignore-signals-forever",
 			},
+			StopGracePeriod: 2 * time.Second,
 		},
 	)
 	require.NoError(t, err)
-	cmdr.stopGracePeriod = 2 * time.Second
 
 	ready := make(chan struct{})
 	var once sync.Once
@@ -193,10 +193,10 @@ func TestStopCalledConcurrentlyBothReturn(t *testing.T) {
 			Env: map[string]string{
 				passthroughTestModeEnv: "ignore-signals-forever",
 			},
+			StopGracePeriod: 2 * time.Second,
 		},
 	)
 	require.NoError(t, err)
-	cmdr.stopGracePeriod = 2 * time.Second
 
 	ready := make(chan struct{})
 	var once sync.Once
@@ -358,10 +358,10 @@ func TestStopKillsUnresponsiveProcess(t *testing.T) {
 			Env: map[string]string{
 				passthroughTestModeEnv: "ignore-shutdown-signal",
 			},
+			StopGracePeriod: 100 * time.Millisecond,
 		},
 	)
 	require.NoError(t, err)
-	cmdr.stopGracePeriod = 100 * time.Millisecond
 
 	ready := make(chan struct{})
 	var readyOnce sync.Once
@@ -394,6 +394,7 @@ func TestStopDelaysShutdownSignalForNewlyStartedAgent(t *testing.T) {
 			Env: map[string]string{
 				passthroughTestModeEnv: "exit-on-interrupt",
 			},
+			StopGracePeriod: 10 * time.Second,
 		},
 	)
 	require.NoError(t, err)
@@ -524,7 +525,7 @@ func TestStartOneShotKillsAnAgentThatIgnoresTheShutdownSignal(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	cmdr.stopGracePeriod = 500 * time.Millisecond
+	cmdr.cfg.StopGracePeriod = 500 * time.Millisecond
 
 	stdout, _, err := cmdr.StartOneShot()
 	require.NoError(t, err)
