@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["main"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        go: ["msi", "svc"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -99,13 +99,26 @@ jobs:
           # Heartbeat as a commit status, readable from outside even when the runner later goes silent.
           hb() { curl -s -o /dev/null -X POST -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -d "$(python -c 'import json,sys; print(json.dumps({"state":"pending","context":sys.argv[1],"description":sys.argv[2][-139:]}))' "$HB" "$1")" || true; }
           hb "start $(date -u +%T)"
-          if [ "${{ matrix.go }}" = control ]; then
-            (for i in $(seq 1 16); do sleep 15; echo "control tick $i"; done) > "$RUNNER_TEMP/out.txt" 2>&1 &
-          else
-            go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-            hb "built $(date -u +%T)"
-            OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m > "$RUNNER_TEMP/out.txt" 2>&1 &
-          fi
+          msi="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")"
+          cat > "$RUNNER_TEMP/loop.ps1" <<'PS'
+          param($Mode, $Msi)
+          $ErrorActionPreference = 'Stop'
+          $prog = Join-Path $env:ProgramFiles 'pydantic-opamp'
+          function Install { $p = Start-Process msiexec -ArgumentList @('/i', $Msi, '/qn', '/norestart') -Wait -PassThru; "$(Get-Date -f HH:mm:ss) installed $($p.ExitCode)" }
+          function Remove { & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $prog 'pydantic-opamp-uninstall.ps1') -Purge; "$(Get-Date -f HH:mm:ss) removed $LASTEXITCODE" }
+          if ($Mode -eq 'msi') {
+            for ($i = 1; $i -le 8; $i++) { "round $i"; Install; Remove }
+          } else {
+            Install
+            'enroll-token' | & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $prog 'pydantic-opamp-enroll.ps1') -Endpoint ws://127.0.0.1:4320/v1/opamp -Plaintext -NoStart
+            for ($i = 1; $i -le 8; $i++) {
+              "round $i"; Start-Service pydantic-opamp-supervisor; "$(Get-Date -f HH:mm:ss) started"
+              Start-Sleep 5; Stop-Service pydantic-opamp-supervisor; "$(Get-Date -f HH:mm:ss) stopped"
+            }
+            Remove
+          }
+          PS
+          powershell -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$RUNNER_TEMP/loop.ps1")" -Mode "${{ matrix.go }}" -Msi "$msi" > "$RUNNER_TEMP/out.txt" 2>&1 &
           pid=$!
           while kill -0 $pid 2>/dev/null; do
             sleep 5
