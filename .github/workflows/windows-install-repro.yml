@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["main"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        go: ["first", "noconnect"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -116,7 +116,7 @@ jobs:
           else
             go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
             hb "built $(date -u +%T)"
-            OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m > "$RUNNER_TEMP/out.txt" 2>&1 &
+            REPRO="${{ matrix.go }}" OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m > "$RUNNER_TEMP/out.txt" 2>&1 &
           fi
           pid=$!
           while kill -0 $pid 2>/dev/null; do

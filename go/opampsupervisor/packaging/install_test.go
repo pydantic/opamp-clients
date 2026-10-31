@@ -68,6 +68,16 @@ func TestInstallEnrollRestart(t *testing.T) {
 	install(t)
 	validateHostLogs(t, "")
 	srv := newIssuingServer(t)
+	// WIP repro stages (removed before review).
+	if os.Getenv("REPRO") == "noconnect" {
+		enroll(t, "ws://127.0.0.1:1/v1/opamp")
+		for i := 0; i < 3; i++ {
+			stop := startService(t)
+			time.Sleep(10 * time.Second)
+			stop()
+		}
+		return
+	}
 	enroll(t, srv.endpoint)
 
 	stop := startService(t)
@@ -77,6 +87,9 @@ func TestInstallEnrollRestart(t *testing.T) {
 		assert.Contains(c, statuses, protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED)
 	}, 30*time.Second, 200*time.Millisecond)
 	stop()
+	if os.Getenv("REPRO") == "first" {
+		return
+	}
 
 	state, err := os.ReadFile(filepath.Join(storage, "opamp-state"))
 	require.NoError(t, err)
