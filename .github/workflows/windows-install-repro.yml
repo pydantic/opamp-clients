@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["uninst", "reinst"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        go: ["main", "conhost"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -89,6 +89,17 @@ jobs:
           }
           "@ | Set-Content -Encoding UTF8 "$dir\boot.ps1"
           schtasks /create /f /tn boot /sc onstart /ru SYSTEM /tr "powershell -NoProfile -ExecutionPolicy Bypass -File $dir\boot.ps1"
+      - name: Consoles stay in conhost (no hand-off to Windows Terminal), for this user and SYSTEM
+        if: matrix.go == 'conhost'
+        shell: pwsh
+        run: |
+          $conhost = '{B23D10C0-E52E-411E-9D5B-C09FDF709C7D}'
+          foreach ($root in 'HKCU:\Console\%%Startup', 'Registry::HKEY_USERS\S-1-5-18\Console\%%Startup', 'Registry::HKEY_USERS\.DEFAULT\Console\%%Startup') {
+            New-Item -Force -Path $root | Out-Null
+            Set-ItemProperty -Path $root -Name DelegationConsole -Value $conhost
+            Set-ItemProperty -Path $root -Name DelegationTerminal -Value $conhost
+            Get-ItemProperty -Path $root | Format-List DelegationConsole, DelegationTerminal
+          }
       - name: Which Defender and hardware this machine has (posted, so a run that goes dark still has it)
         shell: pwsh
         env:
