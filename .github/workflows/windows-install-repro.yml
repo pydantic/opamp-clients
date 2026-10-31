@@ -12,9 +12,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["main"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-    runs-on: windows-latest
+        go: ["windows-2025", "windows-2022"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    runs-on: ${{ matrix.go }}
     timeout-minutes: 30
     defaults:
       run:
