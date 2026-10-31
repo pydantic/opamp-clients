@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["main", "conhost"]
+        go: ["main"]
         n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     runs-on: windows-latest
     timeout-minutes: 30
@@ -80,7 +80,7 @@ jobs:
               `$boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToUniversalTime().ToString('HH:mm:ss')
               post 'a' ("booted `$boot, now {0:HH:mm:ss}" -f (Get-Date).ToUniversalTime())
               `$n = 0
-              foreach (`$e in (Get-WinEvent -FilterHashtable @{LogName='System'; Id=1074,6008,41,1076} -MaxEvents 4 -ErrorAction SilentlyContinue)) {
+              foreach (`$e in (Get-WinEvent -FilterHashtable @{LogName='System'; Id=1001,1074,6008,41,1076} -MaxEvents 4 -ErrorAction SilentlyContinue)) {
                 `$n++
                 post "e`$n" (('{0:HH:mm:ss} {1} ' -f `$e.TimeCreated.ToUniversalTime(), `$e.Id) + ((`$e.Properties | ForEach-Object { `$_.Value }) -join '|'))
               }
@@ -89,6 +89,13 @@ jobs:
           }
           "@ | Set-Content -Encoding UTF8 "$dir\boot.ps1"
           schtasks /create /f /tn boot /sc onstart /ru SYSTEM /tr "powershell -NoProfile -ExecutionPolicy Bypass -File $dir\boot.ps1"
+      - name: A crash restarts the machine (so the on-boot task can report the bug check)
+        shell: pwsh
+        run: |
+          $k = 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl'
+          Get-ItemProperty $k | Format-List AutoReboot, CrashDumpEnabled, DumpFile, MinidumpDir
+          Set-ItemProperty $k -Name AutoReboot -Value 1
+          Set-ItemProperty $k -Name CrashDumpEnabled -Value 3
       - name: Consoles stay in conhost (no hand-off to Windows Terminal), for this user and SYSTEM
         if: matrix.go == 'conhost'
         shell: pwsh
