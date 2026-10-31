@@ -5,14 +5,15 @@ on:
     branches: [claude/project-thread-qekgrg]
 permissions:
   contents: read
+  statuses: write
 jobs:
   installer-windows:
     name: Windows install (${{ matrix.go }}, ${{ matrix.n }})
     strategy:
       fail-fast: false
       matrix:
-        go: ["before-105"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        go: ["control", "main"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -47,16 +48,33 @@ jobs:
       - working-directory: go/opampsupervisor/packaging
         # A stuck step is stopped here, so the steps after it still run and the log is kept.
         timeout-minutes: 8
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HB: hb/${{ matrix.go }}-${{ matrix.n }}
         run: |
-          go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m &
+          # Heartbeat as a commit status, readable from outside even when the runner later goes silent.
+          hb() { curl -s -o /dev/null -X POST -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/statuses/$GITHUB_SHA" -d "$(python -c 'import json,sys; print(json.dumps({"state":"pending","context":sys.argv[1],"description":sys.argv[2][-139:]}))' "$HB" "$1")" || true; }
+          hb "start $(date -u +%T)"
+          if [ "${{ matrix.go }}" = control ]; then
+            (for i in $(seq 1 16); do sleep 15; echo "control tick $i"; done) > "$RUNNER_TEMP/out.txt" 2>&1 &
+          else
+            go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
+            hb "built $(date -u +%T)"
+            OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 20m > "$RUNNER_TEMP/out.txt" 2>&1 &
+          fi
           pid=$!
-          # Every 15 s while it runs: the busiest processes, so a starved runner shows who starved it.
           while kill -0 $pid 2>/dev/null; do
             sleep 15
-            powershell -NoProfile -Command "Get-Process | Sort-Object CPU -Descending | Select-Object -First 6 Id, Name, CPU | Format-Table -HideTableHeaders | Out-String -Width 200" | tr -s "\n" | sed "s/^/[cpu] /"
+            mem=$(powershell -NoProfile -Command '$o=Get-CimInstance Win32_OperatingSystem; "{0}MB free" -f [int]($o.FreePhysicalMemory/1024)')
+            top=$(powershell -NoProfile -Command "Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 | ForEach-Object { \$_.Name + ':' + [int]\$_.CPU }" | tr '\r\n' '  ')
+            last=$(grep -a -v '^\s*$' "$RUNNER_TEMP/out.txt" | tail -n 1 | tr -d '\r' | cut -c1-60)
+            echo "[hb] $(date -u +%T) $mem $top | $last"
+            hb "$(date -u +%T) $mem $top | $last"
           done
-          wait $pid
+          wait $pid; rc=$?
+          cat "$RUNNER_TEMP/out.txt"
+          hb "done rc=$rc $(date -u +%T)"
+          exit $rc
       - name: What runs and how busy, after the test
         if: always()
         shell: pwsh
