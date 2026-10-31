@@ -262,10 +262,11 @@ command line still installs it.
 The `.msi` installs the Supervisor, the collector and `pydantic-opamp-enroll.ps1` in
 `Program Files\pydantic-opamp`. It also installs the `pydantic-opamp-supervisor` service, which
 runs as LocalSystem, logs to the Application event log, and stays stopped until enrolled. As an
-administrator:
+administrator (`/norestart` keeps a quiet install that finds a file in use from restarting
+Windows on the spot; msiexec exits 3010 to say a restart is due instead):
 
 ```powershell
-msiexec /i pydantic-opamp-supervisor-0.8.0-windows-amd64.msi /qn
+msiexec /i pydantic-opamp-supervisor-0.8.0-windows-amd64.msi /qn /norestart
 $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 ```
 

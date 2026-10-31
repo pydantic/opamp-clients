@@ -15,6 +15,8 @@ package packaging
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,12 +30,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// commandTimeout bounds each command these tests run. A command stuck past it (a service that
+// doesn't stop) fails the test with what the machine shows then (diagnose), instead of hanging
+// until the CI job is cancelled with no output at all.
+const commandTimeout = 3 * time.Minute
+
 func run(t *testing.T, stdin string, name string, args ...string) {
 	t.Helper()
-	cmd := exec.Command(name, args...)
-	cmd.Stdin = strings.NewReader(stdin)
-	out, err := cmd.CombinedOutput()
+	out, err := timed(t, stdin, name, args...)
 	require.NoError(t, err, "%s %v: %s", name, args, out)
+}
+
+// timed runs a command bounded by commandTimeout, and on a timeout logs diagnose's report.
+func timed(t *testing.T, stdin string, name string, args ...string) ([]byte, error) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stdin = strings.NewReader(stdin)
+	// A child the killed command left holding its output must not keep the read open.
+	cmd.WaitDelay = 10 * time.Second
+	out, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		t.Logf("%s %v still running after %s; the machine now:\n%s", name, args, commandTimeout, diagnose())
+		return out, fmt.Errorf("timed out after %s: %w", commandTimeout, err)
+	}
+	return out, err
 }
 
 func TestInstallEnrollRestart(t *testing.T) {
