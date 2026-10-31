@@ -57,5 +57,10 @@
     "@opentelemetry/otlp-transformer": "0.222.0",
     "@types/node": "24.19.0",
     "typescript": "7.0.2"
+  },
+  "overrides": {
+    "rimraf": {
+      "glob": "^14.0.3"
+    }
   }
 }
