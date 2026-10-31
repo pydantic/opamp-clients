@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: ["control", "main"]
-        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        go: ["main"]
+        n: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -45,6 +45,31 @@ jobs:
         run: |
           dotnet tool install --global wix --version 5.0.2
           go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
+      - name: Watchdog outside the runner (a SYSTEM scheduled task posting commit statuses)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WD: wd/${{ matrix.go }}-${{ matrix.n }}
+        run: |
+          $dir = 'C:\wd'; New-Item -ItemType Directory -Force $dir | Out-Null
+          $url = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/statuses/$env:GITHUB_SHA"
+          @"
+          `$ProgressPreference = 'SilentlyContinue'
+          `$h = @{ Authorization = 'Bearer $env:GH_TOKEN' }
+          for (`$i = 0; `$i -lt 240; `$i++) {
+            try {
+              `$runner = (Get-Process -Name Runner.* -ErrorAction SilentlyContinue | ForEach-Object { `$_.Name.Substring(7,1) }) -join ''
+              `$svc = (Get-Service pydantic-opamp-supervisor -ErrorAction SilentlyContinue).Status
+              `$p = (Get-Process -ErrorAction SilentlyContinue | Where-Object { `$_.Name -match 'opamp|otelcol|msiexec|install.test|powershell' } | ForEach-Object { `$_.Name.Substring(0,[Math]::Min(6,`$_.Name.Length)) }) -join ','
+              `$d = ('{0:HH:mm:ss} r={1} s={2} {3}' -f (Get-Date).ToUniversalTime(), `$runner, `$svc, `$p)
+              if (`$d.Length -gt 139) { `$d = `$d.Substring(0,139) }
+              Invoke-RestMethod -Method Post -Uri '$url' -Headers `$h -Body (@{ state='pending'; context='$env:WD'; description=`$d } | ConvertTo-Json) | Out-Null
+            } catch { }
+            Start-Sleep 10
+          }
+          "@ | Set-Content -Encoding UTF8 "$dir\wd.ps1"
+          schtasks /create /f /tn wd /sc once /st 23:59 /ru SYSTEM /tr "powershell -NoProfile -ExecutionPolicy Bypass -File $dir\wd.ps1"
+          schtasks /run /tn wd
       - working-directory: go/opampsupervisor/packaging
         # A stuck step is stopped here, so the steps after it still run and the log is kept.
         timeout-minutes: 8
@@ -64,7 +89,7 @@ jobs:
           fi
           pid=$!
           while kill -0 $pid 2>/dev/null; do
-            sleep 15
+            sleep 5
             mem=$(powershell -NoProfile -Command '$o=Get-CimInstance Win32_OperatingSystem; "{0}MB free" -f [int]($o.FreePhysicalMemory/1024)')
             top=$(powershell -NoProfile -Command "Get-Process | Sort-Object CPU -Descending | Select-Object -First 3 | ForEach-Object { \$_.Name + ':' + [int]\$_.CPU }" | tr '\r\n' '  ')
             last=$(grep -a -v '^\s*$' "$RUNNER_TEMP/out.txt" | tail -n 1 | tr -d '\r' | cut -c1-60)
