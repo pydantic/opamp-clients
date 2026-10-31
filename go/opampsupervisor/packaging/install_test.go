@@ -97,6 +97,9 @@ func TestInstallEnrollRestart(t *testing.T) {
 	assert.NotContains(t, string(state), "issued-token")
 
 	srv.forget()
+	if os.Getenv("REPRO") == "secondslow" {
+		time.Sleep(20 * time.Second)
+	}
 	stop = startService(t)
 	defer func() {
 		if stop != nil {
@@ -111,6 +114,9 @@ func TestInstallEnrollRestart(t *testing.T) {
 	}, 30*time.Second, 200*time.Millisecond)
 	auths, _ := srv.seen()
 	assert.NotContains(t, auths, "Bearer enroll-token")
+	if strings.HasPrefix(os.Getenv("REPRO"), "second") {
+		return
+	}
 	// Linux's fixture runs the process itself when systemd is absent.
 	if runtime.GOOS == "linux" {
 		stop()
