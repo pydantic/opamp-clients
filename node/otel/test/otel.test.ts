@@ -1045,7 +1045,7 @@ test("the endpoint is logged without its secrets, whatever it is", () => {
   assert.equal(shownEndpoint("https://user:secret@[::1/v1/opamp?k=v"), "https://[::1/v1/opamp");
 });
 
-test("without OTEL_LOG_LEVEL, warnings and errors go to the console; info stays on diag", (t) => {
+test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to the console; other info stays on diag", (t) => {
   const warned = t.mock.method(console, "warn", () => {});
   const errored = t.mock.method(console, "error", () => {});
   const before = say.console;
@@ -1058,15 +1058,21 @@ test("without OTEL_LOG_LEVEL, warnings and errors go to the console; info stays 
     const r = new Reachability(s.shown, "", "u", s.hints);
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
     r.notified({ kind: "connected" });
+    r.notified({ kind: "connectFailed", status: 404, detail: "" });
+    r.notified({ kind: "connected" });
     say.error("OpAMP: x");
   } finally {
     say.console = before;
     diag.disable();
   }
-  assert.deepEqual(warned.mock.calls.map((c) => c.arguments), [[
-    "OpAMP: can't reach http://opamp.example.com/v1/opamp (HTTP 404): nothing serves OpAMP at that path: check "
-      + "OTEL_OPAMP_ENDPOINT (it usually ends in /v1/opamp). Retrying in the background; the SDK keeps its current "
-      + "settings meanwhile"]]);
+  const notFound = "OpAMP: can't reach http://opamp.example.com/v1/opamp (HTTP 404): nothing serves OpAMP at that "
+    + "path: check OTEL_OPAMP_ENDPOINT (it usually ends in /v1/opamp). Retrying in the background; the SDK keeps its "
+    + "current settings meanwhile";
+  assert.deepEqual(warned.mock.calls.map((c) => c.arguments), [
+    [notFound],
+    ["OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance u"],
+    [notFound],
+  ]);
   assert.deepEqual(errored.mock.calls.map((c) => c.arguments), [["OpAMP: x"]]);
-  assert.deepEqual(lines, ["OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance u"]);
+  assert.deepEqual(lines, ["OpAMP: connected to http://opamp.example.com/v1/opamp again"]);
 });

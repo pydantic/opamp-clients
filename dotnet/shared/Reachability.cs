@@ -61,7 +61,7 @@ internal sealed class Reachability(string shown, SetupHints hints, string servic
                 if (!this.ever)
                 {
                     var who = service.Length > 0 ? $" as {service}" : string.Empty;
-                    log.Info($"connected to {endpoint}; this SDK is managed{who}, instance {uid}");
+                    (log.Notice ?? log.Info)($"connected to {endpoint}; this SDK is managed{who}, instance {uid}");
                 }
                 else if (this.failing)
                 {

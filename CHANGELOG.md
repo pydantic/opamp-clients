@@ -41,6 +41,14 @@ and date. Tests, CI and docs alone don't need a line.
   `opamp.IsFailedForNow` and `opamp.IsFailedLeavingUnknown` to read them. A plain error fails the
   version for good, as before (#81).
 
+### Changed
+
+- Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
+  as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
+  that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
+  own; Node.js and the .NET plugin show it unless `OTEL_LOG_LEVEL` is set (Node.js) or set below
+  `info` (.NET). Reconnections stay at INFO.
+
 ### Fixed
 
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.

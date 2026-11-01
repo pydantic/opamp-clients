@@ -161,6 +161,14 @@ const SUCCESS: ExportResult = { code: 0 };
  */
 export const say = {
   console: str(process.env, "OTEL_LOG_LEVEL") === undefined,
+  /**
+   * What a person checks for once, such as the first connection: on the console too without
+   * OTEL_LOG_LEVEL, so that working and not loaded don't look alike; with it, diag's info.
+   */
+  notice(message: string): void {
+    if (this.console) console.warn(message);
+    else diag.info(message);
+  },
   warn(message: string): void {
     if (this.console) console.warn(message);
     else diag.warn(message);
@@ -267,7 +275,7 @@ export class Reachability {
     if (n.kind === "connected") {
       if (!this.#ever) {
         const who = this.service ? ` as ${this.service}` : "";
-        diag.info(`OpAMP: connected to ${endpoint}; this SDK is managed${who}, instance ${this.uid}`);
+        say.notice(`OpAMP: connected to ${endpoint}; this SDK is managed${who}, instance ${this.uid}`);
       } else if (this.#failing) {
         diag.info(`OpAMP: connected to ${endpoint} again`);
       }

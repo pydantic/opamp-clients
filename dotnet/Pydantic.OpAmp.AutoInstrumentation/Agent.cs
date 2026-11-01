@@ -396,7 +396,10 @@ internal sealed class LogsWatch(SdkAgent agent) : BaseProcessor<OpenTelemetry.Lo
     }
 }
 
-/// <summary>What the plugin says: warnings and errors always, information at OTEL_LOG_LEVEL info or debug, the rest at debug.</summary>
+/// <summary>
+/// What the plugin says: warnings and errors always, information at OTEL_LOG_LEVEL info or debug, the rest at debug.
+/// The first connection too without OTEL_LOG_LEVEL, so that working and not loaded don't look alike.
+/// </summary>
 internal static class Log
 {
     private static readonly string? Level = Environment.GetEnvironmentVariable("OTEL_LOG_LEVEL")?.Trim().ToLowerInvariant();
@@ -404,7 +407,7 @@ internal static class Log
     private static readonly bool Verbose = Level is "info" or "debug";
 
     /// <summary>The same, for the agent the plugin shares with the hosting package.</summary>
-    public static readonly AgentLog Sink = new(Info, Warn, Error, Debug);
+    public static readonly AgentLog Sink = new(Info, Warn, Error, Debug, Notice);
 
     public static void Debug(string message)
     {
@@ -417,6 +420,14 @@ internal static class Log
     public static void Info(string message)
     {
         if (Verbose)
+        {
+            Console.Error.WriteLine($"OpAMP: {message}");
+        }
+    }
+
+    public static void Notice(string message)
+    {
+        if (Level is null || Verbose)
         {
             Console.Error.WriteLine($"OpAMP: {message}");
         }

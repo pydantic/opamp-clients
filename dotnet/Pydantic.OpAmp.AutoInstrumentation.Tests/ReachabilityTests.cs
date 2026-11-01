@@ -53,6 +53,24 @@ public class ReachabilityTests
     }
 
     /// <summary>
+    /// The first connection goes to Notice where the log has one (the plugin's: shown without
+    /// OTEL_LOG_LEVEL), so a working SDK doesn't look like one not loaded; a reconnection stays Info.
+    /// </summary>
+    [Fact]
+    public void TheFirstConnectionIsANotice()
+    {
+        var lines = new List<string>();
+        var log = new AgentLog(m => lines.Add($"Info: {m}"), m => lines.Add($"Warn: {m}"), m => lines.Add($"Error: {m}"),
+            _ => { }, m => lines.Add($"Notice: {m}"));
+        var r = For("https://opamp.example.com/v1/opamp", "checkout", log);
+        r.Notified(new OpAmpNotification.Connected());
+        r.Notified(new OpAmpNotification.ConnectFailed(null, "connection refused"));
+        r.Notified(new OpAmpNotification.Connected());
+        Assert.Equal("Notice: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout, instance " + Uid, lines[0]);
+        Assert.Equal("Info: connected to https://opamp.example.com/v1/opamp again", lines[2]);
+    }
+
+    /// <summary>
     /// After the server moved the agent to another endpoint, what it says names the one the client
     /// uses now (logged without credentials), not the one configured.
     /// </summary>
