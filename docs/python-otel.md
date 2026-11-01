@@ -144,7 +144,7 @@ SDK joins the fleet and takes the server's settings. Install the package with it
 import logfire
 import pydantic_opamp_otel
 
-pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+pydantic_opamp_otel.configure_logfire(service_name="checkout")
 logfire.instrument_fastapi(app)  # the Logfire SDK's instrumentations, as before
 ```
 
@@ -166,12 +166,16 @@ What it does differently from `logfire.configure()`:
   arrives when a setting changes ([at once](sdk-settings.md#the-controls)).
 - The instance UID is `service.instance.id`, in place of the random one the Logfire SDK makes.
 
-What exports past the gates is declared, so a policy that overrides a setting it would bypass is
-refused (FAILED, naming the setting), as in [the host](sdk-settings.md#the-host), and a warning
-at start names the settings set aside:
+The policy's controls apply to the exporters to Logfire, not to the Logfire SDK's console (on
+unless `console=False` or `LOGFIRE_CONSOLE=false`). The console is a local view of every span and
+log as recorded: redaction, scrubbing, `signal_exports` and the log controls don't change what it
+shows (sampling does, as the sampler runs first). A policy applies with the console on; turn the
+console off where its output is collected and must be redacted too, as container logs often are.
 
-- the console (on unless `console=False` or `LOGFIRE_CONSOLE=false`): it shows every span and
-  log, so with it on the trace and log gates and redaction are set aside;
+What sends telemetry elsewhere past the gates is declared, so a policy that overrides a setting it
+would bypass is refused (FAILED, naming the setting), as in [the host](sdk-settings.md#the-host),
+and a warning at start names the settings set aside:
+
 - span processors (`additional_span_processors`), log record processors
   (`advanced.log_record_processors`) and metric readers (`metrics.additional_readers`) given in the
   arguments;

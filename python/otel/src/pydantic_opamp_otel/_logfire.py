@@ -8,10 +8,11 @@ the way the Logfire SDK builds them, with the package's gates between the SDK an
 Logfire SDK then sends nothing itself (``send_to_logfire=False``). Everything else is
 ``logfire.configure``'s own: its scrubbing, its console, its instrumentations.
 
-What can't be gated (console output, a processor or metric reader given here, the OTLP exporters
+What exports past the gates elsewhere (a processor or metric reader given here, the OTLP exporters
 the Logfire SDK adds for ``OTEL_EXPORTER_OTLP_*``, or an export the Logfire SDK makes from its
 credentials file) is declared, so a policy that overrides a setting it would bypass is refused
-rather than answered as done (docs/python-otel.md, "The Logfire SDK").
+rather than answered as done. The console isn't: it is a local view, which the policy's controls
+don't reach, as documented (docs/python-otel.md, "The Logfire SDK").
 """
 
 from __future__ import annotations
@@ -198,7 +199,6 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     kwargs["resource_attributes"] = {**config.resource_attributes, _INSTANCE_ID: str(AGENT.uid)}
 
     tokens, sends_ungated, base_url = _resolved(config)
-    console = config.console is not False
     given_spans = list(kwargs.get("additional_span_processors") or ())
     advanced = kwargs.get("advanced")
     if isinstance(advanced, Mapping):
@@ -220,8 +220,9 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     # What exports past the gates, so the settings it would bypass aren't declared (sdk_host).
     AGENT.configured = True
     AGENT.logfire = True
-    AGENT.span_processors = bool(given_spans) or console or sends_ungated or _otlp_variables("traces")
-    AGENT.log_processors = bool(given_logs) or console or sends_ungated or _otlp_variables("logs")
+    # The console isn't counted: it is a local view the controls don't reach, as documented.
+    AGENT.span_processors = bool(given_spans) or sends_ungated or _otlp_variables("traces")
+    AGENT.log_processors = bool(given_logs) or sends_ungated or _otlp_variables("logs")
     ungated_metrics = metrics is not False and (bool(given_readers) or sends_ungated or _otlp_variables("metrics"))
     AGENT.extra_metric_exporters = [_UNGATED] if ungated_metrics else []
     AGENT.listed_exporters = [(signal, LOGFIRE_EXPORTER) for _ in built for signal in

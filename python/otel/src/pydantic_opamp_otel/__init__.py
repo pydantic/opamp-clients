@@ -1194,9 +1194,8 @@ class Agent:
                 _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
                              "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
             elif self.logfire:
-                _log.warning("OpAMP: the Logfire SDK's console, or a processor, metric reader or OTLP exporter "
-                             "it was given, exports past this package's gates: %s can't be carried out "
-                             "(console=False keeps the console out)", lost)
+                _log.warning("OpAMP: a processor, metric reader or OTLP exporter the Logfire SDK was given "
+                             "exports past this package's gates: %s can't be carried out", lost)
             else:
                 _log.warning("OpAMP: the processors or metric exporters passed to the configurator export "
                              "past this package's gates: %s can't be carried out", lost)

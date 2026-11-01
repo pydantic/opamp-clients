@@ -186,17 +186,20 @@ def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers):
     assert sorted(ingest.names()) == ["before", "loud stdlib", "loud warning", "request"], run.stderr
 
 
-def test_console_output_is_past_the_gates_so_a_policy_that_needs_them_is_refused(tmp_path, servers):
-    """The Logfire SDK's console shows every span, ungated: a policy that masks an attribute
-    can't be carried out on it, so it is refused, and what reaches Logfire is as before."""
+def test_the_console_doesnt_stop_a_policy(tmp_path, servers):
+    """The Logfire SDK's console is a local view the controls don't reach (documented): with it on,
+    a policy that masks an attribute is applied all the same, and carried out on what reaches
+    Logfire."""
     server, ingest = servers
     run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), console=True)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
-    assert any(m.remote_config_status.status == FAILED for m in server.got)
-    assert not any(m.remote_config_status.status == APPLIED for m in server.got)
-    assert "the Logfire SDK's console" in run.stderr and "mask_attributes" in run.stderr
-    # The sampler is still the server's to set.
-    assert "sampling_rate" in run.stdout.split("live ")[-1]
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert not any(m.remote_config_status.status == FAILED for m in server.got)
+    (after,) = [a for n, a in ingest.spans if n == "after"]
+    assert after["user.email"] != "a@example.com"
+    assert "past this package's gates" not in run.stderr
+    for setting in ("send_traces", "send_logs", "sampling_rate", "mask_attributes", "scrub_patterns"):
+        assert setting in run.stdout.split("live ")[-1]
 
 
 def test_without_an_endpoint_it_is_logfire_configure():

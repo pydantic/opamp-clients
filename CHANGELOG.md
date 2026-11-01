@@ -43,6 +43,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Python (`pydantic-opamp-otel`): with `configure_logfire()`, the Logfire SDK's console no longer
+  makes a policy that overrides redaction, scrubbing, `signal_exports` or the log controls FAILED.
+  The controls apply to what is sent to Logfire; the console, a local view, shows spans and logs
+  as recorded (sampling still applies). Pass `console=False` where the console's output must be
+  redacted too.
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its

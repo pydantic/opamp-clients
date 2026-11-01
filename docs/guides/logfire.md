@@ -23,7 +23,7 @@ the application gives `logfire.configure()` today:
 import logfire
 import pydantic_opamp_otel
 
-pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+pydantic_opamp_otel.configure_logfire(service_name="checkout")
 logfire.instrument_httpx()  # the Logfire SDK's instrumentations, as before
 ```
 
@@ -40,11 +40,14 @@ its sampler in front of the Logfire SDK's head sampling, and its gates in front 
 to Logfire. Without `OTEL_OPAMP_ENDPOINT` (or `endpoint=`), `configure_logfire()` is
 `logfire.configure()`.
 
-Pass `console=False` (or set `LOGFIRE_CONSOLE=false`). The console shows every span and log as
-it is, past the gates, so with it on the server can still sample but a policy that overrides
-`signal_exports`, the log controls, `attribute_redaction` or `scrubbing` is refused. The same
-goes for span processors, log record processors or metric readers given in the arguments, and for
-the OTLP exporters the Logfire SDK adds for `OTEL_EXPORTER_OTLP_*ENDPOINT`.
+The policy's controls (redaction, scrubbing, what to send, log levels) apply to what is sent to
+Logfire. They don't change the Logfire SDK's console, a local view of every span and log as
+recorded; only sampling does. If the console's output is collected somewhere that must be
+redacted too, such as container logs, pass `console=False` (or set `LOGFIRE_CONSOLE=false`).
+
+Telemetry sent elsewhere past the gates is different: with span processors, log record processors
+or metric readers given in the arguments, or the OTLP exporters the Logfire SDK adds for
+`OTEL_EXPORTER_OTLP_*ENDPOINT`, a policy that overrides a control they would bypass is refused.
 
 [python-otel.md](../python-otel.md#the-logfire-sdk-configure_logfire) has the whole reference:
 which Logfire SDK versions, what it does differently from `logfire.configure()`, and what is
