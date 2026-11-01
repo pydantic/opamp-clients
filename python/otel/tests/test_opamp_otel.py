@@ -1,6 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 
+import io
 import logging
 import json
 import os
@@ -1357,6 +1358,32 @@ def test_connecting_failing_and_recovering_are_each_said_once(caplog):
         (logging.INFO, "OpAMP: connected to https://opamp.example.com/v1/opamp again"),
     ]
     assert "secret" not in caplog.text and "token=x" not in caplog.text
+
+
+def test_the_first_connection_reaches_stderr_without_logging_of_the_applications(monkeypatch, capsys):
+    """With INFO off and no handler of the application's, the first connection still shows, once, so
+    that a working SDK doesn't look like one not loaded; later lines stay at INFO. An application
+    with a handler of its own decides."""
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(root, "level", logging.WARNING)
+    monkeypatch.setattr(logging.getLogger("pydantic_opamp_otel"), "level", logging.NOTSET)
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r.notified(Notification("connected"))
+    r.notified(Notification("connect_failed", detail="connection refused"))
+    capsys.readouterr()
+    r.notified(Notification("connected"))
+    assert capsys.readouterr().err == ""  # "again" stays at INFO
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r.notified(Notification("connected"))
+    assert capsys.readouterr().err == ("OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed "
+                                       f"as checkout, instance {uuid.UUID(int=7)}\n")
+    own = logging.StreamHandler(io.StringIO())
+    own.setLevel(logging.WARNING)
+    monkeypatch.setattr(root, "handlers", [own])
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r.notified(Notification("connected"))
+    assert capsys.readouterr().err == "" and own.stream.getvalue() == ""
 
 
 def test_what_is_said_names_the_endpoint_in_use(caplog):

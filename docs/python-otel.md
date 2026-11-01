@@ -12,11 +12,13 @@ It plugs in through upstream's extension points, including the SDK's OpAMP hook
 
 ## Use it
 
-Install it next to the instrumentations the application needs (from the repository, until it is
-published):
+Install it next to the instrumentations the application needs. Until it is published, install it
+from a checkout of this repository, after fetching the compiled core the checkout pins:
 
 ```bash
-pip install ./python ./python/otel opentelemetry-instrumentation-flask
+git clone https://github.com/pydantic/opamp-clients && cd opamp-clients
+scripts/fetch_core.py fetch
+pip install ./python/core ./python ./python/otel opentelemetry-instrumentation-flask
 ```
 
 Then run the application under `opentelemetry-instrument` as usual, with the server's address:
@@ -24,7 +26,7 @@ Then run the application under `opentelemetry-instrument` as usual, with the ser
 ```bash
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 opentelemetry-instrument python app.py
 ```
@@ -34,7 +36,7 @@ opentelemetry-instrument python app.py
 | `OTEL_OPAMP_DISABLED` | `true` turns OpAMP off: no client starts, whatever else is given (the endpoint given to `configure()` too), and the SDK runs on its own settings. This is the way to take an application off the server in an incident: set it and restart, no deploy. One warning says so (`OpAMP: off, as OTEL_OPAMP_DISABLED=true says: no OpAMP client is started, whatever the code gives`). `false` or blank leaves it to the rest; any other value (`1`, `yes`) is taken as `true`, and the warning says how to write it. |
 | `OTEL_SDK_DISABLED` | OpenTelemetry's own: `true` turns OpAMP off too, read as `OTEL_OPAMP_DISABLED` is (here `1` is taken as `true` as well). What the SDK does with it is upstream's. |
 | `OTEL_OPAMP_ENDPOINT` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the package does nothing beyond the upstream distro's defaults. |
-| `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The enrollment key goes here. |
+| `OTEL_OPAMP_HEADERS` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded. The key the server gave you goes here. |
 | `OTEL_OPAMP_STATE_DIR` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the package keeps one of the user's own, one per process of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off, and then each start is a new instance and settings that take effect at the next start are refused. A directory named here belongs to one process: two processes given the same one are the same instance. |
 | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the application. |
 
@@ -56,7 +58,8 @@ answered as done ([the host](sdk-settings.md#the-host)). The package logs a warn
 
 The package says so on the `pydantic_opamp_otel` logger. When the client first reaches the server it logs,
 at INFO, `OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout,
-instance <uid>`. When it can't, it logs one WARNING per run of failures, with what to check:
+instance <uid>`. That line reaches stderr even with INFO off, unless the application has logging
+handlers of its own, so a working SDK never looks like one that isn't loaded. When it can't, it logs one WARNING per run of failures, with what to check:
 
 ```
 OpAMP: can't reach https://opamp.example.com/v1/opamp (HTTP 401): the server refused this agent's

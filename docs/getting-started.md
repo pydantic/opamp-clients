@@ -25,7 +25,11 @@ needs.
 The server gives you two things: its OpAMP endpoint, and a key the agent sends as a bearer token.
 In Logfire, **Fleet → Connect an application** shows both
 ([guides/logfire.md](guides/logfire.md#an-application)). The key is shown once: store it in your
-secret manager.
+secret manager. These pages write it as `<key>`.
+
+Servers name keys differently. An *enrollment key* is one a host's Supervisor uses once, to get
+a key of its own. A key you give an application is the one it connects with: Logfire's Fleet
+calls it the application's connection key.
 
 The key that connects an application is not a telemetry write token. Telemetry goes where the
 SDK sends it, with its own credentials (for Logfire, a write token), and never through the OpAMP
@@ -60,16 +64,18 @@ OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp
   SDK runs unmanaged.
 - `OTEL_OPAMP_HEADERS`: as `OTEL_EXPORTER_OTLP_HEADERS`, values percent-encoded (`%20` for the
   space after `Bearer`).
-- `OTEL_OPAMP_STATE_DIR`: where the agent keeps its identity and the key the server issues it,
-  readable by the application's user only. Give each process its own directory, on a disk that
-  outlives a restart. Without it the integration keeps one of the user's own
-  ([default-state-dir.md](default-state-dir.md)).
+- `OTEL_OPAMP_STATE_DIR` (optional): where the agent keeps its identity and the key the server
+  issues it, readable by the application's user only. Without it the integration keeps one of the
+  user's own ([default-state-dir.md](default-state-dir.md)), which is fine to start with. In
+  production, give each process its own directory, on a disk that outlives a restart, that the
+  application's user can create.
 
 Then start the application as you do today, with its usual exporter settings.
 
 ### 4. Check it connected
 
-The integration logs one line when it first reaches the server:
+The integration logs one line when it first reaches the server, shown even with the default log
+settings:
 
 ```
 OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout, instance <uid>
@@ -115,9 +121,10 @@ installation in Fleet revokes its keys and closes its connections.
 
 ## A host
 
-The Supervisor runs a collector on the host and lets the server configure it, within a policy
-the host sets. The server can't widen that policy: by default it may use a short list of
-components, send telemetry only to its own host, and read no log files
+The Supervisor runs a collector on the host and lets the server configure it. By default the
+server may run any config: any component the collector has, sending anywhere. Install with
+`--restricted` to set a policy on the host that the server can't widen: a short list of
+components, telemetry only to the server's own host, and no log files unless you name them
 ([what the server can do to this host](../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)).
 
 - **Logfire:** **Fleet → Connect host** gives a one-line install command for Linux, macOS or

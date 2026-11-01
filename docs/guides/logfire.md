@@ -30,7 +30,7 @@ logfire.instrument_httpx()  # the Logfire SDK's instrumentations, as before
 ```bash
 LOGFIRE_TOKEN=<write token> \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 python app.py
 ```
@@ -86,7 +86,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=https://logfire-us.pydantic.dev \
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf \
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=<write token>" \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:opentelemetry-javaagent.jar \
      -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
@@ -119,10 +119,10 @@ installation; each process of it is an instance.
 
 1. On the project's Fleet page, choose **Connect an application**. Name it, optionally give an
    environment, and pick the **SDK policy to apply**: a new policy starts from the SDK's own
-   settings, and **Just monitor this application** connects it with no policy.
+   settings.
 2. Choose how long the connection key lasts (up to a year): the application keeps it, and Fleet
-   doesn't renew it. **Create connection** shows the OpAMP endpoint and the runtime key. The key
-   is shown once: store it in your secret manager as `LOGFIRE_OPAMP_TOKEN`.
+   doesn't renew it. **Create connection** shows the OpAMP endpoint and the connection key. The key
+   is shown once: store it in your secret manager (the example below calls it `LOGFIRE_OPAMP_TOKEN`; any name works).
 3. Start the application with its integration (above), the endpoint and the key:
 
    ```bash
@@ -143,17 +143,20 @@ FAILED ([troubleshooting.md](../troubleshooting.md#a-policy-is-failed)).
 
 1. Choose **Connect host**. Pick the policy, which says what the host's collector collects, and
    optionally a host name (left blank, Fleet uses the host's own).
-2. **Create enrollment key**, then choose the host's operating system. Fleet shows one command,
-   with the enrollment key in it:
+2. **Create enrollment key**, then choose the host's operating system. Fleet shows the key and
+   one command:
 
    ```bash
-   uvx logfire-cli --beta --base-url <...> --org <org> collector install \
-     --project <project> --enrollment-token <enrollment key> --yes
+   uvx --from 'logfire-cli>=0.1.16' logfire-cli --beta --base-url <...> --org <org> collector install \
+     --project <project> --token-stdin --yes
    ```
 
    Run it on the host (an administrator PowerShell on Windows; `uvx` comes with
-   [uv](https://docs.astral.sh/uv/getting-started/installation/)). It installs the Supervisor and
-   its collector as a service and enrolls the host. No Logfire sign-in is needed on the host.
+   [uv](https://docs.astral.sh/uv/getting-started/installation/)) and paste the enrollment key
+   when it asks: it isn't echoed and stays out of your shell history. In automation, pipe the key
+   in, or set `LOGFIRE_COLLECTOR_ENROLLMENT_TOKEN` and leave out `--token-stdin`. The command
+   installs the Supervisor and its collector as a service and enrolls the host. No Logfire sign-in
+   is needed on the host.
 3. The host shows up in Fleet. Its collector runs the policy, within what the host allows
    ([what the server can do to this host](../../go/opampsupervisor/packaging/README.md#what-the-server-can-do-to-this-host)).
 
@@ -170,7 +173,7 @@ bridge applies the Collector resources in the cluster's Fleet policy and reports
    Autopilot, install cert-manager with Helm and its leader election in its own namespace
    (`--set global.leaderElection.namespace=cert-manager`).
 2. Choose **Connect Kubernetes**. Name the cluster, give the namespaces its collectors run in,
-   pick a policy (or **Just monitor this cluster**), and what to collect. On GKE Autopilot,
+   pick a policy, and what to collect. On GKE Autopilot,
    leave **Container logs** off: Autopilot refuses the host path it reads.
 3. Fleet shows the runtime key and the commands that store it as the `logfire-opamp` Secret and
    apply the bridge. Save the key: it is shown once.

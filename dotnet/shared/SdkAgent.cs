@@ -212,7 +212,12 @@ internal sealed record Clock(Func<ulong> WallMs, Func<long> Nanos, Func<TimeSpan
 }
 
 /// <summary>Where what the agent says goes: the plugin's standard error, or the application's logger.</summary>
-internal sealed record AgentLog(Action<string> Info, Action<string> Warn, Action<string> Error, Action<string>? Debug = null);
+/// <remarks>
+/// <c>Notice</c> is what a person checks for once, such as the first connection: information, shown
+/// unless logging was asked to be quieter. Without one it is <c>Info</c>.
+/// </remarks>
+internal sealed record AgentLog(Action<string> Info, Action<string> Warn, Action<string> Error, Action<string>? Debug = null,
+    Action<string>? Notice = null);
 
 /// <summary>
 /// The SDK under the server, whatever set the SDK up (the plugin, or the hosting package): the

@@ -88,6 +88,24 @@ class _LastResort(logging.Handler):
 
 
 _log.addHandler(_LastResort(logging.WARNING))
+
+
+def _notice(message: str, *args: object) -> None:
+    """Say something a person checks for once, such as the first connection, at INFO. Where INFO is
+    off and the application has no logging of its own, it reaches stderr all the same, so that
+    working and not loaded don't look alike; where the application set up its own handlers, they
+    decide."""
+    if _log.isEnabledFor(logging.INFO):
+        _log.info(message, *args)
+        return
+    logger: logging.Logger | None = _log
+    while logger:
+        if any(not type(h).__module__.startswith("opentelemetry.") and not isinstance(h, _LastResort)
+               for h in logger.handlers):
+            return
+        logger = logger.parent if logger.propagate else None
+    record = _log.makeRecord(_log.name, logging.INFO, __file__, 0, message, args, None)
+    (logging.lastResort or logging.StreamHandler(sys.stderr)).handle(record)
 _INSTANCE_ID = "service.instance.id"
 
 
@@ -212,7 +230,7 @@ class Reachability:
         if n.kind == "connected":
             if not self.ever:
                 who = f" as {self.service}" if self.service else ""
-                _log.info("OpAMP: connected to %s; this SDK is managed%s, instance %s", endpoint, who, self.uid)
+                _notice("OpAMP: connected to %s; this SDK is managed%s, instance %s", endpoint, who, self.uid)
             elif self.failing:
                 _log.info("OpAMP: connected to %s again", endpoint)
             self.ever, self.failing = True, False

@@ -26,7 +26,7 @@ application's. Then start the application with the agent and the extension:
 ```bash
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:opentelemetry-javaagent.jar \
      -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
@@ -38,7 +38,7 @@ java -javaagent:opentelemetry-javaagent.jar \
 | `otel.opamp.disabled` | `true` turns OpAMP off: no client starts, whatever else is given, and the agent runs on its own settings. This is the way to take an application off the server in an incident: set it and restart, no deploy. One warning says so, naming the variable (`OpAMP: off, as OTEL_OPAMP_DISABLED=true says: no OpAMP client is started, whatever the code gives`). `false` or blank leaves it to the rest; any other value (`1`, `yes`) is taken as `true`, and the warning says how to write it. |
 | `otel.sdk.disabled` | OpenTelemetry's own: `true` turns OpAMP off too, read as `otel.opamp.disabled` is (here `1` is taken as `true` as well). What the agent does with it is upstream's. |
 | `otel.opamp.endpoint` | The OpAMP server: `http(s)://.../v1/opamp` polls, `ws(s)://...` keeps a connection open. Without it the extension does nothing. |
-| `otel.opamp.headers` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded (`+` is a plus). A header whose value has an escape it can't decode, or that HTTP can't carry, is left out, with a warning naming the header. The enrollment key goes here. |
+| `otel.opamp.headers` | Headers for every request, as `OTEL_EXPORTER_OTLP_HEADERS`: `name=value,...`, values percent-encoded (`+` is a plus). A header whose value has an escape it can't decode, or that HTTP can't carry, is left out, with a warning naming the header. The key the server gave you goes here. |
 | `otel.opamp.state.dir` | Where to keep state across restarts: the instance UID, the settings for the next start, the client's own state (written readable by the application's user only). Without it, the extension keeps one of the user's own, one per JVM of the program running at once ([default-state-dir.md](default-state-dir.md)); `none` turns that off. A directory named here is one per process: two JVMs given the same one would share an instance UID and overwrite each other's state. With `none`, settings that take effect at the next start are refused; live ones still apply. With `none`, or a directory that can't be written (checked at start), each start is a new instance; in a directory that can't be written, a settings change fails, as it can't be saved, as in every language. |
 | `otel.opamp.heartbeat.interval` | How often to check in until the server offers an interval (default 30 s): milliseconds, or `500ms`, `30s`, `2m`. A value it can't read is warned about and the default used; longer than a day is a day; it never stops the SDK. |
 

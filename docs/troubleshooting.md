@@ -6,9 +6,9 @@ when it connects, and says once, with what to check, when it can't.
 
 ## Where each integration logs
 
-| Integration | Where | INFO lines shown |
+| Integration | Where | INFO lines shown (the first connection is always shown unless logging was set quieter) |
 |---|---|---|
-| Python ([python-otel.md](python-otel.md#is-it-working)) | the `pydantic_opamp_otel` logger; warnings reach stderr | with a handler at INFO |
+| Python ([python-otel.md](python-otel.md#is-it-working)) | the `pydantic_opamp_otel` logger; warnings and the first connection reach stderr | with a handler at INFO |
 | Go ([go-otel.md](go-otel.md#is-it-working)) | `slog`'s default logger | at slog's level |
 | Node.js ([node-otel.md](node-otel.md#is-it-working)) | OpenTelemetry's `diag` logger; warnings reach stderr | with `OTEL_LOG_LEVEL=info` |
 | Java ([javaagent.md](javaagent.md#is-it-working)) | the `java.util.logging` logger `dev.pydantic.opamp.javaagent.Extension` | at INFO |

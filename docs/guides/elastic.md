@@ -46,7 +46,7 @@ Give EDOT's agent the extension, as you would the upstream agent:
 ```bash
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:elastic-otel-javaagent.jar \
      -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
@@ -90,7 +90,7 @@ List both plugins, EDOT's first, and start the application with `_instrument.sh`
 OTEL_DOTNET_AUTO_PLUGINS="Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation" \
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 ./_instrument.sh dotnet Checkout.dll
 ```
@@ -115,7 +115,7 @@ OTEL_TRACES_SAMPLER=experimental_composite_parentbased_traceidratio \
 OTEL_EXPERIMENTAL_RESOURCE_DETECTORS=process_runtime,os,telemetry_distro,otel \
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 opentelemetry-instrument python app.py
 ```
