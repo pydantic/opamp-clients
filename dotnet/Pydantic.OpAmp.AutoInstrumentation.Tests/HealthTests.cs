@@ -119,6 +119,33 @@ public class HealthTests
         Assert.Equal("Connection refused (collector:4318)", m.LastError);
     }
 
+    // Regression: an error inside the gate (here a body it can't read) failed the export with
+    // nothing counted, so Fleet's Traffic and health never showed it.
+    [Fact]
+    public void AnErrorInsideTheGateIsAFailedExportAndStillThrown()
+    {
+        var controls = new Controls();
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"mask":["k"]}"""))));
+        using var client = new HttpClient(new GateHandler(controls, Signal.Traces) { InnerHandler = new Sink() });
+        var request = new HttpRequestMessage(HttpMethod.Post, "http://collector/v1/traces") { Content = new Unreadable() };
+        Assert.Throws<IOException>(() => client.Send(request));
+        var t = controls.Tally.Counts().Traces;
+        Assert.Equal((1UL, "gate: the body broke"), (t.ExportsFailed, t.LastError));
+    }
+
+    private sealed class Unreadable : HttpContent
+    {
+        protected override Stream CreateContentReadStream(CancellationToken cancellationToken) => throw new IOException("the body broke");
+
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) => throw new IOException("the body broke");
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
     [Fact]
     public void WhatTheLevelsTheCapsAndRedactionsFailClosedDropIsCounted()
     {

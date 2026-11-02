@@ -117,6 +117,29 @@ public class LogsCapTests
         Assert.Equal(2, Through(controls, two).Count);
     }
 
+    // Regression: the OTLP exporter's retry of a failed export (the same bytes, a new request) went
+    // through the gate afresh: its records were charged to the cap again and dropped, counted filtered.
+    [Fact]
+    public void ARetryOfAFailedExportIsSentAsFirstDecided()
+    {
+        var controls = this.Controls();
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":2}"""))));
+        var export = Logs(ScopeLogs("a", [Record(9, "1"), Record(9, "2"), Record(9, "3")]));
+        var sink = new Sink { Answer = _ => new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable) };
+        using var client = new HttpClient(new GateHandler(controls, Signal.Logs) { InnerHandler = sink });
+        HttpRequestMessage Attempt() => new(HttpMethod.Post, "http://collector/v1/logs")
+        {
+            Content = new ByteArrayContent(export) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } },
+        };
+        client.Send(Attempt());
+        sink.Answer = null;
+        client.Send(Attempt());
+        Assert.Equal(["1", "2"], ReadLogs(sink.Exports[1].Message).Select(r => r.Body));
+        Assert.Equal(1UL, controls.Tally.Counts().Logs.ItemsFiltered);
+        // Once sent, the same bytes again are a new export: the bucket is empty.
+        Assert.Empty(Through(controls, export));
+    }
+
     [Fact]
     public void ADroppedLogsExportTakesNoTokens()
     {
