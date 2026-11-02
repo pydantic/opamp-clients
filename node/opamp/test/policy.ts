@@ -39,6 +39,7 @@ export interface Overrides {
   app_settings?: Fields;
   instrumentations?: Fields;
   scrubbing?: Fields;
+  self_monitoring?: Fields;
 }
 
 /**

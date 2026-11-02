@@ -672,14 +672,23 @@ export type Sampling =
 
 /**
  * The text a rule's attribute glob matches: a string's own, an integer's decimal, `true` or
- * `false`. A double, an array or a missing attribute has none. An integer is a number that is a
- * safe integer, as OTLP exports it (an int); JavaScript can't tell 1.0 from 1.
+ * `false`. A double, an array or a missing attribute has none. An integer is one the OTLP
+ * exporter writes as an int ([int64]); JavaScript can't tell 1.0 from 1.
  */
 function attributeText(value: AttributeValue | undefined): string | undefined {
   if (typeof value === "string") return value;
   if (typeof value === "boolean") return String(value);
-  if (typeof value === "number" && Number.isSafeInteger(value)) return String(value);
-  return undefined;
+  return int64(value)?.toString();
+}
+
+/**
+ * A number as the OTLP exporter writes it when it is an int (Number.isInteger: 2^53 and above
+ * too), in int64's range; undefined for anything else, which goes as a double or not at all.
+ */
+function int64(value: unknown): bigint | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value >= -(2 ** 63) && value < 2 ** 63
+    ? BigInt(value)
+    : undefined;
 }
 
 /** The path a rule's `path` matches: `url.path`, or else `http.target` up to its `?`. */
@@ -1033,6 +1042,21 @@ export class Controls {
   }
 
   /**
+   * Run a gate's export, so that an error inside it (a value redaction can't walk, an exporter
+   * that throws) fails the export, counted as failed with its `items`, instead of the processor
+   * dropping the batch with nothing counted.
+   */
+  #guarded(signal: "traces" | "metrics" | "logs", items: number, done: (r: ExportResult) => void, run: () => void): void {
+    try {
+      run();
+    } catch (e) {
+      const r: ExportResult = { code: 1, error: e instanceof Error ? e : new Error(String(e)) };
+      this.counts[signal].result(r, items);
+      done(r);
+    }
+  }
+
+  /**
    * Carry out the live settings; a setting left out is the SDK's own. The SDK's settings and the
    * application's (custom) go in force in this one synchronous call: nothing runs between them, so
    * both always come from the same document.
@@ -1104,14 +1128,14 @@ export class Controls {
   spans(to: SpanExporter): SpanExporter {
     const gate: SpanExporter & Gated = {
       [GATED]: to,
-      export: (spans: ReadableSpan[], done: (r: ExportResult) => void) => {
+      export: (spans: ReadableSpan[], done: (r: ExportResult) => void) => this.#guarded("traces", spans.length, done, () => {
         if (!this.sendTraces) {
           this.counts.traces.itemsFiltered += spans.length;
           return done(SUCCESS);
         }
         const redaction = this.redaction;
         to.export(redaction.on ? spans.map((s) => redaction.span(s)) : spans, this.#counted("traces", spans.length, done));
-      },
+      }),
       shutdown: () => to.shutdown(),
       forceFlush: () => to.forceFlush?.() ?? Promise.resolve(),
     };
@@ -1128,16 +1152,7 @@ export class Controls {
       [GATED]: to,
       export: (metrics: ResourceMetrics, done: (r: ExportResult) => void) => {
         const all = points(metrics.scopeMetrics);
-        if (!this.sendMetrics) {
-          this.counts.metrics.itemsFiltered += all;
-          return done(SUCCESS);
-        }
-        const kept = metrics.scopeMetrics.filter((m) => !this.off(m.scope.name));
-        const n = points(kept);
-        this.counts.metrics.itemsFiltered += all - n;
-        if (kept.length === metrics.scopeMetrics.length) return to.export(metrics, this.#counted("metrics", n, done));
-        if (kept.length === 0) return done(SUCCESS);
-        to.export({ ...metrics, scopeMetrics: kept }, this.#counted("metrics", n, done));
+        this.#guarded("metrics", all, done, () => this.#metrics(to, metrics, all, done));
       },
       shutdown: () => to.shutdown(),
       forceFlush: () => to.forceFlush(),
@@ -1145,6 +1160,20 @@ export class Controls {
     if (to.selectAggregationTemporality) gated.selectAggregationTemporality = (t) => to.selectAggregationTemporality!(t);
     if (to.selectAggregation) gated.selectAggregation = (t) => to.selectAggregation!(t);
     return gated;
+  }
+
+  /** The metrics gate's export of `metrics` (`all`: its points), as `metrics` above describes it. */
+  #metrics(to: PushMetricExporter, metrics: ResourceMetrics, all: number, done: (r: ExportResult) => void): void {
+    if (!this.sendMetrics) {
+      this.counts.metrics.itemsFiltered += all;
+      return done(SUCCESS);
+    }
+    const kept = metrics.scopeMetrics.filter((m) => !this.off(m.scope.name));
+    const n = points(kept);
+    this.counts.metrics.itemsFiltered += all - n;
+    if (kept.length === metrics.scopeMetrics.length) return to.export(metrics, this.#counted("metrics", n, done));
+    if (kept.length === 0) return done(SUCCESS);
+    to.export({ ...metrics, scopeMetrics: kept }, this.#counted("metrics", n, done));
   }
 
   /**
@@ -1180,7 +1209,7 @@ export class Controls {
   logs(to: LogRecordExporter): LogRecordExporter {
     const gate: LogRecordExporter & Gated = {
       [GATED]: to,
-      export: (logs: ReadableLogRecord[], done: (r: ExportResult) => void) => {
+      export: (logs: ReadableLogRecord[], done: (r: ExportResult) => void) => this.#guarded("logs", logs.length, done, () => {
         if (!this.sendLogs) {
           this.counts.logs.itemsFiltered += logs.length;
           return done(SUCCESS);
@@ -1194,7 +1223,7 @@ export class Controls {
         this.counts.logs.itemsFiltered += logs.length - kept.length;
         if (kept.length === 0 && logs.length > 0) return done(SUCCESS);
         to.export(kept, this.#counted("logs", kept.length, done));
-      },
+      }),
       shutdown: () => to.shutdown(),
       forceFlush: () => to.forceFlush?.() ?? Promise.resolve(),
     };
@@ -1542,8 +1571,8 @@ function anyValue(value: AttributeValue | null | undefined): AnyValue {
     typeof value === "boolean"
       ? { case: "boolValue" as const, value }
       : typeof value === "number"
-        ? Number.isSafeInteger(value)
-          ? { case: "intValue" as const, value: BigInt(value) }
+        ? int64(value) !== undefined
+          ? { case: "intValue" as const, value: int64(value)! }
           : { case: "doubleValue" as const, value }
         : typeof value === "string"
           ? { case: "stringValue" as const, value }

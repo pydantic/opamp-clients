@@ -321,7 +321,8 @@ test("resource attributes reach the server typed, lists as lists", () => {
   assert.deepEqual(by.i, { case: "intValue", value: 3n });
   assert.deepEqual(by.d, { case: "doubleValue", value: 1.5 });
   assert.deepEqual(by.b, { case: "boolValue", value: true });
-  assert.equal(by.big?.case, "doubleValue"); // past 2^53 an integer isn't exact
+  // An integer past 2^53 goes as an int, as the OTLP exporter writes it (Number.isInteger).
+  assert.deepEqual(by.big, { case: "intValue", value: 2n ** 60n });
   assert.equal(by.l?.case, "arrayValue");
   assert.deepEqual((by.l?.value as { values: { value: unknown }[] }).values.map((v) => v.value),
     [{ case: "stringValue", value: "x" }, { case: "stringValue", value: "y" }]);

@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { type Attributes, type AttributeValue, type Context, ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
+import { type ExportResult } from "@opentelemetry/core";
 import { JsonLogsSerializer, JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
 import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import {
@@ -552,6 +553,35 @@ test("scrubbing: nothing scrubbed, the span itself; a scrubbed log record keeps 
     [["secret", "[Scrubbed due to 'secret']"], ["n", undefined]]);
 });
 
+// Regression: a log body that is a class instance wasn't scrubbed, yet the OTLP exporter writes any
+// object's own members as a map, so its password went out in clear.
+test("scrubbing: a class instance as a log body is scrubbed as the map the OTLP exporter writes", () => {
+  const c = new Controls();
+  c.apply(settings({ scrubbing: { defaults: true } }));
+  class Login { constructor(readonly user: string, readonly password: string) {} }
+  const { gated, logger } = logging(c);
+  logger.emit({ severityNumber: 9, body: new Login("ann", "hunter2") as never });
+  const [exported] = gated.getFinishedLogRecords();
+  const wire = JSON.parse(new TextDecoder().decode(JsonLogsSerializer.serializeRequest([exported!])));
+  const members = wire.resourceLogs[0].scopeLogs[0].logRecords[0].body.kvlistValue.values;
+  assert.deepEqual(members.map((m: { key: string; value: { stringValue?: string } }) => [m.key, m.value.stringValue]),
+    [["user", "ann"], ["password", "[Scrubbed due to 'password']"]]);
+});
+
+// Regression: an error inside a gate (here a span redaction can't read) dropped the batch with
+// nothing counted, so Fleet's Traffic and health never showed it. It now fails the export, counted.
+test("an error inside a gate fails the export and counts its items as failed", () => {
+  const c = new Controls();
+  c.apply(settings({ attribute_redaction: { drop: ["secret"] } }));
+  const out = sink<object>();
+  const unreadable = { get attributes(): never { throw new Error("no attributes"); }, events: [], links: [] } as never;
+  const results: ExportResult[] = [];
+  c.spans(out as never).export([unreadable, unreadable], (r) => results.push(r));
+  assert.equal(out.got.length, 0);
+  assert.deepEqual(results.map((r) => [r.code, r.error?.message]), [[1, "no attributes"]]);
+  assert.deepEqual([c.counts.traces.exportsFailed, c.counts.traces.itemsFailed, c.counts.traces.lastError], [1, 2, "no attributes"]);
+});
+
 test("scrubbing: the default patterns at their edges", () => {
   const s = new Scrubbing(true);
   const cases: [string, string | undefined][] = [
@@ -709,6 +739,20 @@ test("sampling rules on a real SDK: by path, kind and name; children follow; lef
   c.apply(settings({}));
   request("/checkout");
   assert.deepEqual(exported(), []);
+});
+
+// Regression: integers of 2^53 and above never matched a rule's attribute, though the OTLP exporter
+// writes them as ints (Number.isInteger), so the layer matches their decimal text.
+test("sampling rules match an integer attribute of 2^53 and above by its decimal text", () => {
+  const c = new Controls();
+  c.sampler.wrap(new AlwaysOffSampler());
+  const big = 2 ** 60;
+  c.apply(settings({ sampling_rules: { rules: [{ rate: 1, attributes: { "user.id": "1152921504606846976", "n": "9007199254740992" } }] } }));
+  const decide = (attributes: Attributes) =>
+    c.sampler.shouldSample(ROOT_CONTEXT, "0af7651916cd43dd8448eb211c80319c", "GET", SpanKind.SERVER, attributes, []).decision;
+  assert.equal(decide({ "user.id": big, n: 2 ** 53 }), SamplingDecision.RECORD_AND_SAMPLED);
+  assert.equal(decide({ "user.id": big, n: 2 ** 53 + 2 }), SamplingDecision.NOT_RECORD);
+  assert.equal(decide({ "user.id": 1.5, n: 2 ** 53 }), SamplingDecision.NOT_RECORD);
 });
 
 test("a caller's decision is followed whatever the rules: sampled under rate 0, unsampled under rate 1", () => {
