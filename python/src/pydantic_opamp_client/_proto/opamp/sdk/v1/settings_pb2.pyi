@@ -228,16 +228,18 @@ class Refreshed(_message.Message):
     def __init__(self, settings: _Optional[_Union[Settings, _Mapping]] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., refresh_at_unix_ms: _Optional[int] = ..., warning: _Optional[str] = ...) -> None: ...
 
 class Health(_message.Message):
-    __slots__ = ("counts", "previous", "now_unix_ms", "settings")
+    __slots__ = ("counts", "previous", "now_unix_ms", "settings", "exporters")
     COUNTS_FIELD_NUMBER: _ClassVar[int]
     PREVIOUS_FIELD_NUMBER: _ClassVar[int]
     NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     SETTINGS_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
     counts: ExportCounts
     previous: HealthReport
     now_unix_ms: int
     settings: Settings
-    def __init__(self, counts: _Optional[_Union[ExportCounts, _Mapping]] = ..., previous: _Optional[_Union[HealthReport, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., settings: _Optional[_Union[Settings, _Mapping]] = ...) -> None: ...
+    exporters: _containers.RepeatedCompositeFieldContainer[Exporter]
+    def __init__(self, counts: _Optional[_Union[ExportCounts, _Mapping]] = ..., previous: _Optional[_Union[HealthReport, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., settings: _Optional[_Union[Settings, _Mapping]] = ..., exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ...) -> None: ...
 
 class ExportCounts(_message.Message):
     __slots__ = ("traces", "metrics", "logs")
@@ -320,14 +322,16 @@ class Instrumentation(_message.Message):
     def __init__(self, name: _Optional[str] = ..., version: _Optional[str] = ...) -> None: ...
 
 class Exporter(_message.Message):
-    __slots__ = ("signal", "name", "gated")
+    __slots__ = ("signal", "name", "gated", "destination")
     SIGNAL_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     GATED_FIELD_NUMBER: _ClassVar[int]
+    DESTINATION_FIELD_NUMBER: _ClassVar[int]
     signal: str
     name: str
     gated: bool
-    def __init__(self, signal: _Optional[str] = ..., name: _Optional[str] = ..., gated: bool = ...) -> None: ...
+    destination: str
+    def __init__(self, signal: _Optional[str] = ..., name: _Optional[str] = ..., gated: bool = ..., destination: _Optional[str] = ...) -> None: ...
 
 class Evaluate(_message.Message):
     __slots__ = ("settings", "host", "now_unix_ms", "span", "log", "attributes", "cap")

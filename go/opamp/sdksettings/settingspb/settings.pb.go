@@ -1306,7 +1306,8 @@ type Health struct {
 	Counts        *ExportCounts          `protobuf:"bytes,1,opt,name=counts,proto3" json:"counts,omitempty"`     // cumulative since start
 	Previous      *HealthReport          `protobuf:"bytes,2,opt,name=previous,proto3" json:"previous,omitempty"` // the last HealthReport answered; none at the first call
 	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
-	Settings      *Settings              `protobuf:"bytes,4,opt,name=settings,proto3" json:"settings,omitempty"` // in force: a send_* false reports that signal off
+	Settings      *Settings              `protobuf:"bytes,4,opt,name=settings,proto3" json:"settings,omitempty"`   // in force: a send_* false reports that signal off
+	Exporters     []*Exporter            `protobuf:"bytes,5,rep,name=exporters,proto3" json:"exporters,omitempty"` // as the inventory lists them: one child each under its signal
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1365,6 +1366,13 @@ func (x *Health) GetNowUnixMs() uint64 {
 func (x *Health) GetSettings() *Settings {
 	if x != nil {
 		return x.Settings
+	}
+	return nil
+}
+
+func (x *Health) GetExporters() []*Exporter {
+	if x != nil {
+		return x.Exporters
 	}
 	return nil
 }
@@ -1520,7 +1528,8 @@ type HealthReport struct {
 	// Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
 	// one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
 	// last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-	// items.filtered. Not `send`: the one last sent.
+	// items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+	// keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
 	Exporters     *protobufs.ComponentHealth `protobuf:"bytes,2,opt,name=exporters,proto3" json:"exporters,omitempty"`
 	SentUnixMs    uint64                     `protobuf:"varint,3,opt,name=sent_unix_ms,json=sentUnixMs,proto3" json:"sent_unix_ms,omitempty"` // when `exporters` was sent
 	unknownFields protoimpl.UnknownFields
@@ -1842,10 +1851,14 @@ func (x *Instrumentation) GetVersion() string {
 }
 
 type Exporter struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Signal        string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"` // traces, metrics or logs
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`     // as OTEL_*_EXPORTER names it, or its type
-	Gated         bool                   `protobuf:"varint,3,opt,name=gated,proto3" json:"gated,omitempty"`  // the integration's send_* switch reaches it
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Signal string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"` // traces, metrics or logs
+	Name   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`     // as OTEL_*_EXPORTER names it, or its type
+	Gated  bool                   `protobuf:"varint,3,opt,name=gated,proto3" json:"gated,omitempty"`  // governed: the policy's gates are in front of it
+	// Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+	// or not known. The layer keeps only the scheme, host and port, so a credential in it never
+	// leaves the process.
+	Destination   string `protobuf:"bytes,4,opt,name=destination,proto3" json:"destination,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1899,6 +1912,13 @@ func (x *Exporter) GetGated() bool {
 		return x.Gated
 	}
 	return false
+}
+
+func (x *Exporter) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
 }
 
 // Test-only: what the reference matchers make of one input under a settings document, so that
@@ -2971,12 +2991,13 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\bsettings\x18\x01 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x12=\n" +
 	"\teffective\x18\x02 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigR\teffective\x12+\n" +
 	"\x12refresh_at_unix_ms\x18\x03 \x01(\x04R\x0frefreshAtUnixMs\x12\x18\n" +
-	"\awarning\x18\x04 \x01(\tR\awarning\"\xc8\x01\n" +
+	"\awarning\x18\x04 \x01(\tR\awarning\"\xfe\x01\n" +
 	"\x06Health\x122\n" +
 	"\x06counts\x18\x01 \x01(\v2\x1a.opamp.sdk.v1.ExportCountsR\x06counts\x126\n" +
 	"\bprevious\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.HealthReportR\bprevious\x12\x1e\n" +
 	"\vnow_unix_ms\x18\x03 \x01(\x04R\tnowUnixMs\x122\n" +
-	"\bsettings\x18\x04 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\"\xa8\x01\n" +
+	"\bsettings\x18\x04 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x124\n" +
+	"\texporters\x18\x05 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\"\xa8\x01\n" +
 	"\fExportCounts\x122\n" +
 	"\x06traces\x18\x01 \x01(\v2\x1a.opamp.sdk.v1.SignalCountsR\x06traces\x124\n" +
 	"\ametrics\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.SignalCountsR\ametrics\x12.\n" +
@@ -3015,11 +3036,12 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\texporters\x18\x06 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\"?\n" +
 	"\x0fInstrumentation\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\"L\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\"n\n" +
 	"\bExporter\x12\x16\n" +
 	"\x06signal\x18\x01 \x01(\tR\x06signal\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
-	"\x05gated\x18\x03 \x01(\bR\x05gated\"\xb9\x02\n" +
+	"\x05gated\x18\x03 \x01(\bR\x05gated\x12 \n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\"\xb9\x02\n" +
 	"\bEvaluate\x12\x1a\n" +
 	"\bsettings\x18\x01 \x01(\fR\bsettings\x12&\n" +
 	"\x04host\x18\x02 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
@@ -3201,54 +3223,55 @@ var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	19, // 19: opamp.sdk.v1.Health.counts:type_name -> opamp.sdk.v1.ExportCounts
 	21, // 20: opamp.sdk.v1.Health.previous:type_name -> opamp.sdk.v1.HealthReport
 	5,  // 21: opamp.sdk.v1.Health.settings:type_name -> opamp.sdk.v1.Settings
-	20, // 22: opamp.sdk.v1.ExportCounts.traces:type_name -> opamp.sdk.v1.SignalCounts
-	20, // 23: opamp.sdk.v1.ExportCounts.metrics:type_name -> opamp.sdk.v1.SignalCounts
-	20, // 24: opamp.sdk.v1.ExportCounts.logs:type_name -> opamp.sdk.v1.SignalCounts
-	42, // 25: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
-	43, // 26: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
-	9,  // 27: opamp.sdk.v1.Describe.host:type_name -> opamp.sdk.v1.Host
-	24, // 28: opamp.sdk.v1.Components.inventory:type_name -> opamp.sdk.v1.Inventory
-	9,  // 29: opamp.sdk.v1.Components.host:type_name -> opamp.sdk.v1.Host
-	25, // 30: opamp.sdk.v1.Inventory.instrumentations:type_name -> opamp.sdk.v1.Instrumentation
-	26, // 31: opamp.sdk.v1.Inventory.exporters:type_name -> opamp.sdk.v1.Exporter
-	9,  // 32: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
-	32, // 33: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
-	31, // 34: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
-	30, // 35: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
-	28, // 36: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
-	3,  // 37: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
-	29, // 38: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
-	1,  // 39: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
-	43, // 40: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
-	44, // 41: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
-	0,  // 42: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
-	43, // 43: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
-	1,  // 44: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
-	34, // 45: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
-	43, // 46: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
-	44, // 47: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
-	4,  // 48: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
-	10, // 49: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
-	12, // 50: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
-	22, // 51: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
-	27, // 52: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
-	16, // 53: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
-	18, // 54: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
-	23, // 55: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
-	14, // 56: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
-	11, // 57: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
-	15, // 58: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
-	45, // 59: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
-	33, // 60: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
-	17, // 61: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
-	21, // 62: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
-	46, // 63: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
-	13, // 64: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
-	65, // [65:65] is the sub-list for method output_type
-	65, // [65:65] is the sub-list for method input_type
-	65, // [65:65] is the sub-list for extension type_name
-	65, // [65:65] is the sub-list for extension extendee
-	0,  // [0:65] is the sub-list for field type_name
+	26, // 22: opamp.sdk.v1.Health.exporters:type_name -> opamp.sdk.v1.Exporter
+	20, // 23: opamp.sdk.v1.ExportCounts.traces:type_name -> opamp.sdk.v1.SignalCounts
+	20, // 24: opamp.sdk.v1.ExportCounts.metrics:type_name -> opamp.sdk.v1.SignalCounts
+	20, // 25: opamp.sdk.v1.ExportCounts.logs:type_name -> opamp.sdk.v1.SignalCounts
+	42, // 26: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
+	43, // 27: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
+	9,  // 28: opamp.sdk.v1.Describe.host:type_name -> opamp.sdk.v1.Host
+	24, // 29: opamp.sdk.v1.Components.inventory:type_name -> opamp.sdk.v1.Inventory
+	9,  // 30: opamp.sdk.v1.Components.host:type_name -> opamp.sdk.v1.Host
+	25, // 31: opamp.sdk.v1.Inventory.instrumentations:type_name -> opamp.sdk.v1.Instrumentation
+	26, // 32: opamp.sdk.v1.Inventory.exporters:type_name -> opamp.sdk.v1.Exporter
+	9,  // 33: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
+	32, // 34: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
+	31, // 35: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
+	30, // 36: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
+	28, // 37: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
+	3,  // 38: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
+	29, // 39: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
+	1,  // 40: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
+	43, // 41: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
+	44, // 42: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
+	0,  // 43: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
+	43, // 44: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
+	1,  // 45: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
+	34, // 46: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
+	43, // 47: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
+	44, // 48: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
+	4,  // 49: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
+	10, // 50: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
+	12, // 51: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
+	22, // 52: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
+	27, // 53: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
+	16, // 54: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
+	18, // 55: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
+	23, // 56: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
+	14, // 57: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
+	11, // 58: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
+	15, // 59: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
+	45, // 60: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
+	33, // 61: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
+	17, // 62: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
+	21, // 63: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
+	46, // 64: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
+	13, // 65: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
+	66, // [66:66] is the sub-list for method output_type
+	66, // [66:66] is the sub-list for method input_type
+	66, // [66:66] is the sub-list for extension type_name
+	66, // [66:66] is the sub-list for extension extendee
+	0,  // [0:66] is the sub-list for field type_name
 }
 
 func init() { file_opamp_sdk_v1_settings_proto_init() }

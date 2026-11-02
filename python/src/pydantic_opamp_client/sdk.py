@@ -72,11 +72,13 @@ class SdkSettings:
         return self._call(settings_pb2.Request(refresh=refresh)).refreshed
 
     def health(self, counts: settings_pb2.ExportCounts, previous: settings_pb2.HealthReport | None,
-               now_unix_ms: int, settings: settings_pb2.Settings | None = None) -> settings_pb2.HealthReport:
+               now_unix_ms: int, settings: settings_pb2.Settings | None = None,
+               exporters: list[settings_pb2.Exporter] | None = None) -> settings_pb2.HealthReport:
         """Export health, from the gates' counts since start: whether to send it now, and the entry
         for the agent health's component_health_map["exporters"]. `previous`: what the last call
-        answered (None at the first); `settings`: those in force."""
-        health = settings_pb2.Health(counts=counts, now_unix_ms=now_unix_ms)
+        answered (None at the first); `settings`: those in force; `exporters`: the inventory's, each
+        listed under its signal as governed or ungoverned."""
+        health = settings_pb2.Health(counts=counts, now_unix_ms=now_unix_ms, exporters=exporters or [])
         if previous is not None:
             health.previous.CopyFrom(previous)
         if settings is not None:

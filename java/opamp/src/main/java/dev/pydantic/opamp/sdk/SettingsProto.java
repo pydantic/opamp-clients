@@ -12147,6 +12147,32 @@ java.lang.String defaultValue) {
      * @return The settings.
      */
     dev.pydantic.opamp.sdk.SettingsProto.Settings getSettings();
+
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> 
+        getExportersList();
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index);
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    int getExportersCount();
   }
   /**
    * <pre>
@@ -12164,6 +12190,7 @@ java.lang.String defaultValue) {
       // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Health)
       HealthOrBuilder {
     private Health() {
+      exporters_ = emptyProtobufList();
     }
     private int bitField0_;
     public static final int COUNTS_FIELD_NUMBER = 1;
@@ -12394,6 +12421,147 @@ java.lang.String defaultValue) {
     private void clearSettings() {
       settings_ = null;
       bitField0_ = (bitField0_ & ~0x00000004);
+    }
+
+    public static final int EXPORTERS_FIELD_NUMBER = 5;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.Exporter> exporters_;
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> getExportersList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.sdk.SettingsProto.ExporterOrBuilder> 
+        getExportersOrBuilderList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.Override
+    public int getExportersCount() {
+      return exporters_.size();
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index) {
+      return exporters_.get(index);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    public dev.pydantic.opamp.sdk.SettingsProto.ExporterOrBuilder getExportersOrBuilder(
+        int index) {
+      return exporters_.get(index);
+    }
+    private void ensureExportersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.Exporter> tmp = exporters_;
+      if (!tmp.isModifiable()) {
+        exporters_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.set(index, value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(index, value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    private void addAllExporters(
+        java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.Exporter> values) {
+      ensureExportersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, exporters_);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    private void clearExporters() {
+      exporters_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * as the inventory lists them: one child each under its signal
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     */
+    private void removeExporters(int index) {
+      ensureExportersIsMutable();
+      exporters_.remove(index);
     }
 
     public static dev.pydantic.opamp.sdk.SettingsProto.Health parseFrom(
@@ -12741,6 +12909,156 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> getExportersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getExportersList());
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      @java.lang.Override
+      public int getExportersCount() {
+        return instance.getExportersCount();
+      }/**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index) {
+        return instance.getExporters(index);
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.setExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder addExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder addExporters(
+          dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder addAllExporters(
+          java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.Exporter> values) {
+        copyOnWrite();
+        instance.addAllExporters(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them: one child each under its signal
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       */
+      public Builder removeExporters(int index) {
+        copyOnWrite();
+        instance.removeExporters(index);
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Health)
     }
     @java.lang.Override
@@ -12762,10 +13080,12 @@ java.lang.String defaultValue) {
               "previous_",
               "nowUnixMs_",
               "settings_",
+              "exporters_",
+              dev.pydantic.opamp.sdk.SettingsProto.Exporter.class,
             };
             java.lang.String info =
-                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
-                "\u1009\u0001\u0003\u0003\u0004\u1009\u0002";
+                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u1009\u0000\u0002" +
+                "\u1009\u0001\u0003\u0003\u0004\u1009\u0002\u0005\u001b";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -14088,7 +14408,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14100,7 +14421,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14174,7 +14496,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14188,7 +14511,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14202,7 +14526,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14218,7 +14543,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14240,7 +14566,8 @@ java.lang.String defaultValue) {
      * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
      * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
      * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-     * items.filtered. Not `send`: the one last sent.
+     * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+     * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
      * </pre>
      *
      * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14430,7 +14757,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14444,7 +14772,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14458,7 +14787,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14473,7 +14803,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14489,7 +14820,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -14504,7 +14836,8 @@ java.lang.String defaultValue) {
        * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
        * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
        * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-       * items.filtered. Not `send`: the one last sent.
+       * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+       * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
        * </pre>
        *
        * <code>.opamp.proto.v1.ComponentHealth exporters = 2;</code>
@@ -17813,13 +18146,37 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * the integration's send_* switch reaches it
+     * governed: the policy's gates are in front of it
      * </pre>
      *
      * <code>bool gated = 3;</code>
      * @return The gated.
      */
     boolean getGated();
+
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @return The destination.
+     */
+    java.lang.String getDestination();
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @return The bytes for destination.
+     */
+    com.google.protobuf.ByteString
+        getDestinationBytes();
   }
   /**
    * Protobuf type {@code opamp.sdk.v1.Exporter}
@@ -17832,6 +18189,7 @@ java.lang.String defaultValue) {
     private Exporter() {
       signal_ = "";
       name_ = "";
+      destination_ = "";
     }
     public static final int SIGNAL_FIELD_NUMBER = 1;
     private java.lang.String signal_;
@@ -17973,7 +18331,7 @@ java.lang.String defaultValue) {
     private boolean gated_;
     /**
      * <pre>
-     * the integration's send_* switch reaches it
+     * governed: the policy's gates are in front of it
      * </pre>
      *
      * <code>bool gated = 3;</code>
@@ -17985,7 +18343,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * the integration's send_* switch reaches it
+     * governed: the policy's gates are in front of it
      * </pre>
      *
      * <code>bool gated = 3;</code>
@@ -17997,7 +18355,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * the integration's send_* switch reaches it
+     * governed: the policy's gates are in front of it
      * </pre>
      *
      * <code>bool gated = 3;</code>
@@ -18005,6 +18363,84 @@ java.lang.String defaultValue) {
     private void clearGated() {
 
       gated_ = false;
+    }
+
+    public static final int DESTINATION_FIELD_NUMBER = 4;
+    private java.lang.String destination_;
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @return The destination.
+     */
+    @java.lang.Override
+    public java.lang.String getDestination() {
+      return destination_;
+    }
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @return The bytes for destination.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDestinationBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(destination_);
+    }
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @param value The destination to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDestination(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      destination_ = value;
+    }
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     */
+    private void clearDestination() {
+
+      destination_ = getDefaultInstance().getDestination();
+    }
+    /**
+     * <pre>
+     * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+     * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+     * leaves the process.
+     * </pre>
+     *
+     * <code>string destination = 4;</code>
+     * @param value The bytes for destination to set.
+     */
+    private void setDestinationBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      destination_ = value.toStringUtf8();
+
     }
 
     public static dev.pydantic.opamp.sdk.SettingsProto.Exporter parseFrom(
@@ -18244,7 +18680,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * the integration's send_* switch reaches it
+       * governed: the policy's gates are in front of it
        * </pre>
        *
        * <code>bool gated = 3;</code>
@@ -18256,7 +18692,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * the integration's send_* switch reaches it
+       * governed: the policy's gates are in front of it
        * </pre>
        *
        * <code>bool gated = 3;</code>
@@ -18270,7 +18706,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * the integration's send_* switch reaches it
+       * governed: the policy's gates are in front of it
        * </pre>
        *
        * <code>bool gated = 3;</code>
@@ -18279,6 +18715,85 @@ java.lang.String defaultValue) {
       public Builder clearGated() {
         copyOnWrite();
         instance.clearGated();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+       * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+       * leaves the process.
+       * </pre>
+       *
+       * <code>string destination = 4;</code>
+       * @return The destination.
+       */
+      @java.lang.Override
+      public java.lang.String getDestination() {
+        return instance.getDestination();
+      }
+      /**
+       * <pre>
+       * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+       * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+       * leaves the process.
+       * </pre>
+       *
+       * <code>string destination = 4;</code>
+       * @return The bytes for destination.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDestinationBytes() {
+        return instance.getDestinationBytes();
+      }
+      /**
+       * <pre>
+       * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+       * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+       * leaves the process.
+       * </pre>
+       *
+       * <code>string destination = 4;</code>
+       * @param value The destination to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDestination(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setDestination(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+       * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+       * leaves the process.
+       * </pre>
+       *
+       * <code>string destination = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDestination() {
+        copyOnWrite();
+        instance.clearDestination();
+        return this;
+      }
+      /**
+       * <pre>
+       * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+       * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+       * leaves the process.
+       * </pre>
+       *
+       * <code>string destination = 4;</code>
+       * @param value The bytes for destination to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDestinationBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setDestinationBytes(value);
         return this;
       }
 
@@ -18301,10 +18816,11 @@ java.lang.String defaultValue) {
               "signal_",
               "name_",
               "gated_",
+              "destination_",
             };
             java.lang.String info =
-                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
-                "\u0003\u0007";
+                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "\u0003\u0007\u0004\u0208";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

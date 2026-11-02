@@ -186,16 +186,20 @@ def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers):
     assert sorted(ingest.names()) == ["before", "loud stdlib", "loud warning", "request"], run.stderr
 
 
-def test_console_output_is_past_the_gates_so_a_policy_that_needs_them_is_refused(tmp_path, servers):
-    """The Logfire SDK's console shows every span, ungated: a policy that masks an attribute
-    can't be carried out on it, so it is refused, and what reaches Logfire is as before."""
+def test_the_logfire_sdks_console_is_governed_like_its_export_to_logfire(tmp_path, servers):
+    """The Logfire SDK's console gets the gates once it is built: a policy that turns the traces
+    off is APPLIED and in force on the console as on what reaches Logfire."""
     server, ingest = servers
-    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), console=True)
+    after = _AFTER + '\nprint("exporters", sorted((e.signal, e.name, e.gated) for e in agent.exporters))'
+    run = _run(server, ingest, tmp_path, policy(signal_exports={"traces": {"enabled": False}}), console=True,
+               after=after)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
-    assert any(m.remote_config_status.status == FAILED for m in server.got)
-    assert not any(m.remote_config_status.status == APPLIED for m in server.got)
-    assert "the Logfire SDK's console" in run.stderr and "mask_attributes" in run.stderr
-    # The sampler is still the server's to set.
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert not any(m.remote_config_status.status == FAILED for m in server.got)
+    assert ingest.names() == ["before"]
+    # The console showed "before", and nothing after the policy.
+    assert "before" in run.stdout and "after" not in run.stdout.split("exporters ")[0]
+    assert "('traces', 'console', True)" in run.stdout and "False)" not in run.stdout.split("exporters ")[-1]
     assert "sampling_rate" in run.stdout.split("live ")[-1]
 
 
@@ -300,9 +304,8 @@ def test_zstd_is_sent_as_the_logfire_sdk_sends_it(tmp_path, servers):
 
 
 def test_what_the_logfire_sdk_resolves_leaves_the_arguments_as_given(tmp_path, monkeypatch):
-    """Resolving reads the Logfire SDK's variables as it does, without changing the options given;
-    and with send_to_logfire=True but no token or credentials file it would create a project and
-    send to it, past the gates."""
+    """Resolving reads the Logfire SDK's variables as it does, without changing the options given:
+    with no token or credentials file there is nothing to send with, whatever send_to_logfire says."""
     import logfire  # noqa: PLC0415
     from pydantic_opamp_otel._logfire import _config, _resolved  # noqa: PLC0415
 
@@ -311,9 +314,9 @@ def test_what_the_logfire_sdk_resolves_leaves_the_arguments_as_given(tmp_path, m
     advanced = logfire.AdvancedOptions()
     config = _config({"advanced": advanced, "send_to_logfire": True, "data_dir": tmp_path})
     assert advanced.base_url is None
-    assert _resolved(config) == ([], True, "https://ingest.example.com")
+    assert _resolved(config) == ([], "https://ingest.example.com")
     config = _config({"send_to_logfire": "if-token-present", "data_dir": tmp_path})
-    assert _resolved(config) == ([], False, "https://ingest.example.com")
+    assert _resolved(config) == ([], "https://ingest.example.com")
 
 
 def test_advanced_options_as_a_mapping_keep_their_log_record_processors(servers):

@@ -79,84 +79,86 @@ namespace Pydantic.OpAmp.Client.Sdk {
             "CglSZWZyZXNoZWQSKAoIc2V0dGluZ3MYASABKAsyFi5vcGFtcC5zZGsudjEu",
             "U2V0dGluZ3MSMgoJZWZmZWN0aXZlGAIgASgLMh8ub3BhbXAucHJvdG8udjEu",
             "RWZmZWN0aXZlQ29uZmlnEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgDIAEoBBIP",
-            "Cgd3YXJuaW5nGAQgASgJIqEBCgZIZWFsdGgSKgoGY291bnRzGAEgASgLMhou",
+            "Cgd3YXJuaW5nGAQgASgJIswBCgZIZWFsdGgSKgoGY291bnRzGAEgASgLMhou",
             "b3BhbXAuc2RrLnYxLkV4cG9ydENvdW50cxIsCghwcmV2aW91cxgCIAEoCzIa",
             "Lm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnQSEwoLbm93X3VuaXhfbXMYAyAB",
-            "KAQSKAoIc2V0dGluZ3MYBCABKAsyFi5vcGFtcC5zZGsudjEuU2V0dGluZ3Mi",
-            "kQEKDEV4cG9ydENvdW50cxIqCgZ0cmFjZXMYASABKAsyGi5vcGFtcC5zZGsu",
-            "djEuU2lnbmFsQ291bnRzEisKB21ldHJpY3MYAiABKAsyGi5vcGFtcC5zZGsu",
-            "djEuU2lnbmFsQ291bnRzEigKBGxvZ3MYAyABKAsyGi5vcGFtcC5zZGsudjEu",
-            "U2lnbmFsQ291bnRzIpEBCgxTaWduYWxDb3VudHMSEgoKZXhwb3J0c19vaxgB",
-            "IAEoBBIWCg5leHBvcnRzX2ZhaWxlZBgCIAEoBBIUCgxpdGVtc19mYWlsZWQY",
-            "AyABKAQSFgoOaXRlbXNfZmlsdGVyZWQYBCABKAQSEwoLbGFzdF9mYWlsZWQY",
-            "BSABKAgSEgoKbGFzdF9lcnJvchgGIAEoCSJmCgxIZWFsdGhSZXBvcnQSDAoE",
-            "c2VuZBgBIAEoCBIyCglleHBvcnRlcnMYAiABKAsyHy5vcGFtcC5wcm90by52",
-            "MS5Db21wb25lbnRIZWFsdGgSFAoMc2VudF91bml4X21zGAMgASgEIm0KCERl",
-            "c2NyaWJlEioKCHJlc291cmNlGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5",
-            "VmFsdWUSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25v",
-            "d191bml4X21zGAMgASgEIm8KCkNvbXBvbmVudHMSKgoJaW52ZW50b3J5GAEg",
-            "ASgLMhcub3BhbXAuc2RrLnYxLkludmVudG9yeRIgCgRob3N0GAIgASgLMhIu",
-            "b3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQizAEKCUlu",
-            "dmVudG9yeRITCgtpbnRlZ3JhdGlvbhgBIAEoCRIbChNpbnRlZ3JhdGlvbl92",
-            "ZXJzaW9uGAIgASgJEhQKDHNka19sYW5ndWFnZRgDIAEoCRITCgtzZGtfdmVy",
-            "c2lvbhgEIAEoCRI3ChBpbnN0cnVtZW50YXRpb25zGAUgAygLMh0ub3BhbXAu",
-            "c2RrLnYxLkluc3RydW1lbnRhdGlvbhIpCglleHBvcnRlcnMYBiADKAsyFi5v",
-            "cGFtcC5zZGsudjEuRXhwb3J0ZXIiMAoPSW5zdHJ1bWVudGF0aW9uEgwKBG5h",
-            "bWUYASABKAkSDwoHdmVyc2lvbhgCIAEoCSI3CghFeHBvcnRlchIOCgZzaWdu",
-            "YWwYASABKAkSDAoEbmFtZRgCIAEoCRINCgVnYXRlZBgDIAEoCCKCAgoIRXZh",
-            "bHVhdGUSEAoIc2V0dGluZ3MYASABKAwSIAoEaG9zdBgCIAEoCzISLm9wYW1w",
-            "LnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAcgASgEEicKBHNwYW4YAyAB",
-            "KAsyFy5vcGFtcC5zZGsudjEuU3BhblN0YXJ0SAASJgoDbG9nGAQgASgLMhcu",
-            "b3BhbXAuc2RrLnYxLkxvZ1JlY29yZEgAEi4KCmF0dHJpYnV0ZXMYBSABKAsy",
-            "GC5vcGFtcC5zZGsudjEuQXR0cmlidXRlc0gAEiMKA2NhcBgGIAEoCzIULm9w",
-            "YW1wLnNkay52MS5DYXBSdW5IAEIHCgVpbnB1dCJ9CgZDYXBSdW4SKwoGc2ln",
-            "bmFsGAEgASgOMhsub3BhbXAuc2RrLnYxLkNhcFJ1bi5TaWduYWwSJgoGZXZl",
-            "bnRzGAIgAygLMhYub3BhbXAuc2RrLnYxLkNhcEV2ZW50Ih4KBlNpZ25hbBIK",
-            "CgZUUkFDRVMQABIICgRMT0dTEAEiYQoIQ2FwRXZlbnQSDQoFYXRfbnMYASAB",
-            "KAQSJAoGcGFyZW50GAIgASgOMhQub3BhbXAuc2RrLnYxLlBhcmVudBIPCgdz",
-            "YW1wbGVkGAMgASgIEg8KB3JlY29yZHMYBCABKAQiYgoKQXR0cmlidXRlcxIs",
-            "CgphdHRyaWJ1dGVzGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUS",
-            "JgoEYm9keRgCIAEoCzIYLm9wYW1wLnByb3RvLnYxLkFueVZhbHVlIiwKCUxv",
-            "Z1JlY29yZBINCgVzY29wZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoDSKTAQoJ",
-            "U3BhblN0YXJ0EgwKBG5hbWUYASABKAkSJAoEa2luZBgCIAEoDjIWLm9wYW1w",
-            "LnNkay52MS5TcGFuS2luZBIsCgphdHRyaWJ1dGVzGAMgAygLMhgub3BhbXAu",
-            "cHJvdG8udjEuS2V5VmFsdWUSJAoGcGFyZW50GAQgASgOMhQub3BhbXAuc2Rr",
-            "LnYxLlBhcmVudCLKAQoJRXZhbHVhdGVkEg8KB3JlZnVzZWQYASABKAkSLAoI",
-            "c2FtcGxpbmcYAiABKAsyGi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5nEhEK",
-            "BGtlcHQYAyABKAhIAIgBARIqCghyZWRhY3RlZBgEIAMoCzIYLm9wYW1wLnBy",
-            "b3RvLnYxLktleVZhbHVlEiYKBGJvZHkYBiABKAsyGC5vcGFtcC5wcm90by52",
-            "MS5BbnlWYWx1ZRIOCgZwYXNzZWQYBSADKARCBwoFX2tlcHQisgEKDFNwYW5T",
-            "YW1wbGluZxIrCgNob3cYASABKA4yHi5vcGFtcC5zZGsudjEuU3BhblNhbXBs",
-            "aW5nLkhvdxIWCg5wYXJlbnRfc2FtcGxlZBgCIAEoCBIMCgRyYXRlGAMgASgB",
-            "EhEKBHJ1bGUYBCABKA1IAIgBASIzCgNIb3cSEQoNRk9MTE9XX1BBUkVOVBAA",
-            "EggKBFJBVEUQARIPCgtBUFBfU0FNUExFUhACQgcKBV9ydWxlIt8CCgdSZXF1",
-            "ZXN0EiIKBGxvYWQYASABKAsyEi5vcGFtcC5zZGsudjEuTG9hZEgAEiYKBmRl",
-            "Y2lkZRgCIAEoCzIULm9wYW1wLnNkay52MS5EZWNpZGVIABIqCghkZXNjcmli",
-            "ZRgDIAEoCzIWLm9wYW1wLnNkay52MS5EZXNjcmliZUgAEioKCGV2YWx1YXRl",
-            "GAQgASgLMhYub3BhbXAuc2RrLnYxLkV2YWx1YXRlSAASKAoHcmVmcmVzaBgF",
-            "IAEoCzIVLm9wYW1wLnNkay52MS5SZWZyZXNoSAASJgoGaGVhbHRoGAYgASgL",
-            "MhQub3BhbXAuc2RrLnYxLkhlYWx0aEgAEi4KCmNvbXBvbmVudHMYByABKAsy",
-            "GC5vcGFtcC5zZGsudjEuQ29tcG9uZW50c0gAEiYKBmNvbW1pdBgIIAEoCzIU",
-            "Lm9wYW1wLnNkay52MS5Db21taXRIAEIGCgRjYWxsIqkDCgVSZXBseRImCgZs",
-            "b2FkZWQYASABKAsyFC5vcGFtcC5zZGsudjEuTG9hZGVkSAASKgoIZGVjaXNp",
-            "b24YAiABKAsyFi5vcGFtcC5zZGsudjEuRGVjaXNpb25IABI3CgtkZXNjcmlw",
-            "dGlvbhgDIAEoCzIgLm9wYW1wLnByb3RvLnYxLkFnZW50RGVzY3JpcHRpb25I",
-            "ABIPCgVlcnJvchgEIAEoCUgAEiwKCWV2YWx1YXRlZBgFIAEoCzIXLm9wYW1w",
-            "LnNkay52MS5FdmFsdWF0ZWRIABIsCglyZWZyZXNoZWQYBiABKAsyFy5vcGFt",
-            "cC5zZGsudjEuUmVmcmVzaGVkSAASMwoNaGVhbHRoX3JlcG9ydBgHIAEoCzIa",
-            "Lm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnRIABJDChRhdmFpbGFibGVfY29t",
-            "cG9uZW50cxgIIAEoCzIjLm9wYW1wLnByb3RvLnYxLkF2YWlsYWJsZUNvbXBv",
-            "bmVudHNIABIiCgRwbGFuGAkgASgLMhIub3BhbXAuc2RrLnYxLlBsYW5IAEII",
-            "CgZyZXN1bHQqmQEKCFNwYW5LaW5kEhkKFVNQQU5fS0lORF9VTlNQRUNJRklF",
-            "RBAAEhYKElNQQU5fS0lORF9JTlRFUk5BTBABEhQKEFNQQU5fS0lORF9TRVJW",
-            "RVIQAhIUChBTUEFOX0tJTkRfQ0xJRU5UEAMSFgoSU1BBTl9LSU5EX1BST0RV",
-            "Q0VSEAQSFgoSU1BBTl9LSU5EX0NPTlNVTUVSEAUqhwEKBlBhcmVudBIPCgtQ",
-            "QVJFTlRfTk9ORRAAEhgKFFBBUkVOVF9MT0NBTF9TQU1QTEVEEAESGgoWUEFS",
-            "RU5UX0xPQ0FMX1VOU0FNUExFRBACEhkKFVBBUkVOVF9SRU1PVEVfU0FNUExF",
-            "RBADEhsKF1BBUkVOVF9SRU1PVEVfVU5TQU1QTEVEEARChgEKFmRldi5weWRh",
-            "bnRpYy5vcGFtcC5zZGtCDVNldHRpbmdzUHJvdG9aQWdpdGh1Yi5jb20vcHlk",
-            "YW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFtcC9zZGtzZXR0aW5ncy9zZXR0",
-            "aW5nc3BiqgIZUHlkYW50aWMuT3BBbXAuQ2xpZW50LlNka2IGcHJvdG8z"));
+            "KAQSKAoIc2V0dGluZ3MYBCABKAsyFi5vcGFtcC5zZGsudjEuU2V0dGluZ3MS",
+            "KQoJZXhwb3J0ZXJzGAUgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyIpEB",
+            "CgxFeHBvcnRDb3VudHMSKgoGdHJhY2VzGAEgASgLMhoub3BhbXAuc2RrLnYx",
+            "LlNpZ25hbENvdW50cxIrCgdtZXRyaWNzGAIgASgLMhoub3BhbXAuc2RrLnYx",
+            "LlNpZ25hbENvdW50cxIoCgRsb2dzGAMgASgLMhoub3BhbXAuc2RrLnYxLlNp",
+            "Z25hbENvdW50cyKRAQoMU2lnbmFsQ291bnRzEhIKCmV4cG9ydHNfb2sYASAB",
+            "KAQSFgoOZXhwb3J0c19mYWlsZWQYAiABKAQSFAoMaXRlbXNfZmFpbGVkGAMg",
+            "ASgEEhYKDml0ZW1zX2ZpbHRlcmVkGAQgASgEEhMKC2xhc3RfZmFpbGVkGAUg",
+            "ASgIEhIKCmxhc3RfZXJyb3IYBiABKAkiZgoMSGVhbHRoUmVwb3J0EgwKBHNl",
+            "bmQYASABKAgSMgoJZXhwb3J0ZXJzGAIgASgLMh8ub3BhbXAucHJvdG8udjEu",
+            "Q29tcG9uZW50SGVhbHRoEhQKDHNlbnRfdW5peF9tcxgDIAEoBCJtCghEZXNj",
+            "cmliZRIqCghyZXNvdXJjZRgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZh",
+            "bHVlEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3df",
+            "dW5peF9tcxgDIAEoBCJvCgpDb21wb25lbnRzEioKCWludmVudG9yeRgBIAEo",
+            "CzIXLm9wYW1wLnNkay52MS5JbnZlbnRvcnkSIAoEaG9zdBgCIAEoCzISLm9w",
+            "YW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEIswBCglJbnZl",
+            "bnRvcnkSEwoLaW50ZWdyYXRpb24YASABKAkSGwoTaW50ZWdyYXRpb25fdmVy",
+            "c2lvbhgCIAEoCRIUCgxzZGtfbGFuZ3VhZ2UYAyABKAkSEwoLc2RrX3ZlcnNp",
+            "b24YBCABKAkSNwoQaW5zdHJ1bWVudGF0aW9ucxgFIAMoCzIdLm9wYW1wLnNk",
+            "ay52MS5JbnN0cnVtZW50YXRpb24SKQoJZXhwb3J0ZXJzGAYgAygLMhYub3Bh",
+            "bXAuc2RrLnYxLkV4cG9ydGVyIjAKD0luc3RydW1lbnRhdGlvbhIMCgRuYW1l",
+            "GAEgASgJEg8KB3ZlcnNpb24YAiABKAkiTAoIRXhwb3J0ZXISDgoGc2lnbmFs",
+            "GAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZ2F0ZWQYAyABKAgSEwoLZGVzdGlu",
+            "YXRpb24YBCABKAkiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdzGAEgASgMEiAK",
+            "BGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9t",
+            "cxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYxLlNwYW5TdGFy",
+            "dEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dSZWNvcmRIABIu",
+            "CgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0dHJpYnV0ZXNI",
+            "ABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVuSABCBwoFaW5w",
+            "dXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1wLnNkay52MS5D",
+            "YXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1wLnNkay52MS5D",
+            "YXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9HUxABImEKCENh",
+            "cEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEoDjIULm9wYW1w",
+            "LnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdyZWNvcmRzGAQg",
+            "ASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMoCzIYLm9wYW1w",
+            "LnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5vcGFtcC5wcm90",
+            "by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkSEAoI",
+            "c2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJEiQK",
+            "BGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0cmli",
+            "dXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBhcmVu",
+            "dBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2YWx1YXRlZBIP",
+            "CgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAuc2Rr",
+            "LnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVkYWN0",
+            "ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5GAYg",
+            "ASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFzc2VkGAUgAygE",
+            "QgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3Bh",
+            "bXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQY",
+            "AiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93",
+            "EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQ",
+            "AkIHCgVfcnVsZSLfAgoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAu",
+            "c2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEu",
+            "RGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVz",
+            "Y3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFs",
+            "dWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVz",
+            "aEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIu",
+            "Cgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNI",
+            "ABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SABCBgoE",
+            "Y2FsbCKpAwoFUmVwbHkSJgoGbG9hZGVkGAEgASgLMhQub3BhbXAuc2RrLnYx",
+            "LkxvYWRlZEgAEioKCGRlY2lzaW9uGAIgASgLMhYub3BhbXAuc2RrLnYxLkRl",
+            "Y2lzaW9uSAASNwoLZGVzY3JpcHRpb24YAyABKAsyIC5vcGFtcC5wcm90by52",
+            "MS5BZ2VudERlc2NyaXB0aW9uSAASDwoFZXJyb3IYBCABKAlIABIsCglldmFs",
+            "dWF0ZWQYBSABKAsyFy5vcGFtcC5zZGsudjEuRXZhbHVhdGVkSAASLAoJcmVm",
+            "cmVzaGVkGAYgASgLMhcub3BhbXAuc2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhl",
+            "YWx0aF9yZXBvcnQYByABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0",
+            "SAASQwoUYXZhaWxhYmxlX2NvbXBvbmVudHMYCCABKAsyIy5vcGFtcC5wcm90",
+            "by52MS5BdmFpbGFibGVDb21wb25lbnRzSAASIgoEcGxhbhgJIAEoCzISLm9w",
+            "YW1wLnNkay52MS5QbGFuSABCCAoGcmVzdWx0KpkBCghTcGFuS2luZBIZChVT",
+            "UEFOX0tJTkRfVU5TUEVDSUZJRUQQABIWChJTUEFOX0tJTkRfSU5URVJOQUwQ",
+            "ARIUChBTUEFOX0tJTkRfU0VSVkVSEAISFAoQU1BBTl9LSU5EX0NMSUVOVBAD",
+            "EhYKElNQQU5fS0lORF9QUk9EVUNFUhAEEhYKElNQQU5fS0lORF9DT05TVU1F",
+            "UhAFKocBCgZQYXJlbnQSDwoLUEFSRU5UX05PTkUQABIYChRQQVJFTlRfTE9D",
+            "QUxfU0FNUExFRBABEhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBMRUQQAhIZChVQ",
+            "QVJFTlRfUkVNT1RFX1NBTVBMRUQQAxIbChdQQVJFTlRfUkVNT1RFX1VOU0FN",
+            "UExFRBAEQoYBChZkZXYucHlkYW50aWMub3BhbXAuc2RrQg1TZXR0aW5nc1By",
+            "b3RvWkFnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28vb3Bh",
+            "bXAvc2Rrc2V0dGluZ3Mvc2V0dGluZ3NwYqoCGVB5ZGFudGljLk9wQW1wLkNs",
+            "aWVudC5TZGtiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.AnyvalueReflection.Descriptor, global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Client.Sdk.SpanKind), typeof(global::Pydantic.OpAmp.Client.Sdk.Parent), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -173,7 +175,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Decision), global::Pydantic.OpAmp.Client.Sdk.Decision.Parser, new[]{ "Status", "Apply", "Current", "Effective", "PendingRestart", "RefreshAtUnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Refresh), global::Pydantic.OpAmp.Client.Sdk.Refresh.Parser, new[]{ "Current", "AtStart", "Host", "NowUnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Refreshed), global::Pydantic.OpAmp.Client.Sdk.Refreshed.Parser, new[]{ "Settings", "Effective", "RefreshAtUnixMs", "Warning" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Health), global::Pydantic.OpAmp.Client.Sdk.Health.Parser, new[]{ "Counts", "Previous", "NowUnixMs", "Settings" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Health), global::Pydantic.OpAmp.Client.Sdk.Health.Parser, new[]{ "Counts", "Previous", "NowUnixMs", "Settings", "Exporters" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.ExportCounts), global::Pydantic.OpAmp.Client.Sdk.ExportCounts.Parser, new[]{ "Traces", "Metrics", "Logs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.SignalCounts), global::Pydantic.OpAmp.Client.Sdk.SignalCounts.Parser, new[]{ "ExportsOk", "ExportsFailed", "ItemsFailed", "ItemsFiltered", "LastFailed", "LastError" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.HealthReport), global::Pydantic.OpAmp.Client.Sdk.HealthReport.Parser, new[]{ "Send", "Exporters", "SentUnixMs" }, null, null, null, null),
@@ -181,7 +183,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Components), global::Pydantic.OpAmp.Client.Sdk.Components.Parser, new[]{ "Inventory", "Host", "NowUnixMs" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Inventory), global::Pydantic.OpAmp.Client.Sdk.Inventory.Parser, new[]{ "Integration", "IntegrationVersion", "SdkLanguage", "SdkVersion", "Instrumentations", "Exporters" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Instrumentation), global::Pydantic.OpAmp.Client.Sdk.Instrumentation.Parser, new[]{ "Name", "Version" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Exporter), global::Pydantic.OpAmp.Client.Sdk.Exporter.Parser, new[]{ "Signal", "Name", "Gated" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Exporter), global::Pydantic.OpAmp.Client.Sdk.Exporter.Parser, new[]{ "Signal", "Name", "Gated", "Destination" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Evaluate), global::Pydantic.OpAmp.Client.Sdk.Evaluate.Parser, new[]{ "Settings", "Host", "NowUnixMs", "Span", "Log", "Attributes", "Cap" }, new[]{ "Input" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.CapRun), global::Pydantic.OpAmp.Client.Sdk.CapRun.Parser, new[]{ "Signal", "Events" }, null, new[]{ typeof(global::Pydantic.OpAmp.Client.Sdk.CapRun.Types.Signal) }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.CapEvent), global::Pydantic.OpAmp.Client.Sdk.CapEvent.Parser, new[]{ "AtNs", "Parent", "Sampled", "Records" }, null, null, null, null),
@@ -4939,6 +4941,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       previous_ = other.previous_ != null ? other.previous_.Clone() : null;
       nowUnixMs_ = other.nowUnixMs_;
       settings_ = other.settings_ != null ? other.settings_.Clone() : null;
+      exporters_ = other.exporters_.Clone();
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -5005,6 +5008,20 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 5;
+    private static readonly pb::FieldCodec<global::Pydantic.OpAmp.Client.Sdk.Exporter> _repeated_exporters_codec
+        = pb::FieldCodec.ForMessage(42, global::Pydantic.OpAmp.Client.Sdk.Exporter.Parser);
+    private readonly pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter> exporters_ = new pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter>();
+    /// <summary>
+    /// as the inventory lists them: one child each under its signal
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter> Exporters {
+      get { return exporters_; }
+    }
+
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override bool Equals(object other) {
@@ -5024,6 +5041,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (!object.Equals(Previous, other.Previous)) return false;
       if (NowUnixMs != other.NowUnixMs) return false;
       if (!object.Equals(Settings, other.Settings)) return false;
+      if(!exporters_.Equals(other.exporters_)) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -5035,6 +5053,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (previous_ != null) hash ^= Previous.GetHashCode();
       if (NowUnixMs != 0UL) hash ^= NowUnixMs.GetHashCode();
       if (settings_ != null) hash ^= Settings.GetHashCode();
+      hash ^= exporters_.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -5069,6 +5088,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(34);
         output.WriteMessage(Settings);
       }
+      exporters_.WriteTo(output, _repeated_exporters_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -5095,6 +5115,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(34);
         output.WriteMessage(Settings);
       }
+      exporters_.WriteTo(ref output, _repeated_exporters_codec);
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -5117,6 +5138,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (settings_ != null) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Settings);
       }
+      size += exporters_.CalculateSize(_repeated_exporters_codec);
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
       }
@@ -5150,6 +5172,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
         }
         Settings.MergeFrom(other.Settings);
       }
+      exporters_.Add(other.exporters_);
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
 
@@ -5194,6 +5217,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
             input.ReadMessage(Settings);
             break;
           }
+          case 42: {
+            exporters_.AddEntriesFrom(input, _repeated_exporters_codec);
+            break;
+          }
         }
       }
     #endif
@@ -5236,6 +5263,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
               Settings = new global::Pydantic.OpAmp.Client.Sdk.Settings();
             }
             input.ReadMessage(Settings);
+            break;
+          }
+          case 42: {
+            exporters_.AddEntriesFrom(ref input, _repeated_exporters_codec);
             break;
           }
         }
@@ -6011,7 +6042,8 @@ namespace Pydantic.OpAmp.Client.Sdk {
     /// Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
     /// one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
     /// last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-    /// items.filtered. Not `send`: the one last sent.
+    /// items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+    /// keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -7473,6 +7505,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       signal_ = other.signal_;
       name_ = other.name_;
       gated_ = other.gated_;
+      destination_ = other.destination_;
       _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
     }
 
@@ -7516,7 +7549,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     public const int GatedFieldNumber = 3;
     private bool gated_;
     /// <summary>
-    /// the integration's send_* switch reaches it
+    /// governed: the policy's gates are in front of it
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
@@ -7524,6 +7557,23 @@ namespace Pydantic.OpAmp.Client.Sdk {
       get { return gated_; }
       set {
         gated_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "destination" field.</summary>
+    public const int DestinationFieldNumber = 4;
+    private string destination_ = "";
+    /// <summary>
+    /// Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+    /// or not known. The layer keeps only the scheme, host and port, so a credential in it never
+    /// leaves the process.
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Destination {
+      get { return destination_; }
+      set {
+        destination_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
       }
     }
 
@@ -7545,6 +7595,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (Signal != other.Signal) return false;
       if (Name != other.Name) return false;
       if (Gated != other.Gated) return false;
+      if (Destination != other.Destination) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
 
@@ -7555,6 +7606,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (Signal.Length != 0) hash ^= Signal.GetHashCode();
       if (Name.Length != 0) hash ^= Name.GetHashCode();
       if (Gated != false) hash ^= Gated.GetHashCode();
+      if (Destination.Length != 0) hash ^= Destination.GetHashCode();
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
       }
@@ -7585,6 +7637,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(24);
         output.WriteBool(Gated);
       }
+      if (Destination.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Destination);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -7607,6 +7663,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(24);
         output.WriteBool(Gated);
       }
+      if (Destination.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Destination);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -7625,6 +7685,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (Gated != false) {
         size += 1 + 1;
+      }
+      if (Destination.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Destination);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -7646,6 +7709,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (other.Gated != false) {
         Gated = other.Gated;
+      }
+      if (other.Destination.Length != 0) {
+        Destination = other.Destination;
       }
       _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
     }
@@ -7678,6 +7744,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Gated = input.ReadBool();
             break;
           }
+          case 34: {
+            Destination = input.ReadString();
+            break;
+          }
         }
       }
     #endif
@@ -7707,6 +7777,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
           }
           case 24: {
             Gated = input.ReadBool();
+            break;
+          }
+          case 34: {
+            Destination = input.ReadString();
             break;
           }
         }

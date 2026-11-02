@@ -296,12 +296,14 @@ def inventory_of(case: dict):
         instrumentations=[settings_pb2.Instrumentation(name=i.get("name", ""), version=i.get("version", ""))
                           for i in inv.get("instrumentations", [])],
         exporters=[settings_pb2.Exporter(signal=e.get("signal", ""), name=e.get("name", ""),
-                                         gated=e.get("gated", False)) for e in inv.get("exporters", [])])
+                                         gated=e.get("gated", False), destination=e.get("destination", ""))
+                   for e in inv.get("exporters", [])])
 
 
 def components_json(c: opamp_pb2.AvailableComponents) -> dict:
     """The components as the vectors give them: sdk (key to text), instrumentations (name to
-    version or None), exporters (signal to name to gated) and settings (key to applies)."""
+    version or None), exporters (signal to identity to gated), destinations (signal to identity to
+    destination, for those with one) and settings (key to applies)."""
 
     def text(d: opamp_pb2.ComponentDetails, key: str) -> str | None:
         found = [kv.value for kv in d.metadata if kv.key == key]
@@ -321,6 +323,9 @@ def components_json(c: opamp_pb2.AvailableComponents) -> dict:
         "instrumentations": {n: text(d, "version") for n, d in parts["instrumentations"].sub_component_map.items()},
         "exporters": {s: {n: gated(e) for n, e in d.sub_component_map.items()}
                       for s, d in parts["exporters"].sub_component_map.items()},
+        "destinations": {s: to for s, d in parts["exporters"].sub_component_map.items()
+                         if (to := {n: text(e, "destination") for n, e in d.sub_component_map.items()
+                                    if text(e, "destination") is not None})},
         "settings": {k: text(d, "applies") for k, d in parts["settings"].sub_component_map.items()},
     }
 

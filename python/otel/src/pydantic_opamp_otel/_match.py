@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable, Mapping
 
 #: SeverityNumber past every other: the threshold of a scope that is `off`.
@@ -92,6 +93,9 @@ class Bucket:
     second on a monotonic clock, up to max(per_second, 1); a take of n gets the whole tokens there
     are, up to n. In floats, in the layer's order. Thread-safe."""
 
+    #: How many items' decisions `admitted` remembers, so a second exporter gets the first's answer.
+    REMEMBERED = 65536
+
     def __init__(self, per_second: float, clock: Callable[[], int] = time.monotonic_ns) -> None:
         self.per_second = per_second
         self._capacity = max(per_second, 1.0)
@@ -99,18 +103,50 @@ class Bucket:
         self._last: int | None = None
         self._clock = clock
         self._lock = threading.Lock()
+        #: id(item) -> (item, admitted, ids of the gates that had it): the item is kept so its id
+        #: can't be another's meanwhile.
+        self._decided: OrderedDict[int, tuple[object, bool, set[int]]] = OrderedDict()
+
+    def admitted(self, items: list, gate: object) -> list:
+        """The items within the cap, in order, for the exporter behind `gate`: one decision per
+        item, shared by every exporter the item reaches (one budget for the process). An item
+        another gate decided keeps that answer; the rest take tokens together, the first that fit
+        admitted. The same gate seeing an item again is a new export of it, decided afresh."""
+        with self._lock:
+            answers: list[bool | None] = [None] * len(items)
+            fresh, now = [], set()
+            for k, item in enumerate(items):
+                seen = self._decided.get(id(item))
+                if seen is not None and seen[0] is item and id(gate) not in seen[2] and id(item) not in now:
+                    answers[k] = seen[1]
+                    seen[2].add(id(gate))
+                else:
+                    fresh.append(k)
+                now.add(id(item))
+            granted = self._take(len(fresh)) if fresh else 0
+            for n, k in enumerate(fresh):
+                self._decided[id(items[k])] = (items[k], n < granted, {id(gate)})
+                self._decided.move_to_end(id(items[k]))
+                answers[k] = n < granted
+            while len(self._decided) > self.REMEMBERED:
+                self._decided.popitem(last=False)
+            return [i for i, a in zip(items, answers) if a]
 
     def take(self, n: int) -> int:
         """Take up to `n` tokens now; how many were taken. A clock that goes back refills nothing."""
         with self._lock:
-            now = self._clock()
-            last = now if self._last is None else self._last
-            elapsed = max(now - last, 0) / 1e9
-            self._tokens = min(self._tokens + elapsed * self.per_second, self._capacity)
-            self._last = max(last, now)
-            taken = min(float(n), math.floor(self._tokens))
-            self._tokens -= taken
-            return int(taken)
+            return self._take(n)
+
+    def _take(self, n: int) -> int:
+        """take, under the lock."""
+        now = self._clock()
+        last = now if self._last is None else self._last
+        elapsed = max(now - last, 0) / 1e9
+        self._tokens = min(self._tokens + elapsed * self.per_second, self._capacity)
+        self._last = max(last, now)
+        taken = min(float(n), math.floor(self._tokens))
+        self._tokens -= taken
+        return int(taken)
 
 
 def rebucket(old: Bucket | None, per_second: float | None, clock: Callable[[], int]) -> Bucket | None:

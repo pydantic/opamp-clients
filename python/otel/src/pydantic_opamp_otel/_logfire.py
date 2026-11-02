@@ -8,10 +8,11 @@ the way the Logfire SDK builds them, with the package's gates between the SDK an
 Logfire SDK then sends nothing itself (``send_to_logfire=False``). Everything else is
 ``logfire.configure``'s own: its scrubbing, its console, its instrumentations.
 
-What can't be gated (console output, a processor or metric reader given here, the OTLP exporters
-the Logfire SDK adds for ``OTEL_EXPORTER_OTLP_*``, or an export the Logfire SDK makes from its
-credentials file) is declared, so a policy that overrides a setting it would bypass is refused
-rather than answered as done (docs/python-otel.md, "The Logfire SDK").
+Everything else the Logfire SDK exports through (its console, a processor or metric reader given
+here, the OTLP exporters it adds for ``OTEL_EXPORTER_OTLP_*``, an export it makes from its
+credentials file) gets the gates once it is built (``govern``, at start), so the policy reaches
+every destination. What can't be gated is reported to the server as ungoverned, never refused
+(docs/python-otel.md, "The Logfire SDK").
 """
 
 from __future__ import annotations
@@ -23,17 +24,11 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.sdk.metrics.export import MetricExporter, PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 
 if TYPE_CHECKING:
     import logfire
-
-#: The name the inventory gives the exporters built here.
-LOGFIRE_EXPORTER = "logfire"
-#: A metric exporter name that isn't gated: what sdk_host is told for a metric reader it can't stop.
-_UNGATED = "ungated"
-
 
 def _config(kwargs: Mapping[str, Any]) -> Any:
     """The Logfire SDK's configuration for these arguments, merged with its variables and config
@@ -58,15 +53,14 @@ def _config(kwargs: Mapping[str, Any]) -> Any:
     return config
 
 
-def _resolved(config) -> tuple[list[str], bool, str | None]:
-    """The tokens the Logfire SDK sends with, whether it would send anyway without one (it
-    creates a project when send_to_logfire is True), and its base URL. As the Logfire SDK does,
-    a token or base URL it isn't given comes from its credentials file."""
+def _resolved(config) -> tuple[list[str], str | None]:
+    """The tokens the Logfire SDK sends with, and its base URL. As the Logfire SDK does, a token or
+    base URL it isn't given comes from its credentials file."""
     from logfire._internal.config import LogfireCredentials  # noqa: PLC0415
 
     send, token, base_url = config.send_to_logfire, config.token, config.advanced.base_url
     if not send:
-        return [], False, base_url
+        return [], base_url
     try:
         credentials = LogfireCredentials.load_creds_file(config.data_dir)
     except Exception:  # noqa: BLE001 - the Logfire SDK raises this itself when it needs the file
@@ -75,15 +69,7 @@ def _resolved(config) -> tuple[list[str], bool, str | None]:
         token = token or credentials.token
         base_url = base_url or credentials.logfire_api_url
     tokens = [] if not token else [token] if isinstance(token, str) else list(token)
-    return tokens, not tokens and send is True, base_url
-
-
-def _otlp_variables(signal: str) -> bool:
-    """The Logfire SDK adds an OTLP exporter of its own for the signal (ungated) when one of
-    these is set and the signal's OTEL_*_EXPORTER is otlp or unset."""
-    if not (os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT") or os.environ.get(f"OTEL_EXPORTER_OTLP_{signal.upper()}_ENDPOINT")):
-        return False
-    return os.environ.get(f"OTEL_{signal.upper()}_EXPORTER", "").lower() in ("otlp", "")
+    return tokens, base_url
 
 
 def _logfire_exporters(token: str, base_url: str | None, controls, advanced, metrics: bool = True):
@@ -126,6 +112,8 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced, met
         spans = RemovePendingSpansExporter(spans)
     reader = None
     if metrics:
+        from . import GatedMetricExporter  # noqa: PLC0415
+
         reader = PeriodicExportingMetricReader(GatedMetricExporter(QuietMetricExporter(
             OTLPMetricExporter(endpoint=urljoin(url, "/v1/metrics"), headers=headers, session=session,
                                compression=gzip, preferred_temporality=METRICS_PREFERRED_TEMPORALITY),
@@ -133,30 +121,6 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced, met
     logs = QuietLogExporter(OTLPLogExporter(endpoint=urljoin(url, "/v1/logs"), session=session, headers=headers,
                                             compression=gzip))
     return (DynamicBatchSpanProcessor(spans), reader, BatchLogRecordProcessor(controls.logs(logs)))
-
-
-class GatedMetricExporter(MetricExporter):
-    """A metric exporter, or nothing while the server says not to send metrics."""
-
-    def __init__(self, to: MetricExporter) -> None:
-        self._to = to
-        super().__init__(preferred_temporality=to._preferred_temporality,  # noqa: SLF001
-                         preferred_aggregation=to._preferred_aggregation)  # noqa: SLF001
-
-    def export(self, metrics_data, timeout_millis: float = 10_000, **kwargs):
-        from . import AGENT, MetricExportResult, _export, _points  # noqa: PLC0415
-
-        counts, points = AGENT.controls.metrics, _points(metrics_data)
-        if not AGENT.controls.gates.send_metrics:
-            counts.filtered(points)
-            return MetricExportResult.SUCCESS
-        return _export(counts, points, lambda: self._to.export(metrics_data, timeout_millis=timeout_millis, **kwargs))
-
-    def force_flush(self, timeout_millis: float = 10_000) -> bool:
-        return self._to.force_flush(timeout_millis=timeout_millis)
-
-    def shutdown(self, timeout_millis: float = 30_000, **kwargs) -> None:
-        self._to.shutdown(timeout_millis=timeout_millis, **kwargs)
 
 
 def _head(sampling) -> Any:
@@ -197,8 +161,7 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     kwargs["sampling"] = dataclasses.replace(sampling, head=controls.sampler.wrap(_head(sampling)))
     kwargs["resource_attributes"] = {**config.resource_attributes, _INSTANCE_ID: str(AGENT.uid)}
 
-    tokens, sends_ungated, base_url = _resolved(config)
-    console = config.console is not False
+    tokens, base_url = _resolved(config)
     given_spans = list(kwargs.get("additional_span_processors") or ())
     advanced = kwargs.get("advanced")
     if isinstance(advanced, Mapping):
@@ -217,15 +180,9 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
             metrics = metrics or MetricsOptions()
             kwargs["metrics"] = dataclasses.replace(metrics, additional_readers=[*given_readers, *(b[1] for b in built)])
 
-    # What exports past the gates, so the settings it would bypass aren't declared (sdk_host).
+    # The sampler is the package's; every exporter the Logfire SDK builds gets its gate at start.
     AGENT.configured = True
     AGENT.logfire = True
-    AGENT.span_processors = bool(given_spans) or console or sends_ungated or _otlp_variables("traces")
-    AGENT.log_processors = bool(given_logs) or console or sends_ungated or _otlp_variables("logs")
-    ungated_metrics = metrics is not False and (bool(given_readers) or sends_ungated or _otlp_variables("metrics"))
-    AGENT.extra_metric_exporters = [_UNGATED] if ungated_metrics else []
-    AGENT.listed_exporters = [(signal, LOGFIRE_EXPORTER) for _ in built for signal in
-                              ("traces", *(("metrics",) if metrics is not False else ()), "logs")]
     instance = logfire.configure(**kwargs)
     AGENT.start(_resource(instance))
     return instance
