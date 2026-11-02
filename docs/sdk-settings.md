@@ -429,69 +429,55 @@ reaches the telemetry that goes through them, and nothing else.
 | `trace_rate_limit`, `log_rate_limit` | at once ¹ ⁴, per process | at once ¹ ³ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ ⁴ | at once ¹ |
 | `debug` | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then ⁴ | at once, until then |
 | [export health](#export-health) (no control) | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ | reported ⁶ |
-| `signal_exports.metrics` | at once, `otlp` only ¹ | at once ¹ | at once, push only ¹ | at once ¹ | at once ¹ | at once, Prometheus too |
+| `signal_exports.metrics` | at once, push exporters ¹ | at once ¹ | at once, push only ¹ | at once ¹ | at once ¹ | at once, Prometheus too |
 | `instrumentations` | next start | at once ² | at once ⁴ | next start | refused | next start |
 | `app_settings` ([app-settings.md](app-settings.md)) | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application | at once, read by the application |
 
 A collector doesn't take the policy: its remote config is its YAML, and the
 [Supervisor](collector.md) answers FAILED to a remote config that holds a policy.
 
-¹ Only for the exporters the integration builds: OTLP and console (and Java's Prometheus reader).
-Another exporter, a span or log processor passed in or added later, or another agent extension's
-processor goes on exporting. Where the integration sees such an exporter when it builds the SDK,
-it does not declare that signal's settings. Thus it refuses a policy that overrides them, and it
-logs each signal as not carried out:
-Python for exporters it doesn't build, span or log processors or metric exporters passed to
-`configure()`, and, from then on, a span or log processor added to its providers later; Node.js for
-exporters it doesn't build, and from the moment the application registers a global tracer, logger
-or meter provider of its own in place of the SDK's; Go for a metrics exporter it doesn't gate, and
-for a global provider the application sets in place of `Setup`'s, from when it is set (the package
-looks before each decision and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET plugin and `WithOpAmp` whenever
-one of a signal's exporters can't be stopped (not OTLP, beside another exporter, another
-plugin's, or, in `WithOpAmp`, with a path or an `HttpClientFactory` of its own), and the .NET
-plugin for traces and metrics under `OTEL_DOTNET_AUTO_SETUP_SDK=false`; the Java agent for a span
-or log record processor or a metric reader another agent extension adds through the autoconfigure
-customizers, and under a configuration file for a span or log processor that is neither batch nor
-simple, or a metric reader neither periodic nor pull. .NET reads the built providers again, before
-each decision and every 30 s, and the plugin reads each logger provider on its first log record.
-Where the host narrows while the SDK runs, the overrides of that signal's controls in the policy
-in force are set aside ([the host](#the-host)): each is reported `local` in the effective config,
-which is reported again, and the rest of the policy stays in force. Elsewhere a processor added
-after the SDK is built is not seen: the policy is still answered APPLIED. In Node.js the SDK's
-providers take no processor once built, and Go's `Setup` hands out no SDK provider, so nothing
-can be added to one. A provider a Node.js or Go application builds and never registers or sets as
-global isn't seen either.
+¹ The policy governs every exporter the SDK exports through, not just the ones the integration
+builds: manage in Logfire, send anywhere. Each integration puts its gate in front of every
+exporter it can reach on the SDK's providers (the SDK's own, console included, a processor passed
+in or added later, another plugin's OTLP exporter in .NET), and one decision per span or log
+record holds for every exporter it reaches, with one rate cap budget per process. What a gate
+can't be put in front of is never a reason to refuse a policy: it is reported to the server as
+ungoverned, listed with `gated: false` in the [inventory](available-components.md) and with the
+status `ungoverned` (healthy all the same) in [export health](#export-health), and the integration
+logs it. The policy is APPLIED and stays in force on everything governed. Reported ungoverned:
+Python, a processor of the application's own that holds an exporter itself, a pulled metric
+reader (Prometheus), or providers that aren't the SDK's; Node.js, a pulled reader, and from the
+moment the application registers a global tracer, logger or meter provider of its own in place
+of the SDK's (`app_provider`); Go, a metrics reader autoexport keeps (Prometheus, producers), and a
+global provider the application sets in place of `Setup`'s (`app_provider`, seen before each
+decision and once a second, [go-otel.md](go-otel.md#where-the-server-cant-reach)); the .NET
+plugin and `WithOpAmp`, every exporter that isn't the gated OTLP one (the gate is the OTLP
+exporter's HTTP handler: console, Zipkin, Prometheus, another plugin's exporter of another kind,
+or in `WithOpAmp` one with a path or an `HttpClientFactory` of its own), and the plugin's traces
+and metrics under `OTEL_DOTNET_AUTO_SETUP_SDK=false` (`app_provider`); the Java agent, a span or
+log record processor or a metric reader another agent extension adds through the autoconfigure
+customizers. .NET reads the built providers again, before each decision and every 30 s, and the
+plugin reads each logger provider on its first log record. A provider a Node.js or Go application
+builds and never registers or sets as global isn't seen.
 
 ² For the instrumentations loaded at start: the server switches them off and on again, but one
 the `OTEL_NODE_*_INSTRUMENTATIONS` variables (or upstream's defaults) leave out isn't loaded, and
 a switched-off one stays loaded, recording nothing ([node-otel.md](node-otel.md#switching-instrumentations-off)).
 
-³ In Node.js the sampler samples the spans of the SDK's tracer provider only. Once the
-application registers a global tracer provider of its own, its spans go past the sampler, so
-`head_sampling`, `sampling_rules`, `trace_rate_limit` and `debug` (`sampling_ratio`) are set
-aside from then on ([node-otel.md](node-otel.md#a-provider-of-the-applications-own)).
+³ In Node.js the sampler samples the spans of the SDK's tracer provider only. A global tracer
+provider the application registers of its own is reported ungoverned, and the sampler's controls
+stay in force on the SDK's spans ([node-otel.md](node-otel.md#a-provider-of-the-applications-own)).
 
 ⁴ Declared to the layer (see [the host](#the-host)) only where the integration carries it out,
 as every control is. Elsewhere the SDK refuses a policy that overrides it, and nothing changes.
-Python declares every one only where its configurator built the SDK (not under another
-configurator or `OTEL_CONFIG_FILE`). Node.js declares `debug` (`until`) always, and
-`sampling_rules`, `trace_rate_limit` and `debug` (`sampling_ratio`) unless the application
-registers a tracer provider of its own (footnote ³), the log ones (`log_levels` (`scopes`),
-`log_rate_limit`, `debug` (`log_level`)) only where it builds the log exporters, and
-`attribute_redaction` and `scrubbing` only where it builds both the span and the log exporters.
-The .NET plugin and `WithOpAmp` declare the log ones where every logs exporter is the gated OTLP
-one, `attribute_redaction` and `scrubbing` where every span and log record exported goes through
-a gate (traces and logs each gated, or not exported), `sampling_rules` and `trace_rate_limit` where `head_sampling`
-is carried out, and debug mode always (its `sampling_ratio` and `log_level` refused where
-`head_sampling` and `log_levels` (`level`) are not carried out). Go declares every one until the
-application sets a global provider of its own in place of `Setup`'s. Then it no longer carries
-out what that signal needs, and sets those overrides aside: for the tracer provider the sampler's
-controls, `signal_exports.traces`, `attribute_redaction`, `scrubbing` and `instrumentations`; for
-the meter provider `signal_exports.metrics`; for the logger provider the log controls,
-`attribute_redaction` and `scrubbing`. The Java agent declares every one but where footnote ¹ says. It also does
-not declare the sampler's controls (`head_sampling`, `sampling_rules`, `trace_rate_limit` and
-`debug` (`sampling_ratio`)) where another agent extension sets a sampler of its own in place of
-the extension's.
+Every integration declares the gates' controls always (footnote ¹). The sampler's controls
+(`head_sampling`, `sampling_rules`, `trace_rate_limit` and `debug` (`sampling_ratio`)) are the one
+exception: they are not declared where the integration's sampler isn't the one in force. Python
+leaves them undeclared where another configurator or `OTEL_CONFIG_FILE` built the SDK; the .NET
+plugin and `WithOpAmp` where they couldn't wrap the sampler (under
+`OTEL_DOTNET_AUTO_SETUP_SDK=false`, say); the Java agent where another agent extension sets a
+sampler of its own in place of the extension's, and from then on an override of them already in
+force is set aside.
 
 ⁵ A rule sees what a span has when it starts, which differs by instrumentation
 ([sampling rules](#sampling-rules)). HTTP server spans start with their path in every language
@@ -506,8 +492,8 @@ either: the integration decides a new trace's request in the ASP.NET Core instru
 ⁶ Each integration counts at its own gates (the exporters ¹ covers) and sends the `exporters`
 entry from its 30 s timer, the top-level `healthy` staying the application's. Not counted:
 records a full batch queue drops (everywhere); a Prometheus reader (Go, Java), which exports
-nothing through a gate, so its child stays `ok` at zero; in Python, a metric exporter that isn't
-the gated `otlp` one, and forked workers' exports (they don't report). In .NET each attempt
+nothing through a gate, so it is reported `ungoverned`; in Python, a metric exporter that is
+an ungoverned one, and forked workers' exports (they don't report). In .NET each attempt
 through the gate counts, so an OTLP retry that then succeeds shows `failing` for a while.
 
 What else to know:
@@ -523,8 +509,8 @@ What else to know:
 - **An SDK the application builds on its own isn't reached.** Python (`pydantic_opamp_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
-  Node.js and Go set aside what a provider the application registers or sets as the global one
-  takes past them. A provider it builds and never registers or sets as global can't be seen: the
+  Node.js and Go report a provider the application registers or sets as the global one as
+  ungoverned. A provider it builds and never registers or sets as global can't be seen: the
   server may hear APPLIED for a setting its telemetry doesn't follow. The Java agent extension
   can't see an `OpenTelemetrySdk` the application builds and uses itself: that SDK's telemetry
   escapes every setting, and the extension still answers for the agent's SDK. In .NET, a tracer or
@@ -533,8 +519,9 @@ What else to know:
   telemetry goes on.
 - **Declarative configuration (`OTEL_CONFIG_FILE`) builds the SDK from the file.** The Python
   integration still joins the fleet and switches instrumentations at the next start, but the
-  file's sampler and exporters are not its own. Thus it refuses a policy that overrides
-  `head_sampling` or `signal_exports`. The Java agent extension takes the configuration file's
+  file's sampler is not its own. Thus it refuses a policy that overrides `head_sampling` (and the
+  sampler's other controls), while its gates go in front of the file's exporters as in front of
+  any other. The Java agent extension takes the configuration file's
   model instead and carries out every control as without it ([javaagent.md](javaagent.md)).
 
 ## The answer
@@ -653,16 +640,17 @@ own.
 - A setting in neither is not carried out. A policy that overrides its control is refused with
   `<control>: this SDK cannot apply the requested override`, or
   `<control>: <field>: this SDK cannot apply the requested override` where the control has
-  several fields, and nothing changes. Each integration declares a signal's sending and what its gate holds only where every
-  exporter of the signal is gated, and the sampler's settings only where its sampler is in force
+  several fields, and nothing changes. Each integration declares a signal's sending and what its
+  gate holds always (an exporter it can't gate is reported ungoverned, not undeclared), and the
+  sampler's settings only where its sampler is in force
   ([where each setting applies](#where-each-setting-applies), footnotes ¹ and ⁴).
   `send_logs_level_by_scope` and `debug_send_logs_level` count as not declared without
   `send_logs_level`, and `debug_sampling_rate` without `sampling_rate`. Debug mode also needs the
   clock. `custom`, the setting behind `app_settings` ([app-settings.md](app-settings.md)), is
   declared where the application can read it.
-- A host can narrow while the SDK runs, when the application sends telemetry past the SDK's
-  gates (another plugin's exporter, a global provider of the application's own, another
-  extension's processor or sampler). From then on the integration passes the narrower host. A
+- A host can narrow while the SDK runs, when another sampler takes the place of the SDK's
+  (another agent extension's, in Java). Telemetry sent past the gates doesn't narrow it: that is
+  reported ungoverned. From then on the integration passes the narrower host. A
   policy offered from then on that overrides a control the SDK no longer carries out is refused
   whole, FAILED, and the error names the control and field
   (`signal_exports.traces: this SDK cannot apply the requested override`). In the policy already
@@ -729,9 +717,10 @@ under declarative configuration, to the configuration model), and the agent's ex
   the application's loggers off by scope, a masked and a dropped URL, both rate caps, and export
   health. It also checks that the effective config that the agent reports is the policy in force,
   the first four controls alone and then every control ([examples/README.md](../examples/README.md)). Its `check_truth`
-  runs the integration under the setups where a control may not reach the telemetry (a processor
-  added once the SDK is built, say), and offers one policy per control. A control counts
-  as set aside when the policy is FAILED as an override the SDK can't carry out, or APPLIED with
-  that override reported `local` in the effective config. Every other override must show in the
-  telemetry, and the controls set aside must be the ones that setup is known to take out of the
-  integration's hands.
+  runs the integration under the setups that add telemetry paths of their own (a processor added
+  once the SDK is built, another extension's exporter, a global provider of the application's
+  own), and offers one policy per control. A control counts as set aside when the policy is
+  FAILED as an override the SDK can't carry out, or APPLIED with that override reported `local`
+  in the effective config. Every other override must show in the telemetry, and only a sampler of
+  another's may set controls aside. What the setup sends past the gates goes to a second sink: it
+  must arrive there and be reported ungoverned in the inventory and export health.

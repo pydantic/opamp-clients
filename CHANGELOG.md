@@ -24,6 +24,21 @@ and date. Tests, CI and docs alone don't need a line.
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
   Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
+- Go, Python, Node.js, Java, .NET: the SDK policy governs every exporter the SDK exports through,
+  not just the ones the integration builds: the console, a processor added later, another
+  plugin's OTLP exporter, the Logfire SDK's console and OTLP exporters. A policy that was FAILED or
+  set aside because another exporter was there is now APPLIED and in force on all of them, and one
+  decision per span or log record holds for every exporter it reaches (one rate cap budget per
+  process). What the gates can't reach (a processor that holds its own exporter, a pulled metric
+  reader, a global provider of the application's own, a non-OTLP exporter in .NET) is reported
+  ungoverned instead of narrowing what the SDK declares: `gated: false` in the inventory and the
+  status `ungoverned`, healthy, in export health. Only another sampler in place of the SDK's still
+  leaves the sampler's controls undeclared.
+- Go, Python, Node.js, Java, .NET: an exporter's inventory key is its identity, its name and
+  `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`), with the metadata
+  `destination` (`scheme://host:port`, never a path or credentials); a server that read `otlp`
+  reads `otlp@...`. Export health lists every exporter under its signal, `governed` or
+  `ungoverned`. Needs core 0.15.0.
 
 ### Added
 

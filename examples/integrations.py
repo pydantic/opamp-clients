@@ -102,10 +102,14 @@ second listener it opens no connection to the first. The next start, with the sa
 directory and the first endpoint still configured, goes straight to the second listener on the
 key it was given there: no connection to the first, nothing refused, no new key.
 
-check_truth runs one more, under a setup (EXAMPLE_SETUP) where a setting may not reach the
-telemetry: the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each
-is either carried out (the sink shows it) or named as set aside in the effective config, never
-APPLIED and neither. The settings set aside must be the ones the setup expects.
+check_truth runs one more, under a setup (EXAMPLE_SETUP) that adds telemetry paths of its own:
+the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each is either
+carried out (the sink shows it) or named as set aside in the effective config, never APPLIED and
+neither. The policy governs every exporter the SDK's gates are in front of, so only a sampler of
+another's can set settings aside, and they must be the ones the setup expects. An exporter past
+the gates sends to a second sink (EXAMPLE_SECOND_SINK) and must be reported ungoverned in the
+inventory and export health; where a signal's every exporter is past them, its settings need only
+be APPLIED and in force.
 
 check_app_settings runs two more, for an integration that lets the application read its own
 settings (docs/app-settings.md), the policy's app_settings control. Its example application reads
@@ -129,6 +133,7 @@ from __future__ import annotations
 import concurrent.futures
 import contextlib
 import functools
+import http.server
 import itertools
 import json
 import os
@@ -138,6 +143,7 @@ from signal import SIGKILL, SIGTERM
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -1209,15 +1215,50 @@ def carried_out(events: list[dict], setting: str, applied: float, end: float) ->
     raise ValueError(f"no measure of {setting}")
 
 
+def measured_on(setting: str) -> str:
+    """The signal carried_out() reads `setting` off: redaction and the switch on spans."""
+    return "metrics" if setting == "send_metrics" else "logs" if "logs" in setting else "traces"
+
+
+def ungoverned_exporters(events: list[dict]) -> dict[str, set[str]]:
+    """The exporters the last full inventory lists as not gated, by signal: the ones the policy
+    can't govern, which the SDK reports ungoverned."""
+    signals = inventory(events).get("exporters", {}).get("components", {})
+    return {signal: names for signal, d in signals.items()
+            if (names := {name for name, e in (d.get("components") or {}).items()
+                          if (e.get("metadata") or {}).get("gated") is False})}
+
+
+def judge_ungoverned(events: list[dict], ungoverned: frozenset[str], second: frozenset[str]) -> list[tuple[str, bool]]:
+    """What check_truth's setup sends past the gates: (what, whether it holds). The inventory lists
+    an ungoverned exporter of each signal in `ungoverned` and of no other; the last export health
+    reports each of them `ungoverned` and healthy; and the second sink received each such signal
+    (`second`), so the path is there and only the inventory says it isn't governed."""
+    listed = ungoverned_exporters(events)
+    reports = exporters(events)
+    children = reports[-1][1] if reports else {}
+    out = [(f"the inventory reports ungoverned exporters of {sorted(ungoverned)} alone ({listed})",
+            set(listed) == set(ungoverned))]
+    for signal in sorted(ungoverned):
+        health = {name: (children.get(signal, {}).get("components") or {}).get(name, {}) for name in listed.get(signal, ())}
+        out.append((f"{signal}: export health reports them ungoverned and healthy ({health})",
+                    bool(health) and all(h.get("status") == "ungoverned" and h.get("healthy") for h in health.values())))
+        out.append((f"{signal}: the second sink received them", signal in second))
+    return out
+
+
 def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bool = False,
-                service: str = "checkout") -> list[tuple[str, bool]]:
+                service: str = "checkout", ungoverned: frozenset[str] = frozenset(),
+                past: frozenset[str] = frozenset(), second: frozenset[str] = frozenset()) -> list[tuple[str, bool]]:
     """check_truth's checks (what, whether it holds): the baseline APPLIED, and its spans, metrics
     and log records arrive; and each setting either shows in the telemetry or is set aside, never
     neither (an APPLIED answer for an override the SDK didn't carry out). Set aside is the policy
     refused (FAILED, naming the control the SDK can't carry out), or APPLIED and the override
-    reported local in the effective config (the SDK stopped carrying it out while it ran). The
-    settings set aside must be `expected_aside`: no more (a setting this setup could carry out,
-    given up), and no fewer (the integration's table out of date)."""
+    reported local in the effective config. The settings set aside must be `expected_aside`: no
+    more (a setting this setup could carry out, given up), and no fewer (the table out of date).
+    `ungoverned` and `second`: judge_ungoverned(). `past`: the signals whose every exporter is
+    past the gates; nothing of theirs reaches the first sink, so a setting read off one need only
+    be APPLIED and in force."""
     judged = TRUTH + ([TRUTH_SWITCH] if switch_at_once else [])
     st = statuses(events)
     out = [(f"{len(judged)} configs answered ({[s for _, s, _ in st]})", len(st) == len(judged)),
@@ -1227,8 +1268,9 @@ def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bo
     times = [t for t, _, _ in st]
     nexts = [offered_before(events, t) for t in times[1:]] + [max(e["t"] for e in events)]
     for name in ("traces", "metrics", "logs"):
-        got = spans(events, times[0], nexts[0]) if name == "traces" else signal(events, name, times[0], nexts[0])
-        out.append((f"baseline: {name} arrive", any(e.get("services") in (None, [service]) for e in got)))
+        if name not in past:
+            got = spans(events, times[0], nexts[0]) if name == "traces" else signal(events, name, times[0], nexts[0])
+            out.append((f"baseline: {name} arrive", any(e.get("services") in (None, [service]) for e in got)))
     aside_seen: set[str] = set()
     for (setting, control, fields), (answered, status, error), end in zip(judged[1:], st[1:], nexts[1:]):
         offered = offered_before(events, answered)
@@ -1248,6 +1290,9 @@ def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bo
             aside_seen.add(setting)
             out.append((f"{setting}: APPLIED, set aside and reported local", True))
             continue
+        if measured_on(setting) in past:
+            out.append((f"{setting}: APPLIED and in force, its {measured_on(setting)} all past the gates", True))
+            continue
         done, seen = carried_out(events, setting, answered, end)
         out.append((f"{setting}: APPLIED and carried out ({seen})" if done else
                     f"{setting}: APPLIED, in force, and the telemetry didn't change ({seen})", done))
@@ -1255,26 +1300,63 @@ def judge_truth(events: list[dict], expected_aside: set[str], switch_at_once: bo
     missing = sorted(expected_aside & {s for s, _, _ in judged} - aside_seen)
     out.append((f"set aside as this setup expects ({sorted(aside_seen)}; not expected: {extra}; "
                 f"expected, carried out: {missing})", not extra and not missing))
-    return out
+    return out + judge_ungoverned(events, ungoverned, second)
+
+
+@contextlib.contextmanager
+def second_sink(listen: str):
+    """An OTLP/HTTP receiver for the exporters check_truth's setups add past the gates, for the
+    block: (its port, the signals it has received so far, filled as requests come). It answers
+    every export with an empty success, and is stopped whatever happens."""
+    received: set[str] = set()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            self.rfile.read(int(self.headers.get("Content-Length") or 0))
+            received.add(self.path.rstrip("/").rsplit("/", 1)[-1])
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-protobuf")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *_: object) -> None:
+            pass
+
+    server = http.server.ThreadingHTTPServer((listen.rsplit(":", 1)[0], 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield str(server.server_address[1]), received
+    finally:
+        server.shutdown()
+        server.server_close()
 
 
 def check_truth(launch: Launch, target_: Path, setup: str, expected_aside: set[str], env: dict[str, str] | None = None,
                 switch_at_once: bool = False, service: str = "checkout", listen: str = "127.0.0.1:0",
-                seconds: float = 360) -> bool:
+                seconds: float = 360, ungoverned: frozenset[str] = frozenset(), past: frozenset[str] = frozenset(),
+                host: str = "127.0.0.1") -> bool:
     """One run of TRUTH's documents under `setup`, the application's setup the matrix in
-    docs/sdk-settings.md names as one where a setting may not reach the telemetry (EXAMPLE_SETUP in
-    its environment, beside `env`); every check printed; True when all pass."""
+    docs/sdk-settings.md names as one that adds telemetry paths of its own (EXAMPLE_SETUP in its
+    environment, beside `env`, and EXAMPLE_SECOND_SINK, where the application reaches the second
+    sink at `host`); every check printed; True when all pass. judge_truth() says what
+    `expected_aside`, `ungoverned` and `past` are."""
     state = Path(tempfile.mkdtemp(prefix=f"state-truth-{setup}-", dir=target_))
     state.chmod(0o777)
     ok = True
     try:
         judged = len(TRUTH) + switch_at_once
-        events = run(launch, truth_scenario(switch_at_once), state, f"truth-{setup}", seconds, listen, target_,
-                     # The last window as long as the others: some eight seconds of requests.
-                     until=lambda ev: len(statuses(ev)) >= judged and len(pings(ev, statuses(ev)[-1][0])) > 8 * REQUESTS,
-                     settle=2, env={**SIGNALS, **(env or {}), "EXAMPLE_SETUP": setup})
-        print(f"truth ({setup}): remote config statuses {[s for _, s, _ in statuses(events)]}")
-        for what, cond in judge_truth(events, expected_aside, switch_at_once, service) + judge_transport(events):
+        with second_sink(listen) as (port, second):
+            events = run(launch, truth_scenario(switch_at_once), state, f"truth-{setup}", seconds, listen, target_,
+                         # The last window as long as the others: some eight seconds of requests.
+                         until=lambda ev: len(statuses(ev)) >= judged and len(pings(ev, statuses(ev)[-1][0])) > 8 * REQUESTS,
+                         settle=2, env={**SIGNALS, **(env or {}), "EXAMPLE_SETUP": setup,
+                                        "EXAMPLE_SECOND_SINK": f"http://{host}:{port}"})
+            received = frozenset(second)
+        print(f"truth ({setup}): remote config statuses {[s for _, s, _ in statuses(events)]}, "
+              f"the second sink received {sorted(received)}")
+        for what, cond in (judge_truth(events, expected_aside, switch_at_once, service, ungoverned, past, received)
+                           + judge_transport(events)):
             ok &= cond
             print(f"  {'ok  ' if cond else 'FAIL'} {what}")
     finally:

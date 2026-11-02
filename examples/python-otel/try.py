@@ -198,10 +198,10 @@ def check_next(launch, target_: Path, seconds: float = 200) -> bool:
     return ok
 
 
-#: What a span and a log record processor the application adds once the SDK is built (setups.py)
-#: take from the package's control: their gates' settings, set aside. The sampler stays its own.
-LATE_PROCESSOR = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-                  "mask_attributes", "drop_attributes"}
+#: What the processors the application adds once the SDK is built (setups.py) export through past
+#: the gates: the span exporter its own kind of processor holds, reported ungoverned. The batch
+#: processors beside it are gated, so nothing is set aside.
+LATE_PROCESSOR = frozenset({"traces"})
 
 
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
@@ -227,7 +227,8 @@ CHECKS = {
     "rotation": of("app.py", lambda d: check_rotation(launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"})),
     "next": of("app.py", lambda d: check_next(launch, d)),
     "app": of("app.py", lambda d: check_app_settings(launch, d)),
-    "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", LATE_PROCESSOR)),
+    "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", set(),
+                                                                         ungoverned=LATE_PROCESSOR)),
     "first-in-code": of("in_code.py", lambda d: check(launch, "urllib", d, switches=False)),
     "setup-in-code": of("in_code.py", lambda d: check_setup(
         launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"},

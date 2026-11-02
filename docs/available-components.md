@@ -72,7 +72,7 @@ carries out and builds the one shape every language sends:
 |---|---|
 | `sdk` | metadata `integration.name` and `integration.version` (our package), `telemetry.sdk.language` and `telemetry.sdk.version` (the OpenTelemetry SDK's) |
 | `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known |
-| `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter, named as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or by its type, with the boolean metadata `gated`: whether the integration's signal export control, levels, caps and redaction reach what it exports |
+| `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter by its identity: its name as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or its type, and `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`). Metadata: the boolean `gated`, whether the policy governs it (the integration's gate is in front of it: signal export, levels, caps, redaction), and `destination` (`scheme://host:port`) with a destination. Never the path, query or credentials. One not gated is ungoverned: reported, never a reason to refuse a policy ([sdk-settings.md](sdk-settings.md#where-each-setting-applies)). A global provider of the application's own (Node.js, Go, .NET) is listed as `app_provider`, not gated |
 | `settings` | one sub-component per setting it carries out, by the setting's name behind the policy's controls ([sdk-settings.md](sdk-settings.md#the-controls)), with metadata `applies`: `at once` or `next start`. A setting it cannot carry out in this process is left out |
 
 For example, a Python service with Flask and a Prometheus reader:
@@ -82,8 +82,9 @@ For example, a Python service with Flask and a Prometheus reader:
   "sdk": {"integration.name": "opamp-otel", "integration.version": "0.4.0",
           "telemetry.sdk.language": "python", "telemetry.sdk.version": "1.45.1"},
   "instrumentations": {"flask": {"version": "0.56b0"}, "requests": {"version": "0.56b0"}},
-  "exporters": {"traces": {"otlp": {"gated": true}},
-                "metrics": {"otlp": {"gated": true}, "prometheus": {"gated": false}}},
+  "exporters": {"traces": {"otlp@collector:4318": {"gated": true, "destination": "http://collector:4318"}},
+                "metrics": {"otlp@collector:4318": {"gated": true, "destination": "http://collector:4318"},
+                            "prometheus": {"gated": false}}},
   "settings": {"sampling_rate": {"applies": "at once"},
                "deactivate_instrumentations": {"applies": "next start"}, "...": {}}
 }
@@ -93,7 +94,7 @@ For example, a Python service with Flask and a Prometheus reader:
   run the same thing share one set, which a server can store once.
 - A name listed twice is one sub-component: an instrumentation's versions joined, sorted, by
   `,` (a version with a `,` in it is left out, since it would read as several); an exporter
-  `gated` only if every exporter of that name is.
+  `gated` only if every exporter of that identity is.
 - Limits, so a set stays small: names and versions of up to 128 bytes (a longer name is left out,
   a longer version cut), 16 versions an instrumentation (past them, the first, sorted), 1024
   instrumentations and 64 exporters a signal (past them, the first by name).

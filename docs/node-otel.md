@@ -276,9 +276,10 @@ rate have said to sample:
   Nor does a span sampled under a remote parent that wasn't (the application's own sampler may sample
   one when only a cap is set).
 - The same bucket as `log_rate_limit` ([rate caps](#rate-caps)), on its own.
-- Both are declared whatever the exporters: the sampler is always this package's. But it samples
-  only the SDK's spans: once the application registers a tracer provider of its own, the
-  sampler's controls are set aside ([above](#a-provider-of-the-applications-own)).
+- Both are declared whatever the exporters: the sampler is always this package's. It samples
+  only the SDK's spans: a tracer provider the application registers of its own is reported
+  ungoverned, and the sampler's controls stay in force on the SDK's spans
+  ([above](#a-provider-of-the-applications-own)).
 
 ### Log levels per scope
 
@@ -296,9 +297,8 @@ rate have said to sample:
 - A record's level is its scope's exact entry, else the longest prefix entry (`app*`), else
   `level`. `off` drops every record of the scope, severity 0 too. A scope's level may be
   lower than `level` as well as higher.
-- Filtered at the log exporters' wrapper, from the next export on, after `signal_exports.logs`
-  and before a rate cap. Where a log exporter is left to NodeSDK, the package does not declare
-  `log_levels`, so a policy that overrides it is FAILED.
+- Filtered at the log exporters' gates, every log exporter NodeSDK built included, from the next
+  export on, after `signal_exports.logs` and before a rate cap.
 
 ### Redaction
 
@@ -317,10 +317,9 @@ rate have said to sample:
   object over it with the redacted attributes, so a processor or exporter the application added
   itself still sees the original. Names, log bodies, resource and scope attributes, and metrics
   are left alone.
-- Declared only when both the span and the log exporters are this package's (OTLP, `console` or
-  `none`). With either left to NodeSDK, a policy that overrides `attribute_redaction` is FAILED,
-  so the control is never half carried out. The same holds once the application registers a
-  tracer or logger provider of its own, and an override already in force is then set aside.
+- Always declared, and carried out at every span and log exporter's gate. A tracer or logger
+  provider the application registers of its own is reported ungoverned, and the override stays
+  in force on everything the gates are in front of.
 
 ### Scrubbing
 
@@ -342,7 +341,7 @@ in a list, and each member of a map, as an attribute of its own. The Logfire SDK
   event, span link and log record attributes, and log record bodies (a string, or the strings in
   an array or a plain object). The application's span or record isn't changed. Names, resource
   and scope attributes, and metrics are left alone.
-- Declared, and set aside, exactly as `attribute_redaction` is.
+- Declared exactly as `attribute_redaction` is.
 
 ### Rate caps
 
@@ -574,8 +573,9 @@ sends the hash at start, and the components in full when the server asks.
   on), leaves out (off), sends in a string (on) and sends again (nothing to tell); after a restart
   with no offer it is on from the start. Last, `check_truth` (the checks `truth-own-*`): app.cjs
   registers a tracer, logger or meter provider of its own (`EXAMPLE_SETUP`, setups.cjs), exporting
-  to the same sink. The server offers one policy per control. A control is set aside
-  when the policy is FAILED as an override the package can't carry out, or APPLIED with that
-  override reported `local` in the effective config. Every other override must show in the
-  telemetry, and the controls set aside must be exactly those that provider takes past the
-  package.
+  to a second sink. The server offers one policy per control, and nothing may be set aside (a
+  policy FAILED, or an override reported `local`): every override must show in the telemetry at
+  the first sink, which the http instrumentation still sends through the package's tracer and
+  meter (the application's own log records all go to its provider, so the log controls need only
+  be in force). The inventory and export health must report that signal's `app_provider`
+  ungoverned, and the second sink must receive it.

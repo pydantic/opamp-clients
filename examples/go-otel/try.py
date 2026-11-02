@@ -40,8 +40,9 @@ told of each change (opampotel.OnAppSettingsChange) (docs/app-settings.md).
 
 The truth-* checks run check_truth (examples/integrations.py) with main.go in a setup of setups.go
 (EXAMPLE_SETUP): once Setup has returned, the application sets a tracer, meter or logger provider
-of its own as the global one. Each setting must change the telemetry at the sink or be named as
-set aside, and exactly the settings that provider takes from the package are set aside.
+of its own as the global one, exporting to a second sink. Nothing is set aside: the agent reports
+that signal's ungoverned app_provider, its settings stay in force, and every other setting must
+change the telemetry at the first sink.
 """
 from __future__ import annotations
 
@@ -228,14 +229,11 @@ def check_settings(launch, target_: Path) -> bool:
     return ok
 
 
-#: What each setup (setups.go) takes from Setup's control, so is named as set aside: a global
-#: provider of the application's own takes every setting the package carries out on that signal,
-#: redaction with spans or log records, and the instrumentation switches with spans.
-GLOBAL_TRACER = {"sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_traces", "drop_attributes",
-                 "mask_attributes", "deactivate_all_instrumentations"}
-GLOBAL_METER = {"send_metrics"}
-GLOBAL_LOGGER = {"send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "drop_attributes",
-                 "mask_attributes"}
+#: The signal each setup (setups.go) takes past Setup's gates: a global provider of the
+#: application's own gets all of it, reported as an ungoverned app_provider.
+GLOBAL_TRACER = frozenset({"traces"})
+GLOBAL_METER = frozenset({"metrics"})
+GLOBAL_LOGGER = frozenset({"logs"})
 
 IN_CODE_TARGET = target("go-otel/in-code")
 FROM_ENV, IN_CODE = launcher(False, TARGET), launcher(True, IN_CODE_TARGET)
@@ -248,9 +246,12 @@ CHECKS = {
     "rotation": lambda: check_rotation(FROM_ENV, TARGET),
     "settings": lambda: check_settings(FROM_ENV, TARGET),
     "app": lambda: check_app_settings(FROM_ENV, TARGET),
-    "truth-global-tracer": lambda: check_truth(FROM_ENV, TARGET, "global-tracer", GLOBAL_TRACER, switch_at_once=True),
-    "truth-global-meter": lambda: check_truth(FROM_ENV, TARGET, "global-meter", GLOBAL_METER, switch_at_once=True),
-    "truth-global-logger": lambda: check_truth(FROM_ENV, TARGET, "global-logger", GLOBAL_LOGGER, switch_at_once=True),
+    "truth-global-tracer": lambda: check_truth(FROM_ENV, TARGET, "global-tracer", set(), switch_at_once=True,
+                                     ungoverned=GLOBAL_TRACER, past=GLOBAL_TRACER),
+    "truth-global-meter": lambda: check_truth(FROM_ENV, TARGET, "global-meter", set(), switch_at_once=True,
+                                     ungoverned=GLOBAL_METER, past=GLOBAL_METER),
+    "truth-global-logger": lambda: check_truth(FROM_ENV, TARGET, "global-logger", set(), switch_at_once=True,
+                                     ungoverned=GLOBAL_LOGGER, past=GLOBAL_LOGGER),
     "first-in-code": lambda: check(IN_CODE, "otelhttp", IN_CODE_TARGET, switch_at_once=True, versioned=False),
     "signals-in-code": lambda: check_signals(IN_CODE, IN_CODE_TARGET, switch_at_once=True),
     "settings-in-code": lambda: check_settings(IN_CODE, IN_CODE_TARGET),

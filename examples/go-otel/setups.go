@@ -8,17 +8,19 @@ package main
 // EXAMPLE_SETUP (comma-separated). Without EXAMPLE_SETUP the example does none of them.
 //
 //   - global-tracer: once Setup has returned, the application sets a tracer provider of its own
-//     as the global one, exporting over OTLP to the same place as Setup's. otelhttp's transport
-//     takes its tracer from the global provider at each request, so its spans go there.
+//     as the global one, exporting over OTLP to a second sink (EXAMPLE_SECOND_SINK). otelhttp's
+//     transport takes its tracer from the global provider at each request, so its spans go there,
+//     past Setup's gates: the agent reports an ungoverned app_provider for traces.
 //   - global-meter: the same with a meter provider of its own, and a gauge the application
-//     observes through it.
+//     observes through it (an ungoverned app_provider for metrics).
 //   - global-logger: the same with a logger provider of its own. main.go makes its otelslog
-//     loggers after the setups, so its log records go there.
+//     loggers after the setups, so its log records go there (an ungoverned app_provider for logs).
 
 import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"runtime"
 	"strings"
 
@@ -36,7 +38,7 @@ import (
 
 var setups = map[string]func(context.Context) (func(context.Context) error, error){
 	"global-tracer": func(ctx context.Context) (func(context.Context) error, error) {
-		exporter, err := otlptracehttp.New(ctx)
+		exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithEndpointURL(secondSink("traces")))
 		if err != nil {
 			return nil, err
 		}
@@ -45,7 +47,7 @@ var setups = map[string]func(context.Context) (func(context.Context) error, erro
 		return tp.Shutdown, nil
 	},
 	"global-meter": func(ctx context.Context) (func(context.Context) error, error) {
-		exporter, err := otlpmetrichttp.New(ctx)
+		exporter, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithEndpointURL(secondSink("metrics")))
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +62,7 @@ var setups = map[string]func(context.Context) (func(context.Context) error, erro
 		return mp.Shutdown, err
 	},
 	"global-logger": func(ctx context.Context) (func(context.Context) error, error) {
-		exporter, err := otlploghttp.New(ctx)
+		exporter, err := otlploghttp.New(ctx, otlploghttp.WithEndpointURL(secondSink("logs")))
 		if err != nil {
 			return nil, err
 		}
@@ -70,6 +72,9 @@ var setups = map[string]func(context.Context) (func(context.Context) error, erro
 		return lp.Shutdown, nil
 	},
 }
+
+// secondSink is the second sink's endpoint for signal: EXAMPLE_SECOND_SINK and the signal's path.
+func secondSink(signal string) string { return os.Getenv("EXAMPLE_SECOND_SINK") + "/v1/" + signal }
 
 // applySetups carries out each setup names names, and returns what shuts them down.
 func applySetups(ctx context.Context, names string) func(context.Context) error {

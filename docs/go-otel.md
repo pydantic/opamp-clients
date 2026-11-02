@@ -506,8 +506,9 @@ told of.
   The `truth-global-tracer`, `truth-global-meter` and `truth-global-logger` checks run
   `check_truth` (`examples/integrations.py`) with the example in each `EXAMPLE_SETUP` of
   [setups.go](../examples/go-otel/setups.go): once `Setup` has returned, the application sets a
-  provider of its own as the global one, exporting to the same sink. The server offers one
-  policy per control. A control is set aside when the policy is FAILED as an override
-  the package can't carry out, or APPLIED with that override reported `local` in the effective
-  config. Every other override must change the telemetry the sink receives, and the controls set
-  aside must be exactly those in the table [above](#where-the-server-cant-reach).
+  provider of its own as the global one, exporting to a second sink. The server offers one
+  policy per control, and nothing may be set aside (a policy FAILED, or an override reported
+  `local`). Every override of another signal must change the telemetry the first sink receives;
+  those of the replaced signal, all of whose telemetry now goes to the second sink, need only be
+  in force. The inventory and export health must report that signal's `app_provider`
+  ungoverned, and the second sink must receive it.
