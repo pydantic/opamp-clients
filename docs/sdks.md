@@ -127,19 +127,20 @@ TCP connections, starts TLS with its own library and moves the bytes, so the byt
 the same from every language. In **platform mode** the language's own HTTP and WebSocket stack
 carries out the core's requests.
 
-The client runs in **core mode** unless the application asks for **platform mode**: by naming it
-in the mode option, or by handing the client an HTTP client of its own, where the SDK takes one
-(an application that brings its own client has asked for the platform's stack). An option only
-one mode honours is never silently ignored: it selects that mode, or the client refuses to start
-with an error that says what to set instead.
+Core mode is the default and the supported path: leave the mode unset. **Platform mode is an
+advanced option** for an application that must bring its own HTTP client or needs its platform's
+own HTTP behaviour; the client runs in it only when the mode option names it. Nothing switches
+modes silently: an option only one mode honours (an HTTP client of the application's is platform
+mode's) makes the client refuse to start, with an error that says what to set, unless that mode is
+named.
 
 | Language | Platform mode, by name | An HTTP client of the application's | Refused at start |
 |---|---|---|---|
-| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`: selects platform mode | `ModeCore` with an `HTTPClient`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
+| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
 | Node.js | `mode: "platform"` | takes none | `spliceDownloads: false` in platform mode |
 | Python | `Config(mode="platform")` | takes none | `splice_downloads=False` in platform mode |
-| Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`: selects platform mode | `Mode.CORE` with an `httpClient`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
-| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`: selects platform mode | `OpAmpMode.Core` with an `HttpClient`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |
+| Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
+| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |
 
 The examples name no mode, so they run in core mode. The integrations of
 [sdk-settings.md](sdk-settings.md) ask for platform mode by name: keeping the client's own

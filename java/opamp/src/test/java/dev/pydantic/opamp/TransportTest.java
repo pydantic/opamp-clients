@@ -208,11 +208,11 @@ class TransportTest {
     // Checked at build, as the mode reads it (core mode takes SOCKS5: CoreModeTest).
     assertTrue(assertThrows(IllegalArgumentException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).proxy("socks5://proxy:1080").build())
         .getMessage().contains("SOCKS"));
-    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x")
+    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM)
         .httpClient(java.net.http.HttpClient.newHttpClient()).proxy("http://proxy:3128").build());
-    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x")
+    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM)
         .httpClient(java.net.http.HttpClient.newHttpClient()).tls(trusting(CA)).build());
-    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x")
+    assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM)
         .httpClient(java.net.http.HttpClient.newHttpClient()).directConnection().build());
     assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x")
         .proxy("http://proxy:3128").directConnection().build());

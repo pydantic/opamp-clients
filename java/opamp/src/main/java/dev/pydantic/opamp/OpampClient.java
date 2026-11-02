@@ -45,7 +45,7 @@ public final class OpampClient {
     CORE,
     /**
      * The JDK's HTTP client and WebSocket: for an application that brings its own {@code
-     * HttpClient} ({@link Config.Builder#httpClient}, which selects it too) or needs the JDK's
+     * HttpClient} ({@link Config.Builder#httpClient}, which needs this mode named) or needs the JDK's
      * own stack (its {@code ProxySelector} and proxy system properties).
      */
     PLATFORM
@@ -269,10 +269,9 @@ public final class OpampClient {
 
       /**
        * Who speaks HTTP and WebSocket: {@link Mode#CORE}, the shared core itself, over the JDK's
-       * sockets and TLS; or {@link Mode#PLATFORM}, the JDK's HTTP client. Not called: core mode,
-       * unless an {@link #httpClient} is given, which only platform mode can use (core mode with
-       * one is an error). An option only one mode honours is never ignored: it selects that mode,
-       * or {@link #build} refuses it with what to set instead.
+       * sockets and TLS; or {@link Mode#PLATFORM} (advanced), the JDK's HTTP client. Not called:
+       * core mode. Nothing switches modes silently: an option only one mode honours (an {@link
+       * #httpClient} is platform mode's) is refused by {@link #build} unless that mode is named.
        */
       public Builder mode(Mode mode) {
         this.mode = Objects.requireNonNull(mode);
@@ -311,8 +310,9 @@ public final class OpampClient {
       }
 
       /**
-       * Your own HTTP client, used as it is for OpAMP and package downloads. Giving one selects
-       * {@link Mode#PLATFORM}: only the JDK's stack can use it. It replaces {@link #tls} and {@link
+       * Your own HTTP client, used as it is for OpAMP and package downloads. Only {@link
+       * Mode#PLATFORM} (advanced) can use it, and it must be named: without {@code
+       * mode(Mode.PLATFORM)} {@link #build} refuses it. It replaces {@link #tls} and {@link
        * #proxy}: set TLS and proxies on it instead (giving both is an error). It must not follow
        * redirects ({@code HttpClient.Redirect.NEVER}, the JDK's default): every 3xx goes to the
        * core as it is, a download's too, and the core decides whether to follow it.
@@ -413,11 +413,14 @@ public final class OpampClient {
       public Config build() {
         if (mode == Mode.CORE && httpClient != null) {
           throw new IllegalStateException("core mode speaks HTTP itself and takes no httpClient: set tls and proxy instead,"
-              + " or don't call mode (an httpClient selects Mode.PLATFORM)");
+              + " or call mode(Mode.PLATFORM), an advanced option, to use it");
         }
-        // With no mode named: core mode, unless the application brought its own HTTP client,
-        // which only platform mode can use.
-        Mode resolved = mode != null ? mode : httpClient != null ? Mode.PLATFORM : Mode.CORE;
+        // Platform mode is only ever named: an httpClient alone never switches modes silently.
+        if (mode == null && httpClient != null) {
+          throw new IllegalStateException("an httpClient needs platform mode, an advanced option: call mode(Mode.PLATFORM) to"
+              + " use it, or leave httpClient out and set tls and proxy instead");
+        }
+        Mode resolved = mode != null ? mode : Mode.CORE;
         if (resolved == Mode.PLATFORM && !spliceDownloads) {
           throw new IllegalStateException("spliceDownloads is core mode's (the JDK's HTTP client writes package files itself):"
               + " leave it out, or run in core mode (no httpClient, and mode(Mode.CORE) or none)");

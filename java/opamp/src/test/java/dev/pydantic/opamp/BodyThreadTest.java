@@ -171,7 +171,7 @@ class BodyThreadTest {
     };
     LinkedBlockingQueue<String> heard = new LinkedBlockingQueue<>();
     OpampClient c = OpampClient.start(OpampClient.Config.builder("http://fake/v1/opamp", new byte[16])
-        .httpClient(http).requestTimeout(Duration.ofMillis(500)).heartbeatInterval(Duration.ofMillis(200))
+        .mode(OpampClient.Mode.PLATFORM).httpClient(http).requestTimeout(Duration.ofMillis(500)).heartbeatInterval(Duration.ofMillis(200))
         .stopTimeout(Duration.ofSeconds(2)).build(),
         OpampClient.Status.of(Opamp.AgentDescription.getDefaultInstance()),
         n -> heard.add(n.getClass().getSimpleName()));

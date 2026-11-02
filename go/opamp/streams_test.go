@@ -1005,7 +1005,9 @@ func TestAModeRefusesWhatItCantTake(t *testing.T) {
 		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
 		{Config{Endpoint: "http://127.0.0.1:9/", TLS: TLS{Config: named}}, "TLS.Config.ServerName in core mode"},
 		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
-		{Config{Endpoint: "http://127.0.0.1:9/", HTTPClient: &http.Client{}, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
+		{Config{Endpoint: "http://127.0.0.1:9/", Mode: ModePlatform, HTTPClient: &http.Client{}, NoSpliceDownloads: true}, "NoSpliceDownloads in platform mode"},
+		// Regression: an HTTPClient alone switched to platform mode silently; it needs the mode named.
+		{Config{Endpoint: "http://127.0.0.1:9/", HTTPClient: &http.Client{}}, "HTTPClient with no Mode"},
 	} {
 		if _, err := Start(context.Background(), c.cfg, Status{}, nil); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%+v: %v, want %q", c.cfg, err, c.want)
@@ -1013,8 +1015,7 @@ func TestAModeRefusesWhatItCantTake(t *testing.T) {
 	}
 }
 
-// The mode a client runs in: core mode with nothing said, platform mode when asked for, by Mode or
-// by an HTTP client of the application's (which only platform mode can use).
+// The mode a client runs in: core mode with nothing said, platform mode only when named.
 func TestTheModeAClientRunsIn(t *testing.T) {
 	own := &http.Client{}
 	for _, c := range []struct {
@@ -1026,7 +1027,6 @@ func TestTheModeAClientRunsIn(t *testing.T) {
 		{"TLS and a proxy", Config{TLS: TLS{MinVersion: tls.VersionTLS13}, Proxy: Proxy{URL: "socks5://p:1"}}, true},
 		{"ModeCore", Config{Mode: ModeCore}, true},
 		{"ModePlatform", Config{Mode: ModePlatform}, false},
-		{"an HTTPClient", Config{HTTPClient: own}, false},
 		{"ModePlatform and an HTTPClient", Config{Mode: ModePlatform, HTTPClient: own}, false},
 		{"platform mode's tls.Config, named", Config{Mode: ModePlatform, TLS: TLS{Config: &tls.Config{ServerName: "a"}}}, false},
 	} {

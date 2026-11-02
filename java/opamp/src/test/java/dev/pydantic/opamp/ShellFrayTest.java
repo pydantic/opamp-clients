@@ -310,7 +310,7 @@ class ShellFrayTest {
         wire.start();
         OpampClient.Config.Builder b = OpampClient.Config
             .builder((plan.ws() ? "ws" : "http") + "://fake/v1/opamp", new byte[16])
-            .httpClient(http)
+            .mode(OpampClient.Mode.PLATFORM).httpClient(http)
             .heartbeatInterval(Duration.ofSeconds(30));
         if (state != null) {
           b.stateFile(state).acceptPackages(true);

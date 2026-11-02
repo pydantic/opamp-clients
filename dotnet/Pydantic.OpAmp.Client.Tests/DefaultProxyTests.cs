@@ -250,6 +250,6 @@ public class DefaultProxyTests
         Assert.Throws<ArgumentException>(() => OpAmpClient.Start(
             new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = endpoint, DirectConnection = true, Proxy = new Uri("http://127.0.0.1:2") }, new OpAmpStatus()));
         Assert.Throws<ArgumentException>(() => OpAmpClient.Start(
-            new OpAmpClientOptions { Endpoint = endpoint, DirectConnection = true, HttpClient = app }, new OpAmpStatus()));
+            new OpAmpClientOptions { Mode = OpAmpMode.Platform, Endpoint = endpoint, DirectConnection = true, HttpClient = app }, new OpAmpStatus()));
     }
 }

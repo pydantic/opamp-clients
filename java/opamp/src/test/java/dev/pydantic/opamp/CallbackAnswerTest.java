@@ -237,7 +237,7 @@ class CallbackAnswerTest {
       wire.start();
       try {
         OpampClient c = OpampClient.start(OpampClient.Config.builder("ws://fake/v1/opamp", new byte[16])
-            .httpClient(http).stateFile(state)
+            .mode(OpampClient.Mode.PLATFORM).httpClient(http).stateFile(state)
             .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
             .heartbeatInterval(Duration.ofSeconds(30)).build(),
             OpampClient.Status.of(Opamp.AgentDescription.getDefaultInstance()), this::notify, null, tapBase.toString(), d -> d);

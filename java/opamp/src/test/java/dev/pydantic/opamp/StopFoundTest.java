@@ -54,7 +54,7 @@ class StopFoundTest {
         .setRemoteConfig(CallbackPropertiesTest.remoteConfig("c1")));
     try {
       OpampClient c = OpampClient.start(OpampClient.Config.builder("http://fake/v1/opamp", new byte[16])
-          .httpClient(http).stateFile(dir.resolve("state"))
+          .mode(OpampClient.Mode.PLATFORM).httpClient(http).stateFile(dir.resolve("state"))
           .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE)
           .stopTimeout(Duration.ofSeconds(2)).heartbeatInterval(Duration.ofSeconds(30)).build(),
           OpampClient.Status.of(Opamp.AgentDescription.getDefaultInstance()), n -> {});
@@ -107,7 +107,7 @@ class StopFoundTest {
         .setPackagesAvailable(offer()));
     try {
       OpampClient c = OpampClient.start(OpampClient.Config.builder("http://fake/v1/opamp", new byte[16])
-          .httpClient(http).stateFile(dir.resolve("state")).acceptPackages(true)
+          .mode(OpampClient.Mode.PLATFORM).httpClient(http).stateFile(dir.resolve("state")).acceptPackages(true)
           .stopTimeout(Duration.ofSeconds(2)).heartbeatInterval(Duration.ofSeconds(30)).build(),
           OpampClient.Status.of(Opamp.AgentDescription.getDefaultInstance()), n -> {
             String name = n.getClass().getSimpleName();

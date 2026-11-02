@@ -37,18 +37,15 @@
 // Package files are downloaded without following redirects: the client reports each response,
 // whatever its status, with a redirect's Location resolved by net/url, and the core decides.
 //
-// # Core mode (the default) and platform mode
+// # Core mode (the default) and platform mode (advanced)
 //
-// Config.Mode says who speaks HTTP and WebSocket. The client runs in core mode unless the
-// application asks for platform mode: by naming it in the mode option, or by handing the client
-// an HTTP client of its own, where the SDK takes one (an application that brings its own client
-// has asked for the platform's stack). An option only one mode honours is never silently ignored:
-// it selects that mode, or the client refuses to start with an error that says what to set
-// instead.
+// Config.Mode says who speaks HTTP and WebSocket. The client runs in core mode, the supported
+// path, unless the application names platform mode (ModePlatform), an advanced option. Nothing
+// switches modes silently: an option only one mode honours is refused at Start with an error that
+// says what to set instead.
 //
-// Here platform mode is net/http's: Mode set to ModePlatform, and Config.HTTPClient selects it
-// too. Start refuses ModeCore with an HTTPClient, a TLS.Config that names the server (ServerName)
-// in core mode, and NoSpliceDownloads in platform mode.
+// Here platform mode is net/http's. Start refuses an HTTPClient without ModePlatform, a TLS.Config
+// that names the server (ServerName) in core mode, and NoSpliceDownloads in platform mode.
 //
 // In core mode the shared core speaks HTTP/1.1 (chunked bodies, kept connections), WebSocket,
 // HTTP CONNECT and SOCKS5 itself (in the same WebAssembly module), so the bytes
@@ -63,7 +60,7 @@
 //
 //	cfg := opamp.Config{Endpoint: "wss://opamp.example.com/v1/opamp"}
 //
-// In platform mode net/http carries OpAMP requests and package downloads (HTTP/2 where the server
+// In platform mode (advanced) net/http carries OpAMP requests and package downloads (HTTP/2 where the server
 // offers it) and gorilla/websocket the WebSocket. Choose it to bring your own *http.Client, or
 // when the connection must be made as net/http makes it: by net/http's reading of the
 // environment's proxies (below), over HTTP/2, or with a tls.Config that names the server
@@ -115,8 +112,8 @@
 // A configured Proxy.URL is used as it is in both modes (in core mode it is handed to the core,
 // with its credentials and ConnectHeader).
 //
-// An application with its own *http.Client sets Config.HTTPClient instead, and then no TLS or
-// Proxy; the client then runs in platform mode. Its Transport carries HTTP and downloads as it is,
+// An application with its own *http.Client sets Mode to ModePlatform and Config.HTTPClient
+// instead, and then no TLS or Proxy. Its Transport carries HTTP and downloads as it is,
 // one round trip each (no redirect is followed, no cookie sent), and WebSocket takes the
 // Transport's TLSClientConfig, Proxy, ProxyConnectHeader and DialContext (so it must be an
 // *http.Transport). Options that can't work (PEM that doesn't parse, a key that doesn't match its
@@ -194,9 +191,9 @@ type Config struct {
 	// alike. The zero value takes it from the environment (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY,
 	// NO_PROXY, by core mode's rule; in platform mode by net/http's); Proxy.Direct goes direct.
 	Proxy Proxy
-	// HTTPClient, if set, is used instead of TLS and Proxy (setting both is an error), and the
-	// client runs in platform mode: only net/http can use it (with Mode set to ModeCore it is an
-	// error). OpAMP requests and package downloads go through its Transport, one round trip
+	// HTTPClient, if set, is used instead of TLS and Proxy (setting both is an error). Only
+	// platform mode can use it, and only when asked for by name: without Mode set to
+	// ModePlatform it is an error. OpAMP requests and package downloads go through its Transport, one round trip
 	// each: no redirect is followed (the core decides) and its Jar and Timeout don't apply.
 	// WebSocket takes the TLS settings, proxy, CONNECT headers and dialer of its Transport, which
 	// must then be an *http.Transport (nil: http.DefaultTransport).
@@ -233,8 +230,8 @@ type Config struct {
 	// DownloadTimeout is how long a download may take; 0: 10 minutes.
 	DownloadTimeout time.Duration
 	// Mode is who speaks HTTP and WebSocket: ModeCore (the shared core itself, over Go's TCP
-	// connections and crypto/tls) or ModePlatform (net/http and gorilla/websocket). Unset (""): core
-	// mode, unless HTTPClient is set, which only platform mode can use. Both take TLS and Proxy.
+	// connections and crypto/tls) or ModePlatform (net/http and gorilla/websocket; advanced).
+	// Unset (""): core mode. Both take TLS and Proxy; only ModePlatform takes HTTPClient.
 	Mode Mode
 	// NoSpliceDownloads, in core mode, passes package files' bytes through the core. Unset (the
 	// default), a download's body goes from the connection straight to its file wherever the
@@ -723,21 +720,21 @@ func (c *Client) send(in *corepb.Input) {
 }
 
 // coreMode says which mode the client runs in (true: core mode), and refuses what the mode can't
-// take. With no Mode it is core mode, unless the application brought its own HTTP client, which
-// only platform mode can use. Nothing one mode alone honours is ignored: it is an error that says
-// what to set instead.
+// take. With no Mode it is core mode; platform mode is only ever asked for by name, so an
+// HTTPClient without ModePlatform is an error rather than a silent switch. Nothing one mode alone
+// honours is ignored: it is an error that says what to set instead.
 func (cfg Config) coreMode() (bool, error) {
 	switch cfg.Mode {
 	case "":
 		if cfg.HTTPClient != nil {
-			return false, cfg.platformModeOnly()
+			return false, errors.New("opamp: HTTPClient with no Mode: an HTTPClient needs platform mode, an advanced option; set Mode to ModePlatform to use it, or leave HTTPClient unset and set TLS and Proxy instead")
 		}
 		return true, cfg.coreModeOnly()
 	case ModePlatform:
 		return false, cfg.platformModeOnly()
 	case ModeCore:
 		if cfg.HTTPClient != nil {
-			return false, errors.New("opamp: HTTPClient in core mode: the core speaks HTTP itself over Go's connections; set TLS and Proxy instead, or leave Mode unset (an HTTPClient selects platform mode)")
+			return false, errors.New("opamp: HTTPClient in core mode: the core speaks HTTP itself over Go's connections; set TLS and Proxy instead, or set Mode to ModePlatform (an advanced option) to use it")
 		}
 		return true, cfg.coreModeOnly()
 	default:

@@ -108,9 +108,9 @@ public sealed record OpAmpClientOptions
 
     /// <summary>
     /// Your own HttpClient, instead of <see cref="Tls"/>, <see cref="Proxy"/> and
-    /// <see cref="DirectConnection"/> (setting any of them with it is an error). Setting it selects
-    /// <see cref="OpAmpMode.Platform"/>: only .NET's stack can use it (with <see cref="Mode"/> set to
-    /// <see cref="OpAmpMode.Core"/> it is an error). It carries everything: requests, the WebSocket
+    /// <see cref="DirectConnection"/> (setting any of them with it is an error). Only
+    /// <see cref="OpAmpMode.Platform"/> (advanced) can use it, and it must be named: without
+    /// <see cref="Mode"/> set to <see cref="OpAmpMode.Platform"/> it is an error. It carries everything: requests, the WebSocket
     /// upgrade and package downloads. Build it on a handler that doesn't follow redirects or
     /// decompress (<c>AllowAutoRedirect = false</c>, the default decompression): a 3xx goes to the
     /// core as it is, which decides what it means, and the core asks for no compression. The
@@ -174,9 +174,9 @@ public sealed record OpAmpClientOptions
     /// (HTTP/1.1, WebSocket, CONNECT and SOCKS5), over the client's own TCP connections and
     /// SslStream with <see cref="Tls"/>; .NET only opens connections, starts TLS, answers which
     /// proxy to use and writes package files. <see cref="OpAmpMode.Platform"/>: .NET's HttpClient
-    /// and ClientWebSocket. Default (null): core mode, unless <see cref="HttpClient"/> is set,
-    /// which only platform mode can use. An option only one mode honours is never ignored: it
-    /// selects that mode, or <c>Start</c> throws with what to set instead.
+    /// and ClientWebSocket (advanced). Default (null): core mode. Nothing switches modes silently:
+    /// an option only one mode honours (<see cref="HttpClient"/> is platform mode's) makes
+    /// <c>Start</c> throw with what to set instead, unless that mode is named.
     /// </summary>
     public OpAmpMode? Mode { get; init; }
 
@@ -228,7 +228,7 @@ public enum OpAmpMode
 
     /// <summary>
     /// .NET's HttpClient and ClientWebSocket: for an application that brings its own HttpClient
-    /// (<see cref="OpAmpClientOptions.HttpClient"/>, which selects it too) or needs .NET's own
+    /// (<see cref="OpAmpClientOptions.HttpClient"/>, which needs this mode named) or needs .NET's own
     /// stack (the system's proxy settings).
     /// </summary>
     Platform,
@@ -424,9 +424,10 @@ public sealed class OpAmpClient
         var files = seams?.Files ?? FileOps.Real;
         var coreMode = options.Mode switch
         {
-            // None named: core mode, unless the application brought its own HttpClient, which only
-            // platform mode can use.
-            null => options.HttpClient is null,
+            // None named: core mode. Platform mode is only ever named, so an HttpClient alone is an
+            // error rather than a silent switch.
+            null when options.HttpClient is not null => throw new ArgumentException("HttpClient needs platform mode, an advanced option: set Mode = OpAmpMode.Platform to use it, or leave HttpClient unset and set Tls and Proxy instead", nameof(options)),
+            null => true,
             OpAmpMode.Platform => false,
             OpAmpMode.Core => true,
             _ => throw new ArgumentException($"Mode is Core or Platform, not {options.Mode}", nameof(options)),
@@ -709,7 +710,7 @@ public sealed class OpAmpClient
     {
         if (o.HttpClient is not null)
         {
-            throw new ArgumentException("HttpClient can't be used in core mode: the core speaks HTTP itself, over the client's own connections (set Tls and Proxy instead, or leave Mode unset: an HttpClient selects platform mode)", nameof(o));
+            throw new ArgumentException("HttpClient can't be used in core mode: the core speaks HTTP itself, over the client's own connections (set Tls and Proxy instead, or set Mode = OpAmpMode.Platform, an advanced option, to use it)", nameof(o));
         }
 
         if (o.Proxy is not null && o.DirectConnection)

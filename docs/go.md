@@ -93,7 +93,7 @@ in full.
 | Headers | `Config.Header`, sent with every request and WebSocket upgrade; `Config.AuthHeader`, a function asked for headers about every second (a token it renews) | [sdks.md](sdks.md#credentials-and-state) |
 | TLS | `Config.TLS`: `CAPEM`, `IncludeSystemCAs`, `CertPEM` and `KeyPEM`, `MinVersion`, `MaxVersion`, and a `*tls.Config` to start from | package documentation, "TLS and proxies" |
 | Proxy | `Config.Proxy`: `URL`, `ConnectHeader`, `ResolveLocally`, or `Direct` for none. Without one, the environment's | package documentation, "TLS and proxies" |
-| Who speaks HTTP | `Config.Mode`: `opamp.ModeCore` (the default) or `opamp.ModePlatform` (net/http and gorilla/websocket); `Config.HTTPClient` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
+| Who speaks HTTP | `Config.Mode`: `opamp.ModeCore` (the default) or `opamp.ModePlatform` (net/http and gorilla/websocket; advanced); `Config.HTTPClient` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `Config.StateFile`: kept across restarts, written 0600; `Config.StateSealer` encrypts it (`go/statekey` has one: `statekey.Load(spec, stateFile)`) | [state-file.md](state-file.md#encrypted-at-rest-go) |
 | Instance UID | `Config.InstanceUID`, or zero for one the core makes; `Config.RequestInstanceUID` to have the server assign it; `client.InstanceUID()` is the one in use | [instance-uid.md](instance-uid.md) |
 | Before connecting | `opamp.Open(ctx, cfg)` reads the state file and sends nothing: `InstanceUID()` and `Resumed()` (the config last applied, the one to work on, a refused one's status, the telemetry settings) say what the client starts from; then `Start(status, notify)` or `Close()`. `opamp.Start` is `Open` then `Start` | |

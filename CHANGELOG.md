@@ -20,6 +20,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
+  mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
+  `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
+  refused at start, saying what to set (#109).
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.

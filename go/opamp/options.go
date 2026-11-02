@@ -16,17 +16,16 @@ import (
 type Mode string
 
 const (
-	// ModeCore (the default: also what the zero value "" means, unless Config.HTTPClient is
-	// set): the shared core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself
-	// (in the same WebAssembly module), over TCP connections Go opens and TLS
-	// Go starts on them (crypto/tls, with Config.TLS). Go only connects, starts TLS, resolves
+	// ModeCore (the default: also what the zero value "" means): the shared core speaks HTTP/1.1,
+	// WebSocket, CONNECT and SOCKS5 itself (in the same WebAssembly module), over TCP connections
+	// Go opens and TLS Go starts on them (crypto/tls, with Config.TLS). Go only connects, starts TLS, resolves
 	// names (for a SOCKS5 proxy with Proxy.ResolveLocally), answers which proxy to use, moves the
 	// bytes, and writes package files.
 	ModeCore Mode = "core"
-	// ModePlatform: Go's net/http and gorilla/websocket carry out the core's requests, WebSocket
-	// connections and downloads. For an application that brings its own *http.Client
-	// (Config.HTTPClient, which selects it too) or needs net/http's own behaviour: its reading of
-	// the environment's proxies, HTTP/2.
+	// ModePlatform (advanced): Go's net/http and gorilla/websocket carry out the core's requests,
+	// WebSocket connections and downloads. For an application that brings its own *http.Client
+	// (Config.HTTPClient, which needs this mode named) or needs net/http's own behaviour: its
+	// reading of the environment's proxies, HTTP/2.
 	ModePlatform Mode = "platform"
 )
 

@@ -584,8 +584,7 @@ public class StreamsTests
         }
     }
 
-    // The mode a client runs in: core mode with none named, platform mode when asked for, by Mode
-    // or by an HttpClient of the application's (which only platform mode can use). Core mode asks
+    // The mode a client runs in: core mode with none named, platform mode only when named. Core mode asks
     // its proxy rule (the environment) before it connects; platform mode never reads it.
     [Fact]
     public async Task WithNoModeNamedTheClientRunsInCoreMode()
@@ -598,7 +597,6 @@ public class StreamsTests
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Core }, true),
             (new() { Endpoint = endpoint, SpliceDownloads = false }, true),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform }, false),
-            (new() { Endpoint = endpoint, HttpClient = app }, false),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app }, false),
         ];
         foreach (var (options, coreMode) in cases)
@@ -635,10 +633,12 @@ public class StreamsTests
         (OpAmpClientOptions Options, string Says)[] bad =
         [
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
-            (new() { Endpoint = endpoint, HttpClient = app, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
+            // Regression: an HttpClient alone switched to platform mode silently; the mode must be named.
+            (new() { Endpoint = endpoint, HttpClient = app }, "HttpClient needs platform mode"),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Core, HttpClient = app }, "HttpClient can't be used in core mode"),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, Proxy = new Uri("socks5://127.0.0.1:1080"), ProxyResolveLocally = true }, "core mode can"),
-            (new() { Endpoint = endpoint, HttpClient = app, ProxyResolveLocally = true }, "ProxyResolveLocally"),
+            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app, ProxyResolveLocally = true }, "ProxyResolveLocally"),
         ];
         foreach (var (options, says) in bad)
         {

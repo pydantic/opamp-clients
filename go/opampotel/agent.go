@@ -278,7 +278,7 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		// A key of its own, offered by the server: taken with a state directory (cfg.StateFile,
 		// below) and kept there; without one the client neither declares nor takes it.
 		AcceptConnectionSettings: true,
-		// Platform mode, asked for by name (an HTTPClient selects it too): the agent's requests go
+		// Platform mode, asked for by name (an HTTPClient needs it): the agent's requests go
 		// through net/http, on a transport of its own that no instrumentation wraps.
 		Mode:       opamp.ModePlatform,
 		HTTPClient: untraced(),
