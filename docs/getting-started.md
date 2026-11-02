@@ -28,8 +28,8 @@ In Logfire, **Fleet → Connect an application** shows both
 secret manager. These pages write it as `<key>`.
 
 Servers name keys differently. An *enrollment key* is one a host's Supervisor uses once, to get
-a key of its own. A key you give an application is the one it connects with: Logfire's Fleet
-calls it the application's connection key.
+a key of its own. A key a client connects with (an application's, an Operator bridge's, a
+collector's own) is what Logfire's Fleet calls a connection key.
 
 The key that connects an application is not a telemetry write token. Telemetry goes where the
 SDK sends it, with its own credentials (for Logfire, a write token), and never through the OpAMP
