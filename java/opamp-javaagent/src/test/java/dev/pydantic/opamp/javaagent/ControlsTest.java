@@ -548,6 +548,30 @@ class ControlsTest {
     }
   }
 
+  // Regression: an error inside a gate (here a span redaction can't read) went up to the
+  // processor, which dropped the batch with nothing counted: Fleet never showed it.
+  @Test
+  void anErrorInsideAGateFailsTheExportAndIsCounted() {
+    Controls c = new Controls();
+    c.apply(settings(every("attribute_redaction", override("\"mask\":[\"k\"]"))));
+    Scripted exporter = new Scripted();
+    var span = io.opentelemetry.sdk.testing.trace.TestSpanData.builder().setName("s")
+        .setKind(io.opentelemetry.api.trace.SpanKind.INTERNAL).setStartEpochNanos(1).setEndEpochNanos(2)
+        .setHasEnded(true).setStatus(io.opentelemetry.sdk.trace.data.StatusData.unset()).build();
+    var unreadable = new io.opentelemetry.sdk.trace.data.DelegatingSpanData(span) {
+      @Override
+      public io.opentelemetry.api.common.Attributes getAttributes() {
+        throw new IllegalArgumentException("no attributes");
+      }
+    };
+    var result = c.spans(exporter).export(java.util.List.of(unreadable, span));
+    assertFalse(result.isSuccess());
+    var t = c.counts().getTraces();
+    assertEquals(1, t.getExportsFailed());
+    assertEquals(2, t.getItemsFailed());
+    assertEquals("gate: no attributes", t.getLastError());
+  }
+
   @Test
   void theGatesCountExportsAfterTheExportersRetriesAndWhatTheyDropOnPurpose() {
     Controls c = new Controls();

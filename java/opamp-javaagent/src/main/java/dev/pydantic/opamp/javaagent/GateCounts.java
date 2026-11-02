@@ -5,6 +5,7 @@ package dev.pydantic.opamp.javaagent;
 
 import dev.pydantic.opamp.sdk.SettingsProto;
 import io.opentelemetry.sdk.common.CompletableResultCode;
+import java.util.function.Supplier;
 
 /**
  * What one signal's gate counted since start, for export health: exports that succeeded or failed
@@ -28,6 +29,21 @@ final class GateCounts {
   CompletableResultCode exported(CompletableResultCode result, long items) {
     result.whenComplete(() -> completed(result.isSuccess(), items, result.getFailureThrowable()));
     return result;
+  }
+
+  /**
+   * Run a gate's export of {@code items} items: an error inside the gate (a value redaction can't
+   * walk) fails the export, counted as failed, where the processor would drop the batch uncounted.
+   */
+  CompletableResultCode guarded(long items, Supplier<CompletableResultCode> export) {
+    try {
+      return export.get();
+    } catch (RuntimeException e) {
+      String why = "gate: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+      IllegalStateException failure = new IllegalStateException(why, e);
+      completed(false, items, failure);
+      return CompletableResultCode.ofExceptionalFailure(failure);
+    }
   }
 
   synchronized void completed(boolean ok, long items, Throwable error) {

@@ -145,6 +145,10 @@ final class Controls {
     return new SpanGate() {
       @Override
       public CompletableResultCode export(Collection<SpanData> spans) {
+        return traceCounts.guarded(spans.size(), () -> gated(spans));
+      }
+
+      private CompletableResultCode gated(Collection<SpanData> spans) {
         Gates g = gates;
         if (!g.sendTraces()) {
           traceCounts.filtered(spans.size());
@@ -180,11 +184,13 @@ final class Controls {
       @Override
       public CompletableResultCode export(Collection<MetricData> metrics) {
         long points = metrics.stream().mapToLong(m -> m.getData().getPoints().size()).sum();
-        if (!gates.sendMetrics()) {
-          metricCounts.filtered(points);
-          return CompletableResultCode.ofSuccess();
-        }
-        return metricCounts.exported(to.export(metrics), points);
+        return metricCounts.guarded(points, () -> {
+          if (!gates.sendMetrics()) {
+            metricCounts.filtered(points);
+            return CompletableResultCode.ofSuccess();
+          }
+          return metricCounts.exported(to.export(metrics), points);
+        });
       }
 
       @Override
@@ -323,6 +329,10 @@ final class Controls {
     return new LogGate() {
       @Override
       public CompletableResultCode export(Collection<LogRecordData> logs) {
+        return logCounts.guarded(logs.size(), () -> gated(logs));
+      }
+
+      private CompletableResultCode gated(Collection<LogRecordData> logs) {
         int given = logs.size();
         Gates g = gates;
         if (!g.sendLogs()) {
