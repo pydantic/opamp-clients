@@ -623,10 +623,18 @@ class Controls:
         # Last: a callback the application gave sees the SDK's settings already in force.
         self.app.put(s.custom)
 
-    def spans(self, to: SpanExporter, log_spans: bool = False) -> SpanExporter:
+    def spans(self, to: SpanExporter, log_spans: bool = False, redact: bool = True) -> SpanExporter:
         """The trace gate in front of `to`. With `log_spans`, the Logfire SDK's logs (spans whose
-        `logfire.span_type` is `log`) go through the log controls in its place."""
-        return _GatedSpanExporter(to, self, log_spans)
+        `logfire.span_type` is `log`) go through the log controls in its place. `redact=False`
+        leaves redaction to a `redacting` exporter further in, under an exporter that retries:
+        the gate then decides and counts each span once, however often it is retried."""
+        return _GatedSpanExporter(to, self, log_spans, redact)
+
+    def redacting(self, to: SpanExporter) -> SpanExporter:
+        """Redaction and scrubbing alone in front of `to`, for a gate made with `redact=False`:
+        a span a retrying exporter re-sends, or makes (Logfire's body-too-large span), is
+        redacted each time it is sent, and never decided or counted again."""
+        return _RedactingSpanExporter(to, self)
 
     def logs(self, to: LogRecordExporter) -> LogRecordExporter:
         return _GatedLogExporter(to, self)
@@ -702,13 +710,43 @@ def _export_parts(parts: list[tuple[Counts, int]], export):
     return result
 
 
+def _send(sent: list[bool], export, batch):
+    """Hand `batch` to the exporter, noting in `sent` that what is raised from here on is its own."""
+    sent.append(True)
+    return export(batch)
+
+
+def _gate_failed(parts: list[tuple[Counts, int]], e: Exception) -> None:
+    """An error inside a gate (a value redaction can't walk): the export fails, counted as failed
+    for each signal's items, where the processor would drop it with nothing counted."""
+    why = f"gate: {str(e) or type(e).__name__}"
+    _log.warning("OpAMP: an export was dropped by an error in the policy gate: %s", why)
+    for counts, items in parts:
+        if items:
+            counts.failed(items, why)
+
+
 class _GatedSpanExporter(SpanExporter):
-    def __init__(self, to: SpanExporter, controls: Controls, log_spans: bool = False) -> None:
-        self._to, self._c, self._log_spans = to, controls, log_spans
+    def __init__(self, to: SpanExporter, controls: Controls, log_spans: bool = False, redact: bool = True) -> None:
+        self._to, self._c, self._log_spans, self._redact = to, controls, log_spans, redact
 
     def export(self, spans):
         """send_traces (the log controls, for a Logfire log), then redaction and scrubbing. What
         the gates drop is counted as filtered; a batch left empty isn't exported."""
+        sent: list[bool] = []
+        try:
+            return self._export(spans, sent)
+        except Exception as e:
+            if sent:  # the exporter's own error, counted as it came: raised as before
+                raise
+            try:
+                logs = sum(1 for s in spans if _is_log_span(s)) if self._log_spans else 0
+            except Exception:  # noqa: BLE001 - the error may be the spans' own
+                logs = 0
+            _gate_failed([(self._c.traces, len(spans) - logs), (self._c.logs_counts, logs)], e)
+            return SpanExportResult.FAILURE
+
+    def _export(self, spans, sent: list[bool]):
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         logs = [s for s in spans if _is_log_span(s)] if self._log_spans else []
         traces = [s for s in spans if not _is_log_span(s)] if logs else list(spans)
@@ -724,9 +762,26 @@ class _GatedSpanExporter(SpanExporter):
         out = [s for s in spans if id(s) in keep] if logs else traces
         if not out:
             return SpanExportResult.SUCCESS
-        if g.redactor:
+        if g.redactor and self._redact:
             out = [_redacted_span(span, g.redactor) for span in out]
-        return _export_parts([(c.traces, len(traces)), (c.logs_counts, len(logs))], lambda: self._to.export(out))
+        return _export_parts([(c.traces, len(traces)), (c.logs_counts, len(logs))], lambda: _send(sent, self._to.export, out))
+
+    def shutdown(self) -> None:
+        self._to.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._to.force_flush(timeout_millis)
+
+
+class _RedactingSpanExporter(SpanExporter):
+    """Controls.redacting: the gates' redaction alone, with the latest document's redactor."""
+
+    def __init__(self, to: SpanExporter, controls: Controls) -> None:
+        self._to, self._c = to, controls
+
+    def export(self, spans):
+        r = self._c.gates.redactor
+        return self._to.export([_redacted_span(span, r) for span in spans] if r else spans)
 
     def shutdown(self) -> None:
         self._to.shutdown()
@@ -743,17 +798,29 @@ class _GatedLogExporter(LogRecordExporter):
         """send_logs, then the levels, then the rate cap, then redaction and scrubbing (of the
         attributes and the body); a batch left empty isn't
         exported. What they drop is counted as filtered."""
+        sent: list[bool] = []
+        try:
+            return self._export(batch, sent)
+        except Exception as e:
+            if sent:  # the exporter's own error, counted as it came: raised as before
+                raise
+            from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
+
+            _gate_failed([(self._c.logs_counts, len(batch))], e)
+            return LogRecordExportResult.FAILURE
+
+    def _export(self, batch, sent: list[bool]):
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         counts, given = c.logs_counts, len(batch)
         if g.send_logs and g.logs_min_severity is None and not g.logs_scope_levels and g.logs_cap is None \
                 and not g.redactor:
-            return _export(counts, given, lambda: self._to.export(batch))
+            return _export(counts, given, lambda: _send(sent, self._to.export, batch))
         batch = _logs_gated(batch, g, _kept, self)
         if g.redactor and batch:
             batch = [_redacted_record(r, g.redactor) for r in batch]
         counts.filtered(given - len(batch))
         if batch:
-            return _export(counts, len(batch), lambda: self._to.export(batch))
+            return _export(counts, len(batch), lambda: _send(sent, self._to.export, batch))
         from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
 
         return LogRecordExportResult.SUCCESS

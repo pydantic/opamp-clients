@@ -368,6 +368,38 @@ class _Recording:
         return True
 
 
+def test_a_retried_logfire_export_is_decided_and_counted_once_and_redacted_each_time():
+    """Regression: Logfire's RetryFewerSpansSpanExporter wrapped the gate, so halves re-sent after a
+    body-too-large error went through it again: the log cap charged twice dropped admitted log
+    spans, counted as both failed and filtered. The gate now sits above the retries, redaction
+    under them."""
+    from logfire._internal.exporters.otlp import BodyTooLargeError, RetryFewerSpansSpanExporter
+    from opentelemetry.sdk.trace import ReadableSpan
+    from opentelemetry.sdk.trace.export import SpanExportResult
+    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
+
+    from pydantic_opamp_otel._logfire import _gated_spans
+
+    class Sender(_Recording):
+        def export(self, batch, *args, **kwargs):
+            if len(batch) > 2:
+                raise BodyTooLargeError(len(batch), 2)
+            self.batches.append(list(batch))
+            return SpanExportResult.SUCCESS
+
+    log = lambda name: ReadableSpan(name=name, attributes={"logfire.span_type": "log", "logfire.level_num": 9, "k": "v"},  # noqa: E731
+                                    instrumentation_scope=InstrumentationScope("logfire"))
+    c = Controls(clock=lambda: 0)
+    c.apply(settings(policy(log_rate_limit={"records_per_second": 4}, attribute_redaction={"mask": ["k"]})))
+    sender = Sender()
+    assert _gated_spans(c, RetryFewerSpansSpanExporter, sender).export([log(n) for n in "abcd"]) \
+        is SpanExportResult.SUCCESS
+    assert [[s.name for s in b] for b in sender.batches] == [["a", "b"], ["c", "d"]]
+    assert {s.attributes["k"] for b in sender.batches for s in b} == {"[REDACTED]"}
+    logs = c.counts().logs
+    assert (logs.exports_ok, logs.exports_failed, logs.items_failed, logs.items_filtered) == (1, 0, 0, 0)
+
+
 def test_logs_stop_and_start_with_send_logs():
     from opentelemetry.sdk._logs.export import LogRecordExportResult
 

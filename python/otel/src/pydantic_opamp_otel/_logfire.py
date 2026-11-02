@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -102,11 +102,8 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced, met
     # Ingest's responses, as the Logfire SDK reads them: by default its X-Logfire-Warning header.
     install_logfire_response_hook(session, getattr(advanced, "server_response_hook", None))
     gzip = Compression.NoCompression if zstd else Compression.Gzip
-    # The gate sits under the retry and pending-span handling, so what it drops is never retried
-    # and what it lets through is redacted before it is sent, a pending span included.
-    spans = BodySizeCheckingOTLPSpanExporter(endpoint=urljoin(url, "/v1/traces"), session=session,
-                                             compression=gzip, headers=headers)
-    spans = RetryFewerSpansSpanExporter(controls.spans(QuietSpanExporter(spans), log_spans=True))
+    spans = _gated_spans(controls, RetryFewerSpansSpanExporter, QuietSpanExporter(BodySizeCheckingOTLPSpanExporter(
+        endpoint=urljoin(url, "/v1/traces"), session=session, compression=gzip, headers=headers)))
     # Before logfire 5.2 pending spans were always sent, and there was no setting for them.
     if getattr(advanced, "pending_spans", True):
         spans = RemovePendingSpansExporter(spans)
@@ -121,6 +118,14 @@ def _logfire_exporters(token: str, base_url: str | None, controls, advanced, met
     logs = QuietLogExporter(OTLPLogExporter(endpoint=urljoin(url, "/v1/logs"), session=session, headers=headers,
                                             compression=gzip))
     return (DynamicBatchSpanProcessor(spans), reader, BatchLogRecordProcessor(controls.logs(logs)))
+
+
+def _gated_spans(controls, retry: Callable[[Any], Any], sender: Any) -> Any:
+    """The span gate around Logfire's retrying exporter (`retry`, over `sender`): the gate decides
+    and counts each span once, above the retries, so a retried log span isn't charged to the cap
+    again or counted twice; redaction sits under them, so every span sent is redacted, the
+    body-too-large span the retry makes included."""
+    return controls.spans(retry(controls.redacting(sender)), log_spans=True, redact=False)
 
 
 def _head(sampling) -> Any:

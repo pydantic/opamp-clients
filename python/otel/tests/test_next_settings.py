@@ -568,6 +568,58 @@ def test_scrubbing_changes_live_and_reverts_when_withdrawn():
     assert exported(c, [r])[0] is r
 
 
+def body_record(body) -> ReadableLogRecord:
+    return ReadableLogRecord(LogRecord(body=body, severity_number=SeverityNumber(9)), Resource.create({}),
+                             InstrumentationScope("app"))
+
+
+def test_a_body_that_is_any_sequence_is_scrubbed_as_the_encoder_writes_it():
+    """Regression: a Sequence body other than a list or tuple (UserList) wasn't scrubbed, yet the
+    OTLP encoder writes any Sequence as an array, so its secret went out in clear."""
+    from collections import UserList
+
+    from opentelemetry.exporter.otlp.proto.common._internal import _encode_value
+
+    c = controlled({"scrubbing": {"defaults": True}})
+    out = exported(c, [body_record(UserList(["my password is x", 1]))])[0]
+    wire = _encode_value(out.log_record.body).array_value.values
+    assert [v.string_value or v.int_value for v in wire] == ["[Scrubbed due to 'password']", 1]
+
+
+def test_a_map_key_that_is_not_a_string_is_scrubbed_as_the_encoder_names_it():
+    """Regression: a body map with a non-str key raised inside the gate and lost the batch. The
+    encoder names a member str(key), so the key is matched as that text."""
+    c = controlled({"scrubbing": {"defaults": True}})
+    out = exported(c, [body_record({1: "x", ("pass", "word"): "y", "note": "my secret"})])
+    assert len(out) == 1
+    assert out[0].log_record.body == {1: "x", ("pass", "word"): "y", "note": "[Scrubbed due to 'secret']"}
+
+
+def test_an_error_inside_a_gate_fails_the_export_and_is_counted():
+    """Regression: an error inside a gate (a body redaction can't walk) went up to the processor,
+    which dropped the batch with nothing counted, so Fleet's Traffic and health never showed it."""
+    from collections.abc import Mapping
+
+    from opentelemetry.sdk._logs.export import LogRecordExportResult
+
+    class Unreadable(Mapping):
+        def __getitem__(self, key):
+            raise KeyError(key)
+
+        def __iter__(self):
+            raise RuntimeError("unreadable body")
+
+        def __len__(self):
+            return 1
+
+    c = controlled({"scrubbing": {"defaults": True}})
+    inner = Recording()
+    assert c.logs(inner).export([body_record(Unreadable()), record()]) is LogRecordExportResult.FAILURE
+    assert inner.batches == []
+    counts = c.counts().logs
+    assert (counts.exports_failed, counts.items_failed, counts.last_error) == (1, 2, "gate: unreadable body")
+
+
 @pytest.mark.parametrize(("text", "want"), [
     ("the author wrote", None),
     ("the authors wrote", None),

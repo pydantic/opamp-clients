@@ -12,7 +12,7 @@ import math
 import threading
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 
 #: SeverityNumber past every other: the threshold of a scope that is `off`.
 SEVERITY_OFF = 0xFFFF
@@ -408,7 +408,9 @@ class Scrubber:
     def value(self, key: str | None, value):
         """A value as scrubbing leaves it (an attribute's, a map member's, a sequence's item, or a
         log body), or _UNCHANGED: `key` is the attribute or member it is the value of (None: a
-        body or an item). The value itself is never changed."""
+        body or an item). The value itself is never changed. Values are walked as the OTLP
+        encoder writes them: any Sequence but text and bytes as an array, any Mapping as a map
+        whose members are named str(key)."""
         if key is not None:
             what = self.key(key)
             if what is self.KEEP:
@@ -418,17 +420,17 @@ class Scrubber:
         if isinstance(value, str):
             r = self.text(value)
             return self._UNCHANGED if r is None else r
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
             items, changed = list(value), False
             for i, item in enumerate(items):
                 r = self.value(None, item)
                 if r is not self._UNCHANGED:
                     items[i], changed = r, True
-            return (type(value)(items) if isinstance(value, tuple) else items) if changed else self._UNCHANGED
+            return (tuple(items) if isinstance(value, tuple) else items) if changed else self._UNCHANGED
         if isinstance(value, Mapping):
             members, changed = dict(value), False
             for k, v in value.items():
-                r = self.value(k, v)
+                r = self.value(k if isinstance(k, str) else str(k), v)
                 if r is not self._UNCHANGED:
                     members[k], changed = r, True
             return members if changed else self._UNCHANGED
