@@ -48,14 +48,44 @@ final class Inventory {
    * Under autoconfigure, from the customizer an exporter of {@code signal} ({@code traces},
    * {@code metrics} or {@code logs}) went through: the SDK builds one for each name
    * {@code otel.<signal>.exporter} gives ({@code otlp} when unset; {@code none}: none), and every
-   * one of them is in the extension's gate.
+   * one of them is in the extension's gate. Each with where it sends ({@link #destination}).
    */
   void configured(String signal, ConfigProperties config) {
     List<SettingsProto.Exporter> built = new ArrayList<>();
     for (String name : names(config, signal)) {
-      built.add(exporter(signal, name, true));
+      built.add(exporter(signal, name, true).toBuilder().setDestination(destination(config, signal, name)).build());
     }
     exporters(signal, built);
+  }
+
+  /**
+   * Where the SDK's {@code name} exporter of {@code signal} sends, as autoconfigure reads it: OTLP's
+   * endpoint for the signal, else the shared one, else the default for its protocol (the SDK's
+   * grpc, the agent's http/protobuf); Zipkin's endpoint. Empty for any other (console, Prometheus,
+   * which is pulled). The layer keeps only the scheme, host and port.
+   */
+  static String destination(ConfigProperties config, String signal, String name) {
+    return switch (name) {
+      case "otlp" -> {
+        String endpoint = first(config, "otel.exporter.otlp." + signal + ".endpoint", "otel.exporter.otlp.endpoint");
+        String protocol = first(config, "otel.exporter.otlp." + signal + ".protocol", "otel.exporter.otlp.protocol");
+        yield !endpoint.isEmpty() ? endpoint
+            : protocol.isEmpty() || protocol.equals("grpc") ? "http://localhost:4317" : "http://localhost:4318";
+      }
+      case "zipkin" -> config.getString("otel.exporter.zipkin.endpoint", "http://localhost:9411/api/v2/spans");
+      default -> "";
+    };
+  }
+
+  /** The first of {@code keys} set (not blank), trimmed; empty when none is. */
+  private static String first(ConfigProperties config, String... keys) {
+    for (String k : keys) {
+      String v = config.getString(k, "").trim();
+      if (!v.isEmpty()) {
+        return v;
+      }
+    }
+    return "";
   }
 
   /** The exporters of {@code otel.<signal>.exporter}, as the SDK reads it. */
@@ -66,7 +96,7 @@ final class Inventory {
 
   /**
    * What another extension added to the SDK's {@code signal} past the gate (a processor, by its
-   * exporter's class or its own, or a metric reader), each ungated, beside the configured ones.
+   * exporter's class or its own, or a metric reader), each ungoverned, beside the configured ones.
    */
   synchronized void outside(String signal, List<String> names) {
     List<SettingsProto.Exporter> added = new ArrayList<>(outside.getOrDefault(signal, List.of()));
@@ -83,6 +113,14 @@ final class Inventory {
     return SettingsProto.Exporter.newBuilder().setSignal(signal).setName(name).setGated(gated).build();
   }
 
+  /** Every exporter listed, governed or not: what export health reports under each signal. */
+  synchronized List<SettingsProto.Exporter> listed() {
+    List<SettingsProto.Exporter> out = new ArrayList<>();
+    exporters.values().forEach(out::addAll);
+    outside.values().forEach(out::addAll);
+    return out;
+  }
+
   /**
    * The inventory: the SDK's version and language as its own default resource gives them (the
    * application's {@code otel.resource.attributes} can't change them).
@@ -94,9 +132,7 @@ final class Inventory {
     SettingsProto.Inventory.Builder b = SettingsProto.Inventory.newBuilder().setIntegration(PACKAGE)
         .setIntegrationVersion(VERSION).setSdkLanguage(language == null ? "java" : language)
         .setSdkVersion(version == null ? "" : version).addAllInstrumentations(instrumentations.get());
-    exporters.values().forEach(b::addAllExporters);
-    outside.values().forEach(b::addAllExporters);
-    return b.build();
+    return b.addAllExporters(listed()).build();
   }
 
   /**

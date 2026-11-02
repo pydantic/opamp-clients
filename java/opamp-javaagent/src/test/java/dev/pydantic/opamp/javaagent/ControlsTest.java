@@ -259,6 +259,39 @@ class ControlsTest {
   }
 
   @Test
+  void everyLogExporterSendsTheSameCappedRecordsFromOneBudget() {
+    // Two exporters, each behind its own processor, which hands it its own copy of each record.
+    Controls c = new Controls();
+    long[] now = {0};
+    c.nanoTime = () -> now[0];
+    var first = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var second = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var provider = io.opentelemetry.sdk.logs.SdkLoggerProvider.builder()
+        .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(c.logs(first)))
+        .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(c.logs(second)))
+        .build();
+    var logger = provider.get("app");
+    java.util.function.Function<io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter,
+        java.util.List<String>> bodies = out -> out.getFinishedLogRecordItems().stream()
+            .map(r -> r.getBodyValue().asString()).toList();
+    c.apply(settings(every("log_rate_limit", override("\"records_per_second\":3"))));
+    for (int i = 0; i < 5; i++) {
+      logger.logRecordBuilder().setBody("r" + i).emit();
+    }
+    // One decision a record: both send r0 to r2, and the bucket paid for three, not six.
+    assertEquals(java.util.List.of("r0", "r1", "r2"), bodies.apply(first));
+    assertEquals(java.util.List.of("r0", "r1", "r2"), bodies.apply(second));
+    assertEquals(0, c.logDecisions.size()); // every gate saw each: nothing kept
+    now[0] = 500_000_000L; // half a second: 1.5 tokens, so one record each
+    logger.logRecordBuilder().setBody("r5").emit();
+    logger.logRecordBuilder().setBody("r6").emit();
+    assertEquals("r5", bodies.apply(first).get(3));
+    assertEquals(bodies.apply(first), bodies.apply(second));
+    assertEquals(4, bodies.apply(second).size());
+    provider.close();
+  }
+
+  @Test
   void redactionChangesWhatIsExportedNotTheApplicationsSpansOrRecords() {
     Controls c = new Controls();
     var gated = InMemorySpanExporter.create();

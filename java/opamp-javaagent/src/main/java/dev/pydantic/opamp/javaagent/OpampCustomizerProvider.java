@@ -10,8 +10,8 @@ import io.opentelemetry.sdk.autoconfigure.spi.AutoConfigurationCustomizerProvide
  * Puts the extension's controls into the SDK the agent builds: the saved next-start settings as
  * properties, the instance UID in the resource, and the live sampler and gated exporters (and pull
  * metric reader) around the agent's own, each listed in the inventory. Last of all, it reads what
- * another extension added to the SDK past the gates ({@link Outside}): the settings it escapes are
- * then set aside. With no {@code otel.opamp.endpoint} it changes nothing.
+ * another extension added to the SDK past the gates ({@link Outside}): each is listed ungoverned.
+ * With no {@code otel.opamp.endpoint} it changes nothing.
  */
 public final class OpampCustomizerProvider implements AutoConfigurationCustomizerProvider {
   /** Where EDOT Java's own OpAMP client takes Elastic's central configuration from, when given. */

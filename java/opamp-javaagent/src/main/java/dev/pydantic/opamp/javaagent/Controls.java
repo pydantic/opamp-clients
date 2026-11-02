@@ -38,6 +38,8 @@ final class Controls {
   final GateCounts traceCounts = new GateCounts();
   final GateCounts metricCounts = new GateCounts();
   final GateCounts logCounts = new GateCounts();
+  /** send_logs_per_second's decision on each record, shared by every log gate. */
+  final LogDecisions logDecisions = new LogDecisions();
   /** The monotonic clock the rate caps (the sampler's too) refill by. */
   java.util.function.LongSupplier nanoTime = System::nanoTime;
 
@@ -312,10 +314,12 @@ final class Controls {
    * severity or above go on; a record with no severity (SeverityNumber 0) can't be judged and goes
    * on, unless its scope's level is {@code off}. The scope is the one the record is exported
    * under: the agent's logging bridges name it after the logger. Then {@code send_logs_per_second}:
-   * of a batch, the first records the bucket has tokens for go on, the rest are dropped. Last,
-   * redaction: each record as {@link Redaction} leaves it.
+   * of a batch, the first records the bucket has tokens for go on, the rest are dropped; a record
+   * another log gate already decided keeps its decision ({@link LogDecisions}). Last, redaction:
+   * each record as {@link Redaction} leaves it.
    */
   LogRecordExporter logs(LogRecordExporter to) {
+    logDecisions.gates.incrementAndGet();
     return new LogGate() {
       @Override
       public CompletableResultCode export(Collection<LogRecordData> logs) {
@@ -332,8 +336,7 @@ final class Controls {
         }
         TokenBucket cap = g.logCap();
         if (cap != null) {
-          List<LogRecordData> all = List.copyOf(logs);
-          logs = all.subList(0, (int) cap.take(nanoTime.getAsLong(), all.size()));
+          logs = logDecisions.admitted(List.copyOf(logs), this, n -> cap.take(nanoTime.getAsLong(), n));
         }
         logCounts.filtered(given - logs.size());
         if (logs.isEmpty()) {
@@ -361,5 +364,82 @@ final class Controls {
         return "OpampGated{" + to + "}";
       }
     };
+  }
+
+  /**
+   * send_logs_per_second's decision on each record, so that every exporter sends the same records
+   * and the process spends one budget: the first log gate to see a record takes a token for it,
+   * and the others reuse that decision. Only kept while there are several log gates. The SDK hands
+   * each processor its own copy of a record, so a record is known by what it holds ({@link Key}).
+   * A gate that sees the same record again decides afresh. Bounded: an entry a gate never sees
+   * (its processor dropped the record) goes once {@link #KEPT} newer ones are kept.
+   */
+  static final class LogDecisions {
+    static final int KEPT = 8192;
+    /** How many log gates there are. */
+    final java.util.concurrent.atomic.AtomicInteger gates = new java.util.concurrent.atomic.AtomicInteger();
+    private final java.util.Map<Key, Decision> decided = new java.util.LinkedHashMap<>() {
+      @Override
+      protected boolean removeEldestEntry(java.util.Map.Entry<Key, Decision> eldest) {
+        return size() > KEPT;
+      }
+    };
+
+    /** A record as every processor's copy of it holds it: its observed time is set once, as it is emitted. */
+    record Key(long observedNs, long timestampNs, String scope, int severity, String traceId, String spanId,
+        Object body, io.opentelemetry.api.common.Attributes attributes) {
+      static Key of(LogRecordData r) {
+        return new Key(r.getObservedTimestampEpochNanos(), r.getTimestampEpochNanos(),
+            r.getInstrumentationScopeInfo().getName(), r.getSeverity().getSeverityNumber(),
+            r.getSpanContext().getTraceId(), r.getSpanContext().getSpanId(), r.getBodyValue(), r.getAttributes());
+      }
+    }
+
+    /** Whether a record goes on, and the gates that have seen it. */
+    private record Decision(boolean admitted, java.util.Set<Object> seen) {}
+
+    /** Number of known decisions, for tests. */
+    synchronized int size() {
+      return decided.size();
+    }
+
+    /**
+     * The records of {@code records} {@code gate} sends on: each reuses another gate's decision, or
+     * is decided now, the first of those {@code take} (a count of records to the tokens granted)
+     * has tokens for going on.
+     */
+    synchronized List<LogRecordData> admitted(List<LogRecordData> records, Object gate,
+        java.util.function.LongUnaryOperator take) {
+      int n = gates.get();
+      if (n < 2) {
+        return records.subList(0, (int) take.applyAsLong(records.size()));
+      }
+      List<Key> keys = records.stream().map(Key::of).toList();
+      boolean[] fresh = new boolean[keys.size()];
+      int asked = 0;
+      for (int i = 0; i < fresh.length; i++) {
+        Decision d = decided.get(keys.get(i));
+        fresh[i] = d == null || d.seen().contains(gate);
+        asked += fresh[i] ? 1 : 0;
+      }
+      long tokens = asked == 0 ? 0 : take.applyAsLong(asked);
+      List<LogRecordData> out = new java.util.ArrayList<>();
+      for (int i = 0; i < fresh.length; i++) {
+        Key k = keys.get(i);
+        Decision d = fresh[i] ? null : decided.get(k);
+        if (d == null) {
+          d = new Decision(tokens-- > 0, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+          decided.put(k, d);
+        }
+        d.seen().add(gate);
+        if (d.seen().size() >= n) {
+          decided.remove(k); // every gate has it
+        }
+        if (d.admitted()) {
+          out.add(records.get(i));
+        }
+      }
+      return out;
+    }
   }
 }

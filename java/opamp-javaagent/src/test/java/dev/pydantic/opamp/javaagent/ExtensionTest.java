@@ -371,6 +371,17 @@ class ExtensionTest {
               }
             }
             var settings = Vectors.settings(step.has("settings") ? step.get("settings").toString() : v1(), Vectors.NOW);
+            // The step's exporters, as the inventory lists them.
+            for (String signal : List.of("traces", "metrics", "logs")) {
+              List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> listed = new java.util.ArrayList<>();
+              step.path("exporters").forEach(x -> {
+                if (x.path("signal").asText().equals(signal)) {
+                  listed.add(Inventory.exporter(signal, x.path("name").asText(), x.path("gated").asBoolean())
+                      .toBuilder().setDestination(x.path("destination").asText()).build());
+                }
+              });
+              e.inventory.exporters(signal, listed);
+            }
             Opamp.ComponentHealth before = e.health();
             Opamp.ComponentHealth sent = e.health(counts.build(), settings, step.get("now_unix_ms").asLong());
             var want = step.get("want");
@@ -405,6 +416,13 @@ class ExtensionTest {
                 }
                 if (w.has("last_error")) {
                   assertEquals(w.get("last_error").asText(), one.getLastError(), step.toString());
+                }
+                if (w.has("exporters")) {
+                  Map<String, String> children = new java.util.TreeMap<>();
+                  one.getComponentHealthMapMap().forEach((k, v) -> children.put(k, v.getStatus()));
+                  Map<String, String> wanted = new java.util.TreeMap<>();
+                  w.get("exporters").fields().forEachRemaining(kv -> wanted.put(kv.getKey(), kv.getValue().asText()));
+                  assertEquals(wanted, children, step.toString());
                 }
                 if (w.has("counters") && sent != null) {
                   w.get("counters").fields().forEachRemaining(kv -> assertEquals(kv.getValue().asLong(),
@@ -456,12 +474,11 @@ class ExtensionTest {
     assertEquals(new java.util.TreeSet<>(Vectors.ALL.getLiveList()), new java.util.TreeSet<>(Extension.HOST.getLiveList()));
     assertEquals(new java.util.TreeSet<>(Vectors.ALL.getNextStartList()),
         new java.util.TreeSet<>(Extension.HOST.getNextStartList()));
-    // Where a signal's exporters pass no gate of the agent's, what the gate holds isn't declared.
-    dev.pydantic.opamp.sdk.SettingsProto.Host ungated = Extension.host(java.util.Set.of("metrics", "logs"));
-    assertFalse(ungated.getLiveList().stream().anyMatch(k -> k.startsWith("send_logs") || k.equals("send_metrics")
-        || k.endsWith("_attributes") || k.startsWith("scrub_") || k.equals("debug_send_logs_level")),
-        ungated.toString());
-    assertTrue(ungated.getLiveList().containsAll(List.of("send_traces", "sampling_rate", "debug_until")));
+    // Where the SDK samples with another sampler, only what the extension's sampler holds isn't declared.
+    dev.pydantic.opamp.sdk.SettingsProto.Host sampledElsewhere = Extension.host(true);
+    java.util.Set<String> left = new java.util.TreeSet<>(Extension.LIVE);
+    Extension.SAMPLED.forEach(left::remove);
+    assertEquals(left, new java.util.TreeSet<>(sampledElsewhere.getLiveList()));
   }
 
   @Test
@@ -503,14 +520,6 @@ class ExtensionTest {
       assertEquals(FAILED, s.getStatus());
       assertEquals("app_settings: values: this SDK cannot apply the requested override", s.getErrorMessage());
     }
-    // Where the metrics exporter passes no gate of the agent's, the metrics switch is refused.
-    Extension ungated = Extension.forTest(setup(dir));
-    ungated.notGated(java.util.Set.of("metrics"));
-    Opamp.RemoteConfigStatus s = ungated.remoteConfig(config(v1("signal_exports", exports("", "off", ""))));
-    assertEquals(FAILED, s.getStatus());
-    assertEquals("signal_exports.metrics: this SDK cannot apply the requested override", s.getErrorMessage());
-    assertTrue(ungated.controls.gates.sendMetrics());
-    assertEquals(full(v1()), effective(ungated));
   }
 
   @Test

@@ -265,16 +265,22 @@ class SdkSettingsTest {
 
   @Test
   void exportHealthIsSentAtTheFirstCallAndOnAFailureAndHeldWhileNothingChanges() {
-    SettingsProto.HealthReport first = layer.health(SettingsProto.ExportCounts.getDefaultInstance(), null, NOW, null);
+    SettingsProto.HealthReport first = layer.health(SettingsProto.ExportCounts.getDefaultInstance(), null, NOW, null, List.of());
     assertTrue(first.getSend());
     assertEquals(3, first.getExporters().getComponentHealthMapCount());
     assertEquals("ok", first.getExporters().getStatus());
-    assertFalse(layer.health(SettingsProto.ExportCounts.getDefaultInstance(), first, NOW + 30_000, null).getSend());
+    assertFalse(layer.health(SettingsProto.ExportCounts.getDefaultInstance(), first, NOW + 30_000, null, List.of()).getSend());
     SettingsProto.HealthReport failed = layer.health(SettingsProto.ExportCounts.newBuilder()
         .setTraces(SettingsProto.SignalCounts.newBuilder().setExportsFailed(1).setItemsFailed(512).setLastFailed(true)
             .setLastError("connection refused")).build(),
-        first, NOW + 30_000, SettingsProto.Settings.newBuilder().setSendLogs(false).build());
+        first, NOW + 30_000, SettingsProto.Settings.newBuilder().setSendLogs(false).build(),
+        List.of(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("zipkin").build()));
     assertTrue(failed.getSend());
+    // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
+    Opamp.ComponentHealth zipkin = failed.getExporters().getComponentHealthMapMap().get("traces")
+        .getComponentHealthMapMap().get("zipkin");
+    assertEquals("ungoverned", zipkin.getStatus());
+    assertTrue(zipkin.getHealthy());
     assertFalse(failed.getExporters().getHealthy());
     assertEquals("connection refused", failed.getExporters().getComponentHealthMapMap().get("traces").getLastError());
     assertEquals("off", failed.getExporters().getComponentHealthMapMap().get("logs").getStatus());
@@ -340,7 +346,8 @@ class SdkSettingsTest {
     i.path("instrumentations").forEach(x -> b.addInstrumentations(SettingsProto.Instrumentation.newBuilder()
         .setName(x.path("name").asText()).setVersion(x.path("version").asText())));
     i.path("exporters").forEach(x -> b.addExporters(SettingsProto.Exporter.newBuilder()
-        .setSignal(x.path("signal").asText()).setName(x.path("name").asText()).setGated(x.path("gated").asBoolean())));
+        .setSignal(x.path("signal").asText()).setName(x.path("name").asText()).setGated(x.path("gated").asBoolean())
+        .setDestination(x.path("destination").asText())));
     return b.build();
   }
 
@@ -361,7 +368,8 @@ class SdkSettingsTest {
 
   /**
    * The components as the vectors give them: sdk (key to text), instrumentations (name to version,
-   * null when none), exporters (signal to name to gated) and settings (key to applies).
+   * null when none), exporters (signal to identity to gated), destinations (signal to identity to
+   * destination, for those with one) and settings (key to applies).
    */
   static JsonNode components(Opamp.AvailableComponents c) {
     ObjectNode out = JSON.createObjectNode();
@@ -372,14 +380,21 @@ class SdkSettingsTest {
         instrumentations.put(name, d.getMetadataList().stream().filter(kv -> kv.getKey().equals("version"))
             .map(SdkSettingsTest::text).findFirst().orElse(null)));
     ObjectNode exporters = out.putObject("exporters");
+    ObjectNode destinations = out.putObject("destinations");
     c.getComponentsMap().get("exporters").getSubComponentMapMap().forEach((signal, d) -> {
       ObjectNode names = exporters.putObject(signal);
       d.getSubComponentMapMap().forEach((name, e) -> {
-        assertEquals(1, e.getMetadataCount(), signal + "/" + name);
         Anyvalue.KeyValue gated = e.getMetadata(0);
         assertEquals("gated", gated.getKey());
         assertTrue(gated.getValue().hasBoolValue(), signal + "/" + name + ": gated is a boolean");
         names.put(name, gated.getValue().getBoolValue());
+        // Then where it sends, for one that says: nothing else.
+        e.getMetadataList().stream().skip(1).forEach(kv -> {
+          assertEquals("destination", kv.getKey(), signal + "/" + name);
+          ObjectNode sent = destinations.has(signal) ? (ObjectNode) destinations.get(signal)
+              : destinations.putObject(signal);
+          sent.put(name, text(kv));
+        });
       });
     });
     ObjectNode settings = out.putObject("settings");

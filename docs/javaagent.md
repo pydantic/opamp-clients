@@ -60,8 +60,9 @@ of each `batch` or `simple` processor and each `periodic` or `pull` reader are w
 controls around it. The instance UID goes into `resource.attributes`, and the next-start settings
 go into `distribution.javaagent.instrumentation`, where the agent reads which instrumentations
 run: `disabled` (with `_` for `-`, as the agent compares names) and `default_enabled: false`.
-Every setting is carried out as without the file. A processor or reader the file names by a
-component of its own isn't covered, as an extension's isn't. The model's classes change from
+Every setting is carried out as without the file. A span or log processor the file names by a
+component of its own isn't reached, as an extension's isn't: it is reported ungoverned
+([below](#what-another-extension-adds)). The model's classes change from
 one SDK release to the next, so the extension is built against the agent's own (1.65.0-alpha for
 agent 2.31.1). If an endpoint is set but the agent built its SDK without calling either hook, the
 extension logs a WARNING saying it won't connect, rather than nothing.
@@ -73,12 +74,12 @@ extension's customizers run last, and it reads what the SDK is built with:
 
 - **A processor or reader of its own.** A tracer, logger or meter provider customizer can add a
   span processor, a log record processor or a metric reader. What it exports doesn't go through
-  the extension's gate, so that signal's gate controls are set aside, as under a configuration
-  file. For traces these are `signal_exports.traces`, `attribute_redaction` and `scrubbing`. For logs they are
-  `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug`
-  (`log_level`), `attribute_redaction` and `scrubbing`. For metrics it is `signal_exports.metrics`. The agent
-  logs a WARNING that names what was added and what is set aside. The inventory lists it,
-  ungated. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
+  the extension's gates, and the extension can't put them in front of an exporter another
+  extension built. It is reported to the server as ungoverned: listed with `gated` false in the
+  [inventory](#inventory), and with the status `ungoverned` (healthy all the same) under its
+  signal in [export health](#export-health). The agent logs a WARNING naming it. Nothing is set
+  aside: the policy still governs every exporter the agent built, and a policy is APPLIED as
+  before. A span processor that isn't told when a span ends (`isEndRequired()` false) isn't
   counted: the agent adds such processors itself, and one that exported would send spans before
   they end.
 - **What is left alone.** A processor or reader the agent built from `otel.*.exporter` stays
@@ -90,7 +91,7 @@ extension's customizers run last, and it reads what the SDK is built with:
   Elastic's distribution of the agent (EDOT Java) adds a span logger of its own to every SDK,
   which writes spans to the agent's log only once Elastic's central configuration switches debug
   logging on. With EDOT's own OpAMP client off (no `elastic.otel.opamp.endpoint`), nothing can,
-  and it is left alone; with it on, it counts as one that exports
+  and it is left alone; with it on, it counts as one that exports, reported ungoverned
   ([guides/elastic.md](guides/elastic.md#java)).
 - **A sampler of its own.** A tracer provider customizer can set a sampler in place of the
   extension's. Once the SDK is built, the extension checks its sampler. If it isn't the
@@ -98,11 +99,11 @@ extension's customizers run last, and it reads what the SDK is built with:
   (`sampling_ratio`) are set aside, with a WARNING. A sampler set through
   `otel.traces.sampler` or a sampler customizer is still the one the extension wraps.
 
-All of this is decided before the client starts, so the extension never declares these controls
-([the host](sdk-settings.md#the-host)). A policy that overrides one is refused, FAILED, and the
-error names the control and field (`signal_exports.traces: this SDK cannot apply the requested
-override`). A saved policy that overrides one is not used at start, and the SDK starts with its
-own settings. The SDK's builders don't expose their processors and readers, so the
+A sampler of another extension's is found before the client starts, so the extension never
+declares the sampler's controls ([the host](sdk-settings.md#the-host)). A policy that overrides
+one is refused, FAILED, and the error names the control and field (`head_sampling: this SDK
+cannot apply the requested override`). A saved policy that overrides one is not used at start,
+and the SDK starts with its own settings. The SDK's builders don't expose their processors and readers, so the
 extension reads them reflectively. If it can't, it logs a WARNING and sees nothing added.
 
 The extension can't see an SDK the application builds itself. An application that makes its own
@@ -278,6 +279,10 @@ in a list, and each member of a map, as an attribute of its own. The Logfire SDK
   a trace is whole or not there at all.
 - Logs: at the log gate, after the levels: of each batch, the first records the bucket allows.
   The agent's batch delay is 1 s (`otel.blrp.schedule.delay`); a longer one makes the cap stricter.
+  One bucket for the JVM, and one decision a record: with several log exporters, the first gate
+  to see a record decides it and the others reuse that, so every exporter sends the same records.
+  Each processor gets its own copy of a record, so the gates know one by what it holds (its
+  observed time, timestamp, scope, severity, span, body and attributes).
 
 ### Debug mode
 
@@ -300,7 +305,8 @@ in a list, and each member of a map, as an attribute of its own. The Logfire SDK
 No setting: always on. Each gate counts its exporter's results, after the OTLP exporter's own
 retries, and what it dropped on purpose. Every 30 s, on the same timer, the layer says whether
 to send; the agent health then carries `component_health_map["exporters"]`, one child per signal,
-while the top-level `healthy` stays true. A failure whose exporter gives no exception (the OTLP
+while the top-level `healthy` stays true. Under each signal, every exporter of the
+[inventory](#inventory) by its identity, `governed` or `ungoverned` (healthy either way). A failure whose exporter gives no exception (the OTLP
 exporters log the HTTP status instead) has no `last_error` of its own; the agent's log has it.
 A pull reader (Prometheus) exports nothing, so nothing is counted for it.
 
@@ -381,9 +387,12 @@ built by the SDK settings layer as in every language:
 - `exporters`: each exporter the SDK was built with, by signal, as `otel.traces.exporter`,
   `otel.metrics.exporter` and `otel.logs.exporter` name it (`otlp` when unset, nothing for `none`,
   `console`, `prometheus`, or the name another library's exporter is configured by). Every one is
-  `gated`: it is inside the extension's gate. Under declarative configuration the file's exporters
+  `gated`: it is inside the extension's gate. An OTLP or Zipkin exporter carries where it sends,
+  as autoconfigure reads it (`otel.exporter.otlp.<signal>.endpoint`, then
+  `otel.exporter.otlp.endpoint`, then the default for the protocol; the agent's is
+  `http/protobuf`, port 4318), so it is listed as `otlp@host:port`. Under declarative configuration the file's exporters
   are listed the same way (`otlp_http` and `otlp_grpc` as `otlp`, `prometheus/development` as
-  `prometheus`), and a processor of a kind of its own, which the controls don't reach, by its name
+  `prometheus`, each with its `endpoint` or its kind's default), and a processor of a kind of its own, which the controls don't reach, by its name
   with `gated` false. A processor or metric reader another extension adds is listed with `gated`
   false too: a batch or simple processor by its exporter's class (`OtlpHttpSpanExporter`), any
   other processor or reader by its own class.
@@ -415,13 +424,15 @@ sent once, at start: the hash in the first message, the components in full when 
   gone no longer held; and the bridge's jar loaded by a class loader that sees the JDK alone.
 - What another extension adds (`OutsideTest`), on an SDK built through another extension's
   customizers and then the extension's: a span processor, a log record processor and a metric
-  reader of its own each set aside their signal's controls, a policy that overrides one refused,
-  and are listed ungated; a span processor that only starts spans, and another extension's wrapper
-  around the agent's own processors, set nothing aside; a sampler set in place of the extension's
-  sets the sampler's controls aside, while one set through the sampler customizer is still wrapped.
+  reader of its own each listed ungoverned in the inventory and export health, with every setting
+  still declared and a policy that switches their signals off APPLIED to the agent's exporters; a
+  span processor that only starts spans, and another extension's wrapper around the agent's own
+  processors, list nothing ungoverned; a sampler set in place of the extension's sets the
+  sampler's controls aside, while one set through the sampler customizer is still wrapped.
 - The inventory (`InventoryTest`) of an SDK built through the extension's hooks: the
   names the `instrumentations` control takes, versions where embedded, each exporter as configured
-  (`none`, another library's, a processor of a file's own kind ungated), and the client sending
+  (`none`, another library's, where OTLP and Zipkin send, a processor of a file's own kind
+  ungoverned), and the client sending
   the hash first and the components in full when a test server asks.
 - The shared test vectors (`testdata/sdk-settings`), each case through the agent's own
   sampler, gates and extension: sampling, log levels, redaction, rate caps (the clock injected),
@@ -455,8 +466,8 @@ sent once, at start: the hash in the first message, the components in full when 
   is set aside when the policy is FAILED as an override the extension can't carry out, or APPLIED
   with that override reported `local` in the effective config. Every other override must show in
   the telemetry. `extension-processor` adds a span processor, a log record processor and a metric
-  reader exporting to the same sink: their signals' gate controls are set aside, and the
-  sampler's are carried out. `extension-sampler` sets a sampler that samples every trace:
+  reader exporting to a second sink: every control is carried out on what reaches the first, and
+  the inventory lists the three ungoverned. `extension-sampler` sets a sampler that samples every trace:
   `head_sampling`, `sampling_rules` and `trace_rate_limit` are set aside, and the gates' controls
   are carried out.
 

@@ -195,7 +195,19 @@ class InventoryTest {
     Inventory inventory = new Inventory();
     inventory.configured("traces", io.opentelemetry.sdk.autoconfigure.spi.internal.DefaultConfigProperties
         .createFromMap(Map.of()));
-    assertEquals(List.of(Inventory.exporter("traces", "otlp", true)), inventory.build().getExportersList());
+    // Where it sends: the SDK's default protocol, gRPC (the agent sets http/protobuf, port 4318).
+    assertEquals(List.of(Inventory.exporter("traces", "otlp", true).toBuilder()
+        .setDestination("http://localhost:4317").build()), inventory.build().getExportersList());
+    java.util.function.BiFunction<String, Map<String, String>, String> sendsTo = (name, props) -> Inventory
+        .destination(io.opentelemetry.sdk.autoconfigure.spi.internal.DefaultConfigProperties.createFromMap(props),
+            "traces", name);
+    assertEquals("http://localhost:4318", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.protocol", "http/protobuf")));
+    // The signal's endpoint before the shared one.
+    assertEquals("https://a:4318/v1/traces", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.endpoint", "https://b",
+        "otel.exporter.otlp.traces.endpoint", "https://a:4318/v1/traces")));
+    assertEquals("https://b", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.endpoint", "https://b")));
+    assertEquals("http://localhost:9411/api/v2/spans", sendsTo.apply("zipkin", Map.of()));
+    assertEquals("", sendsTo.apply("console", Map.of()));
   }
 
   @Test
@@ -212,7 +224,7 @@ class InventoryTest {
   }
 
   @Test
-  void underAConfigurationFileEachExporterIsListedOnceByItsNameAndAProcessorOfItsOwnIsUngated() {
+  void underAConfigurationFileEachExporterIsListedByItsNameAndWhereItSendsAndAProcessorOfItsOwnIsUngoverned() {
     Inventory inventory = new Inventory();
     Declarative.wrap(DeclarativeTest.model("""
         file_format: "1.1"
@@ -244,8 +256,10 @@ class InventoryTest {
                   otlp_grpc:
         """), inventory);
     Opamp.AvailableComponents c = Vectors.LAYER.components(inventory.build(), Extension.HOST, Vectors.NOW);
-    assertEquals(Map.of("traces", Map.of("otlp", true, "console", true, "kafka_processor", false),
-        "metrics", Map.of("otlp", true, "prometheus", true), "logs", Map.of("otlp", true)), exporters(c));
+    // OTLP over HTTP and over gRPC send to different ports: two exporters, each by its destination.
+    assertEquals(Map.of("traces", Map.of("otlp@localhost:4318", true, "console", true, "kafka_processor", false),
+        "metrics", Map.of("otlp@localhost:4317", true, "prometheus", true),
+        "logs", Map.of("otlp@localhost:4318", true, "otlp@localhost:4317", true)), exporters(c));
   }
 
   @Test
