@@ -320,6 +320,25 @@ public final class SettingsProto {
     boolean getSendMetrics();
 
     /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     * @return Whether the sendSelfMetrics field is set.
+     */
+    boolean hasSendSelfMetrics();
+    /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     * @return The sendSelfMetrics.
+     */
+    boolean getSendSelfMetrics();
+
+    /**
      * <code>optional bool send_logs = 4;</code>
      * @return Whether the sendLogs field is set.
      */
@@ -839,6 +858,56 @@ java.lang.String defaultValue);
       sendMetrics_ = false;
     }
 
+    public static final int SEND_SELF_METRICS_FIELD_NUMBER = 20;
+    private boolean sendSelfMetrics_;
+    /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     * @return Whether the sendSelfMetrics field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendSelfMetrics() {
+      return ((bitField0_ & 0x00000008) != 0);
+    }
+    /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     * @return The sendSelfMetrics.
+     */
+    @java.lang.Override
+    public boolean getSendSelfMetrics() {
+      return sendSelfMetrics_;
+    }
+    /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     * @param value The sendSelfMetrics to set.
+     */
+    private void setSendSelfMetrics(boolean value) {
+      bitField0_ |= 0x00000008;
+      sendSelfMetrics_ = value;
+    }
+    /**
+     * <pre>
+     * Export SDK self-metrics independently of application metric exports.
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 20;</code>
+     */
+    private void clearSendSelfMetrics() {
+      bitField0_ = (bitField0_ & ~0x00000008);
+      sendSelfMetrics_ = false;
+    }
+
     public static final int SEND_LOGS_FIELD_NUMBER = 4;
     private boolean sendLogs_;
     /**
@@ -847,7 +916,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasSendLogs() {
-      return ((bitField0_ & 0x00000008) != 0);
+      return ((bitField0_ & 0x00000010) != 0);
     }
     /**
      * <code>optional bool send_logs = 4;</code>
@@ -862,14 +931,14 @@ java.lang.String defaultValue);
      * @param value The sendLogs to set.
      */
     private void setSendLogs(boolean value) {
-      bitField0_ |= 0x00000008;
+      bitField0_ |= 0x00000010;
       sendLogs_ = value;
     }
     /**
      * <code>optional bool send_logs = 4;</code>
      */
     private void clearSendLogs() {
-      bitField0_ = (bitField0_ & ~0x00000008);
+      bitField0_ = (bitField0_ & ~0x00000010);
       sendLogs_ = false;
     }
 
@@ -888,7 +957,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasSendLogsMinSeverity() {
-      return ((bitField0_ & 0x00000010) != 0);
+      return ((bitField0_ & 0x00000020) != 0);
     }
     /**
      * <pre>
@@ -917,7 +986,7 @@ java.lang.String defaultValue);
      * @param value The sendLogsMinSeverity to set.
      */
     private void setSendLogsMinSeverity(int value) {
-      bitField0_ |= 0x00000010;
+      bitField0_ |= 0x00000020;
       sendLogsMinSeverity_ = value;
     }
     /**
@@ -931,7 +1000,7 @@ java.lang.String defaultValue);
      * <code>optional uint32 send_logs_min_severity = 9;</code>
      */
     private void clearSendLogsMinSeverity() {
-      bitField0_ = (bitField0_ & ~0x00000010);
+      bitField0_ = (bitField0_ & ~0x00000020);
       sendLogsMinSeverity_ = 0;
     }
 
@@ -1529,7 +1598,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasSamplingTracesPerSecond() {
-      return ((bitField0_ & 0x00000020) != 0);
+      return ((bitField0_ & 0x00000040) != 0);
     }
     /**
      * <pre>
@@ -1562,7 +1631,7 @@ java.lang.String defaultValue);
      * @param value The samplingTracesPerSecond to set.
      */
     private void setSamplingTracesPerSecond(double value) {
-      bitField0_ |= 0x00000020;
+      bitField0_ |= 0x00000040;
       samplingTracesPerSecond_ = value;
     }
     /**
@@ -1578,7 +1647,7 @@ java.lang.String defaultValue);
      * <code>optional double sampling_traces_per_second = 14;</code>
      */
     private void clearSamplingTracesPerSecond() {
-      bitField0_ = (bitField0_ & ~0x00000020);
+      bitField0_ = (bitField0_ & ~0x00000040);
       samplingTracesPerSecond_ = 0D;
     }
 
@@ -1590,7 +1659,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasSendLogsPerSecond() {
-      return ((bitField0_ & 0x00000040) != 0);
+      return ((bitField0_ & 0x00000080) != 0);
     }
     /**
      * <code>optional double send_logs_per_second = 15;</code>
@@ -1605,14 +1674,14 @@ java.lang.String defaultValue);
      * @param value The sendLogsPerSecond to set.
      */
     private void setSendLogsPerSecond(double value) {
-      bitField0_ |= 0x00000040;
+      bitField0_ |= 0x00000080;
       sendLogsPerSecond_ = value;
     }
     /**
      * <code>optional double send_logs_per_second = 15;</code>
      */
     private void clearSendLogsPerSecond() {
-      bitField0_ = (bitField0_ & ~0x00000040);
+      bitField0_ = (bitField0_ & ~0x00000080);
       sendLogsPerSecond_ = 0D;
     }
 
@@ -1627,7 +1696,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasDeactivateInstrumentations() {
-      return ((bitField0_ & 0x00000080) != 0);
+      return ((bitField0_ & 0x00000100) != 0);
     }
     /**
      * <pre>
@@ -1651,7 +1720,7 @@ java.lang.String defaultValue);
     private void setDeactivateInstrumentations(dev.pydantic.opamp.sdk.SettingsProto.Names value) {
       value.getClass();  // minimal bytecode null check
       deactivateInstrumentations_ = value;
-      bitField0_ |= 0x00000080;
+      bitField0_ |= 0x00000100;
     }
     /**
      * <pre>
@@ -1670,7 +1739,7 @@ java.lang.String defaultValue);
       } else {
         deactivateInstrumentations_ = value;
       }
-      bitField0_ |= 0x00000080;
+      bitField0_ |= 0x00000100;
     }
     /**
      * <pre>
@@ -1681,7 +1750,7 @@ java.lang.String defaultValue);
      */
     private void clearDeactivateInstrumentations() {
       deactivateInstrumentations_ = null;
-      bitField0_ = (bitField0_ & ~0x00000080);
+      bitField0_ = (bitField0_ & ~0x00000100);
     }
 
     public static final int DEACTIVATE_ALL_INSTRUMENTATIONS_FIELD_NUMBER = 6;
@@ -1692,7 +1761,7 @@ java.lang.String defaultValue);
      */
     @java.lang.Override
     public boolean hasDeactivateAllInstrumentations() {
-      return ((bitField0_ & 0x00000100) != 0);
+      return ((bitField0_ & 0x00000200) != 0);
     }
     /**
      * <code>optional bool deactivate_all_instrumentations = 6;</code>
@@ -1707,14 +1776,14 @@ java.lang.String defaultValue);
      * @param value The deactivateAllInstrumentations to set.
      */
     private void setDeactivateAllInstrumentations(boolean value) {
-      bitField0_ |= 0x00000100;
+      bitField0_ |= 0x00000200;
       deactivateAllInstrumentations_ = value;
     }
     /**
      * <code>optional bool deactivate_all_instrumentations = 6;</code>
      */
     private void clearDeactivateAllInstrumentations() {
-      bitField0_ = (bitField0_ & ~0x00000100);
+      bitField0_ = (bitField0_ & ~0x00000200);
       deactivateAllInstrumentations_ = false;
     }
 
@@ -2240,6 +2309,58 @@ java.lang.String defaultValue) {
       public Builder clearSendMetrics() {
         copyOnWrite();
         instance.clearSendMetrics();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * Export SDK self-metrics independently of application metric exports.
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 20;</code>
+       * @return Whether the sendSelfMetrics field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendSelfMetrics() {
+        return instance.hasSendSelfMetrics();
+      }
+      /**
+       * <pre>
+       * Export SDK self-metrics independently of application metric exports.
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 20;</code>
+       * @return The sendSelfMetrics.
+       */
+      @java.lang.Override
+      public boolean getSendSelfMetrics() {
+        return instance.getSendSelfMetrics();
+      }
+      /**
+       * <pre>
+       * Export SDK self-metrics independently of application metric exports.
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 20;</code>
+       * @param value The sendSelfMetrics to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendSelfMetrics(boolean value) {
+        copyOnWrite();
+        instance.setSendSelfMetrics(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Export SDK self-metrics independently of application metric exports.
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 20;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendSelfMetrics() {
+        copyOnWrite();
+        instance.clearSendSelfMetrics();
         return this;
       }
 
@@ -3486,12 +3607,13 @@ java.lang.String defaultValue) {
               CustomDefaultEntryHolder.defaultEntry,
               "scrubDefaults_",
               "scrubPatterns_",
+              "sendSelfMetrics_",
             };
             java.lang.String info =
-                "\u0000\u0010\u0000\u0001\u0001\u0013\u0010\u0001\u0005\u0000\u0001\u1000\u0000\u0002" +
-                "\u1007\u0001\u0003\u1007\u0002\u0004\u1007\u0003\u0005\u1009\u0007\u0006\u1007\b" +
-                "\t\u100b\u0004\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0005\u000f\u1000" +
-                "\u0006\u00102\u0012\u0007\u0013\u021a";
+                "\u0000\u0011\u0000\u0001\u0001\u0014\u0011\u0001\u0005\u0000\u0001\u1000\u0000\u0002" +
+                "\u1007\u0001\u0003\u1007\u0002\u0004\u1007\u0004\u0005\u1009\b\u0006\u1007\t\t\u100b" +
+                "\u0005\n\u001b\u000b\u001b\f\u021a\r\u021a\u000e\u1000\u0006\u000f\u1000\u0007\u0010" +
+                "2\u0012\u0007\u0013\u021a\u0014\u1007\u0003";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

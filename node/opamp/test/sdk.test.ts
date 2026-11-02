@@ -45,6 +45,7 @@ const declaring = {
     "send_logs_level_by_scope",
     "send_logs_per_second",
     "send_metrics",
+    "send_self_metrics",
     "send_traces",
   ],
   nextStart: ["deactivate_all_instrumentations", "deactivate_instrumentations"],

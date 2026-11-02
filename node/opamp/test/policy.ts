@@ -21,6 +21,7 @@ const MORE_CONTROLS = [
   "app_settings",
   "instrumentations",
   "scrubbing",
+  "self_monitoring",
 ] as const;
 
 type Fields = Record<string, unknown>;

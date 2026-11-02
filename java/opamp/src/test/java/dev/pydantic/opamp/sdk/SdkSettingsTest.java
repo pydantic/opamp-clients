@@ -156,7 +156,7 @@ class SdkSettingsTest {
     assertEquals("h", attribute(desc, "host.name"));
     String every = "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
         + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,"
-        + "scrubbing";
+        + "scrubbing,self_monitoring";
     record Case(SettingsProto.Host host, long now, String controls) {}
     for (Case c : List.of(
         new Case(EVERY, NOW, every),
@@ -189,7 +189,7 @@ class SdkSettingsTest {
       "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
       "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns",
       "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
-      "send_traces"))
+      "send_self_metrics", "send_traces"))
       .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations")).build();
   /** {@link #DECLARING} with the application's own settings ({@code custom}) too. */
   static final SettingsProto.Host EVERY = DECLARING.toBuilder().addLive("custom").build();

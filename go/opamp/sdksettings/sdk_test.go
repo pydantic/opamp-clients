@@ -46,7 +46,7 @@ func effective(t *testing.T, e *protobufs.EffectiveConfig) string {
 
 // The controls of a policy in order: it must send the first two, and may leave out the others.
 var controls = []string{"head_sampling", "signal_exports", "sampling_rules", "trace_rate_limit", "log_levels",
-	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "scrubbing"}
+	"log_rate_limit", "attribute_redaction", "debug", "app_settings", "instrumentations", "scrubbing", "self_monitoring"}
 
 const allLocal = `{"traces":{"mode":"local"},"metrics":{"mode":"local"},"logs":{"mode":"local"}}`
 
@@ -255,6 +255,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 var declaring = &settingspb.Host{Live: []string{"debug_sampling_rate", "debug_send_logs_level", "debug_until",
 	"drop_attributes", "mask_attributes", "sampling_rate", "sampling_rules", "sampling_traces_per_second", "send_logs",
 	"scrub_defaults", "scrub_patterns", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
+	"send_self_metrics",
 	"send_traces"},
 	NextStart: []string{"deactivate_all_instrumentations", "deactivate_instrumentations"}}
 

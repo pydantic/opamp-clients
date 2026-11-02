@@ -19,7 +19,7 @@ FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
 LIVE = ["custom", "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
         "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns", "send_logs",
         "send_logs_level",
-        "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
+        "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_self_metrics", "send_traces"]
 NEXT_START = ["deactivate_all_instrumentations", "deactivate_instrumentations"]
 NOW = 1_791_979_200_000  # 2026-10-14T12:00:00Z
 

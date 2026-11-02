@@ -38,7 +38,7 @@ PARENT_REMOTE_SAMPLED: Parent
 PARENT_REMOTE_UNSAMPLED: Parent
 
 class Settings(_message.Message):
-    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "custom", "scrub_defaults", "scrub_patterns")
+    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_self_metrics", "send_logs", "send_logs_min_severity", "sampling_rules", "send_logs_scope_levels", "drop_attributes", "mask_attributes", "sampling_traces_per_second", "send_logs_per_second", "deactivate_instrumentations", "deactivate_all_instrumentations", "custom", "scrub_defaults", "scrub_patterns")
     class CustomEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -49,6 +49,7 @@ class Settings(_message.Message):
     SAMPLING_RATE_FIELD_NUMBER: _ClassVar[int]
     SEND_TRACES_FIELD_NUMBER: _ClassVar[int]
     SEND_METRICS_FIELD_NUMBER: _ClassVar[int]
+    SEND_SELF_METRICS_FIELD_NUMBER: _ClassVar[int]
     SEND_LOGS_FIELD_NUMBER: _ClassVar[int]
     SEND_LOGS_MIN_SEVERITY_FIELD_NUMBER: _ClassVar[int]
     SAMPLING_RULES_FIELD_NUMBER: _ClassVar[int]
@@ -65,6 +66,7 @@ class Settings(_message.Message):
     sampling_rate: float
     send_traces: bool
     send_metrics: bool
+    send_self_metrics: bool
     send_logs: bool
     send_logs_min_severity: int
     sampling_rules: _containers.RepeatedCompositeFieldContainer[SamplingRule]
@@ -78,7 +80,7 @@ class Settings(_message.Message):
     custom: _containers.ScalarMap[str, str]
     scrub_defaults: bool
     scrub_patterns: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., custom: _Optional[_Mapping[str, str]] = ..., scrub_defaults: bool = ..., scrub_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
+    def __init__(self, sampling_rate: _Optional[float] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_self_metrics: bool = ..., send_logs: bool = ..., send_logs_min_severity: _Optional[int] = ..., sampling_rules: _Optional[_Iterable[_Union[SamplingRule, _Mapping]]] = ..., send_logs_scope_levels: _Optional[_Iterable[_Union[ScopeLevel, _Mapping]]] = ..., drop_attributes: _Optional[_Iterable[str]] = ..., mask_attributes: _Optional[_Iterable[str]] = ..., sampling_traces_per_second: _Optional[float] = ..., send_logs_per_second: _Optional[float] = ..., deactivate_instrumentations: _Optional[_Union[Names, _Mapping]] = ..., deactivate_all_instrumentations: bool = ..., custom: _Optional[_Mapping[str, str]] = ..., scrub_defaults: bool = ..., scrub_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class SamplingRule(_message.Message):
     __slots__ = ("rate", "name", "kind", "path", "attributes")

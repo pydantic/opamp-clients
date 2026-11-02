@@ -303,7 +303,9 @@ type Settings struct {
 	SamplingRate *float64 `protobuf:"fixed64,1,opt,name=sampling_rate,json=samplingRate,proto3,oneof" json:"sampling_rate,omitempty"` // new traces; a child follows its parent
 	SendTraces   *bool    `protobuf:"varint,2,opt,name=send_traces,json=sendTraces,proto3,oneof" json:"send_traces,omitempty"`        // unset: send
 	SendMetrics  *bool    `protobuf:"varint,3,opt,name=send_metrics,json=sendMetrics,proto3,oneof" json:"send_metrics,omitempty"`
-	SendLogs     *bool    `protobuf:"varint,4,opt,name=send_logs,json=sendLogs,proto3,oneof" json:"send_logs,omitempty"`
+	// Export SDK self-metrics independently of application metric exports.
+	SendSelfMetrics *bool `protobuf:"varint,20,opt,name=send_self_metrics,json=sendSelfMetrics,proto3,oneof" json:"send_self_metrics,omitempty"`
+	SendLogs        *bool `protobuf:"varint,4,opt,name=send_logs,json=sendLogs,proto3,oneof" json:"send_logs,omitempty"`
 	// send_logs_level: the lowest OpenTelemetry SeverityNumber of the log records to export (trace 1,
 	// debug 5, info 9, warn 13, error 17, fatal 21). Unset: every severity. Records with severity
 	// number 0 (UNSPECIFIED) can't be judged, so they are exported. Like send_logs, it only filters
@@ -398,6 +400,13 @@ func (x *Settings) GetSendTraces() bool {
 func (x *Settings) GetSendMetrics() bool {
 	if x != nil && x.SendMetrics != nil {
 		return *x.SendMetrics
+	}
+	return false
+}
+
+func (x *Settings) GetSendSelfMetrics() bool {
+	if x != nil && x.SendSelfMetrics != nil {
+		return *x.SendSelfMetrics
 	}
 	return false
 }
@@ -2887,23 +2896,24 @@ var File_opamp_sdk_v1_settings_proto protoreflect.FileDescriptor
 
 const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\n" +
-	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\x87\t\n" +
+	"\x1bopamp/sdk/v1/settings.proto\x12\fopamp.sdk.v1\x1a\x17opamp/v1/anyvalue.proto\x1a\x14opamp/v1/opamp.proto\"\xce\t\n" +
 	"\bSettings\x12(\n" +
 	"\rsampling_rate\x18\x01 \x01(\x01H\x00R\fsamplingRate\x88\x01\x01\x12$\n" +
 	"\vsend_traces\x18\x02 \x01(\bH\x01R\n" +
 	"sendTraces\x88\x01\x01\x12&\n" +
-	"\fsend_metrics\x18\x03 \x01(\bH\x02R\vsendMetrics\x88\x01\x01\x12 \n" +
-	"\tsend_logs\x18\x04 \x01(\bH\x03R\bsendLogs\x88\x01\x01\x128\n" +
-	"\x16send_logs_min_severity\x18\t \x01(\rH\x04R\x13sendLogsMinSeverity\x88\x01\x01\x12A\n" +
+	"\fsend_metrics\x18\x03 \x01(\bH\x02R\vsendMetrics\x88\x01\x01\x12/\n" +
+	"\x11send_self_metrics\x18\x14 \x01(\bH\x03R\x0fsendSelfMetrics\x88\x01\x01\x12 \n" +
+	"\tsend_logs\x18\x04 \x01(\bH\x04R\bsendLogs\x88\x01\x01\x128\n" +
+	"\x16send_logs_min_severity\x18\t \x01(\rH\x05R\x13sendLogsMinSeverity\x88\x01\x01\x12A\n" +
 	"\x0esampling_rules\x18\n" +
 	" \x03(\v2\x1a.opamp.sdk.v1.SamplingRuleR\rsamplingRules\x12M\n" +
 	"\x16send_logs_scope_levels\x18\v \x03(\v2\x18.opamp.sdk.v1.ScopeLevelR\x13sendLogsScopeLevels\x12'\n" +
 	"\x0fdrop_attributes\x18\f \x03(\tR\x0edropAttributes\x12'\n" +
 	"\x0fmask_attributes\x18\r \x03(\tR\x0emaskAttributes\x12@\n" +
-	"\x1asampling_traces_per_second\x18\x0e \x01(\x01H\x05R\x17samplingTracesPerSecond\x88\x01\x01\x124\n" +
-	"\x14send_logs_per_second\x18\x0f \x01(\x01H\x06R\x11sendLogsPerSecond\x88\x01\x01\x12T\n" +
+	"\x1asampling_traces_per_second\x18\x0e \x01(\x01H\x06R\x17samplingTracesPerSecond\x88\x01\x01\x124\n" +
+	"\x14send_logs_per_second\x18\x0f \x01(\x01H\aR\x11sendLogsPerSecond\x88\x01\x01\x12T\n" +
 	"\x1bdeactivate_instrumentations\x18\x05 \x01(\v2\x13.opamp.sdk.v1.NamesR\x1adeactivateInstrumentations\x12K\n" +
-	"\x1fdeactivate_all_instrumentations\x18\x06 \x01(\bH\aR\x1ddeactivateAllInstrumentations\x88\x01\x01\x12:\n" +
+	"\x1fdeactivate_all_instrumentations\x18\x06 \x01(\bH\bR\x1ddeactivateAllInstrumentations\x88\x01\x01\x12:\n" +
 	"\x06custom\x18\x10 \x03(\v2\".opamp.sdk.v1.Settings.CustomEntryR\x06custom\x12%\n" +
 	"\x0escrub_defaults\x18\x12 \x01(\bR\rscrubDefaults\x12%\n" +
 	"\x0escrub_patterns\x18\x13 \x03(\tR\rscrubPatterns\x1a9\n" +
@@ -2912,7 +2922,8 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x10\n" +
 	"\x0e_sampling_rateB\x0e\n" +
 	"\f_send_tracesB\x0f\n" +
-	"\r_send_metricsB\f\n" +
+	"\r_send_metricsB\x14\n" +
+	"\x12_send_self_metricsB\f\n" +
 	"\n" +
 	"_send_logsB\x19\n" +
 	"\x17_send_logs_min_severityB\x1d\n" +
