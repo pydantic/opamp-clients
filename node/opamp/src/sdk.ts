@@ -148,15 +148,17 @@ export class SdkSettings {
   /**
    * Export health, from the gates' counts since start: whether to send it now, and the entry for
    * the agent health's `component_health_map["exporters"]`. `previous`: what the last call
-   * answered; `settings`: those in force.
+   * answered; `settings`: those in force; `exporters`: each exporter as the inventory lists it,
+   * reported governed or ungoverned under its signal.
    */
   health(
     counts: MessageInitShape<typeof ExportCountsSchema>,
     previous: HealthReport | undefined,
     nowUnixMs: bigint,
     settings?: MessageInitShape<typeof SettingsSchema>,
+    exporters: readonly { signal: string; name: string; gated: boolean; destination?: string }[] = [],
   ): HealthReport {
-    const r = this.#call({ call: { case: "health", value: { counts, previous, nowUnixMs, settings } } });
+    const r = this.#call({ call: { case: "health", value: { counts, previous, nowUnixMs, settings, exporters: [...exporters] } } });
     if (r.result.case !== "healthReport") throw new Error(`health answered ${r.result.case}`);
     return r.result.value;
   }

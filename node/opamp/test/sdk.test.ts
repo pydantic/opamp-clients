@@ -385,6 +385,10 @@ function shown(c: AvailableComponents): Record<string, unknown> {
         assert.equal(g?.case, "boolValue", `${s}/${name}: gated`);
         return g.value;
       })),
+    // Where each exporter sends, for those that say: signal to identity to destination.
+    destinations: Object.fromEntries(Object.entries(subs(c.components.exporters, (signal) =>
+      Object.fromEntries(Object.entries(subs(signal, (e) => text(meta(e, "destination")))).filter(([, d]) => d))))
+      .filter(([, d]) => Object.keys(d).length > 0)),
     settings: subs(c.components.settings, (d) => text(meta(d, "applies"))),
   };
 }

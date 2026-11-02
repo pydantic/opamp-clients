@@ -55,7 +55,7 @@ const config = (doc: string | object) => policyConfig(document(doc), document(do
  * package declares them with every exporter its own (hostFromEnv), at `now` (0: no clock).
  */
 function settings(doc: string | object, now = 0): Settings {
-  const d = LAYER.decide(config(doc), EMPTY, EMPTY, hostFromEnv({}), BigInt(now));
+  const d = LAYER.decide(config(doc), EMPTY, EMPTY, hostFromEnv(), BigInt(now));
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
   return d.apply!;
 }
@@ -161,9 +161,9 @@ test("send_logs false overrides every scope's level; a scope level on a host tha
   c.apply(settings({ signal_exports: off("logs"), log_levels: { scopes: { "*": "trace" } } }));
   c.logs(out as never).export([record("app", 21)], () => {});
   assert.equal(out.got.length, 0);
-  // Logs NodeSDK exports, ungated: neither send_logs_level nor the scope levels are carried out.
-  const host = hostFromEnv({ OTEL_LOGS_EXPORTER: "custom" });
-  assert.ok(!host.live!.includes("send_logs_level_by_scope"));
+  // A host that doesn't declare the scope levels refuses them (the layer's rule; this package
+  // declares them always, test/inventory.test.ts).
+  const host = { live: hostFromEnv().live!.filter((k) => k !== "send_logs_level_by_scope") };
   const d = LAYER.decide(config({ log_levels: { scopes: { a: "off" } } }), EMPTY, EMPTY, host, BigInt(NOW));
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.equal(d.status?.errorMessage, "log_levels: scopes: this SDK cannot apply the requested override");
@@ -248,14 +248,28 @@ test("the log cap, live: a new n starts a full bucket, the same n keeps it, left
   assert.equal(c.logsCap, undefined);
   assert.equal(send(5000), 5000);
   // A cap the layer refuses changes nothing: 0 is "turn the logs off".
-  const d = LAYER.decide(config({ log_rate_limit: { records_per_second: 0 } }), EMPTY, EMPTY, hostFromEnv({}), 0n);
+  const d = LAYER.decide(config({ log_rate_limit: { records_per_second: 0 } }), EMPTY, EMPTY, hostFromEnv(), 0n);
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.equal(d.status!.errorMessage, "log_rate_limit: records_per_second must be a number more than 0, at most 1000000");
 });
 
-test("the log cap is declared only where the package builds the log exporters", () => {
-  assert.ok(hostFromEnv({}).live!.includes("send_logs_per_second"));
-  assert.ok(!hostFromEnv({ OTEL_LOGS_EXPORTER: "otlp,custom" }).live!.includes("send_logs_per_second"));
+test("a record every exporter gets is decided once for all of them: one budget for the process", () => {
+  const c = new Controls();
+  let now = 0;
+  c.clock = () => now;
+  c.apply(settings({ log_rate_limit: { records_per_second: 2 } }));
+  const otlp = sink();
+  const console = sink();
+  const toOtlp = c.logs(otlp as never);
+  const toConsole = c.logs(console as never);
+  const batch = [record("app", 9), record("app", 9), record("app", 9)];
+  toOtlp.export(batch, () => {});
+  toConsole.export([...batch].reverse(), () => {});
+  assert.deepEqual(otlp.got, [batch.slice(0, 2)]);
+  assert.deepEqual(console.got, [batch.slice(0, 2).reverse()]);
+  // No tokens left: the same exporter seeing them again is a new export, and capped.
+  toOtlp.export(batch, () => {});
+  assert.equal(otlp.got.length, 1);
 });
 
 // --- drop_attributes and mask_attributes -------------------------------------------------------
@@ -425,18 +439,12 @@ test("redaction: a key both lists match is dropped; drop doesn't change dropped_
   assert.deepEqual([gated.getFinishedSpans()[0]!.attributes, gated.getFinishedSpans()[0]!.droppedAttributesCount], [{}, 0]);
 });
 
-test("redaction is declared only where both the span and the log exporters are this package's", () => {
-  for (const env of [{}, { OTEL_LOGS_EXPORTER: "none" }, { OTEL_TRACES_EXPORTER: "console" }]) {
-    assert.ok(hostFromEnv(env).live!.includes("drop_attributes"), JSON.stringify(env));
-    assert.ok(hostFromEnv(env).live!.includes("mask_attributes"), JSON.stringify(env));
-  }
-  for (const env of [{ OTEL_LOGS_EXPORTER: "custom" }, { OTEL_TRACES_EXPORTER: "zipkin" }]) {
-    const host = hostFromEnv(env);
-    assert.ok(!host.live!.includes("drop_attributes") && !host.live!.includes("mask_attributes"), JSON.stringify(env));
-    const d = LAYER.decide(config({ attribute_redaction: { mask: ["user.email"] } }), EMPTY, EMPTY, host, 0n);
-    assert.equal(d.status?.errorMessage, "attribute_redaction: mask: this SDK cannot apply the requested override");
-    assert.equal(d.apply, undefined);
-  }
+test("redaction is declared, and a host that doesn't declare it refuses it", () => {
+  assert.ok(hostFromEnv().live!.includes("drop_attributes") && hostFromEnv().live!.includes("mask_attributes"));
+  const host = { live: hostFromEnv().live!.filter((k) => k !== "drop_attributes" && k !== "mask_attributes") };
+  const d = LAYER.decide(config({ attribute_redaction: { mask: ["user.email"] } }), EMPTY, EMPTY, host, 0n);
+  assert.equal(d.status?.errorMessage, "attribute_redaction: mask: this SDK cannot apply the requested override");
+  assert.equal(d.apply, undefined);
 });
 
 test("globs: * alone, leading, trailing, **, the empty pattern, by characters", () => {
@@ -573,12 +581,10 @@ test("scrubbing: the default patterns at their edges", () => {
 });
 
 test("scrubbing is declared where redaction is", () => {
-  for (const env of [{}, { OTEL_LOGS_EXPORTER: "custom" }, { OTEL_TRACES_EXPORTER: "zipkin" }]) {
-    const live = hostFromEnv(env).live!;
-    assert.equal(live.includes("scrub_defaults"), live.includes("drop_attributes"), JSON.stringify(env));
-    assert.equal(live.includes("scrub_patterns"), live.includes("drop_attributes"), JSON.stringify(env));
-  }
-  const d = LAYER.decide(config({ scrubbing: { defaults: true } }), EMPTY, EMPTY, hostFromEnv({ OTEL_LOGS_EXPORTER: "custom" }), 0n);
+  const live = hostFromEnv().live!;
+  assert.ok(live.includes("scrub_defaults") && live.includes("scrub_patterns"));
+  const host = { live: live.filter((k) => !k.startsWith("scrub_")) };
+  const d = LAYER.decide(config({ scrubbing: { defaults: true } }), EMPTY, EMPTY, host, 0n);
   assert.match(d.status?.errorMessage ?? "", /^scrubbing: /);
   assert.equal(d.apply, undefined);
 });
@@ -720,7 +726,7 @@ test("a caller's decision is followed whatever the rules: sampled under rate 0, 
 });
 
 test("rules written another way are the same rules, and report the same effective config", () => {
-  const host = hostFromEnv({});
+  const host = hostFromEnv();
   const a = LAYER.decide(config({ sampling_rules: { rules: [{ rate: 0, path: "/health*" }] } }), EMPTY, EMPTY, host, 0n);
   const other = policy({ sampling_rules: { rules: [{ path: "/health*", rate: 0 }] } }).replace('"rate":0}', '"rate":0.0}');
   const b = LAYER.decide(config(other), EMPTY, EMPTY, host, 0n);
@@ -1011,20 +1017,17 @@ test("debug mode: refused more than 24 h ahead, and an end already past is appli
   assert.deepEqual(agent.settingsInForce, { head_sampling: { ratio: 0.5 } });
 });
 
-test("debug mode: the caps stay, and the debug level is refused where the logs are not this package's", () => {
+test("debug mode: the caps stay, and the debug level is carried out whatever builds the logs", () => {
   const agent = new TestAgent(undefined);
   const until = new Date(NOW + 1000).toISOString();
   agent.remoteConfig(config({ log_rate_limit: { records_per_second: 2 }, debug: { until } }));
   assert.equal(agent.controls.logsCap?.perSecond, 2);
-  const ungated = new TestAgent(undefined, { OTEL_LOGS_EXPORTER: "custom" });
-  const s = ungated.remoteConfig(config({ debug: { until, log_level: "info" } }));
-  assert.equal(s.errorMessage, "debug: log_level: this SDK cannot apply the requested override");
-  assert.equal(ungated.controls.sampler.samplingRate, undefined);
-  // The debug rate alone is this package's to carry out.
-  ungated.remoteConfig(config({ debug: { until } }));
-  assert.equal(ungated.controls.sendLogsMinSeverity, undefined);
-  assert.equal(ungated.controls.sampler.samplingRate, 1);
-  assert.deepEqual(ungated.settingsInForce, { debug: { until } });
+  // NodeSDK builds the logs here; their exporters get the gate at start, so the level is ours.
+  const theirs = new TestAgent(undefined, { OTEL_LOGS_EXPORTER: "custom" });
+  const s = theirs.remoteConfig(config({ debug: { until, log_level: "info" } }));
+  assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.errorMessage);
+  assert.equal(theirs.controls.sampler.samplingRate, 1);
+  assert.equal(theirs.controls.sendLogsMinSeverity, 9);
 });
 
 test("a stopped agent arms no timer", async () => {
@@ -1055,10 +1058,11 @@ interface HealthCase {
   steps: {
     now_unix_ms: number;
     settings?: object;
+    exporters?: { signal: string; name: string; gated?: boolean; destination?: string }[];
     counts?: Partial<Record<Signal, Partial<{ exports_ok: number; exports_failed: number; items_failed: number;
       items_filtered: number; last_failed: boolean; last_error: string }>>>;
     want: HealthWant & { send?: boolean; sent_unix_ms?: number;
-      signals?: Partial<Record<Signal, HealthWant & { counters?: Record<string, number> }>> };
+      signals?: Partial<Record<Signal, HealthWant & { counters?: Record<string, number>; exporters?: Record<string, string> }>> };
   }[];
 }
 
@@ -1084,6 +1088,7 @@ test("vectors: health.json, call after call through the agent: its gates' counts
       const what = `${k.name}, step ${i + 1}`;
       agent.wall = step.now_unix_ms;
       agent.remoteConfig(config(step.settings ?? {}));
+      agent.exporters = (step.exporters ?? []).map((e) => ({ destination: "", gated: false, ...e }));
       for (const signal of ["traces", "metrics", "logs"] as const) {
         const n = step.counts?.[signal] ?? {};
         Object.assign(agent.controls.counts[signal], {
@@ -1106,6 +1111,12 @@ test("vectors: health.json, call after call through the agent: its gates' counts
         for (const [key, n] of Object.entries(sw.counters ?? {})) {
           const kv = child!.attributes.find((a) => a.key === key);
           assert.deepEqual(kv?.value?.value, { case: "intValue", value: BigInt(n) }, `${what}: ${signal} ${key}`);
+        }
+        if (sw.exporters !== undefined) {
+          const children = child!.componentHealthMap;
+          assert.deepEqual(Object.fromEntries(Object.entries(children).map(([k, c]) => [k, c.status])), sw.exporters,
+            `${what}: ${signal} exporters`);
+          assert.ok(Object.values(children).every((c) => c.healthy), `${what}: ${signal} exporters healthy`);
         }
       }
     }

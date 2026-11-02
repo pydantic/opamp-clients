@@ -119,7 +119,7 @@ process running.
   |---|---|
   | `head_sampling` | a sampler in place of the one `OTEL_TRACES_SAMPLER` names. A span whose parent was sampled, here or by the caller, is sampled at any ratio, 0 included. Local: that sampler. |
   | `sampling_rules`, `trace_rate_limit` | the same sampler: a rate per kind of new trace, and at most this many traces a second ([below](#sampling-rules)). |
-  | `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs` | each signal's exporters this package builds (OTLP and `console`, below), wrapped. `enabled: false` drops what would be exported. Spans are still made and sampled, so services downstream still trace them. |
+  | `signal_exports.traces`, `signal_exports.metrics`, `signal_exports.logs` | every exporter on the SDK's providers, wrapped (below). `enabled: false` drops what would be exported. Spans are still made and sampled, so services downstream still trace them. |
   | `log_levels` (`level`) | the same log exporters, wrapped. A record whose severity number is below the level's is dropped from the next export on, and one without a severity number is kept. Local: every severity. |
   | `log_levels` (`scopes`) | the same log exporters: a level per scope, over `level` ([below](#log-levels-per-scope)). |
   | `log_rate_limit` | the same log exporters: at most this many records a second ([below](#rate-caps)). |
@@ -144,9 +144,15 @@ and `none`. It reads the variables as NodeSDK 0.222 does: an empty variable is a
 name listed twice is one exporter, `none` is read as NodeSDK reads it (for traces, `none` among
 other names means the default `otlp` alone), and `OTEL_METRIC_EXPORT_INTERVAL`,
 `OTEL_METRIC_EXPORT_TIMEOUT`, `OTEL_BSP_*` and `OTEL_BLRP_*` fall back to their defaults when not a
-number above 0, and an OTLP protocol it doesn't know is `http/protobuf`, with a warning. A signal configured with anything else (`zipkin`, `prometheus`) is left to NodeSDK
-and cannot be stopped by the server. The package logs it, and refuses a policy that overrides
-that signal's `signal_exports` (and for logs, `log_levels`) ([the host](sdk-settings.md#the-host)). What the package logs goes
+number above 0, and an OTLP protocol it doesn't know is `http/protobuf`, with a warning. A signal
+configured with anything else (`zipkin`, `prometheus`) is left to NodeSDK to build. Once the SDK
+has started, the package puts its gates in front of every exporter on the providers it
+registered, NodeSDK's own included: the exporter of each span and log record processor and of
+each periodic metric reader. What it can't put a gate in front of (a pulled reader such as
+Prometheus, a processor holding an exporter some other way) is reported as ungoverned and
+warned about, never refused: the policy governs every exporter it can reach. One decision per
+log record holds for every exporter it reaches, and the log rate limit is one budget for the
+process. What the package logs goes
 to the logger `OTEL_LOG_LEVEL` sets up, from the start. Without `OTEL_LOG_LEVEL`, OpenTelemetry's
 `diag` logger shows nothing, so the package's own warnings and errors (`OpAMP: ...`) go to the
 console (stderr) instead, and its INFO lines aren't shown.
@@ -185,23 +191,13 @@ a tracer, logger or meter provider it builds itself goes past them.
   another until the first is disabled (`trace.disable()`, `logs.disable()`, `metrics.disable()`).
   When the application then registers its own (`trace.setGlobalTracerProvider`,
   `provider.register()`, `logs.setGlobalLoggerProvider`, `metrics.setGlobalMeterProvider`), the
-  package sees it at once. It warns, and no longer carries out the controls that provider takes
-  past it. In the policy in force, each of their overrides is set aside: reported `local` in the
-  effective config, which the package reports to the server at once, with the inventory's
-  settings. The rest of the policy stays in force. A policy offered from then on that overrides
-  one is refused (`head_sampling: this SDK cannot apply the requested override`). A provider the
-  application registered before `register()` is seen the same way, as the SDK's is refused.
-
-  | The application's own | Set aside from then on |
-  |---|---|
-  | tracer provider | `head_sampling`, `sampling_rules`, `trace_rate_limit`, `debug` (`sampling_ratio`), `signal_exports.traces`, `attribute_redaction`, `scrubbing` |
-  | logger provider | `signal_exports.logs`, `log_levels` (`level` and `scopes`), `log_rate_limit`, `debug` (`log_level`), `attribute_redaction`, `scrubbing` |
-  | meter provider | `signal_exports.metrics` |
-
+  package sees it at once, warns, and reports it to the server as an ungoverned exporter of that
+  signal (`app_provider`, `gated: false` in the [inventory](#inventory), status `ungoverned` in
+  [export health](#export-health)). Nothing is set aside or refused for it: the policy stays
+  APPLIED and in force on everything the SDK exports. A provider the application registered
+  before `register()` is seen the same way, as the SDK's is refused.
 - **The instrumentations keep the SDK's providers.** Each got its providers when NodeSDK started.
-  So their spans are still sampled and gated, and the server still switches them. But a control
-  that no longer reaches all of the application's telemetry isn't answered as carried out. The
-  controls stay set aside until the next start.
+  So their spans are still sampled and gated, and the server still switches them.
 - **Not registered, not seen.** A provider the application builds and uses directly
   (`provider.getTracer("app")`) goes past the package unseen, and a policy that overrides its
   controls is still answered APPLIED. The same holds for one registered through another copy of
@@ -415,6 +411,8 @@ read the agent's health:
   when to send: at once on a change of status, at most every 60 s while only the counters move.
   A change of status is logged at `info` (`OpAMP: export health: failing (...)`).
 - Records a full batch queue drops aren't counted: the SDK only logs them.
+- Under each signal, every exporter of the inventory by its identity, `governed` or `ungoverned`
+  (one the gates can't reach). Healthy either way: being ungoverned is not a failure.
 
 ## The application's own settings
 
@@ -482,8 +480,9 @@ sends the hash at start, and the components in full when the server asks.
 {"sdk": {"integration.name": "@pydantic/opamp-otel", "integration.version": "0.1.0",
          "telemetry.sdk.language": "nodejs", "telemetry.sdk.version": "2.11.0"},
  "instrumentations": {"express": {"version": "0.70.0"}, "http": {"version": "0.222.0"}, "...": {}},
- "exporters": {"traces": {"otlp": {"gated": true}},
-               "metrics": {"otlp": {"gated": false}, "prometheus": {"gated": false}}},
+ "exporters": {"traces": {"otlp@localhost:4318": {"gated": true, "destination": "http://localhost:4318"}},
+               "metrics": {"otlp@localhost:4318": {"gated": true, "destination": "http://localhost:4318"},
+                           "prometheus": {"gated": false}}},
  "settings": {"sampling_rate": {"applies": "at once"}, "deactivate_instrumentations": {"applies": "at once"}, "...": {}}}
 ```
 
@@ -493,16 +492,16 @@ sends the hash at start, and the components in full when the server asks.
   `OTEL_NODE_DISABLED_INSTRUMENTATIONS`), switched off or not, under the short name
   the `instrumentations` control takes (`http` for `@opentelemetry/instrumentation-http`), with its
   version. One not loaded isn't listed: the server can't switch it on.
-- `exporters`: each signal's exporters, named as `OTEL_*_EXPORTER` names them, once each, with
-  `none` read as NodeSDK reads it. Those this package builds are `gated`; a signal it leaves to
-  NodeSDK (a `prometheus` or `zipkin` exporter among them) is listed as NodeSDK builds it, every
-  exporter `gated: false`. Its `send_*` setting is not carried out, so it is not under `settings`.
-  A name NodeSDK does not know builds nothing, and is not listed.
+- `exporters`: every exporter on the SDK's providers, read off them once the gates are in, named
+  as `OTEL_*_EXPORTER` names them (`otlp`, `console`, `zipkin`, `prometheus`) or by its type, with
+  the host and port it sends to where it has one (`otlp@api.honeycomb.io:443`; never credentials
+  or a path). `gated` is whether the package's gate is in front of it; a pulled reader is
+  `gated: false`, and so is a global provider of the application's own (`app_provider`). A name
+  NodeSDK does not know builds nothing, and is not listed.
 - `settings`: the settings the package carries out, by the layer's names for them, as it declares
-  them to the layer. The instrumentations are switched `at once`. The log settings are there only
-  where the package builds the log exporters.
-- Worked out once, as the client starts. Only `settings` can change while the application runs:
-  a provider of the application's own takes its settings out, and the components are sent again.
+  them to the layer: every one, at once.
+- Worked out once, as the client starts. Only `exporters` can change while the application runs:
+  a provider of the application's own adds `app_provider`, and the components are sent again.
 
 ## How it is checked
 
@@ -548,14 +547,16 @@ sends the hash at start, and the components in full when the server asks.
     subscribing from inside a callback; restarts with and without a state directory; one map for
     the register and the application, by `import` or `require`;
   - a provider of the application's own (`test/providers.test.ts`): a tracer, logger or meter
-    provider registered once NodeSDK has started sets exactly its settings aside, reported at
-    once with the inventory's settings, and the configs decided after; one the API refuses
-    changes nothing; one registered before NodeSDK starts is seen as the SDK's is refused;
+    provider registered once NodeSDK has started is reported at once as an ungoverned exporter, in
+    the components and export health, with every override still in force and later configs
+    APPLIED; one the API refuses changes nothing; one registered before NodeSDK starts is seen as
+    the SDK's is refused; an exporter given to NodeSDK without a gate gets one (once);
   - the inventory (`test/inventory.test.ts`): a typical setup's components; every instrumentation
     `getNodeAutoInstrumentations` loads listed with its version, and switched off by the name
-    listed; no instrumentations, exporters set to `none`, repeated and unknown ones; an exporter
-    gated exactly where its `send_*` is carried out; and in a real process, the hash at start and
-    the components in full when the server asks.
+    listed; no instrumentations, exporters set to `none`, repeated and unknown ones; every exporter
+    NodeSDK builds (zipkin included) gated and named by where it sends, a pulled reader
+    ungoverned, every setting declared; and in a real process, the hash at start and the
+    components in full when the server asks.
 - End to end: `python3 examples/node-otel/try.py` (CI's `node-otel` job), the checks every
   integration passes (`examples/integrations.py`). A program with no OpenTelemetry code runs
   under the register, and its `http` requests are traced; once the server switches `http`, `net`
