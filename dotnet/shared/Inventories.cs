@@ -27,9 +27,9 @@ internal static class Inventories
         Exporters = { exporters },
     };
 
-    /// <summary>An exporter of <paramref name="signal"/>, as the layer takes it.</summary>
-    public static Exporter Exporter(Signal signal, string name, bool gated) =>
-        new() { Signal = signal.ToString().ToLowerInvariant(), Name = name, Gated = gated };
+    /// <summary>An exporter of <paramref name="signal"/>, as the layer takes it, with where it sends (empty: not known).</summary>
+    public static Exporter Exporter(Signal signal, string name, bool gated, string destination = "") =>
+        new() { Signal = signal.ToString().ToLowerInvariant(), Name = name, Gated = gated, Destination = destination };
 
     /// <summary>
     /// An assembly's version as its package's: the informational version without its build metadata

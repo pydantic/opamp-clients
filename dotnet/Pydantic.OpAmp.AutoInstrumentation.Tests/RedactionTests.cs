@@ -220,19 +220,17 @@ public class RedactionTests
     }
 
     [Fact]
-    public void ThePluginDeclaresItWhereEverySpanAndLogRecordGoesThroughAGate()
+    public void ThePluginDeclaresItWhateverTheExportersAre()
     {
         Agent Prepare(params (string Name, string Value)[] env) => Agent.Prepare(
             n => n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : env.FirstOrDefault(e => e.Name == n).Value, (_, _) => { })!;
 
         Assert.Contains("drop_attributes", Prepare().HostNow(providersBuilt: false).Live);
-        Assert.Contains("mask_attributes", Prepare(("OTEL_LOGS_EXPORTER", "none")).HostNow(providersBuilt: false).Live);
+        Assert.Contains("mask_attributes", Prepare(("OTEL_TRACES_EXPORTER", "zipkin")).HostNow(providersBuilt: false).Live);
+        // A console logs exporter is reported ungoverned; redaction governs every exporter behind a gate.
         var console = Prepare(("OTEL_LOGS_EXPORTER", "console"));
-        Assert.DoesNotContain("drop_attributes", console.HostNow(providersBuilt: false).Live);
-        Assert.DoesNotContain("mask_attributes", Prepare(("OTEL_TRACES_EXPORTER", "zipkin")).HostNow(providersBuilt: false).Live);
-        var refused = console.RemoteConfig(Vectors.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}"""))));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("attribute_redaction: drop: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Null(console.Controls.Policy(Signal.Traces).Redact); // refused, not carried out by half
+        Assert.Equal(RemoteConfigStatuses.Applied, console.RemoteConfig(Vectors.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}""")))).Status);
+        Assert.NotNull(console.Controls.Policy(Signal.Traces).Redact);
+        Assert.Contains(console.Inventory().Exporters, e => e.Signal == "logs" && e.Name == "console" && !e.Gated);
     }
 }

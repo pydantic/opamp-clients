@@ -158,8 +158,9 @@ public class HealthTests
     }
 
     // Every case of testdata/health.json through the agent: its counts reached through the tally's
-    // own calls, its settings as a remote config; the first step the agent's start (export health
-    // goes with the first message), each next the timer going off 30 s after the last.
+    // own calls, its settings as a remote config, its exporters as the inventory lists them; the
+    // first step the agent's start (export health goes with the first message), each next the
+    // timer going off 30 s after the last.
     [Fact]
     public void EveryHealthVectorThroughTheAgentsTimer()
     {
@@ -178,6 +179,7 @@ public class HealthTests
             try
             {
                 var had = new Dictionary<Signal, SignalCounts>();
+                var listed = new Inventory();
                 for (var i = 0; i < steps.Count; i++)
                 {
                     var step = steps[i];
@@ -199,10 +201,22 @@ public class HealthTests
                         had[signal] = want;
                     }
 
+                    listed = new Inventory();
+                    if (step.TryGetProperty("exporters", out var exporters))
+                    {
+                        listed.Exporters.Add(exporters.EnumerateArray().Select(e => new Exporter
+                        {
+                            Signal = e.GetProperty("signal").GetString(),
+                            Name = e.GetProperty("name").GetString(),
+                            Gated = e.TryGetProperty("gated", out var g) && g.GetBoolean(),
+                            Destination = e.TryGetProperty("destination", out var d) ? d.GetString() : string.Empty,
+                        }));
+                    }
+
                     var before = agent.Sdk.HealthSent;
                     if (i == 0)
                     {
-                        agent.Start([new("service.name", "health-test")]);
+                        agent.Sdk.Start([new("service.name", "health-test")], () => listed);
                     }
                     else
                     {
@@ -360,6 +374,16 @@ public class HealthTests
                 }
 
                 Entry(s.Value, child, $"{where} {s.Name}", failed);
+                if (s.Value.TryGetProperty("exporters", out var exporters))
+                {
+                    var wanted = exporters.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetString());
+                    var got = child.ComponentHealthMap.ToDictionary(e => e.Key, e => (string?)e.Value.Status);
+                    if (!wanted.OrderBy(e => e.Key).SequenceEqual(got.OrderBy(e => e.Key)))
+                    {
+                        failed.Add($"{where} {s.Name}: exporters {string.Join(", ", got)}");
+                    }
+                }
+
                 if (s.Value.TryGetProperty("counters", out var counters))
                 {
                     foreach (var counter in counters.EnumerateObject())

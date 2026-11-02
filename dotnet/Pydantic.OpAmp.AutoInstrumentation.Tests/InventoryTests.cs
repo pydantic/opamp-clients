@@ -51,7 +51,7 @@ public class InventoryTests
             new Dictionary<string, Dictionary<string, bool>>
             {
                 ["traces"] = new() { ["otlp"] = true },
-                ["metrics"] = new() { ["otlp"] = false, ["prometheus"] = false }, // send_metrics isn't carried out
+                ["metrics"] = new() { ["otlp"] = true, ["prometheus"] = false }, // a pull reader: ungoverned
                 ["logs"] = new() { ["otlp"] = true },
             },
             Exporters(inventory));
@@ -88,11 +88,11 @@ public class InventoryTests
     [Theory]
     [InlineData("none", "")] // none built
     [InlineData("otlp,otlp", "otlp:True")] // one exporter, gated
-    [InlineData("otlp,none", "otlp:False")] // none beside it: the setting isn't carried out
-    [InlineData("otlp,jaeger", "otlp:False")] // one it doesn't know builds nothing, but isn't gated
-    [InlineData("console", "console:False")]
-    [InlineData("zipkin,otlp", "otlp:False,zipkin:False")]
-    [InlineData(" otlp , console ", "console:False,otlp:False")]
+    [InlineData("otlp,none", "otlp:True")]
+    [InlineData("otlp,jaeger", "otlp:True")] // one it doesn't know builds nothing
+    [InlineData("console", "console:False")] // no gate in front of it: ungoverned
+    [InlineData("zipkin,otlp", "otlp:True,zipkin:False")]
+    [InlineData(" otlp , console ", "console:False,otlp:True")]
     public void EachTracesExporterIsListedAsTheVariableNamesIt(string variable, string listed)
     {
         var traces = Prepared(new() { ["OTEL_TRACES_EXPORTER"] = variable }).Inventory().Exporters.Where(e => e.Signal == "traces")
@@ -116,10 +116,10 @@ public class InventoryTests
         Assert.NotEmpty(inventory.Instrumentations); // switched off or not
     }
 
-    // The exporters are the file's, which the plugin can't read: it lists none, rather than the
-    // variables', which the SDK doesn't read then.
+    // The exporters are the file's, which the plugin reads from the built providers alone: none of
+    // the variables', which the SDK doesn't read then.
     [Fact]
-    public void WithFileBasedConfigurationNoExporterIsListed()
+    public void WithFileBasedConfigurationNoVariablesExporterIsListed()
     {
         var agent = Prepared(new() { ["OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED"] = "true", ["OTEL_TRACES_EXPORTER"] = "console" });
         var inventory = agent.Inventory();
@@ -127,20 +127,41 @@ public class InventoryTests
         Assert.NotEmpty(inventory.Instrumentations);
         var c = new SdkSettings().Components(inventory, agent.HostNow(providersBuilt: true), Vectors.Now);
         Assert.DoesNotContain("deactivate_instrumentations", c.Components["settings"].SubComponentMap.Keys);
-        Assert.DoesNotContain("send_traces", c.Components["settings"].SubComponentMap.Keys);
+        Assert.Contains("send_traces", c.Components["settings"].SubComponentMap.Keys);
     }
 
-    // An exporter is gated exactly where its signal's send_* is carried out.
+    // The OTLP exporter is gated, whatever is beside it; every other is ungoverned. Every send_* is
+    // declared all the same, with each OTLP exporter's destination.
     [Theory]
     [InlineData("otlp", "otlp", "otlp")]
     [InlineData("console", "otlp,prometheus", "otlp")]
     [InlineData("otlp,zipkin", "prometheus", "console")]
     [InlineData("none", "none", "otlp,otlp")]
-    public void AnExporterIsGatedWhereItsSignalsSendingIsCarriedOut(string traces, string metrics, string logs)
+    public void TheOtlpExporterIsGatedAndEveryOtherUngoverned(string traces, string metrics, string logs)
     {
         var agent = Prepared(new() { ["OTEL_TRACES_EXPORTER"] = traces, ["OTEL_METRICS_EXPORTER"] = metrics, ["OTEL_LOGS_EXPORTER"] = logs });
         var live = agent.HostNow(providersBuilt: true).Live;
-        Assert.All(agent.Inventory().Exporters, e => Assert.Equal(live.Contains($"send_{e.Signal}"), e.Gated));
+        Assert.Contains("send_traces", live);
+        Assert.Contains("send_metrics", live);
+        Assert.Contains("send_logs", live);
+        Assert.All(agent.Inventory().Exporters, e => Assert.Equal(e.Name == "otlp", e.Gated));
+        Assert.All(agent.Inventory().Exporters.Where(e => e.Name == "otlp"), e => Assert.Equal("http://localhost:4318", e.Destination));
+    }
+
+    // Where each exporter sends, as its variables say.
+    [Fact]
+    public void EachExporterSaysWhereItSends()
+    {
+        string At(Signal signal, string name, params (string Key, string Value)[] env) =>
+            Variables.Destination(k => env.FirstOrDefault(e => e.Key == k).Value, signal, name);
+        Assert.Equal("http://localhost:4317", At(Signal.Logs, "otlp", ("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")));
+        Assert.Equal("http://localhost:4317", At(Signal.Logs, "otlp", ("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", "grpc")));
+        Assert.Equal("https://b", At(Signal.Traces, "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b")));
+        Assert.Equal("https://a/v1/traces", At(Signal.Traces, "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b"),
+            ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://a/v1/traces")));
+        Assert.Equal("http://localhost:9411/api/v2/spans", At(Signal.Traces, "zipkin"));
+        Assert.Equal("http://z:9411", At(Signal.Traces, "zipkin", ("OTEL_EXPORTER_ZIPKIN_ENDPOINT", "http://z:9411")));
+        Assert.Equal(string.Empty, At(Signal.Traces, "console"));
     }
 
     // Started, the agent's components are the layer's of its inventory under the host it runs by:
@@ -161,7 +182,7 @@ public class InventoryTests
             agent.Start([new("service.name", "inventory-test")]);
             var components = agent.Sdk.Components!;
             var settings = components.Components["settings"].SubComponentMap;
-            Assert.DoesNotContain("send_traces", settings.Keys); // console: not carried out
+            Assert.Contains("send_traces", settings.Keys); // console beside: ungoverned, the setting still declared
             Assert.Equal("at once", settings["send_logs"].Metadata.Single(m => m.Key == "applies").Value.StringValue);
             Assert.Equal("next start", settings["deactivate_instrumentations"].Metadata.Single(m => m.Key == "applies").Value.StringValue);
             Assert.Equal(new SdkSettings().Components(agent.Inventory(), agent.HostNow(providersBuilt: true), Vectors.Now).Components["settings"], components.Components["settings"]);

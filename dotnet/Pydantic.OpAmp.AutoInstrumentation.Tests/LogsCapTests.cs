@@ -129,15 +129,13 @@ public class LogsCapTests
     }
 
     [Fact]
-    public void ThePluginDeclaresItWhereTheLogsAreGated()
+    public void ThePluginDeclaresItWhateverTheLogsExportersAre()
     {
-        var otlp = Agent.Prepare(n => n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : null, (_, _) => { })!;
-        Assert.Contains("send_logs_per_second", otlp.HostNow(providersBuilt: false).Live);
-        var none = Agent.Prepare(n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_LOGS_EXPORTER" => "otlp,console", _ => null }, (_, _) => { })!;
-        Assert.DoesNotContain("send_logs_per_second", none.HostNow(providersBuilt: false).Live);
-        var refused = none.RemoteConfig(Vectors.Config(Policy.Of(("log_rate_limit", """{"records_per_second":5}"""))));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("log_rate_limit: records_per_second: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Null(none.Controls.Policy(Signal.Logs).Cap);
+        var both = Agent.Prepare(n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_LOGS_EXPORTER" => "otlp,console", _ => null }, (_, _) => { })!;
+        Assert.Contains("send_logs_per_second", both.HostNow(providersBuilt: false).Live);
+        Assert.Equal(RemoteConfigStatuses.Applied, both.RemoteConfig(Vectors.Config(Policy.Of(("log_rate_limit", """{"records_per_second":5}""")))).Status);
+        Assert.NotNull(both.Controls.Policy(Signal.Logs).Cap);
+        // The OTLP exporter is behind the gate; the console one is reported ungoverned.
+        Assert.Equal(["otlp:True", "console:False"], both.Inventory().Exporters.Where(e => e.Signal == "logs").Select(e => $"{e.Name}:{e.Gated}"));
     }
 }

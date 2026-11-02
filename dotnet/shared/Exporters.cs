@@ -10,37 +10,38 @@ using OpenTelemetry.Trace;
 namespace Pydantic.OpAmp.Otel;
 
 /// <summary>
-/// Which signals' exports the gate can't stop, read from the built providers. The SDK keeps their
-/// processors and readers in internal members, read by reflection as the sampler is
-/// (<see cref="Samplers"/>). A signal is gated only when every exporter it has is OTLP and sends
-/// through the gate's HTTP client, the gate for its signal (a gate that tells signals by path:
-/// to its signal's path); what can't be read counts as not gated. Read again whenever asked: a
-/// processor the application adds to a built provider is found the next time.
+/// What the built providers export through, read from them: each exporter, and whether the gate is
+/// in front of it. The SDK keeps their processors and readers in internal members, read by
+/// reflection as the sampler is (<see cref="Samplers"/>). An exporter is gated only when it is
+/// OTLP and sends through the gate's HTTP client, the gate for its signal (a gate that tells
+/// signals by path: to its signal's path); what can't be read counts as not gated, and is reported
+/// ungoverned. Read again whenever asked: a processor the application adds later is found.
 /// </summary>
 internal static class Exporters
 {
+    /// <summary>
+    /// An exporter met: its signal, its name as <c>OTEL_*_EXPORTER</c> gives it or else its type,
+    /// whether the gate is in front of it, and where it sends (empty: nowhere, or not known).
+    /// </summary>
+    internal sealed record Built(Signal Signal, string Name, bool Gated, string Destination = "");
+
     private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
     // Processors that hold others, nested deeper than this, aren't followed: not gated.
     private const int Deepest = 8;
 
-    /// <summary>The signals some exporter of which goes on sending whatever the server says. A provider not built: none.</summary>
-    public static HashSet<Signal> Ungated(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs) => Read(tracing, metrics, logs).Ungated;
-
     /// <summary>
-    /// What the built providers export through: each exporter, by the name <c>OTEL_*_EXPORTER</c>
-    /// gives it or else its type, and whether the gate is in front of it (a processor or reader it
-    /// can't see into is listed by its own type, not gated); and the signals some exporter of which
-    /// goes on sending whatever the server says.
+    /// What the built providers export through: each exporter met (<see cref="Built"/>); a
+    /// processor or reader it can't see into is listed by its own type, not gated. A provider not
+    /// built: nothing.
     /// </summary>
-    public static (HashSet<Signal> Ungated, List<(Signal Signal, string Name, bool Gated)> Built) Read(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs) =>
+    public static List<Built> Read(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs) =>
         Read([(Signal.Traces, tracing), (Signal.Metrics, metrics), (Signal.Logs, logs)]);
 
     /// <summary>The same, of any number of providers, each of its signal (several logger providers, say).</summary>
-    public static (HashSet<Signal> Ungated, List<(Signal Signal, string Name, bool Gated)> Built) Read(IEnumerable<(Signal Signal, object? Provider)> providers)
+    public static List<Built> Read(IEnumerable<(Signal Signal, object? Provider)> providers)
     {
-        var ungated = new HashSet<Signal>();
-        var built = new List<(Signal, string, bool)>();
+        var built = new List<Built>();
         foreach (var (signal, provider) in providers)
         {
             if (provider is null)
@@ -49,22 +50,20 @@ internal static class Exporters
             }
 
             var part = signal == Signal.Metrics ? "Reader" : "Processor";
-
-            var found = new List<(string Name, bool Gated)>();
+            var found = new List<Built>();
             if (!TryMember(provider, part, out var p))
             {
-                found.Add((TypeName(provider), false));
-                ungated.Add(signal);
+                found.Add(new(signal, TypeName(provider), false));
             }
-            else if (!Gated(signal, p, 0, found))
+            else
             {
-                ungated.Add(signal);
+                Gated(signal, p, 0, found);
             }
 
-            built.AddRange(found.Select(f => (signal, f.Name, f.Gated)));
+            built.AddRange(found);
         }
 
-        return (ungated, built);
+        return built;
     }
 
     /// <summary>
@@ -73,7 +72,7 @@ internal static class Exporters
     /// holds none exports nothing). None at all: nothing to stop. Each exporter met goes in
     /// <paramref name="found"/>, and each part that can't be seen into, as not gated.
     /// </summary>
-    private static bool Gated(Signal signal, object? part, int depth, List<(string Name, bool Gated)> found)
+    private static bool Gated(Signal signal, object? part, int depth, List<Built> found)
     {
         if (part is null)
         {
@@ -82,7 +81,7 @@ internal static class Exporters
 
         if (depth > Deepest)
         {
-            found.Add((TypeName(part), false));
+            found.Add(new(signal, TypeName(part), false));
             return false;
         }
 
@@ -95,7 +94,7 @@ internal static class Exporters
             {
                 if (!TryMember(node, "Value", out var value))
                 {
-                    found.Add((TypeName(node), false));
+                    found.Add(new(signal, TypeName(node), false));
                     all = false;
                 }
                 else
@@ -111,7 +110,7 @@ internal static class Exporters
         {
             if (!TryMember(part, "exporter", out var exporter) || exporter is null)
             {
-                found.Add((TypeName(part), false));
+                found.Add(new(signal, TypeName(part), false));
                 return false;
             }
 
@@ -121,7 +120,7 @@ internal static class Exporters
         if (part is MetricReader)
         {
             // A reader of another kind is read from (a scrape, say): nothing in it to stop.
-            found.Add((TypeName(part), false));
+            found.Add(new(signal, TypeName(part), false));
             return false;
         }
 
@@ -134,13 +133,25 @@ internal static class Exporters
         return gated;
     }
 
-    /// <summary>An exporter, listed: whether it is gated.</summary>
-    private static bool Exporter(Signal signal, object exporter, List<(string Name, bool Gated)> found)
+    /// <summary>An exporter, listed with where it sends: whether it is gated.</summary>
+    private static bool Exporter(Signal signal, object exporter, List<Built> found)
     {
         var gated = GatedExporter(signal, exporter);
-        found.Add((Named(exporter.GetType()), gated));
+        found.Add(new(signal, Named(exporter.GetType()), gated, Destination(exporter)));
         return gated;
     }
+
+    /// <summary>
+    /// Where an exporter sends, read off it: an OTLP exporter's export client's endpoint, Zipkin's
+    /// options' endpoint; empty for any other. The layer keeps only the scheme, host and port.
+    /// </summary>
+    internal static string Destination(object exporter) =>
+        TryMember(exporter, "transmissionHandler", out var handler) && handler is not null &&
+        TryMember(handler, "ExportClient", out var client) && client is not null &&
+        TryMember(client, "Endpoint", out var endpoint) && endpoint is Uri otlp ? otlp.ToString()
+        : TryMember(exporter, "options", out var options) && options is not null &&
+          TryMember(options, "Endpoint", out var at) && at is Uri other ? other.ToString()
+        : string.Empty;
 
     /// <summary>An exporter's name as <c>OTEL_*_EXPORTER</c> gives it (<c>otlp</c>, <c>console</c>, <c>zipkin</c>, <c>prometheus</c>), else its type's.</summary>
     internal static string Named(Type type) =>

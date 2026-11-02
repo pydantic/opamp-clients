@@ -264,8 +264,13 @@ public class SdkSettingsTests
             },
             first,
             Now + 30_000,
-            new Settings { SendLogs = false });
+            new Settings { SendLogs = false },
+            [new Exporter { Signal = "traces", Name = "zipkin" }]);
         Assert.True(failed.Send);
+        // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
+        var zipkin = failed.Exporters.ComponentHealthMap["traces"].ComponentHealthMap["zipkin"];
+        Assert.Equal("ungoverned", zipkin.Status);
+        Assert.True(zipkin.Healthy);
         Assert.False(failed.Exporters.Healthy);
         Assert.Equal("connection refused", failed.Exporters.ComponentHealthMap["traces"].LastError);
         Assert.Equal("off", failed.Exporters.ComponentHealthMap["logs"].Status);
@@ -303,6 +308,20 @@ public class SdkSettingsTests
                     s => s.Name, s => s.Value.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetBoolean()));
                 var actual = got.Components["exporters"].SubComponentMap.ToDictionary(
                     s => s.Key, s => s.Value.SubComponentMap.ToDictionary(e => e.Key, e => Assert.Single(e.Value.Metadata, m => m.Key == "gated").Value.BoolValue));
+                Assert.Equal(expected, actual);
+            }
+
+            if (want.TryGetProperty("destinations", out var destinations))
+            {
+                // Where each exporter sends, for those that say: signal to identity to destination.
+                var expected = destinations.EnumerateObject().ToDictionary(
+                    s => s.Name, s => s.Value.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetString()!));
+                var actual = got.Components["exporters"].SubComponentMap
+                    .Select(s => (s.Key, Sent: s.Value.SubComponentMap
+                        .Where(e => e.Value.Metadata.Any(m => m.Key == "destination"))
+                        .ToDictionary(e => e.Key, e => e.Value.Metadata.Single(m => m.Key == "destination").Value.StringValue)))
+                    .Where(s => s.Sent.Count > 0)
+                    .ToDictionary(s => s.Key, s => s.Sent);
                 Assert.Equal(expected, actual);
             }
 
@@ -388,6 +407,7 @@ public class SdkSettingsTests
                 Signal = Text(e, "signal"),
                 Name = Text(e, "name"),
                 Gated = e.TryGetProperty("gated", out var g) && g.GetBoolean(),
+                Destination = e.TryGetProperty("destination", out var d) ? d.GetString() : string.Empty,
             }));
         }
 

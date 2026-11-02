@@ -28,7 +28,6 @@ internal sealed class OpAmpAgent : IDisposable
     private readonly bool gateable;
     private readonly OtlpTls? tls;
     private TracerProviderBuilder? tracing;
-    private (TracerProvider? Tracing, MeterProvider? Metrics, LoggerProvider? Logs)? built;
     private ComponentHealth? health;
 
     public OpAmpAgent(IOptions<OpAmpOptions> options, IConfiguration? configuration = null)
@@ -103,39 +102,25 @@ internal sealed class OpAmpAgent : IDisposable
     /// What this SDK carries out, declared to the layer, which sets aside any setting not named
     /// (docs/sdk-settings.md, "The host"): never the instrumentation switches (the application
     /// names its instrumentations in code); the sampling rate only while the live sampler can be the
-    /// tracer provider's; a signal's sending only while every exporter it has can be gated
-    /// (<see cref="Exporters"/>, read from the built providers each time: a processor the application
-    /// adds to one later is found). Nothing waits for the next start.
+    /// tracer provider's; every gate's setting, which governs each exporter the gates are in front
+    /// of. One they aren't (not OTLP, or not sending through the gate's client) is reported
+    /// ungoverned in the inventory and export health, and narrows nothing. Nothing waits for the next start.
     /// </summary>
     public Host HostNow(bool providersBuilt)
     {
-        // Before the providers are built, an exporter not yet seen may still be gated.
-        var ungated = providersBuilt ? this.Ungated() : [];
         var h = new Host();
-        if (this.gateable)
-        {
-            foreach (var signal in Enum.GetValues<Signal>().Where(s => !ungated.Contains(s)))
-            {
-                h.Live.Add($"send_{signal.ToString().ToLowerInvariant()}");
-            }
-
-            if (!ungated.Contains(Signal.Logs))
-            {
-                // The levels are held at the logs gate, which every exporter of the logs is behind.
-                h.Live.Add("send_logs_level");
-                h.Live.Add("send_logs_level_by_scope");
-                h.Live.Add("send_logs_per_second");
-            }
-        }
-
-        // Redaction is at the traces and logs gates: every span and log record exported has to go through one.
-        if (this.gateable && !ungated.Contains(Signal.Traces) && !ungated.Contains(Signal.Logs))
-        {
-            h.Live.Add("drop_attributes");
-            h.Live.Add("mask_attributes");
-            h.Live.Add("scrub_defaults");
-            h.Live.Add("scrub_patterns");
-        }
+        h.Live.Add("send_traces");
+        h.Live.Add("send_metrics");
+        h.Live.Add("send_logs");
+        // At the logs gate.
+        h.Live.Add("send_logs_level");
+        h.Live.Add("send_logs_level_by_scope");
+        h.Live.Add("send_logs_per_second");
+        // At the traces and logs gates.
+        h.Live.Add("drop_attributes");
+        h.Live.Add("mask_attributes");
+        h.Live.Add("scrub_defaults");
+        h.Live.Add("scrub_patterns");
 
         if (!providersBuilt || this.SamplerInForce())
         {
@@ -228,30 +213,25 @@ internal sealed class OpAmpAgent : IDisposable
             this.log.Sink.Warn("the tracer provider's sampler was set after WithOpAmp(): sampling_rate is not carried out. Call WithOpAmp() last.");
         }
 
-        // Which signals go to an exporter the gate isn't in front of is known now. The host does not
-        // declare their send_*, so the layer refuses a policy that overrides it, and sets it aside in
-        // one in force. The providers are read again before each decision, and on the health timer.
-        this.built = (tracing, metrics, logs);
-        foreach (var signal in this.Ungated())
+        // What the gates are in front of is known now: the rest is reported ungoverned. The providers
+        // are read again before each decision, and on the health timer.
+        var ungoverned = this.Agent is null ? [] : Exporters.Read(tracing, metrics, logs).Where(e => !(e.Gated && this.gateable))
+            .Select(e => $"{e.Signal.ToString().ToLowerInvariant()} {e.Name}").Distinct().ToList();
+        if (ungoverned.Count > 0)
         {
-            var name = signal.ToString().ToLowerInvariant();
-            this.log.Sink.Info($"{name} go to an exporter that can't be stopped (not OTLP, an endpoint with a path of its own, or an HttpClientFactory of its own): send_{name} is not carried out");
+            this.log.Sink.Info($"exporters the gates aren't in front of (not OTLP, an endpoint with a path of its own, or an HttpClientFactory of its own): {string.Join(", ", ungoverned)}; reported to the server as ungoverned, and every setting governs the rest");
         }
 
-        this.Agent?.Start(resource, () => this.Inventory(Exporters.Read(tracing, metrics, logs).Built, tracing, metrics, logs), this.health);
+        this.Agent?.Start(resource, () => this.Inventory(Exporters.Read(tracing, metrics, logs), tracing, metrics, logs), this.health);
     }
-
-    /// <summary>The signals some exporter of which the built providers send through past the gates, read now; none before they are built.</summary>
-    private HashSet<Signal> Ungated() =>
-        this.Agent is not null && this.gateable && this.built is { } b ? Exporters.Read(b.Tracing, b.Metrics, b.Logs).Ungated : [];
 
     /// <summary>
     /// What it runs (docs/available-components.md): the instrumentations the application added to
     /// the providers, named as the automatic instrumentation plugin's <c>deactivate_instrumentations</c>
-    /// names them, at their packages' versions; and the providers' exporters, gated where their
-    /// signal's <c>send_*</c> is carried out (<see cref="HostNow"/>).
+    /// names them, at their packages' versions; and the providers' exporters, each gated where the
+    /// gate is in front of it, with where it sends.
     /// </summary>
-    internal Inventory Inventory(IEnumerable<(Signal Signal, string Name, bool Gated)> built, params object?[] providers)
+    internal Inventory Inventory(IEnumerable<Exporters.Built> built, params object?[] providers)
     {
         var instrumentations = providers.SelectMany(p => p is not null && Exporters.TryMember(p, "Instrumentations", out var i) && i is System.Collections.IEnumerable list
                 ? list.Cast<object?>()
@@ -259,8 +239,7 @@ internal sealed class OpAmpAgent : IDisposable
             .OfType<object>()
             .Select(i => i.GetType().Assembly)
             .Select(a => new Instrumentation { Name = InstrumentationName(a.GetName().Name ?? string.Empty), Version = Inventories.Version(a) });
-        var ungated = this.Ungated();
-        var exporters = built.Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated && this.gateable && !ungated.Contains(e.Signal)));
+        var exporters = built.Distinct().Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated && this.gateable, e.Destination));
         return Inventories.Of(typeof(OpAmpAgent).Assembly, instrumentations, exporters);
     }
 

@@ -95,13 +95,16 @@ public sealed class SdkSettings : IDisposable
     /// <summary>
     /// Export health, from the gates' counts since start: whether to send it now, and the entry for the
     /// agent health's <c>component_health_map["exporters"]</c>. <paramref name="previous"/>: what the
-    /// last call answered (null at the first); <paramref name="settings"/>: those in force.
+    /// last call answered (null at the first); <paramref name="settings"/>: those in force;
+    /// <paramref name="exporters"/>: each as the inventory lists it, reported governed or ungoverned
+    /// under its signal.
     /// </summary>
-    public HealthReport Health(ExportCounts counts, HealthReport? previous, ulong nowUnixMs, Settings? settings = null) =>
-        Do(new Request
-        {
-            Health = new Health { Counts = counts, Previous = previous, NowUnixMs = nowUnixMs, Settings = settings },
-        }).HealthReport;
+    public HealthReport Health(ExportCounts counts, HealthReport? previous, ulong nowUnixMs, Settings? settings = null, IEnumerable<Exporter>? exporters = null)
+    {
+        var health = new Health { Counts = counts, Previous = previous, NowUnixMs = nowUnixMs, Settings = settings };
+        health.Exporters.Add(exporters ?? []);
+        return Do(new Request { Health = health }).HealthReport;
+    }
 
     /// <summary>
     /// The agent description, from the SDK's resource attributes. It also names the policy format the

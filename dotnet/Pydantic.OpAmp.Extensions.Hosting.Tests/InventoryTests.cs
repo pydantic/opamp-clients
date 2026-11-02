@@ -23,6 +23,9 @@ public class InventoryTests
 
     private const string Collector = "http://127.0.0.1:1";
 
+    /// <summary>The collector's host and port, as an exporter's identity carries them.</summary>
+    private const string At = "127.0.0.1:1";
+
     /// <summary>A host with <paramref name="setup"/>'s SDK, started against <paramref name="server"/>: its agent's components.</summary>
     private static async Task<(IHost Host, AvailableComponents Components)> Started(OpAmpServer server, Action<HostApplicationBuilder> setup)
     {
@@ -84,15 +87,15 @@ public class InventoryTests
             Assert.Equal(
                 new Dictionary<string, Dictionary<string, bool>>
                 {
-                    ["traces"] = new() { ["otlp"] = true },
-                    ["metrics"] = new() { ["otlp"] = false, ["Kept"] = false }, // a reader of its own: send_metrics isn't carried out
-                    ["logs"] = new() { ["otlp"] = true },
+                    ["traces"] = new() { [$"otlp@{At}"] = true },
+                    ["metrics"] = new() { [$"otlp@{At}"] = true, ["Kept"] = false }, // a reader of its own: ungoverned
+                    ["logs"] = new() { [$"otlp@{At}"] = true },
                 },
                 Exporters(c));
 
-            // The settings are the ones it carries out, by the host it runs by.
+            // The settings are the ones it carries out, by the host it runs by: every gate's.
             var settings = c.Components["settings"].SubComponentMap;
-            Assert.DoesNotContain("send_metrics", settings.Keys);
+            Assert.Contains("send_metrics", settings.Keys);
             Assert.DoesNotContain("deactivate_instrumentations", settings.Keys); // named in code
             Assert.Contains("send_traces", settings.Keys);
             Assert.Equal(
@@ -127,7 +130,7 @@ public class InventoryTests
             .WithOpAmp());
         using (host)
         {
-            Assert.Equal(new Dictionary<string, Dictionary<string, bool>> { ["traces"] = new() { ["otlp"] = true } }, Exporters(c));
+            Assert.Equal(new Dictionary<string, Dictionary<string, bool>> { ["traces"] = new() { [$"otlp@{At}"] = true } }, Exporters(c));
             var instrumentations = Instrumentations(c);
             Assert.Equal(["aspnetcore", "pydanticopampextensionshostingtests"], instrumentations.Keys.Order(StringComparer.Ordinal));
             Assert.Equal("1.0.0", instrumentations["pydanticopampextensionshostingtests"]);
@@ -150,7 +153,7 @@ public class InventoryTests
             Assert.Equal(
                 new Dictionary<string, Dictionary<string, bool>>
                 {
-                    ["traces"] = new() { ["otlp"] = false, ["Kept"] = false },
+                    ["traces"] = new() { [$"otlp@{At}"] = true, ["Kept"] = false }, // the OTLP one gated beside it
                     ["metrics"] = new() { ["Pulled"] = false },
                 },
                 Exporters(c));
@@ -158,9 +161,10 @@ public class InventoryTests
         }
     }
 
-    // An OTLP exporter the gate can't be in front of (an endpoint with a path of its own) is not gated.
+    // An OTLP exporter the gate can't be in front of (an endpoint with a path of its own) is listed
+    // ungoverned; its signal's settings are declared all the same.
     [Fact]
-    public async Task AnOtlpExporterTheGateIsntInFrontOfIsNotGated()
+    public async Task AnOtlpExporterTheGateIsntInFrontOfIsUngoverned()
     {
         await using var server = new OpAmpServer();
         var (host, c) = await Started(server, b => b.Services.AddOpenTelemetry()
@@ -168,8 +172,8 @@ public class InventoryTests
             .WithOpAmp());
         using (host)
         {
-            Assert.Equal(new Dictionary<string, Dictionary<string, bool>> { ["traces"] = new() { ["otlp"] = false } }, Exporters(c));
-            Assert.DoesNotContain("send_traces", c.Components["settings"].SubComponentMap.Keys);
+            Assert.Equal(new Dictionary<string, Dictionary<string, bool>> { ["traces"] = new() { [$"otlp@{At}"] = false } }, Exporters(c));
+            Assert.Contains("send_traces", c.Components["settings"].SubComponentMap.Keys);
             await host.StopAsync(Cancel);
         }
     }

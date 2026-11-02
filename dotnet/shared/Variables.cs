@@ -12,6 +12,26 @@ namespace Pydantic.OpAmp.Otel;
 internal static partial class Variables
 {
     /// <summary>
+    /// Where the SDK's <paramref name="name"/> exporter of <paramref name="signal"/> sends, as its
+    /// variables say: OTLP's signal endpoint, else the shared one, else the default for its
+    /// protocol (http/protobuf, port 4318, unless gRPC); Zipkin's endpoint. Empty for any other
+    /// (console, Prometheus, which is pulled). The layer keeps only the scheme, host and port.
+    /// </summary>
+    public static string Destination(Func<string, string?> getenv, Signal signal, string name)
+    {
+        string? Set(string key) => getenv(key)?.Trim() is { Length: > 0 } v ? v : null;
+        var upper = signal.ToString().ToUpperInvariant();
+        return name switch
+        {
+            "otlp" => Set($"OTEL_EXPORTER_OTLP_{upper}_ENDPOINT") ?? Set("OTEL_EXPORTER_OTLP_ENDPOINT")
+                ?? ((Set($"OTEL_EXPORTER_OTLP_{upper}_PROTOCOL") ?? Set("OTEL_EXPORTER_OTLP_PROTOCOL")) == "grpc"
+                    ? "http://localhost:4317" : "http://localhost:4318"),
+            "zipkin" => Set("OTEL_EXPORTER_ZIPKIN_ENDPOINT") ?? "http://localhost:9411/api/v2/spans",
+            _ => string.Empty,
+        };
+    }
+
+    /// <summary>
     /// `1500` (milliseconds, as the SDK's variables), or `500ms`, `30s`, `2m`: the hosting package's
     /// <c>OpAmp:HeartbeatInterval</c>. (The variables themselves are the core's Setup call's to read.)
     /// </summary>

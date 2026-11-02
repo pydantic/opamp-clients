@@ -101,53 +101,53 @@ not conflict with the ones automatic instrumentation ships.
 The rules are the SDK settings layer's (`Pydantic.OpAmp.Client.Sdk`), the same in every
 language. The plugin only carries them out on the .NET SDK.
 
-### What it can't carry out, and says so
+### What the policy governs, and what it reports ungoverned
 
-A setting the plugin cannot carry out in this process is not declared to the layer. Thus the
-plugin refuses a policy that overrides its control (`signal_exports.metrics: this SDK cannot
-apply the requested override`), rather than answer APPLIED and not do it
-([the host](sdk-settings.md#the-host)). The description leaves the control out of
-`logfire.opamp.supported_controls`, so a server can tell beforehand.
+The policy governs every exporter the gates are in front of: each OTLP exporter automatic
+instrumentation builds (`otlp` in `OTEL_{TRACES,METRICS,LOGS}_EXPORTER`, beside any other). The
+gate replaces the OTLP exporter's HTTP client. An exporter given a CA or a client certificate
+(`OTEL_EXPORTER_OTLP_CERTIFICATE`, `..._CLIENT_CERTIFICATE`, `..._CLIENT_KEY`, PEM files; the SDK
+reads no per-signal ones) builds them into its own client, so the gate's client carries the same.
 
-- `send_traces`, `send_metrics`, `send_logs` (`signal_exports`), for a signal whose exporter is
-  not OTLP (console, Zipkin, Prometheus), or is OTLP beside another (`otlp,console`). Only the
-  OTLP one could be stopped, and a control carried out by half is not carried out.
-  The gate replaces the OTLP exporter's HTTP client. An exporter given a CA or a client
-  certificate (`OTEL_EXPORTER_OTLP_CERTIFICATE`, `..._CLIENT_CERTIFICATE`, `..._CLIENT_KEY`, PEM
-  files; the SDK reads no per-signal ones) builds them into its own client, so the gate's client
-  carries the same. Files it can't use (missing, unreadable, an encrypted key, a certificate
-  without its key) leave every exporter as it is, and none of the three is carried out.
-  `send_logs_level` (the `log_levels` `level`) is held at the logs gate, so it is carried out
-  exactly where `send_logs` is.
-- A signal some exporter of which another plugin added. A plugin named in
-  `OTEL_DOTNET_AUTO_PLUGINS` beside ours can add a processor or an exporter to the providers
-  automatic instrumentation builds (in `AfterConfigureTracerProvider`, `TracerProviderInitialized`
-  or `ConfigureLogsOptions(OpenTelemetryLoggerOptions)`, say). The plugin reads what each built
-  provider exports through, as `WithOpAmp()` does ([below](#in-code-withopamp)). Any exporter
-  that isn't the gated OTLP one sends past the gate, so the plugin no longer carries out that
-  signal's controls: its `signal_exports`, for logs `log_levels` and `log_rate_limit` too, and
-  `attribute_redaction` and `scrubbing` for traces or logs. A policy offered from then on that overrides one is
-  refused, and in the policy already in force each such override is set aside: reported `local`
-  in the effective config, with the rest of the policy still in force
-  ([the host](sdk-settings.md#the-host)). It reads the tracer and meter providers as it joins the
-  fleet. Automatic instrumentation builds a logger provider for each logger factory the
-  application creates, later. The plugin adds a processor of its own to each, which exports
-  nothing. On the provider's first log record, before any exporter has it, the plugin reads that
-  provider. If an override in force is set aside then, the plugin reports the effective config
-  again. A logger provider the application disposes exports nothing more, and is no reason from
-  then on.
-- `signal_exports.traces`, `signal_exports.metrics`, the sampling controls (`head_sampling`,
-  `sampling_rules`, `trace_rate_limit`, `debug` `sampling_ratio`), `attribute_redaction` and `scrubbing`, when
-  automatic instrumentation leaves the SDK to the application (`OTEL_DOTNET_AUTO_SETUP_SDK=false`).
-  It then builds no tracer or meter provider, and the application's own aren't the plugin's. The
-  logs are still automatic instrumentation's, and their controls are carried out.
-- `sampling_rate` (`head_sampling`), when the application runs with no tracer provider (traces
-  off).
-- With file-based configuration (`OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED=true`), the
-  instrumentation switches and the exporter gates: the file is read before any plugin runs, and
-  its exporters' TLS settings can't be kept. Sampling still works: the plugin reads the sampler the
-  file configures from the SDK's builder (an internal property) and wraps it, or, if that ever
-  cannot be read, does not carry `sampling_rate` out.
+An exporter the gates aren't in front of is reported to the server as ungoverned: listed with
+`gated` false in the [inventory](#inventory), and with the status `ungoverned` (healthy all the
+same) under its signal in [export health](#export-health). It narrows nothing: every gate's
+setting is still declared, a policy that overrides one is APPLIED, and it governs every exporter
+the gates are in front of. These are:
+
+- An exporter that isn't OTLP (console, Zipkin, Prometheus). The gate is an HTTP handler in the
+  OTLP exporter's client: it can't see another exporter's telemetry.
+- Every exporter, when the TLS files can't be used (missing, unreadable, an encrypted key, a
+  certificate without its key): the plugin leaves every exporter as it is.
+- An exporter another plugin added. A plugin named in `OTEL_DOTNET_AUTO_PLUGINS` beside ours can
+  add a processor or an exporter to the providers automatic instrumentation builds (in
+  `AfterConfigureTracerProvider`, `TracerProviderInitialized` or
+  `ConfigureLogsOptions(OpenTelemetryLoggerOptions)`, say). The plugin reads what each built
+  provider exports through, as `WithOpAmp()` does ([below](#in-code-withopamp)), and lists each
+  exporter that isn't the gated OTLP one by its name or type. It reads the tracer and meter
+  providers as it joins the fleet. Automatic instrumentation builds a logger provider for each
+  logger factory the application creates, later. The plugin adds a processor of its own to each,
+  which exports nothing. On the provider's first log record, before any exporter has it, the
+  plugin reads that provider, and reports the inventory and export health again if it lists
+  something new.
+- The application's own tracer and meter providers, when automatic instrumentation leaves the SDK
+  to it (`OTEL_DOTNET_AUTO_SETUP_SDK=false`): one ungoverned `app_provider` each. The logs are
+  still automatic instrumentation's, and governed.
+- The file's exporters, with file-based configuration
+  (`OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED=true`): the file is read before any plugin
+  runs, and its exporters' TLS settings can't be kept, so the plugin gates none of them.
+
+What the plugin can't carry out in this process is not declared to the layer, so it refuses a
+policy that overrides it (`head_sampling: this SDK cannot apply the requested override`) rather
+than answer APPLIED and not do it ([the host](sdk-settings.md#the-host)):
+
+- The sampling controls (`head_sampling`, `sampling_rules`, `trace_rate_limit`, `debug`
+  `sampling_ratio`) when the sampler isn't the plugin's: the application runs with no tracer
+  provider (traces off), or builds its own (`OTEL_DOTNET_AUTO_SETUP_SDK=false`). With file-based
+  configuration, the plugin reads the sampler the file configures from the SDK's builder (an
+  internal property) and wraps it, or, if that ever cannot be read, does not carry
+  `sampling_rate` out.
+- The instrumentation switches, with file-based configuration.
 
 What the plugin can't see: a tracer or meter provider the application builds itself beside
 automatic instrumentation's (`Sdk.CreateTracerProviderBuilder()`). It listens to the same
@@ -240,8 +240,8 @@ Declared wherever the sampler is the plugin's (not where `sampling_rate` is refu
 
 At the OTLP logs exporter's gate, beside the `level`: a record's scope is its `ILogger`
 category, and the entry for exactly that category, else the longest prefix (`name*`) that matches
-it, sets its level (`off`: none). Categories are matched as written, case and all. Declared where
-`send_logs_level` is carried out: every logs exporter is the gated OTLP one.
+it, sets its level (`off`: none). Categories are matched as written, case and all. Declared
+always; a logs exporter the gate isn't in front of is reported ungoverned.
 
 ### `attribute_redaction`
 
@@ -255,8 +255,8 @@ not): a span's attributes, its events' and its links', and a log record's attrib
 key goes; a masked one keeps its key with the value `[REDACTED]`. Another exporter, or a processor,
 sees the telemetry as it was: nothing shared is changed. A log record's body (its message
 template) is left alone. An export the gate cannot read (another encoding) is not sent while the
-control is overridden: what cannot be read cannot be redacted. Declared only where every span and every log
-record exported goes through a gate (traces and logs each gated, or not exported at all).
+control is overridden: what cannot be read cannot be redacted. Declared always; an exporter the
+gates aren't in front of is reported ungoverned.
 
 ### `scrubbing`
 
@@ -277,8 +277,8 @@ in a list, and each member of a map, as an attribute of its own. The Logfire SDK
 At the same gates, in the same OTLP bytes, on what redaction keeps (a masked value is not
 scrubbed): a span's attributes, its events' and its links', a log record's attributes, and a log
 record's body (a string, or the strings in an array or key-value list). A body or value nested
-more than 100 deep can't be scrubbed, so that export is not sent. Declared, and set aside,
-exactly as `attribute_redaction` is.
+more than 100 deep can't be scrubbed, so that export is not sent. Declared exactly as
+`attribute_redaction` is.
 
 ### `trace_rate_limit`, `log_rate_limit`
 
@@ -308,8 +308,7 @@ over; the agent runs one timer (`System.Threading.Timer`) for the end the layer 
 process runs doesn't move it. When it goes off the agent calls `Refresh`, puts the result in
 force and reports the effective config: debug mode ends without the server. A later remote config
 re-arms it (a generation counter makes the old timer's call do nothing). Declared always. A policy
-that overrides the debug `sampling_ratio` or `log_level` is refused where `sampling_rate` or
-`send_logs_level` is not declared.
+that overrides the debug `sampling_ratio` is refused where `sampling_rate` is not declared.
 
 ### Export health
 
@@ -321,7 +320,9 @@ exporter's retry is a new request through it, so a retry that later succeeds bri
 message is the `last_error`). Records the levels and the log cap drop, and traces the trace cap
 refuses, are `items.filtered`; an export redaction can't read, and so doesn't send, is a failed
 one. The agent asks the layer at start (the first report goes with the first message) and every
-30 s on the same timer, and sends when the layer says to.
+30 s on the same timer, and sends when the layer says to. Under each signal, every exporter of the
+[inventory](#inventory) by its identity, `governed` or `ungoverned` (healthy either way); one
+listed since the last report is sent at once.
 
 ### Inventory
 
@@ -342,17 +343,18 @@ and the server is sent their hash, and them in full when it asks. It lists:
 - `exporters`: for each signal, the plugin's from `OTEL_{TRACES,METRICS,LOGS}_EXPORTER` (`otlp`,
   `console`, `zipkin`, `prometheus`; `none`, a signal switched off with
   `OTEL_DOTNET_AUTO_{SIGNAL}_ENABLED=false`, and a name automatic instrumentation doesn't know
-  list none), and `WithOpAmp()`'s read from the built providers, by those names or, for one they
+  list none), then whatever else the built providers export through (another plugin's, the
+  file's), and `WithOpAmp()`'s read from the built providers; by those names or, for one they
   don't name, its type (`InMemoryExporter`, or a reader or processor it can't see into). `gated` is
-  whether the signal's export control is carried out ([above](#what-it-cant-carry-out-and-says-so)):
-  beside an exporter that can't be stopped, the OTLP one is not gated either. With file-based
-  configuration the exporters are the file's, which the plugin can't read, so none is listed.
+  whether a gate is in front of it ([above](#what-the-policy-governs-and-what-it-reports-ungoverned)).
+  An OTLP or Zipkin exporter carries where it sends (read off the exporter, else from
+  `OTEL_EXPORTER_OTLP_{SIGNAL}_ENDPOINT`, `OTEL_EXPORTER_OTLP_ENDPOINT` or the protocol's default,
+  port 4318), so it is listed as `otlp@host:port`.
 - `settings`: the ones it carries out, from the same host it answers by.
 
-It is reported as the agent joins the fleet. It is reported again only if an exporter that isn't
-gated shows up later (another plugin's logger provider, or a processor added to a built provider
-under `WithOpAmp()`): then the signal's exporters are no longer `gated`, and its settings are no
-longer listed.
+It is reported as the agent joins the fleet, and again whenever the providers export through an
+exporter not listed before (another plugin's logger provider, or a processor added to a built
+provider under `WithOpAmp()`), with export health.
 
 ## In code: `WithOpAmp()`
 
@@ -387,22 +389,17 @@ A hosted service starts the client once the SDK is built and says goodbye as the
 application's health checks, if it has any, are the agent's health, reported when they change.
 
 What it cannot carry out, and so refuses: the `instrumentations` control (the application names
-its instrumentations in code); `send_traces`, `send_metrics`, `send_logs` and `send_logs_level` when the OTLP CA or
-client certificate files (`OTEL_EXPORTER_OTLP_CERTIFICATE` and the rest) can't be used, as for the
-plugin (a gate carries the TLS they set up); `sampling_rate`
-with no tracer provider, or when a sampler is set after `WithOpAmp()` (it says so: call it last).
-A signal's export control (for logs, the `log_levels` `level` with it) is refused too when any of
-the signal's exporters can't be stopped: one that isn't OTLP (console, in-memory, Prometheus), an
-OTLP exporter given an endpoint with a path of its own, and one given an `HttpClientFactory` of
-its own. Which these are is read from the providers once they are built (from the SDK's internals,
-as the sampler is); a processor or reader it can't see into counts as one that can't be stopped.
-It doesn't matter where in the builder the exporter is added, before `WithOpAmp()` or after.
-The providers are read again before each remote config is decided, and every 30 s on the health
-timer. So a processor the application adds to a built provider (`tracerProvider.AddProcessor`,
-`loggerProvider.AddProcessor`) takes its signal's controls out of `WithOpAmp()`'s hands from the
-next decision on: a policy offered from then on that overrides one is refused. In a policy
-already in force, those overrides are set aside within 30 s (reported `local`, the rest of the
-policy still in force), and the effective config is reported again.
+its instrumentations in code); `sampling_rate` with no tracer provider, or when a sampler is set
+after `WithOpAmp()` (it says so: call it last). An exporter the gates aren't in front of is
+reported ungoverned, as for the plugin: one that isn't OTLP (console, in-memory, Prometheus), an
+OTLP exporter given an endpoint with a path of its own, one given an `HttpClientFactory` of its
+own, and every exporter when the OTLP CA or client certificate files can't be used. Which these
+are is read from the providers once they are built (from the SDK's internals, as the sampler is);
+a processor or reader it can't see into counts as one. It doesn't matter where in the builder
+the exporter is added, before `WithOpAmp()` or after. The providers are read again before each
+remote config is decided, and every 30 s on the health timer, so a processor the application
+adds to a built provider (`tracerProvider.AddProcessor`, `loggerProvider.AddProcessor`) is
+reported at the next of those; the policy in force stays.
 A tracer or meter provider the application builds on its own (`Sdk.CreateTracerProviderBuilder()`)
 isn't under `WithOpAmp()`, and isn't seen.
 Tests: `dotnet/Pydantic.OpAmp.Extensions.Hosting.Tests`, a host against an OpAMP server and a
@@ -467,7 +464,8 @@ told of.
   - the sampler and the gate, on the real SDK types;
   - the next-start settings become the instrumentation variables;
   - the answers, saving and reporting follow the layer;
-  - a policy that overrides what the plugin cannot carry out is refused, with the exact reason;
+  - a policy that overrides what the plugin cannot carry out is refused, with the exact reason, and
+    an exporter no gate is in front of is reported ungoverned with every setting still applied;
   - the UID is kept across starts, and a UID the server assigns is the next start's;
   - a second process on the same state directory runs unmanaged;
   - by default (no state directory named) the UID is kept across restarts, a second process at
@@ -486,19 +484,19 @@ told of.
     whole trace, a remote parent decides, the application's `Filter` runs first, the cap counts;
   - the shared vectors `components.json` through the client's `SdkSettings.Components`, and the
     inventory each integration builds: names that the `instrumentations` control takes, versions,
-    each exporter's name and `gated` agreeing with the signal export it carries out (none, duplicates, one it
-    doesn't know, file-based configuration), sent by the client to a server that asks for it in
-    full;
+    each exporter's name, where it sends, and `gated` true for the gated OTLP one alone (none,
+    duplicates, one it doesn't know, file-based configuration), sent by the client to a server
+    that asks for it in full;
   - live changes and reverting: rules, levels, caps and redaction come and go, a stale debug timer
     does nothing, the gate counts each attempt by its status;
-  - telemetry past the gates (`OwnExportersTests`): another plugin's span exporter sets the traces
-    controls aside, and the plugin's own gated exporter alone sets nothing aside; another plugin's
-    log processor sets the logs controls aside once its provider handles a record, with a policy
-    already in force (those overrides reported `local`), and its provider disposed is no reason
-    any more; `OTEL_DOTNET_AUTO_SETUP_SDK=false` sets traces and metrics aside but not logs. Under
-    `WithOpAmp()` (the hosting tests), a processor added to a built tracer provider sets traces
-    aside at the next decision, and one added to the logger provider sets logs aside at the next
-    check, reported to the server;
+  - telemetry past the gates (`OwnExportersTests`): another plugin's span exporter is reported
+    ungoverned in the inventory and export health, and the policy is applied; the plugin's own
+    gated exporter alone is governed; another plugin's log exporter is reported once its provider
+    handles a record, with a policy already in force that stays; `OTEL_DOTNET_AUTO_SETUP_SDK=false`
+    reports traces and metrics as ungoverned `app_provider`s and leaves the sampler's settings
+    undeclared. Under `WithOpAmp()` (the hosting tests), a processor added to a built tracer
+    provider is reported at the next decision, and one added to the logger provider at the next
+    check, with export health sent at once;
   - the application's own settings (`AppSettingsTests`): reads before any policy and once
     `app_settings` is local; the typed reads against `custom.json`'s `typed` vectors and their edges; every
     `custom.json` case through the .NET wrapper's `Decide` and `Controls`, and through the plugin's
@@ -525,6 +523,8 @@ told of.
   override the plugin can't carry out, or APPLIED with that override reported `local` in the
   effective config. Every other override must show in the telemetry, and the controls set aside
   must be exactly those the setup takes from the plugin. `truth-plugin-exporters`: a plugin of the
-  application's own adds a span exporter and a log processor over OTLP. `truth-own-sdk`: with
-  `OTEL_DOTNET_AUTO_SETUP_SDK=false`, the application builds its own tracer and meter providers.
+  application's own adds a span exporter and a log processor over OTLP to a second sink, reported
+  ungoverned, with every control carried out on what reaches the first. `truth-own-sdk`: with
+  `OTEL_DOTNET_AUTO_SETUP_SDK=false`, the application builds its own tracer and meter providers:
+  the sampler's controls are set aside, and its providers reported as ungoverned `app_provider`s.
   `--local` runs it with this host's .NET SDK and native core instead of Docker.

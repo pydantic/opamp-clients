@@ -187,8 +187,11 @@ internal sealed class Agent
         options.AddProcessor(watch);
     }
 
-    /// <summary>The signals some exporter of which the built providers send through past the gates.</summary>
-    internal HashSet<Signal> Ungated()
+    /// <summary>The name a provider of the application's own, which the plugin can't see into, is listed under.</summary>
+    internal const string AppProvider = "app_provider";
+
+    /// <summary>What the built providers export through, each provider apart (several logger providers, say).</summary>
+    private List<List<Exporters.Built>> BuiltExporters()
     {
         List<(Signal, object?)> providers;
         lock (this.logs)
@@ -203,7 +206,7 @@ internal sealed class Agent
             }
         }
 
-        return Exporters.Read(providers).Ungated;
+        return providers.Select(p => Exporters.Read([p])).ToList();
     }
 
     /// <summary>ASP.NET Core's instrumentation options: the sampler's Filter, chained after any the configuration set.</summary>
@@ -218,10 +221,10 @@ internal sealed class Agent
     /// <summary>Once the SDK is built: join the fleet, reporting what it runs.</summary>
     public void Start(IEnumerable<KeyValuePair<string, object>> resource)
     {
-        foreach (var signal in this.Ungated().Where(this.gated.Contains))
+        var ungoverned = this.Inventory().Exporters.Where(e => !e.Gated).Select(e => $"{e.Signal} {e.Name}").ToList();
+        if (ungoverned.Count > 0)
         {
-            var name = signal.ToString().ToLowerInvariant();
-            Log.Info($"{name} also go to an exporter another plugin added, which can't be stopped: send_{name} is not carried out");
+            Log.Info($"exporters the gates aren't in front of: {string.Join(", ", ungoverned)}; reported to the server as ungoverned, and every setting governs the rest");
         }
 
         this.agent.Start(resource, () => this.Inventory());
@@ -231,17 +234,17 @@ internal sealed class Agent
     /// What it runs (docs/available-components.md): every instrumentation automatic instrumentation
     /// has on .NET, switched off or not, under the name <c>deactivate_instrumentations</c> takes,
     /// at automatic instrumentation's version (they ship together; none when it isn't loaded); and
-    /// each signal's exporters as <c>OTEL_*_EXPORTER</c> names them, gated where the signal's
-    /// <c>send_*</c> is carried out. With file-based configuration the exporters are the file's,
-    /// which the plugin can't read: none is listed.
+    /// each signal's exporters as <c>OTEL_*_EXPORTER</c> names them, the OTLP one gated where the
+    /// plugin gates it, each with where it sends. Then what the built providers export through
+    /// beside those (another plugin's processor, or the file's exporters under file-based
+    /// configuration, whose variables the SDK doesn't read), as the providers say.
     /// <paramref name="autoVersion"/>: automatic instrumentation's version, but in tests.
     /// </summary>
     internal Inventory Inventory(string? autoVersion = null)
     {
         autoVersion ??= AutoInstrumentationVersion();
         var instrumentations = Env.Runnable.Select(name => new Instrumentation { Name = name, Version = autoVersion });
-        var exporters = new List<Exporter>();
-        var ungated = this.Ungated();
+        var configured = new List<Exporters.Built>();
         foreach (var signal in Enum.GetValues<Signal>())
         {
             if (this.fileConfig || !Env.SetsUp(this.getenv, signal))
@@ -251,10 +254,43 @@ internal sealed class Agent
 
             foreach (var name in Env.Exporters(this.getenv, signal))
             {
-                exporters.Add(Inventories.Exporter(signal, name, this.gated.Contains(signal) && !ungated.Contains(signal)));
+                configured.Add(new(signal, name, name == "otlp" && this.gated.Contains(signal), Variables.Destination(this.getenv, signal, name)));
             }
         }
 
+        // Of each provider, what isn't one of those: each configured exporter accounts for one built
+        // of its name, which says where it sends.
+        var beside = new List<Exporters.Built>();
+        foreach (var provider in this.BuiltExporters())
+        {
+            var left = Enumerable.Range(0, configured.Count).ToList();
+            foreach (var e in provider)
+            {
+                var i = left.FindIndex(k => configured[k].Signal == e.Signal && configured[k].Name == e.Name);
+                if (i < 0)
+                {
+                    beside.Add(e);
+                    continue;
+                }
+
+                var at = left[i];
+                left.RemoveAt(i);
+                if (e.Destination.Length > 0)
+                {
+                    configured[at] = configured[at] with { Destination = e.Destination };
+                }
+            }
+        }
+
+        // The application's own tracer and meter providers (OTEL_DOTNET_AUTO_SETUP_SDK=false), which
+        // the plugin never sees: one ungoverned exporter each, as every SDK reports such a provider.
+        foreach (var signal in new[] { Signal.Traces, Signal.Metrics }.Where(s => !this.fileConfig && !Env.SetsUpSdk(this.getenv, s)))
+        {
+            beside.Add(new(signal, AppProvider, false));
+        }
+
+        var exporters = configured.Distinct().Concat(beside.Distinct())
+            .Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated, e.Destination));
         return Inventories.Of(typeof(Agent).Assembly, instrumentations, exporters);
     }
 
@@ -284,15 +320,13 @@ internal sealed class Agent
 
     /// <summary>
     /// What this SDK carries out, declared to the layer, which sets aside any setting not named
-    /// (docs/sdk-settings.md, "The host"). Once the providers are built, whether the sampler could
-    /// be wrapped is known too (no tracer provider: it wasn't), and what they export through: a
-    /// signal some exporter of which another plugin added past the gate is gated no more.
+    /// (docs/sdk-settings.md, "The host"). Every gate's setting: it governs each exporter the gates
+    /// are in front of, and one they aren't (not OTLP, another plugin's) is reported ungoverned in
+    /// the inventory and export health, narrowing nothing. Once the providers are built, whether
+    /// the sampler could be wrapped is known (no tracer provider: it wasn't).
     /// </summary>
     internal Host HostNow(bool providersBuilt)
     {
-        var ungated = providersBuilt ? this.Ungated() : [];
-        bool Gated(Signal s) => this.gated.Contains(s) && !ungated.Contains(s);
-        bool Covered(Signal s) => Gated(s) || (!ungated.Contains(s) && this.ExportsNothing(s));
         var h = new Host();
         if (!this.fileConfig)
         {
@@ -301,28 +335,18 @@ internal sealed class Agent
             h.NextStart.Add("deactivate_all_instrumentations");
         }
 
-        foreach (var signal in Enum.GetValues<Signal>().Where(Gated))
-        {
-            h.Live.Add($"send_{signal.ToString().ToLowerInvariant()}");
-        }
-
-        if (Gated(Signal.Logs))
-        {
-            // The levels and the cap are held at the logs exporter's gate.
-            h.Live.Add("send_logs_level");
-            h.Live.Add("send_logs_level_by_scope");
-            h.Live.Add("send_logs_per_second");
-        }
-
-        // Redaction is at the traces and logs gates: every span and log record exported has to go
-        // through one, or nothing is exported at all.
-        if (Covered(Signal.Traces) && Covered(Signal.Logs))
-        {
-            h.Live.Add("drop_attributes");
-            h.Live.Add("mask_attributes");
-            h.Live.Add("scrub_defaults");
-            h.Live.Add("scrub_patterns");
-        }
+        h.Live.Add("send_traces");
+        h.Live.Add("send_metrics");
+        h.Live.Add("send_logs");
+        // At the logs exporter's gate.
+        h.Live.Add("send_logs_level");
+        h.Live.Add("send_logs_level_by_scope");
+        h.Live.Add("send_logs_per_second");
+        // At the traces and logs gates.
+        h.Live.Add("drop_attributes");
+        h.Live.Add("mask_attributes");
+        h.Live.Add("scrub_defaults");
+        h.Live.Add("scrub_patterns");
 
         if (!providersBuilt || this.samplerWrapped)
         {
@@ -348,18 +372,10 @@ internal sealed class Agent
     /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
     internal void Notified(OpAmpClient client, OpAmpNotification n) => this.agent.Notified(client, n);
 
-    /// <summary>
-    /// Whether automatic instrumentation exports the signal nowhere (<c>none</c>) and nothing else
-    /// sets it up: not the application, in place of automatic instrumentation.
-    /// </summary>
-    private bool ExportsNothing(Signal signal) =>
-        !this.fileConfig && Env.SetsUpSdk(this.getenv, signal) &&
-        (this.getenv($"OTEL_{signal.ToString().ToUpperInvariant()}_EXPORTER") ?? "otlp")
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).All(e => e == "none");
 
     /// <summary>
-    /// Whether a signal's exports can be stopped: its every exporter is OTLP (the gate is on the
-    /// OTLP client; beside another, only half the setting would be carried out). With file-based
+    /// Whether a signal's OTLP exporter can be gated: it has one (the gate is on the OTLP client;
+    /// another beside it is reported ungoverned). With file-based
     /// configuration, never; nor for traces and metrics when automatic instrumentation leaves the
     /// SDK to the application (<c>OTEL_DOTNET_AUTO_SETUP_SDK=false</c>): its exporters aren't the
     /// plugin's to gate.
@@ -373,7 +389,7 @@ internal sealed class Agent
 
         var name = signal.ToString().ToUpperInvariant();
         var exporters = (this.getenv($"OTEL_{name}_EXPORTER") ?? "otlp").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        return exporters.All(e => e == "otlp");
+        return exporters.Contains("otlp");
     }
 }
 

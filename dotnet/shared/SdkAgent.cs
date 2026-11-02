@@ -265,9 +265,12 @@ internal sealed class SdkAgent
     private AvailableComponents? components;
 
     // Once started: what the SDK runs, as the caller reads it now, for the available components.
-    // A host that narrows (Recheck) lists them again.
+    // Read again by Recheck: an exporter added since is listed, and reported in export health.
     private Func<Inventory>? inventory;
     private AvailableComponents? unsent;
+
+    // The exporters last listed, governed or not: one child each in export health.
+    private List<Exporter> exporters = [];
 
     /// <summary>
     /// Load the saved settings and put them in force on <paramref name="controls"/>; name the instance.
@@ -399,7 +402,7 @@ internal sealed class SdkAgent
     /// <summary>
     /// Once the SDK is built: join the fleet, described by the SDK's resource, with
     /// <paramref name="health"/> (null: healthy) and the <paramref name="inventory"/> of what it
-    /// built, reported as its available components (read again if the host narrows). The client
+    /// built, reported as its available components (read again by <see cref="Recheck"/>). The client
     /// runs with instrumentation suppressed, so its requests are never the application's spans.
     /// </summary>
     public void Start(IEnumerable<KeyValuePair<string, object>> attributes, Func<Inventory> inventory, ComponentHealth? health = null)
@@ -419,10 +422,11 @@ internal sealed class SdkAgent
             // A setting it turned out not to carry out is the SDK's own again.
             this.Put(loaded.Settings);
             this.Arm(loaded.RefreshAtUnixMs, now);
-            // By the same host and clock: what it lists of the settings is what it carries out. It
-            // changes only if the host narrows (Recheck).
+            // By the same host and clock: what it lists of the settings is what it carries out.
             this.inventory = inventory;
-            this.components = this.layer.Components(inventory(), this.host, now);
+            var listed = inventory();
+            this.exporters = [.. listed.Exporters];
+            this.components = this.layer.Components(listed, this.host, now);
             described = this.host;
             describedAt = now;
         }
@@ -513,67 +517,96 @@ internal sealed class SdkAgent
     }
 
     /// <summary>
-    /// Ask the caller again what the SDK carries out, once started: a processor or reader the
-    /// application added to a built provider exports past the gates, and the settings it takes
-    /// from them are set aside from then on. When the host narrows, what is in force is decided
-    /// again (the layer's refresh), and the effective config and the available components are
-    /// reported. Also asked before each remote config is decided, and on the health timer.
+    /// Ask the caller again what the SDK runs, once started: a processor or reader the application
+    /// added to a built provider (or a logger provider built since) exports through exporters not
+    /// listed before. They are listed, the governed with the gates in front and the rest
+    /// ungoverned, and the available components and export health are reported at once; the policy
+    /// in force stays as it is. Also asked before each remote config is decided, and on the health timer.
     /// </summary>
     public void Recheck()
     {
         EffectiveConfig? report = null;
         AvailableComponents? listed = null;
+        ComponentHealth? health = null;
         OpAmpClient? c;
         lock (this.gate)
         {
-            if (this.RehostLocked(this.clock.WallMs()))
+            if (this.RelistLocked(this.clock.WallMs(), out var rehosted))
             {
-                report = this.effective;
+                report = rehosted ? this.effective : null;
                 listed = this.unsent;
                 this.unsent = null;
+                health = this.HealthLocked();
             }
 
             c = this.client;
         }
 
-        if (c is not null && report is not null)
+        if (c is null)
+        {
+            return;
+        }
+
+        if (report is not null)
         {
             c.SetEffectiveConfig(report);
-            if (listed is not null)
-            {
-                c.SetAvailableComponents(listed);
-            }
+        }
+
+        if (listed is not null)
+        {
+            c.SetAvailableComponents(listed);
+        }
+
+        if (health is not null)
+        {
+            this.HealthSent = health;
+            c.SetHealth(health);
         }
     }
 
     /// <summary>
-    /// The host now, if started (before, the host is the one to start with): when it differs, the
-    /// settings in force are what the layer decides under it, and the components are listed
-    /// again. Whether it changed.
+    /// The host and the exporters now, if started: when the exporters differ they are listed
+    /// again; when the host differs (it can only lose the sampler's settings), the settings in
+    /// force are what the layer decides under it (<paramref name="rehosted"/>). Whether either changed.
     /// </summary>
-    private bool RehostLocked(ulong nowUnixMs)
+    private bool RelistLocked(ulong nowUnixMs, out bool rehosted)
     {
+        rehosted = false;
         if (this.inventory is not { } listing || this.stopped)
         {
             return false;
         }
 
         var now = this.hostNow(true);
-        if (now.Equals(this.host))
+        var listed = listing();
+        var relisted = !listed.Exporters.SequenceEqual(this.exporters);
+        if (now.Equals(this.host) && !relisted)
         {
             return false;
         }
 
-        var lost = this.host.Live.Concat(this.host.NextStart).Except(now.Live.Concat(now.NextStart)).Order(StringComparer.Ordinal).ToList();
-        this.host = now;
-        if (lost.Count > 0)
+        if (!now.Equals(this.host))
         {
-            this.log.Warn($"the SDK now exports past the gates (an exporter, processor or reader that isn't the gated OTLP one): {string.Join(", ", lost)} can't be carried out and are set aside");
+            var lost = this.host.Live.Concat(this.host.NextStart).Except(now.Live.Concat(now.NextStart)).Order(StringComparer.Ordinal).ToList();
+            this.host = now;
+            if (lost.Count > 0)
+            {
+                this.log.Warn($"the SDK no longer carries out {string.Join(", ", lost)}: they are set aside");
+            }
+
+            this.RefreshLocked(nowUnixMs);
+            this.Rearm();
+            rehosted = true;
         }
 
-        this.RefreshLocked(nowUnixMs);
-        this.Rearm();
-        this.unsent = this.components = this.layer.Components(listing(), now, nowUnixMs);
+        var added = listed.Exporters.Where(e => !e.Gated).Except(this.exporters).Select(e => $"{e.Signal} {e.Name}").ToList();
+        if (added.Count > 0)
+        {
+            this.log.Warn($"the SDK now exports past the gates through {string.Join(", ", added)}: the server's settings govern every other exporter, and these are reported to it as ungoverned");
+        }
+
+        this.exporters = [.. listed.Exporters];
+        this.unsent = this.components = this.layer.Components(listed, now, nowUnixMs);
         return true;
     }
 
@@ -648,8 +681,8 @@ internal sealed class SdkAgent
             // tells the server APPLIED once that is saved: nothing for the agent to save. Without one,
             // nothing is kept, and a next-start change is refused.
             var now = this.clock.WallMs();
-            // Decided under the host as it is now: a processor added since may have narrowed it.
-            this.RehostLocked(now);
+            // Listed as it is now: a processor added since is reported with the answer.
+            this.RelistLocked(now, out _);
             Action<byte[]>? save = this.server.StateDir == null ? null : _ => { };
             var d = this.layer.Decide(config, this.current, this.atStart.Current, this.host, now, save);
             if (d.Apply is { } apply)
@@ -721,7 +754,7 @@ internal sealed class SdkAgent
     /// </summary>
     private ComponentHealth? HealthLocked()
     {
-        var report = this.layer.Health(this.Controls.Tally.Counts(), this.lastHealth, this.clock.WallMs(), this.inForce);
+        var report = this.layer.Health(this.Controls.Tally.Counts(), this.lastHealth, this.clock.WallMs(), this.inForce, this.exporters);
         // Passed back next time, sent or not: when not, its entry is the one last sent.
         this.lastHealth = report;
         return report.Send ? this.Merged() : null;
@@ -792,10 +825,10 @@ internal sealed class SdkAgent
                 }
 
                 var now = this.clock.Nanos();
-                if (this.nextHealth is { } due && now >= due && this.RehostLocked(this.clock.WallMs()))
+                if (this.nextHealth is { } due && now >= due && this.RelistLocked(this.clock.WallMs(), out var rehosted))
                 {
-                    // With the health report: the host narrowed since the last decision.
-                    report = this.effective;
+                    // With the health report: what the SDK runs changed since the last look.
+                    report = rehosted ? this.effective : null;
                     listed = this.unsent;
                     this.unsent = null;
                 }

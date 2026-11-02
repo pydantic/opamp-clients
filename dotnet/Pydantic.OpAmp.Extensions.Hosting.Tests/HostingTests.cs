@@ -464,8 +464,9 @@ public class HostingTests
         await host.StopAsync(Cancel);
     }
 
+    // A span exporter the gate isn't in front of is reported ungoverned; redaction governs the rest.
     [Fact]
-    public async Task WithASpanExporterTheGateIsntInFrontOfRedactionIsRefused()
+    public async Task WithASpanExporterTheGateIsntInFrontOfRedactionIsStillApplied()
     {
         await using var server = new OpAmpServer();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint });
@@ -473,11 +474,9 @@ public class HostingTests
         using var host = b.Build();
         await host.StartAsync(Cancel);
         var agent = host.Services.GetRequiredService<OpAmpAgent>();
-        Assert.DoesNotContain("drop_attributes", agent.HostNow(providersBuilt: true).Live);
-        var refused = agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}"""))));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("attribute_redaction: drop: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Null(agent.Controls.Policy(Signal.Traces).Redact);
+        Assert.Contains("drop_attributes", agent.HostNow(providersBuilt: true).Live);
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("attribute_redaction", """{"drop":["token"]}""")))).Status);
+        Assert.NotNull(agent.Controls.Policy(Signal.Traces).Redact);
         await host.StopAsync(Cancel);
     }
 
@@ -497,9 +496,9 @@ public class HostingTests
         await host.StopAsync(Cancel);
     }
 
-    // A logs exporter the gate isn't in front of: the levels, global or per scope, can't be held.
+    // A logs exporter the gate isn't in front of is reported ungoverned; the levels govern the rest.
     [Fact]
-    public async Task WithALogsExporterTheGateIsntInFrontOfTheLevelsAreRefused()
+    public async Task WithALogsExporterTheGateIsntInFrontOfTheLevelsAreStillApplied()
     {
         await using var server = new OpAmpServer();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint });
@@ -508,13 +507,9 @@ public class HostingTests
         using var host = b.Build();
         await host.StartAsync(Cancel);
         var agent = host.Services.GetRequiredService<OpAmpAgent>();
-        var h = agent.HostNow(providersBuilt: true);
-        Assert.Contains("send_logs_level", h.Undeclared());
-        Assert.DoesNotContain("send_logs_level_by_scope", h.Live);
-        var refused = agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("log_levels", """{"level":"error","scopes":{"x":"off"}}"""))));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("log_levels: level: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.False(agent.Controls.LogLevels.Active);
+        Assert.DoesNotContain(agent.HostNow(providersBuilt: true).Undeclared(), u => u.StartsWith("send_logs", StringComparison.Ordinal));
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent!.RemoteConfig(Kit.Config(Policy.Of(("log_levels", """{"level":"error","scopes":{"x":"off"}}""")))).Status);
+        Assert.True(agent.Controls.LogLevels.Active);
         await host.StopAsync(Cancel);
     }
 
@@ -577,11 +572,11 @@ public class HostingTests
 
     /// <summary>
     /// Every signal turned off by the server, with the SDK <paramref name="setup"/> sets up. The
-    /// signals in <paramref name="ungated"/> go to an exporter the gate is not in front of. Their
-    /// send_* is not carried out, so the policy is refused and every signal goes on sending. With
-    /// none, the policy is applied and every signal is off.
+    /// exporters in <paramref name="ungoverned"/> (signal/name) are ones the gate is not in front
+    /// of: each is reported ungoverned, in the inventory, export health and the log, and the policy
+    /// is applied all the same, every gate off.
     /// </summary>
-    private static async Task SendingIsRefusedFor(string[] ungated, Action<HostApplicationBuilder, string> setup)
+    private static async Task UngovernedAre(string[] ungoverned, Action<HostApplicationBuilder, string> setup)
     {
         var body = Policy.Stop("traces", "metrics", "logs");
         await using var server = new OpAmpServer(Kit.Config(body));
@@ -593,47 +588,33 @@ public class HostingTests
         using var host = b.Build();
         await host.StartAsync(Cancel);
         var agent = host.Services.GetRequiredService<OpAmpAgent>();
-        var signals = Enum.GetValues<Signal>().Select(s => s.ToString().ToLowerInvariant()).ToArray();
-        var refusedFor = signals.FirstOrDefault(name => ungated.Contains($"send_{name}"));
-        var answered = refusedFor is null ? RemoteConfigStatuses.Applied : RemoteConfigStatuses.Failed;
-        await Kit.Until(() => server.Messages.Any(m => m.RemoteConfigStatus is { } s && s.Status == answered &&
-                                                       s.LastRemoteConfigHash.ToStringUtf8() == body), $"the remote config answered {answered}");
-        var status = server.Messages.Select(m => m.RemoteConfigStatus).Last(s => s is not null && s.LastRemoteConfigHash.ToStringUtf8() == body);
-        Assert.Equal(refusedFor is null ? string.Empty : $"signal_exports.{refusedFor}: this SDK cannot apply the requested override", status.ErrorMessage);
+        await Kit.Until(() => Applied(server, body), "the remote config answered APPLIED");
         await Kit.Until(() => server.Messages.Any(m => Effective(m).Length > 0), "the effective config reported");
-        var effective = server.Messages.Select(Effective).Last(e => e.Length > 0);
         Assert.Equal(
-            refusedFor is null ? """{"signal_exports.logs":{"enabled":false},"signal_exports.metrics":{"enabled":false},"signal_exports.traces":{"enabled":false}}""" : "{}",
-            effective);
+            """{"signal_exports.logs":{"enabled":false},"signal_exports.metrics":{"enabled":false},"signal_exports.traces":{"enabled":false}}""",
+            server.Messages.Select(Effective).Last(e => e.Length > 0));
         foreach (var signal in Enum.GetValues<Signal>())
         {
-            Assert.Equal(refusedFor is not null, agent.Controls.Sends(signal));
+            Assert.False(agent.Controls.Sends(signal));
         }
 
-        // send_logs_level is held at the logs gate: it is carried out exactly where send_logs is.
-        Assert.Equal(ungated.Contains("send_logs"), agent.HostNow(providersBuilt: true).Undeclared().Contains("send_logs_level"));
-
-        // The description lists only the signals whose export the SDK can stop.
+        // The description lists every signal's export.
         var description = server.Messages.Select(m => m.AgentDescription).First(d => d is not null);
         var controls = description.NonIdentifyingAttributes.Single(a => a.Key == "logfire.opamp.supported_controls").Value.ArrayValue.Values.Select(v => v.StringValue);
-        foreach (var name in signals)
-        {
-            Assert.Equal(!ungated.Contains($"send_{name}"), controls.Contains($"signal_exports.{name}"));
-        }
+        Assert.All(new[] { "traces", "metrics", "logs" }, name => Assert.Contains($"signal_exports.{name}", controls));
 
-        // The inventory says the same: an exporter of a signal whose sending is not carried out is
-        // not gated, and every other one is.
-        var exporters = agent.Agent!.Components!.Components["exporters"].SubComponentMap;
-        foreach (var (signal, named) in exporters)
-        {
-            Assert.All(named.SubComponentMap.Values, e => Assert.Equal(!ungated.Contains($"send_{signal}"), e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
-        }
+        // The inventory lists the ungoverned ones with gated false, every other gated; export health
+        // gives each its child, ungoverned and healthy.
+        var listed = agent.Agent!.Components!.Components["exporters"].SubComponentMap.SelectMany(s => s.Value.SubComponentMap.Select(e =>
+            (Key: $"{s.Key}/{e.Key.Split('@')[0]}", Gated: e.Value.Metadata.Single(m => m.Key == "gated").Value.BoolValue))).ToList();
+        Assert.Equal(ungoverned.Order(), listed.Where(e => !e.Gated).Select(e => e.Key).Distinct().Order());
+        var health = agent.Agent.LastHealth!.Exporters.ComponentHealthMap;
+        Assert.All(ungoverned, u => Assert.Contains(health[u.Split('/')[0]].ComponentHealthMap,
+            c => c.Key.Split('@')[0] == u.Split('/')[1] && c.Value.Status == "ungoverned" && c.Value.Healthy));
 
-        Assert.All(ungated, name => Assert.Contains(name["send_".Length..], exporters.Keys));
-
-        var notCarriedOut = said.Lines.Where(l => l.EndsWith(" is not carried out", StringComparison.Ordinal) && l.Contains("exporter that can't be stopped", StringComparison.Ordinal))
-            .Select(l => l.Split(' ')[^5]).ToArray();
-        Assert.Equal(ungated.Order(), notCarriedOut.Order());
+        var reported = said.Lines.Where(l => l.Contains("reported to the server as ungoverned", StringComparison.Ordinal)).ToList();
+        Assert.Equal(ungoverned.Length > 0 ? 1 : 0, reported.Count);
+        Assert.All(ungoverned, u => Assert.Contains(u.Replace('/', ' '), reported.Single()));
         await host.StopAsync(Cancel);
     }
 
@@ -644,9 +625,9 @@ public class HostingTests
     }
 
     [Fact]
-    public async Task AnOverrideOfASignalWithAnExporterThatIsntOtlpIsRefused()
+    public async Task AnExporterThatIsntOtlpIsReportedUngoverned()
     {
-        await SendingIsRefusedFor(["send_logs", "send_traces"], (b, collector) =>
+        await UngovernedAre(["logs/Kept", "traces/Kept"], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddProcessor(new SimpleLogRecordExportProcessor(new Kept<LogRecord>())));
             b.Services.AddOpenTelemetry()
@@ -656,7 +637,7 @@ public class HostingTests
         });
 
         // A metric reader of its own, likewise.
-        await SendingIsRefusedFor(["send_metrics"], (b, collector) =>
+        await UngovernedAre(["metrics/Kept"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithMetrics(m => m.AddMeter("kept").AddOtlpExporter(e => Otlp(e, collector + "/v1/metrics")).AddReader(new PeriodicExportingMetricReader(new Kept<Metric>())))
                 .WithOpAmp());
@@ -679,15 +660,15 @@ public class HostingTests
     // An exporter held in a processor's collection is found too.
     [Fact]
     public async Task AnExporterInAProcessorsListIsFound() =>
-        await SendingIsRefusedFor(["send_traces"], (b, collector) =>
+        await UngovernedAre(["traces/Kept"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")).AddProcessor(new FanOut(new Kept<Activity>())))
                 .WithOpAmp());
 
     // The gate tells signals by path: an endpoint with a path of its own isn't gated.
     [Fact]
-    public async Task AnOtlpEndpointWithAPathOfItsOwnIsNotGated() =>
-        await SendingIsRefusedFor(["send_traces"], (b, collector) =>
+    public async Task AnOtlpEndpointWithAPathOfItsOwnIsUngoverned() =>
+        await UngovernedAre(["traces/otlp"], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector + "/v1/logs")));
             b.Services.AddOpenTelemetry()
@@ -697,8 +678,8 @@ public class HostingTests
         });
 
     [Fact]
-    public async Task AnOtlpExporterWithAnHttpClientFactoryOfItsOwnIsNotGated() =>
-        await SendingIsRefusedFor(["send_metrics"], (b, collector) =>
+    public async Task AnOtlpExporterWithAnHttpClientFactoryOfItsOwnIsUngoverned() =>
+        await UngovernedAre(["metrics/otlp"], (b, collector) =>
             b.Services.AddOpenTelemetry()
                 .WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector + "/v1/traces")))
                 .WithMetrics(m => m.AddMeter("m").AddOtlpExporter(e =>
@@ -708,10 +689,10 @@ public class HostingTests
                 }))
                 .WithOpAmp());
 
-    // Every exporter OTLP and gated, or none at all: every signal can be stopped.
+    // Every exporter OTLP and gated, or none at all: nothing ungoverned.
     [Fact]
-    public async Task GatedOrNoExportersAreCarriedOut() =>
-        await SendingIsRefusedFor([], (b, collector) =>
+    public async Task GatedOrNoExportersAreAllGoverned() =>
+        await UngovernedAre([], (b, collector) =>
         {
             b.Logging.AddOpenTelemetry(o => o.AddOtlpExporter(e => Otlp(e, collector + "/v1/logs")));
             b.Services.AddOpenTelemetry()
@@ -719,13 +700,11 @@ public class HostingTests
                 .WithOpAmp();
         });
 
-    // A processor added to a built provider once the host has started exports past the gate. Before
-    // the next policy is decided, that signal's export (here, traces) is set aside in the policy in
-    // force and reported local, and the next policy, which overrides it, is refused; a check between
-    // policies (here, logs; the health timer's, or Recheck) reports the effective config again. The
-    // inventory no longer says those signals are gated.
+    // A processor added to a built provider once the host has started exports past the gate. It is
+    // reported ungoverned before the next policy is decided, and at a check between policies (the
+    // health timer's, or Recheck); the policy in force stays, and the next is applied.
     [Fact]
-    public async Task AProcessorAddedToABuiltProviderSetsItsSignalAside()
+    public async Task AProcessorAddedToABuiltProviderIsReportedUngoverned()
     {
         var first = Policy.Stop("traces", "logs");
         var next = Policy.Of(("head_sampling", """{"ratio":1}"""), ("signal_exports.traces", """{"enabled":false}"""), ("signal_exports.logs", """{"enabled":false}"""));
@@ -740,26 +719,21 @@ public class HostingTests
         await Kit.Until(() => Applied(server, first), "the first config answered APPLIED");
         Assert.False(agent.Controls.Sends(Signal.Traces));
         Assert.False(agent.Controls.Sends(Signal.Logs));
+        bool Listed(string signal) => agent.Agent!.Components!.Components["exporters"].SubComponentMap.TryGetValue(signal, out var s) &&
+            s.SubComponentMap.TryGetValue("Kept", out var e) && !e.Metadata.Single(m => m.Key == "gated").Value.BoolValue;
 
         host.Services.GetRequiredService<TracerProvider>().AddProcessor(new SimpleActivityExportProcessor(new Kept<Activity>()));
-        var refused = agent.Agent!.RemoteConfig(Kit.Config(next));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.True(agent.Controls.Sends(Signal.Traces));
-        Assert.False(agent.Controls.Sends(Signal.Logs));
-        Assert.Equal(Policy.Overrides(Policy.Stop("logs")), Policy.Overrides(agent.Agent.Effective));
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent!.RemoteConfig(Kit.Config(next)).Status);
+        Assert.False(agent.Controls.Sends(Signal.Traces));
+        Assert.True(Listed("traces"));
 
         host.Services.GetRequiredService<LoggerProvider>().AddProcessor(new SimpleLogRecordExportProcessor(new Kept<LogRecord>()));
         agent.Agent.Recheck();
-        Assert.True(agent.Controls.Sends(Signal.Logs));
-        await Kit.Until(() => server.Messages.Any(m => m.EffectiveConfig?.ConfigMap?.ConfigMap.TryGetValue(Policy.File, out var e) == true &&
-                                                       Policy.Overrides(e.Body.ToStringUtf8()) == "{}"), "the effective config reported again");
-        var exporters = agent.Agent.Components!.Components["exporters"].SubComponentMap;
-        foreach (var signal in new[] { "traces", "logs" })
-        {
-            Assert.All(exporters[signal].SubComponentMap.Values, e => Assert.False(e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
-        }
-
+        Assert.True(Listed("logs"));
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+        Assert.Equal("ungoverned", agent.Agent.LastHealth!.Exporters.ComponentHealthMap["logs"].ComponentHealthMap["Kept"].Status);
+        await Kit.Until(() => server.Messages.Any(m => m.Health?.ComponentHealthMap.TryGetValue("exporters", out var x) == true &&
+                                                       x.ComponentHealthMap["logs"].ComponentHealthMap.ContainsKey("Kept")), "export health with it sent");
         await host.StopAsync(Cancel);
     }
 
@@ -802,16 +776,17 @@ public class HostingTests
         Assert.True(Gated(Exporter(host)));
     }
 
-    // TLS files the gate can't use leave every exporter as it is: none of the signals can be stopped.
+    // TLS files the gate can't use leave every exporter as it is, each reported ungoverned; every
+    // setting is still declared.
     [Fact]
-    public void WithTlsFilesItCantUseNoExportIsStopped()
+    public void WithTlsFilesItCantUseNoExporterIsGated()
     {
         var b = Builder(new() { ["OpAmp:Endpoint"] = "http://127.0.0.1:1/v1/opamp", ["OTEL_EXPORTER_OTLP_CERTIFICATE"] = "/nonexistent/ca.pem" });
         b.Services.AddOpenTelemetry().WithOpAmp();
         using var host = b.Build();
         Assert.False(Gated(Exporter(host)));
         Assert.Equal(
-            new[] { "deactivate_instrumentations", "deactivate_all_instrumentations", "send_traces", "send_metrics", "send_logs", "send_logs_level" },
+            new[] { "deactivate_instrumentations", "deactivate_all_instrumentations" },
             host.Services.GetRequiredService<OpAmpAgent>().HostNow(providersBuilt: false).Undeclared());
     }
 
