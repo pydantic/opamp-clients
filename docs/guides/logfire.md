@@ -175,7 +175,7 @@ bridge applies the Collector resources in the cluster's Fleet policy and reports
 2. Choose **Connect Kubernetes**. Name the cluster, give the namespaces its collectors run in,
    pick a policy, and what to collect. On GKE Autopilot,
    leave **Container logs** off: Autopilot refuses the host path it reads.
-3. Fleet shows the runtime key and the commands that store it as the `logfire-opamp` Secret and
+3. Fleet shows the connection key and the commands that store it as the `logfire-opamp` Secret and
    apply the bridge. Save the key: it is shown once.
 4. Publish the policy. The bridge creates the collectors, and Fleet shows the installation
    connected with its workloads.
@@ -187,7 +187,7 @@ collector pod counts toward the organization's collector allowance; the bridge d
 
 A collector configured by your own tooling can report to Fleet without Fleet changing it: give it
 an `opamp` extension (upstream's, or [this repository's](../collector.md#a-collector-with-the-extension))
-with Fleet's endpoint and a runtime key as its bearer token. Its YAML stays yours.
+with Fleet's endpoint and a connection key as its bearer token. Its YAML stays yours.
 
 ### Replacing a key
 

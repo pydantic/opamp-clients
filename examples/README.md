@@ -1,5 +1,9 @@
 # SDK application examples
 
+New to Fleet? Start with [fleet-quickstart](fleet-quickstart/README.md): a small app in Python,
+Node.js and Go that you connect to Logfire Fleet and change from a policy while it runs. The rest
+of this page covers the integration checks.
+
 The OpenTelemetry SDK integrations run against a reference OpAMP server that plays each check's
 scenario, with a telemetry sink that receives the exported spans, metrics and logs. This
 repository does not build that server: `OPAMP_EXAMPLES_SERVER` names its binary, and without one

@@ -1,0 +1,13 @@
+{
+  "name": "fleet-quickstart",
+  "private": true,
+  "type": "module",
+  "description": "A shop that takes an order a second, for trying Logfire Fleet",
+  "scripts": {
+    "start": "node --import @pydantic/opamp-otel/register app.mjs"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api-logs": "0.222.0"
+  }
+}
