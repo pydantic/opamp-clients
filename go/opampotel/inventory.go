@@ -214,7 +214,7 @@ func (a *agent) inventory() (*settingspb.Inventory, uint64) {
 		SdkLanguage:        "go",
 		SdkVersion:         otelsdk.Version(),
 		Instrumentations:   instrumentations,
-		Exporters:          a.exporters,
+		Exporters:          a.listedExporters(),
 	}, gen
 }
 

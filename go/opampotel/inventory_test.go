@@ -153,13 +153,14 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 		sdkMeta["telemetry.sdk.version"] != otelsdk.Version() || otelsdk.Version() == "" {
 		t.Fatalf("sdk: %v", sdkMeta)
 	}
-	if got, want := exportersOf(c), map[string]map[string]bool{"traces": {"otlp": true}, "metrics": {"prometheus": false},
-		"logs": {"console": true}}; !reflect.DeepEqual(got, want) {
+	// Prometheus is pulled, so its reader can't be gated: listed ungoverned. OTLP by where it sends.
+	if got, want := exportersOf(c), map[string]map[string]bool{"traces": {"otlp@localhost:4318": true},
+		"metrics": {"prometheus": false}, "logs": {"console": true}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("exporters %v, want %v", got, want)
 	}
-	// The settings: those of the host Load and Decide are given, without send_metrics.
+	// The settings: those of the host Load and Decide are given, every one, send_metrics too.
 	settings := listed(c.GetComponents()["settings"])
-	if _, ok := settings["send_metrics"]; ok || settings["send_traces"]["applies"] != "at once" ||
+	if settings["send_metrics"]["applies"] != "at once" || settings["send_traces"]["applies"] != "at once" ||
 		settings["deactivate_instrumentations"]["applies"] != "at once" || settings["debug_until"]["applies"] != "at once" {
 		t.Fatalf("settings %v", settings)
 	}
@@ -268,9 +269,9 @@ func TestAnInventoryOfNothing(t *testing.T) {
 	}
 }
 
-// The metrics exporter is gated exactly when send_metrics is carried out: the inventory and the
-// host agree, for each exporter Setup builds.
-func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
+// The metrics exporter is gated wherever Setup builds its reader, and listed ungoverned where
+// autoexport does; send_metrics is carried out either way.
+func TestTheMetricsExporterIsGatedWhereSetupBuildsItsReader(t *testing.T) {
 	t.Setenv("OTEL_TRACES_EXPORTER", "none")
 	t.Setenv("OTEL_LOGS_EXPORTER", "none")
 	t.Setenv("OTEL_EXPORTER_PROMETHEUS_PORT", "0")
@@ -278,11 +279,11 @@ func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
 		env  map[string]string
 		want map[string]map[string]bool
 	}{
-		{map[string]string{}, map[string]map[string]bool{"metrics": {"otlp": true}}},
+		{map[string]string{}, map[string]map[string]bool{"metrics": {"otlp@localhost:4318": true}}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "console"}, map[string]map[string]bool{"metrics": {"console": true}}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "none"}, map[string]map[string]bool{}},
 		{map[string]string{"OTEL_METRICS_EXPORTER": "prometheus"}, map[string]map[string]bool{"metrics": {"prometheus": false}}},
-		{map[string]string{"OTEL_METRICS_PRODUCERS": "prometheus"}, map[string]map[string]bool{"metrics": {"otlp": false}}},
+		{map[string]string{"OTEL_METRICS_PRODUCERS": "prometheus"}, map[string]map[string]bool{"metrics": {"otlp@localhost:4318": false}}},
 	} {
 		for k, v := range tc.env { // autoexport reads the process environment too
 			t.Setenv(k, v)
@@ -301,9 +302,8 @@ func TestTheMetricsExporterIsGatedWhenSendMetricsIsCarriedOut(t *testing.T) {
 		if got := exportersOf(c); !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("%v: exporters %v, want %v", tc.env, got, tc.want)
 		}
-		_, carried := listed(c.GetComponents()["settings"])["send_metrics"]
-		if gated := tc.want["metrics"][metricsExporter(env(tc.env))]; carried != (gated || len(tc.want) == 0) {
-			t.Errorf("%v: send_metrics carried out %v, the exporter gated %v", tc.env, carried, gated)
+		if _, carried := listed(c.GetComponents()["settings"])["send_metrics"]; !carried {
+			t.Errorf("%v: send_metrics not carried out", tc.env)
 		}
 	}
 }

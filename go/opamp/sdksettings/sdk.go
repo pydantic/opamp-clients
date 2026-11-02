@@ -165,11 +165,12 @@ func (l *Layer) Refresh(ctx context.Context, current, atStart []byte, host *sett
 
 // Health gives export health from the gates' counts since start: whether to send it now, and the
 // entry for the agent health's component_health_map["exporters"]. previous is what the last call
-// answered (nil at the first), settings those in force.
+// answered (nil at the first), settings those in force, exporters each exporter as the inventory
+// lists it, reported governed or ungoverned under its signal.
 func (l *Layer) Health(ctx context.Context, counts *settingspb.ExportCounts, previous *settingspb.HealthReport,
-	nowUnixMs uint64, settings *settingspb.Settings) (*settingspb.HealthReport, error) {
+	nowUnixMs uint64, settings *settingspb.Settings, exporters []*settingspb.Exporter) (*settingspb.HealthReport, error) {
 	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Health{Health: &settingspb.Health{
-		Counts: counts, Previous: previous, NowUnixMs: nowUnixMs, Settings: settings}}})
+		Counts: counts, Previous: previous, NowUnixMs: nowUnixMs, Settings: settings, Exporters: exporters}}})
 	if err != nil {
 		return nil, err
 	}

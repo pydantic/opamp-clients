@@ -30,18 +30,15 @@ import (
 
 // host is what this package carries out, declared to the settings layer (docs/sdk-settings.md,
 // "The host"). The layer refuses a policy that overrides a setting not named here, and the
-// description lists only the controls named. The host names every live setting in every configuration
-// Setup builds (the sampler wraps whichever one OTEL_TRACES_SAMPLER names, and every span and log
-// exporter it builds goes through a gate), send_metrics only where the metrics reader is built
-// around a gated exporter, the instrumentation switches at once too (a switched-off
-// instrumentation's tracer starts no span from then on), so nothing waits for the next start. A
-// global provider the application sets in place of Setup's narrows it (agent.host).
+// description lists only the controls named. The host names every live setting, whatever Setup
+// built: the sampler wraps whichever one OTEL_TRACES_SAMPLER names, and every exporter it can
+// reach goes through a gate. What the gates can't reach (autoexport's own metrics reader, a
+// global provider the application sets in place of Setup's) is reported ungoverned, never a
+// reason to declare less (contracts' "What a policy governs"). The instrumentation switches are
+// at once too, so nothing waits for the next start.
 func (s *server) host() *settingspb.Host {
-	live := append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations"}, carried...)
-	if !s.metricsUngated {
-		live = append(live, "send_metrics")
-	}
-	return &settingspb.Host{Live: live}
+	return &settingspb.Host{Live: append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations",
+		"send_metrics"}, carried...)}
 }
 
 // carried are the live settings this package carries out whatever it built: those of its sampler,
@@ -106,7 +103,7 @@ type agent struct {
 	// last listed (under mu).
 	exporters []*settingspb.Exporter
 	listed    uint64
-	// relist: the host narrowed before there was a client to tell; start sends the inventory.
+	// relist: the exporters changed before there was a client to tell; start sends the inventory.
 	relist bool
 
 	// The global providers Setup set (set before start), which of them the application has
@@ -266,8 +263,8 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		return
 	}
 	cfg := opamp.Config{
-		Endpoint:          a.server.endpoint,
-		InstanceUID:       a.uid,
+		Endpoint:    a.server.endpoint,
+		InstanceUID: a.uid,
 		// What the integration does and reports, declared: the client takes no status field
 		// whose bit isn't.
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig |
@@ -319,7 +316,7 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 	if a.effective != effective { // a timer changed it since
 		client.SetEffectiveConfig(a.effective)
 	}
-	if a.controls.scopes.gen.Load() != a.listed || a.relist { // an instrumentation came since, or the host narrowed
+	if a.controls.scopes.gen.Load() != a.listed || a.relist { // an instrumentation came since, or a provider was replaced
 		if c := a.components(ctx); c != nil {
 			a.reporter.SetAvailableComponents(c)
 			a.relist = false
@@ -333,9 +330,9 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 	}
 }
 
-// host is what this package carries out now: the server's host (server.host), less what a global
-// provider the application set in place of Setup's takes from it. Under a.mu.
-func (a *agent) host() *settingspb.Host { return a.replaced.without(a.server.host()) }
+// host is what this package carries out: the server's host (server.host), whatever the global
+// providers are now.
+func (a *agent) host() *settingspb.Host { return a.server.host() }
 
 // healthReport is the agent's health: the application's (healthy, as it runs), with export
 // health under component_health_map["exporters"] as the layer builds it from the gates' counts,
@@ -345,7 +342,7 @@ func (a *agent) healthReport(ctx context.Context, now time.Time) (*protobufs.Com
 		a.started = uint64(now.UnixNano())
 	}
 	h := &protobufs.ComponentHealth{Healthy: true, StartTimeUnixNano: a.started}
-	r, err := a.layer.Health(ctx, a.controls.Counts(), a.health, unixMs(now), a.settings)
+	r, err := a.layer.Health(ctx, a.controls.Counts(), a.health, unixMs(now), a.settings, a.listedExporters())
 	if err != nil {
 		slog.Warn("opamp: export health could not be built", "error", err)
 		return h, false
@@ -528,10 +525,9 @@ func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteC
 	if a.server.stateDir != "" {
 		save = func([]byte) error { return nil }
 	}
-	// A provider replaced since the last look is seen before the decision, so the answer is for
-	// what this package carries out now.
+	// A provider replaced since the last look is reported before the decision.
 	if a.noticeReplaced() {
-		a.narrowed(now)
+		a.reportReplaced(now)
 	}
 	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.host(), unixMs(now), save)
 	if err != nil {

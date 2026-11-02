@@ -385,17 +385,24 @@ func TestExportHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	first, err := l.Health(ctx, &settingspb.ExportCounts{}, nil, now, nil)
+	first, err := l.Health(ctx, &settingspb.ExportCounts{}, nil, now, nil, nil)
 	if err != nil || !first.GetSend() || len(first.GetExporters().GetComponentHealthMap()) != 3 || first.GetExporters().GetStatus() != "ok" {
 		t.Fatalf("first: %v %v", first, err)
 	}
-	if again, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil); err != nil || again.GetSend() {
+	if again, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil, nil); err != nil || again.GetSend() {
 		t.Fatalf("again: %v %v", again, err)
+	}
+	// An exporter the gates can't reach: listed under its signal, ungoverned, healthy, and sent at once.
+	ungoverned, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil,
+		[]*settingspb.Exporter{{Signal: "traces", Name: "zipkin", Gated: false}})
+	child := ungoverned.GetExporters().GetComponentHealthMap()["traces"].GetComponentHealthMap()["zipkin"]
+	if err != nil || !ungoverned.GetSend() || child.GetStatus() != "ungoverned" || !child.GetHealthy() {
+		t.Fatalf("ungoverned: %v %v", ungoverned, err)
 	}
 	off := false
 	failed, err := l.Health(ctx, &settingspb.ExportCounts{Traces: &settingspb.SignalCounts{
 		ExportsFailed: 1, ItemsFailed: 512, LastFailed: true, LastError: "connection refused"}},
-		first, now+30_000, &settingspb.Settings{SendLogs: &off})
+		first, now+30_000, &settingspb.Settings{SendLogs: &off}, nil)
 	m := failed.GetExporters().GetComponentHealthMap()
 	if err != nil || !failed.GetSend() || failed.GetExporters().GetHealthy() ||
 		m["traces"].GetLastError() != "connection refused" || m["logs"].GetStatus() != "off" {
@@ -560,7 +567,7 @@ func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string
 		"instrumentations": each(part("instrumentations"), func(d *protobufs.ComponentDetails) any { return text(d, "version") }),
 		"exporters": each(part("exporters"), func(signal *protobufs.ComponentDetails) any {
 			return each(signal, func(e *protobufs.ComponentDetails) any {
-				if md := e.GetMetadata(); len(md) == 1 && md[0].GetKey() == "gated" {
+				if md := e.GetMetadata(); len(md) >= 1 && md[0].GetKey() == "gated" {
 					if g, ok := md[0].GetValue().GetValue().(*protobufs.AnyValue_BoolValue); ok {
 						return g.BoolValue
 					}
@@ -569,6 +576,22 @@ func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string
 				return nil
 			})
 		}),
+		// Where each exporter sends, for those that say: signal to identity to destination.
+		"destinations": func() map[string]any {
+			out := map[string]any{}
+			for s, signal := range part("exporters").GetSubComponentMap() {
+				m := map[string]any{}
+				for name, e := range signal.GetSubComponentMap() {
+					if d := text(e, "destination"); d != nil {
+						m[name] = d
+					}
+				}
+				if len(m) > 0 {
+					out[s] = m
+				}
+			}
+			return out
+		}(),
 		"settings": each(part("settings"), func(d *protobufs.ComponentDetails) any { return text(d, "applies") }),
 	}
 }

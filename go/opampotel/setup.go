@@ -82,7 +82,6 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 		}
 	}()
 	if srv != nil {
-		srv.metricsUngated = !metricsGated(getenv)
 		controls := NewControls()
 		controls.app = theAppSettings // what AppSetting reads
 		if s.agent, err = newAgent(ctx, srv, controls, getenv("OTEL_RESOURCE_ATTRIBUTES")); err != nil {
@@ -120,7 +119,7 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 	if err := s.metrics(ctx, getenv); err != nil {
 		return nil, err
 	}
-	if err := s.logs(ctx); err != nil {
+	if err := s.logs(ctx, getenv); err != nil {
 		return nil, err
 	}
 	// The globals only once all of it is built: a failed Setup leaves them as they were.
@@ -159,7 +158,7 @@ func (s *SDK) traces(ctx context.Context, getenv func(string) string) error {
 		if s.Controls != nil {
 			exporter = s.Controls.Spans(exporter)
 		}
-		s.built("traces", exporterName("OTEL_TRACES_EXPORTER"), s.Controls != nil)
+		s.built("traces", exporterName("OTEL_TRACES_EXPORTER"), s.Controls != nil, getenv)
 		opts = append(opts, sdktrace.WithBatcher(exporter))
 	}
 	tp := sdktrace.NewTracerProvider(opts...)
@@ -179,8 +178,8 @@ func (s *SDK) metrics(ctx context.Context, getenv func(string) string) error {
 	opts := []sdkmetric.Option{sdkmetric.WithResource(s.Resource)}
 	if reader != nil {
 		opts = append(opts, sdkmetric.WithReader(reader))
-		// Gated as the host says: an exporter that metricsGated says is not gated leaves send_metrics undeclared.
-		s.built("metrics", metricsExporter(getenv), s.Controls != nil && metricsGated(getenv))
+		// Gated where Setup built the reader around a gate; autoexport's own reader is reported ungoverned.
+		s.built("metrics", metricsExporter(getenv), s.Controls != nil && metricsGated(getenv), getenv)
 	}
 	mp := sdkmetric.NewMeterProvider(opts...)
 	s.shutdown = append(s.shutdown, mp.Shutdown)
@@ -200,7 +199,7 @@ func metricsExporter(getenv func(string) string) string {
 }
 
 // metricsGated says whether metricReader builds the metrics reader around a gated exporter, so
-// send_metrics can stop it. Known from the variables alone, before the SDK is built.
+// send_metrics can stop it; else it is reported ungoverned. Known from the variables alone.
 func metricsGated(getenv func(string) string) bool {
 	if strings.TrimSpace(getenv("OTEL_METRICS_PRODUCERS")) != "" {
 		return false
@@ -215,13 +214,14 @@ func metricsGated(getenv func(string) string) bool {
 // metricReader is autoexport's reader for OTEL_METRICS_EXPORTER, with the exporter gated. A
 // reader can't be wrapped outside the SDK, so this builds the push exporters autoexport does
 // (otlp over either protocol, console) the same way, around a gated exporter. Anything else (a
-// pull exporter such as prometheus, or OTEL_METRICS_PRODUCERS) is autoexport's own, and the
-// server can't stop it.
+// pull exporter such as prometheus, or OTEL_METRICS_PRODUCERS) is autoexport's own: the gate
+// can't reach it, so it is reported ungoverned.
 func (s *SDK) metricReader(ctx context.Context, getenv func(string) string) (sdkmetric.Reader, error) {
 	name := metricsExporter(getenv)
 	if s.Controls == nil || !metricsGated(getenv) {
 		if s.Controls != nil {
-			slog.Warn("opamp: the metrics exporter is autoexport's own: the server can't stop it", "exporter", name)
+			slog.Warn("opamp: the metrics exporter is autoexport's own, so the server's settings can't govern it; "+
+				"reported as ungoverned", "exporter", name)
 		}
 		r, err := autoexport.NewMetricReader(ctx)
 		if err != nil || autoexport.IsNoneMetricReader(r) {
@@ -256,7 +256,7 @@ func (s *SDK) metricReader(ctx context.Context, getenv func(string) string) (sdk
 	return sdkmetric.NewPeriodicReader(s.Controls.Metrics(exporter)), nil
 }
 
-func (s *SDK) logs(ctx context.Context) error {
+func (s *SDK) logs(ctx context.Context, getenv func(string) string) error {
 	exporter, err := autoexport.NewLogExporter(ctx)
 	if err != nil {
 		return fmt.Errorf("logs exporter: %w", err)
@@ -266,7 +266,7 @@ func (s *SDK) logs(ctx context.Context) error {
 		if s.Controls != nil {
 			exporter = s.Controls.Logs(exporter)
 		}
-		s.built("logs", exporterName("OTEL_LOGS_EXPORTER"), s.Controls != nil)
+		s.built("logs", exporterName("OTEL_LOGS_EXPORTER"), s.Controls != nil, getenv)
 		opts = append(opts, sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter)))
 	}
 	lp := sdklog.NewLoggerProvider(opts...)
@@ -278,8 +278,31 @@ func (s *SDK) logs(ctx context.Context) error {
 	return nil
 }
 
-// built keeps an exporter it built for a signal, under the name OTEL_*_EXPORTER gives it, and
-// whether a gate wraps it.
-func (s *SDK) built(signal, name string, gated bool) {
-	s.exporters = append(s.exporters, &settingspb.Exporter{Signal: signal, Name: name, Gated: gated})
+// built keeps an exporter it built for a signal, under the name OTEL_*_EXPORTER gives it, whether
+// a gate wraps it, and for OTLP where it sends (the layer keeps only the scheme, host and port).
+func (s *SDK) built(signal, name string, gated bool, getenv func(string) string) {
+	e := &settingspb.Exporter{Signal: signal, Name: name, Gated: gated}
+	if name == "otlp" {
+		e.Destination = otlpEndpoint(signal, getenv)
+	}
+	s.exporters = append(s.exporters, e)
+}
+
+// otlpEndpoint is where a signal's OTLP exporter sends, as its variables give it: the signal's own
+// endpoint, else the common one, else the protocol's default on localhost (gRPC 4317, HTTP 4318).
+func otlpEndpoint(signal string, getenv func(string) string) string {
+	upper := strings.ToUpper(signal)
+	for _, k := range []string{"OTEL_EXPORTER_OTLP_" + upper + "_ENDPOINT", "OTEL_EXPORTER_OTLP_ENDPOINT"} {
+		if v := strings.TrimSpace(getenv(k)); v != "" {
+			return v
+		}
+	}
+	protocol := strings.TrimSpace(getenv("OTEL_EXPORTER_OTLP_" + upper + "_PROTOCOL"))
+	if protocol == "" {
+		protocol = strings.TrimSpace(getenv("OTEL_EXPORTER_OTLP_PROTOCOL"))
+	}
+	if protocol == "grpc" {
+		return "http://localhost:4317"
+	}
+	return "http://localhost:4318"
 }
