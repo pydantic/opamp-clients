@@ -95,7 +95,8 @@ The enrollment token in the config is then only a fallback.
 
 Other options:
 - `--token-file PATH` reads the token from a file instead of standard input.
-- `--ca-file PATH` sets the CA bundle to trust for the server.
+- `--ca-file PATH` sets the CA bundle to trust for the server. On Linux it is copied to
+  `/etc/pydantic-opamp/ca.pem`, which the service can read, so the original can be anywhere.
 - `--plaintext` allows a `ws://` or `http://` endpoint.
 - `--restricted` limits what the server's configs may do ([the restricted
   policy](#the-restricted-policy)). The default is no: any config the server sends runs.
