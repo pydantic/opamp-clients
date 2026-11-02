@@ -51,6 +51,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
+  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
+  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
+  from starting, and enrolling only said it hadn't reported its status (#111).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
   A WebSocket connection given up after the server said nothing for two heartbeat intervals now
   says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the

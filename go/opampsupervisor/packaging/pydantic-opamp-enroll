@@ -233,8 +233,13 @@ fi
 
 tls=
 if [ -n "$ca_file" ]; then
+	# A copy beside the config: the service has a private /tmp and can't read most home directories,
+	# so a bundle left where it was given can stop the Supervisor from starting.
+	cp -- "$ca_file" "$etc/ca.pem.tmp"
+	chmod 0640 "$etc/ca.pem.tmp"
+	mv -f "$etc/ca.pem.tmp" "$etc/ca.pem"
 	tls="  tls:
-    ca_file: \"$ca_file\"
+    ca_file: \"/etc/pydantic-opamp/ca.pem\"
 "
 fi
 accepts_packages=
@@ -321,6 +326,7 @@ chmod 0640 "$etc/supervisor.yaml.tmp"
 mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"
 if getent group pydantic-opamp >/dev/null 2>&1 && [ "$(id -u)" = 0 ]; then
 	chgrp pydantic-opamp "$etc" "$etc/supervisor.yaml"
+	[ ! -e "$etc/ca.pem" ] || chgrp pydantic-opamp "$etc/ca.pem"
 fi
 
 # wait_connected waits up to 30 seconds for the Supervisor started at $1 (Unix seconds) to connect.

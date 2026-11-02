@@ -296,13 +296,15 @@ func TestEnrollAgainKeepsTheStateKey(t *testing.T) {
 
 func TestEnrollWithACAFile(t *testing.T) {
 	e := newEnrollment(t)
-	ca := filepath.Join(t.TempDir(), "ca.pem")
+	// Under /tmp on a real host: the service's private /tmp can't see it, so enrolling copies it.
+	ca := filepath.Join(t.TempDir(), "given-ca.pem")
 	require.NoError(t, os.WriteFile(ca, []byte("not checked here"), 0o644))
 	tokenFile := filepath.Join(t.TempDir(), "token")
 	require.NoError(t, os.WriteFile(tokenFile, []byte("from-a-file"), 0o600))
 	out, err := e.run(t, "", "--endpoint", "wss://opamp.example.com/v1/opamp", "--ca-file", ca, "--token-file", tokenFile)
 	require.NoError(t, err, out)
-	assert.Contains(t, e.read(t, "supervisor.yaml"), "ca_file: \""+ca+"\"")
+	assert.Contains(t, e.read(t, "supervisor.yaml"), `ca_file: "/etc/pydantic-opamp/ca.pem"`)
+	assert.Equal(t, "not checked here", e.read(t, "ca.pem"))
 	assert.Equal(t, "SEALED:--name=opamp-enroll-token:from-a-file", e.read(t, "enroll-token.cred"))
 }
 
