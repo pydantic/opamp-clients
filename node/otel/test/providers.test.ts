@@ -110,7 +110,8 @@ test("a provider of the application's own, registered once the SDK has started, 
   assert.equal(got.effective.length, 1);
   assert.equal(a.controls.sampler.samplingRate, 1);
   assert.equal(a.controls.sendTraces, false);
-  assert.match(got.warned.join("\n"), /a tracer provider of its own, .*reported as ungoverned/);
+  // The layer's words, as every SDK says them.
+  assert.match(got.warned.join("\n"), /the application set a traces provider of its own: .*Fleet lists them ungoverned/);
 
   // The same signal again changes nothing more.
   const sent = got.components.length;

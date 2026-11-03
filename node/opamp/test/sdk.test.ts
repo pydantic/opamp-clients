@@ -18,7 +18,7 @@ import {
   KeyValueSchema,
   RemoteConfigStatuses,
 } from "../src/index.js";
-import { type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
+import { type FoundExporterInit, type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
 import { config, full, off, overridden, policy, reported, V1 } from "./policy.js";
 
 const text = (s: string) => new TextEncoder().encode(s);
@@ -393,6 +393,23 @@ function shown(c: AvailableComponents): Record<string, unknown> {
     settings: subs(c.components.settings, (d) => text(meta(d, "applies"))),
   };
 }
+
+test("vectors: exporters.json, each case through Exporters", () => {
+  const url = new URL("../../../../testdata/sdk-settings/exporters.json", import.meta.url);
+  type Found = { signal: string; kind?: string; gated?: boolean; endpoint?: string; from_env?: boolean };
+  type Case = { name: string; found: Found[]; env?: Record<string, string>; default_protocol?: string; want: unknown };
+  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: Case[] }).cases;
+  assert.ok(cases.length > 10);
+  const layer = new SdkSettings();
+  for (const c of cases) {
+    const found: FoundExporterInit[] = c.found.map(({ from_env, ...f }) => ({ ...f, fromEnv: from_env }));
+    const got = layer.exporters(found, c.env ?? {}, c.default_protocol ?? "");
+    assert.deepEqual({
+      exporters: got.exporters.map((e) => ({ signal: e.signal, name: e.name, gated: e.gated, destination: e.destination })),
+      governed: got.governed, ungoverned: got.ungoverned, warnings: got.warnings,
+    }, c.want, c.name);
+  }
+});
 
 test("vectors: components.json, each inventory through Components", () => {
   const url = new URL("../../../../testdata/sdk-settings/components.json", import.meta.url);

@@ -129,6 +129,7 @@ import {
   startSetup,
 } from "@pydantic/opamp-client";
 import {
+  type FoundExporterInit,
   type HealthReport,
   type HostInit,
   type InventoryInit,
@@ -1335,19 +1336,12 @@ function exporterLike(o: unknown): o is { export: unknown; shutdown: unknown } {
 }
 
 /**
- * An exporter as listed: named as OTEL_*_EXPORTER names it (`otlp`, `console`, `zipkin`,
- * `prometheus`) or by its type, with where it sends where that is known (the layer keeps only
- * the scheme, host and port).
+ * An exporter as found, for the layer to decide the name it is listed under (`OTLPTraceExporter`
+ * is `otlp`) and where it sends: known by its type, with its endpoint where it says.
  */
-function listed(signal: ApiSignal, exporter: object, gated: boolean): Exporter {
+function found(signal: ApiSignal, exporter: object, gated: boolean): FoundExporterInit {
   const inner = behind(exporter) ?? exporter;
-  const type = inner.constructor?.name ?? "";
-  const name = /^OTLP(Trace|Metric|Log)Exporter$/.test(type) ? "otlp"
-    : /^Console(Span|Metric|LogRecord)Exporter$/.test(type) ? "console"
-    : type === "ZipkinExporter" ? "zipkin"
-    : type === "PrometheusExporter" ? "prometheus"
-    : type || "unknown";
-  return { signal, name, gated, destination: sendsTo(inner) };
+  return { signal, kind: inner.constructor?.name || "unknown", gated, endpoint: sendsTo(inner) };
 }
 
 /**
@@ -1371,10 +1365,11 @@ const DEEPEST = 8;
  * span and log record processor's exporter (`_exporter`, as the SDK's simple and batch
  * processors hold it) and each periodic reader's. What can't be gated is listed ungoverned: a
  * processor that holds an exporter some other way, a reader that is pulled (Prometheus). A
- * processor that holds no exporter is the application's logic: left alone. Idempotent.
+ * processor that holds no exporter is the application's logic: left alone. Idempotent. Each
+ * exporter as found, for the layer's `exporters` to decide how it is listed.
  */
-export function govern(c: Controls, providers: Partial<Record<ApiSignal, unknown>>): Exporter[] {
-  const found: Exporter[] = [];
+export function govern(c: Controls, providers: Partial<Record<ApiSignal, unknown>>): FoundExporterInit[] {
+  const out: FoundExporterInit[] = [];
   const seen = new Set<unknown>();
   const field = (o: unknown, k: string): unknown =>
     typeof o === "object" && o !== null ? (o as Record<string, unknown>)[k] : undefined;
@@ -1387,11 +1382,11 @@ export function govern(c: Controls, providers: Partial<Record<ApiSignal, unknown
       const gated = behind(exporter) ? exporter
         : signal === "traces" ? c.spans(exporter as unknown as SpanExporter) : c.logs(exporter as unknown as LogRecordExporter);
       (p as Record<string, unknown>)._exporter = gated;
-      found.push(listed(signal, gated, true));
+      out.push(found(signal, gated, true));
     } else if (Array.isArray(children)) {
       for (const child of children) processor(signal, child, depth + 1);
     } else {
-      for (const held of Object.values(p)) if (exporterLike(held)) found.push(listed(signal, held, behind(held) !== undefined));
+      for (const held of Object.values(p)) if (exporterLike(held)) out.push(found(signal, held, behind(held) !== undefined));
     }
   };
   processor("traces", field(providers.traces, "_activeSpanProcessor"), 0);
@@ -1406,19 +1401,17 @@ export function govern(c: Controls, providers: Partial<Record<ApiSignal, unknown
     if (exporterLike(exporter)) {
       const gated = behind(exporter) ? exporter : c.metrics(exporter as unknown as PushMetricExporter);
       (reader as Record<string, unknown>)._exporter = gated;
-      found.push(listed("metrics", gated, true));
+      out.push(found("metrics", gated, true));
     } else {
-      found.push(listed("metrics", reader, false));
+      out.push(found("metrics", reader, false));
     }
   }
-  return found;
+  return out;
 }
 
 
 /** A signal the OpenTelemetry API holds one global provider for. */
 export type ApiSignal = "traces" | "metrics" | "logs";
-
-const PROVIDER: Record<ApiSignal, string> = { traces: "tracer", metrics: "meter", logs: "logger" };
 
 /**
  * The global providers the API holds, as `watchProviders` sees them registered: the SDK's, and
@@ -1640,8 +1633,14 @@ export class Agent {
   inventory: InventoryInit | undefined;
   /** The signals the application registered a global provider of its own for (watchProviders). */
   readonly ownProviders = new Set<ApiSignal>();
-  /** Every exporter, governed or not, as the inventory and export health list them (`govern`). */
+  /** Every exporter, governed or not, as the inventory and export health list them (`#decide`). */
   exporters: Exporter[] = [];
+  /** The exporters on the SDK's providers as found (`govern`), which the layer decides `exporters` from. */
+  found: FoundExporterInit[] = [];
+  /** The variables the SDK was built from (`prepare`): where an exporter built from them sends. */
+  #env: NodeJS.ProcessEnv = {};
+  /** The layer's warnings said so far: each once. */
+  readonly #warned = new Set<string>();
   /** The instrumentations the SDK loaded (`instrument`), which the inventory lists. */
   #instrumentations: Instrumentation[] | undefined;
 
@@ -1660,6 +1659,8 @@ export class Agent {
     this.layer = new SdkSettings();
     this.ownProviders.clear();
     this.exporters = [];
+    this.found = [];
+    this.#env = env;
     this.host = hostFromEnv();
     let saved: Uint8Array | undefined;
     let coreState: Uint8Array | undefined;
@@ -1799,9 +1800,7 @@ export class Agent {
   providerOfItsOwn(signal: ApiSignal): void {
     if (!this.layer || this.ownProviders.has(signal)) return;
     this.ownProviders.add(signal);
-    this.exporters = [...this.exporters, { signal, name: APP_PROVIDER, gated: false, destination: "" }];
-    say.warn(`OpAMP: the application registered a ${PROVIDER[signal]} provider of its own, so what it sends `
-      + `through it isn't governed by the server's settings; reported as ungoverned`);
+    this.#decide();
     // Called from the application's code: what the client sends isn't the application's to trace.
     context.with(suppressTracing(context.active()), () => {
       if (this.#instrumentations) this.inventory = inventory(this.#instrumentations, this.exporters);
@@ -1816,9 +1815,23 @@ export class Agent {
    * registered (`govern`), each one that can't be gated warned about once.
    */
   govern(providers: Partial<Record<ApiSignal, unknown>>): void {
-    this.exporters = [...govern(this.controls, providers), ...this.exporters.filter((e) => e.name === APP_PROVIDER)];
-    for (const e of this.exporters.filter((e) => !e.gated && e.name !== APP_PROVIDER)) {
-      say.warn(`OpAMP: the ${e.signal} exporter ${e.name} can't be governed by the server's settings; reported as ungoverned`);
+    this.found = govern(this.controls, providers);
+    this.#decide();
+  }
+
+  /**
+   * The exporters listed, as the layer decides them in every SDK: those `govern` found, and an
+   * ungoverned app_provider for each signal the application registered a provider of its own
+   * for. Each warning the layer gives is said once.
+   */
+  #decide(): void {
+    if (!this.layer) return;
+    const own = [...this.ownProviders].map((signal) => ({ signal, kind: APP_PROVIDER, gated: false }));
+    const d = this.layer.exporters([...this.found, ...own], this.#env, "http/protobuf");
+    this.exporters = d.exporters.map(({ signal, name, gated, destination }) => ({ signal, name, gated, destination }));
+    for (const w of d.warnings.filter((w) => !this.#warned.has(w))) {
+      this.#warned.add(w);
+      say.warn(`OpAMP: ${w}`);
     }
   }
 
