@@ -150,7 +150,8 @@ class DeclarativeTest {
         """), inventory);
     assertNull(m.getMeterProvider());
     assertNull(m.getLoggerProvider());
-    assertEquals(List.of(Inventory.exporter("traces", "console", true)), inventory.build().getExportersList());
+    assertEquals(List.of(dev.pydantic.opamp.sdk.SettingsProto.Exporter.newBuilder().setSignal("traces").setName("console")
+        .setGated(true).build()), inventory.build().getExportersList());
     OpenTelemetrySdk sdk = DeclarativeConfiguration.create(m).getSdk();
     try {
       String tracing = sdk.getSdkTracerProvider().toString();

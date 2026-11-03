@@ -22,6 +22,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 import opamp.proto.v1.Anyvalue;
 import opamp.proto.v1.Opamp;
@@ -287,6 +289,37 @@ class SdkSettingsTest {
   }
 
   static final ObjectMapper JSON = new ObjectMapper();
+
+  /** testdata/exporters.json, each case through Exporters: what is decided, compared whole. */
+  @TestFactory
+  Stream<DynamicTest> theExportersVectors() throws IOException {
+    List<DynamicTest> tests = new ArrayList<>();
+    for (JsonNode c : JSON.readTree(testdata().resolve("exporters.json").toFile()).get("cases")) {
+      tests.add(DynamicTest.dynamicTest(c.get("name").asText(), () -> {
+        List<SettingsProto.FoundExporter> found = new ArrayList<>();
+        for (JsonNode f : c.get("found")) {
+          found.add(SettingsProto.FoundExporter.newBuilder().setSignal(f.path("signal").asText())
+              .setKind(f.path("kind").asText()).setGated(f.path("gated").asBoolean())
+              .setEndpoint(f.path("endpoint").asText()).setFromEnv(f.path("from_env").asBoolean()).build());
+        }
+        Map<String, String> env = new TreeMap<>();
+        c.path("env").fields().forEachRemaining(v -> env.put(v.getKey(), v.getValue().asText()));
+        SettingsProto.ExportersDecided got = layer.exporters(found, env, c.path("default_protocol").asText());
+        var out = JSON.createObjectNode();
+        var exporters = out.putArray("exporters");
+        got.getExportersList().forEach(e -> exporters.addObject().put("signal", e.getSignal()).put("name", e.getName())
+            .put("gated", e.getGated()).put("destination", e.getDestination()));
+        var governed = out.putArray("governed");
+        got.getGovernedList().forEach(governed::add);
+        var ungoverned = out.putArray("ungoverned");
+        got.getUngovernedList().forEach(ungoverned::add);
+        var warnings = out.putArray("warnings");
+        got.getWarningsList().forEach(warnings::add);
+        assertEquals(c.get("want"), out);
+      }));
+    }
+    return tests.stream();
+  }
 
   /** testdata/components.json, each case through Components, compared as the vectors' about says. */
   @TestFactory

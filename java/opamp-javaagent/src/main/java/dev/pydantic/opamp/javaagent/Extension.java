@@ -122,6 +122,11 @@ final class Extension {
   final Outside outside = new Outside();
   /** What the agent runs, as the exporters were built: reported at start, as available components. */
   final Inventory inventory = new Inventory();
+
+  {
+    // The listed exporters are decided by the extension's own layer.
+    inventory.layer = this::layer;
+  }
   private volatile Opamp.AvailableComponents components;
   /** The wall clock, in milliseconds since the Unix epoch: what debug mode is decided by. */
   java.util.function.LongSupplier wallClock = System::currentTimeMillis;
@@ -588,9 +593,8 @@ final class Extension {
       return;
     }
     inventory.outside(signal, added);
-    LOG.warning("OpAMP: another extension added " + String.join(", ", added) + " to the SDK's " + signal
-        + ", which exports past this extension's gates; the server's settings govern every other exporter, and"
-        + " this one is reported to it as ungoverned");
+    // Decided at once, so the layer's warning for each is logged now.
+    inventory.listed();
   }
 
   /**

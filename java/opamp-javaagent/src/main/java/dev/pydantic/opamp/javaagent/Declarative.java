@@ -144,7 +144,7 @@ final class Declarative {
         inner(sampler).forEach(live::withAdditionalProperty);
       }
       m.getTracerProvider().withSampler(new SamplerModel().withAdditionalProperty(NAME, live));
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (SpanProcessorModel p : list(m.getTracerProvider().getProcessors())) {
         if (p.getBatch() != null) {
           p.getBatch().withExporter(spans(p.getBatch().getExporter(), built));
@@ -152,12 +152,12 @@ final class Declarative {
         if (p.getSimple() != null) {
           p.getSimple().withExporter(spans(p.getSimple().getExporter(), built));
         }
-        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.exporter("traces", k, false)));
+        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.found("traces", k, false, "")));
       }
       inventory.exporters("traces", built);
     }
     if (m.getMeterProvider() != null) {
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (MetricReaderModel r : list(m.getMeterProvider().getReaders())) {
         if (r.getPeriodic() != null && r.getPeriodic().getExporter() != null) {
           PushMetricExporterPropertyModel gated = new PushMetricExporterPropertyModel();
@@ -175,7 +175,7 @@ final class Declarative {
       inventory.exporters("metrics", built);
     }
     if (m.getLoggerProvider() != null) {
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (LogRecordProcessorModel p : list(m.getLoggerProvider().getProcessors())) {
         if (p.getBatch() != null) {
           p.getBatch().withExporter(logs(p.getBatch().getExporter(), built));
@@ -183,7 +183,7 @@ final class Declarative {
         if (p.getSimple() != null) {
           p.getSimple().withExporter(logs(p.getSimple().getExporter(), built));
         }
-        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.exporter("logs", k, false)));
+        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.found("logs", k, false, "")));
       }
       inventory.exporters("logs", built);
     }
@@ -191,43 +191,23 @@ final class Declarative {
   }
 
   /**
-   * An exporter the model names, as {@code OTEL_*_EXPORTER} names it: {@code otlp_http} and
-   * {@code otlp_grpc} are {@code otlp}, {@code prometheus/development} is {@code prometheus}; any
-   * other by its name in the model ({@code console}, {@code zipkin}, a component of its own).
+   * The exporter a part of the model names (its one key: {@code otlp_http}, {@code console}, a
+   * component of its own), gated, onto {@code built}: with its {@code endpoint}, else (no variables
+   * are read under a model) the default for its kind, as the layer decides.
    */
-  static String exporterName(String model) {
-    return switch (model) {
-      case "otlp_http", "otlp_grpc" -> "otlp";
-      case "prometheus/development" -> "prometheus";
-      default -> model;
-    };
-  }
-
-  /** The exporter a part of the model names (its one key), gated, with where it sends, onto {@code built}. */
-  private static void listed(String signal, Map<String, Object> exporter, List<SettingsProto.Exporter> built) {
-    exporter.forEach((k, v) -> built.add(Inventory.exporter(signal, exporterName(k), true).toBuilder()
-        .setDestination(destination(k, v)).build()));
-  }
-
-  /**
-   * Where an exporter of the model sends: its {@code endpoint}, else the default for its kind
-   * (OTLP over HTTP or gRPC, Zipkin). Empty for any other (console, Prometheus, which is pulled).
-   */
-  static String destination(String kind, Object config) {
-    Object endpoint = config instanceof Map<?, ?> m ? m.get("endpoint") : null;
-    return endpoint instanceof String e && !e.isBlank() ? e.trim() : switch (kind) {
-      case "otlp_http" -> "http://localhost:4318";
-      case "otlp_grpc" -> "http://localhost:4317";
-      case "zipkin" -> "http://localhost:9411/api/v2/spans";
-      default -> "";
-    };
+  private static void listed(String signal, Map<String, Object> exporter, List<SettingsProto.FoundExporter> built) {
+    exporter.forEach((k, v) -> {
+      Object endpoint = v instanceof Map<?, ?> m ? m.get("endpoint") : null;
+      String given = endpoint instanceof String e ? e.trim() : "";
+      built.add(Inventory.found(signal, k, true, given).toBuilder().setFromEnv(given.isEmpty()).build());
+    });
   }
 
   private static <T> List<T> list(List<T> l) {
     return l == null ? List.of() : l;
   }
 
-  private static SpanExporterModel spans(SpanExporterModel exporter, List<SettingsProto.Exporter> built) {
+  private static SpanExporterModel spans(SpanExporterModel exporter, List<SettingsProto.FoundExporter> built) {
     if (exporter == null) {
       return null;
     }
@@ -237,7 +217,7 @@ final class Declarative {
     return new SpanExporterModel().withAdditionalProperty(NAME, gated);
   }
 
-  private static LogRecordExporterModel logs(LogRecordExporterModel exporter, List<SettingsProto.Exporter> built) {
+  private static LogRecordExporterModel logs(LogRecordExporterModel exporter, List<SettingsProto.FoundExporter> built) {
     if (exporter == null) {
       return null;
     }

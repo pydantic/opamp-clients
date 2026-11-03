@@ -192,22 +192,26 @@ class InventoryTest {
 
   @Test
   void withNoExporterConfiguredTheSdksDefaultOtlpIsListed() {
+    // Where it sends: the SDK's default protocol, gRPC (the agent sets http/protobuf, port 4318).
+    assertEquals(List.of(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("otlp").setGated(true)
+        .setDestination("http://localhost:4317").build()), configured(Map.of()).build().getExportersList());
+    java.util.function.Function<Map<String, String>, String> sendsTo =
+        props -> configured(props).listed().get(0).getDestination();
+    assertEquals("http://localhost:4318/v1/traces", sendsTo.apply(Map.of("otel.exporter.otlp.protocol", "http/protobuf")));
+    // The signal's endpoint before the shared one, whether a variable or a system property gave it.
+    assertEquals("https://a:4318/v1/traces", sendsTo.apply(Map.of("otel.exporter.otlp.endpoint", "https://b",
+        "otel.exporter.otlp.traces.endpoint", "https://a:4318/v1/traces")));
+    assertEquals("https://b", sendsTo.apply(Map.of("otel.exporter.otlp.endpoint", "https://b")));
+    assertEquals("http://localhost:9411/api/v2/spans", sendsTo.apply(Map.of("otel.traces.exporter", "zipkin")));
+    assertEquals("", sendsTo.apply(Map.of("otel.traces.exporter", "console")));
+  }
+
+  /** An inventory of the traces exporters autoconfigure builds under {@code props}. */
+  private static Inventory configured(Map<String, String> props) {
     Inventory inventory = new Inventory();
     inventory.configured("traces", io.opentelemetry.sdk.autoconfigure.spi.internal.DefaultConfigProperties
-        .createFromMap(Map.of()));
-    // Where it sends: the SDK's default protocol, gRPC (the agent sets http/protobuf, port 4318).
-    assertEquals(List.of(Inventory.exporter("traces", "otlp", true).toBuilder()
-        .setDestination("http://localhost:4317").build()), inventory.build().getExportersList());
-    java.util.function.BiFunction<String, Map<String, String>, String> sendsTo = (name, props) -> Inventory
-        .destination(io.opentelemetry.sdk.autoconfigure.spi.internal.DefaultConfigProperties.createFromMap(props),
-            "traces", name);
-    assertEquals("http://localhost:4318", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.protocol", "http/protobuf")));
-    // The signal's endpoint before the shared one.
-    assertEquals("https://a:4318/v1/traces", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.endpoint", "https://b",
-        "otel.exporter.otlp.traces.endpoint", "https://a:4318/v1/traces")));
-    assertEquals("https://b", sendsTo.apply("otlp", Map.of("otel.exporter.otlp.endpoint", "https://b")));
-    assertEquals("http://localhost:9411/api/v2/spans", sendsTo.apply("zipkin", Map.of()));
-    assertEquals("", sendsTo.apply("console", Map.of()));
+        .createFromMap(props));
+    return inventory;
   }
 
   @Test

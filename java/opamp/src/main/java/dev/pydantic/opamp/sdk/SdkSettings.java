@@ -9,6 +9,8 @@ import com.dylibso.chicory.runtime.Memory;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import opamp.proto.v1.Anyvalue;
 import opamp.proto.v1.Opamp;
 
@@ -202,6 +204,24 @@ public final class SdkSettings {
       c.setHost(host);
     }
     return call(SettingsProto.Request.newBuilder().setComponents(c).build()).getAvailableComponents();
+  }
+
+  /**
+   * What Fleet is told of the exporters an integration found on its SDK's providers, decided the
+   * same in every language: the name each is listed under, where it sends (its own endpoint, else
+   * the {@code OTEL_EXPORTER_*} variables in {@code env}), the governed and ungoverned signals, and
+   * a warning for each ungoverned exporter. At start and when the providers change; never per span.
+   */
+  public SettingsProto.ExportersDecided exporters(List<SettingsProto.FoundExporter> found, Map<String, String> env,
+      String defaultProtocol) {
+    SettingsProto.Exporters.Builder e = SettingsProto.Exporters.newBuilder().addAllFound(found)
+        .setDefaultProtocol(defaultProtocol == null ? "" : defaultProtocol);
+    new TreeMap<>(env).forEach((k, v) -> {
+      if (k.startsWith("OTEL_EXPORTER_") && v != null) {
+        e.addEnv(SettingsProto.EnvVar.newBuilder().setName(k).setValue(v));
+      }
+    });
+    return call(SettingsProto.Request.newBuilder().setExporters(e).build()).getExportersDecided();
   }
 
   private synchronized SettingsProto.Reply call(SettingsProto.Request request) {

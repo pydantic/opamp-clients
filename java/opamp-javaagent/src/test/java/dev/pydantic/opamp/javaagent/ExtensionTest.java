@@ -373,11 +373,11 @@ class ExtensionTest {
             var settings = Vectors.settings(step.has("settings") ? step.get("settings").toString() : v1(), Vectors.NOW);
             // The step's exporters, as the inventory lists them.
             for (String signal : List.of("traces", "metrics", "logs")) {
-              List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> listed = new java.util.ArrayList<>();
+              List<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> listed = new java.util.ArrayList<>();
               step.path("exporters").forEach(x -> {
                 if (x.path("signal").asText().equals(signal)) {
-                  listed.add(Inventory.exporter(signal, x.path("name").asText(), x.path("gated").asBoolean())
-                      .toBuilder().setDestination(x.path("destination").asText()).build());
+                  listed.add(Inventory.found(signal, x.path("name").asText(), x.path("gated").asBoolean(),
+                      x.path("destination").asText()));
                 }
               });
               e.inventory.exporters(signal, listed);
