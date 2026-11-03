@@ -14,8 +14,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        n: [1, 2, 3]
-        fw: [net10.0, net8.0]
+        n: [1, 2, 3, 4]
+        fw: [net8.0]
     defaults:
       run:
         shell: bash
