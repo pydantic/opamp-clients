@@ -738,6 +738,31 @@ public class HostingTests
         await host.StopAsync(Cancel);
     }
 
+    // A failing Exporters call (a trapped core) is reporting only: the exporters listed stay as they
+    // were, the policy is decided and applied, and nothing reaches the application.
+    [Fact]
+    public async Task AFailingExportersCallKeepsTheListAndThePolicy()
+    {
+        var first = Policy.Stop("traces");
+        await using var server = new OpAmpServer(Kit.Config(first));
+        await using var collector = new Collector();
+        var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:HeartbeatInterval"] = "100ms" });
+        b.Services.AddOpenTelemetry().WithTracing(t => t.AddSource("s").AddOtlpExporter(e => Otlp(e, collector.Endpoint + "/v1/traces"))).WithOpAmp();
+        using var host = b.Build();
+        await host.StartAsync(Cancel);
+        var agent = host.Services.GetRequiredService<OpAmpAgent>();
+        await Kit.Until(() => Applied(server, first), "the first config answered APPLIED");
+        var before = agent.Agent!.Components!.Components["exporters"];
+        agent.Agent.DecideExporters = (_, _, _) => throw new InvalidOperationException("the core trapped");
+        host.Services.GetRequiredService<TracerProvider>().AddProcessor(new SimpleActivityExportProcessor(new Kept<Activity>()));
+        var next = Policy.Stop("traces", "logs");
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent.RemoteConfig(Kit.Config(next)).Status);
+        agent.Agent.Recheck();
+        Assert.Equal(before, agent.Agent.Components!.Components["exporters"]);
+        Assert.False(agent.Controls.Sends(Signal.Logs));
+        await host.StopAsync(Cancel);
+    }
+
     private static bool Applied(OpAmpServer server, string body) =>
         server.Messages.Any(m => m.RemoteConfigStatus is { Status: RemoteConfigStatuses.Applied } s && s.LastRemoteConfigHash.ToStringUtf8() == body);
 

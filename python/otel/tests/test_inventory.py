@@ -414,3 +414,26 @@ def test_configure_gates_a_span_processor_it_was_given_and_lists_no_instrumentat
     # installed, under the names opentelemetry-instrument would take.
     assert "deactivate_instrumentations" not in got["settings"]
     assert got["instrumentations"] == instrumentors()
+
+
+class _FailingLayer:
+    """A layer whose Exporters call fails, as a trapped core would."""
+
+    def exporters(self, *args, **kwargs):
+        raise RuntimeError("the core trapped")
+
+
+def test_a_failing_exporters_call_leaves_the_gates_in_place_and_raises_nothing(caplog):
+    # Reporting only: the gates are in front of every exporter all the same, the list stays as it
+    # was (empty at start), and the application never sees the error.
+    c = Controls()
+    traces = TracerProvider()
+    memory = InMemorySpanExporter()
+    traces.add_span_processor(SimpleSpanProcessor(memory))
+    try:
+        got = pydantic_opamp_otel.govern(c, traces, MeterProvider(), LoggerProvider(), layer=_FailingLayer())
+    finally:
+        traces.shutdown()
+    assert got.exporters == [] and len(got.found) == 1
+    assert traces._active_span_processor._span_processors[0].span_exporter._to is memory
+    assert "can't list the exporters" in caplog.text

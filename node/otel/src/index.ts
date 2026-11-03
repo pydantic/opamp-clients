@@ -1822,12 +1822,19 @@ export class Agent {
   /**
    * The exporters listed, as the layer decides them in every SDK: those `govern` found, and an
    * ungoverned app_provider for each signal the application registered a provider of its own
-   * for. Each warning the layer gives is said once.
+   * for. Each warning the layer gives is said once. Reporting only: should the call fail, the list
+   * stays as it was and nothing is thrown (this runs in the application's own calls, too).
    */
   #decide(): void {
     if (!this.layer) return;
     const own = [...this.ownProviders].map((signal) => ({ signal, kind: APP_PROVIDER, gated: false }));
-    const d = this.layer.exporters([...this.found, ...own], this.#env, "http/protobuf");
+    let d: ReturnType<SdkSettings["exporters"]>;
+    try {
+      d = this.layer.exporters([...this.found, ...own], this.#env, "http/protobuf");
+    } catch (e) {
+      say.warn(`OpAMP: can't list the exporters; they are governed all the same: ${String(e)}`);
+      return;
+    }
     this.exporters = d.exporters.map(({ signal, name, gated, destination }) => ({ signal, name, gated, destination }));
     for (const w of d.warnings.filter((w) => !this.#warned.has(w))) {
       this.#warned.add(w);

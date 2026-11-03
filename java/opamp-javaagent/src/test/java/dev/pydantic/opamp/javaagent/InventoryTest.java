@@ -206,6 +206,19 @@ class InventoryTest {
     assertEquals("", sendsTo.apply(Map.of("otel.traces.exporter", "console")));
   }
 
+  @Test
+  void aFailingExportersCallKeepsTheListAndThrowsNothing() {
+    Inventory inventory = configured(Map.of());
+    List<SettingsProto.Exporter> before = inventory.listed();
+    assertEquals(1, before.size());
+    // As a trapped core would: reporting only, so the list stays as it was.
+    inventory.layer = () -> {
+      throw new IllegalStateException("the core trapped");
+    };
+    inventory.outside("traces", List.of("Another"));
+    assertEquals(before, inventory.listed());
+  }
+
   /** An inventory of the traces exporters autoconfigure builds under {@code props}. */
   private static Inventory configured(Map<String, String> props) {
     Inventory inventory = new Inventory();

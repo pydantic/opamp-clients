@@ -189,3 +189,23 @@ test("an agent that isn't on hears nothing, and the setters still work", () => {
   assert.equal(trace.setGlobalTracerProvider(p), true);
   assert.equal(a.ownProviders.size, 0);
 });
+
+test("a failing Exporters call leaves the gates and the list as they were, and the application never sees it", () => {
+  const { a, got } = agent();
+  const s = sdk(a);
+  watchProviders(a, () => s.start());
+  a.govern(providersOf(s));
+  const before = a.exporters;
+  assert.ok(before.length > 0);
+  // As a trapped core would.
+  a.layer!.exporters = () => {
+    throw new Error("the core trapped");
+  };
+  a.govern(providersOf(s));
+  trace.disable();
+  // Registering a provider of its own goes through to the API, error or not.
+  assert.equal(trace.setGlobalTracerProvider(new BasicTracerProvider()), true);
+  assert.deepEqual(a.exporters, before);
+  assert.ok(got.warned.some((w) => w.includes("can't list the exporters")), got.warned.join("\n"));
+  trace.disable();
+});

@@ -1067,8 +1067,13 @@ class Governed:
 
     def decide(self, layer: SdkSettings, env: Mapping[str, str]) -> Governed:
         """What the core decides of the exporters found (`SdkSettings.exporters`): the same names,
-        destinations and warnings as every other SDK's. The OTEL_* variables in `env` are read."""
-        decided = layer.exporters(self.found, dict(env), "grpc")
+        destinations and warnings as every other SDK's. The OTEL_* variables in `env` are read.
+        Reporting only: should the call fail, the list stays as it was and nothing is raised."""
+        try:
+            decided = layer.exporters(self.found, dict(env), "grpc")
+        except Exception:  # noqa: BLE001 - the gates are in place; only the report is missing
+            _log.warning("OpAMP: can't list the exporters; they are governed all the same", exc_info=True)
+            return self
         self.exporters, self.warnings = list(decided.exporters), list(decided.warnings)
         return self
 
@@ -1446,6 +1451,7 @@ class Agent:
             if not found.found:
                 return
             found.found[:0] = self.found
+            found.exporters = self.exporters  # kept, should the call fail
             found.decide(self.layer, os.environ)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)

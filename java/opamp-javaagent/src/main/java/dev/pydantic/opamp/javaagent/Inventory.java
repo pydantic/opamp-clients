@@ -116,7 +116,8 @@ final class Inventory {
   /**
    * Every exporter listed, governed or not, as the layer decides them in every SDK: what the
    * inventory and export health report. Decided again only after a change; each warning the layer
-   * gives is logged once. The layer is called outside this lock (it takes the extension's).
+   * gives is logged once. The layer is called outside this lock (it takes the extension's). Never
+   * throws: should the call fail, the list last decided stands.
    */
   List<SettingsProto.Exporter> listed() {
     List<SettingsProto.FoundExporter> found = new ArrayList<>();
@@ -131,8 +132,17 @@ final class Inventory {
       vars = Map.copyOf(env);
       at = changes;
     }
-    // The SDK's own default; the agent sets http/protobuf, which autoconfigure then reads.
-    SettingsProto.ExportersDecided d = layer.get().exporters(found, vars, "grpc");
+    SettingsProto.ExportersDecided d;
+    try {
+      // The SDK's own default; the agent sets http/protobuf, which autoconfigure then reads.
+      d = layer.get().exporters(found, vars, "grpc");
+    } catch (RuntimeException e) {
+      // Reporting only: the gates are in place, and the list stays as it was.
+      LOG.log(Level.WARNING, "OpAMP: can't list the exporters; they are governed all the same", e);
+      synchronized (this) {
+        return decided;
+      }
+    }
     synchronized (this) {
       for (String w : d.getWarningsList()) {
         if (warned.add(w)) {

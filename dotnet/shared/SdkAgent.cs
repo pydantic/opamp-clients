@@ -278,6 +278,9 @@ internal sealed class SdkAgent
     private List<Exporter> decided = [];
     private readonly HashSet<string> warned = [];
 
+    /// <summary>The layer's Exporters call; a test's own in tests (one that fails, say).</summary>
+    internal Func<List<FoundExporter>, IEnumerable<KeyValuePair<string, string>>, string, ExportersDecided> DecideExporters;
+
     /// <summary>
     /// Load the saved settings and put them in force on <paramref name="controls"/>; name the instance.
     /// <paramref name="hostNow"/> says what the SDK carries out (its argument: whether the providers are built).
@@ -295,6 +298,7 @@ internal sealed class SdkAgent
         controls.App.Info = log.Info;
         controls.App.Error = log.Error;
         this.layer = new SdkSettings();
+        this.DecideExporters = (found, env, protocol) => this.layer.Exporters(found, env, protocol);
         this.host = hostNow(false);
         var now = this.clock.WallMs();
         this.atStart = this.layer.Load(this.ReadSaved(), this.host, now, this.ReadCoreState());
@@ -526,6 +530,7 @@ internal sealed class SdkAgent
     /// The exporters an integration found, as listed, decided by the layer as in every SDK: the
     /// names, and where each sends (its own endpoint, else the <c>OTEL_EXPORTER_*</c> variables).
     /// Decided again only when what is found changes; each warning the layer gives is logged once.
+    /// Never throws: should the call fail, the list last decided stands.
     /// </summary>
     public List<Exporter> Exporters(IEnumerable<Exporters.Built> built, string defaultProtocol)
     {
@@ -534,7 +539,18 @@ internal sealed class SdkAgent
         {
             if (!now.SequenceEqual(this.found))
             {
-                var d = this.layer.Exporters(now, ExporterVariables(this.getenv), defaultProtocol);
+                ExportersDecided d;
+                try
+                {
+                    d = this.DecideExporters(now, ExporterVariables(this.getenv), defaultProtocol);
+                }
+                catch (Exception e)
+                {
+                    // Reporting only: the gates are in place, and the list stays as it was.
+                    this.log.Warn($"can't list the exporters; they are governed all the same: {e.Message}");
+                    return [.. this.decided];
+                }
+
                 foreach (var w in d.Warnings.Where(this.warned.Add))
                 {
                     this.log.Warn(w);
