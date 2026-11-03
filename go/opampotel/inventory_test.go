@@ -253,8 +253,8 @@ func TestAnInventoryOfNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer sdk.Shutdown(context.Background())
-	if len(sdk.exporters) != 0 {
-		t.Fatalf("exporters %v", sdk.exporters)
+	if len(sdk.found) != 0 {
+		t.Fatalf("exporters %v", sdk.found)
 	}
 	sdk.agent.mu.Lock()
 	c := sdk.agent.components(context.Background())
@@ -479,5 +479,28 @@ func TestAVersionWithACommaTakesNoSlot(t *testing.T) {
 	slices.Sort(versions)
 	if len(versions) != maxScopeVersions || versions[0] != "1.000" || versions[maxScopeVersions-1] != fmt.Sprintf("1.%03d", maxScopeVersions-1) {
 		t.Fatalf("versions %v: want the %d without a comma", versions, maxScopeVersions)
+	}
+}
+
+// Each exporter Setup built is listed as the layer decides from the variables autoexport read:
+// OTLP at its per-signal endpoint, the console under its own name.
+func TestTheExportersAreListedWhereTheVariablesSend(t *testing.T) {
+	t.Setenv("OTEL_TRACES_EXPORTER", "otlp")
+	t.Setenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://collector.example.com:4318/v1/traces")
+	t.Setenv("OTEL_LOGS_EXPORTER", "console")
+	sdk, err := setup(context.Background(), env(map[string]string{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:1/v1/opamp",
+		"OTEL_METRICS_EXPORTER": "none"}), WithStateDir("none"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sdk.Shutdown(context.Background())
+	sdk.agent.mu.Lock()
+	defer sdk.agent.mu.Unlock()
+	var got []string
+	for _, e := range sdk.agent.listedExporters() {
+		got = append(got, fmt.Sprintf("%s/%s/%v/%s", e.GetSignal(), e.GetName(), e.GetGated(), e.GetDestination()))
+	}
+	if want := []string{"traces/otlp/true/https://collector.example.com:4318/v1/traces", "logs/console/true/"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("listed %v, want %v", got, want)
 	}
 }

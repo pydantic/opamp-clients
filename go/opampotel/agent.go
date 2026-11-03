@@ -99,9 +99,12 @@ type agent struct {
 	client *opamp.Client
 	reach  *reachability // set in start; used on the client's goroutine only
 
-	// The inventory: the exporters Setup built (set before start), and the generation of scopes
-	// last listed (under mu).
+	// The inventory: the exporters Setup built as found (set before start), those the layer
+	// decided are listed (decide), the warnings said, and the generation of scopes last listed
+	// (under mu).
+	found     []*settingspb.FoundExporter
 	exporters []*settingspb.Exporter
+	warned    map[string]bool
 	listed    uint64
 	// relist: the exporters changed before there was a client to tell; start sends the inventory.
 	relist bool

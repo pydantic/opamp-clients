@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
@@ -214,6 +215,25 @@ func (l *Layer) Components(ctx context.Context, inventory *settingspb.Inventory,
 		return nil, err
 	}
 	return r.GetAvailableComponents(), nil
+}
+
+// Exporters decides, the same in every language, what Fleet is told of the exporters an
+// integration found on its SDK's providers: the name each is listed under, where it sends (its own
+// endpoint, else the OTEL_EXPORTER_* variables in env, as os.Environ gives them), which signals are
+// governed, and a warning for each ungoverned one. Called at start and when the providers change.
+func (l *Layer) Exporters(ctx context.Context, found []*settingspb.FoundExporter, env []string,
+	defaultProtocol string) (*settingspb.ExportersDecided, error) {
+	e := &settingspb.Exporters{Found: found, DefaultProtocol: defaultProtocol}
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok && strings.HasPrefix(k, "OTEL_EXPORTER_") {
+			e.Env = append(e.Env, &settingspb.EnvVar{Name: k, Value: v})
+		}
+	}
+	r, err := l.do(ctx, &settingspb.Request{Call: &settingspb.Request_Exporters{Exporters: e}})
+	if err != nil {
+		return nil, err
+	}
+	return r.GetExportersDecided(), nil
 }
 
 func (l *Layer) do(ctx context.Context, req *settingspb.Request) (*settingspb.Reply, error) {

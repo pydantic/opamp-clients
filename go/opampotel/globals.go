@@ -6,8 +6,8 @@ package opampotel
 import (
 	"context"
 	"log/slog"
+	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -45,20 +45,42 @@ type replaced struct{ traces, metrics, logs bool }
 // appProvider is the identity a global provider of the application's own is reported under.
 const appProvider = "app_provider"
 
-// listedExporters are the exporters Setup built, and an ungoverned app_provider for each signal
-// whose global provider the application replaced: what the inventory and export health list.
+// listedExporters are what the inventory and export health list, as decide last decided them.
 // Under a.mu, or before start.
 func (a *agent) listedExporters() []*settingspb.Exporter {
-	out := slices.Clone(a.exporters)
+	return a.exporters
+}
+
+// decide has the layer decide the exporters listed, as every SDK's does, from those Setup built
+// and an ungoverned app_provider for each signal whose global provider the application replaced;
+// each warning it gives is said once. On an error the list stays as it was. Under a.mu, or before
+// start.
+func (a *agent) decide(ctx context.Context) {
+	found := slices.Clone(a.found)
 	for _, s := range []struct {
 		is     bool
 		signal string
 	}{{a.replaced.traces, "traces"}, {a.replaced.metrics, "metrics"}, {a.replaced.logs, "logs"}} {
 		if s.is {
-			out = append(out, &settingspb.Exporter{Signal: s.signal, Name: appProvider})
+			found = append(found, &settingspb.FoundExporter{Signal: s.signal, Kind: appProvider})
 		}
 	}
-	return out
+	// autoexport reads the process's environment, and so its exporters send where it says.
+	d, err := a.layer.Exporters(ctx, found, os.Environ(), "http/protobuf")
+	if err != nil {
+		slog.Warn("opamp: the exporters could not be listed", "error", err)
+		return
+	}
+	a.exporters = d.GetExporters()
+	for _, w := range d.GetWarnings() {
+		if !a.warned[w] {
+			if a.warned == nil {
+				a.warned = map[string]bool{}
+			}
+			a.warned[w] = true
+			slog.Warn("opamp: " + w)
+		}
+	}
 }
 
 // watchEvery is how often the agent looks at the global providers. The otel packages say nothing
@@ -121,18 +143,7 @@ func (a *agent) noticeReplaced() bool {
 	if r == a.replaced {
 		return false
 	}
-	var which []string
-	for _, s := range []struct {
-		was, is bool
-		name    string
-	}{{a.replaced.traces, r.traces, "tracer"}, {a.replaced.metrics, r.metrics, "meter"}, {a.replaced.logs, r.logs, "logger"}} {
-		if s.is && !s.was {
-			which = append(which, s.name)
-		}
-	}
 	a.replaced = r
-	slog.Warn("opamp: the application set global providers of its own in place of Setup's (" +
-		strings.Join(which, ", ") + "); the server's settings can't govern the telemetry they receive, " +
-		"so they are reported as ungoverned")
+	a.decide(context.Background())
 	return true
 }

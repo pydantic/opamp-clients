@@ -239,11 +239,13 @@ func TestSetupSeesTheApplicationSetAGlobalProviderOfItsOwn(t *testing.T) {
 		}
 		var warned []string
 		for _, s := range *said {
-			if strings.Contains(s, "global providers of its own") {
+			if strings.Contains(s, "provider of its own") {
 				warned = append(warned, s)
 			}
 		}
-		if len(warned) != 1 || !strings.HasPrefix(warned[0], "WARN") || !strings.Contains(warned[0], "(tracer)") ||
+		// The layer's words, as every SDK says them, once.
+		if len(warned) != 1 || !strings.HasPrefix(warned[0], "WARN") ||
+			!strings.Contains(warned[0], "the application set a traces provider of its own") ||
 			!strings.Contains(warned[0], "ungoverned") {
 			t.Fatalf("warned %q", warned)
 		}

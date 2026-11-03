@@ -224,7 +224,7 @@ func TestTheDescriptionNamesTheFormatAndTheControls(t *testing.T) {
 	}
 	defer l.Close(ctx)
 	all := "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,trace_rate_limit," +
-		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,scrubbing"
+		"log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,scrubbing,self_monitoring"
 	for _, c := range []struct {
 		name     string
 		host     *settingspb.Host
@@ -452,6 +452,81 @@ func TestEvaluate(t *testing.T) {
 		Input: &settingspb.Evaluate_Log{Log: &settingspb.LogRecord{}}})
 	if err != nil || !strings.HasPrefix(refused.GetRefused(), "head_sampling:") {
 		t.Fatalf("refused: %v %v", refused, err)
+	}
+}
+
+// The shared exporters vectors (testdata/sdk-settings/exporters.json), each through Exporters:
+// the exporters, governed and ungoverned signals and warnings, each compared whole.
+func TestTheExportersVectors(t *testing.T) {
+	ctx := context.Background()
+	l, err := New(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close(ctx)
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "sdk-settings", "exporters.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	type exporter struct {
+		Signal      string `json:"signal"`
+		Name        string `json:"name"`
+		Gated       bool   `json:"gated"`
+		Destination string `json:"destination"`
+	}
+	type decided struct {
+		Exporters  []exporter `json:"exporters"`
+		Governed   []string   `json:"governed"`
+		Ungoverned []string   `json:"ungoverned"`
+		Warnings   []string   `json:"warnings"`
+	}
+	var v struct {
+		Cases []struct {
+			Name  string `json:"name"`
+			Found []struct {
+				Signal   string `json:"signal"`
+				Kind     string `json:"kind"`
+				Gated    bool   `json:"gated"`
+				Endpoint string `json:"endpoint"`
+				FromEnv  bool   `json:"from_env"`
+			} `json:"found"`
+			Env             map[string]string `json:"env"`
+			DefaultProtocol string            `json:"default_protocol"`
+			Want            decided           `json:"want"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range v.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			var found []*settingspb.FoundExporter
+			for _, f := range c.Found {
+				found = append(found, &settingspb.FoundExporter{Signal: f.Signal, Kind: f.Kind, Gated: f.Gated,
+					Endpoint: f.Endpoint, FromEnv: f.FromEnv})
+			}
+			var env []string
+			for k, val := range c.Env {
+				env = append(env, k+"="+val)
+			}
+			got, err := l.Exporters(ctx, found, env, c.DefaultProtocol)
+			if err != nil {
+				t.Fatal(err)
+			}
+			have := decided{Exporters: []exporter{}, Governed: got.GetGoverned(), Ungoverned: got.GetUngoverned(),
+				Warnings: got.GetWarnings()}
+			for _, e := range got.GetExporters() {
+				have.Exporters = append(have.Exporters, exporter{e.GetSignal(), e.GetName(), e.GetGated(), e.GetDestination()})
+			}
+			for _, s := range []*[]string{&have.Governed, &have.Ungoverned, &have.Warnings} {
+				if *s == nil {
+					*s = []string{}
+				}
+			}
+			if !reflect.DeepEqual(have, c.Want) {
+				t.Errorf("got %+v\nwant %+v", have, c.Want)
+			}
+		})
 	}
 }
 
