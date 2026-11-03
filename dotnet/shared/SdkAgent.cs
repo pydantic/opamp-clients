@@ -482,12 +482,21 @@ internal sealed class SdkAgent
             // Notifications come one at a time on the client's loop, never before Start returns,
             // each with the client to answer through (docs/sdk-contract.md).
             var started = OpAmpClient.Start(options, status, this.Notified);
+            ComponentHealth? late;
             lock (this.gate)
             {
                 this.client = started;
+                // A SetHealth while the client was starting found no client to send through, and
+                // its caller says nothing again until the health changes: send what it set now.
+                late = ReferenceEquals(this.HealthSent, first) ? null : this.HealthSent;
                 // Export health: every 30 s from now, on the settings' timer.
                 this.nextHealth = this.clock.Nanos() + (HealthEvery.Ticks * 100);
                 this.Rearm();
+            }
+
+            if (late is not null)
+            {
+                started.SetHealth(late);
             }
         }
     }

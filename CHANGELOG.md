@@ -51,6 +51,8 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- .NET: the application's health set while the OpAMP client was starting (a health check that
+  runs at once) is reported. It was lost, and not reported again until the health changed (#PR).
 - Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
   `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
   the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
