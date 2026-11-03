@@ -278,6 +278,9 @@ internal sealed class SdkAgent
     private List<Exporter> decided = [];
     private readonly HashSet<string> warned = [];
 
+    // Each exporter as the layer last listed it, by what was found: should a call fail, they keep their names.
+    private readonly Dictionary<FoundExporter, Exporter> listedAs = [];
+
     /// <summary>The layer's Exporters call; a test's own in tests (one that fails, say).</summary>
     internal Func<List<FoundExporter>, IEnumerable<KeyValuePair<string, string>>, string, ExportersDecided> DecideExporters;
 
@@ -530,7 +533,7 @@ internal sealed class SdkAgent
     /// The exporters an integration found, as listed, decided by the layer as in every SDK: the
     /// names, and where each sends (its own endpoint, else the <c>OTEL_EXPORTER_*</c> variables).
     /// Decided again only when what is found changes; each warning the layer gives is logged once.
-    /// Never throws: should the call fail, the list last decided stands.
+    /// Never throws: should the call fail, each keeps the name last decided, a new one listed as found.
     /// </summary>
     public List<Exporter> Exporters(IEnumerable<Exporters.Built> built, string defaultProtocol)
     {
@@ -546,9 +549,9 @@ internal sealed class SdkAgent
                 }
                 catch (Exception e)
                 {
-                    // Reporting only: the gates are in place, and the list stays as it was.
+                    // Reporting only: the gates are in place whatever the list says.
                     this.log.Warn($"can't list the exporters; they are governed all the same: {e.Message}");
-                    return [.. this.decided];
+                    return [.. now.Select(f => this.listedAs.TryGetValue(f, out var e) ? e : AsFound(f))];
                 }
 
                 foreach (var w in d.Warnings.Where(this.warned.Add))
@@ -558,15 +561,40 @@ internal sealed class SdkAgent
 
                 this.found = now;
                 this.decided = [.. d.Exporters];
+                if (d.Exporters.Count == now.Count)
+                {
+                    foreach (var (f, e) in now.Zip(d.Exporters))
+                    {
+                        this.listedAs[f] = e;
+                    }
+                }
             }
 
             return [.. this.decided];
         }
     }
 
-    /// <summary>The name each exporter is listed under, as the layer gives it: to tell two views of one exporter apart.</summary>
-    public List<string> ExporterNames(IEnumerable<Exporters.Built> built) =>
-        [.. this.layer.Exporters(built.Select(b => b.Found())).Exporters.Select(e => e.Name)];
+    /// <summary>
+    /// The name each exporter is listed under, as the layer gives it: to tell two views of one
+    /// exporter apart. Never throws: should the call fail, each is named as it was found.
+    /// </summary>
+    public List<string> ExporterNames(IEnumerable<Exporters.Built> built)
+    {
+        var found = built.Select(b => b.Found()).ToList();
+        try
+        {
+            return [.. this.DecideExporters(found, [], "http/protobuf").Exporters.Select(e => e.Name)];
+        }
+        catch (Exception)
+        {
+            // Exporters, called next with the same, says so.
+            return [.. found.Select(f => f.Kind)];
+        }
+    }
+
+    /// <summary>An exporter listed as it was found, when the layer can't name it: its kind and its own endpoint.</summary>
+    private static Exporter AsFound(FoundExporter f) =>
+        new() { Signal = f.Signal, Name = f.Kind, Gated = f.Gated, Destination = f.Endpoint };
 
     /// <summary>The variables the layer reads to say where an exporter built from them sends.</summary>
     private static List<KeyValuePair<string, string>> ExporterVariables(Func<string, string?> getenv) =>

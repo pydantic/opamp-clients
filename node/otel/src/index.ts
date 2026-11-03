@@ -1641,6 +1641,8 @@ export class Agent {
   #env: NodeJS.ProcessEnv = {};
   /** The layer's warnings said so far: each once. */
   readonly #warned = new Set<string>();
+  /** Each exporter as the layer last listed it, by what was found: should a call fail, it keeps its name. */
+  readonly #listedAs = new Map<string, Exporter>();
   /** The instrumentations the SDK loaded (`instrument`), which the inventory lists. */
   #instrumentations: Instrumentation[] | undefined;
 
@@ -1822,20 +1824,26 @@ export class Agent {
   /**
    * The exporters listed, as the layer decides them in every SDK: those `govern` found, and an
    * ungoverned app_provider for each signal the application registered a provider of its own
-   * for. Each warning the layer gives is said once. Reporting only: should the call fail, the list
-   * stays as it was and nothing is thrown (this runs in the application's own calls, too).
+   * for. Each warning the layer gives is said once. Reporting only: should the call fail, nothing
+   * is thrown (this runs in the application's own calls, too), and each exporter keeps the name
+   * last decided, one new since listed as found.
    */
   #decide(): void {
     if (!this.layer) return;
     const own = [...this.ownProviders].map((signal) => ({ signal, kind: APP_PROVIDER, gated: false }));
+    const found: FoundExporterInit[] = [...this.found, ...own];
+    const keys = found.map((f) => JSON.stringify([f.signal, f.kind, f.gated, f.endpoint ?? "", f.fromEnv ?? false]));
     let d: ReturnType<SdkSettings["exporters"]>;
     try {
-      d = this.layer.exporters([...this.found, ...own], this.#env, "http/protobuf");
+      d = this.layer.exporters(found, this.#env, "http/protobuf");
     } catch (e) {
       say.warn(`OpAMP: can't list the exporters; they are governed all the same: ${String(e)}`);
+      this.exporters = found.map((f, i) => this.#listedAs.get(keys[i]!)
+        ?? { signal: f.signal ?? "", name: f.kind ?? "", gated: f.gated ?? false, destination: f.endpoint ?? "" });
       return;
     }
     this.exporters = d.exporters.map(({ signal, name, gated, destination }) => ({ signal, name, gated, destination }));
+    if (this.exporters.length === keys.length) this.exporters.forEach((e, i) => this.#listedAs.set(keys[i]!, e));
     for (const w of d.warnings.filter((w) => !this.#warned.has(w))) {
       this.#warned.add(w);
       say.warn(`OpAMP: ${w}`);

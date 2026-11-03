@@ -100,6 +100,17 @@ public class InventoryTests
         Assert.Equal(listed, string.Join(",", traces));
     }
 
+    // The inventory asks the layer for names too: a failing call there never reaches the
+    // application, and the exporters it found are still listed, by what they were found as.
+    [Fact]
+    public void AFailingExportersCallStillListsTheExporters()
+    {
+        var agent = Prepared(new() { ["OTEL_TRACES_EXPORTER"] = "otlp" });
+        agent.Sdk.DecideExporters = (_, _, _) => throw new InvalidOperationException("the core trapped");
+        var traces = agent.Inventory().Exporters.Where(e => e.Signal == "traces").Select(e => e.Name);
+        Assert.Equal(["otlp"], traces);
+    }
+
     // What isn't a signal's own exporter isn't listed: prometheus is metrics' alone.
     [Fact]
     public void AnExporterOfAnotherSignalIsNotListed()

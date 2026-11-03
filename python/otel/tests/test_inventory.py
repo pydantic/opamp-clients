@@ -424,8 +424,8 @@ class _FailingLayer:
 
 
 def test_a_failing_exporters_call_leaves_the_gates_in_place_and_raises_nothing(caplog):
-    # Reporting only: the gates are in front of every exporter all the same, the list stays as it
-    # was (empty at start), and the application never sees the error.
+    # Reporting only: the gates are in front of every exporter all the same, each exporter is
+    # listed as it was found, and the application never sees the error.
     c = Controls()
     traces = TracerProvider()
     memory = InMemorySpanExporter()
@@ -434,6 +434,20 @@ def test_a_failing_exporters_call_leaves_the_gates_in_place_and_raises_nothing(c
         got = pydantic_opamp_otel.govern(c, traces, MeterProvider(), LoggerProvider(), layer=_FailingLayer())
     finally:
         traces.shutdown()
-    assert got.exporters == [] and len(got.found) == 1
+    assert got.exporters == [settings_pb2.Exporter(signal="traces", name="InMemorySpanExporter", gated=True)]
     assert traces._active_span_processor._span_processors[0].span_exporter._to is memory
     assert "can't list the exporters" in caplog.text
+
+
+def test_a_failing_exporters_call_keeps_the_names_last_decided():
+    # Identities in Fleet stay put: an exporter listed before keeps its name, one new since is
+    # listed as it was found.
+    otlp = settings_pb2.FoundExporter(signal="traces", kind="otlp_proto_grpc", gated=True, endpoint="col:4317")
+    listed_as: dict = {}
+    first = pydantic_opamp_otel.Governed()
+    first.found = [otlp]
+    assert [e.name for e in first.decide(LAYER, {}, listed_as).exporters] == ["otlp"]
+    later = pydantic_opamp_otel.Governed()
+    later.found = [otlp, settings_pb2.FoundExporter(signal="traces", kind="Mine", gated=False)]
+    got = later.decide(_FailingLayer(), {}, listed_as).exporters
+    assert [(e.name, e.gated, e.destination) for e in got] == [("otlp", True, "col:4317"), ("Mine", False, "")]

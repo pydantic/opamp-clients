@@ -190,7 +190,7 @@ test("an agent that isn't on hears nothing, and the setters still work", () => {
   assert.equal(a.ownProviders.size, 0);
 });
 
-test("a failing Exporters call leaves the gates and the list as they were, and the application never sees it", () => {
+test("a failing Exporters call keeps the names last decided, and the application never sees it", () => {
   const { a, got } = agent();
   const s = sdk(a);
   watchProviders(a, () => s.start());
@@ -205,7 +205,9 @@ test("a failing Exporters call leaves the gates and the list as they were, and t
   trace.disable();
   // Registering a provider of its own goes through to the API, error or not.
   assert.equal(trace.setGlobalTracerProvider(new BasicTracerProvider()), true);
-  assert.deepEqual(a.exporters, before);
+  // Those listed before keep their names; the provider new since is listed as found.
+  assert.deepEqual(a.exporters.filter((e) => e.name !== APP_PROVIDER), before.filter((e) => e.name !== APP_PROVIDER));
+  assert.ok(a.exporters.some((e) => e.signal === "traces" && e.name === APP_PROVIDER && !e.gated));
   assert.ok(got.warned.some((w) => w.includes("can't list the exporters")), got.warned.join("\n"));
   trace.disable();
 });

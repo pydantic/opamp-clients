@@ -12,6 +12,7 @@ import io.opentelemetry.sdk.resources.Resource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -52,6 +53,8 @@ final class Inventory {
   private long changes;
   private long decidedAt = -1;
   private List<SettingsProto.Exporter> decided = List.of();
+  /** Each exporter as the layer last listed it, by what was found: should a call fail, it keeps its name. */
+  private final Map<SettingsProto.FoundExporter, SettingsProto.Exporter> listedAs = new HashMap<>();
   /** The layer's warnings said so far: each once. */
   private final Set<String> warned = new HashSet<>();
   /** The instrumentations the agent can run: its InstrumentationModules, read once, at start. */
@@ -117,7 +120,7 @@ final class Inventory {
    * Every exporter listed, governed or not, as the layer decides them in every SDK: what the
    * inventory and export health report. Decided again only after a change; each warning the layer
    * gives is logged once. The layer is called outside this lock (it takes the extension's). Never
-   * throws: should the call fail, the list last decided stands.
+   * throws: should the call fail, each exporter keeps the name last decided, a new one listed as found.
    */
   List<SettingsProto.Exporter> listed() {
     List<SettingsProto.FoundExporter> found = new ArrayList<>();
@@ -140,7 +143,9 @@ final class Inventory {
       // Reporting only: the gates are in place, and the list stays as it was.
       LOG.log(Level.WARNING, "OpAMP: can't list the exporters; they are governed all the same", e);
       synchronized (this) {
-        return decided;
+        return found.stream().map(f -> listedAs.getOrDefault(f, SettingsProto.Exporter.newBuilder()
+            .setSignal(f.getSignal()).setName(f.getKind()).setGated(f.getGated()).setDestination(f.getEndpoint())
+            .build())).toList();
       }
     }
     synchronized (this) {
@@ -152,6 +157,11 @@ final class Inventory {
       if (at == changes) {
         decided = List.copyOf(d.getExportersList());
         decidedAt = at;
+      }
+      if (d.getExportersCount() == found.size()) {
+        for (int i = 0; i < found.size(); i++) {
+          listedAs.put(found.get(i), d.getExporters(i));
+        }
       }
     }
     return List.copyOf(d.getExportersList());

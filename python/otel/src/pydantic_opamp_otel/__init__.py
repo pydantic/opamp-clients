@@ -1065,16 +1065,24 @@ class Governed:
         self.sdk = {"traces": False, "metrics": False, "logs": False}
         self._seen: set[int] = set()
 
-    def decide(self, layer: SdkSettings, env: Mapping[str, str]) -> Governed:
+    def decide(self, layer: SdkSettings, env: Mapping[str, str], listed_as: dict[bytes, settings_pb2.Exporter]
+               | None = None) -> Governed:
         """What the core decides of the exporters found (`SdkSettings.exporters`): the same names,
         destinations and warnings as every other SDK's. The OTEL_* variables in `env` are read.
-        Reporting only: should the call fail, the list stays as it was and nothing is raised."""
+        Reporting only: should the call fail, nothing is raised, and each exporter keeps the name
+        `listed_as` holds from an earlier decision (kept up to date here), a new one listed as found."""
+        listed_as = {} if listed_as is None else listed_as
+        keys = [f.SerializeToString(deterministic=True) for f in self.found]
         try:
             decided = layer.exporters(self.found, dict(env), "grpc")
         except Exception:  # noqa: BLE001 - the gates are in place; only the report is missing
             _log.warning("OpAMP: can't list the exporters; they are governed all the same", exc_info=True)
+            self.exporters = [listed_as.get(k) or settings_pb2.Exporter(
+                signal=f.signal, name=f.kind, gated=f.gated, destination=f.endpoint) for k, f in zip(keys, self.found)]
             return self
         self.exporters, self.warnings = list(decided.exporters), list(decided.warnings)
+        if len(self.exporters) == len(keys):
+            listed_as.update(zip(keys, self.exporters))
         return self
 
     def first_time(self, o) -> bool:
@@ -1165,13 +1173,13 @@ def _govern_readers(provider, found: Governed) -> None:
 
 def govern(controls: Controls, tracer_provider=None, meter_provider=None, logger_provider=None,
            log_spans: bool = False, layer: SdkSettings | None = None,
-           env: Mapping[str, str] | None = None) -> Governed:
+           env: Mapping[str, str] | None = None, listed_as: dict[bytes, settings_pb2.Exporter] | None = None) -> Governed:
     """Put the gates in front of every exporter the SDK's providers export through (the global
     ones unless others are given), however the SDK was built: its exporters, a processor passed
     to the configurator, a declarative configuration file's, the Logfire SDK's console and the
     OTLP exporters it adds. Idempotent: an exporter already gated is left as it is. What can't be
     gated is listed ungoverned, for the inventory and export health; the core names each and says
-    where it sends (`layer`, `env`: the process's by default). `log_spans`: the Logfire SDK's
+    where it sends (`layer`, `env`: the process's by default; `listed_as`: see `Governed.decide`). `log_spans`: the Logfire SDK's
     logs are spans, which its span exporters see; they go through the log controls."""
     from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
     from opentelemetry.sdk._logs import LoggerProvider  # noqa: PLC0415
@@ -1194,7 +1202,7 @@ def govern(controls: Controls, tracer_provider=None, meter_provider=None, logger
         if multi is not None:
             found.sdk["logs"] = found.sdk["logs"] or isinstance(p, LoggerProvider) or p is not _sdk_provider(p)
             _govern_logs(multi, controls, found)
-    return found.decide(layer or SdkSettings(), os.environ if env is None else env)
+    return found.decide(layer or SdkSettings(), os.environ if env is None else env, listed_as)
 
 
 def inventory(exporters: list[settings_pb2.Exporter]) -> settings_pb2.Inventory:
@@ -1233,6 +1241,8 @@ class Agent:
         self.exporters: list[settings_pb2.Exporter] = []
         #: The exporters as found, which the core decides `exporters` from.
         self.found: list[settings_pb2.FoundExporter] = []
+        #: Each exporter as the core last listed it, by what was found (`Governed.decide`).
+        self._listed_as: dict[bytes, settings_pb2.Exporter] = {}
         #: The warnings said: a processor added later doesn't say them again.
         self._warned: set[str] = set()
         self.client: Client | None = None
@@ -1354,7 +1364,7 @@ class Agent:
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can
         # carry out of it. The settings loaded at start are loaded again, under the host as built.
-        found = govern(self.controls, log_spans=self.logfire, layer=self.layer)
+        found = govern(self.controls, log_spans=self.logfire, layer=self.layer, listed_as=self._listed_as)
         self.found, self.exporters = found.found, found.exporters
         self._warn(found.warnings)
         built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
@@ -1451,8 +1461,7 @@ class Agent:
             if not found.found:
                 return
             found.found[:0] = self.found
-            found.exporters = self.exporters  # kept, should the call fail
-            found.decide(self.layer, os.environ)
+            found.decide(self.layer, os.environ, self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
             if self.client is not None and self.components is not None:

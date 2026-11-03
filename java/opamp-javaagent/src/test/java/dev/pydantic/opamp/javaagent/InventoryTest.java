@@ -207,16 +207,18 @@ class InventoryTest {
   }
 
   @Test
-  void aFailingExportersCallKeepsTheListAndThrowsNothing() {
+  void aFailingExportersCallKeepsTheNamesAndThrowsNothing() {
     Inventory inventory = configured(Map.of());
     List<SettingsProto.Exporter> before = inventory.listed();
     assertEquals(1, before.size());
-    // As a trapped core would: reporting only, so the list stays as it was.
+    // As a trapped core would: reporting only. What was listed keeps its name; what is new since
+    // is listed as found.
     inventory.layer = () -> {
       throw new IllegalStateException("the core trapped");
     };
     inventory.outside("traces", List.of("Another"));
-    assertEquals(before, inventory.listed());
+    assertEquals(List.of(before.get(0), SettingsProto.Exporter.newBuilder().setSignal("traces").setName("Another")
+        .build()), inventory.listed());
   }
 
   /** An inventory of the traces exporters autoconfigure builds under {@code props}. */

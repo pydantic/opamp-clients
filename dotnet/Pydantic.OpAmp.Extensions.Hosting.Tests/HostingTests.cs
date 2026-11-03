@@ -758,7 +758,10 @@ public class HostingTests
         var next = Policy.Stop("traces", "logs");
         Assert.Equal(RemoteConfigStatuses.Applied, agent.Agent.RemoteConfig(Kit.Config(next)).Status);
         agent.Agent.Recheck();
-        Assert.Equal(before, agent.Agent.Components!.Components["exporters"]);
+        // The OTLP exporter keeps the name last decided; the one added since is listed as found.
+        var traces = agent.Agent.Components!.Components["exporters"].SubComponentMap["traces"].SubComponentMap;
+        Assert.Equal(before.SubComponentMap["traces"].SubComponentMap.Keys.Append("Kept").Order(StringComparer.Ordinal), traces.Keys.Order(StringComparer.Ordinal));
+        Assert.False(traces["Kept"].Metadata.Single(kv => kv.Key == "gated").Value.BoolValue);
         Assert.False(agent.Controls.Sends(Signal.Logs));
         await host.StopAsync(Cancel);
     }
