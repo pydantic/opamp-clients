@@ -485,6 +485,14 @@ internal sealed class SdkAgent
             lock (this.gate)
             {
                 this.client = started;
+                // A SetHealth while the client was starting found no client to send through, and
+                // its caller says nothing again until the health changes: send what it set now.
+                // Health goes under the gate (SetHealth only queues), so it goes in the order set.
+                if (!ReferenceEquals(this.HealthSent, first) && this.HealthSent is { } late)
+                {
+                    started.SetHealth(late);
+                }
+
                 // Export health: every 30 s from now, on the settings' timer.
                 this.nextHealth = this.clock.Nanos() + (HealthEvery.Ticks * 100);
                 this.Rearm();
@@ -498,18 +506,15 @@ internal sealed class SdkAgent
     /// </summary>
     public void SetHealth(ComponentHealth health)
     {
-        OpAmpClient? c;
         ComponentHealth merged;
         lock (this.gate)
         {
             this.app = health;
             this.appSet = true;
             merged = this.Merged();
-            c = this.client;
             this.HealthSent = merged;
+            this.client?.SetHealth(merged); // under the gate: in the order set (it only queues)
         }
-
-        c?.SetHealth(merged);
     }
 
     /// <summary>
@@ -782,7 +787,6 @@ internal sealed class SdkAgent
         {
             EffectiveConfig? report = null;
             AvailableComponents? listed = null;
-            ComponentHealth? health = null;
             OpAmpClient? c;
             lock (this.gate)
             {
@@ -808,8 +812,13 @@ internal sealed class SdkAgent
 
                 if (this.nextHealth is { } next && now >= next)
                 {
-                    health = this.HealthLocked();
+                    var health = this.HealthLocked();
                     this.nextHealth = now + (HealthEvery.Ticks * 100);
+                    if (health is not null)
+                    {
+                        this.HealthSent = health;
+                        this.client?.SetHealth(health); // under the gate, as SetHealth's
+                    }
                 }
 
                 this.Rearm();
@@ -824,12 +833,6 @@ internal sealed class SdkAgent
             if (listed is not null)
             {
                 c?.SetAvailableComponents(listed);
-            }
-
-            if (health is not null)
-            {
-                this.HealthSent = health;
-                c?.SetHealth(health);
             }
         }
         catch (Exception e)

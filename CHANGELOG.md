@@ -51,6 +51,12 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- .NET: the application's health set while the OpAMP client was starting (a health check that
+  runs at once) is reported. It was lost, and not reported again until the health changed (#112).
+- .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.
+  It could stay open (no reader, no close) until the garbage collector finalized it (#112).
+- .NET, core mode: no download file is made or written after stop returns. A file's write that
+  started late on a busy machine (after stop had stopped waiting for it) could still make it (#112).
 - Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
   `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
   the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
