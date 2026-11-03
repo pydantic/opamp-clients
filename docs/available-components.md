@@ -75,6 +75,17 @@ carries out and builds the one shape every language sends:
 | `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter by its identity: its name as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or its type, and `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`). Metadata: the boolean `gated`, whether the policy governs it (the integration's gate is in front of it: signal export, levels, caps, redaction), and `destination` (`scheme://host:port`) with a destination. Never the path, query or credentials. One not gated is ungoverned: reported, never a reason to refuse a policy ([sdk-settings.md](sdk-settings.md#where-each-setting-applies)). A global provider of the application's own (Node.js, Go, .NET) is listed as `app_provider`, not gated |
 | `settings` | one sub-component per setting it carries out, by the setting's name behind the policy's controls ([sdk-settings.md](sdk-settings.md#the-controls)), with metadata `applies`: `at once` or `next start`. A setting it cannot carry out in this process is left out |
 
+The exporters come from the layer too, the same in every language: its `Exporters` call takes
+each exporter the integration found on its SDK's providers as a fact (its signal, what it is known
+as, whether the gate is in front of it, its endpoint when it holds one, and whether it was built
+from the `OTEL_*` variables) and the process's `OTEL_EXPORTER_*` variables, and decides the name it
+is listed under (`OtlpGrpcSpanExporter`, `otlp_proto_http` and `otlp` are all `otlp`), where it
+sends (its own endpoint, else what the variables say, else the default for its protocol), which
+signals are governed, and one warning for each ungoverned exporter, which the integration logs
+once. Walking the providers stays each language's, since that is its SDK's object model; it runs
+at start and when the providers change, never per span. Checked by
+`testdata/sdk-settings/exporters.json`, through each language's wrapper.
+
 For example, a Python service with Flask and a Prometheus reader:
 
 ```json

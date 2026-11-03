@@ -62,6 +62,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
+  warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
+  language. An OTLP exporter built from the variables now lists its signal's path under HTTP
+  (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
+  warnings read the same in every SDK. On core 0.15.0 (#109).
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
