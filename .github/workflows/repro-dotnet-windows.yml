@@ -1,5 +1,5 @@
 # TEMPORARY (remove before merge): repeat the .NET tests the nightly's Windows job failed
-# (NothingAfterACancel in Platform mode, seed 71; ClientsOnOneStateFileLeaveNothingBehind).
+# (NothingAfterACancel in Platform mode, seed 71; the churn and state-file LeaveNothingBehind tests).
 name: Repro .NET on Windows
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
   repro:
     name: Repro ${{ matrix.n }} (${{ matrix.fw }})
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 75
     strategy:
       fail-fast: false
       matrix:
@@ -30,16 +30,16 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
-      - name: The failing tests, five times
+      - name: The failing tests, eight times
         working-directory: dotnet
         run: |
           dotnet build Pydantic.OpAmp.Client.Tests -v q
           fails=0
-          for i in 1 2 3 4 5; do
+          for i in 1 2 3 4 5 6 7 8; do
             dotnet test --project Pydantic.OpAmp.Client.Tests --framework ${{ matrix.fw }} --no-build \
-              --filter-method "*NothingAfterACancel" --filter-method "*ClientsOnOneStateFileLeaveNothingBehind" \
+              --filter-method "*NothingAfterACancel" --filter-method "*LeaveNothingBehind" \
               > run-$i.log 2>&1 || fails=$((fails+1))
             grep -E "^.{0,20}(failed|seed|file descriptors)" run-$i.log | cut -c1-400 || true
           done
-          echo "failed runs: $fails of 5"
+          echo "failed runs: $fails of 8"
           test "$fails" = 0
