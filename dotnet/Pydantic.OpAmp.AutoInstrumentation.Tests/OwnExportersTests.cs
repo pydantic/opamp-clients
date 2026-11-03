@@ -147,6 +147,36 @@ public class OwnExportersTests
         }
     }
 
+    // Regression: another plugin's OTLP log exporter, added before the plugin's own, was taken for
+    // it (both are named otlp), so it was never listed ungoverned. Pairing also needs gated to agree.
+    [Fact]
+    public async Task AnotherPluginsOtlpLogExporterAddedFirstIsStillReportedUngoverned()
+    {
+        var agent = Prepared();
+        try
+        {
+            agent.Start([]);
+            var other = new OtlpExporterOptions { Endpoint = new Uri("http://127.0.0.1:2/v1/logs"), Protocol = OtlpExportProtocol.HttpProtobuf };
+            using (var factory = LoggerFactory.Create(b => b.AddOpenTelemetry(o =>
+                   {
+                       agent.Watch(o);
+                       o.AddProcessor(new BatchLogRecordExportProcessor(new OtlpLogExporter(other))); // another plugin's, first
+                       o.AddOtlpExporter(e => agent.Gate(e, Signal.Logs));
+                   })))
+            {
+                factory.CreateLogger("app").LogWarning("one");
+                await Until(() => Listed(agent).ContainsKey("logs/otlp@127.0.0.1:2"), "the other plugin's exporter listed");
+                var logs = Listed(agent).Where(e => e.Key.StartsWith("logs/", StringComparison.Ordinal)).ToList();
+                Assert.Equal([false, true], logs.Select(e => e.Value).Order());
+                Assert.False(Listed(agent)["logs/otlp@127.0.0.1:2"]);
+            }
+        }
+        finally
+        {
+            agent.Stop(TimeSpan.Zero);
+        }
+    }
+
     // With OTEL_DOTNET_AUTO_SETUP_SDK=false the application builds its tracer and meter providers
     // itself: their exporters and sampler aren't the plugin's. Their exporters are reported as one
     // ungoverned app_provider each; the sampler's settings aren't declared. The logs are the plugin's.

@@ -256,7 +256,8 @@ internal sealed class Agent
         }
 
         // Of each provider, what isn't one of those: each configured exporter accounts for one built
-        // of the name it is listed under, whose endpoint says where it sends.
+        // of the name it is listed under and as gated, whose endpoint says where it sends. (By name
+        // alone, another plugin's OTLP exporter ahead of ours would be taken for it.)
         var beside = new List<Exporters.Built>();
         var names = this.agent.ExporterNames(configured);
         foreach (var provider in this.BuiltExporters())
@@ -265,7 +266,7 @@ internal sealed class Agent
             var named = this.agent.ExporterNames(provider);
             foreach (var (e, name) in provider.Zip(named))
             {
-                var i = left.FindIndex(k => configured[k].Signal == e.Signal && names[k] == name);
+                var i = left.FindIndex(k => configured[k].Signal == e.Signal && configured[k].Gated == e.Gated && names[k] == name);
                 if (i < 0)
                 {
                     beside.Add(e);
