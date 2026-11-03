@@ -1,0 +1,45 @@
+# TEMPORARY (remove before merge): repeat the .NET tests the nightly's Windows job failed
+# (NothingAfterACancel in Platform mode, seed 71; ClientsOnOneStateFileLeaveNothingBehind).
+name: Repro .NET on Windows
+on:
+  push:
+    branches: [claude/project-thread-1wonz4]
+permissions:
+  contents: read
+jobs:
+  repro:
+    name: Repro ${{ matrix.n }} (${{ matrix.fw }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        n: [1, 2, 3]
+        fw: [net10.0, net8.0]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The core, fetched and verified against the lock
+        uses: ./.github/actions/core
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/.dotnet
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: The failing tests, five times
+        working-directory: dotnet
+        run: |
+          dotnet build Pydantic.OpAmp.Client.Tests -v q
+          fails=0
+          for i in 1 2 3 4 5; do
+            dotnet test --project Pydantic.OpAmp.Client.Tests --framework ${{ matrix.fw }} --no-build \
+              --filter-method "*NothingAfterACancel" --filter-method "*ClientsOnOneStateFileLeaveNothingBehind" \
+              > run-$i.log 2>&1 || fails=$((fails+1))
+            grep -E "^.{0,20}(failed|seed|file descriptors)" run-$i.log | cut -c1-400 || true
+          done
+          echo "failed runs: $fails of 5"
+          test "$fails" = 0
