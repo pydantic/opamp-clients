@@ -106,60 +106,71 @@ namespace Pydantic.OpAmp.Client.Sdk {
             "AygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyIjAKD0luc3RydW1lbnRhdGlv",
             "bhIMCgRuYW1lGAEgASgJEg8KB3ZlcnNpb24YAiABKAkiTAoIRXhwb3J0ZXIS",
             "DgoGc2lnbmFsGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZ2F0ZWQYAyABKAgS",
-            "EwoLZGVzdGluYXRpb24YBCABKAkiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdz",
-            "GAEgASgMEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtu",
-            "b3dfdW5peF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYx",
-            "LlNwYW5TdGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dS",
-            "ZWNvcmRIABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0",
-            "dHJpYnV0ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVu",
-            "SABCBwoFaW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1w",
-            "LnNkay52MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1w",
-            "LnNkay52MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9H",
-            "UxABImEKCENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEo",
-            "DjIULm9wYW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdy",
-            "ZWNvcmRzGAQgASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMo",
-            "CzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5v",
-            "cGFtcC5wcm90by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUY",
-            "ASABKAkSEAoIc2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1l",
-            "GAEgASgJEiQKBGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQS",
-            "LAoKYXR0cmlidXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVl",
-            "EiQKBnBhcmVudBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2",
-            "YWx1YXRlZBIPCgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhou",
-            "b3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQES",
-            "KgoIcmVkYWN0ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIm",
-            "CgRib2R5GAYgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFz",
-            "c2VkGAUgAygEQgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEg",
-            "ASgOMh4ub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50",
-            "X3NhbXBsZWQYAiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACI",
-            "AQEiMwoDSG93EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQ",
-            "X1NBTVBMRVIQAkIHCgVfcnVsZSLfAgoHUmVxdWVzdBIiCgRsb2FkGAEgASgL",
-            "MhIub3BhbXAuc2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFt",
-            "cC5zZGsudjEuRGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5z",
-            "ZGsudjEuRGVzY3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNk",
-            "ay52MS5FdmFsdWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsu",
-            "djEuUmVmcmVzaEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5I",
-            "ZWFsdGhIABIuCgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNv",
-            "bXBvbmVudHNIABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29t",
-            "bWl0SABCBgoEY2FsbCKpAwoFUmVwbHkSJgoGbG9hZGVkGAEgASgLMhQub3Bh",
-            "bXAuc2RrLnYxLkxvYWRlZEgAEioKCGRlY2lzaW9uGAIgASgLMhYub3BhbXAu",
-            "c2RrLnYxLkRlY2lzaW9uSAASNwoLZGVzY3JpcHRpb24YAyABKAsyIC5vcGFt",
-            "cC5wcm90by52MS5BZ2VudERlc2NyaXB0aW9uSAASDwoFZXJyb3IYBCABKAlI",
-            "ABIsCglldmFsdWF0ZWQYBSABKAsyFy5vcGFtcC5zZGsudjEuRXZhbHVhdGVk",
-            "SAASLAoJcmVmcmVzaGVkGAYgASgLMhcub3BhbXAuc2RrLnYxLlJlZnJlc2hl",
-            "ZEgAEjMKDWhlYWx0aF9yZXBvcnQYByABKAsyGi5vcGFtcC5zZGsudjEuSGVh",
-            "bHRoUmVwb3J0SAASQwoUYXZhaWxhYmxlX2NvbXBvbmVudHMYCCABKAsyIy5v",
-            "cGFtcC5wcm90by52MS5BdmFpbGFibGVDb21wb25lbnRzSAASIgoEcGxhbhgJ",
-            "IAEoCzISLm9wYW1wLnNkay52MS5QbGFuSABCCAoGcmVzdWx0KpkBCghTcGFu",
-            "S2luZBIZChVTUEFOX0tJTkRfVU5TUEVDSUZJRUQQABIWChJTUEFOX0tJTkRf",
-            "SU5URVJOQUwQARIUChBTUEFOX0tJTkRfU0VSVkVSEAISFAoQU1BBTl9LSU5E",
-            "X0NMSUVOVBADEhYKElNQQU5fS0lORF9QUk9EVUNFUhAEEhYKElNQQU5fS0lO",
-            "RF9DT05TVU1FUhAFKocBCgZQYXJlbnQSDwoLUEFSRU5UX05PTkUQABIYChRQ",
-            "QVJFTlRfTE9DQUxfU0FNUExFRBABEhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBM",
-            "RUQQAhIZChVQQVJFTlRfUkVNT1RFX1NBTVBMRUQQAxIbChdQQVJFTlRfUkVN",
-            "T1RFX1VOU0FNUExFRBAEQoYBChZkZXYucHlkYW50aWMub3BhbXAuc2RrQg1T",
-            "ZXR0aW5nc1Byb3RvWkFnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVu",
-            "dHMvZ28vb3BhbXAvc2Rrc2V0dGluZ3Mvc2V0dGluZ3NwYqoCGVB5ZGFudGlj",
-            "Lk9wQW1wLkNsaWVudC5TZGtiBnByb3RvMw=="));
+            "EwoLZGVzdGluYXRpb24YBCABKAkidAoJRXhwb3J0ZXJzEioKBWZvdW5kGAEg",
+            "AygLMhsub3BhbXAuc2RrLnYxLkZvdW5kRXhwb3J0ZXISIQoDZW52GAIgAygL",
+            "MhQub3BhbXAuc2RrLnYxLkVudlZhchIYChBkZWZhdWx0X3Byb3RvY29sGAMg",
+            "ASgJImAKDUZvdW5kRXhwb3J0ZXISDgoGc2lnbmFsGAEgASgJEgwKBGtpbmQY",
+            "AiABKAkSDQoFZ2F0ZWQYAyABKAgSEAoIZW5kcG9pbnQYBCABKAkSEAoIZnJv",
+            "bV9lbnYYBSABKAgiJQoGRW52VmFyEgwKBG5hbWUYASABKAkSDQoFdmFsdWUY",
+            "AiABKAkidQoQRXhwb3J0ZXJzRGVjaWRlZBIpCglleHBvcnRlcnMYASADKAsy",
+            "Fi5vcGFtcC5zZGsudjEuRXhwb3J0ZXISEAoIZ292ZXJuZWQYAiADKAkSEgoK",
+            "dW5nb3Zlcm5lZBgDIAMoCRIQCgh3YXJuaW5ncxgEIAMoCSKCAgoIRXZhbHVh",
+            "dGUSEAoIc2V0dGluZ3MYASABKAwSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNk",
+            "ay52MS5Ib3N0EhMKC25vd191bml4X21zGAcgASgEEicKBHNwYW4YAyABKAsy",
+            "Fy5vcGFtcC5zZGsudjEuU3BhblN0YXJ0SAASJgoDbG9nGAQgASgLMhcub3Bh",
+            "bXAuc2RrLnYxLkxvZ1JlY29yZEgAEi4KCmF0dHJpYnV0ZXMYBSABKAsyGC5v",
+            "cGFtcC5zZGsudjEuQXR0cmlidXRlc0gAEiMKA2NhcBgGIAEoCzIULm9wYW1w",
+            "LnNkay52MS5DYXBSdW5IAEIHCgVpbnB1dCJ9CgZDYXBSdW4SKwoGc2lnbmFs",
+            "GAEgASgOMhsub3BhbXAuc2RrLnYxLkNhcFJ1bi5TaWduYWwSJgoGZXZlbnRz",
+            "GAIgAygLMhYub3BhbXAuc2RrLnYxLkNhcEV2ZW50Ih4KBlNpZ25hbBIKCgZU",
+            "UkFDRVMQABIICgRMT0dTEAEiYQoIQ2FwRXZlbnQSDQoFYXRfbnMYASABKAQS",
+            "JAoGcGFyZW50GAIgASgOMhQub3BhbXAuc2RrLnYxLlBhcmVudBIPCgdzYW1w",
+            "bGVkGAMgASgIEg8KB3JlY29yZHMYBCABKAQiYgoKQXR0cmlidXRlcxIsCgph",
+            "dHRyaWJ1dGVzGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUSJgoE",
+            "Ym9keRgCIAEoCzIYLm9wYW1wLnByb3RvLnYxLkFueVZhbHVlIiwKCUxvZ1Jl",
+            "Y29yZBINCgVzY29wZRgBIAEoCRIQCghzZXZlcml0eRgCIAEoDSKTAQoJU3Bh",
+            "blN0YXJ0EgwKBG5hbWUYASABKAkSJAoEa2luZBgCIAEoDjIWLm9wYW1wLnNk",
+            "ay52MS5TcGFuS2luZBIsCgphdHRyaWJ1dGVzGAMgAygLMhgub3BhbXAucHJv",
+            "dG8udjEuS2V5VmFsdWUSJAoGcGFyZW50GAQgASgOMhQub3BhbXAuc2RrLnYx",
+            "LlBhcmVudCLKAQoJRXZhbHVhdGVkEg8KB3JlZnVzZWQYASABKAkSLAoIc2Ft",
+            "cGxpbmcYAiABKAsyGi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5nEhEKBGtl",
+            "cHQYAyABKAhIAIgBARIqCghyZWRhY3RlZBgEIAMoCzIYLm9wYW1wLnByb3Rv",
+            "LnYxLktleVZhbHVlEiYKBGJvZHkYBiABKAsyGC5vcGFtcC5wcm90by52MS5B",
+            "bnlWYWx1ZRIOCgZwYXNzZWQYBSADKARCBwoFX2tlcHQisgEKDFNwYW5TYW1w",
+            "bGluZxIrCgNob3cYASABKA4yHi5vcGFtcC5zZGsudjEuU3BhblNhbXBsaW5n",
+            "LkhvdxIWCg5wYXJlbnRfc2FtcGxlZBgCIAEoCBIMCgRyYXRlGAMgASgBEhEK",
+            "BHJ1bGUYBCABKA1IAIgBASIzCgNIb3cSEQoNRk9MTE9XX1BBUkVOVBAAEggK",
+            "BFJBVEUQARIPCgtBUFBfU0FNUExFUhACQgcKBV9ydWxlIo0DCgdSZXF1ZXN0",
+            "EiIKBGxvYWQYASABKAsyEi5vcGFtcC5zZGsudjEuTG9hZEgAEiYKBmRlY2lk",
+            "ZRgCIAEoCzIULm9wYW1wLnNkay52MS5EZWNpZGVIABIqCghkZXNjcmliZRgD",
+            "IAEoCzIWLm9wYW1wLnNkay52MS5EZXNjcmliZUgAEioKCGV2YWx1YXRlGAQg",
+            "ASgLMhYub3BhbXAuc2RrLnYxLkV2YWx1YXRlSAASKAoHcmVmcmVzaBgFIAEo",
+            "CzIVLm9wYW1wLnNkay52MS5SZWZyZXNoSAASJgoGaGVhbHRoGAYgASgLMhQu",
+            "b3BhbXAuc2RrLnYxLkhlYWx0aEgAEi4KCmNvbXBvbmVudHMYByABKAsyGC5v",
+            "cGFtcC5zZGsudjEuQ29tcG9uZW50c0gAEiYKBmNvbW1pdBgIIAEoCzIULm9w",
+            "YW1wLnNkay52MS5Db21taXRIABIsCglleHBvcnRlcnMYCSABKAsyFy5vcGFt",
+            "cC5zZGsudjEuRXhwb3J0ZXJzSABCBgoEY2FsbCLmAwoFUmVwbHkSJgoGbG9h",
+            "ZGVkGAEgASgLMhQub3BhbXAuc2RrLnYxLkxvYWRlZEgAEioKCGRlY2lzaW9u",
+            "GAIgASgLMhYub3BhbXAuc2RrLnYxLkRlY2lzaW9uSAASNwoLZGVzY3JpcHRp",
+            "b24YAyABKAsyIC5vcGFtcC5wcm90by52MS5BZ2VudERlc2NyaXB0aW9uSAAS",
+            "DwoFZXJyb3IYBCABKAlIABIsCglldmFsdWF0ZWQYBSABKAsyFy5vcGFtcC5z",
+            "ZGsudjEuRXZhbHVhdGVkSAASLAoJcmVmcmVzaGVkGAYgASgLMhcub3BhbXAu",
+            "c2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhlYWx0aF9yZXBvcnQYByABKAsyGi5v",
+            "cGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0SAASQwoUYXZhaWxhYmxlX2NvbXBv",
+            "bmVudHMYCCABKAsyIy5vcGFtcC5wcm90by52MS5BdmFpbGFibGVDb21wb25l",
+            "bnRzSAASIgoEcGxhbhgJIAEoCzISLm9wYW1wLnNkay52MS5QbGFuSAASOwoR",
+            "ZXhwb3J0ZXJzX2RlY2lkZWQYCiABKAsyHi5vcGFtcC5zZGsudjEuRXhwb3J0",
+            "ZXJzRGVjaWRlZEgAQggKBnJlc3VsdCqZAQoIU3BhbktpbmQSGQoVU1BBTl9L",
+            "SU5EX1VOU1BFQ0lGSUVEEAASFgoSU1BBTl9LSU5EX0lOVEVSTkFMEAESFAoQ",
+            "U1BBTl9LSU5EX1NFUlZFUhACEhQKEFNQQU5fS0lORF9DTElFTlQQAxIWChJT",
+            "UEFOX0tJTkRfUFJPRFVDRVIQBBIWChJTUEFOX0tJTkRfQ09OU1VNRVIQBSqH",
+            "AQoGUGFyZW50Eg8KC1BBUkVOVF9OT05FEAASGAoUUEFSRU5UX0xPQ0FMX1NB",
+            "TVBMRUQQARIaChZQQVJFTlRfTE9DQUxfVU5TQU1QTEVEEAISGQoVUEFSRU5U",
+            "X1JFTU9URV9TQU1QTEVEEAMSGwoXUEFSRU5UX1JFTU9URV9VTlNBTVBMRUQQ",
+            "BEKGAQoWZGV2LnB5ZGFudGljLm9wYW1wLnNka0INU2V0dGluZ3NQcm90b1pB",
+            "Z2l0aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1wL3Nk",
+            "a3NldHRpbmdzL3NldHRpbmdzcGKqAhlQeWRhbnRpYy5PcEFtcC5DbGllbnQu",
+            "U2RrYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::OpAmp.Proto.V1.AnyvalueReflection.Descriptor, global::OpAmp.Proto.V1.OpampReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::Pydantic.OpAmp.Client.Sdk.SpanKind), typeof(global::Pydantic.OpAmp.Client.Sdk.Parent), }, null, new pbr::GeneratedClrTypeInfo[] {
@@ -185,6 +196,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Inventory), global::Pydantic.OpAmp.Client.Sdk.Inventory.Parser, new[]{ "Integration", "IntegrationVersion", "SdkLanguage", "SdkVersion", "Instrumentations", "Exporters" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Instrumentation), global::Pydantic.OpAmp.Client.Sdk.Instrumentation.Parser, new[]{ "Name", "Version" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Exporter), global::Pydantic.OpAmp.Client.Sdk.Exporter.Parser, new[]{ "Signal", "Name", "Gated", "Destination" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Exporters), global::Pydantic.OpAmp.Client.Sdk.Exporters.Parser, new[]{ "Found", "Env", "DefaultProtocol" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.FoundExporter), global::Pydantic.OpAmp.Client.Sdk.FoundExporter.Parser, new[]{ "Signal", "Kind", "Gated", "Endpoint", "FromEnv" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.EnvVar), global::Pydantic.OpAmp.Client.Sdk.EnvVar.Parser, new[]{ "Name", "Value" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.ExportersDecided), global::Pydantic.OpAmp.Client.Sdk.ExportersDecided.Parser, new[]{ "Exporters", "Governed", "Ungoverned", "Warnings" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Evaluate), global::Pydantic.OpAmp.Client.Sdk.Evaluate.Parser, new[]{ "Settings", "Host", "NowUnixMs", "Span", "Log", "Attributes", "Cap" }, new[]{ "Input" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.CapRun), global::Pydantic.OpAmp.Client.Sdk.CapRun.Parser, new[]{ "Signal", "Events" }, null, new[]{ typeof(global::Pydantic.OpAmp.Client.Sdk.CapRun.Types.Signal) }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.CapEvent), global::Pydantic.OpAmp.Client.Sdk.CapEvent.Parser, new[]{ "AtNs", "Parent", "Sampled", "Records" }, null, null, null, null),
@@ -193,8 +208,8 @@ namespace Pydantic.OpAmp.Client.Sdk {
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.SpanStart), global::Pydantic.OpAmp.Client.Sdk.SpanStart.Parser, new[]{ "Name", "Kind", "Attributes", "Parent" }, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Evaluated), global::Pydantic.OpAmp.Client.Sdk.Evaluated.Parser, new[]{ "Refused", "Sampling", "Kept", "Redacted", "Body", "Passed" }, new[]{ "Kept" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.SpanSampling), global::Pydantic.OpAmp.Client.Sdk.SpanSampling.Parser, new[]{ "How", "ParentSampled", "Rate", "Rule" }, new[]{ "Rule" }, new[]{ typeof(global::Pydantic.OpAmp.Client.Sdk.SpanSampling.Types.How) }, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Request), global::Pydantic.OpAmp.Client.Sdk.Request.Parser, new[]{ "Load", "Decide", "Describe", "Evaluate", "Refresh", "Health", "Components", "Commit" }, new[]{ "Call" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Reply), global::Pydantic.OpAmp.Client.Sdk.Reply.Parser, new[]{ "Loaded", "Decision", "Description", "Error", "Evaluated", "Refreshed", "HealthReport", "AvailableComponents", "Plan" }, new[]{ "Result" }, null, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Request), global::Pydantic.OpAmp.Client.Sdk.Request.Parser, new[]{ "Load", "Decide", "Describe", "Evaluate", "Refresh", "Health", "Components", "Commit", "Exporters" }, new[]{ "Call" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Pydantic.OpAmp.Client.Sdk.Reply), global::Pydantic.OpAmp.Client.Sdk.Reply.Parser, new[]{ "Loaded", "Decision", "Description", "Error", "Evaluated", "Refreshed", "HealthReport", "AvailableComponents", "Plan", "ExportersDecided" }, new[]{ "Result" }, null, null, null)
           }));
     }
     #endregion
@@ -7847,6 +7862,1141 @@ namespace Pydantic.OpAmp.Client.Sdk {
   }
 
   /// <summary>
+  /// The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
+  /// is decided of them is the same in every language. Call it at start and whenever the providers
+  /// change; pass ExportersDecided.exporters as Inventory.exporters, and log its warnings.
+  /// </summary>
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class Exporters : pb::IMessage<Exporters>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<Exporters> _parser = new pb::MessageParser<Exporters>(() => new Exporters());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<Exporters> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[22]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Exporters() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Exporters(Exporters other) : this() {
+      found_ = other.found_.Clone();
+      env_ = other.env_.Clone();
+      defaultProtocol_ = other.defaultProtocol_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public Exporters Clone() {
+      return new Exporters(this);
+    }
+
+    /// <summary>Field number for the "found" field.</summary>
+    public const int FoundFieldNumber = 1;
+    private static readonly pb::FieldCodec<global::Pydantic.OpAmp.Client.Sdk.FoundExporter> _repeated_found_codec
+        = pb::FieldCodec.ForMessage(10, global::Pydantic.OpAmp.Client.Sdk.FoundExporter.Parser);
+    private readonly pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.FoundExporter> found_ = new pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.FoundExporter>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.FoundExporter> Found {
+      get { return found_; }
+    }
+
+    /// <summary>Field number for the "env" field.</summary>
+    public const int EnvFieldNumber = 2;
+    private static readonly pb::FieldCodec<global::Pydantic.OpAmp.Client.Sdk.EnvVar> _repeated_env_codec
+        = pb::FieldCodec.ForMessage(18, global::Pydantic.OpAmp.Client.Sdk.EnvVar.Parser);
+    private readonly pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.EnvVar> env_ = new pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.EnvVar>();
+    /// <summary>
+    /// the process's environment (only OTEL_EXPORTER_* is read)
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.EnvVar> Env {
+      get { return env_; }
+    }
+
+    /// <summary>Field number for the "default_protocol" field.</summary>
+    public const int DefaultProtocolFieldNumber = 3;
+    private string defaultProtocol_ = "";
+    /// <summary>
+    /// the SDK's OTLP protocol with none set: grpc or http/protobuf
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string DefaultProtocol {
+      get { return defaultProtocol_; }
+      set {
+        defaultProtocol_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as Exporters);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(Exporters other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if(!found_.Equals(other.found_)) return false;
+      if(!env_.Equals(other.env_)) return false;
+      if (DefaultProtocol != other.DefaultProtocol) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      hash ^= found_.GetHashCode();
+      hash ^= env_.GetHashCode();
+      if (DefaultProtocol.Length != 0) hash ^= DefaultProtocol.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      found_.WriteTo(output, _repeated_found_codec);
+      env_.WriteTo(output, _repeated_env_codec);
+      if (DefaultProtocol.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(DefaultProtocol);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      found_.WriteTo(ref output, _repeated_found_codec);
+      env_.WriteTo(ref output, _repeated_env_codec);
+      if (DefaultProtocol.Length != 0) {
+        output.WriteRawTag(26);
+        output.WriteString(DefaultProtocol);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      size += found_.CalculateSize(_repeated_found_codec);
+      size += env_.CalculateSize(_repeated_env_codec);
+      if (DefaultProtocol.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(DefaultProtocol);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(Exporters other) {
+      if (other == null) {
+        return;
+      }
+      found_.Add(other.found_);
+      env_.Add(other.env_);
+      if (other.DefaultProtocol.Length != 0) {
+        DefaultProtocol = other.DefaultProtocol;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            found_.AddEntriesFrom(input, _repeated_found_codec);
+            break;
+          }
+          case 18: {
+            env_.AddEntriesFrom(input, _repeated_env_codec);
+            break;
+          }
+          case 26: {
+            DefaultProtocol = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            found_.AddEntriesFrom(ref input, _repeated_found_codec);
+            break;
+          }
+          case 18: {
+            env_.AddEntriesFrom(ref input, _repeated_env_codec);
+            break;
+          }
+          case 26: {
+            DefaultProtocol = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class FoundExporter : pb::IMessage<FoundExporter>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<FoundExporter> _parser = new pb::MessageParser<FoundExporter>(() => new FoundExporter());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<FoundExporter> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[23]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public FoundExporter() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public FoundExporter(FoundExporter other) : this() {
+      signal_ = other.signal_;
+      kind_ = other.kind_;
+      gated_ = other.gated_;
+      endpoint_ = other.endpoint_;
+      fromEnv_ = other.fromEnv_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public FoundExporter Clone() {
+      return new FoundExporter(this);
+    }
+
+    /// <summary>Field number for the "signal" field.</summary>
+    public const int SignalFieldNumber = 1;
+    private string signal_ = "";
+    /// <summary>
+    /// traces, metrics or logs
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Signal {
+      get { return signal_; }
+      set {
+        signal_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "kind" field.</summary>
+    public const int KindFieldNumber = 2;
+    private string kind_ = "";
+    /// <summary>
+    /// What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+    /// or app_provider (a global provider of the application's own).
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Kind {
+      get { return kind_; }
+      set {
+        kind_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "gated" field.</summary>
+    public const int GatedFieldNumber = 3;
+    private bool gated_;
+    /// <summary>
+    /// the policy's gates are in front of it
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Gated {
+      get { return gated_; }
+      set {
+        gated_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "endpoint" field.</summary>
+    public const int EndpointFieldNumber = 4;
+    private string endpoint_ = "";
+    /// <summary>
+    /// as the exporter holds it; empty: not known
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Endpoint {
+      get { return endpoint_; }
+      set {
+        endpoint_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "from_env" field.</summary>
+    public const int FromEnvFieldNumber = 5;
+    private bool fromEnv_;
+    /// <summary>
+    /// built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool FromEnv {
+      get { return fromEnv_; }
+      set {
+        fromEnv_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as FoundExporter);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(FoundExporter other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Signal != other.Signal) return false;
+      if (Kind != other.Kind) return false;
+      if (Gated != other.Gated) return false;
+      if (Endpoint != other.Endpoint) return false;
+      if (FromEnv != other.FromEnv) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Signal.Length != 0) hash ^= Signal.GetHashCode();
+      if (Kind.Length != 0) hash ^= Kind.GetHashCode();
+      if (Gated != false) hash ^= Gated.GetHashCode();
+      if (Endpoint.Length != 0) hash ^= Endpoint.GetHashCode();
+      if (FromEnv != false) hash ^= FromEnv.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Signal.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Signal);
+      }
+      if (Kind.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Kind);
+      }
+      if (Gated != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(Gated);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Endpoint);
+      }
+      if (FromEnv != false) {
+        output.WriteRawTag(40);
+        output.WriteBool(FromEnv);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Signal.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Signal);
+      }
+      if (Kind.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Kind);
+      }
+      if (Gated != false) {
+        output.WriteRawTag(24);
+        output.WriteBool(Gated);
+      }
+      if (Endpoint.Length != 0) {
+        output.WriteRawTag(34);
+        output.WriteString(Endpoint);
+      }
+      if (FromEnv != false) {
+        output.WriteRawTag(40);
+        output.WriteBool(FromEnv);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Signal.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Signal);
+      }
+      if (Kind.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Kind);
+      }
+      if (Gated != false) {
+        size += 1 + 1;
+      }
+      if (Endpoint.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Endpoint);
+      }
+      if (FromEnv != false) {
+        size += 1 + 1;
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(FoundExporter other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Signal.Length != 0) {
+        Signal = other.Signal;
+      }
+      if (other.Kind.Length != 0) {
+        Kind = other.Kind;
+      }
+      if (other.Gated != false) {
+        Gated = other.Gated;
+      }
+      if (other.Endpoint.Length != 0) {
+        Endpoint = other.Endpoint;
+      }
+      if (other.FromEnv != false) {
+        FromEnv = other.FromEnv;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Signal = input.ReadString();
+            break;
+          }
+          case 18: {
+            Kind = input.ReadString();
+            break;
+          }
+          case 24: {
+            Gated = input.ReadBool();
+            break;
+          }
+          case 34: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 40: {
+            FromEnv = input.ReadBool();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Signal = input.ReadString();
+            break;
+          }
+          case 18: {
+            Kind = input.ReadString();
+            break;
+          }
+          case 24: {
+            Gated = input.ReadBool();
+            break;
+          }
+          case 34: {
+            Endpoint = input.ReadString();
+            break;
+          }
+          case 40: {
+            FromEnv = input.ReadBool();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class EnvVar : pb::IMessage<EnvVar>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<EnvVar> _parser = new pb::MessageParser<EnvVar>(() => new EnvVar());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<EnvVar> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[24]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public EnvVar() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public EnvVar(EnvVar other) : this() {
+      name_ = other.name_;
+      value_ = other.value_;
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public EnvVar Clone() {
+      return new EnvVar(this);
+    }
+
+    /// <summary>Field number for the "name" field.</summary>
+    public const int NameFieldNumber = 1;
+    private string name_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Name {
+      get { return name_; }
+      set {
+        name_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    /// <summary>Field number for the "value" field.</summary>
+    public const int ValueFieldNumber = 2;
+    private string value_ = "";
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public string Value {
+      get { return value_; }
+      set {
+        value_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as EnvVar);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(EnvVar other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (Name != other.Name) return false;
+      if (Value != other.Value) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (Name.Length != 0) hash ^= Name.GetHashCode();
+      if (Value.Length != 0) hash ^= Value.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      if (Name.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Name);
+      }
+      if (Value.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Value);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      if (Name.Length != 0) {
+        output.WriteRawTag(10);
+        output.WriteString(Name);
+      }
+      if (Value.Length != 0) {
+        output.WriteRawTag(18);
+        output.WriteString(Value);
+      }
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      if (Name.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Name);
+      }
+      if (Value.Length != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(Value);
+      }
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(EnvVar other) {
+      if (other == null) {
+        return;
+      }
+      if (other.Name.Length != 0) {
+        Name = other.Name;
+      }
+      if (other.Value.Length != 0) {
+        Value = other.Value;
+      }
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            Name = input.ReadString();
+            break;
+          }
+          case 18: {
+            Value = input.ReadString();
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            Name = input.ReadString();
+            break;
+          }
+          case 18: {
+            Value = input.ReadString();
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  [global::System.Diagnostics.DebuggerDisplayAttribute("{ToString(),nq}")]
+  public sealed partial class ExportersDecided : pb::IMessage<ExportersDecided>
+  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      , pb::IBufferMessage
+  #endif
+  {
+    private static readonly pb::MessageParser<ExportersDecided> _parser = new pb::MessageParser<ExportersDecided>(() => new ExportersDecided());
+    private pb::UnknownFieldSet _unknownFields;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pb::MessageParser<ExportersDecided> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[25]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ExportersDecided() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ExportersDecided(ExportersDecided other) : this() {
+      exporters_ = other.exporters_.Clone();
+      governed_ = other.governed_.Clone();
+      ungoverned_ = other.ungoverned_.Clone();
+      warnings_ = other.warnings_.Clone();
+      _unknownFields = pb::UnknownFieldSet.Clone(other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public ExportersDecided Clone() {
+      return new ExportersDecided(this);
+    }
+
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 1;
+    private static readonly pb::FieldCodec<global::Pydantic.OpAmp.Client.Sdk.Exporter> _repeated_exporters_codec
+        = pb::FieldCodec.ForMessage(10, global::Pydantic.OpAmp.Client.Sdk.Exporter.Parser);
+    private readonly pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter> exporters_ = new pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter>();
+    /// <summary>
+    /// Inventory.exporters, in the order found
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<global::Pydantic.OpAmp.Client.Sdk.Exporter> Exporters {
+      get { return exporters_; }
+    }
+
+    /// <summary>Field number for the "governed" field.</summary>
+    public const int GovernedFieldNumber = 2;
+    private static readonly pb::FieldCodec<string> _repeated_governed_codec
+        = pb::FieldCodec.ForString(18);
+    private readonly pbc::RepeatedField<string> governed_ = new pbc::RepeatedField<string>();
+    /// <summary>
+    /// the signals with exporters, every one governed
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<string> Governed {
+      get { return governed_; }
+    }
+
+    /// <summary>Field number for the "ungoverned" field.</summary>
+    public const int UngovernedFieldNumber = 3;
+    private static readonly pb::FieldCodec<string> _repeated_ungoverned_codec
+        = pb::FieldCodec.ForString(26);
+    private readonly pbc::RepeatedField<string> ungoverned_ = new pbc::RepeatedField<string>();
+    /// <summary>
+    /// the signals with an exporter past the gates
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<string> Ungoverned {
+      get { return ungoverned_; }
+    }
+
+    /// <summary>Field number for the "warnings" field.</summary>
+    public const int WarningsFieldNumber = 4;
+    private static readonly pb::FieldCodec<string> _repeated_warnings_codec
+        = pb::FieldCodec.ForString(34);
+    private readonly pbc::RepeatedField<string> warnings_ = new pbc::RepeatedField<string>();
+    /// <summary>
+    /// one line per ungoverned exporter identity
+    /// </summary>
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public pbc::RepeatedField<string> Warnings {
+      get { return warnings_; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override bool Equals(object other) {
+      return Equals(other as ExportersDecided);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public bool Equals(ExportersDecided other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if(!exporters_.Equals(other.exporters_)) return false;
+      if(!governed_.Equals(other.governed_)) return false;
+      if(!ungoverned_.Equals(other.ungoverned_)) return false;
+      if(!warnings_.Equals(other.warnings_)) return false;
+      return Equals(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override int GetHashCode() {
+      int hash = 1;
+      hash ^= exporters_.GetHashCode();
+      hash ^= governed_.GetHashCode();
+      hash ^= ungoverned_.GetHashCode();
+      hash ^= warnings_.GetHashCode();
+      if (_unknownFields != null) {
+        hash ^= _unknownFields.GetHashCode();
+      }
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void WriteTo(pb::CodedOutputStream output) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      output.WriteRawMessage(this);
+    #else
+      exporters_.WriteTo(output, _repeated_exporters_codec);
+      governed_.WriteTo(output, _repeated_governed_codec);
+      ungoverned_.WriteTo(output, _repeated_ungoverned_codec);
+      warnings_.WriteTo(output, _repeated_warnings_codec);
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(output);
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
+      exporters_.WriteTo(ref output, _repeated_exporters_codec);
+      governed_.WriteTo(ref output, _repeated_governed_codec);
+      ungoverned_.WriteTo(ref output, _repeated_ungoverned_codec);
+      warnings_.WriteTo(ref output, _repeated_warnings_codec);
+      if (_unknownFields != null) {
+        _unknownFields.WriteTo(ref output);
+      }
+    }
+    #endif
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public int CalculateSize() {
+      int size = 0;
+      size += exporters_.CalculateSize(_repeated_exporters_codec);
+      size += governed_.CalculateSize(_repeated_governed_codec);
+      size += ungoverned_.CalculateSize(_repeated_ungoverned_codec);
+      size += warnings_.CalculateSize(_repeated_warnings_codec);
+      if (_unknownFields != null) {
+        size += _unknownFields.CalculateSize();
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(ExportersDecided other) {
+      if (other == null) {
+        return;
+      }
+      exporters_.Add(other.exporters_);
+      governed_.Add(other.governed_);
+      ungoverned_.Add(other.ungoverned_);
+      warnings_.Add(other.warnings_);
+      _unknownFields = pb::UnknownFieldSet.MergeFrom(_unknownFields, other._unknownFields);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public void MergeFrom(pb::CodedInputStream input) {
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+      input.ReadRawMessage(this);
+    #else
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
+            break;
+          case 10: {
+            exporters_.AddEntriesFrom(input, _repeated_exporters_codec);
+            break;
+          }
+          case 18: {
+            governed_.AddEntriesFrom(input, _repeated_governed_codec);
+            break;
+          }
+          case 26: {
+            ungoverned_.AddEntriesFrom(input, _repeated_ungoverned_codec);
+            break;
+          }
+          case 34: {
+            warnings_.AddEntriesFrom(input, _repeated_warnings_codec);
+            break;
+          }
+        }
+      }
+    #endif
+    }
+
+    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+      if ((tag & 7) == 4) {
+        // Abort on any end group tag.
+        return;
+      }
+      switch(tag) {
+          default:
+            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
+            break;
+          case 10: {
+            exporters_.AddEntriesFrom(ref input, _repeated_exporters_codec);
+            break;
+          }
+          case 18: {
+            governed_.AddEntriesFrom(ref input, _repeated_governed_codec);
+            break;
+          }
+          case 26: {
+            ungoverned_.AddEntriesFrom(ref input, _repeated_ungoverned_codec);
+            break;
+          }
+          case 34: {
+            warnings_.AddEntriesFrom(ref input, _repeated_warnings_codec);
+            break;
+          }
+        }
+      }
+    }
+    #endif
+
+  }
+
+  /// <summary>
   /// Test-only: what the reference matchers make of one input under a settings document, so that
   /// each language's own matchers can be held to them (testdata/sdk-settings).
   /// </summary>
@@ -7865,7 +9015,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[22]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[26]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8396,7 +9546,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[23]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[27]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8633,7 +9783,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[24]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[28]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -8957,7 +10107,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[25]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[29]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9196,7 +10346,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[26]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[30]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9440,7 +10590,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[27]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[31]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -9745,7 +10895,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[28]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[32]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10161,7 +11311,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[29]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[33]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10512,7 +11662,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[30]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[34]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10556,6 +11706,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
           break;
         case CallOneofCase.Commit:
           Commit = other.Commit.Clone();
+          break;
+        case CallOneofCase.Exporters:
+          Exporters = other.Exporters.Clone();
           break;
       }
 
@@ -10664,6 +11817,18 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "exporters" field.</summary>
+    public const int ExportersFieldNumber = 9;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Client.Sdk.Exporters Exporters {
+      get { return callCase_ == CallOneofCase.Exporters ? (global::Pydantic.OpAmp.Client.Sdk.Exporters) call_ : null; }
+      set {
+        call_ = value;
+        callCase_ = value == null ? CallOneofCase.None : CallOneofCase.Exporters;
+      }
+    }
+
     private object call_;
     /// <summary>Enum of possible cases for the "call" oneof.</summary>
     public enum CallOneofCase {
@@ -10676,6 +11841,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       Health = 6,
       Components = 7,
       Commit = 8,
+      Exporters = 9,
     }
     private CallOneofCase callCase_ = CallOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -10714,6 +11880,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (!object.Equals(Health, other.Health)) return false;
       if (!object.Equals(Components, other.Components)) return false;
       if (!object.Equals(Commit, other.Commit)) return false;
+      if (!object.Equals(Exporters, other.Exporters)) return false;
       if (CallCase != other.CallCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -10730,6 +11897,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (callCase_ == CallOneofCase.Health) hash ^= Health.GetHashCode();
       if (callCase_ == CallOneofCase.Components) hash ^= Components.GetHashCode();
       if (callCase_ == CallOneofCase.Commit) hash ^= Commit.GetHashCode();
+      if (callCase_ == CallOneofCase.Exporters) hash ^= Exporters.GetHashCode();
       hash ^= (int) callCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -10781,6 +11949,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(66);
         output.WriteMessage(Commit);
       }
+      if (callCase_ == CallOneofCase.Exporters) {
+        output.WriteRawTag(74);
+        output.WriteMessage(Exporters);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -10823,6 +11995,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(66);
         output.WriteMessage(Commit);
       }
+      if (callCase_ == CallOneofCase.Exporters) {
+        output.WriteRawTag(74);
+        output.WriteMessage(Exporters);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -10856,6 +12032,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (callCase_ == CallOneofCase.Commit) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Commit);
+      }
+      if (callCase_ == CallOneofCase.Exporters) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(Exporters);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -10917,6 +12096,12 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Commit = new global::Pydantic.OpAmp.Client.Sdk.Commit();
           }
           Commit.MergeFrom(other.Commit);
+          break;
+        case CallOneofCase.Exporters:
+          if (Exporters == null) {
+            Exporters = new global::Pydantic.OpAmp.Client.Sdk.Exporters();
+          }
+          Exporters.MergeFrom(other.Exporters);
           break;
       }
 
@@ -11011,6 +12196,15 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Commit = subBuilder;
             break;
           }
+          case 74: {
+            global::Pydantic.OpAmp.Client.Sdk.Exporters subBuilder = new global::Pydantic.OpAmp.Client.Sdk.Exporters();
+            if (callCase_ == CallOneofCase.Exporters) {
+              subBuilder.MergeFrom(Exporters);
+            }
+            input.ReadMessage(subBuilder);
+            Exporters = subBuilder;
+            break;
+          }
         }
       }
     #endif
@@ -11102,6 +12296,15 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Commit = subBuilder;
             break;
           }
+          case 74: {
+            global::Pydantic.OpAmp.Client.Sdk.Exporters subBuilder = new global::Pydantic.OpAmp.Client.Sdk.Exporters();
+            if (callCase_ == CallOneofCase.Exporters) {
+              subBuilder.MergeFrom(Exporters);
+            }
+            input.ReadMessage(subBuilder);
+            Exporters = subBuilder;
+            break;
+          }
         }
       }
     }
@@ -11124,7 +12327,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[31]; }
+      get { return global::Pydantic.OpAmp.Client.Sdk.SettingsReflection.Descriptor.MessageTypes[35]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11171,6 +12374,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
           break;
         case ResultOneofCase.Plan:
           Plan = other.Plan.Clone();
+          break;
+        case ResultOneofCase.ExportersDecided:
+          ExportersDecided = other.ExportersDecided.Clone();
           break;
       }
 
@@ -11308,6 +12514,18 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
     }
 
+    /// <summary>Field number for the "exporters_decided" field.</summary>
+    public const int ExportersDecidedFieldNumber = 10;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
+    public global::Pydantic.OpAmp.Client.Sdk.ExportersDecided ExportersDecided {
+      get { return resultCase_ == ResultOneofCase.ExportersDecided ? (global::Pydantic.OpAmp.Client.Sdk.ExportersDecided) result_ : null; }
+      set {
+        result_ = value;
+        resultCase_ = value == null ? ResultOneofCase.None : ResultOneofCase.ExportersDecided;
+      }
+    }
+
     private object result_;
     /// <summary>Enum of possible cases for the "result" oneof.</summary>
     public enum ResultOneofCase {
@@ -11321,6 +12539,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       HealthReport = 7,
       AvailableComponents = 8,
       Plan = 9,
+      ExportersDecided = 10,
     }
     private ResultOneofCase resultCase_ = ResultOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -11360,6 +12579,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (!object.Equals(HealthReport, other.HealthReport)) return false;
       if (!object.Equals(AvailableComponents, other.AvailableComponents)) return false;
       if (!object.Equals(Plan, other.Plan)) return false;
+      if (!object.Equals(ExportersDecided, other.ExportersDecided)) return false;
       if (ResultCase != other.ResultCase) return false;
       return Equals(_unknownFields, other._unknownFields);
     }
@@ -11377,6 +12597,7 @@ namespace Pydantic.OpAmp.Client.Sdk {
       if (resultCase_ == ResultOneofCase.HealthReport) hash ^= HealthReport.GetHashCode();
       if (resultCase_ == ResultOneofCase.AvailableComponents) hash ^= AvailableComponents.GetHashCode();
       if (resultCase_ == ResultOneofCase.Plan) hash ^= Plan.GetHashCode();
+      if (resultCase_ == ResultOneofCase.ExportersDecided) hash ^= ExportersDecided.GetHashCode();
       hash ^= (int) resultCase_;
       if (_unknownFields != null) {
         hash ^= _unknownFields.GetHashCode();
@@ -11432,6 +12653,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(74);
         output.WriteMessage(Plan);
       }
+      if (resultCase_ == ResultOneofCase.ExportersDecided) {
+        output.WriteRawTag(82);
+        output.WriteMessage(ExportersDecided);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(output);
       }
@@ -11478,6 +12703,10 @@ namespace Pydantic.OpAmp.Client.Sdk {
         output.WriteRawTag(74);
         output.WriteMessage(Plan);
       }
+      if (resultCase_ == ResultOneofCase.ExportersDecided) {
+        output.WriteRawTag(82);
+        output.WriteMessage(ExportersDecided);
+      }
       if (_unknownFields != null) {
         _unknownFields.WriteTo(ref output);
       }
@@ -11514,6 +12743,9 @@ namespace Pydantic.OpAmp.Client.Sdk {
       }
       if (resultCase_ == ResultOneofCase.Plan) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Plan);
+      }
+      if (resultCase_ == ResultOneofCase.ExportersDecided) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(ExportersDecided);
       }
       if (_unknownFields != null) {
         size += _unknownFields.CalculateSize();
@@ -11578,6 +12810,12 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Plan = new global::Pydantic.OpAmp.Client.Sdk.Plan();
           }
           Plan.MergeFrom(other.Plan);
+          break;
+        case ResultOneofCase.ExportersDecided:
+          if (ExportersDecided == null) {
+            ExportersDecided = new global::Pydantic.OpAmp.Client.Sdk.ExportersDecided();
+          }
+          ExportersDecided.MergeFrom(other.ExportersDecided);
           break;
       }
 
@@ -11676,6 +12914,15 @@ namespace Pydantic.OpAmp.Client.Sdk {
             Plan = subBuilder;
             break;
           }
+          case 82: {
+            global::Pydantic.OpAmp.Client.Sdk.ExportersDecided subBuilder = new global::Pydantic.OpAmp.Client.Sdk.ExportersDecided();
+            if (resultCase_ == ResultOneofCase.ExportersDecided) {
+              subBuilder.MergeFrom(ExportersDecided);
+            }
+            input.ReadMessage(subBuilder);
+            ExportersDecided = subBuilder;
+            break;
+          }
         }
       }
     #endif
@@ -11769,6 +13016,15 @@ namespace Pydantic.OpAmp.Client.Sdk {
             }
             input.ReadMessage(subBuilder);
             Plan = subBuilder;
+            break;
+          }
+          case 82: {
+            global::Pydantic.OpAmp.Client.Sdk.ExportersDecided subBuilder = new global::Pydantic.OpAmp.Client.Sdk.ExportersDecided();
+            if (resultCase_ == ResultOneofCase.ExportersDecided) {
+              subBuilder.MergeFrom(ExportersDecided);
+            }
+            input.ReadMessage(subBuilder);
+            ExportersDecided = subBuilder;
             break;
           }
         }

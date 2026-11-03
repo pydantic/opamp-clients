@@ -18997,6 +18997,3568 @@ java.lang.String defaultValue) {
     }
   }
 
+  public interface ExportersOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Exporters)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    java.util.List<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> 
+        getFoundList();
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.FoundExporter getFound(int index);
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    int getFoundCount();
+
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    java.util.List<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> 
+        getEnvList();
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.EnvVar getEnv(int index);
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    int getEnvCount();
+
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @return The defaultProtocol.
+     */
+    java.lang.String getDefaultProtocol();
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @return The bytes for defaultProtocol.
+     */
+    com.google.protobuf.ByteString
+        getDefaultProtocolBytes();
+  }
+  /**
+   * <pre>
+   * The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
+   * is decided of them is the same in every language. Call it at start and whenever the providers
+   * change; pass ExportersDecided.exporters as Inventory.exporters, and log its warnings.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.sdk.v1.Exporters}
+   */
+  public  static final class Exporters extends
+      com.google.protobuf.GeneratedMessageLite<
+          Exporters, Exporters.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Exporters)
+      ExportersOrBuilder {
+    private Exporters() {
+      found_ = emptyProtobufList();
+      env_ = emptyProtobufList();
+      defaultProtocol_ = "";
+    }
+    public static final int FOUND_FIELD_NUMBER = 1;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> found_;
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> getFoundList() {
+      return found_;
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.sdk.SettingsProto.FoundExporterOrBuilder> 
+        getFoundOrBuilderList() {
+      return found_;
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.Override
+    public int getFoundCount() {
+      return found_.size();
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.FoundExporter getFound(int index) {
+      return found_.get(index);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    public dev.pydantic.opamp.sdk.SettingsProto.FoundExporterOrBuilder getFoundOrBuilder(
+        int index) {
+      return found_.get(index);
+    }
+    private void ensureFoundIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> tmp = found_;
+      if (!tmp.isModifiable()) {
+        found_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setFound(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureFoundIsMutable();
+      found_.set(index, value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addFound(dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureFoundIsMutable();
+      found_.add(value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addFound(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureFoundIsMutable();
+      found_.add(index, value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    private void addAllFound(
+        java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> values) {
+      ensureFoundIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, found_);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    private void clearFound() {
+      found_ = emptyProtobufList();
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+     */
+    private void removeFound(int index) {
+      ensureFoundIsMutable();
+      found_.remove(index);
+    }
+
+    public static final int ENV_FIELD_NUMBER = 2;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> env_;
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> getEnvList() {
+      return env_;
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.sdk.SettingsProto.EnvVarOrBuilder> 
+        getEnvOrBuilderList() {
+      return env_;
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.Override
+    public int getEnvCount() {
+      return env_.size();
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.EnvVar getEnv(int index) {
+      return env_.get(index);
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    public dev.pydantic.opamp.sdk.SettingsProto.EnvVarOrBuilder getEnvOrBuilder(
+        int index) {
+      return env_.get(index);
+    }
+    private void ensureEnvIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> tmp = env_;
+      if (!tmp.isModifiable()) {
+        env_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEnv(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.set(index, value);
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnv(dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.add(value);
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEnv(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEnvIsMutable();
+      env_.add(index, value);
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    private void addAllEnv(
+        java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.EnvVar> values) {
+      ensureEnvIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, env_);
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    private void clearEnv() {
+      env_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * the process's environment (only OTEL_EXPORTER_* is read)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+     */
+    private void removeEnv(int index) {
+      ensureEnvIsMutable();
+      env_.remove(index);
+    }
+
+    public static final int DEFAULT_PROTOCOL_FIELD_NUMBER = 3;
+    private java.lang.String defaultProtocol_;
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @return The defaultProtocol.
+     */
+    @java.lang.Override
+    public java.lang.String getDefaultProtocol() {
+      return defaultProtocol_;
+    }
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @return The bytes for defaultProtocol.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDefaultProtocolBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(defaultProtocol_);
+    }
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @param value The defaultProtocol to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDefaultProtocol(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      defaultProtocol_ = value;
+    }
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     */
+    private void clearDefaultProtocol() {
+
+      defaultProtocol_ = getDefaultInstance().getDefaultProtocol();
+    }
+    /**
+     * <pre>
+     * the SDK's OTLP protocol with none set: grpc or http/protobuf
+     * </pre>
+     *
+     * <code>string default_protocol = 3;</code>
+     * @param value The bytes for defaultProtocol to set.
+     */
+    private void setDefaultProtocolBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      defaultProtocol_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.Exporters prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
+     * is decided of them is the same in every language. Call it at start and whenever the providers
+     * change; pass ExportersDecided.exporters as Inventory.exporters, and log its warnings.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.sdk.v1.Exporters}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.Exporters, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Exporters)
+        dev.pydantic.opamp.sdk.SettingsProto.ExportersOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.Exporters.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> getFoundList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getFoundList());
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      @java.lang.Override
+      public int getFoundCount() {
+        return instance.getFoundCount();
+      }/**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.FoundExporter getFound(int index) {
+        return instance.getFound(index);
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder setFound(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+        copyOnWrite();
+        instance.setFound(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder setFound(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.setFound(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder addFound(dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+        copyOnWrite();
+        instance.addFound(value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder addFound(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter value) {
+        copyOnWrite();
+        instance.addFound(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder addFound(
+          dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addFound(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder addFound(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addFound(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder addAllFound(
+          java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> values) {
+        copyOnWrite();
+        instance.addAllFound(values);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder clearFound() {
+        copyOnWrite();
+        instance.clearFound();
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.FoundExporter found = 1;</code>
+       */
+      public Builder removeFound(int index) {
+        copyOnWrite();
+        instance.removeFound(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> getEnvList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getEnvList());
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      @java.lang.Override
+      public int getEnvCount() {
+        return instance.getEnvCount();
+      }/**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.EnvVar getEnv(int index) {
+        return instance.getEnv(index);
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder setEnv(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+        copyOnWrite();
+        instance.setEnv(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder setEnv(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar.Builder builderForValue) {
+        copyOnWrite();
+        instance.setEnv(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder addEnv(dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+        copyOnWrite();
+        instance.addEnv(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder addEnv(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar value) {
+        copyOnWrite();
+        instance.addEnv(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder addEnv(
+          dev.pydantic.opamp.sdk.SettingsProto.EnvVar.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnv(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder addEnv(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.EnvVar.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEnv(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder addAllEnv(
+          java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.EnvVar> values) {
+        copyOnWrite();
+        instance.addAllEnv(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder clearEnv() {
+        copyOnWrite();
+        instance.clearEnv();
+        return this;
+      }
+      /**
+       * <pre>
+       * the process's environment (only OTEL_EXPORTER_* is read)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.EnvVar env = 2;</code>
+       */
+      public Builder removeEnv(int index) {
+        copyOnWrite();
+        instance.removeEnv(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the SDK's OTLP protocol with none set: grpc or http/protobuf
+       * </pre>
+       *
+       * <code>string default_protocol = 3;</code>
+       * @return The defaultProtocol.
+       */
+      @java.lang.Override
+      public java.lang.String getDefaultProtocol() {
+        return instance.getDefaultProtocol();
+      }
+      /**
+       * <pre>
+       * the SDK's OTLP protocol with none set: grpc or http/protobuf
+       * </pre>
+       *
+       * <code>string default_protocol = 3;</code>
+       * @return The bytes for defaultProtocol.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDefaultProtocolBytes() {
+        return instance.getDefaultProtocolBytes();
+      }
+      /**
+       * <pre>
+       * the SDK's OTLP protocol with none set: grpc or http/protobuf
+       * </pre>
+       *
+       * <code>string default_protocol = 3;</code>
+       * @param value The defaultProtocol to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDefaultProtocol(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setDefaultProtocol(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the SDK's OTLP protocol with none set: grpc or http/protobuf
+       * </pre>
+       *
+       * <code>string default_protocol = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDefaultProtocol() {
+        copyOnWrite();
+        instance.clearDefaultProtocol();
+        return this;
+      }
+      /**
+       * <pre>
+       * the SDK's OTLP protocol with none set: grpc or http/protobuf
+       * </pre>
+       *
+       * <code>string default_protocol = 3;</code>
+       * @param value The bytes for defaultProtocol to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDefaultProtocolBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setDefaultProtocolBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Exporters)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.Exporters();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "found_",
+              dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.class,
+              "env_",
+              dev.pydantic.opamp.sdk.SettingsProto.EnvVar.class,
+              "defaultProtocol_",
+            };
+            java.lang.String info =
+                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0002\u0000\u0001\u001b\u0002\u001b" +
+                "\u0003\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.Exporters> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.Exporters.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.Exporters>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Exporters)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.Exporters DEFAULT_INSTANCE;
+    static {
+      Exporters defaultInstance = new Exporters();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        Exporters.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Exporters getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<Exporters> PARSER;
+
+    public static com.google.protobuf.Parser<Exporters> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface FoundExporterOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.FoundExporter)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @return The signal.
+     */
+    java.lang.String getSignal();
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @return The bytes for signal.
+     */
+    com.google.protobuf.ByteString
+        getSignalBytes();
+
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @return The kind.
+     */
+    java.lang.String getKind();
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @return The bytes for kind.
+     */
+    com.google.protobuf.ByteString
+        getKindBytes();
+
+    /**
+     * <pre>
+     * the policy's gates are in front of it
+     * </pre>
+     *
+     * <code>bool gated = 3;</code>
+     * @return The gated.
+     */
+    boolean getGated();
+
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <pre>
+     * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+     * </pre>
+     *
+     * <code>bool from_env = 5;</code>
+     * @return The fromEnv.
+     */
+    boolean getFromEnv();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.FoundExporter}
+   */
+  public  static final class FoundExporter extends
+      com.google.protobuf.GeneratedMessageLite<
+          FoundExporter, FoundExporter.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.FoundExporter)
+      FoundExporterOrBuilder {
+    private FoundExporter() {
+      signal_ = "";
+      kind_ = "";
+      endpoint_ = "";
+    }
+    public static final int SIGNAL_FIELD_NUMBER = 1;
+    private java.lang.String signal_;
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @return The signal.
+     */
+    @java.lang.Override
+    public java.lang.String getSignal() {
+      return signal_;
+    }
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @return The bytes for signal.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getSignalBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(signal_);
+    }
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @param value The signal to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setSignal(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      signal_ = value;
+    }
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     */
+    private void clearSignal() {
+
+      signal_ = getDefaultInstance().getSignal();
+    }
+    /**
+     * <pre>
+     * traces, metrics or logs
+     * </pre>
+     *
+     * <code>string signal = 1;</code>
+     * @param value The bytes for signal to set.
+     */
+    private void setSignalBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      signal_ = value.toStringUtf8();
+
+    }
+
+    public static final int KIND_FIELD_NUMBER = 2;
+    private java.lang.String kind_;
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @return The kind.
+     */
+    @java.lang.Override
+    public java.lang.String getKind() {
+      return kind_;
+    }
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @return The bytes for kind.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getKindBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(kind_);
+    }
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @param value The kind to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setKind(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      kind_ = value;
+    }
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     */
+    private void clearKind() {
+
+      kind_ = getDefaultInstance().getKind();
+    }
+    /**
+     * <pre>
+     * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+     * or app_provider (a global provider of the application's own).
+     * </pre>
+     *
+     * <code>string kind = 2;</code>
+     * @param value The bytes for kind to set.
+     */
+    private void setKindBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      kind_ = value.toStringUtf8();
+
+    }
+
+    public static final int GATED_FIELD_NUMBER = 3;
+    private boolean gated_;
+    /**
+     * <pre>
+     * the policy's gates are in front of it
+     * </pre>
+     *
+     * <code>bool gated = 3;</code>
+     * @return The gated.
+     */
+    @java.lang.Override
+    public boolean getGated() {
+      return gated_;
+    }
+    /**
+     * <pre>
+     * the policy's gates are in front of it
+     * </pre>
+     *
+     * <code>bool gated = 3;</code>
+     * @param value The gated to set.
+     */
+    private void setGated(boolean value) {
+      
+      gated_ = value;
+    }
+    /**
+     * <pre>
+     * the policy's gates are in front of it
+     * </pre>
+     *
+     * <code>bool gated = 3;</code>
+     */
+    private void clearGated() {
+
+      gated_ = false;
+    }
+
+    public static final int ENDPOINT_FIELD_NUMBER = 4;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * as the exporter holds it; empty: not known
+     * </pre>
+     *
+     * <code>string endpoint = 4;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int FROM_ENV_FIELD_NUMBER = 5;
+    private boolean fromEnv_;
+    /**
+     * <pre>
+     * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+     * </pre>
+     *
+     * <code>bool from_env = 5;</code>
+     * @return The fromEnv.
+     */
+    @java.lang.Override
+    public boolean getFromEnv() {
+      return fromEnv_;
+    }
+    /**
+     * <pre>
+     * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+     * </pre>
+     *
+     * <code>bool from_env = 5;</code>
+     * @param value The fromEnv to set.
+     */
+    private void setFromEnv(boolean value) {
+      
+      fromEnv_ = value;
+    }
+    /**
+     * <pre>
+     * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+     * </pre>
+     *
+     * <code>bool from_env = 5;</code>
+     */
+    private void clearFromEnv() {
+
+      fromEnv_ = false;
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.FoundExporter prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.FoundExporter}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.FoundExporter, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.FoundExporter)
+        dev.pydantic.opamp.sdk.SettingsProto.FoundExporterOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * traces, metrics or logs
+       * </pre>
+       *
+       * <code>string signal = 1;</code>
+       * @return The signal.
+       */
+      @java.lang.Override
+      public java.lang.String getSignal() {
+        return instance.getSignal();
+      }
+      /**
+       * <pre>
+       * traces, metrics or logs
+       * </pre>
+       *
+       * <code>string signal = 1;</code>
+       * @return The bytes for signal.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getSignalBytes() {
+        return instance.getSignalBytes();
+      }
+      /**
+       * <pre>
+       * traces, metrics or logs
+       * </pre>
+       *
+       * <code>string signal = 1;</code>
+       * @param value The signal to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSignal(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setSignal(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * traces, metrics or logs
+       * </pre>
+       *
+       * <code>string signal = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSignal() {
+        copyOnWrite();
+        instance.clearSignal();
+        return this;
+      }
+      /**
+       * <pre>
+       * traces, metrics or logs
+       * </pre>
+       *
+       * <code>string signal = 1;</code>
+       * @param value The bytes for signal to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSignalBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setSignalBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+       * or app_provider (a global provider of the application's own).
+       * </pre>
+       *
+       * <code>string kind = 2;</code>
+       * @return The kind.
+       */
+      @java.lang.Override
+      public java.lang.String getKind() {
+        return instance.getKind();
+      }
+      /**
+       * <pre>
+       * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+       * or app_provider (a global provider of the application's own).
+       * </pre>
+       *
+       * <code>string kind = 2;</code>
+       * @return The bytes for kind.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getKindBytes() {
+        return instance.getKindBytes();
+      }
+      /**
+       * <pre>
+       * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+       * or app_provider (a global provider of the application's own).
+       * </pre>
+       *
+       * <code>string kind = 2;</code>
+       * @param value The kind to set.
+       * @return This builder for chaining.
+       */
+      public Builder setKind(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setKind(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+       * or app_provider (a global provider of the application's own).
+       * </pre>
+       *
+       * <code>string kind = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearKind() {
+        copyOnWrite();
+        instance.clearKind();
+        return this;
+      }
+      /**
+       * <pre>
+       * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+       * or app_provider (a global provider of the application's own).
+       * </pre>
+       *
+       * <code>string kind = 2;</code>
+       * @param value The bytes for kind to set.
+       * @return This builder for chaining.
+       */
+      public Builder setKindBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setKindBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the policy's gates are in front of it
+       * </pre>
+       *
+       * <code>bool gated = 3;</code>
+       * @return The gated.
+       */
+      @java.lang.Override
+      public boolean getGated() {
+        return instance.getGated();
+      }
+      /**
+       * <pre>
+       * the policy's gates are in front of it
+       * </pre>
+       *
+       * <code>bool gated = 3;</code>
+       * @param value The gated to set.
+       * @return This builder for chaining.
+       */
+      public Builder setGated(boolean value) {
+        copyOnWrite();
+        instance.setGated(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the policy's gates are in front of it
+       * </pre>
+       *
+       * <code>bool gated = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearGated() {
+        copyOnWrite();
+        instance.clearGated();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as the exporter holds it; empty: not known
+       * </pre>
+       *
+       * <code>string endpoint = 4;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * as the exporter holds it; empty: not known
+       * </pre>
+       *
+       * <code>string endpoint = 4;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * as the exporter holds it; empty: not known
+       * </pre>
+       *
+       * <code>string endpoint = 4;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the exporter holds it; empty: not known
+       * </pre>
+       *
+       * <code>string endpoint = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * as the exporter holds it; empty: not known
+       * </pre>
+       *
+       * <code>string endpoint = 4;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+       * </pre>
+       *
+       * <code>bool from_env = 5;</code>
+       * @return The fromEnv.
+       */
+      @java.lang.Override
+      public boolean getFromEnv() {
+        return instance.getFromEnv();
+      }
+      /**
+       * <pre>
+       * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+       * </pre>
+       *
+       * <code>bool from_env = 5;</code>
+       * @param value The fromEnv to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFromEnv(boolean value) {
+        copyOnWrite();
+        instance.setFromEnv(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+       * </pre>
+       *
+       * <code>bool from_env = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFromEnv() {
+        copyOnWrite();
+        instance.clearFromEnv();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.FoundExporter)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.FoundExporter();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "signal_",
+              "kind_",
+              "gated_",
+              "endpoint_",
+              "fromEnv_",
+            };
+            java.lang.String info =
+                "\u0000\u0005\u0000\u0000\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "\u0003\u0007\u0004\u0208\u0005\u0007";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.FoundExporter.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.FoundExporter>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.FoundExporter)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.FoundExporter DEFAULT_INSTANCE;
+    static {
+      FoundExporter defaultInstance = new FoundExporter();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        FoundExporter.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.FoundExporter getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<FoundExporter> PARSER;
+
+    public static com.google.protobuf.Parser<FoundExporter> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface EnvVarOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.EnvVar)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    java.lang.String getName();
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    com.google.protobuf.ByteString
+        getNameBytes();
+
+    /**
+     * <code>string value = 2;</code>
+     * @return The value.
+     */
+    java.lang.String getValue();
+    /**
+     * <code>string value = 2;</code>
+     * @return The bytes for value.
+     */
+    com.google.protobuf.ByteString
+        getValueBytes();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.EnvVar}
+   */
+  public  static final class EnvVar extends
+      com.google.protobuf.GeneratedMessageLite<
+          EnvVar, EnvVar.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.EnvVar)
+      EnvVarOrBuilder {
+    private EnvVar() {
+      name_ = "";
+      value_ = "";
+    }
+    public static final int NAME_FIELD_NUMBER = 1;
+    private java.lang.String name_;
+    /**
+     * <code>string name = 1;</code>
+     * @return The name.
+     */
+    @java.lang.Override
+    public java.lang.String getName() {
+      return name_;
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @return The bytes for name.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNameBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(name_);
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The name to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setName(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      name_ = value;
+    }
+    /**
+     * <code>string name = 1;</code>
+     */
+    private void clearName() {
+
+      name_ = getDefaultInstance().getName();
+    }
+    /**
+     * <code>string name = 1;</code>
+     * @param value The bytes for name to set.
+     */
+    private void setNameBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      name_ = value.toStringUtf8();
+
+    }
+
+    public static final int VALUE_FIELD_NUMBER = 2;
+    private java.lang.String value_;
+    /**
+     * <code>string value = 2;</code>
+     * @return The value.
+     */
+    @java.lang.Override
+    public java.lang.String getValue() {
+      return value_;
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @return The bytes for value.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getValueBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(value_);
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @param value The value to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setValue(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      value_ = value;
+    }
+    /**
+     * <code>string value = 2;</code>
+     */
+    private void clearValue() {
+
+      value_ = getDefaultInstance().getValue();
+    }
+    /**
+     * <code>string value = 2;</code>
+     * @param value The bytes for value to set.
+     */
+    private void setValueBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      value_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.EnvVar prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.EnvVar}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.EnvVar, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.EnvVar)
+        dev.pydantic.opamp.sdk.SettingsProto.EnvVarOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.EnvVar.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>string name = 1;</code>
+       * @return The name.
+       */
+      @java.lang.Override
+      public java.lang.String getName() {
+        return instance.getName();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return The bytes for name.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getNameBytes() {
+        return instance.getNameBytes();
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setName(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setName(value);
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearName() {
+        copyOnWrite();
+        instance.clearName();
+        return this;
+      }
+      /**
+       * <code>string name = 1;</code>
+       * @param value The bytes for name to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNameBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setNameBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string value = 2;</code>
+       * @return The value.
+       */
+      @java.lang.Override
+      public java.lang.String getValue() {
+        return instance.getValue();
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @return The bytes for value.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getValueBytes() {
+        return instance.getValueBytes();
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @param value The value to set.
+       * @return This builder for chaining.
+       */
+      public Builder setValue(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setValue(value);
+        return this;
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearValue() {
+        copyOnWrite();
+        instance.clearValue();
+        return this;
+      }
+      /**
+       * <code>string value = 2;</code>
+       * @param value The bytes for value to set.
+       * @return This builder for chaining.
+       */
+      public Builder setValueBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setValueBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.EnvVar)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.EnvVar();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "name_",
+              "value_",
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.EnvVar> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.EnvVar.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.EnvVar>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.EnvVar)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.EnvVar DEFAULT_INSTANCE;
+    static {
+      EnvVar defaultInstance = new EnvVar();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        EnvVar.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.EnvVar getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<EnvVar> PARSER;
+
+    public static com.google.protobuf.Parser<EnvVar> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface ExportersDecidedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.ExportersDecided)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> 
+        getExportersList();
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index);
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    int getExportersCount();
+
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @return A list containing the governed.
+     */
+    java.util.List<java.lang.String>
+        getGovernedList();
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @return The count of governed.
+     */
+    int getGovernedCount();
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param index The index of the element to return.
+     * @return The governed at the given index.
+     */
+    java.lang.String getGoverned(int index);
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param index The index of the element to return.
+     * @return The governed at the given index.
+     */
+    com.google.protobuf.ByteString
+        getGovernedBytes(int index);
+
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @return A list containing the ungoverned.
+     */
+    java.util.List<java.lang.String>
+        getUngovernedList();
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @return The count of ungoverned.
+     */
+    int getUngovernedCount();
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param index The index of the element to return.
+     * @return The ungoverned at the given index.
+     */
+    java.lang.String getUngoverned(int index);
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param index The index of the element to return.
+     * @return The ungoverned at the given index.
+     */
+    com.google.protobuf.ByteString
+        getUngovernedBytes(int index);
+
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @return A list containing the warnings.
+     */
+    java.util.List<java.lang.String>
+        getWarningsList();
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @return The count of warnings.
+     */
+    int getWarningsCount();
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    java.lang.String getWarnings(int index);
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    com.google.protobuf.ByteString
+        getWarningsBytes(int index);
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.ExportersDecided}
+   */
+  public  static final class ExportersDecided extends
+      com.google.protobuf.GeneratedMessageLite<
+          ExportersDecided, ExportersDecided.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.ExportersDecided)
+      ExportersDecidedOrBuilder {
+    private ExportersDecided() {
+      exporters_ = emptyProtobufList();
+      governed_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+      ungoverned_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+      warnings_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    public static final int EXPORTERS_FIELD_NUMBER = 1;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.Exporter> exporters_;
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> getExportersList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    public java.util.List<? extends dev.pydantic.opamp.sdk.SettingsProto.ExporterOrBuilder> 
+        getExportersOrBuilderList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public int getExportersCount() {
+      return exporters_.size();
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index) {
+      return exporters_.get(index);
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    public dev.pydantic.opamp.sdk.SettingsProto.ExporterOrBuilder getExportersOrBuilder(
+        int index) {
+      return exporters_.get(index);
+    }
+    private void ensureExportersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.opamp.sdk.SettingsProto.Exporter> tmp = exporters_;
+      if (!tmp.isModifiable()) {
+        exporters_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.set(index, value);
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(value);
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(
+        int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(index, value);
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void addAllExporters(
+        java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.Exporter> values) {
+      ensureExportersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, exporters_);
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void clearExporters() {
+      exporters_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * Inventory.exporters, in the order found
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void removeExporters(int index) {
+      ensureExportersIsMutable();
+      exporters_.remove(index);
+    }
+
+    public static final int GOVERNED_FIELD_NUMBER = 2;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> governed_;
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @return A list containing the governed.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getGovernedList() {
+      return governed_;
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @return The count of governed.
+     */
+    @java.lang.Override
+    public int getGovernedCount() {
+      return governed_.size();
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param index The index of the element to return.
+     * @return The governed at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getGoverned(int index) {
+      return governed_.get(index);
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the governed at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getGovernedBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          governed_.get(index));
+    }
+    private void ensureGovernedIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          governed_;  if (!tmp.isModifiable()) {
+        governed_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param index The index to set the value at.
+     * @param value The governed to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setGoverned(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureGovernedIsMutable();
+      governed_.set(index, value);
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param value The governed to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addGoverned(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureGovernedIsMutable();
+      governed_.add(value);
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param values The governed to add.
+     */
+    private void addAllGoverned(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureGovernedIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, governed_);
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     */
+    private void clearGoverned() {
+      governed_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * the signals with exporters, every one governed
+     * </pre>
+     *
+     * <code>repeated string governed = 2;</code>
+     * @param value The bytes of the governed to add.
+     */
+    private void addGovernedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureGovernedIsMutable();
+      governed_.add(value.toStringUtf8());
+    }
+
+    public static final int UNGOVERNED_FIELD_NUMBER = 3;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> ungoverned_;
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @return A list containing the ungoverned.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getUngovernedList() {
+      return ungoverned_;
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @return The count of ungoverned.
+     */
+    @java.lang.Override
+    public int getUngovernedCount() {
+      return ungoverned_.size();
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param index The index of the element to return.
+     * @return The ungoverned at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getUngoverned(int index) {
+      return ungoverned_.get(index);
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the ungoverned at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUngovernedBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          ungoverned_.get(index));
+    }
+    private void ensureUngovernedIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          ungoverned_;  if (!tmp.isModifiable()) {
+        ungoverned_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param index The index to set the value at.
+     * @param value The ungoverned to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUngoverned(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureUngovernedIsMutable();
+      ungoverned_.set(index, value);
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param value The ungoverned to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addUngoverned(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureUngovernedIsMutable();
+      ungoverned_.add(value);
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param values The ungoverned to add.
+     */
+    private void addAllUngoverned(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureUngovernedIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, ungoverned_);
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     */
+    private void clearUngoverned() {
+      ungoverned_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * the signals with an exporter past the gates
+     * </pre>
+     *
+     * <code>repeated string ungoverned = 3;</code>
+     * @param value The bytes of the ungoverned to add.
+     */
+    private void addUngovernedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureUngovernedIsMutable();
+      ungoverned_.add(value.toStringUtf8());
+    }
+
+    public static final int WARNINGS_FIELD_NUMBER = 4;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> warnings_;
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @return A list containing the warnings.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getWarningsList() {
+      return warnings_;
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @return The count of warnings.
+     */
+    @java.lang.Override
+    public int getWarningsCount() {
+      return warnings_.size();
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param index The index of the element to return.
+     * @return The warnings at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getWarnings(int index) {
+      return warnings_.get(index);
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the warnings at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getWarningsBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          warnings_.get(index));
+    }
+    private void ensureWarningsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          warnings_;  if (!tmp.isModifiable()) {
+        warnings_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param index The index to set the value at.
+     * @param value The warnings to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setWarnings(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureWarningsIsMutable();
+      warnings_.set(index, value);
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param value The warnings to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addWarnings(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureWarningsIsMutable();
+      warnings_.add(value);
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param values The warnings to add.
+     */
+    private void addAllWarnings(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureWarningsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, warnings_);
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     */
+    private void clearWarnings() {
+      warnings_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * one line per ungoverned exporter identity
+     * </pre>
+     *
+     * <code>repeated string warnings = 4;</code>
+     * @param value The bytes of the warnings to add.
+     */
+    private void addWarningsBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureWarningsIsMutable();
+      warnings_.add(value.toStringUtf8());
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.ExportersDecided}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.ExportersDecided)
+        dev.pydantic.opamp.sdk.SettingsProto.ExportersDecidedOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.opamp.sdk.SettingsProto.Exporter> getExportersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getExportersList());
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public int getExportersCount() {
+        return instance.getExportersCount();
+      }/**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.Exporter getExporters(int index) {
+        return instance.getExporters(index);
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.setExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.opamp.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addAllExporters(
+          java.lang.Iterable<? extends dev.pydantic.opamp.sdk.SettingsProto.Exporter> values) {
+        copyOnWrite();
+        instance.addAllExporters(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+      /**
+       * <pre>
+       * Inventory.exporters, in the order found
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder removeExporters(int index) {
+        copyOnWrite();
+        instance.removeExporters(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @return A list containing the governed.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getGovernedList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getGovernedList());
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @return The count of governed.
+       */
+      @java.lang.Override
+      public int getGovernedCount() {
+        return instance.getGovernedCount();
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param index The index of the element to return.
+       * @return The governed at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getGoverned(int index) {
+        return instance.getGoverned(index);
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the governed at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getGovernedBytes(int index) {
+        return instance.getGovernedBytes(index);
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param index The index to set the value at.
+       * @param value The governed to set.
+       * @return This builder for chaining.
+       */
+      public Builder setGoverned(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setGoverned(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param value The governed to add.
+       * @return This builder for chaining.
+       */
+      public Builder addGoverned(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addGoverned(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param values The governed to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllGoverned(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllGoverned(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearGoverned() {
+        copyOnWrite();
+        instance.clearGoverned();
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with exporters, every one governed
+       * </pre>
+       *
+       * <code>repeated string governed = 2;</code>
+       * @param value The bytes of the governed to add.
+       * @return This builder for chaining.
+       */
+      public Builder addGovernedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addGovernedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @return A list containing the ungoverned.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getUngovernedList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getUngovernedList());
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @return The count of ungoverned.
+       */
+      @java.lang.Override
+      public int getUngovernedCount() {
+        return instance.getUngovernedCount();
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param index The index of the element to return.
+       * @return The ungoverned at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getUngoverned(int index) {
+        return instance.getUngoverned(index);
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the ungoverned at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUngovernedBytes(int index) {
+        return instance.getUngovernedBytes(index);
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param index The index to set the value at.
+       * @param value The ungoverned to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUngoverned(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setUngoverned(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param value The ungoverned to add.
+       * @return This builder for chaining.
+       */
+      public Builder addUngoverned(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addUngoverned(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param values The ungoverned to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllUngoverned(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllUngoverned(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUngoverned() {
+        copyOnWrite();
+        instance.clearUngoverned();
+        return this;
+      }
+      /**
+       * <pre>
+       * the signals with an exporter past the gates
+       * </pre>
+       *
+       * <code>repeated string ungoverned = 3;</code>
+       * @param value The bytes of the ungoverned to add.
+       * @return This builder for chaining.
+       */
+      public Builder addUngovernedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addUngovernedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @return A list containing the warnings.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getWarningsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getWarningsList());
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @return The count of warnings.
+       */
+      @java.lang.Override
+      public int getWarningsCount() {
+        return instance.getWarningsCount();
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param index The index of the element to return.
+       * @return The warnings at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getWarnings(int index) {
+        return instance.getWarnings(index);
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the warnings at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getWarningsBytes(int index) {
+        return instance.getWarningsBytes(index);
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param index The index to set the value at.
+       * @param value The warnings to set.
+       * @return This builder for chaining.
+       */
+      public Builder setWarnings(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setWarnings(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param value The warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addWarnings(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addWarnings(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param values The warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllWarnings(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllWarnings(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearWarnings() {
+        copyOnWrite();
+        instance.clearWarnings();
+        return this;
+      }
+      /**
+       * <pre>
+       * one line per ungoverned exporter identity
+       * </pre>
+       *
+       * <code>repeated string warnings = 4;</code>
+       * @param value The bytes of the warnings to add.
+       * @return This builder for chaining.
+       */
+      public Builder addWarningsBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addWarningsBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.ExportersDecided)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "exporters_",
+              dev.pydantic.opamp.sdk.SettingsProto.Exporter.class,
+              "governed_",
+              "ungoverned_",
+              "warnings_",
+            };
+            java.lang.String info =
+                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0004\u0000\u0001\u001b\u0002\u021a" +
+                "\u0003\u021a\u0004\u021a";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.ExportersDecided)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided DEFAULT_INSTANCE;
+    static {
+      ExportersDecided defaultInstance = new ExportersDecided();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        ExportersDecided.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<ExportersDecided> PARSER;
+
+    public static com.google.protobuf.Parser<ExportersDecided> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
   public interface EvaluateOrBuilder extends
       // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Evaluate)
       com.google.protobuf.MessageLiteOrBuilder {
@@ -25168,6 +28730,17 @@ java.lang.String defaultValue) {
      */
     dev.pydantic.opamp.sdk.SettingsProto.Commit getCommit();
 
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     * @return Whether the exporters field is set.
+     */
+    boolean hasExporters();
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     * @return The exporters.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.Exporters getExporters();
+
     public dev.pydantic.opamp.sdk.SettingsProto.Request.CallCase getCallCase();
   }
   /**
@@ -25192,6 +28765,7 @@ java.lang.String defaultValue) {
       HEALTH(6),
       COMPONENTS(7),
       COMMIT(8),
+      EXPORTERS(9),
       CALL_NOT_SET(0);
       private final int value;
       private CallCase(int value) {
@@ -25215,6 +28789,7 @@ java.lang.String defaultValue) {
           case 6: return HEALTH;
           case 7: return COMPONENTS;
           case 8: return COMMIT;
+          case 9: return EXPORTERS;
           case 0: return CALL_NOT_SET;
           default: return null;
         }
@@ -25647,6 +29222,58 @@ java.lang.String defaultValue) {
      */
     private void clearCommit() {
       if (callCase_ == 8) {
+        callCase_ = 0;
+        call_ = null;
+      }
+    }
+
+    public static final int EXPORTERS_FIELD_NUMBER = 9;
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     */
+    @java.lang.Override
+    public boolean hasExporters() {
+      return callCase_ == 9;
+    }
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.Exporters getExporters() {
+      if (callCase_ == 9) {
+         return (dev.pydantic.opamp.sdk.SettingsProto.Exporters) call_;
+      }
+      return dev.pydantic.opamp.sdk.SettingsProto.Exporters.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporters value) {
+      value.getClass();  // minimal bytecode null check
+      call_ = value;
+      callCase_ = 9;
+    }
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporters value) {
+      value.getClass();  // minimal bytecode null check
+      if (callCase_ == 9 &&
+          call_ != dev.pydantic.opamp.sdk.SettingsProto.Exporters.getDefaultInstance()) {
+        call_ = dev.pydantic.opamp.sdk.SettingsProto.Exporters.newBuilder((dev.pydantic.opamp.sdk.SettingsProto.Exporters) call_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        call_ = value;
+      }
+      callCase_ = 9;
+    }
+    /**
+     * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+     */
+    private void clearExporters() {
+      if (callCase_ == 9) {
         callCase_ = 0;
         call_ = null;
       }
@@ -26145,6 +29772,54 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      @java.lang.Override
+      public boolean hasExporters() {
+        return instance.hasExporters();
+      }
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.Exporters getExporters() {
+        return instance.getExporters();
+      }
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      public Builder setExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporters value) {
+        copyOnWrite();
+        instance.setExporters(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      public Builder setExporters(
+          dev.pydantic.opamp.sdk.SettingsProto.Exporters.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      public Builder mergeExporters(dev.pydantic.opamp.sdk.SettingsProto.Exporters value) {
+        copyOnWrite();
+        instance.mergeExporters(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Request)
     }
     @java.lang.Override
@@ -26171,10 +29846,11 @@ java.lang.String defaultValue) {
               dev.pydantic.opamp.sdk.SettingsProto.Health.class,
               dev.pydantic.opamp.sdk.SettingsProto.Components.class,
               dev.pydantic.opamp.sdk.SettingsProto.Commit.class,
+              dev.pydantic.opamp.sdk.SettingsProto.Exporters.class,
             };
             java.lang.String info =
-                "\u0000\b\u0001\u0000\u0001\b\b\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
-                "<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000";
+                "\u0000\t\u0001\u0000\u0001\t\t\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
+                "<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -26350,6 +30026,17 @@ java.lang.String defaultValue) {
      */
     dev.pydantic.opamp.sdk.SettingsProto.Plan getPlan();
 
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     * @return Whether the exportersDecided field is set.
+     */
+    boolean hasExportersDecided();
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     * @return The exportersDecided.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided getExportersDecided();
+
     public dev.pydantic.opamp.sdk.SettingsProto.Reply.ResultCase getResultCase();
   }
   /**
@@ -26375,6 +30062,7 @@ java.lang.String defaultValue) {
       HEALTH_REPORT(7),
       AVAILABLE_COMPONENTS(8),
       PLAN(9),
+      EXPORTERS_DECIDED(10),
       RESULT_NOT_SET(0);
       private final int value;
       private ResultCase(int value) {
@@ -26399,6 +30087,7 @@ java.lang.String defaultValue) {
           case 7: return HEALTH_REPORT;
           case 8: return AVAILABLE_COMPONENTS;
           case 9: return PLAN;
+          case 10: return EXPORTERS_DECIDED;
           case 0: return RESULT_NOT_SET;
           default: return null;
         }
@@ -26920,6 +30609,58 @@ java.lang.String defaultValue) {
      */
     private void clearPlan() {
       if (resultCase_ == 9) {
+        resultCase_ = 0;
+        result_ = null;
+      }
+    }
+
+    public static final int EXPORTERS_DECIDED_FIELD_NUMBER = 10;
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     */
+    @java.lang.Override
+    public boolean hasExportersDecided() {
+      return resultCase_ == 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided getExportersDecided() {
+      if (resultCase_ == 10) {
+         return (dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided) result_;
+      }
+      return dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExportersDecided(dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided value) {
+      value.getClass();  // minimal bytecode null check
+      result_ = value;
+      resultCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeExportersDecided(dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided value) {
+      value.getClass();  // minimal bytecode null check
+      if (resultCase_ == 10 &&
+          result_ != dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.getDefaultInstance()) {
+        result_ = dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.newBuilder((dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided) result_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        result_ = value;
+      }
+      resultCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+     */
+    private void clearExportersDecided() {
+      if (resultCase_ == 10) {
         resultCase_ = 0;
         result_ = null;
       }
@@ -27499,6 +31240,54 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      @java.lang.Override
+      public boolean hasExportersDecided() {
+        return instance.hasExportersDecided();
+      }
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided getExportersDecided() {
+        return instance.getExportersDecided();
+      }
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      public Builder setExportersDecided(dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided value) {
+        copyOnWrite();
+        instance.setExportersDecided(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      public Builder setExportersDecided(
+          dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExportersDecided(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      public Builder mergeExportersDecided(dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided value) {
+        copyOnWrite();
+        instance.mergeExportersDecided(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
+       */
+      public Builder clearExportersDecided() {
+        copyOnWrite();
+        instance.clearExportersDecided();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Reply)
     }
     @java.lang.Override
@@ -27525,11 +31314,12 @@ java.lang.String defaultValue) {
               dev.pydantic.opamp.sdk.SettingsProto.HealthReport.class,
               opamp.proto.v1.Opamp.AvailableComponents.class,
               dev.pydantic.opamp.sdk.SettingsProto.Plan.class,
+              dev.pydantic.opamp.sdk.SettingsProto.ExportersDecided.class,
             };
             java.lang.String info =
-                "\u0000\t\u0001\u0000\u0001\t\t\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
+                "\u0000\n\u0001\u0000\u0001\n\n\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
                 "<\u0000\u0004\u023b\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000" +
-                "";
+                "\n<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

@@ -968,10 +968,6 @@ def _undeclared(host: settings_pb2.Host) -> list[str]:
 
 #: The package as published, which the inventory names.
 PACKAGE = "pydantic-opamp-otel"
-#: Exporter entry points by the name OTEL_*_EXPORTER gives them in every language: the OTLP ones,
-#: whatever their protocol, are `otlp`.
-_EXPORTER_NAMES = {"otlp_proto_grpc": "otlp", "otlp_proto_http": "otlp", "zipkin_json": "zipkin",
-                   "zipkin_proto": "zipkin"}
 
 
 def instrumentations() -> list[settings_pb2.Instrumentation]:
@@ -994,10 +990,10 @@ def instrumentations() -> list[settings_pb2.Instrumentation]:
     return out
 
 
-def _exporter_name(signal: str, kind: type) -> str:
-    """An exporter's (or a metric reader's) name: its entry point's, as OTEL_*_EXPORTER names it,
-    for that exporter or one it subclasses (the Logfire SDK's OTLP exporters are `otlp`); a console
-    exporter of another library's is `console`; else its type's. Only entry points whose module is
+def _exporter_kind(signal: str, kind: type) -> str:
+    """What an exporter (or a metric reader) is known as, for the core to name it: its entry
+    point's name, as OTEL_*_EXPORTER gives it, for that exporter or one it subclasses (the Logfire
+    SDK's OTLP exporters are `otlp_proto_http`); else its type's. Only entry points whose module is
     loaded are looked at: one that isn't can't be this one, and nothing is imported to find out."""
     from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
 
@@ -1010,10 +1006,8 @@ def _exporter_name(signal: str, kind: type) -> str:
         for part in attr.strip().split("."):
             found = getattr(found, part, None)
         if isinstance(found, type) and issubclass(kind, found):
-            names.append(_EXPORTER_NAMES.get(ep.name, ep.name))
-    if names:
-        return min(names)
-    return "console" if "Console" in kind.__name__ else kind.__name__
+            names.append(ep.name)
+    return min(names) if names else kind.__name__
 
 
 #: Where an exporter that wraps another keeps it: the Logfire SDK's wrappers (`wrapped_exporter`,
@@ -1039,9 +1033,9 @@ def _gated(exporter) -> bool:
     return any(isinstance(e, (_GatedSpanExporter, _GatedLogExporter, GatedMetricExporter)) for e in _chain(exporter))
 
 
-def _destination(exporter) -> str:
-    """Where `exporter` sends, as it was given it (an OTLP exporter's endpoint); "" if not known.
-    The layer keeps only the scheme, host and port."""
+def _endpoint(exporter) -> str:
+    """Where `exporter` sends, as it holds it (an OTLP exporter's endpoint, which the SDK resolved
+    from the OTEL_* variables when built from them); "" if not known."""
     for e in _chain(exporter):
         endpoint = getattr(e, "_endpoint", None)
         if isinstance(endpoint, str) and endpoint:
@@ -1049,32 +1043,40 @@ def _destination(exporter) -> str:
     return ""
 
 
-def _listed(signal: str, exporter, gated: bool) -> settings_pb2.Exporter:
-    """An exporter as the inventory lists it: named by the innermost exporter in its chain."""
+def _found(signal: str, exporter, gated: bool) -> settings_pb2.FoundExporter:
+    """An exporter as found, for the core to decide its name and destination: known by the
+    innermost exporter in its chain."""
     inner = [e for e in _chain(exporter) if not isinstance(e, (_GatedSpanExporter, _GatedLogExporter,
                                                                 GatedMetricExporter))]
     kind = type(inner[-1] if inner else exporter)
-    return settings_pb2.Exporter(signal=signal, name=_exporter_name(signal, kind), gated=gated,
-                                 destination=_destination(exporter))
+    return settings_pb2.FoundExporter(signal=signal, kind=_exporter_kind(signal, kind), gated=gated,
+                                      endpoint=_endpoint(exporter))
 
 
 class Governed:
-    """What `govern` found on the providers: each exporter (governed or not), as the inventory
-    lists them, and whether the providers were the SDK's at all."""
+    """What `govern` found on the providers: each exporter (governed or not) as found, and once
+    `decide`d, as the inventory lists them with the core's warnings; and whether the providers were
+    the SDK's at all."""
 
     def __init__(self) -> None:
+        self.found: list[settings_pb2.FoundExporter] = []
         self.exporters: list[settings_pb2.Exporter] = []
+        self.warnings: list[str] = []
         self.sdk = {"traces": False, "metrics": False, "logs": False}
         self._seen: set[int] = set()
+
+    def decide(self, layer: SdkSettings, env: Mapping[str, str]) -> Governed:
+        """What the core decides of the exporters found (`SdkSettings.exporters`): the same names,
+        destinations and warnings as every other SDK's. The OTEL_* variables in `env` are read."""
+        decided = layer.exporters(self.found, dict(env), "grpc")
+        self.exporters, self.warnings = list(decided.exporters), list(decided.warnings)
+        return self
 
     def first_time(self, o) -> bool:
         if id(o) in self._seen:
             return False
         self._seen.add(id(o))
         return True
-
-    def ungoverned(self) -> list[settings_pb2.Exporter]:
-        return [e for e in self.exporters if not e.gated]
 
 
 def _sdk_provider(provider):
@@ -1099,10 +1101,10 @@ def _govern_spans(p, controls: Controls, log_spans: bool, found: Governed, depth
     wrap = lambda e: e if _gated(e) else controls.spans(e, log_spans)  # noqa: E731
     if isinstance(p, SimpleSpanProcessor):
         p.span_exporter = wrap(p.span_exporter)
-        found.exporters.append(_listed("traces", p.span_exporter, True))
+        found.found.append(_found("traces", p.span_exporter, True))
     elif isinstance(p, BatchSpanProcessor) and getattr(getattr(p, "_batch_processor", None), "_exporter", None):
         p._batch_processor._exporter = wrap(p._batch_processor._exporter)  # noqa: SLF001
-        found.exporters.append(_listed("traces", p._batch_processor._exporter, True))  # noqa: SLF001
+        found.found.append(_found("traces", p._batch_processor._exporter, True))  # noqa: SLF001
     elif (children := getattr(p, "_span_processors", None)) is not None:
         for child in children:
             _govern_spans(child, controls, log_spans, found, depth + 1)
@@ -1111,7 +1113,7 @@ def _govern_spans(p, controls: Controls, log_spans: bool, found: Governed, depth
     else:
         for held in vars(p).values() if hasattr(p, "__dict__") else ():
             if isinstance(held, SpanExporter):
-                found.exporters.append(_listed("traces", held, _gated(held)))
+                found.found.append(_found("traces", held, _gated(held)))
 
 
 def _govern_logs(p, controls: Controls, found: Governed, depth: int = 0) -> None:
@@ -1124,10 +1126,10 @@ def _govern_logs(p, controls: Controls, found: Governed, depth: int = 0) -> None
     wrap = lambda e: e if _gated(e) else controls.logs(e)  # noqa: E731
     if isinstance(p, SimpleLogRecordProcessor) and getattr(p, "_exporter", None) is not None:
         p._exporter = wrap(p._exporter)  # noqa: SLF001
-        found.exporters.append(_listed("logs", p._exporter, True))  # noqa: SLF001
+        found.found.append(_found("logs", p._exporter, True))  # noqa: SLF001
     elif isinstance(p, BatchLogRecordProcessor) and getattr(getattr(p, "_batch_processor", None), "_exporter", None):
         p._batch_processor._exporter = wrap(p._batch_processor._exporter)  # noqa: SLF001
-        found.exporters.append(_listed("logs", p._batch_processor._exporter, True))  # noqa: SLF001
+        found.found.append(_found("logs", p._batch_processor._exporter, True))  # noqa: SLF001
     elif (children := getattr(p, "_log_record_processors", None)) is not None:
         for child in children:
             _govern_logs(child, controls, found, depth + 1)
@@ -1136,7 +1138,7 @@ def _govern_logs(p, controls: Controls, found: Governed, depth: int = 0) -> None
     else:
         for held in vars(p).values() if hasattr(p, "__dict__") else ():
             if isinstance(held, LogRecordExporter):
-                found.exporters.append(_listed("logs", held, _gated(held)))
+                found.found.append(_found("logs", held, _gated(held)))
 
 
 def _govern_readers(provider, found: Governed) -> None:
@@ -1151,19 +1153,20 @@ def _govern_readers(provider, found: Governed) -> None:
         if isinstance(reader, PeriodicExportingMetricReader) and isinstance(exporter, MetricExporter):
             if not _gated(exporter):
                 reader._exporter = exporter = GatedMetricExporter(exporter)  # noqa: SLF001
-            found.exporters.append(_listed("metrics", exporter, True))
+            found.found.append(_found("metrics", exporter, True))
         else:
-            found.exporters.append(settings_pb2.Exporter(signal="metrics", name=_exporter_name("metrics", type(reader)),
-                                                         gated=False))
+            found.found.append(settings_pb2.FoundExporter(signal="metrics", kind=_exporter_kind("metrics", type(reader))))
 
 
 def govern(controls: Controls, tracer_provider=None, meter_provider=None, logger_provider=None,
-           log_spans: bool = False) -> Governed:
+           log_spans: bool = False, layer: SdkSettings | None = None,
+           env: Mapping[str, str] | None = None) -> Governed:
     """Put the gates in front of every exporter the SDK's providers export through (the global
     ones unless others are given), however the SDK was built: its exporters, a processor passed
     to the configurator, a declarative configuration file's, the Logfire SDK's console and the
     OTLP exporters it adds. Idempotent: an exporter already gated is left as it is. What can't be
-    gated is listed ungoverned, for the inventory and export health. `log_spans`: the Logfire SDK's
+    gated is listed ungoverned, for the inventory and export health; the core names each and says
+    where it sends (`layer`, `env`: the process's by default). `log_spans`: the Logfire SDK's
     logs are spans, which its span exporters see; they go through the log controls."""
     from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
     from opentelemetry.sdk._logs import LoggerProvider  # noqa: PLC0415
@@ -1186,7 +1189,7 @@ def govern(controls: Controls, tracer_provider=None, meter_provider=None, logger
         if multi is not None:
             found.sdk["logs"] = found.sdk["logs"] or isinstance(p, LoggerProvider) or p is not _sdk_provider(p)
             _govern_logs(multi, controls, found)
-    return found
+    return found.decide(layer or SdkSettings(), os.environ if env is None else env)
 
 
 def inventory(exporters: list[settings_pb2.Exporter]) -> settings_pb2.Inventory:
@@ -1223,6 +1226,10 @@ class Agent:
         self.logfire = False
         #: Every exporter on the SDK's providers, governed or not, as govern found them last.
         self.exporters: list[settings_pb2.Exporter] = []
+        #: The exporters as found, which the core decides `exporters` from.
+        self.found: list[settings_pb2.FoundExporter] = []
+        #: The warnings said: a processor added later doesn't say them again.
+        self._warned: set[str] = set()
         self.client: Client | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         # Reentrant: a decision under it re-arms the timer, which takes it too.
@@ -1342,9 +1349,9 @@ class Agent:
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can
         # carry out of it. The settings loaded at start are loaded again, under the host as built.
-        found = govern(self.controls, log_spans=self.logfire)
-        self.exporters = found.exporters
-        self._warn_ungoverned(found.ungoverned())
+        found = govern(self.controls, log_spans=self.logfire, layer=self.layer)
+        self.found, self.exporters = found.found, found.exporters
+        self._warn(found.warnings)
         built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
                          governed=any(found.sdk.values()))
         if built != self.host:
@@ -1418,14 +1425,13 @@ class Agent:
             if hasattr(os, "register_at_fork"):
                 os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
 
-    @staticmethod
-    def _warn_ungoverned(ungoverned: list[settings_pb2.Exporter]) -> None:
-        """Say what exports past the gates: the policy is in force on everything else, and the
-        server is told (inventory and export health)."""
-        if ungoverned:
-            _log.warning("OpAMP: %s export past this package's gates: the server's policy doesn't reach "
-                         "what they send, and they are reported to it as ungoverned",
-                         ", ".join(f"{e.signal} {e.name}" for e in ungoverned))
+    def _warn(self, warnings: list[str]) -> None:
+        """Say, once each, what exports past the gates (the core's words): the policy is in force on
+        everything else, and the server is told (inventory and export health)."""
+        for warning in warnings:
+            if warning not in self._warned:
+                self._warned.add(warning)
+                _log.warning("OpAMP: %s", warning)
 
     def processor_added(self, processor, signal: str) -> None:
         """The application is adding a span (`signal` "traces") or log record ("logs") processor
@@ -1437,10 +1443,12 @@ class Agent:
                 _govern_spans(processor, self.controls, self.logfire, found)
             else:
                 _govern_logs(processor, self.controls, found)
-            if not found.exporters:
+            if not found.found:
                 return
-            self.exporters = [*self.exporters, *found.exporters]
-            self._warn_ungoverned(found.ungoverned())
+            found.found[:0] = self.found
+            found.decide(self.layer, os.environ)
+            self.found, self.exporters = found.found, found.exporters
+            self._warn(found.warnings)
             if self.client is not None and self.components is not None:
                 components = self._components()
                 if components is not None:

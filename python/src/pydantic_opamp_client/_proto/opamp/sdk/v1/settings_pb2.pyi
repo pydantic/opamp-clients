@@ -335,6 +335,50 @@ class Exporter(_message.Message):
     destination: str
     def __init__(self, signal: _Optional[str] = ..., name: _Optional[str] = ..., gated: bool = ..., destination: _Optional[str] = ...) -> None: ...
 
+class Exporters(_message.Message):
+    __slots__ = ("found", "env", "default_protocol")
+    FOUND_FIELD_NUMBER: _ClassVar[int]
+    ENV_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_PROTOCOL_FIELD_NUMBER: _ClassVar[int]
+    found: _containers.RepeatedCompositeFieldContainer[FoundExporter]
+    env: _containers.RepeatedCompositeFieldContainer[EnvVar]
+    default_protocol: str
+    def __init__(self, found: _Optional[_Iterable[_Union[FoundExporter, _Mapping]]] = ..., env: _Optional[_Iterable[_Union[EnvVar, _Mapping]]] = ..., default_protocol: _Optional[str] = ...) -> None: ...
+
+class FoundExporter(_message.Message):
+    __slots__ = ("signal", "kind", "gated", "endpoint", "from_env")
+    SIGNAL_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    GATED_FIELD_NUMBER: _ClassVar[int]
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    FROM_ENV_FIELD_NUMBER: _ClassVar[int]
+    signal: str
+    kind: str
+    gated: bool
+    endpoint: str
+    from_env: bool
+    def __init__(self, signal: _Optional[str] = ..., kind: _Optional[str] = ..., gated: bool = ..., endpoint: _Optional[str] = ..., from_env: bool = ...) -> None: ...
+
+class EnvVar(_message.Message):
+    __slots__ = ("name", "value")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    value: str
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+
+class ExportersDecided(_message.Message):
+    __slots__ = ("exporters", "governed", "ungoverned", "warnings")
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
+    GOVERNED_FIELD_NUMBER: _ClassVar[int]
+    UNGOVERNED_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    exporters: _containers.RepeatedCompositeFieldContainer[Exporter]
+    governed: _containers.RepeatedScalarFieldContainer[str]
+    ungoverned: _containers.RepeatedScalarFieldContainer[str]
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ..., governed: _Optional[_Iterable[str]] = ..., ungoverned: _Optional[_Iterable[str]] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class Evaluate(_message.Message):
     __slots__ = ("settings", "host", "now_unix_ms", "span", "log", "attributes", "cap")
     SETTINGS_FIELD_NUMBER: _ClassVar[int]
@@ -444,7 +488,7 @@ class SpanSampling(_message.Message):
     def __init__(self, how: _Optional[_Union[SpanSampling.How, str]] = ..., parent_sampled: bool = ..., rate: _Optional[float] = ..., rule: _Optional[int] = ...) -> None: ...
 
 class Request(_message.Message):
-    __slots__ = ("load", "decide", "describe", "evaluate", "refresh", "health", "components", "commit")
+    __slots__ = ("load", "decide", "describe", "evaluate", "refresh", "health", "components", "commit", "exporters")
     LOAD_FIELD_NUMBER: _ClassVar[int]
     DECIDE_FIELD_NUMBER: _ClassVar[int]
     DESCRIBE_FIELD_NUMBER: _ClassVar[int]
@@ -453,6 +497,7 @@ class Request(_message.Message):
     HEALTH_FIELD_NUMBER: _ClassVar[int]
     COMPONENTS_FIELD_NUMBER: _ClassVar[int]
     COMMIT_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
     load: Load
     decide: Decide
     describe: Describe
@@ -461,10 +506,11 @@ class Request(_message.Message):
     health: Health
     components: Components
     commit: Commit
-    def __init__(self, load: _Optional[_Union[Load, _Mapping]] = ..., decide: _Optional[_Union[Decide, _Mapping]] = ..., describe: _Optional[_Union[Describe, _Mapping]] = ..., evaluate: _Optional[_Union[Evaluate, _Mapping]] = ..., refresh: _Optional[_Union[Refresh, _Mapping]] = ..., health: _Optional[_Union[Health, _Mapping]] = ..., components: _Optional[_Union[Components, _Mapping]] = ..., commit: _Optional[_Union[Commit, _Mapping]] = ...) -> None: ...
+    exporters: Exporters
+    def __init__(self, load: _Optional[_Union[Load, _Mapping]] = ..., decide: _Optional[_Union[Decide, _Mapping]] = ..., describe: _Optional[_Union[Describe, _Mapping]] = ..., evaluate: _Optional[_Union[Evaluate, _Mapping]] = ..., refresh: _Optional[_Union[Refresh, _Mapping]] = ..., health: _Optional[_Union[Health, _Mapping]] = ..., components: _Optional[_Union[Components, _Mapping]] = ..., commit: _Optional[_Union[Commit, _Mapping]] = ..., exporters: _Optional[_Union[Exporters, _Mapping]] = ...) -> None: ...
 
 class Reply(_message.Message):
-    __slots__ = ("loaded", "decision", "description", "error", "evaluated", "refreshed", "health_report", "available_components", "plan")
+    __slots__ = ("loaded", "decision", "description", "error", "evaluated", "refreshed", "health_report", "available_components", "plan", "exporters_decided")
     LOADED_FIELD_NUMBER: _ClassVar[int]
     DECISION_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -474,6 +520,7 @@ class Reply(_message.Message):
     HEALTH_REPORT_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_COMPONENTS_FIELD_NUMBER: _ClassVar[int]
     PLAN_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_DECIDED_FIELD_NUMBER: _ClassVar[int]
     loaded: Loaded
     decision: Decision
     description: _opamp_pb2.AgentDescription
@@ -483,4 +530,5 @@ class Reply(_message.Message):
     health_report: HealthReport
     available_components: _opamp_pb2.AvailableComponents
     plan: Plan
-    def __init__(self, loaded: _Optional[_Union[Loaded, _Mapping]] = ..., decision: _Optional[_Union[Decision, _Mapping]] = ..., description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., error: _Optional[str] = ..., evaluated: _Optional[_Union[Evaluated, _Mapping]] = ..., refreshed: _Optional[_Union[Refreshed, _Mapping]] = ..., health_report: _Optional[_Union[HealthReport, _Mapping]] = ..., available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., plan: _Optional[_Union[Plan, _Mapping]] = ...) -> None: ...
+    exporters_decided: ExportersDecided
+    def __init__(self, loaded: _Optional[_Union[Loaded, _Mapping]] = ..., decision: _Optional[_Union[Decision, _Mapping]] = ..., description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., error: _Optional[str] = ..., evaluated: _Optional[_Union[Evaluated, _Mapping]] = ..., refreshed: _Optional[_Union[Refreshed, _Mapping]] = ..., health_report: _Optional[_Union[HealthReport, _Mapping]] = ..., available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., plan: _Optional[_Union[Plan, _Mapping]] = ..., exporters_decided: _Optional[_Union[ExportersDecided, _Mapping]] = ...) -> None: ...

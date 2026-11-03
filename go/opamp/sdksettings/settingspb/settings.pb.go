@@ -242,7 +242,7 @@ func (x CapRun_Signal) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CapRun_Signal.Descriptor instead.
 func (CapRun_Signal) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{23, 0}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27, 0}
 }
 
 type SpanSampling_How int32
@@ -291,7 +291,7 @@ func (x SpanSampling_How) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SpanSampling_How.Descriptor instead.
 func (SpanSampling_How) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{29, 0}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{33, 0}
 }
 
 // Settings, typed. Every field left unset is the SDK's own value. In debug mode (debug_until) the
@@ -1930,6 +1930,267 @@ func (x *Exporter) GetDestination() string {
 	return ""
 }
 
+// The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
+// is decided of them is the same in every language. Call it at start and whenever the providers
+// change; pass ExportersDecided.exporters as Inventory.exporters, and log its warnings.
+type Exporters struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Found           []*FoundExporter       `protobuf:"bytes,1,rep,name=found,proto3" json:"found,omitempty"`
+	Env             []*EnvVar              `protobuf:"bytes,2,rep,name=env,proto3" json:"env,omitempty"`                                                // the process's environment (only OTEL_EXPORTER_* is read)
+	DefaultProtocol string                 `protobuf:"bytes,3,opt,name=default_protocol,json=defaultProtocol,proto3" json:"default_protocol,omitempty"` // the SDK's OTLP protocol with none set: grpc or http/protobuf
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Exporters) Reset() {
+	*x = Exporters{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Exporters) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Exporters) ProtoMessage() {}
+
+func (x *Exporters) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Exporters.ProtoReflect.Descriptor instead.
+func (*Exporters) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *Exporters) GetFound() []*FoundExporter {
+	if x != nil {
+		return x.Found
+	}
+	return nil
+}
+
+func (x *Exporters) GetEnv() []*EnvVar {
+	if x != nil {
+		return x.Env
+	}
+	return nil
+}
+
+func (x *Exporters) GetDefaultProtocol() string {
+	if x != nil {
+		return x.DefaultProtocol
+	}
+	return ""
+}
+
+type FoundExporter struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Signal string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"` // traces, metrics or logs
+	// What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+	// or app_provider (a global provider of the application's own).
+	Kind          string `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	Gated         bool   `protobuf:"varint,3,opt,name=gated,proto3" json:"gated,omitempty"`                    // the policy's gates are in front of it
+	Endpoint      string `protobuf:"bytes,4,opt,name=endpoint,proto3" json:"endpoint,omitempty"`               // as the exporter holds it; empty: not known
+	FromEnv       bool   `protobuf:"varint,5,opt,name=from_env,json=fromEnv,proto3" json:"from_env,omitempty"` // built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FoundExporter) Reset() {
+	*x = FoundExporter{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FoundExporter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FoundExporter) ProtoMessage() {}
+
+func (x *FoundExporter) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FoundExporter.ProtoReflect.Descriptor instead.
+func (*FoundExporter) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *FoundExporter) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+func (x *FoundExporter) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *FoundExporter) GetGated() bool {
+	if x != nil {
+		return x.Gated
+	}
+	return false
+}
+
+func (x *FoundExporter) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *FoundExporter) GetFromEnv() bool {
+	if x != nil {
+		return x.FromEnv
+	}
+	return false
+}
+
+type EnvVar struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnvVar) Reset() {
+	*x = EnvVar{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnvVar) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnvVar) ProtoMessage() {}
+
+func (x *EnvVar) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnvVar.ProtoReflect.Descriptor instead.
+func (*EnvVar) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *EnvVar) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EnvVar) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type ExportersDecided struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exporters     []*Exporter            `protobuf:"bytes,1,rep,name=exporters,proto3" json:"exporters,omitempty"`   // Inventory.exporters, in the order found
+	Governed      []string               `protobuf:"bytes,2,rep,name=governed,proto3" json:"governed,omitempty"`     // the signals with exporters, every one governed
+	Ungoverned    []string               `protobuf:"bytes,3,rep,name=ungoverned,proto3" json:"ungoverned,omitempty"` // the signals with an exporter past the gates
+	Warnings      []string               `protobuf:"bytes,4,rep,name=warnings,proto3" json:"warnings,omitempty"`     // one line per ungoverned exporter identity
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ExportersDecided) Reset() {
+	*x = ExportersDecided{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExportersDecided) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExportersDecided) ProtoMessage() {}
+
+func (x *ExportersDecided) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExportersDecided.ProtoReflect.Descriptor instead.
+func (*ExportersDecided) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ExportersDecided) GetExporters() []*Exporter {
+	if x != nil {
+		return x.Exporters
+	}
+	return nil
+}
+
+func (x *ExportersDecided) GetGoverned() []string {
+	if x != nil {
+		return x.Governed
+	}
+	return nil
+}
+
+func (x *ExportersDecided) GetUngoverned() []string {
+	if x != nil {
+		return x.Ungoverned
+	}
+	return nil
+}
+
+func (x *ExportersDecided) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
 // Test-only: what the reference matchers make of one input under a settings document, so that
 // each language's own matchers can be held to them (testdata/sdk-settings).
 type Evaluate struct {
@@ -1950,7 +2211,7 @@ type Evaluate struct {
 
 func (x *Evaluate) Reset() {
 	*x = Evaluate{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1962,7 +2223,7 @@ func (x *Evaluate) String() string {
 func (*Evaluate) ProtoMessage() {}
 
 func (x *Evaluate) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1975,7 +2236,7 @@ func (x *Evaluate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evaluate.ProtoReflect.Descriptor instead.
 func (*Evaluate) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{22}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Evaluate) GetSettings() []byte {
@@ -2083,7 +2344,7 @@ type CapRun struct {
 
 func (x *CapRun) Reset() {
 	*x = CapRun{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2095,7 +2356,7 @@ func (x *CapRun) String() string {
 func (*CapRun) ProtoMessage() {}
 
 func (x *CapRun) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2108,7 +2369,7 @@ func (x *CapRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapRun.ProtoReflect.Descriptor instead.
 func (*CapRun) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{23}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *CapRun) GetSignal() CapRun_Signal {
@@ -2137,7 +2398,7 @@ type CapEvent struct {
 
 func (x *CapEvent) Reset() {
 	*x = CapEvent{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2149,7 +2410,7 @@ func (x *CapEvent) String() string {
 func (*CapEvent) ProtoMessage() {}
 
 func (x *CapEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2162,7 +2423,7 @@ func (x *CapEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapEvent.ProtoReflect.Descriptor instead.
 func (*CapEvent) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{24}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *CapEvent) GetAtNs() uint64 {
@@ -2204,7 +2465,7 @@ type Attributes struct {
 
 func (x *Attributes) Reset() {
 	*x = Attributes{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2216,7 +2477,7 @@ func (x *Attributes) String() string {
 func (*Attributes) ProtoMessage() {}
 
 func (x *Attributes) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2229,7 +2490,7 @@ func (x *Attributes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attributes.ProtoReflect.Descriptor instead.
 func (*Attributes) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{25}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Attributes) GetAttributes() []*protobufs.KeyValue {
@@ -2257,7 +2518,7 @@ type LogRecord struct {
 
 func (x *LogRecord) Reset() {
 	*x = LogRecord{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2269,7 +2530,7 @@ func (x *LogRecord) String() string {
 func (*LogRecord) ProtoMessage() {}
 
 func (x *LogRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2282,7 +2543,7 @@ func (x *LogRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogRecord.ProtoReflect.Descriptor instead.
 func (*LogRecord) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{26}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *LogRecord) GetScope() string {
@@ -2312,7 +2573,7 @@ type SpanStart struct {
 
 func (x *SpanStart) Reset() {
 	*x = SpanStart{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2324,7 +2585,7 @@ func (x *SpanStart) String() string {
 func (*SpanStart) ProtoMessage() {}
 
 func (x *SpanStart) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2337,7 +2598,7 @@ func (x *SpanStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanStart.ProtoReflect.Descriptor instead.
 func (*SpanStart) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *SpanStart) GetName() string {
@@ -2382,7 +2643,7 @@ type Evaluated struct {
 
 func (x *Evaluated) Reset() {
 	*x = Evaluated{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2394,7 +2655,7 @@ func (x *Evaluated) String() string {
 func (*Evaluated) ProtoMessage() {}
 
 func (x *Evaluated) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2407,7 +2668,7 @@ func (x *Evaluated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evaluated.ProtoReflect.Descriptor instead.
 func (*Evaluated) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{28}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Evaluated) GetRefused() string {
@@ -2464,7 +2725,7 @@ type SpanSampling struct {
 
 func (x *SpanSampling) Reset() {
 	*x = SpanSampling{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2476,7 +2737,7 @@ func (x *SpanSampling) String() string {
 func (*SpanSampling) ProtoMessage() {}
 
 func (x *SpanSampling) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2489,7 +2750,7 @@ func (x *SpanSampling) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanSampling.ProtoReflect.Descriptor instead.
 func (*SpanSampling) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{29}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SpanSampling) GetHow() SpanSampling_How {
@@ -2532,6 +2793,7 @@ type Request struct {
 	//	*Request_Health
 	//	*Request_Components
 	//	*Request_Commit
+	//	*Request_Exporters
 	Call          isRequest_Call `protobuf_oneof:"call"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2539,7 +2801,7 @@ type Request struct {
 
 func (x *Request) Reset() {
 	*x = Request{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2551,7 +2813,7 @@ func (x *Request) String() string {
 func (*Request) ProtoMessage() {}
 
 func (x *Request) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2564,7 +2826,7 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Request.ProtoReflect.Descriptor instead.
 func (*Request) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{30}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Request) GetCall() isRequest_Call {
@@ -2646,6 +2908,15 @@ func (x *Request) GetCommit() *Commit {
 	return nil
 }
 
+func (x *Request) GetExporters() *Exporters {
+	if x != nil {
+		if x, ok := x.Call.(*Request_Exporters); ok {
+			return x.Exporters
+		}
+	}
+	return nil
+}
+
 type isRequest_Call interface {
 	isRequest_Call()
 }
@@ -2682,6 +2953,10 @@ type Request_Commit struct {
 	Commit *Commit `protobuf:"bytes,8,opt,name=commit,proto3,oneof"`
 }
 
+type Request_Exporters struct {
+	Exporters *Exporters `protobuf:"bytes,9,opt,name=exporters,proto3,oneof"`
+}
+
 func (*Request_Load) isRequest_Call() {}
 
 func (*Request_Decide) isRequest_Call() {}
@@ -2698,6 +2973,8 @@ func (*Request_Components) isRequest_Call() {}
 
 func (*Request_Commit) isRequest_Call() {}
 
+func (*Request_Exporters) isRequest_Call() {}
+
 type Reply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Result:
@@ -2711,6 +2988,7 @@ type Reply struct {
 	//	*Reply_HealthReport
 	//	*Reply_AvailableComponents
 	//	*Reply_Plan
+	//	*Reply_ExportersDecided
 	Result        isReply_Result `protobuf_oneof:"result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2718,7 +2996,7 @@ type Reply struct {
 
 func (x *Reply) Reset() {
 	*x = Reply{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2730,7 +3008,7 @@ func (x *Reply) String() string {
 func (*Reply) ProtoMessage() {}
 
 func (x *Reply) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2743,7 +3021,7 @@ func (x *Reply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reply.ProtoReflect.Descriptor instead.
 func (*Reply) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{31}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Reply) GetResult() isReply_Result {
@@ -2834,6 +3112,15 @@ func (x *Reply) GetPlan() *Plan {
 	return nil
 }
 
+func (x *Reply) GetExportersDecided() *ExportersDecided {
+	if x != nil {
+		if x, ok := x.Result.(*Reply_ExportersDecided); ok {
+			return x.ExportersDecided
+		}
+	}
+	return nil
+}
+
 type isReply_Result interface {
 	isReply_Result()
 }
@@ -2874,6 +3161,10 @@ type Reply_Plan struct {
 	Plan *Plan `protobuf:"bytes,9,opt,name=plan,proto3,oneof"`
 }
 
+type Reply_ExportersDecided struct {
+	ExportersDecided *ExportersDecided `protobuf:"bytes,10,opt,name=exporters_decided,json=exportersDecided,proto3,oneof"`
+}
+
 func (*Reply_Loaded) isReply_Result() {}
 
 func (*Reply_Decision) isReply_Result() {}
@@ -2891,6 +3182,8 @@ func (*Reply_HealthReport) isReply_Result() {}
 func (*Reply_AvailableComponents) isReply_Result() {}
 
 func (*Reply_Plan) isReply_Result() {}
+
+func (*Reply_ExportersDecided) isReply_Result() {}
 
 var File_opamp_sdk_v1_settings_proto protoreflect.FileDescriptor
 
@@ -3052,7 +3345,27 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x06signal\x18\x01 \x01(\tR\x06signal\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
 	"\x05gated\x18\x03 \x01(\bR\x05gated\x12 \n" +
-	"\vdestination\x18\x04 \x01(\tR\vdestination\"\xb9\x02\n" +
+	"\vdestination\x18\x04 \x01(\tR\vdestination\"\x91\x01\n" +
+	"\tExporters\x121\n" +
+	"\x05found\x18\x01 \x03(\v2\x1b.opamp.sdk.v1.FoundExporterR\x05found\x12&\n" +
+	"\x03env\x18\x02 \x03(\v2\x14.opamp.sdk.v1.EnvVarR\x03env\x12)\n" +
+	"\x10default_protocol\x18\x03 \x01(\tR\x0fdefaultProtocol\"\x88\x01\n" +
+	"\rFoundExporter\x12\x16\n" +
+	"\x06signal\x18\x01 \x01(\tR\x06signal\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05gated\x18\x03 \x01(\bR\x05gated\x12\x1a\n" +
+	"\bendpoint\x18\x04 \x01(\tR\bendpoint\x12\x19\n" +
+	"\bfrom_env\x18\x05 \x01(\bR\afromEnv\"2\n" +
+	"\x06EnvVar\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xa0\x01\n" +
+	"\x10ExportersDecided\x124\n" +
+	"\texporters\x18\x01 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\x12\x1a\n" +
+	"\bgoverned\x18\x02 \x03(\tR\bgoverned\x12\x1e\n" +
+	"\n" +
+	"ungoverned\x18\x03 \x03(\tR\n" +
+	"ungoverned\x12\x1a\n" +
+	"\bwarnings\x18\x04 \x03(\tR\bwarnings\"\xb9\x02\n" +
 	"\bEvaluate\x12\x1a\n" +
 	"\bsettings\x18\x01 \x01(\fR\bsettings\x12&\n" +
 	"\x04host\x18\x02 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
@@ -3109,7 +3422,7 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\rFOLLOW_PARENT\x10\x00\x12\b\n" +
 	"\x04RATE\x10\x01\x12\x0f\n" +
 	"\vAPP_SAMPLER\x10\x02B\a\n" +
-	"\x05_rule\"\xa6\x03\n" +
+	"\x05_rule\"\xdf\x03\n" +
 	"\aRequest\x12(\n" +
 	"\x04load\x18\x01 \x01(\v2\x12.opamp.sdk.v1.LoadH\x00R\x04load\x12.\n" +
 	"\x06decide\x18\x02 \x01(\v2\x14.opamp.sdk.v1.DecideH\x00R\x06decide\x124\n" +
@@ -3120,8 +3433,9 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\n" +
 	"components\x18\a \x01(\v2\x18.opamp.sdk.v1.ComponentsH\x00R\n" +
 	"components\x12.\n" +
-	"\x06commit\x18\b \x01(\v2\x14.opamp.sdk.v1.CommitH\x00R\x06commitB\x06\n" +
-	"\x04call\"\x8e\x04\n" +
+	"\x06commit\x18\b \x01(\v2\x14.opamp.sdk.v1.CommitH\x00R\x06commit\x127\n" +
+	"\texporters\x18\t \x01(\v2\x17.opamp.sdk.v1.ExportersH\x00R\texportersB\x06\n" +
+	"\x04call\"\xdd\x04\n" +
 	"\x05Reply\x12.\n" +
 	"\x06loaded\x18\x01 \x01(\v2\x14.opamp.sdk.v1.LoadedH\x00R\x06loaded\x124\n" +
 	"\bdecision\x18\x02 \x01(\v2\x16.opamp.sdk.v1.DecisionH\x00R\bdecision\x12D\n" +
@@ -3131,7 +3445,9 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\trefreshed\x18\x06 \x01(\v2\x17.opamp.sdk.v1.RefreshedH\x00R\trefreshed\x12A\n" +
 	"\rhealth_report\x18\a \x01(\v2\x1a.opamp.sdk.v1.HealthReportH\x00R\fhealthReport\x12X\n" +
 	"\x14available_components\x18\b \x01(\v2#.opamp.proto.v1.AvailableComponentsH\x00R\x13availableComponents\x12(\n" +
-	"\x04plan\x18\t \x01(\v2\x12.opamp.sdk.v1.PlanH\x00R\x04planB\b\n" +
+	"\x04plan\x18\t \x01(\v2\x12.opamp.sdk.v1.PlanH\x00R\x04plan\x12M\n" +
+	"\x11exporters_decided\x18\n" +
+	" \x01(\v2\x1e.opamp.sdk.v1.ExportersDecidedH\x00R\x10exportersDecidedB\b\n" +
 	"\x06result*\x99\x01\n" +
 	"\bSpanKind\x12\x19\n" +
 	"\x15SPAN_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -3161,7 +3477,7 @@ func file_opamp_sdk_v1_settings_proto_rawDescGZIP() []byte {
 }
 
 var file_opamp_sdk_v1_settings_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_opamp_sdk_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_opamp_sdk_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_opamp_sdk_v1_settings_proto_goTypes = []any{
 	(SpanKind)(0),                         // 0: opamp.sdk.v1.SpanKind
 	(Parent)(0),                           // 1: opamp.sdk.v1.Parent
@@ -3190,47 +3506,51 @@ var file_opamp_sdk_v1_settings_proto_goTypes = []any{
 	(*Inventory)(nil),                     // 24: opamp.sdk.v1.Inventory
 	(*Instrumentation)(nil),               // 25: opamp.sdk.v1.Instrumentation
 	(*Exporter)(nil),                      // 26: opamp.sdk.v1.Exporter
-	(*Evaluate)(nil),                      // 27: opamp.sdk.v1.Evaluate
-	(*CapRun)(nil),                        // 28: opamp.sdk.v1.CapRun
-	(*CapEvent)(nil),                      // 29: opamp.sdk.v1.CapEvent
-	(*Attributes)(nil),                    // 30: opamp.sdk.v1.Attributes
-	(*LogRecord)(nil),                     // 31: opamp.sdk.v1.LogRecord
-	(*SpanStart)(nil),                     // 32: opamp.sdk.v1.SpanStart
-	(*Evaluated)(nil),                     // 33: opamp.sdk.v1.Evaluated
-	(*SpanSampling)(nil),                  // 34: opamp.sdk.v1.SpanSampling
-	(*Request)(nil),                       // 35: opamp.sdk.v1.Request
-	(*Reply)(nil),                         // 36: opamp.sdk.v1.Reply
-	nil,                                   // 37: opamp.sdk.v1.Settings.CustomEntry
-	nil,                                   // 38: opamp.sdk.v1.SamplingRule.AttributesEntry
-	(*protobufs.EffectiveConfig)(nil),     // 39: opamp.proto.v1.EffectiveConfig
-	(*protobufs.AgentRemoteConfig)(nil),   // 40: opamp.proto.v1.AgentRemoteConfig
-	(*protobufs.RemoteConfigStatus)(nil),  // 41: opamp.proto.v1.RemoteConfigStatus
-	(*protobufs.ComponentHealth)(nil),     // 42: opamp.proto.v1.ComponentHealth
-	(*protobufs.KeyValue)(nil),            // 43: opamp.proto.v1.KeyValue
-	(*protobufs.AnyValue)(nil),            // 44: opamp.proto.v1.AnyValue
-	(*protobufs.AgentDescription)(nil),    // 45: opamp.proto.v1.AgentDescription
-	(*protobufs.AvailableComponents)(nil), // 46: opamp.proto.v1.AvailableComponents
+	(*Exporters)(nil),                     // 27: opamp.sdk.v1.Exporters
+	(*FoundExporter)(nil),                 // 28: opamp.sdk.v1.FoundExporter
+	(*EnvVar)(nil),                        // 29: opamp.sdk.v1.EnvVar
+	(*ExportersDecided)(nil),              // 30: opamp.sdk.v1.ExportersDecided
+	(*Evaluate)(nil),                      // 31: opamp.sdk.v1.Evaluate
+	(*CapRun)(nil),                        // 32: opamp.sdk.v1.CapRun
+	(*CapEvent)(nil),                      // 33: opamp.sdk.v1.CapEvent
+	(*Attributes)(nil),                    // 34: opamp.sdk.v1.Attributes
+	(*LogRecord)(nil),                     // 35: opamp.sdk.v1.LogRecord
+	(*SpanStart)(nil),                     // 36: opamp.sdk.v1.SpanStart
+	(*Evaluated)(nil),                     // 37: opamp.sdk.v1.Evaluated
+	(*SpanSampling)(nil),                  // 38: opamp.sdk.v1.SpanSampling
+	(*Request)(nil),                       // 39: opamp.sdk.v1.Request
+	(*Reply)(nil),                         // 40: opamp.sdk.v1.Reply
+	nil,                                   // 41: opamp.sdk.v1.Settings.CustomEntry
+	nil,                                   // 42: opamp.sdk.v1.SamplingRule.AttributesEntry
+	(*protobufs.EffectiveConfig)(nil),     // 43: opamp.proto.v1.EffectiveConfig
+	(*protobufs.AgentRemoteConfig)(nil),   // 44: opamp.proto.v1.AgentRemoteConfig
+	(*protobufs.RemoteConfigStatus)(nil),  // 45: opamp.proto.v1.RemoteConfigStatus
+	(*protobufs.ComponentHealth)(nil),     // 46: opamp.proto.v1.ComponentHealth
+	(*protobufs.KeyValue)(nil),            // 47: opamp.proto.v1.KeyValue
+	(*protobufs.AnyValue)(nil),            // 48: opamp.proto.v1.AnyValue
+	(*protobufs.AgentDescription)(nil),    // 49: opamp.proto.v1.AgentDescription
+	(*protobufs.AvailableComponents)(nil), // 50: opamp.proto.v1.AvailableComponents
 }
 var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	6,  // 0: opamp.sdk.v1.Settings.sampling_rules:type_name -> opamp.sdk.v1.SamplingRule
 	7,  // 1: opamp.sdk.v1.Settings.send_logs_scope_levels:type_name -> opamp.sdk.v1.ScopeLevel
 	8,  // 2: opamp.sdk.v1.Settings.deactivate_instrumentations:type_name -> opamp.sdk.v1.Names
-	37, // 3: opamp.sdk.v1.Settings.custom:type_name -> opamp.sdk.v1.Settings.CustomEntry
+	41, // 3: opamp.sdk.v1.Settings.custom:type_name -> opamp.sdk.v1.Settings.CustomEntry
 	0,  // 4: opamp.sdk.v1.SamplingRule.kind:type_name -> opamp.sdk.v1.SpanKind
-	38, // 5: opamp.sdk.v1.SamplingRule.attributes:type_name -> opamp.sdk.v1.SamplingRule.AttributesEntry
+	42, // 5: opamp.sdk.v1.SamplingRule.attributes:type_name -> opamp.sdk.v1.SamplingRule.AttributesEntry
 	9,  // 6: opamp.sdk.v1.Load.host:type_name -> opamp.sdk.v1.Host
 	5,  // 7: opamp.sdk.v1.Loaded.settings:type_name -> opamp.sdk.v1.Settings
-	39, // 8: opamp.sdk.v1.Loaded.effective:type_name -> opamp.proto.v1.EffectiveConfig
-	40, // 9: opamp.sdk.v1.Decide.config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	43, // 8: opamp.sdk.v1.Loaded.effective:type_name -> opamp.proto.v1.EffectiveConfig
+	44, // 9: opamp.sdk.v1.Decide.config:type_name -> opamp.proto.v1.AgentRemoteConfig
 	9,  // 10: opamp.sdk.v1.Decide.host:type_name -> opamp.sdk.v1.Host
 	12, // 11: opamp.sdk.v1.Commit.decide:type_name -> opamp.sdk.v1.Decide
 	2,  // 12: opamp.sdk.v1.Commit.saved:type_name -> opamp.sdk.v1.Commit.Saved
-	41, // 13: opamp.sdk.v1.Decision.status:type_name -> opamp.proto.v1.RemoteConfigStatus
+	45, // 13: opamp.sdk.v1.Decision.status:type_name -> opamp.proto.v1.RemoteConfigStatus
 	5,  // 14: opamp.sdk.v1.Decision.apply:type_name -> opamp.sdk.v1.Settings
-	39, // 15: opamp.sdk.v1.Decision.effective:type_name -> opamp.proto.v1.EffectiveConfig
+	43, // 15: opamp.sdk.v1.Decision.effective:type_name -> opamp.proto.v1.EffectiveConfig
 	9,  // 16: opamp.sdk.v1.Refresh.host:type_name -> opamp.sdk.v1.Host
 	5,  // 17: opamp.sdk.v1.Refreshed.settings:type_name -> opamp.sdk.v1.Settings
-	39, // 18: opamp.sdk.v1.Refreshed.effective:type_name -> opamp.proto.v1.EffectiveConfig
+	43, // 18: opamp.sdk.v1.Refreshed.effective:type_name -> opamp.proto.v1.EffectiveConfig
 	19, // 19: opamp.sdk.v1.Health.counts:type_name -> opamp.sdk.v1.ExportCounts
 	21, // 20: opamp.sdk.v1.Health.previous:type_name -> opamp.sdk.v1.HealthReport
 	5,  // 21: opamp.sdk.v1.Health.settings:type_name -> opamp.sdk.v1.Settings
@@ -3238,51 +3558,56 @@ var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	20, // 23: opamp.sdk.v1.ExportCounts.traces:type_name -> opamp.sdk.v1.SignalCounts
 	20, // 24: opamp.sdk.v1.ExportCounts.metrics:type_name -> opamp.sdk.v1.SignalCounts
 	20, // 25: opamp.sdk.v1.ExportCounts.logs:type_name -> opamp.sdk.v1.SignalCounts
-	42, // 26: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
-	43, // 27: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
+	46, // 26: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
+	47, // 27: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
 	9,  // 28: opamp.sdk.v1.Describe.host:type_name -> opamp.sdk.v1.Host
 	24, // 29: opamp.sdk.v1.Components.inventory:type_name -> opamp.sdk.v1.Inventory
 	9,  // 30: opamp.sdk.v1.Components.host:type_name -> opamp.sdk.v1.Host
 	25, // 31: opamp.sdk.v1.Inventory.instrumentations:type_name -> opamp.sdk.v1.Instrumentation
 	26, // 32: opamp.sdk.v1.Inventory.exporters:type_name -> opamp.sdk.v1.Exporter
-	9,  // 33: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
-	32, // 34: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
-	31, // 35: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
-	30, // 36: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
-	28, // 37: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
-	3,  // 38: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
-	29, // 39: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
-	1,  // 40: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
-	43, // 41: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
-	44, // 42: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
-	0,  // 43: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
-	43, // 44: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
-	1,  // 45: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
-	34, // 46: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
-	43, // 47: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
-	44, // 48: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
-	4,  // 49: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
-	10, // 50: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
-	12, // 51: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
-	22, // 52: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
-	27, // 53: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
-	16, // 54: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
-	18, // 55: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
-	23, // 56: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
-	14, // 57: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
-	11, // 58: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
-	15, // 59: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
-	45, // 60: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
-	33, // 61: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
-	17, // 62: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
-	21, // 63: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
-	46, // 64: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
-	13, // 65: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
-	66, // [66:66] is the sub-list for method output_type
-	66, // [66:66] is the sub-list for method input_type
-	66, // [66:66] is the sub-list for extension type_name
-	66, // [66:66] is the sub-list for extension extendee
-	0,  // [0:66] is the sub-list for field type_name
+	28, // 33: opamp.sdk.v1.Exporters.found:type_name -> opamp.sdk.v1.FoundExporter
+	29, // 34: opamp.sdk.v1.Exporters.env:type_name -> opamp.sdk.v1.EnvVar
+	26, // 35: opamp.sdk.v1.ExportersDecided.exporters:type_name -> opamp.sdk.v1.Exporter
+	9,  // 36: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
+	36, // 37: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
+	35, // 38: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
+	34, // 39: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
+	32, // 40: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
+	3,  // 41: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
+	33, // 42: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
+	1,  // 43: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
+	47, // 44: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
+	48, // 45: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
+	0,  // 46: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
+	47, // 47: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
+	1,  // 48: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
+	38, // 49: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
+	47, // 50: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
+	48, // 51: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
+	4,  // 52: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
+	10, // 53: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
+	12, // 54: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
+	22, // 55: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
+	31, // 56: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
+	16, // 57: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
+	18, // 58: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
+	23, // 59: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
+	14, // 60: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
+	27, // 61: opamp.sdk.v1.Request.exporters:type_name -> opamp.sdk.v1.Exporters
+	11, // 62: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
+	15, // 63: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
+	49, // 64: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
+	37, // 65: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
+	17, // 66: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
+	21, // 67: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
+	50, // 68: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
+	13, // 69: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
+	30, // 70: opamp.sdk.v1.Reply.exporters_decided:type_name -> opamp.sdk.v1.ExportersDecided
+	71, // [71:71] is the sub-list for method output_type
+	71, // [71:71] is the sub-list for method input_type
+	71, // [71:71] is the sub-list for extension type_name
+	71, // [71:71] is the sub-list for extension extendee
+	0,  // [0:71] is the sub-list for field type_name
 }
 
 func init() { file_opamp_sdk_v1_settings_proto_init() }
@@ -3294,15 +3619,15 @@ func file_opamp_sdk_v1_settings_proto_init() {
 	file_opamp_sdk_v1_settings_proto_msgTypes[1].OneofWrappers = []any{}
 	file_opamp_sdk_v1_settings_proto_msgTypes[5].OneofWrappers = []any{}
 	file_opamp_sdk_v1_settings_proto_msgTypes[8].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[22].OneofWrappers = []any{
+	file_opamp_sdk_v1_settings_proto_msgTypes[26].OneofWrappers = []any{
 		(*Evaluate_Span)(nil),
 		(*Evaluate_Log)(nil),
 		(*Evaluate_Attributes)(nil),
 		(*Evaluate_Cap)(nil),
 	}
-	file_opamp_sdk_v1_settings_proto_msgTypes[28].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[29].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[30].OneofWrappers = []any{
+	file_opamp_sdk_v1_settings_proto_msgTypes[32].OneofWrappers = []any{}
+	file_opamp_sdk_v1_settings_proto_msgTypes[33].OneofWrappers = []any{}
+	file_opamp_sdk_v1_settings_proto_msgTypes[34].OneofWrappers = []any{
 		(*Request_Load)(nil),
 		(*Request_Decide)(nil),
 		(*Request_Describe)(nil),
@@ -3311,8 +3636,9 @@ func file_opamp_sdk_v1_settings_proto_init() {
 		(*Request_Health)(nil),
 		(*Request_Components)(nil),
 		(*Request_Commit)(nil),
+		(*Request_Exporters)(nil),
 	}
-	file_opamp_sdk_v1_settings_proto_msgTypes[31].OneofWrappers = []any{
+	file_opamp_sdk_v1_settings_proto_msgTypes[35].OneofWrappers = []any{
 		(*Reply_Loaded)(nil),
 		(*Reply_Decision)(nil),
 		(*Reply_Description)(nil),
@@ -3322,6 +3648,7 @@ func file_opamp_sdk_v1_settings_proto_init() {
 		(*Reply_HealthReport)(nil),
 		(*Reply_AvailableComponents)(nil),
 		(*Reply_Plan)(nil),
+		(*Reply_ExportersDecided)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3329,7 +3656,7 @@ func file_opamp_sdk_v1_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_opamp_sdk_v1_settings_proto_rawDesc), len(file_opamp_sdk_v1_settings_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   34,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

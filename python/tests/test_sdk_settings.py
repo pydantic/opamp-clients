@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from pydantic_opamp_client import anyvalue_pb2, opamp_pb2
-from pydantic_opamp_client.sdk import SdkSettings
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 
 from _policy import FILE, V1, config, effective, full, policy
 
@@ -344,6 +344,21 @@ def test_the_inventory_without_a_host_lists_no_setting() -> None:
     # No host: one that declares nothing, as for load and decide.
     got = components_json(SdkSettings().components(inventory_of({}), None, NOW))
     assert got["settings"] == {}
+
+
+EXPORTERS = json.loads((VECTORS / "exporters.json").read_text(encoding="utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", EXPORTERS, ids=[c["name"] for c in EXPORTERS])
+def test_the_exporters_vectors(case: dict) -> None:
+    """testdata/sdk-settings/exporters.json through the module: what is decided of the exporters found."""
+    found = [settings_pb2.FoundExporter(**f) for f in case["found"]]
+    got = SdkSettings().exporters(found, case.get("env", {}), case.get("default_protocol", ""))
+    assert {
+        "exporters": [{"signal": e.signal, "name": e.name, "gated": e.gated, "destination": e.destination}
+                      for e in got.exporters],
+        "governed": list(got.governed), "ungoverned": list(got.ungoverned), "warnings": list(got.warnings),
+    } == case["want"]
 
 
 START = json.loads((VECTORS / "start.json").read_text(encoding="utf-8"))["cases"]

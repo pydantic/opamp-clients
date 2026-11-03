@@ -200,6 +200,12 @@ def test_every_exporter_on_the_sdks_providers_is_gated_and_what_cant_be_is_repor
                    "InMemorySpanExporter": False},
         "metrics": {"console": True, "InMemoryMetricReader": False},
         "logs": {"otlp@127.0.0.1:9": True, "console": True}}
+    # The core's words, one per ungoverned exporter, as every SDK says them.
+    assert got.warnings == [
+        "the traces exporter InMemorySpanExporter sends past the policy's gates, and Fleet lists it ungoverned: "
+        "add it to the SDK's providers for the policy to govern it",
+        "the metrics exporter InMemoryMetricReader sends past the policy's gates, and Fleet lists it ungoverned: "
+        "add it to the SDK's providers for the policy to govern it"]
 
 
 def test_providers_that_arent_the_sdks_have_no_exporters():

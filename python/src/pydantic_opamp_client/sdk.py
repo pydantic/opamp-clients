@@ -106,6 +106,18 @@ class SdkSettings:
             components.host.CopyFrom(host)
         return self._call(settings_pb2.Request(components=components)).available_components
 
+    def exporters(self, found: list[settings_pb2.FoundExporter], env: dict[str, str] | None = None,
+                  default_protocol: str = "") -> settings_pb2.ExportersDecided:
+        """What the layer decides of the exporters found on the SDK's providers, the same in every
+        language: their inventory entries (name and destination), the signals governed or not,
+        and a warning per ungoverned exporter. `env`: the process's environment (only
+        OTEL_EXPORTER_* is read); `default_protocol`: the SDK's OTLP protocol when none is set.
+        Call it at start and when the providers change. See docs/available-components.md."""
+        exporters = settings_pb2.Exporters(found=found, default_protocol=default_protocol,
+                                           env=[settings_pb2.EnvVar(name=k, value=v) for k, v in (env or {}).items()
+                                                if k.startswith("OTEL_EXPORTER_")])
+        return self._call(settings_pb2.Request(exporters=exporters)).exporters_decided
+
     def _call(self, request: settings_pb2.Request) -> settings_pb2.Reply:
         try:
             raw = _native.sdk_settings_call(request.SerializeToString())
