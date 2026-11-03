@@ -235,7 +235,7 @@ storage:
 "@
 
 if ($NoStart) {
-    Write-Output "enrolled with $Endpoint; start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
+    Write-Output "Enrolled with $Endpoint. Start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
 } else {
     Set-Service -Name $service -StartupType Automatic
     $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
@@ -249,5 +249,5 @@ if ($NoStart) {
         Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
         exit 1
     }
-    Write-Output "enrolled with $Endpoint; the Supervisor is running and connected ($service)"
+    Write-Output "Enrolled with $Endpoint. The Supervisor is running and connected ($service)."
 }

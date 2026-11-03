@@ -318,7 +318,7 @@ if [ -n "$start" ]; then
 	started=$(date +%s)
 	"$launchctl" bootstrap system "$plist"
 	wait_connected "$started"
-	echo "enrolled with $endpoint; the Supervisor is running and connected ($label)"
+	echo "Enrolled with $endpoint. The Supervisor is running and connected ($label)."
 else
-	echo "enrolled with $endpoint; start the Supervisor with: sudo launchctl bootstrap system $plist"
+	echo "Enrolled with $endpoint. Start the Supervisor with: sudo launchctl bootstrap system $plist"
 fi

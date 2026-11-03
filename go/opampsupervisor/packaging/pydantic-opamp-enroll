@@ -347,7 +347,7 @@ if [ -n "$start" ]; then
 	started=$(date +%s)
 	"$systemctl" restart "$unit"
 	wait_connected "$started"
-	echo "enrolled with $endpoint; the Supervisor is running and connected ($unit)"
+	echo "Enrolled with $endpoint. The Supervisor is running and connected ($unit)."
 else
-	echo "enrolled with $endpoint; start the Supervisor with: systemctl enable --now $unit"
+	echo "Enrolled with $endpoint. Start the Supervisor with: systemctl enable --now $unit"
 fi

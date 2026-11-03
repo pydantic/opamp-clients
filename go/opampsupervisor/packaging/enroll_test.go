@@ -437,7 +437,7 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	e := newEnrollment(t)
 	out, err := e.run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp")
 	require.NoError(t, err, out)
-	assert.Contains(t, out, "the Supervisor is running and connected")
+	assert.Contains(t, out, "The Supervisor is running and connected")
 	calls, err := os.ReadFile(filepath.Join(e.tools, "supervisor.log"))
 	require.NoError(t, err)
 	assert.Regexp(t, `^status --storage `+regexp.QuoteMeta(e.root)+`/var/lib/pydantic-opamp --wait 30s --since \d+\n$`, string(calls))
