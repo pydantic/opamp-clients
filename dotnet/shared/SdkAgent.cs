@@ -272,6 +272,12 @@ internal sealed class SdkAgent
     // The exporters last listed, governed or not: one child each in export health.
     private List<Exporter> exporters = [];
 
+    // The exporters as last found and decided (Exporters), and the layer's warnings said.
+    private readonly object decisions = new();
+    private List<FoundExporter> found = [];
+    private List<Exporter> decided = [];
+    private readonly HashSet<string> warned = [];
+
     /// <summary>
     /// Load the saved settings and put them in force on <paramref name="controls"/>; name the instance.
     /// <paramref name="hostNow"/> says what the SDK carries out (its argument: whether the providers are built).
@@ -517,6 +523,43 @@ internal sealed class SdkAgent
     }
 
     /// <summary>
+    /// The exporters an integration found, as listed, decided by the layer as in every SDK: the
+    /// names, and where each sends (its own endpoint, else the <c>OTEL_EXPORTER_*</c> variables).
+    /// Decided again only when what is found changes; each warning the layer gives is logged once.
+    /// </summary>
+    public List<Exporter> Exporters(IEnumerable<Exporters.Built> built, string defaultProtocol)
+    {
+        var now = built.Select(b => b.Found()).ToList();
+        lock (this.decisions)
+        {
+            if (!now.SequenceEqual(this.found))
+            {
+                var d = this.layer.Exporters(now, ExporterVariables(this.getenv), defaultProtocol);
+                foreach (var w in d.Warnings.Where(this.warned.Add))
+                {
+                    this.log.Warn(w);
+                }
+
+                this.found = now;
+                this.decided = [.. d.Exporters];
+            }
+
+            return [.. this.decided];
+        }
+    }
+
+    /// <summary>The name each exporter is listed under, as the layer gives it: to tell two views of one exporter apart.</summary>
+    public List<string> ExporterNames(IEnumerable<Exporters.Built> built) =>
+        [.. this.layer.Exporters(built.Select(b => b.Found())).Exporters.Select(e => e.Name)];
+
+    /// <summary>The variables the layer reads to say where an exporter built from them sends.</summary>
+    private static List<KeyValuePair<string, string>> ExporterVariables(Func<string, string?> getenv) =>
+        [.. new[] { string.Empty, "TRACES_", "METRICS_", "LOGS_" }
+            .SelectMany(s => new[] { $"OTEL_EXPORTER_OTLP_{s}ENDPOINT", $"OTEL_EXPORTER_OTLP_{s}PROTOCOL" })
+            .Append("OTEL_EXPORTER_ZIPKIN_ENDPOINT")
+            .Select(k => KeyValuePair.Create(k, getenv(k) ?? string.Empty)).Where(kv => kv.Value.Length > 0)];
+
+    /// <summary>
     /// Ask the caller again what the SDK runs, once started: a processor or reader the application
     /// added to a built provider (or a logger provider built since) exports through exporters not
     /// listed before. They are listed, the governed with the gates in front and the rest
@@ -597,12 +640,6 @@ internal sealed class SdkAgent
             this.RefreshLocked(nowUnixMs);
             this.Rearm();
             rehosted = true;
-        }
-
-        var added = listed.Exporters.Where(e => !e.Gated).Except(this.exporters).Select(e => $"{e.Signal} {e.Name}").ToList();
-        if (added.Count > 0)
-        {
-            this.log.Warn($"the SDK now exports past the gates through {string.Join(", ", added)}: the server's settings govern every other exporter, and these are reported to it as ungoverned");
         }
 
         this.exporters = [.. listed.Exporters];

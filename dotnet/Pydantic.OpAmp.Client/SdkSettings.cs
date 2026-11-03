@@ -128,6 +128,21 @@ public sealed class SdkSettings : IDisposable
     public AvailableComponents Components(Inventory inventory, Host? host = null, ulong nowUnixMs = 0) =>
         Do(new Request { Components = new Components { Inventory = inventory, Host = host, NowUnixMs = nowUnixMs } }).AvailableComponents;
 
+    /// <summary>
+    /// What Fleet is told of the exporters an integration found on its SDK's providers, decided the
+    /// same in every language: the name each is listed under, where it sends (its own endpoint, else
+    /// the <c>OTEL_EXPORTER_*</c> variables in <paramref name="env"/>), the governed and ungoverned
+    /// signals, and a warning for each ungoverned exporter. At start and when the providers change.
+    /// </summary>
+    public ExportersDecided Exporters(IEnumerable<FoundExporter> found, IEnumerable<KeyValuePair<string, string>>? env = null,
+        string defaultProtocol = "")
+    {
+        var call = new Exporters { Found = { found }, DefaultProtocol = defaultProtocol };
+        call.Env.AddRange((env ?? []).Where(kv => kv.Key.StartsWith("OTEL_EXPORTER_", StringComparison.Ordinal))
+            .Select(kv => new EnvVar { Name = kv.Key, Value = kv.Value }));
+        return Do(new Request { Exporters = call }).ExportersDecided;
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {

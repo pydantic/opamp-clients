@@ -612,9 +612,10 @@ public class HostingTests
         Assert.All(ungoverned, u => Assert.Contains(health[u.Split('/')[0]].ComponentHealthMap,
             c => c.Key.Split('@')[0] == u.Split('/')[1] && c.Value.Status == "ungoverned" && c.Value.Healthy));
 
-        var reported = said.Lines.Where(l => l.Contains("reported to the server as ungoverned", StringComparison.Ordinal)).ToList();
-        Assert.Equal(ungoverned.Length > 0 ? 1 : 0, reported.Count);
-        Assert.All(ungoverned, u => Assert.Contains(u.Replace('/', ' '), reported.Single()));
+        // The layer's warning for each, as every SDK says it.
+        var reported = said.Lines.Where(l => l.Contains("sends past the policy's gates, and Fleet lists it ungoverned", StringComparison.Ordinal)).ToList();
+        Assert.Equal(ungoverned.Length > 0, reported.Count > 0);
+        Assert.All(ungoverned, u => Assert.Contains(reported, l => l.Contains($"the {u.Split('/')[0]} exporter {u.Split('/')[1]}", StringComparison.Ordinal)));
         await host.StopAsync(Cancel);
     }
 

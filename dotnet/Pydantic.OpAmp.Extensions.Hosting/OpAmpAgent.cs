@@ -12,6 +12,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Exporters = Pydantic.OpAmp.Otel.Exporters;
 
 namespace Pydantic.OpAmp.Extensions.Hosting;
 
@@ -213,15 +214,9 @@ internal sealed class OpAmpAgent : IDisposable
             this.log.Sink.Warn("the tracer provider's sampler was set after WithOpAmp(): sampling_rate is not carried out. Call WithOpAmp() last.");
         }
 
-        // What the gates are in front of is known now: the rest is reported ungoverned. The providers
-        // are read again before each decision, and on the health timer.
-        var ungoverned = this.Agent is null ? [] : Exporters.Read(tracing, metrics, logs).Where(e => !(e.Gated && this.gateable))
-            .Select(e => $"{e.Signal.ToString().ToLowerInvariant()} {e.Name}").Distinct().ToList();
-        if (ungoverned.Count > 0)
-        {
-            this.log.Sink.Info($"exporters the gates aren't in front of (not OTLP, an endpoint with a path of its own, or an HttpClientFactory of its own): {string.Join(", ", ungoverned)}; reported to the server as ungoverned, and every setting governs the rest");
-        }
-
+        // What the gates are in front of is known now: the rest is reported ungoverned, and warned
+        // about as the inventory is first listed. The providers are read again before each
+        // decision, and on the health timer.
         this.Agent?.Start(resource, () => this.Inventory(Exporters.Read(tracing, metrics, logs), tracing, metrics, logs), this.health);
     }
 
@@ -229,7 +224,8 @@ internal sealed class OpAmpAgent : IDisposable
     /// What it runs (docs/available-components.md): the instrumentations the application added to
     /// the providers, named as the automatic instrumentation plugin's <c>deactivate_instrumentations</c>
     /// names them, at their packages' versions; and the providers' exporters, each gated where the
-    /// gate is in front of it, with where it sends.
+    /// gate is in front of it (not: not OTLP, an endpoint with a path of its own, or an
+    /// HttpClientFactory of its own), named and placed by the layer.
     /// </summary>
     internal Inventory Inventory(IEnumerable<Exporters.Built> built, params object?[] providers)
     {
@@ -239,7 +235,7 @@ internal sealed class OpAmpAgent : IDisposable
             .OfType<object>()
             .Select(i => i.GetType().Assembly)
             .Select(a => new Instrumentation { Name = InstrumentationName(a.GetName().Name ?? string.Empty), Version = Inventories.Version(a) });
-        var exporters = built.Distinct().Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated && this.gateable, e.Destination));
+        var exporters = this.Agent?.Exporters(built.Distinct().Select(e => e with { Gated = e.Gated && this.gateable }), "http/protobuf") ?? [];
         return Inventories.Of(typeof(OpAmpAgent).Assembly, instrumentations, exporters);
     }
 

@@ -145,23 +145,34 @@ public class InventoryTests
         Assert.Contains("send_metrics", live);
         Assert.Contains("send_logs", live);
         Assert.All(agent.Inventory().Exporters, e => Assert.Equal(e.Name == "otlp", e.Gated));
-        Assert.All(agent.Inventory().Exporters.Where(e => e.Name == "otlp"), e => Assert.Equal("http://localhost:4318", e.Destination));
+        Assert.All(agent.Inventory().Exporters.Where(e => e.Name == "otlp"), e => Assert.Equal($"http://localhost:4318/v1/{e.Signal}", e.Destination));
     }
 
-    // Where each exporter sends, as its variables say.
+    // Where each exporter sends, as its variables say (the layer reads them).
     [Fact]
     public void EachExporterSaysWhereItSends()
     {
-        string At(Signal signal, string name, params (string Key, string Value)[] env) =>
-            Variables.Destination(k => env.FirstOrDefault(e => e.Key == k).Value, signal, name);
-        Assert.Equal("http://localhost:4317", At(Signal.Logs, "otlp", ("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")));
-        Assert.Equal("http://localhost:4317", At(Signal.Logs, "otlp", ("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", "grpc")));
-        Assert.Equal("https://b", At(Signal.Traces, "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b")));
-        Assert.Equal("https://a/v1/traces", At(Signal.Traces, "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b"),
+        string At(string signal, string name, params (string Key, string Value)[] env)
+        {
+            var vars = new Dictionary<string, string?> { ["OTEL_TRACES_EXPORTER"] = "none", ["OTEL_METRICS_EXPORTER"] = "none", ["OTEL_LOGS_EXPORTER"] = "none" };
+            vars[$"OTEL_{signal.ToUpperInvariant()}_EXPORTER"] = name;
+            foreach (var (k, v) in env)
+            {
+                vars[k] = v;
+            }
+
+            return Assert.Single(Prepared(vars).Inventory().Exporters).Destination;
+        }
+
+        Assert.Equal("http://localhost:4317", At("logs", "otlp", ("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")));
+        Assert.Equal("http://localhost:4317", At("logs", "otlp", ("OTEL_EXPORTER_OTLP_LOGS_PROTOCOL", "grpc")));
+        Assert.Equal("https://b", At("traces", "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b"), ("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")));
+        Assert.Equal("https://b/v1/traces", At("traces", "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b")));
+        Assert.Equal("https://a/v1/traces", At("traces", "otlp", ("OTEL_EXPORTER_OTLP_ENDPOINT", "https://b"),
             ("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "https://a/v1/traces")));
-        Assert.Equal("http://localhost:9411/api/v2/spans", At(Signal.Traces, "zipkin"));
-        Assert.Equal("http://z:9411", At(Signal.Traces, "zipkin", ("OTEL_EXPORTER_ZIPKIN_ENDPOINT", "http://z:9411")));
-        Assert.Equal(string.Empty, At(Signal.Traces, "console"));
+        Assert.Equal("http://localhost:9411/api/v2/spans", At("traces", "zipkin"));
+        Assert.Equal("http://z:9411", At("traces", "zipkin", ("OTEL_EXPORTER_ZIPKIN_ENDPOINT", "http://z:9411")));
+        Assert.Equal(string.Empty, At("traces", "console"));
     }
 
     // Started, the agent's components are the layer's of its inventory under the host it runs by:

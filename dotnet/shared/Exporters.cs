@@ -7,6 +7,8 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Pydantic.OpAmp.Client.Sdk;
+
 namespace Pydantic.OpAmp.Otel;
 
 /// <summary>
@@ -20,10 +22,19 @@ namespace Pydantic.OpAmp.Otel;
 internal static class Exporters
 {
     /// <summary>
-    /// An exporter met: its signal, its name as <c>OTEL_*_EXPORTER</c> gives it or else its type,
-    /// whether the gate is in front of it, and where it sends (empty: nowhere, or not known).
+    /// An exporter met, as found: its signal, what it is known as (its type's name, or the name
+    /// <c>OTEL_*_EXPORTER</c> gives it), whether the gate is in front of it, its endpoint (empty: not
+    /// known), and whether it was built from the variables. The layer decides how it is listed.
     /// </summary>
-    internal sealed record Built(Signal Signal, string Name, bool Gated, string Destination = "");
+    internal sealed record Built(Signal Signal, string Kind, bool Gated, string Endpoint = "", bool FromEnv = false)
+    {
+        /// <summary>As the layer takes it.</summary>
+        public FoundExporter Found() => new()
+        {
+            Signal = this.Signal.ToString().ToLowerInvariant(), Kind = this.Kind, Gated = this.Gated, Endpoint = this.Endpoint,
+            FromEnv = this.FromEnv,
+        };
+    }
 
     private const BindingFlags Any = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
 
@@ -133,34 +144,25 @@ internal static class Exporters
         return gated;
     }
 
-    /// <summary>An exporter, listed with where it sends: whether it is gated.</summary>
+    /// <summary>An exporter, by its type, with its endpoint: whether it is gated.</summary>
     private static bool Exporter(Signal signal, object exporter, List<Built> found)
     {
         var gated = GatedExporter(signal, exporter);
-        found.Add(new(signal, Named(exporter.GetType()), gated, Destination(exporter)));
+        found.Add(new(signal, TypeName(exporter), gated, Endpoint(exporter)));
         return gated;
     }
 
     /// <summary>
     /// Where an exporter sends, read off it: an OTLP exporter's export client's endpoint, Zipkin's
-    /// options' endpoint; empty for any other. The layer keeps only the scheme, host and port.
+    /// options' endpoint; empty for any other.
     /// </summary>
-    internal static string Destination(object exporter) =>
+    internal static string Endpoint(object exporter) =>
         TryMember(exporter, "transmissionHandler", out var handler) && handler is not null &&
         TryMember(handler, "ExportClient", out var client) && client is not null &&
         TryMember(client, "Endpoint", out var endpoint) && endpoint is Uri otlp ? otlp.ToString()
         : TryMember(exporter, "options", out var options) && options is not null &&
           TryMember(options, "Endpoint", out var at) && at is Uri other ? other.ToString()
         : string.Empty;
-
-    /// <summary>An exporter's name as <c>OTEL_*_EXPORTER</c> gives it (<c>otlp</c>, <c>console</c>, <c>zipkin</c>, <c>prometheus</c>), else its type's.</summary>
-    internal static string Named(Type type) =>
-        type.Assembly == typeof(OtlpExporterOptions).Assembly && type.Name.StartsWith("Otlp", StringComparison.Ordinal) ? "otlp"
-        : type.Namespace != "OpenTelemetry.Exporter" ? TypeName(type)
-        : type.Name.StartsWith("Console", StringComparison.Ordinal) ? "console"
-        : type.Name == "ZipkinExporter" ? "zipkin"
-        : type.Name == "PrometheusExporter" ? "prometheus"
-        : TypeName(type);
 
     /// <summary>A type's name without its generic arity: <c>InMemoryExporter</c> for <c>InMemoryExporter`1</c>.</summary>
     private static string TypeName(object o) => TypeName(o.GetType());

@@ -10,6 +10,7 @@ using OpenTelemetry.Trace;
 using Pydantic.OpAmp.Client;
 using Pydantic.OpAmp.Client.Sdk;
 using Pydantic.OpAmp.Otel;
+using Exporters = Pydantic.OpAmp.Otel.Exporters;
 
 namespace Pydantic.OpAmp.AutoInstrumentation;
 
@@ -221,12 +222,7 @@ internal sealed class Agent
     /// <summary>Once the SDK is built: join the fleet, reporting what it runs.</summary>
     public void Start(IEnumerable<KeyValuePair<string, object>> resource)
     {
-        var ungoverned = this.Inventory().Exporters.Where(e => !e.Gated).Select(e => $"{e.Signal} {e.Name}").ToList();
-        if (ungoverned.Count > 0)
-        {
-            Log.Info($"exporters the gates aren't in front of: {string.Join(", ", ungoverned)}; reported to the server as ungoverned, and every setting governs the rest");
-        }
-
+        // What the gates aren't in front of is warned about as the inventory is first listed.
         this.agent.Start(resource, () => this.Inventory());
     }
 
@@ -235,9 +231,10 @@ internal sealed class Agent
     /// has on .NET, switched off or not, under the name <c>deactivate_instrumentations</c> takes,
     /// at automatic instrumentation's version (they ship together; none when it isn't loaded); and
     /// each signal's exporters as <c>OTEL_*_EXPORTER</c> names them, the OTLP one gated where the
-    /// plugin gates it, each with where it sends. Then what the built providers export through
+    /// plugin gates it, each sending where its variables say. Then what the built providers export through
     /// beside those (another plugin's processor, or the file's exporters under file-based
     /// configuration, whose variables the SDK doesn't read), as the providers say.
+    /// The layer names each and says where it sends (<see cref="SdkAgent.Exporters"/>).
     /// <paramref name="autoVersion"/>: automatic instrumentation's version, but in tests.
     /// </summary>
     internal Inventory Inventory(string? autoVersion = null)
@@ -254,19 +251,21 @@ internal sealed class Agent
 
             foreach (var name in Env.Exporters(this.getenv, signal))
             {
-                configured.Add(new(signal, name, name == "otlp" && this.gated.Contains(signal), Variables.Destination(this.getenv, signal, name)));
+                configured.Add(new(signal, name, name == "otlp" && this.gated.Contains(signal), FromEnv: true));
             }
         }
 
         // Of each provider, what isn't one of those: each configured exporter accounts for one built
-        // of its name, which says where it sends.
+        // of the name it is listed under, whose endpoint says where it sends.
         var beside = new List<Exporters.Built>();
+        var names = this.agent.ExporterNames(configured);
         foreach (var provider in this.BuiltExporters())
         {
             var left = Enumerable.Range(0, configured.Count).ToList();
-            foreach (var e in provider)
+            var named = this.agent.ExporterNames(provider);
+            foreach (var (e, name) in provider.Zip(named))
             {
-                var i = left.FindIndex(k => configured[k].Signal == e.Signal && configured[k].Name == e.Name);
+                var i = left.FindIndex(k => configured[k].Signal == e.Signal && names[k] == name);
                 if (i < 0)
                 {
                     beside.Add(e);
@@ -275,9 +274,9 @@ internal sealed class Agent
 
                 var at = left[i];
                 left.RemoveAt(i);
-                if (e.Destination.Length > 0)
+                if (e.Endpoint.Length > 0)
                 {
-                    configured[at] = configured[at] with { Destination = e.Destination };
+                    configured[at] = configured[at] with { Endpoint = e.Endpoint };
                 }
             }
         }
@@ -289,8 +288,8 @@ internal sealed class Agent
             beside.Add(new(signal, AppProvider, false));
         }
 
-        var exporters = configured.Distinct().Concat(beside.Distinct())
-            .Select(e => Inventories.Exporter(e.Signal, e.Name, e.Gated, e.Destination));
+        // The SDK's OTLP protocol when no variable sets one: http/protobuf.
+        var exporters = this.agent.Exporters(configured.Distinct().Concat(beside.Distinct()), "http/protobuf");
         return Inventories.Of(typeof(Agent).Assembly, instrumentations, exporters);
     }
 

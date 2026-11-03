@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Google.Protobuf;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
@@ -274,6 +275,32 @@ public class SdkSettingsTests
         Assert.False(failed.Exporters.Healthy);
         Assert.Equal("connection refused", failed.Exporters.ComponentHealthMap["traces"].LastError);
         Assert.Equal("off", failed.Exporters.ComponentHealthMap["logs"].Status);
+    }
+
+    // Every case of testdata/exporters.json through the wrapper: what is decided, compared whole.
+    [Fact]
+    public void TheExportersVectors()
+    {
+        using var layer = new SdkSettings();
+        foreach (var c in Cases("exporters.json"))
+        {
+            string Text(JsonElement e, string k) => e.TryGetProperty(k, out var v) ? v.GetString()! : string.Empty;
+            bool Flag(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.GetBoolean();
+            var found = c.GetProperty("found").EnumerateArray().Select(f => new FoundExporter
+            {
+                Signal = Text(f, "signal"), Kind = Text(f, "kind"), Gated = Flag(f, "gated"), Endpoint = Text(f, "endpoint"),
+                FromEnv = Flag(f, "from_env"),
+            }).ToList();
+            var env = c.TryGetProperty("env", out var e) ? e.EnumerateObject().Select(p => KeyValuePair.Create(p.Name, p.Value.GetString()!)).ToList() : [];
+            var got = layer.Exporters(found, env, Text(c, "default_protocol"));
+            var actual = JsonSerializer.Serialize(new
+            {
+                exporters = got.Exporters.Select(x => new { signal = x.Signal, name = x.Name, gated = x.Gated, destination = x.Destination }),
+                governed = got.Governed, ungoverned = got.Ungoverned, warnings = got.Warnings,
+            });
+            var want = JsonSerializer.Serialize(c.GetProperty("want"));
+            Assert.True(JsonNode.DeepEquals(JsonNode.Parse(want), JsonNode.Parse(actual)), $"{c.GetProperty("name")}: {actual}");
+        }
     }
 
     // Every case of testdata/components.json through the wrapper: each component the case gives
