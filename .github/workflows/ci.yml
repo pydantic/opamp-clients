@@ -1057,11 +1057,14 @@ jobs:
           go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
       - name: The .msi installed, enrolled with a server that issues a token, and restarted
         # It installs a service: the runner is thrown away after the job. (The job runs elevated.)
+        # A hang must fail inside the step: a job cancelled at its timeout keeps no log. The test
+        # binary's own timeout (none unless given) panics with every goroutine's stack first.
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
+        timeout-minutes: 12
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 9m
       - name: The .msi, kept
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
