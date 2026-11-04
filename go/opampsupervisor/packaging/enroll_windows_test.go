@@ -55,6 +55,8 @@ func TestWinEnroll(t *testing.T) {
 	assert.Equal(t, "wss://opamp.example.com/v1/opamp", loaded.Server.Endpoint)
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "dpapi", loaded.Storage.StateKey)
+	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
+	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	assert.Equal(t, filepath.ToSlash(filepath.Join(root, "var")), loaded.Storage.Directory)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	// Without -Restricted, any config the server sends runs.

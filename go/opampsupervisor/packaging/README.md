@@ -126,6 +126,20 @@ Without this option, the helper keeps any existing telemetry token. To rotate
 the telemetry token, run the helper with this option and both credentials again.
 `--token-file` cannot be combined with the two-token input mode.
 
+### The Collector's own metrics and logs
+
+Every enroll script, and the container's configs, declare `reports_own_metrics` and
+`reports_own_logs`. The server can then offer where the Collector sends its own metrics and logs
+(`own_metrics`, `own_logs` in the OpAMP connection settings), with the headers to send them with,
+and the Supervisor adds them to the Collector's `service::telemetry`. The Collector's own
+telemetry carries its instance UID as `service.instance.id`. Without an offer nothing is sent,
+and the Collector's log still goes to its standard output. A remote config's own
+`service::telemetry` settings for a signal take the place of the offer's. With `--restricted`,
+the offered endpoints must be allowed exporter endpoints, like the remote config's.
+
+Hosts enrolled before this keep their old `supervisor.yaml`: run the enroll script again to add
+them.
+
 ### Unmanaged
 
 The package can also run its collector on its own, with no OpAMP server, from a config you give

@@ -269,6 +269,9 @@ func TestEnrollBindsTheExporterCredential(t *testing.T) {
 	assert.Equal(t, map[string]string{"logfire/otlp": "LOGFIRE_TOKEN"}, loaded.Agent.ConnectionEnv)
 	assert.True(t, loaded.Capabilities.AcceptsOtherConnectionSettings)
 	assert.True(t, loaded.Capabilities.AcceptsRestartCommand)
+	// The server's own_metrics and own_logs offers say where the Collector's own telemetry goes.
+	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
+	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	// A remote config the Collector fails on doesn't leave the host collecting nothing.
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	out, err = newEnrollment(t).run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp", "--instance-id", "f0cff0a3-08e5-4c49-96ce-1366b14525ed")

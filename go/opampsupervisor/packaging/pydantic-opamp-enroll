@@ -303,6 +303,10 @@ capabilities:
   accepts_restart_command: true
   reports_effective_config: true
   reports_health: true
+  # Where the Collector sends its own metrics and logs: the server offers the destination
+  # (own_metrics, own_logs), and without an offer they stay local.
+  reports_own_metrics: true
+  reports_own_logs: true
   reports_available_components: true$accepts_packages
 
 agent:
