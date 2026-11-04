@@ -28,8 +28,10 @@ Push-Location (Split-Path -Parent $packaging)
 try {
     # The fetcher runs on this machine, whatever GOARCH the packages are for.
     $env:GOOS = ''; $env:GOARCH = ''
-    go run ./internal/fetchcontrib -os windows -arch $Arch -out (Join-Path $bin 'otelcol.exe')
+    # Into dist\otelcol, as on Linux and macOS: the install tests validate configs with it there.
+    go run ./internal/fetchcontrib -os windows -arch $Arch -out packaging\dist\otelcol\otelcol.exe
     $env:GOOS = 'windows'; $env:GOARCH = $Arch
+    Copy-Item packaging\dist\otelcol\otelcol.exe (Join-Path $bin 'otelcol.exe') -Force
     go build -trimpath -o (Join-Path $bin 'opampsupervisor.exe') .
 } finally {
     Pop-Location
