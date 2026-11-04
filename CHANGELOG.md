@@ -143,8 +143,10 @@ The first release of the SDKs on their registries, from the tag `sdk/v0.1.1`, on
 - Java (Maven Central, `dev.pydantic`) and .NET (NuGet, `Pydantic.OpAmp.*`) are not on their
   registries yet. A later `sdk/v*` release publishes them.
 
-The lines under **Unreleased** that name Python or Node.js are in this release. They stay under
-**Unreleased** for Go, Java, .NET and the Supervisor, until those ship.
+This is the first release of these packages, so it lists no changes. Some entries in the
+**Unreleased** section above also apply to Python or Node.js. Version 0.1.1 already includes those
+changes. The entries stay in **Unreleased** because they also apply to Go, Java, .NET or the
+Supervisor, which have not had a release with them.
 
 ## Supervisor 0.8.0 (2026-10-29)
 
