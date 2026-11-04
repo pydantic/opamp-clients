@@ -64,8 +64,8 @@ has an example.
 
 ### Packages
 
-The packages install the Supervisor, a collector for it to run (built with ocb from
-[collector.yaml](../go/opampsupervisor/packaging/collector.yaml), with this extension) and a
+The packages install the Supervisor, a collector for it to run (upstream's `otelcol-contrib`, pinned in
+[contrib.json](../go/opampsupervisor/packaging/contrib.json)) and a
 service, and enroll the host with one command, `pydantic-opamp-enroll`:
 
 | Platform | Package | Service |

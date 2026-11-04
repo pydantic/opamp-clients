@@ -43,6 +43,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
+  archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
+  v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
+  config the server sends can use any contrib component. The packages are about 100 MB larger.
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
@@ -61,8 +65,8 @@ and date. Tests, CI and docs alone don't need a line.
 - Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
   `own_traces` offers) are in the current declarative config format, so the Collector no longer
   warns on every start that they use the deprecated v0.2.0 format.
-- Supervisor installers: the bundled Collector reports its version (0.164.1, the contrib release
-  it is built from) as `service.version` on its own telemetry; it was empty.
+- Supervisor installers: the bundled Collector reports its version (its contrib release, 0.164.0)
+  as `service.version` on its own telemetry; it was empty.
 - .NET: the application's health set while the OpAMP client was starting (a health check that
   runs at once) is reported. It was lost, and not reported again until the health changed (#112).
 - .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.

@@ -1,0 +1,13 @@
+{
+  "comment": "The Collector the packages ship: upstream's otelcol-contrib release, unchanged. internal/fetchcontrib downloads an archive and refuses it unless its SHA-256 is pinned here. Pin a new release only after cosign verify-blob passes on each archive's .sigstore.json (signer: the open-telemetry/opentelemetry-collector-releases workflows); v0.164.0's six were checked that way.",
+  "version": "0.164.0",
+  "url": "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v{version}/otelcol-contrib_{version}_{os}_{arch}.tar.gz",
+  "sha256": {
+    "linux_amd64": "f0c1ce9f661399beb4a58b711924716e08ea70c3802db0715fcfde3cbbada2d4",
+    "linux_arm64": "8bd4a7f443405522a2175cc1a8675f9e99cc047c7181b73461efd08efbba38d3",
+    "darwin_amd64": "b53ab416e9a90625c1453692f1d3a3c4eba72904424e31516866f73064b65d4f",
+    "darwin_arm64": "af6a0c56886e3cc36ccebe849fa167bad2bc47a97a48fd8497a0d6f93d0cf73a",
+    "windows_amd64": "1fb8163f9036126a1bdc59eab2d7aef4e6cda36f6c1e618f2359663cae8b0f4a",
+    "windows_arm64": "850b67d16de82a85355bc94bf0dab71cce635d90fbe1e47cf2c5727dd99e1952"
+  }
+}
