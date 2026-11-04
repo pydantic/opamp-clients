@@ -61,6 +61,16 @@
       </Component>
     </ComponentGroup>
 
+    <!-- After an upgrade (the old version is removed first, its service with it), the enroll script
+         writes the config again with this version's settings and the last enrollment's options,
+         and starts the service again unless it was enrolled with -NoStart. A failure leaves the
+         upgrade installed: the script says what to check. -->
+    <CustomAction Id="RefreshAfterUpgrade" Directory="INSTALLFOLDER" Execute="deferred" Impersonate="no" Return="ignore"
+                  ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;[INSTALLFOLDER]pydantic-opamp-enroll.ps1&quot; -Refresh" />
+    <InstallExecuteSequence>
+      <Custom Action="RefreshAfterUpgrade" After="StartServices" Condition="WIX_UPGRADE_DETECTED AND NOT (REMOVE~=&quot;ALL&quot;)" />
+    </InstallExecuteSequence>
+
     <Feature Id="Main">
       <ComponentGroupRef Id="Supervisor" />
     </Feature>

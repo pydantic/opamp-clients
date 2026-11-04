@@ -137,8 +137,7 @@ and the Collector's log still goes to its standard output. A remote config's own
 `service::telemetry` settings for a signal take the place of the offer's. With `--restricted`,
 the offered endpoints must be allowed exporter endpoints, like the remote config's.
 
-Hosts enrolled before this keep their old `supervisor.yaml`: run the enroll script again to add
-them.
+A package upgrade adds them (see [Upgrades](#upgrades)).
 
 ### Unmanaged
 
@@ -530,6 +529,39 @@ checks out.
 
 CI runs them all, on Linux (with a throwaway signing key), macOS and Windows, and keeps the
 packages as artifacts.
+
+## Upgrades
+
+Installing a newer package over the installed one (apt, dnf, the `.pkg` or the `.msi`) upgrades
+in place. The host
+keeps its enrollment, its issued credentials and its instance UID, and needs no new key:
+
+- The enroll script keeps the options it was last run with, never a token, in `enroll.options`
+  beside the config, with the config's SHA-256 in `supervisor.yaml.sha256`.
+- After the upgrade, the package runs `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows).
+  It writes the config again with this version's settings and those options, then starts the
+  Supervisor again, unless it was enrolled with `--no-start`. On Linux, the deb's postinst runs
+  it, and the rpm's posttrans does, through `pydantic-opamp-after-upgrade`. A host running the
+  unmanaged collector (`pydantic-otelcol-configure` ran after the last enrollment) gets that
+  service started again instead.
+- A config edited since the script wrote it is kept as it is, and the script says so. Run the
+  enroll script again with its options to write it anew.
+- A host enrolled by a package up to 0.9.0 has no `enroll.options`. Without `--restricted`, its
+  config holds all its options (the endpoint, the CA file, `--plaintext`, `--accept-packages`), so
+  they're saved and the config is written again, with the old one kept as `supervisor.yaml.old`. A
+  `--restricted` config may have been widened or narrowed by hand, so it stays. Run the enroll
+  script again with its options to add the new settings.
+
+Packages up to 0.9.0 stopped and disabled the Linux services during an upgrade, and a Windows
+upgrade left the service stopped and set to start on demand. These packages start them again,
+including after an upgrade from one of those. Before stopping its services, Linux's `prerm`
+(`%preun`) now checks whether this is a removal; on an upgrade they keep running until the new
+package restarts them. CI installs the released 0.9.0 `.pkg` and `.msi`, enrolls them, and
+upgrades them in place to the package it built.
+
+The Supervisor can't be updated over OpAMP. A server's package offer
+([Collector updates from the server](#collector-updates-from-the-server)) replaces only the
+Collector it runs.
 
 ## Remove the installed Collector
 

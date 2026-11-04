@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,4 +93,19 @@ func diagnose() string {
 	ps, _ := exec.CommandContext(ctx, "ps", "-axo", "pid,ppid,stat,args").CombinedOutput()
 	log, _ := exec.CommandContext(ctx, "tail", "-n", "200", storage+"/log/supervisor.log").CombinedOutput()
 	return string(print) + "\n" + string(ps) + "\n" + string(log)
+}
+
+// enrolledConfigDir is where the enroll script writes the config.
+const enrolledConfigDir = "/opt/pydantic-opamp/etc"
+
+// enrollStarted enrolls and loads the LaunchDaemon, as an install does.
+func enrollStarted(t *testing.T, endpoint string) {
+	t.Helper()
+	run(t, "enroll-token\n", "/opt/pydantic-opamp/bin/pydantic-opamp-enroll", "--endpoint", endpoint, "--plaintext")
+}
+
+// assertStartsAtBoot checks launchd has the LaunchDaemon loaded.
+func assertStartsAtBoot(t *testing.T) {
+	t.Helper()
+	assert.NoError(t, exec.Command("launchctl", "print", "system/"+label).Run(), "the LaunchDaemon isn't loaded")
 }

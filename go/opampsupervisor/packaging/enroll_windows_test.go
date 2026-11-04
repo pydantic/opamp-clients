@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -213,4 +214,42 @@ func TestWinEnrollHostLogs(t *testing.T) {
 	body := hostLogsConfig(t, "windows", "C:/ProgramData/pydantic-opamp/var/collector", storage)
 	assertHostLogs(t, p, enroll(), body, `configures receiver "windows_event_log/application"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {windows_event_log: {channel: System, remote: {server: dc1}}}`)), "sets remote")
+}
+
+// -Refresh, which the .msi runs after an upgrade, writes the config again with the last
+// enrollment's options and keeps the token; one edited since it was written is kept.
+func TestWinEnrollRefresh(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "pydantic-opamp")
+	out, err := winEnroll(t, root, "s3cr3t-token\r\n", "-Endpoint", "wss://opamp.example.com/v1/opamp", "-Restricted",
+		"-LogPath", `C:\logs\app`, "-AcceptPackages", "-NoStart")
+	require.NoError(t, err, out)
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(root, name))
+		require.NoError(t, err)
+		return string(b)
+	}
+	enrolled := read("supervisor.yaml")
+	assert.NotContains(t, read("enroll.options"), "s3cr3t-token")
+	// (The script's lines end as its checkout's do: \r\n on a Windows runner.)
+	older := regexp.MustCompile(`  reports_own_logs: true\r?\n`).ReplaceAllString(enrolled, "")
+	require.NotEqual(t, enrolled, older)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(older), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml.sha256"), []byte(sha256Hex(older)), 0o600))
+
+	out, err = winEnroll(t, root, "", "-Refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp; start the Supervisor with")
+	assert.Equal(t, enrolled, read("supervisor.yaml"))
+	assert.Equal(t, "s3cr3t-token", read("enroll-token"))
+
+	edited := enrolled + "# by hand\n"
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(edited), 0o600))
+	out, err = winEnroll(t, root, "", "-Refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "edited since it was written and is kept")
+	assert.Equal(t, edited, read("supervisor.yaml"))
+
+	out, err = winEnroll(t, root, "", "-Refresh", "-Plaintext")
+	require.Error(t, err, out)
+	assert.Contains(t, out, "takes no other options")
 }
