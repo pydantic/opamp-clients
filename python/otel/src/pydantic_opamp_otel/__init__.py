@@ -1869,6 +1869,8 @@ def _watch_processors() -> None:
 
     def watched(provider, method: str, signal: str) -> None:
         add = getattr(provider, method)
+        if getattr(add, "_opamp_watched", False):
+            return
 
         def added(*args, **kwargs):
             # Given by position or by its name (span_processor, log_record_processor).
@@ -1877,6 +1879,7 @@ def _watch_processors() -> None:
                 AGENT.processor_added(processor, signal)
             return add(*args, **kwargs)
 
+        added._opamp_watched = True
         setattr(provider, method, added)
 
     tracer_provider = trace.get_tracer_provider()
@@ -2007,9 +2010,14 @@ def manage(*, endpoint: str | None = None, headers: Mapping[str, str] | None = N
         return
     provider = _own_sdk()
     if provider is None:
-        _log.warning("OpAMP: manage() found no OpenTelemetry SDK set up: call it after the application "
-                     "sets its tracer provider (or use configure(), which sets one up)")
+        # Not started: a later call, once the SDK is set up, joins the fleet with it.
+        _log.warning("OpAMP: manage() found no OpenTelemetry SDK set up, so the application runs "
+                     "unmanaged: call it after the application sets its tracer provider (or use "
+                     "configure(), which sets one up)")
+        return
     AGENT.managed = True
+    # A processor the application adds from now on gets its gate too.
+    _watch_processors()
     # The Logfire SDK's logs are spans; its proxy is what it sets as the global provider.
     AGENT.logfire = type(trace.get_tracer_provider()).__module__.split(".")[0] == "logfire"
     AGENT.start(getattr(provider, "resource", None) or Resource.create({}))

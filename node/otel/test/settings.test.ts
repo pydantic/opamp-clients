@@ -582,6 +582,22 @@ test("an error inside a gate fails the export and counts its items as failed", (
   assert.deepEqual([c.counts.traces.exportsFailed, c.counts.traces.itemsFailed, c.counts.traces.lastError], [1, 2, "no attributes"]);
 });
 
+// An exporter that throws after the gate filtered fails only what was kept, counted by signal:
+// the Logfire SDK's log spans as logs, the filtered ones not as failed too.
+test("an exporter that throws after filtering counts the kept items as failed, by signal", () => {
+  const c = new Controls();
+  c.apply(settings({ signal_exports: { traces: { mode: "override", enabled: false } } }));
+  c.logSpans = true;
+  const span = (type: string) => ({ attributes: { "logfire.span_type": type, "logfire.level_num": 13 },
+    instrumentationScope: { name: "app" }, events: [], links: [] }) as never;
+  const throwing = { export() { throw new Error("down"); }, shutdown: () => Promise.resolve() };
+  const results: ExportResult[] = [];
+  c.spans(throwing as never).export([span("log"), span("span")], (r) => results.push(r));
+  assert.deepEqual(results.map((r) => [r.code, r.error?.message]), [[1, "down"]]);
+  assert.deepEqual([c.counts.logs.exportsFailed, c.counts.logs.itemsFailed], [1, 1]);
+  assert.deepEqual([c.counts.traces.exportsFailed, c.counts.traces.itemsFailed, c.counts.traces.itemsFiltered], [0, 0, 1]);
+});
+
 test("scrubbing: the default patterns at their edges", () => {
   const s = new Scrubbing(true);
   const cases: [string, string | undefined][] = [

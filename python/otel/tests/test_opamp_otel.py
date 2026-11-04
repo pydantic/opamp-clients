@@ -1164,6 +1164,13 @@ def test_an_sdk_the_application_set_up_itself_is_put_under_the_server(tmp_path, 
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
+        # One the application adds later gets the gate too.
+        class Late(ConsoleSpanExporter):
+            def export(self, spans):
+                for s in spans:
+                    print("LATE", dict(s.attributes))
+                return super().export([])
+        provider.add_span_processor(SimpleSpanProcessor(Late()))
         trace.get_tracer("t").start_span("after", attributes={{"x": "secret", "y": "kept"}}).end()
         print("exporters", sorted((e.signal, e.name, e.gated) for e in agent.exporters))
         print("live", sorted(agent.host.live))
@@ -1178,7 +1185,8 @@ def test_an_sdk_the_application_set_up_itself_is_put_under_the_server(tmp_path, 
     assert ("configure() builds none" in run.stderr) == (call == "configure")
     # The application's own exporter is behind the gate: the policy's redaction reaches it.
     assert '"name": "after"' in run.stdout and "secret" not in run.stdout and '"y": "kept"' in run.stdout
-    assert "exporters [('traces', 'console', True)]" in run.stdout
+    assert "LATE {'y': 'kept'}" in run.stdout
+    assert "('traces', 'console', True)" in run.stdout and "False" not in run.stdout.split("exporters", 1)[1]
     # Its sampler is the application's: the sampling controls and debug mode aren't declared.
     live = run.stdout.split("live ", 1)[1]
     assert "sampling_rate" not in live and "debug_until" not in live and "send_traces" in live
@@ -1222,8 +1230,10 @@ def test_manage_refuses_a_policy_that_overrides_the_applications_sampler(tmp_pat
 def test_manage_without_an_sdk_says_how_to_call_it(tmp_path):
     server = _Server(reply=lambda msg: None)
     child = textwrap.dedent(f"""
+        import time
         import pydantic_opamp_otel
         pydantic_opamp_otel.manage(endpoint={server.endpoint!r})
+        time.sleep(1)
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -1232,6 +1242,8 @@ def test_manage_without_an_sdk_says_how_to_call_it(tmp_path):
         server.close()
     assert run.returncode == 0, run.stderr
     assert "manage() found no OpenTelemetry SDK set up" in run.stderr
+    # It doesn't join the fleet as an instance with nothing to govern.
+    assert server.got == []
 
 
 def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tmp_path):

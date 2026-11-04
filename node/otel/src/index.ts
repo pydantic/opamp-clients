@@ -1163,11 +1163,18 @@ export class Controls {
         if (out.length === 0 && spans.length > 0) return done(SUCCESS);
         const redaction = this.redaction;
         const [nTraces, nLogs] = [traces.length, logs.length];
-        to.export(redaction.on ? out.map((s) => redaction.span(s)) : out, (r: ExportResult) => {
+        const finished = (r: ExportResult) => {
           if (nTraces > 0 || nLogs === 0) this.counts.traces.result(r, nTraces);
           if (nLogs > 0) this.counts.logs.result(r, nLogs);
           done(r);
-        });
+        };
+        // Past filtering, a failure (redaction, the exporter throwing) is counted per signal, for
+        // what was kept only.
+        try {
+          to.export(redaction.on ? out.map((s) => redaction.span(s)) : out, finished);
+        } catch (e) {
+          finished({ code: 1, error: e instanceof Error ? e : new Error(String(e)) });
+        }
       }),
       shutdown: () => to.shutdown(),
       forceFlush: () => to.forceFlush?.() ?? Promise.resolve(),
