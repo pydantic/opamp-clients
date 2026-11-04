@@ -132,7 +132,10 @@ Get-ChildItem -Recurse -File '` + programData + `' -ErrorAction SilentlyContinue
 Get-ChildItem -Recurse -File -Filter *.log '` + programData + `' -ErrorAction SilentlyContinue | ForEach-Object {
     "==> $($_.FullName)"; Get-Content -Tail 200 $_.FullName }
 `
-	out, err := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	cmd := exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", script)
+	// A child left holding the output (sc.exe) must not keep diagnose waiting past its minute.
+	cmd.WaitDelay = 10 * time.Second
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Sprintf("%s\n(diagnose: %v)", out, err)
 	}
