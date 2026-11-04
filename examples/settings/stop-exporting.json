@@ -1,7 +1,6 @@
 {
   "schema": "logfire-sdk-policy/v1",
   "head_sampling": {"mode": "local"},
-  "self_monitoring": {"mode": "override", "enabled": false},
   "signal_exports": {
     "traces": {"mode": "override", "enabled": false},
     "metrics": {"mode": "override", "enabled": false},

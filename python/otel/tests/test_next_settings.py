@@ -1440,3 +1440,17 @@ def test_scrubbing_agrees_with_the_layers_reference_on_generated_text():
         assert pairs(out.log_record.attributes) == want, (settings, attributes)
         assert out.log_record.body == ref.body.string_value, (settings, body)
     assert 40 < changed < 360  # some attributes are scrubbed, not all
+
+
+COOKBOOK = Path(__file__).resolve().parents[3] / "examples" / "settings"
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in COOKBOOK.glob("*.json")))
+def test_every_cookbook_policy_is_applied_as_the_readme_promises(name, tmp_path):
+    # Regression: stop-exporting.json gained a self_monitoring override no SDK carries out yet, so
+    # every SDK refused it. The cookbook's policies must apply on an SDK the package built.
+    body = (COOKBOOK / name).read_text()
+    agent = Agent()
+    agent.prepare({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
+    s = agent.remote_config(opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body.encode()))
+    assert (s.status, s.error_message) == (APPLIED, ""), name
