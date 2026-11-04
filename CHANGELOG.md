@@ -43,6 +43,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Supervisor installers (Linux, macOS, Windows, container image): the Supervisor declares
+  ReportsOwnMetrics and ReportsOwnLogs, so a server's `own_metrics` and `own_logs` offers send the
+  Collector's own metrics and logs where it says. A host enrolled before keeps its config until
+  the enroll script runs again.
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its

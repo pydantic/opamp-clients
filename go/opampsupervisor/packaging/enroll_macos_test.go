@@ -72,6 +72,8 @@ func TestMacEnroll(t *testing.T) {
 	assert.Equal(t, "Bearer s3cr3t-token", loaded.Server.Headers.Get("Authorization"))
 	assert.Equal(t, "keychain", loaded.Storage.StateKey)
 	assert.True(t, loaded.Capabilities.AcceptsOpAMPConnectionSettings)
+	assert.True(t, loaded.Capabilities.ReportsOwnMetrics)
+	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
 	// Without --restricted, any config the server sends runs.
 	assert.False(t, loaded.Agent.RemoteConfigPolicy.Enabled(), "a policy without --restricted")
