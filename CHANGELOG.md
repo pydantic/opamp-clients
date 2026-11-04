@@ -132,6 +132,22 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
+## SDKs 0.1.1 (2026-11-04)
+
+The first release of the SDKs on their registries, from the tag `sdk/v0.1.1`, on core 0.14.0.
+
+- Python on PyPI: `pydantic-opamp-core`, `pydantic-opamp-client` and `pydantic-opamp-otel`.
+- Node.js on npm: `@pydantic/opamp-client` and `@pydantic/opamp-otel`, with provenance. The npm
+  packages also have a 0.1.0. It has the same contents, was published by hand, and has no
+  provenance. Use 0.1.1.
+- Java (Maven Central, `dev.pydantic`) and .NET (NuGet, `Pydantic.OpAmp.*`) are not on their
+  registries yet. A later `sdk/v*` release publishes them.
+
+This is the first release of these packages, so it lists no changes. Some entries in the
+**Unreleased** section above also apply to Python or Node.js. Version 0.1.1 already includes those
+changes. The entries stay in **Unreleased** because they also apply to Go, Java, .NET or the
+Supervisor, which have not had a release with them.
+
 ## Supervisor 0.8.0 (2026-10-29)
 
 `go/opampsupervisor/v0.8.0`, on core 0.12.0. The Go modules are not released with it.
