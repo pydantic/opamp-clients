@@ -157,11 +157,15 @@ test("the Logfire SDK's logs are spans: the log level reaches them, and its span
   }
 });
 
-test("a processor that wraps the one holding the exporter (as the Logfire SDK's does) is looked through", async () => {
+test("processors a processor wraps (the Logfire SDK's batch processor and console) are looked through", async () => {
   const s = await configServer(policy({ attribute_redaction: { drop: ["x"] } }));
-  // The Logfire SDK's processor holds its batch processor as `wrapped`, and calls it.
+  // The Logfire SDK's processor holds its batch processor as `wrapped`, and its console as a
+  // processor of its own (`console`), and calls both: each one's exporter gets the gates.
   const wrapper = `{ wrapped: new SimpleSpanProcessor(new ConsoleSpanExporter()),
-    onStart(s, c) { this.wrapped.onStart(s, c); }, onEnd(s) { this.wrapped.onEnd(s); },
+    console: new SimpleSpanProcessor({ export(spans, done) { for (const s of spans) console.log("CONSOLE", JSON.stringify(s.attributes)); done({ code: 0 }); },
+      shutdown: () => Promise.resolve() }),
+    onStart(s, c) { this.wrapped.onStart(s, c); this.console.onStart(s, c); },
+    onEnd(s) { this.wrapped.onEnd(s); this.console.onEnd(s); },
     shutdown() { return this.wrapped.shutdown(); }, forceFlush() { return this.wrapped.forceFlush(); } }`;
   try {
     const { code, out } = await app(s.endpoint, { "service.name": "mine" },
@@ -169,6 +173,7 @@ test("a processor that wraps the one holding the exporter (as the Logfire SDK's 
     assert.equal(code, 0, out);
     assert.ok(s.applied(), out);
     assert.match(out, /y: 'kept'/);
+    assert.match(out, /CONSOLE \{"y":"kept"\}/);
     assert.doesNotMatch(out, /secret/);
   } finally {
     s.close();
