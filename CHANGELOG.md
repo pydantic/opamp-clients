@@ -51,6 +51,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
+  `own_traces` offers) are in the current declarative config format, so the Collector no longer
+  warns on every start that they use the deprecated v0.2.0 format.
+- Supervisor installers: the bundled Collector reports its version (0.164.1, the contrib release
+  it is built from) as `service.version` on its own telemetry; it was empty.
 - .NET: the application's health set while the OpAMP client was starting (a health check that
   runs at once) is reported. It was lost, and not reported again until the health changed (#112).
 - .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.

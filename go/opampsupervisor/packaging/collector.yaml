@@ -6,6 +6,9 @@
 dist:
   name: otelcol
   description: OpenTelemetry Collector run by the pydantic OpAMP Supervisor
+  # What the collector reports as its version (service.version on its own telemetry): the
+  # contrib release it is built from. scripts/collector_release.py checks it moves with the pins.
+  version: 0.164.1
   output_path: packaging/dist/otelcol
 receivers:
   - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.164.0

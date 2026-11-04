@@ -2919,8 +2919,10 @@ service:
                 protocol: http/protobuf
                 endpoint: "http://127.0.0.1:4318"
                 headers:
-                  "testkey": "testval"
-                  "testkey2": "testval2"
+                  - name: "testkey"
+                    value: "testval"
+                  - name: "testkey2"
+                    value: "testval2"
 `
 
 		assert.True(t, configChanged)
@@ -4666,4 +4668,35 @@ service:
 		gotConfig := strings.ReplaceAll(cfgState.mergedConfig, "\r\n", "\n")
 		require.Equal(t, expectedMergedConfigMulti, gotConfig)
 	})
+}
+
+// The own telemetry section is in the Collector's current (v0.3.0) declarative config format: in
+// the deprecated v0.2.0 one (headers as a map) the Collector migrates it and warns on every start.
+func TestOwnTelemetrySectionIsCurrentConfigFormat(t *testing.T) {
+	s := Supervisor{telemetrySettings: newNopTelemetrySettings()}
+	require.NoError(t, s.createTemplates())
+	offer := &protobufs.TelemetryConnectionSettings{
+		DestinationEndpoint: "https://ingest.example.com/v1/x",
+		Headers: &protobufs.Headers{Headers: []*protobufs.Header{
+			{Key: "Authorization", Value: "Bearer token"},
+		}},
+	}
+	data := s.updateOwnTelemetryData(map[string]any{}, "Metrics", offer)
+	data = s.updateOwnTelemetryData(data, "Logs", offer)
+	data = s.updateOwnTelemetryData(data, "Traces", offer)
+	var rendered strings.Builder
+	require.NoError(t, s.ownTelemetryTemplate.Execute(&rendered, data))
+
+	retrieved, err := confmap.NewRetrievedFromYAML([]byte(rendered.String()))
+	require.NoError(t, err)
+	section, err := retrieved.AsConf()
+	require.NoError(t, err)
+	telemetryConf, err := section.Sub("service::telemetry")
+	require.NoError(t, err)
+
+	cfg := otelconftelemetry.NewFactory().CreateDefaultConfig().(*otelconftelemetry.Config)
+	require.NoError(t, telemetryConf.Unmarshal(cfg))
+	assert.False(t, cfg.Metrics.MigratedFromV02, "metrics: %s", rendered.String())
+	assert.False(t, cfg.Logs.MigratedFromV02, "logs: %s", rendered.String())
+	assert.False(t, cfg.Traces.MigratedFromV02, "traces: %s", rendered.String())
 }
