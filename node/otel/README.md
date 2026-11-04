@@ -7,7 +7,7 @@ the SDK managed by the server.
 
 Build it in a checkout of this repository (until it is published) and install it into the
 application, then start the application with it in place of upstream's `register`, with the
-server's address and enrollment key:
+server's address and connection key:
 
 ```bash
 OPAMP_CLIENTS=/path/to/opamp-clients   # this repository
@@ -15,19 +15,27 @@ OPAMP_CLIENTS=/path/to/opamp-clients   # this repository
 npm install $OPAMP_CLIENTS/node/otel   # in the application's directory
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
-OTEL_OPAMP_HEADERS="Authorization=Bearer%20<enrollment key>" \
-OTEL_LOG_LEVEL=info \
+OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 node --import @pydantic/opamp-otel/register app.js
 ```
 
-When it works, it logs, at INFO:
+When it works, it says so once, on stderr, with no log settings:
 
 ```
 OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout, instance <uid>
 ```
 
-INFO lines show only with `OTEL_LOG_LEVEL=info`. When it can't connect, it warns once, with what to
-check; warnings go to stderr without it.
+When it can't connect, it warns once, with what to check.
+
+An application that starts its own NodeSDK, or the Logfire SDK (`logfire.configure()`), keeps
+that setup and calls `manage()` after it, in place of the register:
+
+```js
+import { manage } from "@pydantic/opamp-otel";
+
+sdk.start();  // or logfire.configure({ ... })
+manage();
+```
 
 The instance keeps its UID across restarts with no configuration
 ([default-state-dir.md](../../docs/default-state-dir.md)).

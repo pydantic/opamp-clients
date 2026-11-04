@@ -1125,17 +1125,49 @@ export class Controls {
     };
   }
 
-  /** While traces aren't sent, what would be exported is dropped; what is exported is redacted. */
+  /**
+   * The Logfire SDK's logs are spans (`logfire.span_type` `log`): while set (manage() found the
+   * Logfire SDK), they go through the log controls in place of the trace ones.
+   */
+  logSpans = false;
+
+  /**
+   * While traces aren't sent, what would be exported is dropped; what is exported is redacted.
+   * With `logSpans`, a Logfire log goes through the log controls instead: send_logs, its level
+   * (`logfire.level_num`) against its scope's, the rate cap; and is counted as a log.
+   */
   spans(to: SpanExporter): SpanExporter {
     const gate: SpanExporter & Gated = {
       [GATED]: to,
       export: (spans: ReadableSpan[], done: (r: ExportResult) => void) => this.#guarded("traces", spans.length, done, () => {
-        if (!this.sendTraces) {
-          this.counts.traces.itemsFiltered += spans.length;
-          return done(SUCCESS);
+        const logSpans = this.logSpans ? spans.filter(isLogSpan) : [];
+        let traces = logSpans.length > 0 ? spans.filter((s) => !isLogSpan(s)) : spans;
+        let logs = logSpans;
+        if (logs.length > 0) {
+          let kept = this.sendLogs
+            ? logs.filter((s) => !this.off(s.instrumentationScope.name)
+              && this.passes(s.instrumentationScope.name, logSpanLevel(s)))
+            : [];
+          // The first records the tokens allow, each decided once for every exporter it reaches.
+          if (this.logsCap && kept.length > 0) kept = this.logsCap.admitted(this.clock(), kept, gate);
+          this.counts.logs.itemsFiltered += logs.length - kept.length;
+          logs = kept;
         }
+        if (!this.sendTraces) {
+          this.counts.traces.itemsFiltered += traces.length;
+          traces = [];
+        }
+        // In the batch's order, less what was dropped.
+        const keep = new Set<ReadableSpan>([...logs, ...traces]);
+        const out = logSpans.length > 0 ? spans.filter((s) => keep.has(s)) : traces;
+        if (out.length === 0 && spans.length > 0) return done(SUCCESS);
         const redaction = this.redaction;
-        to.export(redaction.on ? spans.map((s) => redaction.span(s)) : spans, this.#counted("traces", spans.length, done));
+        const [nTraces, nLogs] = [traces.length, logs.length];
+        to.export(redaction.on ? out.map((s) => redaction.span(s)) : out, (r: ExportResult) => {
+          if (nTraces > 0 || nLogs === 0) this.counts.traces.result(r, nTraces);
+          if (nLogs > 0) this.counts.logs.result(r, nLogs);
+          done(r);
+        });
       }),
       shutdown: () => to.shutdown(),
       forceFlush: () => to.forceFlush?.() ?? Promise.resolve(),
@@ -1230,6 +1262,22 @@ export class Controls {
     };
     return gate;
   }
+}
+
+/** The attribute the Logfire SDK marks its spans' kind with: `log` for logfire.info() and the rest. */
+const LOGFIRE_SPAN_TYPE = "logfire.span_type";
+/** A Logfire log's severity number (the Logfire SDK's levels are OpenTelemetry's). */
+const LOGFIRE_LEVEL = "logfire.level_num";
+
+/** Whether `span` is one of the Logfire SDK's logs. */
+export function isLogSpan(span: ReadableSpan): boolean {
+  return span.attributes[LOGFIRE_SPAN_TYPE] === "log";
+}
+
+/** A Logfire log's severity number; undefined (kept at any level) when it has none. */
+function logSpanLevel(span: ReadableSpan): number | undefined {
+  const n = span.attributes[LOGFIRE_LEVEL];
+  return typeof n === "number" ? n : undefined;
 }
 
 /** An instrumentation's tracer, or no span while the instrumentation is switched off. */
@@ -1335,6 +1383,13 @@ function exporterLike(o: unknown): o is { export: unknown; shutdown: unknown } {
     && typeof (o as Record<string, unknown>).shutdown === "function";
 }
 
+/** Whether `o` looks like a span or log record processor: one a processor may wrap. */
+function processorLike(o: unknown): boolean {
+  if (typeof o !== "object" || o === null) return false;
+  const p = o as Record<string, unknown>;
+  return typeof p.onEnd === "function" || typeof p.onEmit === "function";
+}
+
 /**
  * An exporter as found, for the layer to decide the name it is listed under (`OTLPTraceExporter`
  * is `otlp`) and where it sends: known by its type, with its endpoint where it says.
@@ -1386,7 +1441,12 @@ export function govern(c: Controls, providers: Partial<Record<ApiSignal, unknown
     } else if (Array.isArray(children)) {
       for (const child of children) processor(signal, child, depth + 1);
     } else {
-      for (const held of Object.values(p)) if (exporterLike(held)) out.push(found(signal, held, behind(held) !== undefined));
+      // A processor that wraps another (the Logfire SDK's, around its batch processor) is looked
+      // through; an exporter it holds itself can't be gated, and is listed ungoverned.
+      for (const held of Object.values(p)) {
+        if (exporterLike(held)) out.push(found(signal, held, behind(held) !== undefined));
+        else if (processorLike(held)) processor(signal, held, depth + 1);
+      }
     }
   };
   processor("traces", field(providers.traces, "_activeSpanProcessor"), 0);
@@ -1681,13 +1741,37 @@ export class Agent {
         say.warn(`OpAMP: saved SDK settings unreadable, using the SDK's own: ${String(e)}`);
       }
     }
-    this.loaded = this.layer.load(saved, this.host, BigInt(this.now()), coreState);
+    this.#saved = saved;
+    this.#coreState = coreState;
+    this.#load();
+    this.uid = this.#identity(env);
+  }
+
+  /** The settings kept from the last run (prepare), to load again under a narrower host. */
+  #saved: Uint8Array | undefined;
+  #coreState: Uint8Array | undefined;
+
+  /** The saved settings loaded under the host, and put in force. */
+  #load(): void {
+    if (!this.layer) return;
+    this.loaded = this.layer.load(this.#saved, this.host, BigInt(this.now()), this.#coreState);
     if (this.loaded.warning) say.warn(`OpAMP: ${this.loaded.warning}`);
     this.current = this.loaded.current;
     this.effective = this.loaded.effective;
     this.controls.apply(this.loaded.settings);
-    this.uid = this.#identity(env);
     this.#refreshAfter(this.loaded.refreshAtUnixMs);
+  }
+
+  /**
+   * Before the client starts: this process carries out less than prepare declared (manage(): the
+   * sampler is the application's, and it loads no instrumentation). The settings loaded at start
+   * are loaded again under the narrower host, so an override of one it no longer declares is set
+   * aside, and a policy that overrides one is refused.
+   */
+  narrow(host: HostInit): void {
+    if (!this.layer) return;
+    this.host = host;
+    this.#load();
   }
 
   /** When the layer said to call Refresh next (wall clock, ms since the epoch; 0: never). */
@@ -2100,6 +2184,78 @@ export function register(
   // A register that fails (the SDK can't be built) leaves what appSettings reads as it was, the
   // saved values Load put in force taken back: an application that catches it runs unmanaged.
   return preparing(AGENT, appSettings, env, () => registered(env, logLevel), options);
+}
+
+/** The settings the package's own sampler carries out: not under manage(), where the sampler is the application's. */
+const SAMPLER_SETTINGS = ["sampling_rate", "sampling_rules", "sampling_traces_per_second",
+  "debug_until", "debug_sampling_rate", "debug_send_logs_level"];
+/** The instrumentation switches: only for the instrumentations register loads. */
+const INSTRUMENTATION_SETTINGS = ["deactivate_instrumentations", "deactivate_all_instrumentations"];
+
+/** What manage() carries out: every gate, the application's own settings; not the sampler or the switches. */
+export function managedHost(): HostInit {
+  const dropped = new Set([...SAMPLER_SETTINGS, ...INSTRUMENTATION_SETTINGS]);
+  return { live: (hostFromEnv().live ?? []).filter((k) => !dropped.has(k)) };
+}
+
+/** The provider behind the API's proxy for it (the global one as the application set it). */
+function delegate(provider: unknown): unknown {
+  const p = provider as { getDelegate?: () => unknown; _getDelegate?: () => unknown } | undefined;
+  return p?.getDelegate?.() ?? p?._getDelegate?.() ?? provider;
+}
+
+/** The resource a tracer provider of the SDK's was built with, if it has one. */
+function providerResource(provider: unknown): Resource | undefined {
+  const p = provider as { _resource?: Resource; _config?: { resource?: Resource }; resource?: Resource } | undefined;
+  return p?._resource ?? p?._config?.resource ?? p?.resource;
+}
+
+/**
+ * Put the SDK the application has already set up (its own NodeSDK or providers, or the Logfire
+ * SDK's `logfire.configure()`) under the server, as it is. Call it once, after that setup has
+ * started. The gates go in front of every exporter on the global providers, and what can't be
+ * gated is reported to the server, never refused. The sampler stays the application's and no
+ * instrumentation is loaded here, so the sampling controls, debug mode and the instrumentation
+ * switches are refused; `register` carries those out too. The instance is described by the tracer
+ * provider's resource, which keeps its own `service.instance.id`. The server is given as to
+ * `register` (`options`, then OTEL_OPAMP_*); without an endpoint it does nothing. `shutdown` says
+ * goodbye to the server: call it before the SDK's own shutdown.
+ */
+export function manage(options: Options = {}, env: NodeJS.ProcessEnv = process.env): { shutdown: () => Promise<void> } {
+  say.console = str(env, "OTEL_LOG_LEVEL") === undefined;
+  return preparing(AGENT, appSettings, env, () => managed(), options);
+}
+
+function managed(): { shutdown: () => Promise<void> } {
+  if (!AGENT.on) return { shutdown: () => Promise.resolve() };
+  const providers: Partial<Record<ApiSignal, unknown>> = {
+    traces: delegate(trace.getTracerProvider()),
+    metrics: delegate(metrics.getMeterProvider()),
+    logs: delegate(logs.getLoggerProvider()),
+  };
+  const resource = providerResource(providers.traces);
+  if (field(providers.traces, "_activeSpanProcessor") === undefined) {
+    say.warn("OpAMP: manage() found no OpenTelemetry SDK set up: call it after the application starts its "
+      + "SDK (or use register(), which sets one up)");
+  }
+  // The Logfire SDK's logs are spans: they go through the log controls.
+  AGENT.controls.logSpans = resource?.attributes["telemetry.sdk.name"] === "logfire";
+  AGENT.narrow(managedHost());
+  say.warn(`OpAMP: manage() keeps the application's own sampler and instrumentations, so ${
+    [...SAMPLER_SETTINGS, ...INSTRUMENTATION_SETTINGS].join(", ")} can't be carried out (register() sets up `
+    + "an SDK the server changes those in)");
+  // From now on, a provider the application registers in place of these is reported (ungoverned).
+  watchProviders(AGENT, () => undefined);
+  registry.sdk = providers;
+  AGENT.govern(providers);
+  AGENT.instrument([]);
+  AGENT.start(resource ?? defaultResource());
+  return { shutdown: () => AGENT.stop() };
+}
+
+/** `o[k]`, for an object; undefined otherwise. */
+function field(o: unknown, k: string): unknown {
+  return typeof o === "object" && o !== null ? (o as Record<string, unknown>)[k] : undefined;
 }
 
 /**

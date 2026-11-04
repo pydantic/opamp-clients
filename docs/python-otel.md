@@ -131,12 +131,58 @@ What it cannot carry out: the `instrumentations` control, because it instruments
 application names its instrumentors in code. A policy that overrides it is refused, like every
 other override above that a process cannot carry out.
 
+If the application has set its SDK up already (a `TracerProvider` set as the global one),
+`configure()` builds none: it puts that SDK under the server, as `manage()` below does, and warns
+(its other keyword arguments aren't used). A second SDK couldn't become the global one, and what
+the application sends would go past it.
+
+## An SDK set up already: `manage()`
+
+An application that sets its SDK up itself, as OpenTelemetry's own docs show, keeps that setup
+and adds one call after it:
+
+```python
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import pydantic_opamp_otel
+
+provider = TracerProvider(resource=Resource.create({"service.name": "checkout"}))
+provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+trace.set_tracer_provider(provider)  # the application's setup, as it was
+
+pydantic_opamp_otel.manage()  # the server from OTEL_OPAMP_*, or manage(endpoint=..., headers=...)
+```
+
+`manage()` takes the server as `configure()` does (`endpoint`, `headers`, `state_dir`,
+`heartbeat_interval`, else the `OTEL_OPAMP_*` variables); without an endpoint it does nothing. It
+works on whatever set the global providers up: the application's code, another distro's
+configurator, or `logfire.configure()` (whose logs then go through the log controls, as under
+`configure_logfire()`).
+
+- **Governed:** the gates go in front of every exporter on the global providers
+  ([what the policy governs](#what-the-policy-governs)), so `signal_exports`, the log controls,
+  the rate caps, redaction and scrubbing apply to what the application's own exporters send.
+- **Refused:** the sampler is the application's, so `head_sampling`, `sampling_rules`,
+  `trace_rate_limit` and `debug` are, with `instrumentations`. A policy that overrides one is
+  refused (FAILED, naming it), and a warning at start names them. `configure()`,
+  `configure_logfire()` or `opentelemetry-instrument` set up a sampler the server changes.
+- **Its resource:** the instance is described by the tracer provider's resource. The telemetry
+  keeps the application's own `service.instance.id`, which may differ from the OpAMP instance
+  UID.
+
+Call it once, after the application sets its tracer provider. With none set it warns and the SDK
+runs unmanaged.
+
 ## The Logfire SDK: `configure_logfire()`
 
 An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
-(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
+(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x). Until it is published, from a checkout
+as [above](#use-it): `pip install ./python/core ./python './python/otel[logfire]'`.
 
 ```python
 import logfire
