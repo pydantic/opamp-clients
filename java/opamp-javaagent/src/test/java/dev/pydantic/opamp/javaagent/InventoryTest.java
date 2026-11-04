@@ -219,6 +219,11 @@ class InventoryTest {
     inventory.outside("traces", List.of("Another"));
     assertEquals(List.of(before.get(0), SettingsProto.Exporter.newBuilder().setSignal("traces").setName("Another")
         .build()), inventory.listed());
+    // Regression: one listed as found carried its raw endpoint, credentials and all.
+    inventory.exporters("logs", List.of(SettingsProto.FoundExporter.newBuilder().setSignal("logs").setKind("Mine")
+        .setEndpoint("https://user:hunter2@col:4318/v1/logs?token=t").build()));
+    assertEquals("", inventory.listed().stream().filter(e -> e.getName().equals("Mine")).findFirst().orElseThrow()
+        .getDestination());
   }
 
   /** An inventory of the traces exporters autoconfigure builds under {@code props}. */

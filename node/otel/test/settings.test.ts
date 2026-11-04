@@ -273,6 +273,21 @@ test("a record every exporter gets is decided once for all of them: one budget f
   assert.equal(otlp.got.length, 1);
 });
 
+// Regression: the second exporter took the last repeat's rejection for every repeat of a record in
+// a batch, and spent tokens again on the rest, so the exporters received different records.
+test("repeats of a record in one batch are decided once each for every exporter", () => {
+  const c = new Controls();
+  c.clock = () => 0;
+  c.apply(settings({ log_rate_limit: { records_per_second: 4 } }));
+  const otlp = sink();
+  const console = sink();
+  const r = record("app", 9);
+  c.logs(otlp as never).export(Array(10).fill(r), () => {});
+  c.logs(console as never).export(Array(10).fill(r), () => {});
+  assert.deepEqual(otlp.got, [Array(4).fill(r)]);
+  assert.deepEqual(console.got, [Array(4).fill(r)]);
+});
+
 // --- drop_attributes and mask_attributes -------------------------------------------------------
 
 /** A vector's attribute, a key and one typed value. */
@@ -580,6 +595,18 @@ test("an error inside a gate fails the export and counts its items as failed", (
   assert.equal(out.got.length, 0);
   assert.deepEqual(results.map((r) => [r.code, r.error?.message]), [[1, "no attributes"]]);
   assert.deepEqual([c.counts.traces.exportsFailed, c.counts.traces.itemsFailed, c.counts.traces.lastError], [1, 2, "no attributes"]);
+});
+
+// Regression: an exporter that threw counted the whole batch failed, the records the gate had
+// filtered out included, so they were counted twice (filtered and failed).
+test("an exporter that throws counts as failed only the records handed to it", () => {
+  const c = new Controls();
+  c.apply(settings({ log_levels: { level: "warn" } }));
+  const throwing = { export: () => { throw new Error("down"); }, shutdown: async () => {} };
+  const results: ExportResult[] = [];
+  c.logs(throwing as never).export([record("app", 13), record("app", 9), record("app", 9)], (r) => results.push(r));
+  assert.deepEqual(results.map((r) => r.code), [1]);
+  assert.deepEqual([c.counts.logs.itemsFiltered, c.counts.logs.itemsFailed], [2, 1]);
 });
 
 test("scrubbing: the default patterns at their edges", () => {

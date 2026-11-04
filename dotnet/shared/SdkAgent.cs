@@ -592,9 +592,12 @@ internal sealed class SdkAgent
         }
     }
 
-    /// <summary>An exporter listed as it was found, when the layer can't name it: its kind and its own endpoint.</summary>
+    /// <summary>
+    /// An exporter listed as it was found, when the layer can't name it: its kind, and no destination
+    /// (its endpoint may hold credentials, which only the layer strips).
+    /// </summary>
     private static Exporter AsFound(FoundExporter f) =>
-        new() { Signal = f.Signal, Name = f.Kind, Gated = f.Gated, Destination = f.Endpoint };
+        new() { Signal = f.Signal, Name = f.Kind, Gated = f.Gated };
 
     /// <summary>The variables the layer reads to say where an exporter built from them sends.</summary>
     private static List<KeyValuePair<string, string>> ExporterVariables(Func<string, string?> getenv) =>

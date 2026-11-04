@@ -140,12 +140,12 @@ final class Inventory {
       // The SDK's own default; the agent sets http/protobuf, which autoconfigure then reads.
       d = layer.get().exporters(found, vars, "grpc");
     } catch (RuntimeException e) {
-      // Reporting only: the gates are in place, and the list stays as it was.
+      // Reporting only: the gates are in place, and the list stays as it was. One new since is
+      // listed as found, with no destination: only the layer strips an endpoint's credentials.
       LOG.log(Level.WARNING, "OpAMP: can't list the exporters; they are governed all the same", e);
       synchronized (this) {
         return found.stream().map(f -> listedAs.getOrDefault(f, SettingsProto.Exporter.newBuilder()
-            .setSignal(f.getSignal()).setName(f.getKind()).setGated(f.getGated()).setDestination(f.getEndpoint())
-            .build())).toList();
+            .setSignal(f.getSignal()).setName(f.getKind()).setGated(f.getGated()).build())).toList();
       }
     }
     synchronized (this) {

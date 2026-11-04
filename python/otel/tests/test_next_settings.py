@@ -287,6 +287,32 @@ def test_a_record_every_exporter_gets_is_decided_once_for_all_of_them():
     assert len(otlp.batches) == 1  # no tokens left: a second export of its own is capped
 
 
+def test_repeats_of_a_record_in_one_batch_are_decided_once_each_for_every_exporter():
+    # Regression: the second exporter took the last repeat's rejection for every repeat, and spent
+    # tokens again on the rest, so the exporters received different records.
+    c = controlled({"log_rate_limit": {"records_per_second": 4}}, clock=Clock())
+    otlp, console = Recording(), Recording()
+    to_otlp, to_console = c.logs(otlp), c.logs(console)  # held, as processors hold them: a gate is known by its id
+    r = record("app", 9)
+    to_otlp.export([r] * 10)
+    to_console.export([r] * 10)
+    assert otlp.batches == [[r] * 4] and console.batches == [[r] * 4]
+
+
+def test_a_decision_stays_until_the_record_is_gone_however_many_come_between():
+    # Regression: a slower exporter's records were decided again once 65,536 others had been
+    # decided, spending tokens twice and dropping what the first exporter sent.
+    c = controlled({"log_rate_limit": {"records_per_second": 1}}, clock=Clock())
+    slow, fast = Recording(), Recording()
+    to_slow, to_fast = c.logs(slow), c.logs(fast)
+    first = record("app", 9)
+    to_fast.export([first])
+    for _ in range(70_000):
+        to_fast.export([record("app", 9)])
+    to_slow.export([first])
+    assert slow.batches == [[first]]
+
+
 def test_the_log_cap_refills_on_the_monotonic_clock():
     clock = Clock(10**12)
     c = controlled({"log_rate_limit": {"records_per_second": 4}}, clock=clock)

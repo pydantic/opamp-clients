@@ -405,8 +405,11 @@ final class Controls {
       }
     }
 
-    /** Whether a record goes on, and the gates that have seen it. */
-    private record Decision(boolean admitted, java.util.Set<Object> seen) {}
+    /**
+     * Whether each repeat of a record goes on (alike records in one batch, in order), and the gates
+     * that have seen it.
+     */
+    private record Decision(java.util.List<Boolean> admitted, java.util.Set<Object> seen) {}
 
     /** Number of known decisions, for tests. */
     synchronized int size() {
@@ -414,9 +417,9 @@ final class Controls {
     }
 
     /**
-     * The records of {@code records} {@code gate} sends on: each reuses another gate's decision, or
-     * is decided now, the first of those {@code take} (a count of records to the tokens granted)
-     * has tokens for going on.
+     * The records of {@code records} {@code gate} sends on: each reuses another gate's decision
+     * (the n-th repeat of a record in the batch the n-th decided), or is decided now, the first of
+     * those {@code take} (a count of records to the tokens granted) has tokens for going on.
      */
     synchronized List<LogRecordData> admitted(List<LogRecordData> records, Object gate,
         java.util.function.LongUnaryOperator take) {
@@ -425,28 +428,46 @@ final class Controls {
         return records.subList(0, (int) take.applyAsLong(records.size()));
       }
       List<Key> keys = records.stream().map(Key::of).toList();
+      // Which repeat of its record each one is, and whether it reuses another gate's decision.
+      java.util.Map<Key, Integer> repeats = new java.util.HashMap<>();
+      int[] repeat = new int[keys.size()];
       boolean[] fresh = new boolean[keys.size()];
       int asked = 0;
       for (int i = 0; i < fresh.length; i++) {
+        repeat[i] = repeats.merge(keys.get(i), 1, Integer::sum) - 1;
         Decision d = decided.get(keys.get(i));
-        fresh[i] = d == null || d.seen().contains(gate);
+        fresh[i] = d == null || d.seen().contains(gate) || repeat[i] >= d.admitted().size();
         asked += fresh[i] ? 1 : 0;
       }
       long tokens = asked == 0 ? 0 : take.applyAsLong(asked);
+      java.util.Map<Key, Decision> now = new java.util.HashMap<>();
       List<LogRecordData> out = new java.util.ArrayList<>();
       for (int i = 0; i < fresh.length; i++) {
         Key k = keys.get(i);
-        Decision d = fresh[i] ? null : decided.get(k);
-        if (d == null) {
-          d = new Decision(tokens-- > 0, java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
-          decided.put(k, d);
+        Decision d = now.computeIfAbsent(k, key -> {
+          Decision had = decided.get(key);
+          return had != null && !had.seen().contains(gate) ? had
+              : new Decision(new java.util.ArrayList<>(),
+                  java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>()));
+        });
+        boolean admitted;
+        if (fresh[i]) {
+          admitted = tokens-- > 0;
+          d.admitted().add(admitted); // a new record's, or a repeat beyond those another gate decided
+        } else {
+          admitted = d.admitted().get(repeat[i]);
         }
+        if (admitted) {
+          out.add(records.get(i));
+        }
+      }
+      for (var e : now.entrySet()) {
+        Decision d = e.getValue();
         d.seen().add(gate);
         if (d.seen().size() >= n) {
-          decided.remove(k); // every gate has it
-        }
-        if (d.admitted()) {
-          out.add(records.get(i));
+          decided.remove(e.getKey()); // every gate has it
+        } else {
+          decided.put(e.getKey(), d);
         }
       }
       return out;
