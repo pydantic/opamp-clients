@@ -72,7 +72,10 @@ echo "$ENROLLMENT_TOKEN" | sudo pydantic-opamp-enroll --endpoint wss://opamp.exa
   `storage.state_key: systemd-creds` and `agent.automatic_config_rollback` (a remote config the
   Collector fails on is replaced by the last one that ran healthy, and stays FAILED), and
   `agent.collector_crash_log_snippet_kib: 4` (the FAILED status carries the end of the Collector's
-  log, so the server can show why), and limits what the server's remote config may do (see
+  log, so the server can show why), and `agent.args: [--feature-gates=telemetry.newPipelineTelemetry]`
+  (the Collector counts the items each receiver, processor and exporter takes in and passes on, as
+  `otelcol.*.consumed.items` and `otelcol.*.produced.items`; see
+  [Pipeline item counts](#pipeline-item-counts)), and limits what the server's remote config may do (see
   [What the server can do to this host](#what-the-server-can-do-to-this-host)).
 - **Starts the service and waits for it to connect.** It enables and starts
   `pydantic-opamp-supervisor.service`, then waits up to 30 seconds for the Supervisor to connect
@@ -354,6 +357,25 @@ both (`PUSH=1`, pushed as `IMAGE`):
 VERSION=0.1.0 GOOS=linux GOARCH=amd64 go/opampsupervisor/packaging/archive.sh
 VERSION=0.1.0 ARCHES=amd64 go/opampsupervisor/packaging/container/build.sh
 ```
+
+## Pipeline item counts
+
+Every packaged config starts the Collector with `--feature-gates=telemetry.newPipelineTelemetry`
+(`agent.args`). With it, the Collector's own metrics count the items each component takes in and
+passes on, per pipeline, as `otelcol.receiver.produced.items`, `otelcol.processor.consumed.items`,
+`otelcol.processor.produced.items` and `otelcol.exporter.consumed.items`. The scope attributes
+`otelcol.component.id`, `otelcol.signal` and `otelcol.pipeline.id` name the component. This covers
+processors that report no counts of their own, such as `batch`. The byte counts
+(`otelcol.*.consumed.size`, `otelcol.*.produced.size`) need `service::telemetry::metrics::level: detailed`.
+
+Feature gates can only be set on the Collector's command line, so a remote config can't turn this
+on or off. To turn it off, remove the `args` line from `supervisor.yaml` and restart the service.
+
+The gate is alpha upstream. A config that reads the Collector's own metrics with a Prometheus
+reader, including the default one on `localhost:8888` when `service::telemetry::metrics` names no
+readers, fails every scrape when a processor or exporter is in more than one pipeline: Prometheus
+labels don't carry the scope attributes, so the series collide. OTLP readers, which Logfire's
+policies use, are not affected.
 
 ## What the server can do to this host
 

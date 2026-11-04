@@ -274,6 +274,7 @@ func TestEnrollBindsTheExporterCredential(t *testing.T) {
 	assert.True(t, loaded.Capabilities.ReportsOwnLogs)
 	// A remote config the Collector fails on doesn't leave the host collecting nothing.
 	assert.True(t, loaded.Agent.AutomaticConfigRollback)
+	assert.Equal(t, []string{"--feature-gates=telemetry.newPipelineTelemetry"}, loaded.Agent.Arguments)
 	out, err = newEnrollment(t).run(t, "bootstrap-token", "--endpoint", "wss://opamp.example.com/v1/opamp", "--instance-id", "f0cff0a3-08e5-4c49-96ce-1366b14525ed")
 	require.Error(t, err, "enrollment no longer takes an instance UID")
 	assert.NotContains(t, out, "bootstrap-token")
