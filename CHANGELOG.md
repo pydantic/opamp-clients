@@ -43,10 +43,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Supervisor installers (Linux, macOS, Windows, container image): the Supervisor declares
-  ReportsOwnMetrics and ReportsOwnLogs, so a server's `own_metrics` and `own_logs` offers send the
-  Collector's own metrics and logs where it says. A host enrolled before keeps its config until
-  the enroll script runs again.
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
@@ -61,10 +57,6 @@ and date. Tests, CI and docs alone don't need a line.
   It could stay open (no reader, no close) until the garbage collector finalized it (#112).
 - .NET, core mode: no download file is made or written after stop returns. A file's write that
   started late on a busy machine (after stop had stopped waiting for it) could still make it (#112).
-- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
-  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
-  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
-  from starting, and enrolling only said it hadn't reported its status (#111).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
   A WebSocket connection given up after the server said nothing for two heartbeat intervals now
   says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the
@@ -131,6 +123,32 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.9.0 (2026-11-04)
+
+`go/opampsupervisor/v0.9.0`, on core 0.14.0. The Go modules are not released with it.
+
+### Changed
+
+- Supervisor installers (Linux, macOS, Windows, container image): the Supervisor declares
+  ReportsOwnMetrics and ReportsOwnLogs, so a server's `own_metrics` and `own_logs` offers send the
+  Collector's own metrics and logs where it says. A host enrolled before keeps its config until
+  the enroll script runs again (#116).
+- Supervisor: forked from contrib v0.164.1, was v0.163.0; takes upstream's
+  `agent::stop_grace_period` (#105).
+
+### Fixed
+
+- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
+  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
+  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
+  from starting, and enrolling only said it hadn't reported its status (#111).
+- Supervisor: on core 0.14.0 (was 0.12.0). Over WebSocket, a connection the server has said
+  nothing on for two heartbeat intervals is given up (saying goodbye first) and made again, so a
+  host behind a proxy that lost its upstream no longer stays on a dead link for hours (#104, #106).
+
+The core and contrib entries in **Unreleased** stay there because they also apply to packages
+that have not had a release with them.
 
 ## SDKs 0.1.1 (2026-11-04)
 
