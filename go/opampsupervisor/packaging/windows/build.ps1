@@ -1,8 +1,8 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 #
-# Builds the Windows installer into packaging\dist, on Windows: the bundled collector (ocb,
-# ..\collector.yaml), the Supervisor, then an .msi (pydantic-opamp-supervisor.wxs, WiX 5):
+# Builds the Windows installer into packaging\dist, on Windows: the bundled collector (upstream's
+# otelcol-contrib, pinned in ..\contrib.json), the Supervisor, then an .msi (pydantic-opamp-supervisor.wxs, WiX 5):
 #   go\opampsupervisor\packaging\windows\build.ps1 -Version 0.1.0
 # The MSI version is numbers only (major.minor.build). With -CertificateThumbprint, signtool
 # signs both executables and the .msi with that certificate from the machine's store.
@@ -26,8 +26,10 @@ function Sign([string[]]$paths) {
 
 Push-Location (Split-Path -Parent $packaging)
 try {
-    go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config packaging/collector.yaml
-    Copy-Item packaging\dist\otelcol\otelcol.exe (Join-Path $bin 'otelcol.exe') -Force
+    # The fetcher runs on this machine, whatever GOARCH the packages are for.
+    $env:GOOS = ''; $env:GOARCH = ''
+    go run ./internal/fetchcontrib -os windows -arch $Arch -out (Join-Path $bin 'otelcol.exe')
+    $env:GOOS = 'windows'; $env:GOARCH = $Arch
     go build -trimpath -o (Join-Path $bin 'opampsupervisor.exe') .
 } finally {
     Pop-Location

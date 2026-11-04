@@ -2,8 +2,8 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 #
-# Builds the macOS package into packaging/dist, on a Mac: the bundled collector (ocb,
-# ../collector.yaml), the Supervisor, then a .pkg installing them under /opt/pydantic-opamp with
+# Builds the macOS package into packaging/dist, on a Mac: the bundled collector (upstream's
+# otelcol-contrib, pinned in ../contrib.json), the Supervisor, then a .pkg installing them under /opt/pydantic-opamp with
 # a LaunchDaemon. Run from anywhere:
 #   VERSION=0.1.0 ARCH=arm64 go/opampsupervisor/packaging/macos/build.sh
 # ARCH is a Go architecture (arm64 or amd64). Signing is optional: CODESIGN_IDENTITY (a
@@ -20,7 +20,7 @@ rm -rf "$stage"
 bin=$stage/root/opt/pydantic-opamp/bin
 doc=$stage/root/opt/pydantic-opamp/share/doc
 mkdir -p "$bin" "$doc" "$stage/root/Library/LaunchDaemons"
-(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config packaging/collector.yaml)
+(cd .. && GOOS= GOARCH= go run ./internal/fetchcontrib -os darwin -arch "$ARCH" -out packaging/dist/otelcol/otelcol)
 cp dist/otelcol/otelcol "$bin/otelcol"
 (cd .. && go build -trimpath -o "packaging/$bin/opampsupervisor" .)
 install -m 0755 macos/pydantic-opamp-enroll pydantic-opamp-uninstall "$bin/"

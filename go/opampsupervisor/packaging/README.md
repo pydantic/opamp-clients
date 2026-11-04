@@ -28,8 +28,8 @@ code signing. `SHA256SUMS` covers the archives. `SHA256SUMS.installers` covers t
 OpAMP:
 
 - the Supervisor (this fork);
-- a collector for it to run, built with ocb from [collector.yaml](collector.yaml), with this
-  repository's opamp extension;
+- a collector for it to run: upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`),
+  unchanged, at `/usr/lib/pydantic-opamp/otelcol` (see [The bundled Collector](#the-bundled-collector));
 - a systemd unit;
 - `pydantic-opamp-enroll`.
 
@@ -204,12 +204,25 @@ REPO_BUCKET=gs://pydantic-opamp-packages REPO_URL=https://packages.pydantic.dev 
 
 Nothing runs it yet: no repository is hosted, and there is no signing key.
 
+### The bundled Collector
+
+Every package (deb, rpm, `.pkg`, `.msi`, the release archives and the container image) carries
+upstream's [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases)
+release as it is: every component contrib has works in a config the server sends, and the
+Supervisor configures it with contrib's own `opamp` extension. [contrib.json](contrib.json) pins
+the release and each platform's archive by SHA-256; `go run ./internal/fetchcontrib` (from
+`go/opampsupervisor`) downloads one, refuses it unless the hash matches, and extracts
+`otelcol-contrib`, installed as `otelcol`. To move to a new contrib release, set its version and
+the six hashes from the release's `.sha256` files, after checking each archive's
+`.sigstore.json` (signed by the open-telemetry/opentelemetry-collector-releases workflows) with
+`cosign verify-blob`.
+
 ### Releases
 
 [archive.sh](archive.sh) builds one release archive into `packaging/dist/`: `opampsupervisor` and
-`otelcol` (built with ocb from [collector.yaml](collector.yaml)), the licenses and a README, as a
-`.tar.gz` for Linux and macOS and a `.zip` for Windows. Both binaries are cross-built without cgo,
-so any machine builds every target:
+`otelcol` (upstream's `otelcol-contrib`), the licenses and a README, as a `.tar.gz` for Linux and
+macOS and a `.zip` for Windows. The Supervisor is cross-built without cgo and the collector is
+downloaded, so any machine builds every target:
 
 ```sh
 VERSION=0.1.0 GOOS=darwin GOARCH=arm64 go/opampsupervisor/packaging/archive.sh
