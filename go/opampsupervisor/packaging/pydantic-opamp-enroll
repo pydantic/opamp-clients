@@ -75,8 +75,8 @@ yaml_list() {
 
 # migrate_options writes the options of an enrollment by a package older than --refresh, which
 # kept none, from its config: only one this script wrote without --restricted, where the endpoint,
-# --plaintext and --accept-packages are all it could say. The old config is kept beside it, as
-# supervisor.yaml.old. A --restricted policy may have been widened or narrowed by hand: it stays.
+# --plaintext and --accept-packages are all it could say. It replaces the old config only if
+# every setting in it is in the new one (keep_or_replace). A --restricted policy may have been widened or narrowed by hand: it stays.
 migrate_options() {
 	head -n 1 "$etc/supervisor.yaml" | grep -qx '# Written by pydantic-opamp-enroll.*' || return 1
 	! grep -q '^  remote_config_policy:' "$etc/supervisor.yaml" || return 1
@@ -88,11 +88,24 @@ migrate_options() {
 		ws://* | http://*) printf -- '--plaintext\n' ;;
 		esac
 		! grep -qx '  accepts_packages: true' "$etc/supervisor.yaml" || printf -- '--accept-packages\n'
-	} >"$options.tmp"
-	chmod 0600 "$options.tmp"
-	cp -p "$etc/supervisor.yaml" "$etc/supervisor.yaml.old"
-	mv -f "$options.tmp" "$options"
-	echo "pydantic-opamp-enroll: rewriting the config an older package wrote; the old one is kept as $etc/supervisor.yaml.old" >&2
+	} >"$migrated"
+	chmod 0600 "$migrated"
+}
+
+# keep_legacy keeps a config an older package wrote, and starts the Supervisor again with it.
+keep_legacy() {
+	rm -f "$migrated" "$etc/supervisor.yaml.tmp" "$etc/settings.tmp"
+	echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
+	"$systemctl" disable --now pydantic-otelcol.service
+	"$systemctl" enable "$unit"
+	"$systemctl" restart "$unit"
+	echo "restarted the Supervisor ($unit)"
+	exit 0
+}
+
+# settings prints a config's settings: its lines but comments and blank ones, sorted.
+settings() {
+	grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$1" | LC_ALL=C sort -u
 }
 
 root=${OPAMP_ENROLL_ROOT:-}
@@ -105,6 +118,9 @@ unit=pydantic-opamp-supervisor.service
 # The last enrollment's options (one a line, no credentials) and its config's SHA-256, for --refresh.
 options=$etc/enroll.options
 written=$etc/supervisor.yaml.sha256
+# An older package's enrollment options, read from its config until the new one replaces it.
+migrated=$etc/enroll.options.migrated
+saved_options=$options
 
 endpoint=
 exporter_endpoints=
@@ -125,19 +141,13 @@ if [ "${1:-}" = --refresh ]; then
 	[ -f "$etc/supervisor.yaml" ] || fail "this host isn't enrolled: run pydantic-opamp-enroll --endpoint URL first"
 	refresh=yes
 	if [ ! -f "$options" ]; then
-		migrate_options || {
-			echo "pydantic-opamp-enroll: $etc/supervisor.yaml was written by an older package with --restricted, or edited, and is kept; run pydantic-opamp-enroll again with its options to add this version's settings" >&2
-			"$systemctl" disable --now pydantic-otelcol.service
-			"$systemctl" enable "$unit"
-			"$systemctl" restart "$unit"
-			echo "restarted the Supervisor ($unit)"
-			exit 0
-		}
+		migrate_options || keep_legacy
+		saved_options=$migrated
 	fi
 	set --
 	while IFS= read -r line; do
 		set -- "$@" "$line"
-	done <"$options"
+	done <"$saved_options"
 fi
 while [ $# -gt 0 ]; do
 	# The options --refresh can use again: everything but where the credentials come from.
@@ -405,6 +415,15 @@ storage:
   # The issued credentials, encrypted with the key systemd decrypts from state-key.cred.
   state_key: systemd-creds
 EOF
+# A config an older package wrote is replaced only if the new one has every setting it had: one
+# edited by hand (another executable, storage directory or header) is kept.
+if [ "$saved_options" = "$migrated" ]; then
+	settings "$etc/supervisor.yaml.tmp" >"$etc/settings.tmp"
+	[ -z "$(settings "$etc/supervisor.yaml" | LC_ALL=C comm -23 - "$etc/settings.tmp")" ] || keep_legacy
+	rm -f "$etc/settings.tmp" "$migrated"
+	cp -p "$etc/supervisor.yaml" "$etc/supervisor.yaml.old"
+	echo "pydantic-opamp-enroll: rewriting the config an older package wrote; the old one is kept as $etc/supervisor.yaml.old" >&2
+fi
 if [ -z "$edited" ]; then
 	chmod 0640 "$etc/supervisor.yaml.tmp"
 	mv -f "$etc/supervisor.yaml.tmp" "$etc/supervisor.yaml"

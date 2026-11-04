@@ -555,15 +555,38 @@ func TestEnrollRefreshWithoutOptions(t *testing.T) {
 	assert.Equal(t, "--endpoint\nws://opamp.example.com/v1/opamp\n--plaintext\n--accept-packages\n", e.read(t, "enroll.options"))
 	assertPackages(t, e.loadEnrolled(t), true, "otelcol")
 
-	// A --restricted policy may have been changed by hand: it stays, and the service starts again.
-	e, cfg = older(t, "--restricted")
-	out, err = e.run(t, "", "--refresh")
-	require.NoError(t, err, out)
-	assert.Contains(t, out, "with --restricted, or edited, and is kept")
-	assert.Equal(t, cfg, e.read(t, "supervisor.yaml"))
-	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
-	require.NoError(t, err)
-	assert.Contains(t, string(log), "restart pydantic-opamp-supervisor.service")
+	// A --restricted policy may have been changed by hand, and so may any setting the new config
+	// wouldn't keep: it stays, with no options saved, and the service starts again.
+	for name, edit := range map[string]func(string) string{
+		"restricted": func(cfg string) string { return cfg },
+		"storage directory edited": func(cfg string) string {
+			return strings.Replace(cfg, "  directory: /var/lib/pydantic-opamp\n", "  directory: /data/opamp\n", 1)
+		},
+		"header added": func(cfg string) string {
+			return strings.Replace(cfg, "  headers:\n", "  headers:\n    X-Team: infra\n", 1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := []string{}
+			if name == "restricted" {
+				args = append(args, "--restricted")
+			}
+			e, cfg := older(t, args...)
+			cfg = edit(cfg)
+			require.NoError(t, os.WriteFile(filepath.Join(e.root, "etc/pydantic-opamp/supervisor.yaml"), []byte(cfg), 0o640))
+			out, err := e.run(t, "", "--refresh")
+			require.NoError(t, err, out)
+			assert.Contains(t, out, "with --restricted, or edited, and is kept")
+			assert.Equal(t, cfg, e.read(t, "supervisor.yaml"))
+			for _, name := range []string{"enroll.options", "enroll.options.migrated", "supervisor.yaml.old", "supervisor.yaml.tmp", "settings.tmp"} {
+				_, err := os.Stat(filepath.Join(e.root, "etc/pydantic-opamp", name))
+				assert.ErrorIs(t, err, os.ErrNotExist, name)
+			}
+			log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+			require.NoError(t, err)
+			assert.Contains(t, string(log), "restart pydantic-opamp-supervisor.service")
+		})
+	}
 }
 
 // After a package upgrade, the collector this host ran starts again: the Supervisor, refreshed,
@@ -599,4 +622,5 @@ func TestAfterUpgrade(t *testing.T) {
 	unmanaged := "enable pydantic-otelcol.service\nrestart pydantic-otelcol.service\n"
 	assert.Equal(t, unmanaged, run(t, "otelcol.yaml"))
 	assert.Equal(t, unmanaged, run(t, "supervisor.yaml", "otelcol.yaml"))
+	assert.Empty(t, run(t, "supervisor.yaml", "otelcol.yaml", "otelcol.no-start"), "configured with --no-start: nothing starts")
 }

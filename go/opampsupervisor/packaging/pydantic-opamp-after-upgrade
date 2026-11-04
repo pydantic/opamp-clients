@@ -10,7 +10,7 @@
 #   version's settings (a config edited by hand is kept) and restarts it, unless it was enrolled
 #   with --no-start;
 # - unmanaged (pydantic-otelcol-configure ran after the last enrollment): pydantic-otelcol.service
-#   is enabled and restarted.
+#   is enabled and restarted, unless it was configured with --no-start.
 #
 # Packages up to 0.9.0 stopped and disabled both services on an upgrade, so whether one was
 # enabled says nothing here: which config is newest says which one this host runs.
@@ -27,6 +27,9 @@ if [ -z "$root" ] && [ ! -d /run/systemd/system ]; then
 	exit 0
 fi
 if [ -f "$etc/otelcol.yaml" ] && { [ ! -f "$etc/supervisor.yaml" ] || [ "$etc/otelcol.yaml" -nt "$etc/supervisor.yaml" ]; }; then
+	if [ -f "$etc/otelcol.no-start" ]; then
+		exit 0
+	fi
 	"$systemctl" enable pydantic-otelcol.service
 	"$systemctl" restart pydantic-otelcol.service || echo "pydantic-opamp-after-upgrade: pydantic-otelcol.service didn't start; check it with: journalctl -u pydantic-otelcol.service" >&2
 elif [ -f "$etc/supervisor.yaml" ]; then

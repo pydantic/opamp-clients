@@ -543,14 +543,17 @@ keeps its enrollment, its issued credentials and its instance UID, and needs no 
   Supervisor again, unless it was enrolled with `--no-start`. On Linux, the deb's postinst runs
   it, and the rpm's posttrans does, through `pydantic-opamp-after-upgrade`. A host running the
   unmanaged collector (`pydantic-otelcol-configure` ran after the last enrollment) gets that
-  service started again instead.
+  service started again instead, unless it was configured with `--no-start`.
 - A config edited since the script wrote it is kept as it is, and the script says so. Run the
   enroll script again with its options to write it anew.
 - A host enrolled by a package up to 0.9.0 has no `enroll.options`. Without `--restricted`, its
   config holds all its options (the endpoint, the CA file, `--plaintext`, `--accept-packages`), so
-  they're saved and the config is written again, with the old one kept as `supervisor.yaml.old`. A
-  `--restricted` config may have been widened or narrowed by hand, so it stays. Run the enroll
-  script again with its options to add the new settings.
+  they're read from it, and the config is written again only if the new one has every setting
+  the old one had (its lines but comments), with the old one kept as `supervisor.yaml.old`. One
+  edited by hand (another executable, storage directory or header) stays, and so does a
+  `--restricted` config, which may have been widened or narrowed by hand. Run the enroll script
+  again with its options to add the new settings. Those packages kept no `--no-start` choice,
+  so this upgrade starts the service.
 
 Packages up to 0.9.0 stopped and disabled the Linux services during an upgrade, and a Windows
 upgrade left the service stopped and set to start on demand. These packages start them again,

@@ -239,6 +239,23 @@ func TestMacEnrollRefresh(t *testing.T) {
 	}
 	assert.Equal(t, older, read("supervisor.yaml.old"))
 
+	// An older package's config with a setting the new one wouldn't keep stays as it is.
+	handEdited := strings.Replace(older, "  headers:\n", "  headers:\n    X-Team: infra\n", 1)
+	require.NotEqual(t, older, handEdited)
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(handEdited), 0o600))
+	require.NoError(t, os.Remove(filepath.Join(etc, "enroll.options")))
+	require.NoError(t, os.Remove(filepath.Join(etc, "supervisor.yaml.sha256")))
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "with --restricted, or edited, and is kept")
+	assert.Equal(t, handEdited, read("supervisor.yaml"))
+	_, err = os.Stat(filepath.Join(etc, "enroll.options"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(enrolled), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml.sha256"), []byte(sha256Hex(enrolled)+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "enroll.options"),
+		[]byte("--endpoint\nwss://opamp.example.com/v1/opamp\n--ca-file\n"+ca+"\n--accept-packages\n"), 0o600))
+
 	edited := enrolled + "# by hand\n"
 	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(edited), 0o600))
 	out, err = macEnroll(t, root, tools, "", "--refresh")

@@ -249,6 +249,25 @@ func TestWinEnrollRefresh(t *testing.T) {
 	assert.Contains(t, out, "edited since it was written and is kept")
 	assert.Equal(t, edited, read("supervisor.yaml"))
 
+	// An older package's config, with no options or checksum: written again only if the new one
+	// keeps every setting it had. (The runner has no service to start, so the restart fails.)
+	require.NoError(t, os.Remove(filepath.Join(root, "enroll.options")))
+	require.NoError(t, os.Remove(filepath.Join(root, "supervisor.yaml.sha256")))
+	handEdited := regexp.MustCompile(`  headers:(\r?\n)`).ReplaceAllString(older, "  headers:${1}    X-Team: infra${1}")
+	require.NotEqual(t, older, handEdited)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(handEdited), 0o600))
+	out, _ = winEnroll(t, root, "", "-Refresh")
+	assert.Contains(t, out, "or edited, and is kept")
+	assert.Equal(t, handEdited, read("supervisor.yaml"))
+	_, err = os.Stat(filepath.Join(root, "enroll.options"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+
+	require.NoError(t, os.WriteFile(filepath.Join(root, "supervisor.yaml"), []byte(older), 0o600))
+	out, _ = winEnroll(t, root, "", "-Refresh")
+	assert.Contains(t, out, "the old one is kept as")
+	assert.Equal(t, older, read("supervisor.yaml.old"))
+	assert.Contains(t, read("supervisor.yaml"), "reports_own_logs: true")
+
 	out, err = winEnroll(t, root, "", "-Refresh", "-Plaintext")
 	require.Error(t, err, out)
 	assert.Contains(t, out, "takes no other options")

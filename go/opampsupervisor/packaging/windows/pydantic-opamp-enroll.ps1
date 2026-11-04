@@ -79,7 +79,19 @@ function Restart-Supervisor {
     Restart-Service -Name $service
 }
 
+# Keep a config an older package wrote, and start the Supervisor again with it.
+function Keep-Legacy([string]$config) {
+    Note "$config was written by an older package with -Restricted, or edited, and is kept; run pydantic-opamp-enroll.ps1 again with its options to add this version's settings"
+    Restart-Supervisor
+    Write-Output "restarted the Supervisor ($service)"
+    exit 0
+}
+
+# A config's settings: its lines but comments and blank ones.
+function Get-Settings([string[]]$lines) { @($lines | Where-Object { $_ -notmatch '^\s*(#|$)' }) }
+
 $edited = $false
+$legacy = $null
 if ($Refresh) {
     if ($Endpoint -or $TokenFile -or $TelemetryTokenStdin -or $CaFile -or $Plaintext -or $Restricted -or $ExporterEndpoint -or
         $LogPath -or $HostLogs -or $AcceptPackages -or $NoStart) {
@@ -95,23 +107,19 @@ if ($Refresh) {
     if (-not (Test-Path -LiteralPath $optionsPath -PathType Leaf)) {
         # Enrolled by a package older than -Refresh, which kept no options: only a config this
         # script wrote without -Restricted says them all (its endpoint, CA file, and packages). A
-        # -Restricted policy may have been widened or narrowed by hand: it stays.
-        $old = Get-Content -LiteralPath $config
-        $oldEndpoint = $old | ForEach-Object { if ($_ -match '^  endpoint: "(.*)"$') { $Matches[1] } } | Select-Object -First 1
-        if (-not ($old[0] -like '# Written by pydantic-opamp-enroll*') -or ($old -contains '  remote_config_policy:') -or -not $oldEndpoint) {
-            Note "$config was written by an older package with -Restricted, or edited, and is kept; run pydantic-opamp-enroll.ps1 again with its options to add this version's settings"
-            Restart-Supervisor
-            Write-Output "restarted the Supervisor ($service)"
-            exit 0
+        # -Restricted policy may have been widened or narrowed by hand: it stays. The new config
+        # replaces it only if it has every setting the old one had (below).
+        $legacy = @(Get-Content -LiteralPath $config)
+        $oldEndpoint = $legacy | ForEach-Object { if ($_ -match '^  endpoint: "(.*)"$') { $Matches[1] } } | Select-Object -First 1
+        if (-not ($legacy[0] -like '# Written by pydantic-opamp-enroll*') -or ($legacy -contains '  remote_config_policy:') -or -not $oldEndpoint) {
+            Keep-Legacy $config
         }
-        $oldCa = $old | ForEach-Object { if ($_ -match "^    ca_file: '(.*)'$") { $Matches[1] } } | Select-Object -First 1
-        $migrated = [ordered]@{ Endpoint = $oldEndpoint; CaFile = $oldCa; Plaintext = ($oldEndpoint -match '^(ws|http)://');
-            AcceptPackages = ($old -contains '  accepts_packages: true') }
-        Copy-Item -LiteralPath $config -Destination "$config.old" -Force
-        [System.IO.File]::WriteAllText($optionsPath, ($migrated | ConvertTo-Json), (New-Object System.Text.UTF8Encoding($false)))
-        Note "rewriting the config an older package wrote; the old one is kept as $config.old"
+        $oldCa = $legacy | ForEach-Object { if ($_ -match "^    ca_file: '(.*)'$") { $Matches[1] } } | Select-Object -First 1
+        $saved = [pscustomobject]@{ Endpoint = $oldEndpoint; CaFile = $oldCa; Plaintext = ($oldEndpoint -match '^(ws|http)://');
+            AcceptPackages = ($legacy -contains '  accepts_packages: true') }
+    } else {
+        $saved = Get-Content -LiteralPath $optionsPath -Raw | ConvertFrom-Json
     }
-    $saved = Get-Content -LiteralPath $optionsPath -Raw | ConvertFrom-Json
     $Endpoint = $saved.Endpoint
     if ($saved.CaFile) { $CaFile = $saved.CaFile }
     $Plaintext = [bool]$saved.Plaintext
@@ -314,6 +322,13 @@ storage:
   # The issued credentials, sealed with a key DPAPI protects for SYSTEM.
   state_key: dpapi
 "@
+if ($legacy) {
+    # One edited by hand (another executable, storage directory or header) is kept.
+    $new = Get-Settings ($rendered -split "\r?\n")
+    if (@(Get-Settings $legacy | Where-Object { $new -cnotcontains $_ }).Count -gt 0) { Keep-Legacy $config }
+    Copy-Item -LiteralPath $config -Destination "$config.old" -Force
+    Note "rewriting the config an older package wrote; the old one is kept as $config.old"
+}
 if (-not $edited) {
     $configPath = Join-Path $root 'supervisor.yaml'
     Write-Atomically $configPath $rendered
