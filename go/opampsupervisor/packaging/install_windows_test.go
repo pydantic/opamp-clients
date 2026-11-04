@@ -20,6 +20,7 @@ import (
 	"time"
 	"unicode/utf16"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/windows"
 )
@@ -137,4 +138,24 @@ Get-ChildItem -Recurse -File -Filter *.log '` + programData + `' -ErrorAction Si
 		return fmt.Sprintf("%s\n(diagnose: %v)", out, err)
 	}
 	return string(out)
+}
+
+// enrolledConfigDir is where the enroll script writes the config.
+var enrolledConfigDir = programData
+
+// enrollStarted enrolls and starts the service, as an install does.
+func enrollStarted(t *testing.T, endpoint string) {
+	t.Helper()
+	script := filepath.Join(os.Getenv("ProgramFiles"), "pydantic-opamp", "pydantic-opamp-enroll.ps1")
+	run(t, "enroll-token\n", "powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script,
+		"-Endpoint", endpoint, "-Plaintext")
+}
+
+// assertStartsAtBoot checks the service is running and set to start automatically.
+func assertStartsAtBoot(t *testing.T) {
+	t.Helper()
+	out, err := timed(t, "", "powershell", "-NoProfile", "-NonInteractive", "-Command",
+		"$s = Get-Service "+service+"; \"$($s.StartType) $($s.Status)\"")
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "Automatic Running", strings.TrimSpace(string(out)))
 }

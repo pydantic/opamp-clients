@@ -22,7 +22,11 @@ func writeStatusFile(t *testing.T, dir string, st supervisor.Status) {
 	t.Helper()
 	b, err := json.Marshal(st)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, supervisor.StatusFile), b, 0o600))
+	// Replaced whole, as the Supervisor does: a status command reading while a test writes from
+	// another goroutine must never see half a file.
+	tmp := filepath.Join(dir, supervisor.StatusFile+".tmp")
+	require.NoError(t, os.WriteFile(tmp, b, 0o600))
+	require.NoError(t, os.Rename(tmp, filepath.Join(dir, supervisor.StatusFile)))
 }
 
 // `status` reads the status file of the storage directory the config names: 0 when all is

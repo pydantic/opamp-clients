@@ -51,6 +51,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
+  running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
+  `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
+  `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows). It writes the config again with this
+  version's settings, such as the Collector's own logs, and the last enrollment's options, keeping
+  the issued credentials, and starts the Supervisor again. A config edited by hand is kept, and so
+  is a `--restricted` one written by 0.9.0 or earlier.
 - Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
   `own_traces` offers) are in the current declarative config format, so the Collector no longer
   warns on every start that they use the deprecated v0.2.0 format.

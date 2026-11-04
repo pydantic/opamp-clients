@@ -1008,6 +1008,18 @@ jobs:
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
           sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+      - name: The released .pkg, enrolled, then upgraded in place to this one
+        # The previous step purged what it installed, so this one starts on a clean machine.
+        if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        env:
+          RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-darwin-arm64.pkg
+          RELEASED_SHA256: b07d36bd44d9b340cf8f9c8f85cb294472a118f018e3b205bef44ffa0bb9d218
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/released.pkg" "$RELEASED"
+          echo "$RELEASED_SHA256  $RUNNER_TEMP/released.pkg" | shasum -a 256 -c -
+          sudo OPAMP_PKG="$RUNNER_TEMP/released.pkg" OPAMP_UPGRADE="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" \
+            "$RUNNER_TEMP/install.test" -test.run Upgrade -test.v
       - name: The .pkg, kept
         if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1054,14 +1066,27 @@ jobs:
         shell: pwsh
         run: |
           dotnet tool install --global wix --version 5.0.2
-          go/opampsupervisor/packaging/windows/build.ps1 -Version 0.0.0
+          # Above every release, so the upgrade test can install it over the released one.
+          go/opampsupervisor/packaging/windows/build.ps1 -Version 255.0.0
       - name: The .msi installed, enrolled with a server that issues a token, and restarted
         # It installs a service: the runner is thrown away after the job. (The job runs elevated.)
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-0.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+      - name: The released .msi, enrolled, then upgraded in place to this one
+        # The previous step purged what it installed, so this one starts on a clean machine.
+        if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
+        working-directory: go/opampsupervisor/packaging
+        env:
+          RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-windows-amd64.msi
+          RELEASED_SHA256: 2a7181195790180e507fc8edab4833e79f6e6575fd42ce05343b025194f19ad8
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/released.msi" "$RELEASED"
+          echo "$RELEASED_SHA256  $RUNNER_TEMP/released.msi" | sha256sum -c -
+          OPAMP_MSI="$(cygpath -w "$RUNNER_TEMP/released.msi")" OPAMP_UPGRADE="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" \
+            "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v
       - name: The .msi, kept
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
