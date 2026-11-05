@@ -18,12 +18,12 @@ client here.
 
 ## Use it
 
-Add the plugin to the application next to the automatic instrumentation package (from the
-repository, until it is published), and name it in `OTEL_DOTNET_AUTO_PLUGINS`:
+Add the plugin to the application next to the automatic instrumentation package, and name it in
+`OTEL_DOTNET_AUTO_PLUGINS`:
 
-```xml
-<PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.17.0" />
-<ProjectReference Include="path/to/dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj" />
+```bash
+dotnet add package OpenTelemetry.AutoInstrumentation --version 1.17.0
+dotnet add package Pydantic.OpAmp.AutoInstrumentation
 ```
 
 ```bash

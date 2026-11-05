@@ -12,16 +12,18 @@ Built and tested against agent 2.31.1 (SDK 1.66). It needs Java 17 or later.
 
 ## Use it
 
-Build the extension jar (Maven, from the repository root):
+Download the extension jar from Maven Central, `dev.pydantic:opamp-javaagent-extension`
+([the latest version](https://central.sonatype.com/artifact/dev.pydantic/opamp-javaagent-extension)),
+next to the upstream agent:
 
 ```bash
-mvn -q -B -DskipTests install -f java/opamp/pom.xml
-mvn -q -B -DskipTests package -f java/opamp-javaagent/pom.xml
+V=0.1.1
+curl -sSfLo opamp-javaagent-extension.jar https://repo1.maven.org/maven2/dev/pydantic/opamp-javaagent-extension/$V/opamp-javaagent-extension-$V.jar
+curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 ```
 
-That gives `java/opamp-javaagent/target/opamp-javaagent-extension-0.1.0-SNAPSHOT.jar`, one jar
-with the OpAMP client and its dependencies inside, relocated so nothing collides with the
-application's. Then start the application with the agent and the extension:
+It is one jar with the OpAMP client and its dependencies inside, relocated so nothing collides
+with the application's. Then start the application with the agent and the extension:
 
 ```bash
 OTEL_SERVICE_NAME=checkout \
