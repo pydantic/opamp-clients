@@ -118,12 +118,50 @@ class Names(_message.Message):
     def __init__(self, names: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Host(_message.Message):
-    __slots__ = ("live", "next_start")
+    __slots__ = ("live", "next_start", "local")
     LIVE_FIELD_NUMBER: _ClassVar[int]
     NEXT_START_FIELD_NUMBER: _ClassVar[int]
+    LOCAL_FIELD_NUMBER: _ClassVar[int]
     live: _containers.RepeatedScalarFieldContainer[str]
     next_start: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, live: _Optional[_Iterable[str]] = ..., next_start: _Optional[_Iterable[str]] = ...) -> None: ...
+    local: Local
+    def __init__(self, live: _Optional[_Iterable[str]] = ..., next_start: _Optional[_Iterable[str]] = ..., local: _Optional[_Union[Local, _Mapping]] = ...) -> None: ...
+
+class Local(_message.Message):
+    __slots__ = ("sampling_rate", "send_traces", "send_metrics", "send_logs", "send_logs_level", "scrubbing", "send_self_metrics", "instrumentations")
+    SAMPLING_RATE_FIELD_NUMBER: _ClassVar[int]
+    SEND_TRACES_FIELD_NUMBER: _ClassVar[int]
+    SEND_METRICS_FIELD_NUMBER: _ClassVar[int]
+    SEND_LOGS_FIELD_NUMBER: _ClassVar[int]
+    SEND_LOGS_LEVEL_FIELD_NUMBER: _ClassVar[int]
+    SCRUBBING_FIELD_NUMBER: _ClassVar[int]
+    SEND_SELF_METRICS_FIELD_NUMBER: _ClassVar[int]
+    INSTRUMENTATIONS_FIELD_NUMBER: _ClassVar[int]
+    sampling_rate: str
+    send_traces: bool
+    send_metrics: bool
+    send_logs: bool
+    send_logs_level: str
+    scrubbing: LocalScrubbing
+    send_self_metrics: bool
+    instrumentations: LocalInstrumentations
+    def __init__(self, sampling_rate: _Optional[str] = ..., send_traces: bool = ..., send_metrics: bool = ..., send_logs: bool = ..., send_logs_level: _Optional[str] = ..., scrubbing: _Optional[_Union[LocalScrubbing, _Mapping]] = ..., send_self_metrics: bool = ..., instrumentations: _Optional[_Union[LocalInstrumentations, _Mapping]] = ...) -> None: ...
+
+class LocalScrubbing(_message.Message):
+    __slots__ = ("defaults", "patterns")
+    DEFAULTS_FIELD_NUMBER: _ClassVar[int]
+    PATTERNS_FIELD_NUMBER: _ClassVar[int]
+    defaults: bool
+    patterns: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, defaults: bool = ..., patterns: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class LocalInstrumentations(_message.Message):
+    __slots__ = ("disabled", "all_disabled")
+    DISABLED_FIELD_NUMBER: _ClassVar[int]
+    ALL_DISABLED_FIELD_NUMBER: _ClassVar[int]
+    disabled: _containers.RepeatedScalarFieldContainer[str]
+    all_disabled: bool
+    def __init__(self, disabled: _Optional[_Iterable[str]] = ..., all_disabled: bool = ...) -> None: ...
 
 class Load(_message.Message):
     __slots__ = ("saved", "host", "now_unix_ms", "core_state")
@@ -316,12 +354,14 @@ class Inventory(_message.Message):
     def __init__(self, integration: _Optional[str] = ..., integration_version: _Optional[str] = ..., sdk_language: _Optional[str] = ..., sdk_version: _Optional[str] = ..., instrumentations: _Optional[_Iterable[_Union[Instrumentation, _Mapping]]] = ..., exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ...) -> None: ...
 
 class Instrumentation(_message.Message):
-    __slots__ = ("name", "version")
+    __slots__ = ("name", "version", "scope")
     NAME_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
+    SCOPE_FIELD_NUMBER: _ClassVar[int]
     name: str
     version: str
-    def __init__(self, name: _Optional[str] = ..., version: _Optional[str] = ...) -> None: ...
+    scope: str
+    def __init__(self, name: _Optional[str] = ..., version: _Optional[str] = ..., scope: _Optional[str] = ...) -> None: ...
 
 class Exporter(_message.Message):
     __slots__ = ("signal", "name", "gated", "destination")

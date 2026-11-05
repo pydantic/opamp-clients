@@ -5676,6 +5676,33 @@ java.lang.String defaultValue) {
      */
     com.google.protobuf.ByteString
         getNextStartBytes(int index);
+
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     * @return Whether the local field is set.
+     */
+    boolean hasLocal();
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     * @return The local.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.Local getLocal();
   }
   /**
    * <pre>
@@ -5696,6 +5723,7 @@ java.lang.String defaultValue) {
       live_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
       nextStart_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
     }
+    private int bitField0_;
     public static final int LIVE_FIELD_NUMBER = 1;
     private com.google.protobuf.Internal.ProtobufList<java.lang.String> live_;
     /**
@@ -5974,6 +6002,94 @@ java.lang.String defaultValue) {
       checkByteStringIsUtf8(value);
       ensureNextStartIsMutable();
       nextStart_.add(value.toStringUtf8());
+    }
+
+    public static final int LOCAL_FIELD_NUMBER = 4;
+    private dev.pydantic.opamp.sdk.SettingsProto.Local local_;
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     */
+    @java.lang.Override
+    public boolean hasLocal() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.Local getLocal() {
+      return local_ == null ? dev.pydantic.opamp.sdk.SettingsProto.Local.getDefaultInstance() : local_;
+    }
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setLocal(dev.pydantic.opamp.sdk.SettingsProto.Local value) {
+      value.getClass();  // minimal bytecode null check
+      local_ = value;
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeLocal(dev.pydantic.opamp.sdk.SettingsProto.Local value) {
+      value.getClass();  // minimal bytecode null check
+      if (local_ != null &&
+          local_ != dev.pydantic.opamp.sdk.SettingsProto.Local.getDefaultInstance()) {
+        local_ =
+          dev.pydantic.opamp.sdk.SettingsProto.Local.newBuilder(local_).mergeFrom(value).buildPartial();
+      } else {
+        local_ = value;
+      }
+      bitField0_ |= 0x00000001;
+    }
+    /**
+     * <pre>
+     * The SDK's own values, as far as the integration can tell them: reported in the effective config
+     * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+     * file. Set, the layer also reports the controls that exist only through the policy (the
+     * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+     * for each one the host carries out.
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Local local = 4;</code>
+     */
+    private void clearLocal() {
+      local_ = null;
+      bitField0_ = (bitField0_ & ~0x00000001);
     }
 
     public static dev.pydantic.opamp.sdk.SettingsProto.Host parseFrom(
@@ -6354,6 +6470,101 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      @java.lang.Override
+      public boolean hasLocal() {
+        return instance.hasLocal();
+      }
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.Local getLocal() {
+        return instance.getLocal();
+      }
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      public Builder setLocal(dev.pydantic.opamp.sdk.SettingsProto.Local value) {
+        copyOnWrite();
+        instance.setLocal(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      public Builder setLocal(
+          dev.pydantic.opamp.sdk.SettingsProto.Local.Builder builderForValue) {
+        copyOnWrite();
+        instance.setLocal(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      public Builder mergeLocal(dev.pydantic.opamp.sdk.SettingsProto.Local value) {
+        copyOnWrite();
+        instance.mergeLocal(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The SDK's own values, as far as the integration can tell them: reported in the effective config
+       * as logfire-sdk-local.json, beside the policy in force (docs/sdk-settings.md). Unset: no such
+       * file. Set, the layer also reports the controls that exist only through the policy (the
+       * sampling rules, the rate limits, attribute redaction, debug mode and app settings) as none,
+       * for each one the host carries out.
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Local local = 4;</code>
+       */
+      public Builder clearLocal() {  copyOnWrite();
+        instance.clearLocal();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Host)
     }
     @java.lang.Override
@@ -6370,12 +6581,14 @@ java.lang.String defaultValue) {
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
               "live_",
               "nextStart_",
+              "local_",
             };
             java.lang.String info =
-                "\u0000\u0002\u0000\u0000\u0001\u0003\u0002\u0000\u0002\u0000\u0001\u021a\u0003\u021a" +
-                "";
+                "\u0000\u0003\u0000\u0001\u0001\u0004\u0003\u0000\u0002\u0000\u0001\u021a\u0003\u021a" +
+                "\u0004\u1009\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -6426,6 +6639,2510 @@ java.lang.String defaultValue) {
     private static volatile com.google.protobuf.Parser<Host> PARSER;
 
     public static com.google.protobuf.Parser<Host> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface LocalOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Local)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return Whether the samplingRate field is set.
+     */
+    boolean hasSamplingRate();
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return The samplingRate.
+     */
+    java.lang.String getSamplingRate();
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return The bytes for samplingRate.
+     */
+    com.google.protobuf.ByteString
+        getSamplingRateBytes();
+
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     * @return Whether the sendTraces field is set.
+     */
+    boolean hasSendTraces();
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     * @return The sendTraces.
+     */
+    boolean getSendTraces();
+
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     * @return Whether the sendMetrics field is set.
+     */
+    boolean hasSendMetrics();
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     * @return The sendMetrics.
+     */
+    boolean getSendMetrics();
+
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     * @return Whether the sendLogs field is set.
+     */
+    boolean hasSendLogs();
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     * @return The sendLogs.
+     */
+    boolean getSendLogs();
+
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return Whether the sendLogsLevel field is set.
+     */
+    boolean hasSendLogsLevel();
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return The sendLogsLevel.
+     */
+    java.lang.String getSendLogsLevel();
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return The bytes for sendLogsLevel.
+     */
+    com.google.protobuf.ByteString
+        getSendLogsLevelBytes();
+
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     * @return Whether the scrubbing field is set.
+     */
+    boolean hasScrubbing();
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     * @return The scrubbing.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing getScrubbing();
+
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     * @return Whether the sendSelfMetrics field is set.
+     */
+    boolean hasSendSelfMetrics();
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     * @return The sendSelfMetrics.
+     */
+    boolean getSendSelfMetrics();
+
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     * @return Whether the instrumentations field is set.
+     */
+    boolean hasInstrumentations();
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     * @return The instrumentations.
+     */
+    dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations getInstrumentations();
+  }
+  /**
+   * <pre>
+   * What each control would be without a policy, as the SDK runs: reported, never applied. A field
+   * left unset is a value the integration can't tell, and the control is left out of the report. A
+   * value that doesn't read (a ratio that is no number from 0 to 1, a level that is none) is left
+   * out too: the report never makes a reply an error.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.sdk.v1.Local}
+   */
+  public  static final class Local extends
+      com.google.protobuf.GeneratedMessageLite<
+          Local, Local.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Local)
+      LocalOrBuilder {
+    private Local() {
+      samplingRate_ = "";
+      sendLogsLevel_ = "";
+    }
+    private int bitField0_;
+    public static final int SAMPLING_RATE_FIELD_NUMBER = 1;
+    private java.lang.String samplingRate_;
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return Whether the samplingRate field is set.
+     */
+    @java.lang.Override
+    public boolean hasSamplingRate() {
+      return ((bitField0_ & 0x00000001) != 0);
+    }
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return The samplingRate.
+     */
+    @java.lang.Override
+    public java.lang.String getSamplingRate() {
+      return samplingRate_;
+    }
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @return The bytes for samplingRate.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getSamplingRateBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(samplingRate_);
+    }
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @param value The samplingRate to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setSamplingRate(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      bitField0_ |= 0x00000001;
+      samplingRate_ = value;
+    }
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     */
+    private void clearSamplingRate() {
+      bitField0_ = (bitField0_ & ~0x00000001);
+      samplingRate_ = getDefaultInstance().getSamplingRate();
+    }
+    /**
+     * <pre>
+     * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+     * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+     * </pre>
+     *
+     * <code>optional string sampling_rate = 1;</code>
+     * @param value The bytes for samplingRate to set.
+     */
+    private void setSamplingRateBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      samplingRate_ = value.toStringUtf8();
+      bitField0_ |= 0x00000001;
+    }
+
+    public static final int SEND_TRACES_FIELD_NUMBER = 2;
+    private boolean sendTraces_;
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     * @return Whether the sendTraces field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendTraces() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     * @return The sendTraces.
+     */
+    @java.lang.Override
+    public boolean getSendTraces() {
+      return sendTraces_;
+    }
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     * @param value The sendTraces to set.
+     */
+    private void setSendTraces(boolean value) {
+      bitField0_ |= 0x00000002;
+      sendTraces_ = value;
+    }
+    /**
+     * <pre>
+     * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+     * OTEL_*_EXPORTER=none says).
+     * </pre>
+     *
+     * <code>optional bool send_traces = 2;</code>
+     */
+    private void clearSendTraces() {
+      bitField0_ = (bitField0_ & ~0x00000002);
+      sendTraces_ = false;
+    }
+
+    public static final int SEND_METRICS_FIELD_NUMBER = 3;
+    private boolean sendMetrics_;
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     * @return Whether the sendMetrics field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendMetrics() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     * @return The sendMetrics.
+     */
+    @java.lang.Override
+    public boolean getSendMetrics() {
+      return sendMetrics_;
+    }
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     * @param value The sendMetrics to set.
+     */
+    private void setSendMetrics(boolean value) {
+      bitField0_ |= 0x00000004;
+      sendMetrics_ = value;
+    }
+    /**
+     * <code>optional bool send_metrics = 3;</code>
+     */
+    private void clearSendMetrics() {
+      bitField0_ = (bitField0_ & ~0x00000004);
+      sendMetrics_ = false;
+    }
+
+    public static final int SEND_LOGS_FIELD_NUMBER = 4;
+    private boolean sendLogs_;
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     * @return Whether the sendLogs field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendLogs() {
+      return ((bitField0_ & 0x00000008) != 0);
+    }
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     * @return The sendLogs.
+     */
+    @java.lang.Override
+    public boolean getSendLogs() {
+      return sendLogs_;
+    }
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     * @param value The sendLogs to set.
+     */
+    private void setSendLogs(boolean value) {
+      bitField0_ |= 0x00000008;
+      sendLogs_ = value;
+    }
+    /**
+     * <code>optional bool send_logs = 4;</code>
+     */
+    private void clearSendLogs() {
+      bitField0_ = (bitField0_ & ~0x00000008);
+      sendLogs_ = false;
+    }
+
+    public static final int SEND_LOGS_LEVEL_FIELD_NUMBER = 5;
+    private java.lang.String sendLogsLevel_;
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return Whether the sendLogsLevel field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendLogsLevel() {
+      return ((bitField0_ & 0x00000010) != 0);
+    }
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return The sendLogsLevel.
+     */
+    @java.lang.Override
+    public java.lang.String getSendLogsLevel() {
+      return sendLogsLevel_;
+    }
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @return The bytes for sendLogsLevel.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getSendLogsLevelBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(sendLogsLevel_);
+    }
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @param value The sendLogsLevel to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setSendLogsLevel(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      bitField0_ |= 0x00000010;
+      sendLogsLevel_ = value;
+    }
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     */
+    private void clearSendLogsLevel() {
+      bitField0_ = (bitField0_ & ~0x00000010);
+      sendLogsLevel_ = getDefaultInstance().getSendLogsLevel();
+    }
+    /**
+     * <pre>
+     * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+     * case, and warning for warn). One that exports every level says trace.
+     * </pre>
+     *
+     * <code>optional string send_logs_level = 5;</code>
+     * @param value The bytes for sendLogsLevel to set.
+     */
+    private void setSendLogsLevelBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      sendLogsLevel_ = value.toStringUtf8();
+      bitField0_ |= 0x00000010;
+    }
+
+    public static final int SCRUBBING_FIELD_NUMBER = 6;
+    private dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing scrubbing_;
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     */
+    @java.lang.Override
+    public boolean hasScrubbing() {
+      return ((bitField0_ & 0x00000020) != 0);
+    }
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing getScrubbing() {
+      return scrubbing_ == null ? dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.getDefaultInstance() : scrubbing_;
+    }
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setScrubbing(dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing value) {
+      value.getClass();  // minimal bytecode null check
+      scrubbing_ = value;
+      bitField0_ |= 0x00000020;
+    }
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeScrubbing(dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing value) {
+      value.getClass();  // minimal bytecode null check
+      if (scrubbing_ != null &&
+          scrubbing_ != dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.getDefaultInstance()) {
+        scrubbing_ =
+          dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.newBuilder(scrubbing_).mergeFrom(value).buildPartial();
+      } else {
+        scrubbing_ = value;
+      }
+      bitField0_ |= 0x00000020;
+    }
+    /**
+     * <pre>
+     * scrubbing: the SDK's own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+     */
+    private void clearScrubbing() {
+      scrubbing_ = null;
+      bitField0_ = (bitField0_ & ~0x00000020);
+    }
+
+    public static final int SEND_SELF_METRICS_FIELD_NUMBER = 7;
+    private boolean sendSelfMetrics_;
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     * @return Whether the sendSelfMetrics field is set.
+     */
+    @java.lang.Override
+    public boolean hasSendSelfMetrics() {
+      return ((bitField0_ & 0x00000040) != 0);
+    }
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     * @return The sendSelfMetrics.
+     */
+    @java.lang.Override
+    public boolean getSendSelfMetrics() {
+      return sendSelfMetrics_;
+    }
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     * @param value The sendSelfMetrics to set.
+     */
+    private void setSendSelfMetrics(boolean value) {
+      bitField0_ |= 0x00000040;
+      sendSelfMetrics_ = value;
+    }
+    /**
+     * <pre>
+     * self_monitoring: whether it sends its own metrics
+     * </pre>
+     *
+     * <code>optional bool send_self_metrics = 7;</code>
+     */
+    private void clearSendSelfMetrics() {
+      bitField0_ = (bitField0_ & ~0x00000040);
+      sendSelfMetrics_ = false;
+    }
+
+    public static final int INSTRUMENTATIONS_FIELD_NUMBER = 8;
+    private dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations instrumentations_;
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     */
+    @java.lang.Override
+    public boolean hasInstrumentations() {
+      return ((bitField0_ & 0x00000080) != 0);
+    }
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations getInstrumentations() {
+      return instrumentations_ == null ? dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.getDefaultInstance() : instrumentations_;
+    }
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setInstrumentations(dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations value) {
+      value.getClass();  // minimal bytecode null check
+      instrumentations_ = value;
+      bitField0_ |= 0x00000080;
+    }
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeInstrumentations(dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations value) {
+      value.getClass();  // minimal bytecode null check
+      if (instrumentations_ != null &&
+          instrumentations_ != dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.getDefaultInstance()) {
+        instrumentations_ =
+          dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.newBuilder(instrumentations_).mergeFrom(value).buildPartial();
+      } else {
+        instrumentations_ = value;
+      }
+      bitField0_ |= 0x00000080;
+    }
+    /**
+     * <pre>
+     * instrumentations: those it switches off of its own
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+     */
+    private void clearInstrumentations() {
+      instrumentations_ = null;
+      bitField0_ = (bitField0_ & ~0x00000080);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.Local prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * What each control would be without a policy, as the SDK runs: reported, never applied. A field
+     * left unset is a value the integration can't tell, and the control is left out of the report. A
+     * value that doesn't read (a ratio that is no number from 0 to 1, a level that is none) is left
+     * out too: the report never makes a reply an error.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.sdk.v1.Local}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.Local, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Local)
+        dev.pydantic.opamp.sdk.SettingsProto.LocalOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.Local.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @return Whether the samplingRate field is set.
+       */
+      @java.lang.Override
+      public boolean hasSamplingRate() {
+        return instance.hasSamplingRate();
+      }
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @return The samplingRate.
+       */
+      @java.lang.Override
+      public java.lang.String getSamplingRate() {
+        return instance.getSamplingRate();
+      }
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @return The bytes for samplingRate.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getSamplingRateBytes() {
+        return instance.getSamplingRateBytes();
+      }
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @param value The samplingRate to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSamplingRate(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setSamplingRate(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSamplingRate() {
+        copyOnWrite();
+        instance.clearSamplingRate();
+        return this;
+      }
+      /**
+       * <pre>
+       * head_sampling: the ratio of new traces the SDK's own sampler samples, as decimal text ("1" for
+       * always on, "0" for always off, "0.25"). Unset for a sampler that is not a ratio.
+       * </pre>
+       *
+       * <code>optional string sampling_rate = 1;</code>
+       * @param value The bytes for samplingRate to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSamplingRateBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setSamplingRateBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+       * OTEL_*_EXPORTER=none says).
+       * </pre>
+       *
+       * <code>optional bool send_traces = 2;</code>
+       * @return Whether the sendTraces field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendTraces() {
+        return instance.hasSendTraces();
+      }
+      /**
+       * <pre>
+       * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+       * OTEL_*_EXPORTER=none says).
+       * </pre>
+       *
+       * <code>optional bool send_traces = 2;</code>
+       * @return The sendTraces.
+       */
+      @java.lang.Override
+      public boolean getSendTraces() {
+        return instance.getSendTraces();
+      }
+      /**
+       * <pre>
+       * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+       * OTEL_*_EXPORTER=none says).
+       * </pre>
+       *
+       * <code>optional bool send_traces = 2;</code>
+       * @param value The sendTraces to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendTraces(boolean value) {
+        copyOnWrite();
+        instance.setSendTraces(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * signal_exports: whether the SDK exports the signal at all (false: no exporter for it, as
+       * OTEL_*_EXPORTER=none says).
+       * </pre>
+       *
+       * <code>optional bool send_traces = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendTraces() {
+        copyOnWrite();
+        instance.clearSendTraces();
+        return this;
+      }
+
+      /**
+       * <code>optional bool send_metrics = 3;</code>
+       * @return Whether the sendMetrics field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendMetrics() {
+        return instance.hasSendMetrics();
+      }
+      /**
+       * <code>optional bool send_metrics = 3;</code>
+       * @return The sendMetrics.
+       */
+      @java.lang.Override
+      public boolean getSendMetrics() {
+        return instance.getSendMetrics();
+      }
+      /**
+       * <code>optional bool send_metrics = 3;</code>
+       * @param value The sendMetrics to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendMetrics(boolean value) {
+        copyOnWrite();
+        instance.setSendMetrics(value);
+        return this;
+      }
+      /**
+       * <code>optional bool send_metrics = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendMetrics() {
+        copyOnWrite();
+        instance.clearSendMetrics();
+        return this;
+      }
+
+      /**
+       * <code>optional bool send_logs = 4;</code>
+       * @return Whether the sendLogs field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendLogs() {
+        return instance.hasSendLogs();
+      }
+      /**
+       * <code>optional bool send_logs = 4;</code>
+       * @return The sendLogs.
+       */
+      @java.lang.Override
+      public boolean getSendLogs() {
+        return instance.getSendLogs();
+      }
+      /**
+       * <code>optional bool send_logs = 4;</code>
+       * @param value The sendLogs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendLogs(boolean value) {
+        copyOnWrite();
+        instance.setSendLogs(value);
+        return this;
+      }
+      /**
+       * <code>optional bool send_logs = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendLogs() {
+        copyOnWrite();
+        instance.clearSendLogs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @return Whether the sendLogsLevel field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendLogsLevel() {
+        return instance.hasSendLogsLevel();
+      }
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @return The sendLogsLevel.
+       */
+      @java.lang.Override
+      public java.lang.String getSendLogsLevel() {
+        return instance.getSendLogsLevel();
+      }
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @return The bytes for sendLogsLevel.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getSendLogsLevelBytes() {
+        return instance.getSendLogsLevelBytes();
+      }
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @param value The sendLogsLevel to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendLogsLevel(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setSendLogsLevel(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendLogsLevel() {
+        copyOnWrite();
+        instance.clearSendLogsLevel();
+        return this;
+      }
+      /**
+       * <pre>
+       * log_levels: the lowest level the SDK exports (trace, debug, info, warn, error or fatal; any
+       * case, and warning for warn). One that exports every level says trace.
+       * </pre>
+       *
+       * <code>optional string send_logs_level = 5;</code>
+       * @param value The bytes for sendLogsLevel to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendLogsLevelBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setSendLogsLevelBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      @java.lang.Override
+      public boolean hasScrubbing() {
+        return instance.hasScrubbing();
+      }
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing getScrubbing() {
+        return instance.getScrubbing();
+      }
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      public Builder setScrubbing(dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing value) {
+        copyOnWrite();
+        instance.setScrubbing(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      public Builder setScrubbing(
+          dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.Builder builderForValue) {
+        copyOnWrite();
+        instance.setScrubbing(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      public Builder mergeScrubbing(dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing value) {
+        copyOnWrite();
+        instance.mergeScrubbing(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * scrubbing: the SDK's own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalScrubbing scrubbing = 6;</code>
+       */
+      public Builder clearScrubbing() {  copyOnWrite();
+        instance.clearScrubbing();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * self_monitoring: whether it sends its own metrics
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 7;</code>
+       * @return Whether the sendSelfMetrics field is set.
+       */
+      @java.lang.Override
+      public boolean hasSendSelfMetrics() {
+        return instance.hasSendSelfMetrics();
+      }
+      /**
+       * <pre>
+       * self_monitoring: whether it sends its own metrics
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 7;</code>
+       * @return The sendSelfMetrics.
+       */
+      @java.lang.Override
+      public boolean getSendSelfMetrics() {
+        return instance.getSendSelfMetrics();
+      }
+      /**
+       * <pre>
+       * self_monitoring: whether it sends its own metrics
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 7;</code>
+       * @param value The sendSelfMetrics to set.
+       * @return This builder for chaining.
+       */
+      public Builder setSendSelfMetrics(boolean value) {
+        copyOnWrite();
+        instance.setSendSelfMetrics(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * self_monitoring: whether it sends its own metrics
+       * </pre>
+       *
+       * <code>optional bool send_self_metrics = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearSendSelfMetrics() {
+        copyOnWrite();
+        instance.clearSendSelfMetrics();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      @java.lang.Override
+      public boolean hasInstrumentations() {
+        return instance.hasInstrumentations();
+      }
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations getInstrumentations() {
+        return instance.getInstrumentations();
+      }
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      public Builder setInstrumentations(dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations value) {
+        copyOnWrite();
+        instance.setInstrumentations(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      public Builder setInstrumentations(
+          dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.Builder builderForValue) {
+        copyOnWrite();
+        instance.setInstrumentations(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      public Builder mergeInstrumentations(dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations value) {
+        copyOnWrite();
+        instance.mergeInstrumentations(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * instrumentations: those it switches off of its own
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.LocalInstrumentations instrumentations = 8;</code>
+       */
+      public Builder clearInstrumentations() {  copyOnWrite();
+        instance.clearInstrumentations();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Local)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.Local();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "samplingRate_",
+              "sendTraces_",
+              "sendMetrics_",
+              "sendLogs_",
+              "sendLogsLevel_",
+              "scrubbing_",
+              "sendSelfMetrics_",
+              "instrumentations_",
+            };
+            java.lang.String info =
+                "\u0000\b\u0000\u0001\u0001\b\b\u0000\u0000\u0000\u0001\u1208\u0000\u0002\u1007\u0001" +
+                "\u0003\u1007\u0002\u0004\u1007\u0003\u0005\u1208\u0004\u0006\u1009\u0005\u0007\u1007" +
+                "\u0006\b\u1009\u0007";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.Local> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.Local.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.Local>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Local)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.Local DEFAULT_INSTANCE;
+    static {
+      Local defaultInstance = new Local();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        Local.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.Local getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<Local> PARSER;
+
+    public static com.google.protobuf.Parser<Local> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface LocalScrubbingOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.LocalScrubbing)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * it scrubs what the Logfire SDK scrubs by default
+     * </pre>
+     *
+     * <code>bool defaults = 1;</code>
+     * @return The defaults.
+     */
+    boolean getDefaults();
+
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @return A list containing the patterns.
+     */
+    java.util.List<java.lang.String>
+        getPatternsList();
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @return The count of patterns.
+     */
+    int getPatternsCount();
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param index The index of the element to return.
+     * @return The patterns at the given index.
+     */
+    java.lang.String getPatterns(int index);
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param index The index of the element to return.
+     * @return The patterns at the given index.
+     */
+    com.google.protobuf.ByteString
+        getPatternsBytes(int index);
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.LocalScrubbing}
+   */
+  public  static final class LocalScrubbing extends
+      com.google.protobuf.GeneratedMessageLite<
+          LocalScrubbing, LocalScrubbing.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.LocalScrubbing)
+      LocalScrubbingOrBuilder {
+    private LocalScrubbing() {
+      patterns_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    public static final int DEFAULTS_FIELD_NUMBER = 1;
+    private boolean defaults_;
+    /**
+     * <pre>
+     * it scrubs what the Logfire SDK scrubs by default
+     * </pre>
+     *
+     * <code>bool defaults = 1;</code>
+     * @return The defaults.
+     */
+    @java.lang.Override
+    public boolean getDefaults() {
+      return defaults_;
+    }
+    /**
+     * <pre>
+     * it scrubs what the Logfire SDK scrubs by default
+     * </pre>
+     *
+     * <code>bool defaults = 1;</code>
+     * @param value The defaults to set.
+     */
+    private void setDefaults(boolean value) {
+      
+      defaults_ = value;
+    }
+    /**
+     * <pre>
+     * it scrubs what the Logfire SDK scrubs by default
+     * </pre>
+     *
+     * <code>bool defaults = 1;</code>
+     */
+    private void clearDefaults() {
+
+      defaults_ = false;
+    }
+
+    public static final int PATTERNS_FIELD_NUMBER = 2;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> patterns_;
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @return A list containing the patterns.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getPatternsList() {
+      return patterns_;
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @return The count of patterns.
+     */
+    @java.lang.Override
+    public int getPatternsCount() {
+      return patterns_.size();
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param index The index of the element to return.
+     * @return The patterns at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getPatterns(int index) {
+      return patterns_.get(index);
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the patterns at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getPatternsBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          patterns_.get(index));
+    }
+    private void ensurePatternsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          patterns_;  if (!tmp.isModifiable()) {
+        patterns_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param index The index to set the value at.
+     * @param value The patterns to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setPatterns(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensurePatternsIsMutable();
+      patterns_.set(index, value);
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param value The patterns to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addPatterns(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensurePatternsIsMutable();
+      patterns_.add(value);
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param values The patterns to add.
+     */
+    private void addAllPatterns(
+        java.lang.Iterable<java.lang.String> values) {
+      ensurePatternsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, patterns_);
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     */
+    private void clearPatterns() {
+      patterns_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * globs of its own, as scrub_patterns takes them
+     * </pre>
+     *
+     * <code>repeated string patterns = 2;</code>
+     * @param value The bytes of the patterns to add.
+     */
+    private void addPatternsBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensurePatternsIsMutable();
+      patterns_.add(value.toStringUtf8());
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.LocalScrubbing}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.LocalScrubbing)
+        dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbingOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * it scrubs what the Logfire SDK scrubs by default
+       * </pre>
+       *
+       * <code>bool defaults = 1;</code>
+       * @return The defaults.
+       */
+      @java.lang.Override
+      public boolean getDefaults() {
+        return instance.getDefaults();
+      }
+      /**
+       * <pre>
+       * it scrubs what the Logfire SDK scrubs by default
+       * </pre>
+       *
+       * <code>bool defaults = 1;</code>
+       * @param value The defaults to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDefaults(boolean value) {
+        copyOnWrite();
+        instance.setDefaults(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * it scrubs what the Logfire SDK scrubs by default
+       * </pre>
+       *
+       * <code>bool defaults = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDefaults() {
+        copyOnWrite();
+        instance.clearDefaults();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @return A list containing the patterns.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getPatternsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getPatternsList());
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @return The count of patterns.
+       */
+      @java.lang.Override
+      public int getPatternsCount() {
+        return instance.getPatternsCount();
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param index The index of the element to return.
+       * @return The patterns at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getPatterns(int index) {
+        return instance.getPatterns(index);
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the patterns at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getPatternsBytes(int index) {
+        return instance.getPatternsBytes(index);
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param index The index to set the value at.
+       * @param value The patterns to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPatterns(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setPatterns(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param value The patterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addPatterns(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addPatterns(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param values The patterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllPatterns(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllPatterns(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPatterns() {
+        copyOnWrite();
+        instance.clearPatterns();
+        return this;
+      }
+      /**
+       * <pre>
+       * globs of its own, as scrub_patterns takes them
+       * </pre>
+       *
+       * <code>repeated string patterns = 2;</code>
+       * @param value The bytes of the patterns to add.
+       * @return This builder for chaining.
+       */
+      public Builder addPatternsBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addPatternsBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.LocalScrubbing)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "defaults_",
+              "patterns_",
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0001\u0000\u0001\u0007\u0002\u021a" +
+                "";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.LocalScrubbing)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing DEFAULT_INSTANCE;
+    static {
+      LocalScrubbing defaultInstance = new LocalScrubbing();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        LocalScrubbing.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalScrubbing getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<LocalScrubbing> PARSER;
+
+    public static com.google.protobuf.Parser<LocalScrubbing> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface LocalInstrumentationsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.LocalInstrumentations)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @return A list containing the disabled.
+     */
+    java.util.List<java.lang.String>
+        getDisabledList();
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @return The count of disabled.
+     */
+    int getDisabledCount();
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param index The index of the element to return.
+     * @return The disabled at the given index.
+     */
+    java.lang.String getDisabled(int index);
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param index The index of the element to return.
+     * @return The disabled at the given index.
+     */
+    com.google.protobuf.ByteString
+        getDisabledBytes(int index);
+
+    /**
+     * <pre>
+     * every instrumentation off
+     * </pre>
+     *
+     * <code>bool all_disabled = 2;</code>
+     * @return The allDisabled.
+     */
+    boolean getAllDisabled();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.LocalInstrumentations}
+   */
+  public  static final class LocalInstrumentations extends
+      com.google.protobuf.GeneratedMessageLite<
+          LocalInstrumentations, LocalInstrumentations.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.LocalInstrumentations)
+      LocalInstrumentationsOrBuilder {
+    private LocalInstrumentations() {
+      disabled_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    public static final int DISABLED_FIELD_NUMBER = 1;
+    private com.google.protobuf.Internal.ProtobufList<java.lang.String> disabled_;
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @return A list containing the disabled.
+     */
+    @java.lang.Override
+    public java.util.List<java.lang.String> getDisabledList() {
+      return disabled_;
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @return The count of disabled.
+     */
+    @java.lang.Override
+    public int getDisabledCount() {
+      return disabled_.size();
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param index The index of the element to return.
+     * @return The disabled at the given index.
+     */
+    @java.lang.Override
+    public java.lang.String getDisabled(int index) {
+      return disabled_.get(index);
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param index The index of the value to return.
+     * @return The bytes of the disabled at the given index.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDisabledBytes(int index) {
+      return com.google.protobuf.ByteString.copyFromUtf8(
+          disabled_.get(index));
+    }
+    private void ensureDisabledIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
+          disabled_;  if (!tmp.isModifiable()) {
+        disabled_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param index The index to set the value at.
+     * @param value The disabled to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDisabled(
+        int index, java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureDisabledIsMutable();
+      disabled_.set(index, value);
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param value The disabled to add.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addDisabled(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      ensureDisabledIsMutable();
+      disabled_.add(value);
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param values The disabled to add.
+     */
+    private void addAllDisabled(
+        java.lang.Iterable<java.lang.String> values) {
+      ensureDisabledIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, disabled_);
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     */
+    private void clearDisabled() {
+      disabled_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * names, as deactivate_instrumentations takes them
+     * </pre>
+     *
+     * <code>repeated string disabled = 1;</code>
+     * @param value The bytes of the disabled to add.
+     */
+    private void addDisabledBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      ensureDisabledIsMutable();
+      disabled_.add(value.toStringUtf8());
+    }
+
+    public static final int ALL_DISABLED_FIELD_NUMBER = 2;
+    private boolean allDisabled_;
+    /**
+     * <pre>
+     * every instrumentation off
+     * </pre>
+     *
+     * <code>bool all_disabled = 2;</code>
+     * @return The allDisabled.
+     */
+    @java.lang.Override
+    public boolean getAllDisabled() {
+      return allDisabled_;
+    }
+    /**
+     * <pre>
+     * every instrumentation off
+     * </pre>
+     *
+     * <code>bool all_disabled = 2;</code>
+     * @param value The allDisabled to set.
+     */
+    private void setAllDisabled(boolean value) {
+      
+      allDisabled_ = value;
+    }
+    /**
+     * <pre>
+     * every instrumentation off
+     * </pre>
+     *
+     * <code>bool all_disabled = 2;</code>
+     */
+    private void clearAllDisabled() {
+
+      allDisabled_ = false;
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.LocalInstrumentations}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.LocalInstrumentations)
+        dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentationsOrBuilder {
+      // Construct using dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @return A list containing the disabled.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.String>
+          getDisabledList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getDisabledList());
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @return The count of disabled.
+       */
+      @java.lang.Override
+      public int getDisabledCount() {
+        return instance.getDisabledCount();
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param index The index of the element to return.
+       * @return The disabled at the given index.
+       */
+      @java.lang.Override
+      public java.lang.String getDisabled(int index) {
+        return instance.getDisabled(index);
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param index The index of the value to return.
+       * @return The bytes of the disabled at the given index.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDisabledBytes(int index) {
+        return instance.getDisabledBytes(index);
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param index The index to set the value at.
+       * @param value The disabled to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDisabled(
+          int index, java.lang.String value) {
+        copyOnWrite();
+        instance.setDisabled(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param value The disabled to add.
+       * @return This builder for chaining.
+       */
+      public Builder addDisabled(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.addDisabled(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param values The disabled to add.
+       * @return This builder for chaining.
+       */
+      public Builder addAllDisabled(
+          java.lang.Iterable<java.lang.String> values) {
+        copyOnWrite();
+        instance.addAllDisabled(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDisabled() {
+        copyOnWrite();
+        instance.clearDisabled();
+        return this;
+      }
+      /**
+       * <pre>
+       * names, as deactivate_instrumentations takes them
+       * </pre>
+       *
+       * <code>repeated string disabled = 1;</code>
+       * @param value The bytes of the disabled to add.
+       * @return This builder for chaining.
+       */
+      public Builder addDisabledBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.addDisabledBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * every instrumentation off
+       * </pre>
+       *
+       * <code>bool all_disabled = 2;</code>
+       * @return The allDisabled.
+       */
+      @java.lang.Override
+      public boolean getAllDisabled() {
+        return instance.getAllDisabled();
+      }
+      /**
+       * <pre>
+       * every instrumentation off
+       * </pre>
+       *
+       * <code>bool all_disabled = 2;</code>
+       * @param value The allDisabled to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAllDisabled(boolean value) {
+        copyOnWrite();
+        instance.setAllDisabled(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * every instrumentation off
+       * </pre>
+       *
+       * <code>bool all_disabled = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAllDisabled() {
+        copyOnWrite();
+        instance.clearAllDisabled();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.LocalInstrumentations)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "disabled_",
+              "allDisabled_",
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0001\u0000\u0001\u021a\u0002\u0007" +
+                "";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.LocalInstrumentations)
+    private static final dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations DEFAULT_INSTANCE;
+    static {
+      LocalInstrumentations defaultInstance = new LocalInstrumentations();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        LocalInstrumentations.class, defaultInstance);
+    }
+
+    public static dev.pydantic.opamp.sdk.SettingsProto.LocalInstrumentations getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<LocalInstrumentations> PARSER;
+
+    public static com.google.protobuf.Parser<LocalInstrumentations> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
@@ -17762,6 +20479,30 @@ java.lang.String defaultValue) {
      */
     com.google.protobuf.ByteString
         getVersionBytes();
+
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @return The scope.
+     */
+    java.lang.String getScope();
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @return The bytes for scope.
+     */
+    com.google.protobuf.ByteString
+        getScopeBytes();
   }
   /**
    * Protobuf type {@code opamp.sdk.v1.Instrumentation}
@@ -17774,6 +20515,7 @@ java.lang.String defaultValue) {
     private Instrumentation() {
       name_ = "";
       version_ = "";
+      scope_ = "";
     }
     public static final int NAME_FIELD_NUMBER = 1;
     private java.lang.String name_;
@@ -17908,6 +20650,84 @@ java.lang.String defaultValue) {
         com.google.protobuf.ByteString value) {
       checkByteStringIsUtf8(value);
       version_ = value.toStringUtf8();
+
+    }
+
+    public static final int SCOPE_FIELD_NUMBER = 3;
+    private java.lang.String scope_;
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @return The scope.
+     */
+    @java.lang.Override
+    public java.lang.String getScope() {
+      return scope_;
+    }
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @return The bytes for scope.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getScopeBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(scope_);
+    }
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @param value The scope to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setScope(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      scope_ = value;
+    }
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     */
+    private void clearScope() {
+
+      scope_ = getDefaultInstance().getScope();
+    }
+    /**
+     * <pre>
+     * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+     * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+     * A name listed with several scopes lists each, as with versions.
+     * </pre>
+     *
+     * <code>string scope = 3;</code>
+     * @param value The bytes for scope to set.
+     */
+    private void setScopeBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      scope_ = value.toStringUtf8();
 
     }
 
@@ -18146,6 +20966,85 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <pre>
+       * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+       * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+       * A name listed with several scopes lists each, as with versions.
+       * </pre>
+       *
+       * <code>string scope = 3;</code>
+       * @return The scope.
+       */
+      @java.lang.Override
+      public java.lang.String getScope() {
+        return instance.getScope();
+      }
+      /**
+       * <pre>
+       * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+       * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+       * A name listed with several scopes lists each, as with versions.
+       * </pre>
+       *
+       * <code>string scope = 3;</code>
+       * @return The bytes for scope.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getScopeBytes() {
+        return instance.getScopeBytes();
+      }
+      /**
+       * <pre>
+       * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+       * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+       * A name listed with several scopes lists each, as with versions.
+       * </pre>
+       *
+       * <code>string scope = 3;</code>
+       * @param value The scope to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScope(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setScope(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+       * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+       * A name listed with several scopes lists each, as with versions.
+       * </pre>
+       *
+       * <code>string scope = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearScope() {
+        copyOnWrite();
+        instance.clearScope();
+        return this;
+      }
+      /**
+       * <pre>
+       * The OpenTelemetry instrumentation scope its telemetry carries (a tracer's, meter's or
+       * logger's name), so a server can tell which instrumentations send anything; empty: not known.
+       * A name listed with several scopes lists each, as with versions.
+       * </pre>
+       *
+       * <code>string scope = 3;</code>
+       * @param value The bytes for scope to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScopeBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setScopeBytes(value);
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Instrumentation)
     }
     @java.lang.Override
@@ -18164,10 +21063,11 @@ java.lang.String defaultValue) {
             java.lang.Object[] objects = new java.lang.Object[] {
               "name_",
               "version_",
+              "scope_",
             };
             java.lang.String info =
-                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
-                "";
+                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "\u0003\u0208";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
