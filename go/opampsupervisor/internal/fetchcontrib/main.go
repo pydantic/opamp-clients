@@ -74,29 +74,55 @@ func run(client *http.Client, lockPath, goos, goarch, out string) error {
 	return extract(archive, binary, out)
 }
 
+// attempts and retryWait bound download's tries: a 5xx or a dropped connection (GitHub's release
+// downloads answer 504 now and then) is tried again; a 4xx or a wrong SHA-256 is not.
+var (
+	attempts  = 4
+	retryWait = 5 * time.Second
+)
+
 // download fetches url, refusing it unless its SHA-256 is want.
 func download(client *http.Client, url, want string) ([]byte, error) {
 	client.Timeout = 10 * time.Minute
+	var err error
+	for try := 1; try <= attempts; try++ {
+		var body []byte
+		var again bool
+		body, again, err = fetch(client, url)
+		if err == nil {
+			sum := sha256.Sum256(body)
+			if got := hex.EncodeToString(sum[:]); got != want {
+				return nil, fmt.Errorf("%s: SHA-256 %s, not the pinned %s", url, got, want)
+			}
+			return body, nil
+		}
+		if !again || try == attempts {
+			break
+		}
+		fmt.Fprintf(os.Stderr, "fetchcontrib: %v; trying again\n", err)
+		time.Sleep(time.Duration(try) * retryWait)
+	}
+	return nil, err
+}
+
+// fetch is one try of download; again says whether the failure is worth another.
+func fetch(client *http.Client, url string) (body []byte, again bool, err error) {
 	resp, err := client.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
+		return nil, resp.StatusCode >= 500, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, archiveLimit+1))
+	body, err = io.ReadAll(io.LimitReader(resp.Body, archiveLimit+1))
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", url, err)
+		return nil, true, fmt.Errorf("%s: %w", url, err)
 	}
 	if len(body) > archiveLimit {
-		return nil, fmt.Errorf("%s: larger than %d bytes", url, archiveLimit)
+		return nil, false, fmt.Errorf("%s: larger than %d bytes", url, archiveLimit)
 	}
-	sum := sha256.Sum256(body)
-	if got := hex.EncodeToString(sum[:]); got != want {
-		return nil, fmt.Errorf("%s: SHA-256 %s, not the pinned %s", url, got, want)
-	}
-	return body, nil
+	return body, false, nil
 }
 
 // extract writes the archive's file named binary to out, executable.
