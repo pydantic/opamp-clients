@@ -197,7 +197,6 @@ and date. Tests, CI and docs alone don't need a line.
 
   The Python entry points keep their names (`OTEL_PYTHON_DISTRO=opamp`,
   `OTEL_PYTHON_CONFIGURATOR=opamp`), and the Go modules keep their paths.
-- Every SDK: the core's default User-Agent is `logfire-opamp/<core version>` (core 0.16.0).
 
 These entries in **Unreleased** above are in 0.2.0. They stay there because they also apply to
 Go or the Supervisor, which have not had a release with them:

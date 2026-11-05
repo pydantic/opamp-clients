@@ -725,7 +725,7 @@ public final class CoreProto {
 
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -734,7 +734,7 @@ public final class CoreProto {
     java.lang.String getUserAgent();
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1606,7 +1606,7 @@ public final class CoreProto {
     private java.lang.String userAgent_;
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1618,7 +1618,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1631,7 +1631,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1646,7 +1646,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -1657,7 +1657,7 @@ public final class CoreProto {
     }
     /**
      * <pre>
-     * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+     * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
      * </pre>
      *
      * <code>string user_agent = 17;</code>
@@ -3000,7 +3000,7 @@ public final class CoreProto {
 
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -3012,7 +3012,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -3025,7 +3025,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -3040,7 +3040,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>
@@ -3053,7 +3053,7 @@ public final class CoreProto {
       }
       /**
        * <pre>
-       * the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version&gt;"
+       * the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version&gt;"
        * </pre>
        *
        * <code>string user_agent = 17;</code>

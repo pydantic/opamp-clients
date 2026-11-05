@@ -282,7 +282,7 @@ type Config struct {
 	SavedState               []byte `protobuf:"bytes,14,opt,name=saved_state,json=savedState,proto3" json:"saved_state,omitempty"`                                              // the data of the last Store, as saved (empty: nothing saved)
 	AcceptConnectionSettings bool   `protobuf:"varint,15,opt,name=accept_connection_settings,json=acceptConnectionSettings,proto3" json:"accept_connection_settings,omitempty"` // accept offers, and declare the capabilities for them
 	VerifyTimeoutMs          uint64 `protobuf:"varint,16,opt,name=verify_timeout_ms,json=verifyTimeoutMs,proto3" json:"verify_timeout_ms,omitempty"`                            // how long offered settings have to prove themselves; default 60 s
-	UserAgent                string `protobuf:"bytes,17,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                 // the User-Agent of every request and upgrade; default "logfire-opamp/<core version>"
+	UserAgent                string `protobuf:"bytes,17,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`                                                 // the User-Agent of every request and upgrade; default "pydantic-opamp/<core version>"
 	// Packages (docs/packages.md), only with persistence.
 	AcceptPackages    bool   `protobuf:"varint,19,opt,name=accept_packages,json=acceptPackages,proto3" json:"accept_packages,omitempty"`            // accept packages, and declare the capabilities for them
 	MaxPackageBytes   uint64 `protobuf:"varint,20,opt,name=max_package_bytes,json=maxPackageBytes,proto3" json:"max_package_bytes,omitempty"`       // the largest file downloaded; default 1 GiB

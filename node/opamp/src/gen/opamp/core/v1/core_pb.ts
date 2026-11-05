@@ -146,7 +146,7 @@ export type Config = Message<"opamp.core.v1.Config"> & {
   verifyTimeoutMs: bigint;
 
   /**
-   * the User-Agent of every request and upgrade; default "logfire-opamp/<core version>"
+   * the User-Agent of every request and upgrade; default "pydantic-opamp/<core version>"
    *
    * @generated from field: string user_agent = 17;
    */

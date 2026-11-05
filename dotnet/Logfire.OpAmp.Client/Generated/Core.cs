@@ -689,7 +689,7 @@ namespace Logfire.OpAmp.Core {
     public const int UserAgentFieldNumber = 17;
     private string userAgent_ = "";
     /// <summary>
-    /// the User-Agent of every request and upgrade; default "logfire-opamp/&lt;core version>"
+    /// the User-Agent of every request and upgrade; default "pydantic-opamp/&lt;core version>"
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
