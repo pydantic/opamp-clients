@@ -12,14 +12,9 @@ HTTP or SOCKS5 proxies. It needs CPython 3.11 or later, free-threaded builds inc
 pip install pydantic-opamp-client
 ```
 
-The package is not on PyPI yet ([sdk-registries.md](sdk-registries.md)). It depends on
-`pydantic-opamp-core`, a wheel per platform that holds the core's library and nothing else. Until
-both are published, install them from a checkout:
-
-```bash
-scripts/fetch_core.py fetch               # the core release the lock pins, verified
-pip install ./python/core ./python        # the core's wheel for this machine, then the client
-```
+It depends on `pydantic-opamp-core`, a wheel per platform (Linux glibc and musl, macOS and
+Windows, on x64 and arm64) that holds the core's library and nothing else; pip picks the one for
+the machine.
 
 ## Start and stop
 

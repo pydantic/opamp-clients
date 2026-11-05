@@ -12,13 +12,10 @@ It plugs in through upstream's extension points, including the SDK's OpAMP hook
 
 ## Use it
 
-Install it next to the instrumentations the application needs. Until it is published, install it
-from a checkout of this repository, after fetching the compiled core the checkout pins:
+Install it next to the instrumentations the application needs:
 
 ```bash
-git clone https://github.com/pydantic/opamp-clients && cd opamp-clients
-scripts/fetch_core.py fetch
-pip install ./python/core ./python ./python/otel opentelemetry-instrumentation-flask
+pip install pydantic-opamp-otel opentelemetry-instrumentation-flask
 ```
 
 Then run the application under `opentelemetry-instrument` as usual, with the server's address:

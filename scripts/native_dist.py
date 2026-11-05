@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -173,13 +174,15 @@ def check() -> None:
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
         if f'id="Pydantic.OpAmp.Core.Native" version="[{core_version()}]"' not in spec:
             problems.append(f"{p.name}: doesn't depend on Pydantic.OpAmp.Core.Native {core_version()} exactly")
-    # The hosting package: its own assembly (and its docs) alone, on the client's package. What it
-    # shares with the plugin (dotnet/shared) is compiled into it, never shipped as source.
+    # The hosting package: its own assembly (and its docs) alone, on the client's package, with the
+    # README its nuspec names for NuGet's page. What it shares with the plugin (dotnet/shared) is
+    # compiled into it, never shipped as source.
     for p in (DIST / "nuget").glob("Pydantic.OpAmp.Extensions.Hosting.*.nupkg"):
         assemblies = [f"lib/{tfm}/Pydantic.OpAmp.Extensions.Hosting" for tfm in FRAMEWORKS]
         with zipfile.ZipFile(p) as z:
-            payload = [n for n in z.namelist() if not nuget_meta(n)]
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
+            readme = re.search(r"<readme>([^</]+\.md)</readme>", spec)
+            payload = [n for n in z.namelist() if not nuget_meta(n) and not (readme and n == readme[1])]
         problems += [f"{p.name}: ships {n}" for n in payload
                      if n not in [f"{a}.{ext}" for a in assemblies for ext in ("dll", "xml")]]
         problems += [f"{p.name}: lacks {a}.dll" for a in assemblies if f"{a}.dll" not in payload]

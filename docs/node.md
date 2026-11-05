@@ -13,16 +13,7 @@ protobuf-es types for OpAMP's messages. It needs Node.js 22 or later. Its
 npm install @pydantic/opamp-client
 ```
 
-The package is not on npm yet ([sdk-registries.md](sdk-registries.md)). Until it is, build it in a
-checkout and install it from there:
-
-```bash
-cd node/opamp
-npm ci
-npm run build                          # compiles to dist/
-cd /path/to/your/app
-npm install /path/to/checkout/node/opamp
-```
+The core is a WebAssembly module inside the package: nothing native to install.
 
 ## Start and stop
 

@@ -204,7 +204,8 @@ jobs:
             if [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
               echo "::notice::$spec is on npm already, skipped"
             elif [ "$PUBLISH" != true ]; then
-              npm publish --dry-run --access public "$tgz"
+              # A dry run is at 0.0.0, below what npm has, which npm won't tag latest.
+              npm publish --dry-run --tag dry-run --access public "$tgz"
             else
               npm publish --provenance --access public "$tgz"
             fi
