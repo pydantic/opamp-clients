@@ -496,7 +496,9 @@ func (a *agent) tell(inUse string, n opamp.Notification) {
 				Endpoint: inUse, Status: uint32(max(n.Status, 0)), Detail: n.Detail}}
 		}
 	case opamp.InstanceUIDChanged:
-		input = func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_InstanceUidChanged{InstanceUidChanged: n.InstanceUID[:]} }
+		input = func(s *settingspb.AgentStep) {
+			s.Input = &settingspb.AgentStep_InstanceUidChanged{InstanceUidChanged: n.InstanceUID[:]}
+		}
 	case opamp.StateFromNewerVersion:
 		input = func(s *settingspb.AgentStep) {
 			s.Input = &settingspb.AgentStep_StateFromNewerVersion{StateFromNewerVersion: n.StateVersion}

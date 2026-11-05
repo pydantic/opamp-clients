@@ -132,7 +132,7 @@ func TestAGlobalProviderSetInPlaceOfSetupsIsReportedUngoverned(t *testing.T) {
 				t.Fatalf("status %v", st)
 			}
 			reported := len(r.effective) // the config's own
-			a.lookAtGlobals() // nothing replaced: nothing reported
+			a.lookAtGlobals()            // nothing replaced: nothing reported
 			if len(r.components) != 0 || len(r.health) != 0 {
 				t.Fatalf("Setup's providers still global: %d inventories, %d health reports", len(r.components), len(r.health))
 			}

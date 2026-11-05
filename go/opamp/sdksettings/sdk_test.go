@@ -414,7 +414,9 @@ func TestDebugModeEndsOnTheTimer(t *testing.T) {
 		f.out.GetWakeAtMonoMs() == 0 || f.out.GetWakeAtMonoMs() > now+end {
 		t.Fatalf("decide: %v", f.out)
 	}
-	f.step(end, func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Timer{Timer: &settingspb.ExportCounts{}} })
+	f.step(end, func(s *settingspb.AgentStep) {
+		s.Input = &settingspb.AgentStep_Timer{Timer: &settingspb.ExportCounts{}}
+	})
 	if f.apply().GetSamplingRate() != 0.1 || f.apply().SendLogsMinSeverity != nil || f.state().GetRefreshAtUnixMs() != 0 ||
 		effective(t, f.out.GetEffective()) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
 		t.Fatalf("the end: %v", f.out)
@@ -436,7 +438,9 @@ func TestExportHealth(t *testing.T) {
 		}
 	}
 	f := startFlow(t, l, declaring, true, nil)
-	f.step(0, func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Built{Built: &settingspb.AgentBuilt{Service: "checkout"}} })
+	f.step(0, func(s *settingspb.AgentStep) {
+		s.Input = &settingspb.AgentStep_Built{Built: &settingspb.AgentBuilt{Service: "checkout"}}
+	})
 	f.step(0, exporters(0, &settingspb.ExportCounts{}))
 	first := f.health().GetComponentHealthMap()["exporters"]
 	if len(first.GetComponentHealthMap()) != 3 || first.GetStatus() != "ok" {
