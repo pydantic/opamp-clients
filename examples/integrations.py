@@ -1569,9 +1569,9 @@ def free_port(host: str) -> int:
 
 
 def masked_ending(sink: list[dict], after: float, before: float) -> tuple[list[str], list[str]]:
-    """The names of the requests' spans that ended between `after` and `before` (the sink names a
-    span by its URL, else its name), and those of them that show a URL."""
-    names = ending(sink, after, before)
+    """The names of the requests' spans that ended between `after` and `before` and arrived by
+    `before` (the sink names a span by its URL, else its name), and those of them that show a URL."""
+    names = ending(sink, after, before, arrived_before=before)
     return names, [n for n in names if "://" in n]
 
 

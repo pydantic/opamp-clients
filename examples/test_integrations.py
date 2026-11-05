@@ -1282,6 +1282,14 @@ class Outage(unittest.TestCase):
         self.assertEqual(self.judged(quiet_while_away=True),
                          ["and the policy holds: spans still exported, each URL [REDACTED] (0 of 0, [])"])
 
+    def test_spans_held_back_until_the_server_returns_fail(self):
+        sink, a, b = outage()
+        for e in sink.events:
+            if e["event"] == "otlp" and 10 < e["t"] < 25:
+                e["t"] = 26  # ended while the server was away, exported only once it was back
+        self.assertEqual(failed(judge_outage(sink.events, a.events, b.events, 10, 25)),
+                         ["and the policy holds: spans still exported, each URL [REDACTED] (0 of 0, [])"])
+
     def test_a_new_uid_fails(self):
         self.assertEqual(self.judged(new_uid=True), ["server B hears the agent again (5 messages), with the same UID"])
 
