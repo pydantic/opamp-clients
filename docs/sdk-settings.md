@@ -531,8 +531,9 @@ config's hash, and on FAILED the reason (`head_sampling: ratio must be a number 
 reason starts with the control it is about, or with `config_map:`, `schema:` or `policy:` when
 the policy as a whole is wrong. It quotes at most 64 characters of a value or key, then
 `… (N bytes)`, so a huge value sent wrong does not come back as a huge reason. The SDK then
-reports its **effective config**: the policy in force, as the only file, `logfire-sdk-policy.json`
-(`application/json`).
+reports its **effective config**: the policy in force, `logfire-sdk-policy.json`
+(`application/json`), and beside it, where the integration can tell any, its
+[local values](#the-local-values), `logfire-sdk-local.json`.
 
 **The client keeps the config applied.** A config is answered in two steps, the same in every
 language. The layer first decides what to keep (`Decide` returns a `Plan`: the policy to keep, or
@@ -560,6 +561,30 @@ Each language's binding runs the two steps, so the integration makes one call.
 - The layer builds the effective config (`Load`, `Commit` and `Refresh` each return the whole of
   it), so every language reports it the same way. The reference server's log shows an effective
   config's JSON files on its `a2s` line, as `effective`.
+
+## The local values
+
+Beside the policy in force, the effective config holds `logfire-sdk-local.json`: what each control
+would be without a policy, as the SDK runs (the contract `logfire-sdk-local/v1`). A server shows it
+beside what a policy sets. It is reported, never applied, and never saved: a `local` control in the
+policy stays `{"mode": "local"}`. The integration hands the layer what it can tell (`Host.local`,
+the same host every call is given), and the layer writes the file, the same bytes in every
+language. A value the integration can't tell is left out, never guessed. The controls only the
+policy has (the sampling rules, the rate limits, attribute redaction, debug mode and app settings)
+the layer reports as none, for each one the host carries out.
+
+| Integration | `head_sampling` | `signal_exports` | `log_levels`, `scrubbing`, `instrumentations` |
+|---|---|---|---|
+| Python | the ratio of the SDK's own sampler, the one this package's wraps (under `manage()`, the tracer provider's): a trace-ID ratio, always on (1) or always off (0); none for another | each signal whose provider is the SDK's: whether it has an exporter, governed or not; again when a processor added later gives one | the Logfire SDK's own: its `min_level` where it is one of the policy's levels, and whether it scrubs (`scrubbing=False`: no). Under `opentelemetry-instrument`, `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS` as the application set it (`*`: all) |
+| Node.js | `register`: the sampler `OTEL_TRACES_SAMPLER` names; `manage()`: none | `register`: whether `OTEL_*_EXPORTER` names an exporter, for each signal this package builds; `manage()`: none | none |
+| Go | the sampler `OTEL_TRACES_SAMPLER` names | whether `Setup` built an exporter for the signal | none |
+| Java agent | the sampler `otel.traces.sampler` names, by its argument; none for another one, or when another extension's sampler is in force | whether `otel.<signal>.exporter` names one; none under a configuration file | none |
+| .NET plugin | the sampler `OTEL_TRACES_SAMPLER` names, where the live sampler wraps that one | each signal automatic instrumentation builds the provider of: set up, with an exporter its variables name or one the providers export through | none |
+| .NET `WithOpAmp()` | as the plugin's | whether the application's provider of the signal exports through anything | none |
+
+The OpenTelemetry SDKs have no level for the application's log records of their own, so
+`log_levels` is reported only where the Logfire SDK sets one. A ratio is decimal text (`"0.25"`),
+as every language writes it the same.
 
 ## The description
 

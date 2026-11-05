@@ -71,7 +71,7 @@ carries out and builds the one shape every language sends:
 | Component | What it holds |
 |---|---|
 | `sdk` | metadata `integration.name` and `integration.version` (our package), `telemetry.sdk.language` and `telemetry.sdk.version` (the OpenTelemetry SDK's) |
-| `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known |
+| `instrumentations` | one sub-component per instrumentation it can run, switched off or not, under the name that the policy's `instrumentations` control takes, with metadata `version` when known, and `scope` when known: the OpenTelemetry instrumentation scope its telemetry carries (its tracer's, meter's or logger's name), so a server can tell which instrumentations send anything |
 | `exporters` | one sub-component per signal (`traces`, `metrics`, `logs`) with an exporter, and under it one per exporter by its identity: its name as `OTEL_*_EXPORTER` names it (`otlp`, `console`, `prometheus`, `zipkin`) or its type, and `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`). Metadata: the boolean `gated`, whether the policy governs it (the integration's gate is in front of it: signal export, levels, caps, redaction), and `destination` (`scheme://host:port`) with a destination. Never the path, query or credentials. One not gated is ungoverned: reported, never a reason to refuse a policy ([sdk-settings.md](sdk-settings.md#where-each-setting-applies)). A global provider of the application's own (Node.js, Go, .NET) is listed as `app_provider`, not gated |
 | `settings` | one sub-component per setting it carries out, by the setting's name behind the policy's controls ([sdk-settings.md](sdk-settings.md#the-controls)), with metadata `applies`: `at once` or `next start`. A setting it cannot carry out in this process is left out |
 
@@ -92,7 +92,8 @@ For example, a Python service with Flask and a Prometheus reader:
 {
   "sdk": {"integration.name": "opamp-otel", "integration.version": "0.4.0",
           "telemetry.sdk.language": "python", "telemetry.sdk.version": "1.45.1"},
-  "instrumentations": {"flask": {"version": "0.56b0"}, "requests": {"version": "0.56b0"}},
+  "instrumentations": {"flask": {"version": "0.56b0", "scope": "opentelemetry.instrumentation.flask"},
+                       "requests": {"version": "0.56b0", "scope": "opentelemetry.instrumentation.requests"}},
   "exporters": {"traces": {"otlp@collector:4318": {"gated": true, "destination": "http://collector:4318"}},
                 "metrics": {"otlp@collector:4318": {"gated": true, "destination": "http://collector:4318"},
                             "prometheus": {"gated": false}}},
@@ -104,10 +105,21 @@ For example, a Python service with Flask and a Prometheus reader:
 - The same inventory in any order gives the same components, and so the same hash: services that
   run the same thing share one set, which a server can store once.
 - A name listed twice is one sub-component: an instrumentation's versions joined, sorted, by
-  `,` (a version with a `,` in it is left out, since it would read as several); an exporter
-  `gated` only if every exporter of that identity is.
-- Limits, so a set stays small: names and versions of up to 128 bytes (a longer name is left out,
-  a longer version cut), 16 versions an instrumentation (past them, the first, sorted), 1024
+  `,` (a version with a `,` in it is left out, since it would read as several), and its scopes
+  the same way; an exporter `gated` only if every exporter of that identity is.
+- Where each integration's scopes come from: Python, the module its entry point names
+  (`opentelemetry.instrumentation.requests`, the name upstream's instrumentations get their
+  tracers by); Node.js, the instrumentation's `instrumentationName`
+  (`@opentelemetry/instrumentation-http`); Go, the whole scope name it was taken under
+  (`go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp`); the Java agent,
+  `io.opentelemetry.<name>` for the name whose version the module embeds (none embedded: none);
+  .NET, a table of the ActivitySource or Meter each instrumentation's telemetry comes from
+  (`System.Net.Http`, `Microsoft.AspNetCore`; none for a logging bridge, whose logs are under the
+  application's categories), and `WithOpAmp()` the instrumentation's assembly name for one the
+  table doesn't have.
+- Limits, so a set stays small: names, versions and scopes of up to 128 bytes (a longer name is
+  left out, a longer version or scope cut), 16 versions and 16 scopes an instrumentation (past
+  them, the first, sorted), 1024
   instrumentations and 64 exporters a signal (past them, the first by name).
 - The integration calls `Components` once its SDK is built, and again when what it lists
   changes, and gives the answer to its client (`set_available_components`). The client then sends
