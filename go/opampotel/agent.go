@@ -7,14 +7,11 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
-	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -64,40 +61,30 @@ var carried = []string{
 	"custom",
 }
 
-// agent puts the SDK under the server: one per Setup.
+// agent puts the SDK under the server: one per Setup. What it does around the settings is the
+// layer's agent flow (docs/sdk-settings.md, "The agent flow"): it tells the flow what happened
+// and carries out what the flow says, in order.
 type agent struct {
 	server   *server
 	controls *Controls
 	layer    *sdksettings.Layer
 	uid      uuid.UUID
-	atStart  *settingspb.Loaded
+	base     time.Time // the monotonic clock's zero
 
-	mu        sync.Mutex // everything below it but client and reach
-	current   []byte
+	mu        sync.Mutex // everything below it but client
+	flow      []byte     // the flow's state, as the layer last gave it
 	effective *protobufs.EffectiveConfig
-	// The timer: one, re-armed for the earlier of when the layer said to ask again (refreshAt,
-	// the end of debug mode) and the next export health report. gen is bumped at each arming, so
-	// a timer that went off before a newer arming is nothing.
-	refreshAt uint64    // milliseconds since the Unix epoch; 0: nothing to ask
-	deadline  time.Time // refreshAt on the monotonic clock: a wall clock moved since doesn't move it
-	// Export health, once the client runs: the settings in force (a send_* false is "off"), the
-	// last report the layer answered, when the next is due, and the time the agent started.
-	settings    *settingspb.Settings
-	health      *settingspb.HealthReport
-	nextHealth  time.Time // zero: none
-	healthEvery time.Duration
-	started     uint64 // nanoseconds since the Unix epoch
-	gen         uint64
-	timer       stopper
-	stopped     bool
-	reporter    reporter // the client, once there is one: where a timer's changes are reported
+	settings  *settingspb.Settings // the settings last put in force
+	gen       uint64               // bumped at each arming: a timer armed before a newer one is nothing
+	timer     stopper
+	stopped   bool
+	reporter  reporter // the client, once there is one
 
 	// now and after are the clock and the timer (a test's own in tests).
 	now   func() time.Time
 	after func(time.Duration, func()) stopper
 
 	client *opamp.Client
-	reach  *reachability // set in start; used on the client's goroutine only
 
 	// The inventory: the exporters Setup built as found (set before start), those the layer
 	// decided are listed (decide), the warnings said, and the generation of scopes last listed
@@ -121,9 +108,10 @@ type agent struct {
 // stopper is a timer that can be stopped (*time.Timer).
 type stopper interface{ Stop() bool }
 
-// reporter is what a timer's changes go to: the client.
+// reporter is where the flow's answers go: the client.
 type reporter interface {
 	SetEffectiveConfig(*protobufs.EffectiveConfig)
+	SetRemoteConfigStatus(*protobufs.RemoteConfigStatus)
 	SetHealth(*protobufs.ComponentHealth)
 	SetAvailableComponents(*protobufs.AvailableComponents)
 }
@@ -151,47 +139,151 @@ func newAgentAt(ctx context.Context, s *server, controls *Controls, resourceAttr
 	if err != nil {
 		return nil, err
 	}
-	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, healthEvery: 30 * time.Second,
-		globals: globalProviders}
+	a := &agent{server: s, controls: controls, layer: layer, now: now, after: after, globals: globalProviders}
 	changed := func() { go a.scopesChanged() }
 	controls.scopes.changed.Store(&changed)
-	var saved, coreState []byte
+	var coreState []byte
 	if s.stateDir != "" {
 		if err := os.MkdirAll(s.stateDir, 0o700); err != nil {
 			slog.Warn("opamp: the state directory is unusable", "error", err)
 		}
 		// The settings to start with are the last config applied, which the client keeps in its
-		// state (opamp-state); sdk-settings.json is what this package kept itself before, read
-		// only while the client's state holds no config applied. Read as the client reads it at
-		// start: after a save a client stopped in this process left writing (a config applied
-		// just before a Shutdown) has landed, or this start would begin from the config before.
+		// state (opamp-state). Read as the client reads it at start: after a save a client stopped
+		// in this process left writing (a config applied just before a Shutdown) has landed, or
+		// this start would begin from the config before.
 		coreState, err = opamp.ReadState(filepath.Join(s.stateDir, "opamp-state"))
 		if err != nil {
 			slog.Warn("opamp: the client's saved state unreadable, using the SDK's own settings", "error", err)
 		}
-		saved, err = os.ReadFile(filepath.Join(s.stateDir, "sdk-settings.json"))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			slog.Warn("opamp: saved SDK settings unreadable, using the SDK's own", "error", err)
-		}
 	}
-	start := a.now()
-	loaded, err := layer.LoadFrom(ctx, coreState, saved, s.host(), unixMs(start))
+	a.base = a.now()
+	a.uid = identity(s.stateDir, resourceAttrs, a.base)
+	h := s.hints
+	out, err := layer.Start(ctx, &settingspb.AgentStart{
+		Host:        s.host(),
+		StateDir:    s.stateDir != "",
+		CoreState:   coreState,
+		Endpoint:    s.endpoint,
+		InstanceUid: a.uid[:],
+		Hints: &settingspb.AgentHints{Refused: h.GetRefused(), NotFound: h.GetNotFound(),
+			Unreachable: h.GetUnreachable(), Error: h.GetError()},
+		NowUnixMs: unixMs(a.base),
+		NowMonoMs: 0,
+	})
 	if err != nil {
 		_ = layer.Close(ctx)
 		return nil, err
 	}
-	if loaded.GetWarning() != "" {
-		slog.Warn("opamp: " + loaded.GetWarning())
-	}
-	a.atStart, a.current, a.effective = loaded, loaded.GetCurrent(), loaded.GetEffective()
-	controls.Apply(loaded.GetSettings())
-	a.settings = loaded.GetSettings()
-	a.uid = identity(s.stateDir, resourceAttrs, start)
 	a.mu.Lock()
-	a.refreshAfter(loaded.GetRefreshAtUnixMs(), start)
-	a.arm()
+	a.carryOut(out)
 	a.mu.Unlock()
 	return a, nil
+}
+
+// step tells the flow what happened, and carries out what it says: the remote config status and
+// the health it gave, if any. Under a.mu.
+func (a *agent) step(input func(*settingspb.AgentStep)) (*protobufs.RemoteConfigStatus, *protobufs.ComponentHealth) {
+	now := a.now()
+	st := &settingspb.AgentStep{Agent: a.flow, NowUnixMs: unixMs(now), NowMonoMs: a.monoMs(now)}
+	input(st)
+	out, err := a.layer.Step(context.Background(), st)
+	if err != nil {
+		slog.Warn("opamp: the settings layer failed", "error", err)
+		return nil, nil
+	}
+	return a.carryOut(out)
+}
+
+// monoMs is now on the monotonic clock, in milliseconds since the agent started.
+func (a *agent) monoMs(now time.Time) uint64 {
+	if d := now.Sub(a.base); d > 0 {
+		return uint64(d.Milliseconds())
+	}
+	return 0
+}
+
+// carryOut carries out the flow's effects in order, and arms the timer for its next wake. Under
+// a.mu.
+func (a *agent) carryOut(out *settingspb.AgentOutput) (status *protobufs.RemoteConfigStatus, health *protobufs.ComponentHealth) {
+	a.flow, a.effective = out.GetAgent(), out.GetEffective()
+	for _, e := range out.GetEffects() {
+		switch e := e.GetEffect().(type) {
+		case *settingspb.AgentEffect_Apply:
+			a.controls.Apply(e.Apply)
+			a.settings = e.Apply
+		case *settingspb.AgentEffect_Effective:
+			if a.reporter != nil {
+				a.reporter.SetEffectiveConfig(e.Effective)
+			}
+		case *settingspb.AgentEffect_Status:
+			status = e.Status
+			if a.reporter != nil {
+				a.reporter.SetRemoteConfigStatus(e.Status)
+			}
+		case *settingspb.AgentEffect_Health:
+			health = e.Health
+			if a.reporter != nil {
+				a.reporter.SetHealth(e.Health)
+			}
+		case *settingspb.AgentEffect_SaveUid:
+			// The client uses the UID from now on; the next start puts it in the telemetry too.
+			if err := write(filepath.Join(a.server.stateDir, opamp.SetupUIDFile), []byte(e.SaveUid)); err != nil {
+				a.step(func(s *settingspb.AgentStep) {
+					s.Input = &settingspb.AgentStep_UidNotSaved{UidNotSaved: err.Error()}
+				})
+			}
+		case *settingspb.AgentEffect_Log:
+			say(e.Log)
+		}
+	}
+	a.arm(out.GetWakeAtMonoMs())
+	return status, health
+}
+
+// say logs a line of the flow's, prefixed as this package's own.
+func say(l *settingspb.AgentLog) {
+	msg := "opamp: " + l.GetText()
+	switch l.GetLevel() {
+	case settingspb.AgentLog_DEBUG:
+		slog.Debug(msg)
+	case settingspb.AgentLog_INFO, settingspb.AgentLog_NOTICE:
+		slog.Info(msg)
+	case settingspb.AgentLog_WARN:
+		slog.Warn(msg)
+	default:
+		slog.Error(msg)
+	}
+}
+
+// arm sets the one timer for wakeMs on the monotonic clock (0: none), in place of any earlier one.
+// Under a.mu.
+func (a *agent) arm(wakeMs uint64) {
+	if a.timer != nil {
+		a.timer.Stop()
+		a.timer = nil
+	}
+	a.gen++
+	if a.stopped || wakeMs == 0 {
+		return
+	}
+	gen := a.gen
+	wait := time.Duration(0)
+	if now := a.monoMs(a.now()); wakeMs > now {
+		wait = time.Duration(wakeMs-now) * time.Millisecond
+	}
+	a.timer = a.after(wait, func() { a.fired(gen) })
+}
+
+// fired is the timer going off: the flow asks the layer again when debug mode ends, and builds
+// export health when it is due. A timer armed before a newer one is nothing.
+func (a *agent) fired(gen uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if gen != a.gen || a.stopped {
+		return
+	}
+	counts := a.controls.Counts()
+	a.step(func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Timer{Timer: counts} })
 }
 
 // identity is the instance UID, as the core's Setup decides it: the one saved in the state
@@ -290,11 +382,9 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 		cfg.StateFile = filepath.Join(a.server.stateDir, "opamp-state")
 	}
 	service, _ := res.Set().Value("service.name")
-	a.reach = &reachability{endpoint: a.server.shown, service: service.AsString(), uid: a.uid,
-		hints: a.server.hints}
 	a.mu.Lock()
+	health := a.built(service.AsString())
 	effective := a.effective
-	health, _ := a.healthReport(ctx, a.now()) // the first report: always sent
 	components := a.components(ctx)
 	a.mu.Unlock()
 	// Notifications come on the client's goroutine, one at a time, and none before Start has
@@ -325,47 +415,37 @@ func (a *agent) start(ctx context.Context, res *resource.Resource) {
 			a.relist = false
 		}
 	}
-	a.nextHealth = a.now().Add(a.healthEvery)
-	a.arm()
 	if a.ours != (providers{}) && !a.stopped {
 		a.watchStop = make(chan struct{})
 		go a.watch(a.watchStop, watchEvery)
 	}
 }
 
+// built tells the flow the SDK is built, and the exporters: the first export health, for the
+// client's first status. Under a.mu.
+func (a *agent) built(service string) *protobufs.ComponentHealth {
+	exporters := a.exporters
+	a.step(func(s *settingspb.AgentStep) {
+		s.Input = &settingspb.AgentStep_Built{Built: &settingspb.AgentBuilt{Service: service, Exporters: exporters}}
+	})
+	if _, health := a.exportersNow(); health != nil {
+		return health
+	}
+	return &protobufs.ComponentHealth{Healthy: true}
+}
+
+// exportersNow tells the flow the exporters listed and the gates' counts now: export health is
+// built at once. Under a.mu.
+func (a *agent) exportersNow() (*protobufs.RemoteConfigStatus, *protobufs.ComponentHealth) {
+	exporters, counts := a.exporters, a.controls.Counts()
+	return a.step(func(s *settingspb.AgentStep) {
+		s.Input = &settingspb.AgentStep_Exporters{Exporters: &settingspb.AgentExporters{Exporters: exporters, Counts: counts}}
+	})
+}
+
 // host is what this package carries out: the server's host (server.host), whatever the global
 // providers are now.
 func (a *agent) host() *settingspb.Host { return a.server.host() }
-
-// healthReport is the agent's health: the application's (healthy, as it runs), with export
-// health under component_health_map["exporters"] as the layer builds it from the gates' counts,
-// and whether the layer says to send it now. Under a.mu.
-func (a *agent) healthReport(ctx context.Context, now time.Time) (*protobufs.ComponentHealth, bool) {
-	if a.started == 0 {
-		a.started = uint64(now.UnixNano())
-	}
-	h := &protobufs.ComponentHealth{Healthy: true, StartTimeUnixNano: a.started}
-	r, err := a.layer.Health(ctx, a.controls.Counts(), a.health, unixMs(now), a.settings, a.listedExporters())
-	if err != nil {
-		slog.Warn("opamp: export health could not be built", "error", err)
-		return h, false
-	}
-	a.health = r
-	if r.GetExporters() != nil {
-		h.ComponentHealthMap = map[string]*protobufs.ComponentHealth{"exporters": r.GetExporters()}
-	}
-	return h, r.GetSend()
-}
-
-// reportHealth sends export health when the layer says to (a status changed, or the counters
-// moved and a minute has passed), and sets when to look again. Under a.mu.
-func (a *agent) reportHealth(now time.Time) {
-	h, send := a.healthReport(context.Background(), now)
-	if send && a.reporter != nil {
-		a.reporter.SetHealth(h)
-	}
-	a.nextHealth = now.Add(a.healthEvery)
-}
 
 // stop says goodbye (agent_disconnect), and waits for the client to stop, the notification being
 // handled with it (until ctx is done); then the SDK may flush.
@@ -389,256 +469,65 @@ func (a *agent) stop(ctx context.Context) error {
 
 // notified handles a notification on the client's goroutine, answering through c.
 func (a *agent) notified(c *opamp.Client, n opamp.Notification) {
-	if a.reach != nil {
-		a.reach.inUse = c.Endpoint
-		a.reach.notified(n)
-	}
-	switch n.Kind {
-	case opamp.RemoteConfig:
-		status := a.remoteConfig(context.Background(), n.RemoteConfig)
-		// Under the lock, so a timer's report can't overtake this one.
+	if n.Kind == opamp.RemoteConfig {
 		a.mu.Lock()
 		if a.reporter == nil {
 			a.reporter = c
 		}
-		c.SetEffectiveConfig(a.effective)
-		c.SetRemoteConfigStatus(status)
 		a.mu.Unlock()
-	case opamp.InstanceUIDChanged:
-		a.instanceUIDChanged(n.InstanceUID)
-	case opamp.StateFromNewerVersion:
-		slog.Warn(stateFromNewerVersion(n.StateVersion))
-	case opamp.Stopped:
-		if n.Err != nil {
-			slog.Error("opamp: the client stopped; the SDK runs unmanaged", "error", n.Err)
-		}
+		a.remoteConfig(context.Background(), n.RemoteConfig)
+		return
 	}
+	a.tell(c.Endpoint(), n)
 }
 
-// stateFromNewerVersion is the warning for a saved state a newer release wrote: an older one was
-// started on its state directory.
-func stateFromNewerVersion(version uint32) string {
-	return fmt.Sprintf("opamp: the saved state was written by a newer version of this SDK (state format %d), "+
-		"which this one can't read: it is kept as it is, and this run saves nothing", version)
-}
-
-// reachability says when the client connects, when it can't (once a run of failures, with what
-// to check), and when it's back: setup that works or doesn't is never silent.
-type reachability struct {
-	endpoint string // the configured one, as it is safe to log
-	// inUse is the endpoint the client uses now, as the client gives it (nil or "": the
-	// configured one): after the server moved the agent, the one it moved it to.
-	inUse   func() string
-	service string // "": none
-	uid     uuid.UUID
-	ever    bool // connected once
-	failing bool // since the last connect
-	// What to check when the server can't be reached (the core's Setup), naming what gave the
-	// endpoint and the headers.
-	hints *opamp.SetupHints
-}
-
-// at is the endpoint the client uses now, as it is safe to log.
-func (r *reachability) at() string {
-	if r.inUse != nil {
-		if e := r.inUse(); e != "" {
-			return shownEndpoint(e, r.endpoint)
-		}
-	}
-	return r.endpoint
-}
-
-func (r *reachability) notified(n opamp.Notification) {
-	endpoint := r.at()
+// tell tells the flow of a notification other than a remote config; inUse is the endpoint the
+// client uses now.
+func (a *agent) tell(inUse string, n opamp.Notification) {
+	var input func(*settingspb.AgentStep)
 	switch n.Kind {
 	case opamp.Connected:
-		if !r.ever {
-			who := ""
-			if r.service != "" {
-				who = " as " + r.service
-			}
-			slog.Info(fmt.Sprintf("opamp: connected to %s; this SDK is managed%s, instance %s", endpoint, who, r.uid))
-		} else if r.failing {
-			slog.Info("opamp: connected to " + endpoint + " again")
+		input = func(s *settingspb.AgentStep) {
+			s.Input = &settingspb.AgentStep_Connected{Connected: &settingspb.AgentConnected{Endpoint: inUse}}
 		}
-		r.ever, r.failing = true, false
 	case opamp.ConnectFailed:
-		if !r.failing {
-			why := n.Detail
-			if why == "" {
-				why = fmt.Sprintf("HTTP %d", n.Status)
-			}
-			slog.Warn(fmt.Sprintf("opamp: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its current settings meanwhile",
-				endpoint, why, r.hint(n.Status)))
-		} else {
-			slog.Debug(fmt.Sprintf("opamp: still can't reach %s: %s", endpoint, n.Detail))
+		input = func(s *settingspb.AgentStep) {
+			s.Input = &settingspb.AgentStep_ConnectFailed{ConnectFailed: &settingspb.AgentConnectFailed{
+				Endpoint: inUse, Status: uint32(max(n.Status, 0)), Detail: n.Detail}}
 		}
-		r.failing = true
-	}
-}
-
-// shownEndpoint is an endpoint as it is safe to log (no user info, query or fragment), by the
-// core's rule; otherwise where the core can't be asked.
-func shownEndpoint(endpoint, otherwise string) string {
-	s, err := opamp.StartSetup(context.Background(), &opamp.SetupStart{Code: &opamp.SetupInCode{Endpoint: &endpoint}})
-	if err != nil || s.GetShownEndpoint() == "" {
-		return otherwise
-	}
-	return s.GetShownEndpoint()
-}
-
-// hint is what to check when the server can't be reached, by the HTTP status (0: none).
-func (r *reachability) hint(status int) string {
-	switch status {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return r.hints.GetRefused()
-	case http.StatusNotFound:
-		return r.hints.GetNotFound()
-	case 0:
-		return r.hints.GetUnreachable()
-	}
-	return r.hints.GetError()
-}
-
-// instanceUIDChanged keeps the UID the server assigned for the next start, which puts it in the
-// telemetry too (service.instance.id); the client uses it from now on.
-func (a *agent) instanceUIDChanged(uid uuid.UUID) {
-	if a.server.stateDir == "" {
-		slog.Warn("opamp: the server assigned a new instance UID; without a state directory the next start won't keep it",
-			"instance_uid", uid.String())
+	case opamp.InstanceUIDChanged:
+		input = func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_InstanceUidChanged{InstanceUidChanged: n.InstanceUID[:]} }
+	case opamp.StateFromNewerVersion:
+		input = func(s *settingspb.AgentStep) {
+			s.Input = &settingspb.AgentStep_StateFromNewerVersion{StateFromNewerVersion: n.StateVersion}
+		}
+	case opamp.Stopped:
+		stopped := &settingspb.AgentStopped{}
+		if n.Err != nil {
+			stopped.Error = n.Err.Error()
+		}
+		input = func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Stopped{Stopped: stopped} }
+	default:
 		return
 	}
-	if err := write(filepath.Join(a.server.stateDir, opamp.SetupUIDFile), []byte(uid.String())); err != nil {
-		slog.Warn("opamp: can't save the instance UID the server assigned", "error", err)
-		return
-	}
-	slog.Info("opamp: the server assigned a new instance UID; in the telemetry from the next start",
-		"instance_uid", uid.String())
-}
-
-// remoteConfig carries out the layer's decision on a remote config, and gives the answer.
-func (a *agent) remoteConfig(ctx context.Context, config *protobufs.AgentRemoteConfig) *protobufs.RemoteConfigStatus {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	now := a.now()
-	// With a state directory the client keeps the config this applies, in its own state, and tells
-	// the server APPLIED once that is saved: nothing for this package to save. Without one, nothing
-	// is kept, and a next-start change is refused.
-	var save func([]byte) error
-	if a.server.stateDir != "" {
-		save = func([]byte) error { return nil }
-	}
+	a.step(input)
+}
+
+// remoteConfig tells the flow of a remote config; the answer, which goes to the client too.
+func (a *agent) remoteConfig(_ context.Context, config *protobufs.AgentRemoteConfig) *protobufs.RemoteConfigStatus {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	// A provider replaced since the last look is reported before the decision.
 	if a.noticeReplaced() {
-		a.reportReplaced(now)
+		a.reportReplaced()
 	}
-	d, err := a.layer.DecideAt(ctx, config, a.current, a.atStart.GetCurrent(), a.host(), unixMs(now), save)
-	if err != nil {
-		return failed(config, err.Error())
+	status, _ := a.step(func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_RemoteConfig{RemoteConfig: config} })
+	if status == nil {
+		return failed(config, "the settings layer gave no answer")
 	}
-	if s := d.GetApply(); s != nil {
-		a.controls.Apply(s)
-		a.settings = s
-	}
-	if len(d.GetPendingRestart()) > 0 {
-		slog.Info("opamp: " + strings.Join(d.GetPendingRestart(), ", ") + " changed; in force when the application restarts")
-	}
-	a.current, a.effective = d.GetCurrent(), d.GetEffective()
-	if d.GetApply() == nil && a.refreshAt != 0 && unixMs(now) >= a.refreshAt {
-		// FAILED, so nothing changes, but what is reported is now's: once the wall clock has
-		// passed the end of debug mode (a machine that slept, before the timer went off), it ends
-		// here, as the report says.
-		a.refresh(now)
-	} else {
-		// A FAILED config leaves the one in force, and its time to ask again.
-		a.refreshAfter(d.GetRefreshAtUnixMs(), now)
-	}
-	a.arm()
-	return d.GetStatus()
-}
-
-// refreshAfter keeps when to ask the layer again, decided at now: refreshAt (0: never), and the
-// same on the monotonic clock. Under a.mu.
-func (a *agent) refreshAfter(refreshAt uint64, now time.Time) {
-	a.refreshAt = refreshAt
-	if refreshAt != 0 {
-		wait := time.Duration(0)
-		if ms := unixMs(now); refreshAt > ms {
-			wait = time.Duration(refreshAt-ms) * time.Millisecond
-		}
-		a.deadline = now.Add(wait)
-	}
-}
-
-// arm sets the one timer for the earliest thing due, in place of any earlier one. Under a.mu.
-func (a *agent) arm() {
-	if a.timer != nil {
-		a.timer.Stop()
-		a.timer = nil
-	}
-	a.gen++
-	if a.stopped {
-		return
-	}
-	var due time.Time
-	if a.refreshAt != 0 {
-		due = a.deadline
-	}
-	if !a.nextHealth.IsZero() && (due.IsZero() || a.nextHealth.Before(due)) {
-		due = a.nextHealth
-	}
-	if due.IsZero() {
-		return
-	}
-	gen := a.gen
-	a.timer = a.after(max(due.Sub(a.now()), 0), func() { a.fired(gen) })
-}
-
-// fired is the timer going off: what is due is done, and the timer armed again. A timer armed
-// before a newer one (a decision came between) is nothing.
-func (a *agent) fired(gen uint64) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if gen != a.gen || a.stopped {
-		return
-	}
-	now := a.now()
-	if a.refreshAt != 0 && !now.Before(a.deadline) {
-		a.refresh(now)
-	}
-	if !a.nextHealth.IsZero() && !now.Before(a.nextHealth) {
-		a.reportHealth(now)
-	}
-	a.arm()
-}
-
-// refresh asks the layer what is in force now that refreshAt has come (debug mode ends), puts it
-// in force, and reports the effective config, with or without the server. The monotonic deadline
-// decides that it has come: the layer is told at least refreshAt, should the wall clock have
-// moved back since. Under a.mu.
-func (a *agent) refresh(now time.Time) {
-	a.decideAgain(now, max(unixMs(now), a.refreshAt))
-}
-
-// decideAgain asks the layer what is in force at ms under the host as it is now, puts it in
-// force, and reports the effective config. Under a.mu.
-func (a *agent) decideAgain(now time.Time, ms uint64) {
-	r, err := a.layer.Refresh(context.Background(), a.current, a.atStart.GetCurrent(), a.host(), ms)
-	if err != nil {
-		slog.Warn("opamp: the settings in force could not be refreshed; asking again in a minute", "error", err)
-		a.refreshAfter(ms+60_000, now)
-		return
-	}
-	if r.GetWarning() != "" {
-		slog.Warn("opamp: " + r.GetWarning())
-	}
-	a.controls.Apply(r.GetSettings())
-	a.settings = r.GetSettings()
-	a.effective = r.GetEffective()
-	a.refreshAfter(r.GetRefreshAtUnixMs(), now)
-	if a.reporter != nil {
-		a.reporter.SetEffectiveConfig(a.effective)
-	}
+	return status
 }
 
 func failed(config *protobufs.AgentRemoteConfig, msg string) *protobufs.RemoteConfigStatus {

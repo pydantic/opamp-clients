@@ -125,123 +125,197 @@ class Host(_message.Message):
     next_start: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, live: _Optional[_Iterable[str]] = ..., next_start: _Optional[_Iterable[str]] = ...) -> None: ...
 
-class Load(_message.Message):
-    __slots__ = ("saved", "host", "now_unix_ms", "core_state")
-    SAVED_FIELD_NUMBER: _ClassVar[int]
+class AgentStart(_message.Message):
+    __slots__ = ("host", "state_dir", "core_state", "endpoint", "instance_uid", "hints", "now_unix_ms", "now_mono_ms")
     HOST_FIELD_NUMBER: _ClassVar[int]
-    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    STATE_DIR_FIELD_NUMBER: _ClassVar[int]
     CORE_STATE_FIELD_NUMBER: _ClassVar[int]
-    saved: bytes
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
+    HINTS_FIELD_NUMBER: _ClassVar[int]
+    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    NOW_MONO_MS_FIELD_NUMBER: _ClassVar[int]
     host: Host
-    now_unix_ms: int
+    state_dir: bool
     core_state: bytes
-    def __init__(self, saved: _Optional[bytes] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., core_state: _Optional[bytes] = ...) -> None: ...
-
-class Loaded(_message.Message):
-    __slots__ = ("settings", "current", "effective", "warning", "refresh_at_unix_ms")
-    SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    CURRENT_FIELD_NUMBER: _ClassVar[int]
-    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
-    WARNING_FIELD_NUMBER: _ClassVar[int]
-    REFRESH_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    settings: Settings
-    current: bytes
-    effective: _opamp_pb2.EffectiveConfig
-    warning: str
-    refresh_at_unix_ms: int
-    def __init__(self, settings: _Optional[_Union[Settings, _Mapping]] = ..., current: _Optional[bytes] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., warning: _Optional[str] = ..., refresh_at_unix_ms: _Optional[int] = ...) -> None: ...
-
-class Decide(_message.Message):
-    __slots__ = ("config", "current", "at_start", "host", "now_unix_ms")
-    CONFIG_FIELD_NUMBER: _ClassVar[int]
-    CURRENT_FIELD_NUMBER: _ClassVar[int]
-    AT_START_FIELD_NUMBER: _ClassVar[int]
-    HOST_FIELD_NUMBER: _ClassVar[int]
-    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    config: _opamp_pb2.AgentRemoteConfig
-    current: bytes
-    at_start: bytes
-    host: Host
+    endpoint: str
+    instance_uid: bytes
+    hints: AgentHints
     now_unix_ms: int
-    def __init__(self, config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., current: _Optional[bytes] = ..., at_start: _Optional[bytes] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ...) -> None: ...
+    now_mono_ms: int
+    def __init__(self, host: _Optional[_Union[Host, _Mapping]] = ..., state_dir: bool = ..., core_state: _Optional[bytes] = ..., endpoint: _Optional[str] = ..., instance_uid: _Optional[bytes] = ..., hints: _Optional[_Union[AgentHints, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., now_mono_ms: _Optional[int] = ...) -> None: ...
 
-class Plan(_message.Message):
-    __slots__ = ("save",)
-    SAVE_FIELD_NUMBER: _ClassVar[int]
-    save: bytes
-    def __init__(self, save: _Optional[bytes] = ...) -> None: ...
-
-class Commit(_message.Message):
-    __slots__ = ("decide", "saved", "error")
-    class Saved(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
-        __slots__ = ()
-        SAVED_NOWHERE: _ClassVar[Commit.Saved]
-        SAVED_DONE: _ClassVar[Commit.Saved]
-        SAVED_FAILED: _ClassVar[Commit.Saved]
-    SAVED_NOWHERE: Commit.Saved
-    SAVED_DONE: Commit.Saved
-    SAVED_FAILED: Commit.Saved
-    DECIDE_FIELD_NUMBER: _ClassVar[int]
-    SAVED_FIELD_NUMBER: _ClassVar[int]
+class AgentHints(_message.Message):
+    __slots__ = ("refused", "not_found", "unreachable", "error")
+    REFUSED_FIELD_NUMBER: _ClassVar[int]
+    NOT_FOUND_FIELD_NUMBER: _ClassVar[int]
+    UNREACHABLE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
-    decide: Decide
-    saved: Commit.Saved
+    refused: str
+    not_found: str
+    unreachable: str
     error: str
-    def __init__(self, decide: _Optional[_Union[Decide, _Mapping]] = ..., saved: _Optional[_Union[Commit.Saved, str]] = ..., error: _Optional[str] = ...) -> None: ...
+    def __init__(self, refused: _Optional[str] = ..., not_found: _Optional[str] = ..., unreachable: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
 
-class Decision(_message.Message):
-    __slots__ = ("status", "apply", "current", "effective", "pending_restart", "refresh_at_unix_ms")
+class AgentStep(_message.Message):
+    __slots__ = ("agent", "now_unix_ms", "now_mono_ms", "remote_config", "connected", "connect_failed", "instance_uid_changed", "uid_not_saved", "state_from_newer_version", "stopped", "timer", "exporters", "host", "built")
+    AGENT_FIELD_NUMBER: _ClassVar[int]
+    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    NOW_MONO_MS_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_CONFIG_FIELD_NUMBER: _ClassVar[int]
+    CONNECTED_FIELD_NUMBER: _ClassVar[int]
+    CONNECT_FAILED_FIELD_NUMBER: _ClassVar[int]
+    INSTANCE_UID_CHANGED_FIELD_NUMBER: _ClassVar[int]
+    UID_NOT_SAVED_FIELD_NUMBER: _ClassVar[int]
+    STATE_FROM_NEWER_VERSION_FIELD_NUMBER: _ClassVar[int]
+    STOPPED_FIELD_NUMBER: _ClassVar[int]
+    TIMER_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
+    HOST_FIELD_NUMBER: _ClassVar[int]
+    BUILT_FIELD_NUMBER: _ClassVar[int]
+    agent: bytes
+    now_unix_ms: int
+    now_mono_ms: int
+    remote_config: _opamp_pb2.AgentRemoteConfig
+    connected: AgentConnected
+    connect_failed: AgentConnectFailed
+    instance_uid_changed: bytes
+    uid_not_saved: str
+    state_from_newer_version: int
+    stopped: AgentStopped
+    timer: ExportCounts
+    exporters: AgentExporters
+    host: Host
+    built: AgentBuilt
+    def __init__(self, agent: _Optional[bytes] = ..., now_unix_ms: _Optional[int] = ..., now_mono_ms: _Optional[int] = ..., remote_config: _Optional[_Union[_opamp_pb2.AgentRemoteConfig, _Mapping]] = ..., connected: _Optional[_Union[AgentConnected, _Mapping]] = ..., connect_failed: _Optional[_Union[AgentConnectFailed, _Mapping]] = ..., instance_uid_changed: _Optional[bytes] = ..., uid_not_saved: _Optional[str] = ..., state_from_newer_version: _Optional[int] = ..., stopped: _Optional[_Union[AgentStopped, _Mapping]] = ..., timer: _Optional[_Union[ExportCounts, _Mapping]] = ..., exporters: _Optional[_Union[AgentExporters, _Mapping]] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., built: _Optional[_Union[AgentBuilt, _Mapping]] = ...) -> None: ...
+
+class AgentBuilt(_message.Message):
+    __slots__ = ("service", "exporters")
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
+    service: str
+    exporters: _containers.RepeatedCompositeFieldContainer[Exporter]
+    def __init__(self, service: _Optional[str] = ..., exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ...) -> None: ...
+
+class AgentConnected(_message.Message):
+    __slots__ = ("endpoint",)
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    endpoint: str
+    def __init__(self, endpoint: _Optional[str] = ...) -> None: ...
+
+class AgentConnectFailed(_message.Message):
+    __slots__ = ("endpoint", "status", "detail")
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    APPLY_FIELD_NUMBER: _ClassVar[int]
-    CURRENT_FIELD_NUMBER: _ClassVar[int]
-    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
-    PENDING_RESTART_FIELD_NUMBER: _ClassVar[int]
-    REFRESH_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    status: _opamp_pb2.RemoteConfigStatus
-    apply: Settings
-    current: bytes
-    effective: _opamp_pb2.EffectiveConfig
-    pending_restart: _containers.RepeatedScalarFieldContainer[str]
-    refresh_at_unix_ms: int
-    def __init__(self, status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., apply: _Optional[_Union[Settings, _Mapping]] = ..., current: _Optional[bytes] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., pending_restart: _Optional[_Iterable[str]] = ..., refresh_at_unix_ms: _Optional[int] = ...) -> None: ...
+    DETAIL_FIELD_NUMBER: _ClassVar[int]
+    endpoint: str
+    status: int
+    detail: str
+    def __init__(self, endpoint: _Optional[str] = ..., status: _Optional[int] = ..., detail: _Optional[str] = ...) -> None: ...
 
-class Refresh(_message.Message):
-    __slots__ = ("current", "at_start", "host", "now_unix_ms")
+class AgentStopped(_message.Message):
+    __slots__ = ("error",)
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    error: str
+    def __init__(self, error: _Optional[str] = ...) -> None: ...
+
+class AgentExporters(_message.Message):
+    __slots__ = ("exporters", "counts")
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
+    COUNTS_FIELD_NUMBER: _ClassVar[int]
+    exporters: _containers.RepeatedCompositeFieldContainer[Exporter]
+    counts: ExportCounts
+    def __init__(self, exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ..., counts: _Optional[_Union[ExportCounts, _Mapping]] = ...) -> None: ...
+
+class AgentOutput(_message.Message):
+    __slots__ = ("agent", "effects", "wake_at_mono_ms", "effective")
+    AGENT_FIELD_NUMBER: _ClassVar[int]
+    EFFECTS_FIELD_NUMBER: _ClassVar[int]
+    WAKE_AT_MONO_MS_FIELD_NUMBER: _ClassVar[int]
+    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
+    agent: bytes
+    effects: _containers.RepeatedCompositeFieldContainer[AgentEffect]
+    wake_at_mono_ms: int
+    effective: _opamp_pb2.EffectiveConfig
+    def __init__(self, agent: _Optional[bytes] = ..., effects: _Optional[_Iterable[_Union[AgentEffect, _Mapping]]] = ..., wake_at_mono_ms: _Optional[int] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ...) -> None: ...
+
+class AgentEffect(_message.Message):
+    __slots__ = ("apply", "effective", "status", "health", "save_uid", "log")
+    APPLY_FIELD_NUMBER: _ClassVar[int]
+    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    HEALTH_FIELD_NUMBER: _ClassVar[int]
+    SAVE_UID_FIELD_NUMBER: _ClassVar[int]
+    LOG_FIELD_NUMBER: _ClassVar[int]
+    apply: Settings
+    effective: _opamp_pb2.EffectiveConfig
+    status: _opamp_pb2.RemoteConfigStatus
+    health: _opamp_pb2.ComponentHealth
+    save_uid: str
+    log: AgentLog
+    def __init__(self, apply: _Optional[_Union[Settings, _Mapping]] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., status: _Optional[_Union[_opamp_pb2.RemoteConfigStatus, _Mapping]] = ..., health: _Optional[_Union[_opamp_pb2.ComponentHealth, _Mapping]] = ..., save_uid: _Optional[str] = ..., log: _Optional[_Union[AgentLog, _Mapping]] = ...) -> None: ...
+
+class AgentLog(_message.Message):
+    __slots__ = ("level", "text")
+    class Level(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+        __slots__ = ()
+        DEBUG: _ClassVar[AgentLog.Level]
+        INFO: _ClassVar[AgentLog.Level]
+        NOTICE: _ClassVar[AgentLog.Level]
+        WARN: _ClassVar[AgentLog.Level]
+        ERROR: _ClassVar[AgentLog.Level]
+    DEBUG: AgentLog.Level
+    INFO: AgentLog.Level
+    NOTICE: AgentLog.Level
+    WARN: AgentLog.Level
+    ERROR: AgentLog.Level
+    LEVEL_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    level: AgentLog.Level
+    text: str
+    def __init__(self, level: _Optional[_Union[AgentLog.Level, str]] = ..., text: _Optional[str] = ...) -> None: ...
+
+class AgentState(_message.Message):
+    __slots__ = ("host", "state_dir", "current", "at_start", "effective", "exporters", "health", "refresh_at_unix_ms", "refresh_due_mono_ms", "health_due_mono_ms", "started_unix_ms", "endpoint", "service", "uid", "hints", "ever", "failing", "asked_unix_ms", "asked_mono_ms")
+    HOST_FIELD_NUMBER: _ClassVar[int]
+    STATE_DIR_FIELD_NUMBER: _ClassVar[int]
     CURRENT_FIELD_NUMBER: _ClassVar[int]
     AT_START_FIELD_NUMBER: _ClassVar[int]
-    HOST_FIELD_NUMBER: _ClassVar[int]
-    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
+    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
+    HEALTH_FIELD_NUMBER: _ClassVar[int]
+    REFRESH_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    REFRESH_DUE_MONO_MS_FIELD_NUMBER: _ClassVar[int]
+    HEALTH_DUE_MONO_MS_FIELD_NUMBER: _ClassVar[int]
+    STARTED_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    ENDPOINT_FIELD_NUMBER: _ClassVar[int]
+    SERVICE_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    HINTS_FIELD_NUMBER: _ClassVar[int]
+    EVER_FIELD_NUMBER: _ClassVar[int]
+    FAILING_FIELD_NUMBER: _ClassVar[int]
+    ASKED_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    ASKED_MONO_MS_FIELD_NUMBER: _ClassVar[int]
+    host: Host
+    state_dir: bool
     current: bytes
     at_start: bytes
-    host: Host
-    now_unix_ms: int
-    def __init__(self, current: _Optional[bytes] = ..., at_start: _Optional[bytes] = ..., host: _Optional[_Union[Host, _Mapping]] = ..., now_unix_ms: _Optional[int] = ...) -> None: ...
-
-class Refreshed(_message.Message):
-    __slots__ = ("settings", "effective", "refresh_at_unix_ms", "warning")
-    SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    EFFECTIVE_FIELD_NUMBER: _ClassVar[int]
-    REFRESH_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    WARNING_FIELD_NUMBER: _ClassVar[int]
-    settings: Settings
-    effective: _opamp_pb2.EffectiveConfig
-    refresh_at_unix_ms: int
-    warning: str
-    def __init__(self, settings: _Optional[_Union[Settings, _Mapping]] = ..., effective: _Optional[_Union[_opamp_pb2.EffectiveConfig, _Mapping]] = ..., refresh_at_unix_ms: _Optional[int] = ..., warning: _Optional[str] = ...) -> None: ...
-
-class Health(_message.Message):
-    __slots__ = ("counts", "previous", "now_unix_ms", "settings", "exporters")
-    COUNTS_FIELD_NUMBER: _ClassVar[int]
-    PREVIOUS_FIELD_NUMBER: _ClassVar[int]
-    NOW_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
-    SETTINGS_FIELD_NUMBER: _ClassVar[int]
-    EXPORTERS_FIELD_NUMBER: _ClassVar[int]
-    counts: ExportCounts
-    previous: HealthReport
-    now_unix_ms: int
-    settings: Settings
+    effective: str
     exporters: _containers.RepeatedCompositeFieldContainer[Exporter]
-    def __init__(self, counts: _Optional[_Union[ExportCounts, _Mapping]] = ..., previous: _Optional[_Union[HealthReport, _Mapping]] = ..., now_unix_ms: _Optional[int] = ..., settings: _Optional[_Union[Settings, _Mapping]] = ..., exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ...) -> None: ...
+    health: HealthReport
+    refresh_at_unix_ms: int
+    refresh_due_mono_ms: int
+    health_due_mono_ms: int
+    started_unix_ms: int
+    endpoint: str
+    service: str
+    uid: str
+    hints: AgentHints
+    ever: bool
+    failing: bool
+    asked_unix_ms: int
+    asked_mono_ms: int
+    def __init__(self, host: _Optional[_Union[Host, _Mapping]] = ..., state_dir: bool = ..., current: _Optional[bytes] = ..., at_start: _Optional[bytes] = ..., effective: _Optional[str] = ..., exporters: _Optional[_Iterable[_Union[Exporter, _Mapping]]] = ..., health: _Optional[_Union[HealthReport, _Mapping]] = ..., refresh_at_unix_ms: _Optional[int] = ..., refresh_due_mono_ms: _Optional[int] = ..., health_due_mono_ms: _Optional[int] = ..., started_unix_ms: _Optional[int] = ..., endpoint: _Optional[str] = ..., service: _Optional[str] = ..., uid: _Optional[str] = ..., hints: _Optional[_Union[AgentHints, _Mapping]] = ..., ever: bool = ..., failing: bool = ..., asked_unix_ms: _Optional[int] = ..., asked_mono_ms: _Optional[int] = ...) -> None: ...
 
 class ExportCounts(_message.Message):
     __slots__ = ("traces", "metrics", "logs")
@@ -488,47 +562,33 @@ class SpanSampling(_message.Message):
     def __init__(self, how: _Optional[_Union[SpanSampling.How, str]] = ..., parent_sampled: bool = ..., rate: _Optional[float] = ..., rule: _Optional[int] = ...) -> None: ...
 
 class Request(_message.Message):
-    __slots__ = ("load", "decide", "describe", "evaluate", "refresh", "health", "components", "commit", "exporters")
-    LOAD_FIELD_NUMBER: _ClassVar[int]
-    DECIDE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("describe", "evaluate", "components", "exporters", "agent_start", "agent_step")
     DESCRIBE_FIELD_NUMBER: _ClassVar[int]
     EVALUATE_FIELD_NUMBER: _ClassVar[int]
-    REFRESH_FIELD_NUMBER: _ClassVar[int]
-    HEALTH_FIELD_NUMBER: _ClassVar[int]
     COMPONENTS_FIELD_NUMBER: _ClassVar[int]
-    COMMIT_FIELD_NUMBER: _ClassVar[int]
     EXPORTERS_FIELD_NUMBER: _ClassVar[int]
-    load: Load
-    decide: Decide
+    AGENT_START_FIELD_NUMBER: _ClassVar[int]
+    AGENT_STEP_FIELD_NUMBER: _ClassVar[int]
     describe: Describe
     evaluate: Evaluate
-    refresh: Refresh
-    health: Health
     components: Components
-    commit: Commit
     exporters: Exporters
-    def __init__(self, load: _Optional[_Union[Load, _Mapping]] = ..., decide: _Optional[_Union[Decide, _Mapping]] = ..., describe: _Optional[_Union[Describe, _Mapping]] = ..., evaluate: _Optional[_Union[Evaluate, _Mapping]] = ..., refresh: _Optional[_Union[Refresh, _Mapping]] = ..., health: _Optional[_Union[Health, _Mapping]] = ..., components: _Optional[_Union[Components, _Mapping]] = ..., commit: _Optional[_Union[Commit, _Mapping]] = ..., exporters: _Optional[_Union[Exporters, _Mapping]] = ...) -> None: ...
+    agent_start: AgentStart
+    agent_step: AgentStep
+    def __init__(self, describe: _Optional[_Union[Describe, _Mapping]] = ..., evaluate: _Optional[_Union[Evaluate, _Mapping]] = ..., components: _Optional[_Union[Components, _Mapping]] = ..., exporters: _Optional[_Union[Exporters, _Mapping]] = ..., agent_start: _Optional[_Union[AgentStart, _Mapping]] = ..., agent_step: _Optional[_Union[AgentStep, _Mapping]] = ...) -> None: ...
 
 class Reply(_message.Message):
-    __slots__ = ("loaded", "decision", "description", "error", "evaluated", "refreshed", "health_report", "available_components", "plan", "exporters_decided")
-    LOADED_FIELD_NUMBER: _ClassVar[int]
-    DECISION_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("description", "error", "evaluated", "available_components", "exporters_decided", "agent_output")
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
     EVALUATED_FIELD_NUMBER: _ClassVar[int]
-    REFRESHED_FIELD_NUMBER: _ClassVar[int]
-    HEALTH_REPORT_FIELD_NUMBER: _ClassVar[int]
     AVAILABLE_COMPONENTS_FIELD_NUMBER: _ClassVar[int]
-    PLAN_FIELD_NUMBER: _ClassVar[int]
     EXPORTERS_DECIDED_FIELD_NUMBER: _ClassVar[int]
-    loaded: Loaded
-    decision: Decision
+    AGENT_OUTPUT_FIELD_NUMBER: _ClassVar[int]
     description: _opamp_pb2.AgentDescription
     error: str
     evaluated: Evaluated
-    refreshed: Refreshed
-    health_report: HealthReport
     available_components: _opamp_pb2.AvailableComponents
-    plan: Plan
     exporters_decided: ExportersDecided
-    def __init__(self, loaded: _Optional[_Union[Loaded, _Mapping]] = ..., decision: _Optional[_Union[Decision, _Mapping]] = ..., description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., error: _Optional[str] = ..., evaluated: _Optional[_Union[Evaluated, _Mapping]] = ..., refreshed: _Optional[_Union[Refreshed, _Mapping]] = ..., health_report: _Optional[_Union[HealthReport, _Mapping]] = ..., available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., plan: _Optional[_Union[Plan, _Mapping]] = ..., exporters_decided: _Optional[_Union[ExportersDecided, _Mapping]] = ...) -> None: ...
+    agent_output: AgentOutput
+    def __init__(self, description: _Optional[_Union[_opamp_pb2.AgentDescription, _Mapping]] = ..., error: _Optional[str] = ..., evaluated: _Optional[_Union[Evaluated, _Mapping]] = ..., available_components: _Optional[_Union[_opamp_pb2.AvailableComponents, _Mapping]] = ..., exporters_decided: _Optional[_Union[ExportersDecided, _Mapping]] = ..., agent_output: _Optional[_Union[AgentOutput, _Mapping]] = ...) -> None: ...

@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
@@ -121,35 +121,120 @@ func full(t *testing.T, doc string) string {
 	return string(b)
 }
 
-func status(d *settingspb.Decision) protobufs.RemoteConfigStatuses { return d.GetStatus().GetStatus() }
+// flow is the layer's agent flow, stepped by a test: its last output.
+type flow struct {
+	t   *testing.T
+	l   *Layer
+	out *settingspb.AgentOutput
+}
+
+// startFlow starts the flow for host at now (on both clocks), with a state directory or not and
+// the client's saved state (nil: none).
+func startFlow(t *testing.T, l *Layer, host *settingspb.Host, stateDir bool, coreState []byte) *flow {
+	t.Helper()
+	out, err := l.Start(context.Background(), &settingspb.AgentStart{Host: host, StateDir: stateDir, CoreState: coreState,
+		Endpoint: "http://127.0.0.1:1", InstanceUid: make([]byte, 16), NowUnixMs: now, NowMonoMs: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &flow{t, l, out}
+}
+
+// step gives the flow one input at now plus ms (on both clocks).
+func (f *flow) step(ms uint64, input func(*settingspb.AgentStep)) *flow {
+	f.t.Helper()
+	st := &settingspb.AgentStep{Agent: f.out.GetAgent(), NowUnixMs: now + ms, NowMonoMs: now + ms}
+	input(st)
+	out, err := f.l.Step(context.Background(), st)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	f.out = out
+	return f
+}
+
+// decide sends doc as a remote config.
+func (f *flow) decide(ms uint64, c *protobufs.AgentRemoteConfig) *flow {
+	return f.step(ms, func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_RemoteConfig{RemoteConfig: c} })
+}
+
+// apply is the settings the last step put in force (nil: none).
+func (f *flow) apply() *settingspb.Settings {
+	for _, e := range f.out.GetEffects() {
+		if e.GetApply() != nil {
+			return e.GetApply()
+		}
+	}
+	return nil
+}
+
+// status is the remote config status the last step gave (nil: none).
+func (f *flow) status() *protobufs.RemoteConfigStatus {
+	for _, e := range f.out.GetEffects() {
+		if e.GetStatus() != nil {
+			return e.GetStatus()
+		}
+	}
+	return nil
+}
+
+// health is the health the last step sent (nil: none).
+func (f *flow) health() *protobufs.ComponentHealth {
+	for _, e := range f.out.GetEffects() {
+		if e.GetHealth() != nil {
+			return e.GetHealth()
+		}
+	}
+	return nil
+}
+
+// warned is whether the last step logged a warning or worse.
+func (f *flow) warned() bool {
+	for _, e := range f.out.GetEffects() {
+		if e.GetLog().GetLevel() >= settingspb.AgentLog_WARN {
+			return true
+		}
+	}
+	return false
+}
+
+// state is the flow's state as it stands.
+func (f *flow) state() *settingspb.AgentState {
+	f.t.Helper()
+	var st settingspb.AgentState
+	if err := proto.Unmarshal(f.out.GetAgent(), &st); err != nil {
+		f.t.Fatal(err)
+	}
+	return &st
+}
 
 const (
 	applied = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED
 	failed  = protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED
 )
 
-// The layer through the module: what the Rust tests hold it to, reached from Go.
-func TestLoadDecideDescribe(t *testing.T) {
+// The layer's agent flow through the module: a config decided and answered, a bad one refused
+// with nothing applied, what the host does not carry out refused, a host with a bug an error.
+func TestTheAgentFlow(t *testing.T) {
 	ctx := context.Background()
 	l, err := New(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	saved := v1("signal_exports", logsOff)
-	loaded, err := l.Load(ctx, []byte(saved), declaring)
-	if err != nil || loaded.GetSettings().SendLogs == nil || loaded.GetSettings().GetSendLogs() || effective(t, loaded.GetEffective()) != full(t, saved) {
-		t.Fatalf("load: %v %v", loaded, err)
+	f := startFlow(t, l, declaring, true, nil)
+	if f.apply() == nil || effective(t, f.out.GetEffective()) != full(t, v1()) {
+		t.Fatalf("start: %v", f.out)
 	}
 	doc := v1("head_sampling", override(`"ratio":0.25`))
-	d, err := l.Decide(ctx, config(doc), loaded.GetCurrent(), loaded.GetCurrent(), declaring, keep)
-	if err != nil || status(d) != applied || d.GetApply().GetSamplingRate() != 0.25 || effective(t, d.GetEffective()) != full(t, doc) {
-		t.Fatalf("decide: %v %v", d, err)
+	f.decide(1, config(doc))
+	if f.status().GetStatus() != applied || f.apply().GetSamplingRate() != 0.25 || effective(t, f.out.GetEffective()) != full(t, doc) {
+		t.Fatalf("decide: %v", f.out)
 	}
-	bad, err := l.Decide(ctx, config(v1("head_sampling", override(`"ratio":"x"`))), d.GetCurrent(), loaded.GetCurrent(), declaring, keep)
-	if err != nil || status(bad) != failed || !strings.HasPrefix(bad.GetStatus().GetErrorMessage(), "head_sampling:") ||
-		bad.GetApply() != nil || effective(t, bad.GetEffective()) != full(t, doc) {
-		t.Fatalf("bad: %v %v", bad, err)
+	f.decide(2, config(v1("head_sampling", override(`"ratio":"x"`))))
+	if f.status().GetStatus() != failed || !strings.HasPrefix(f.status().GetErrorMessage(), "head_sampling:") ||
+		f.apply() != nil || effective(t, f.out.GetEffective()) != full(t, doc) {
+		t.Fatalf("bad: %v", f.out)
 	}
 	// The policy is the remote config's only file: none, or another beside it, is refused.
 	other := config(doc)
@@ -157,34 +242,44 @@ func TestLoadDecideDescribe(t *testing.T) {
 	none := &protobufs.AgentRemoteConfig{ConfigHash: []byte("h"), Config: &protobufs.AgentConfigMap{
 		ConfigMap: map[string]*protobufs.AgentConfigObject{"other.json": {Body: []byte("{}"), ContentType: "application/json"}}}}
 	for name, c := range map[string]*protobufs.AgentRemoteConfig{"another file": other, "no policy": none} {
-		r, err := l.Decide(ctx, c, d.GetCurrent(), loaded.GetCurrent(), declaring, keep)
-		if err != nil || status(r) != failed || !strings.HasPrefix(r.GetStatus().GetErrorMessage(), "config_map:") {
-			t.Fatalf("%s: %v %v", name, r, err)
+		if f.decide(3, c); f.status().GetStatus() != failed || !strings.HasPrefix(f.status().GetErrorMessage(), "config_map:") {
+			t.Fatalf("%s: %v", name, f.out)
 		}
 	}
 	// An override that the host does not carry out is refused, saying which, and changes nothing.
-	host := &settingspb.Host{Live: []string{"sampling_rate"}}
-	d2, err := l.Decide(ctx, config(v1("signal_exports", logsOff)), d.GetCurrent(), nil, host, nil)
-	if err != nil || status(d2) != failed || d2.GetApply() != nil ||
-		d2.GetStatus().GetErrorMessage() != "signal_exports.logs: this SDK cannot apply the requested override" ||
-		string(d2.GetCurrent()) != string(d.GetCurrent()) {
-		t.Fatalf("v1, not carried out: %v %v", d2, err)
+	g := startFlow(t, l, &settingspb.Host{Live: []string{"sampling_rate"}}, false, nil)
+	g.decide(1, config(v1("signal_exports", logsOff)))
+	if g.status().GetStatus() != failed || g.apply() != nil ||
+		g.status().GetErrorMessage() != "signal_exports.logs: this SDK cannot apply the requested override" {
+		t.Fatalf("v1, not carried out: %v", g.out)
 	}
-	d2, err = l.Decide(ctx, config(every("instrumentations", override(`"disabled":["otelhttp"]`))), nil, nil, host, keep)
-	if err != nil || status(d2) != failed ||
-		d2.GetStatus().GetErrorMessage() != "instrumentations: disabled: this SDK cannot apply the requested override" {
-		t.Fatalf("every, not carried out: %v %v", d2, err)
+	g.decide(2, config(every("instrumentations", override(`"disabled":["otelhttp"]`))))
+	if g.status().GetErrorMessage() != "instrumentations: disabled: this SDK cannot apply the requested override" {
+		t.Fatalf("every, not carried out: %v", g.out)
+	}
+	// A next-start change needs somewhere to keep state.
+	h := startFlow(t, l, declaring, false, nil)
+	h.decide(1, config(every("instrumentations", override(`"disabled":["redis"]`))))
+	if h.status().GetErrorMessage() != "instrumentations: takes effect at the next start, which needs somewhere to keep state" {
+		t.Fatalf("next start, nowhere: %v", h.out)
 	}
 	// A host naming what is no setting has a bug: an error, saying which.
-	if _, err := l.Load(ctx, nil, &settingspb.Host{Live: []string{"send_metric"}}); err == nil || !strings.Contains(err.Error(), "send_metric") {
+	if _, err := l.Start(ctx, &settingspb.AgentStart{Host: &settingspb.Host{Live: []string{"send_metric"}},
+		InstanceUid: make([]byte, 16)}); err == nil || !strings.Contains(err.Error(), "send_metric") {
 		t.Fatalf("a host declaring send_metric: %v", err)
 	}
-	// A log level: the lowest severity number to export, reported by its name; unset, every severity.
+	// A step without an input, or with a state that isn't one, is an error.
+	if _, err := l.Step(ctx, &settingspb.AgentStep{Agent: f.out.GetAgent()}); err == nil {
+		t.Fatal("a step without an input")
+	}
+	if _, err := l.Step(ctx, &settingspb.AgentStep{Agent: []byte{0xff}, Input: &settingspb.AgentStep_Timer{}}); err == nil {
+		t.Fatal("a step on a state that isn't one")
+	}
+	// A log level: the lowest severity number to export; unset, every severity.
 	doc = every("log_levels", override(`"level":"warn"`))
-	d, err = l.Decide(ctx, config(doc), nil, nil, declaring, nil)
-	if err != nil || status(d) != applied || d.GetApply().SendLogsMinSeverity == nil || d.GetApply().GetSendLogsMinSeverity() != 13 ||
-		effective(t, d.GetEffective()) != sorted(t, doc) || loaded.GetSettings().SendLogsMinSeverity != nil {
-		t.Fatalf("log level: %v %v", d, err)
+	if f.decide(4, config(doc)); f.status().GetStatus() != applied || f.apply().SendLogsMinSeverity == nil ||
+		f.apply().GetSendLogsMinSeverity() != 13 || effective(t, f.out.GetEffective()) != sorted(t, doc) {
+		t.Fatalf("log level: %v", f.out)
 	}
 	desc, err := l.Describe(ctx, []*protobufs.KeyValue{
 		{Key: "service.name", Value: &protobufs.AnyValue{Value: &protobufs.AnyValue_StringValue{StringValue: "checkout"}}},
@@ -264,55 +359,6 @@ var everySetting = &settingspb.Host{Live: append(slices.Clone(declaring.Live), "
 
 const now = uint64(1_791_979_200_000) // 2026-10-14T12:00:00Z
 
-// keep is a save that keeps nothing, for a host that has somewhere to keep state.
-func keep([]byte) error { return nil }
-
-// Decide, then commit (#215): the integration saves what the layer asks it to keep, and the layer
-// answers from how that went, the same in every language.
-func TestTheSaveTheLayerAsksForDecidesTheAnswer(t *testing.T) {
-	ctx := context.Background()
-	l, err := New(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer l.Close(ctx)
-	current := []byte(v1("head_sampling", override(`"ratio":0.5`)))
-	noSpace := func([]byte) error { return errors.New("no space left on device") }
-	quarter := v1("head_sampling", override(`"ratio":0.25`))
-	d, err := l.Decide(ctx, config(quarter), current, current, declaring, noSpace)
-	if err != nil || status(d) != failed ||
-		d.GetStatus().GetErrorMessage() != "can't save the settings: no space left on device" || d.GetApply() != nil ||
-		string(d.GetCurrent()) != string(current) || effective(t, d.GetEffective()) != full(t, string(current)) {
-		t.Fatalf("a failed save: %v %v", d, err)
-	}
-	// Nowhere to keep state: a live change is applied, a next-start one refused.
-	d, err = l.Decide(ctx, config(quarter), current, current, declaring, nil)
-	if err != nil || status(d) != applied {
-		t.Fatalf("live, nowhere: %v %v", d, err)
-	}
-	redis := every("instrumentations", override(`"disabled":["redis"]`))
-	d, err = l.Decide(ctx, config(redis), current, current, declaring, nil)
-	if err != nil || d.GetStatus().GetErrorMessage() !=
-		"instrumentations: takes effect at the next start, which needs somewhere to keep state" {
-		t.Fatalf("next start, nowhere: %v %v", d, err)
-	}
-	var kept [][]byte
-	d, err = l.Decide(ctx, config(redis), current, current, declaring, func(doc []byte) error {
-		kept = append(kept, doc)
-		return nil
-	})
-	if err != nil || status(d) != applied ||
-		!slices.Equal(d.GetPendingRestart(), []string{"deactivate_instrumentations"}) || len(kept) != 1 ||
-		string(kept[0]) != redis {
-		t.Fatalf("next start, saved: %v %v %q", d, err, kept)
-	}
-	// A refused config asks for no save.
-	d, err = l.Decide(ctx, config(v1("head_sampling", override(`"ratio":2`))), current, current, declaring, noSpace)
-	if err != nil || d.GetStatus().GetErrorMessage() != "head_sampling: ratio must be a number from 0 to 1" {
-		t.Fatalf("refused: %v %v", d, err)
-	}
-}
-
 // The settings that match telemetry arrive typed where the host declares them. Where it does not,
 // the policy is refused.
 func TestTheNewSettingsArrive(t *testing.T) {
@@ -327,11 +373,11 @@ func TestTheNewSettingsArrive(t *testing.T) {
 		"attribute_redaction", override(`"mask":["User.Email"],"drop":["*token*"]`),
 		"trace_rate_limit", override(`"traces_per_second":50`),
 		"log_rate_limit", override(`"records_per_second":0.5`))
-	d, err := l.DecideAt(ctx, config(doc), nil, nil, declaring, now, nil)
-	if err != nil || status(d) != applied {
-		t.Fatalf("decide: %v %v", d, err)
+	f := startFlow(t, l, declaring, false, nil).decide(1, config(doc))
+	if f.status().GetStatus() != applied {
+		t.Fatalf("decide: %v", f.out)
 	}
-	s := d.GetApply()
+	s := f.apply()
 	rule := s.GetSamplingRules()[0]
 	if len(s.GetSamplingRules()) != 1 || rule.GetRate() != 0 || rule.GetKind() != settingspb.SpanKind_SPAN_KIND_SERVER ||
 		rule.GetPath() != "/health*" {
@@ -346,15 +392,15 @@ func TestTheNewSettingsArrive(t *testing.T) {
 	if s.GetSamplingTracesPerSecond() != 50 || s.GetSendLogsPerSecond() != 0.5 {
 		t.Fatalf("caps: %v", s)
 	}
-	plain, err := l.Decide(ctx, config(doc), nil, nil, nil, nil)
-	if err != nil || status(plain) != failed || plain.GetApply() != nil ||
-		!strings.HasSuffix(plain.GetStatus().GetErrorMessage(), ": this SDK cannot apply the requested override") {
-		t.Fatalf("undeclared: %v %v", plain, err)
+	plain := startFlow(t, l, nil, false, nil).decide(1, config(doc))
+	if plain.status().GetStatus() != failed || plain.apply() != nil ||
+		!strings.HasSuffix(plain.status().GetErrorMessage(), ": this SDK cannot apply the requested override") {
+		t.Fatalf("undeclared: %v", plain.out)
 	}
 }
 
-// Debug mode arrives folded in, with the time to ask again; a refresh then ends it.
-func TestDebugModeAndRefresh(t *testing.T) {
+// Debug mode arrives folded in, with a wake for its end; the timer then ends it.
+func TestDebugModeEndsOnTheTimer(t *testing.T) {
 	ctx := context.Background()
 	l, err := New(ctx)
 	if err != nil {
@@ -362,23 +408,21 @@ func TestDebugModeAndRefresh(t *testing.T) {
 	}
 	defer l.Close(ctx)
 	doc := every("head_sampling", override(`"ratio":0.1`), "debug", override(`"until":"2026-10-14T12:30:00Z","log_level":"info"`))
-	d, err := l.DecideAt(ctx, config(doc), nil, nil, declaring, now, keep)
-	end := now + 30*60_000
-	if err != nil || d.GetApply().GetSamplingRate() != 1 || d.GetApply().GetSendLogsMinSeverity() != 9 || d.GetRefreshAtUnixMs() != end {
-		t.Fatalf("decide: %v %v", d, err)
+	f := startFlow(t, l, declaring, true, nil).decide(0, config(doc))
+	end := uint64(30 * 60_000)
+	if f.apply().GetSamplingRate() != 1 || f.apply().GetSendLogsMinSeverity() != 9 || f.state().GetRefreshAtUnixMs() != now+end ||
+		f.out.GetWakeAtMonoMs() == 0 || f.out.GetWakeAtMonoMs() > now+end {
+		t.Fatalf("decide: %v", f.out)
 	}
-	r, err := l.Refresh(ctx, d.GetCurrent(), nil, declaring, end)
-	if err != nil || r.GetSettings().GetSamplingRate() != 0.1 || r.GetSettings().SendLogsMinSeverity != nil || r.GetRefreshAtUnixMs() != 0 ||
-		effective(t, r.GetEffective()) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
-		t.Fatalf("refresh: %v %v", r, err)
-	}
-	loaded, err := l.LoadAt(ctx, d.GetCurrent(), declaring, now)
-	if err != nil || loaded.GetRefreshAtUnixMs() != end {
-		t.Fatalf("load: %v %v", loaded, err)
+	f.step(end, func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Timer{Timer: &settingspb.ExportCounts{}} })
+	if f.apply().GetSamplingRate() != 0.1 || f.apply().SendLogsMinSeverity != nil || f.state().GetRefreshAtUnixMs() != 0 ||
+		effective(t, f.out.GetEffective()) != sorted(t, every("head_sampling", override(`"ratio":0.1`))) {
+		t.Fatalf("the end: %v", f.out)
 	}
 }
 
-// Export health: sent at the first call and on a failure, held while nothing changes.
+// Export health: sent when the SDK is built and on a failure, held while nothing changes; an
+// exporter the gates can't reach is listed under its signal, ungoverned and healthy.
 func TestExportHealth(t *testing.T) {
 	ctx := context.Background()
 	l, err := New(ctx)
@@ -386,28 +430,35 @@ func TestExportHealth(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer l.Close(ctx)
-	first, err := l.Health(ctx, &settingspb.ExportCounts{}, nil, now, nil, nil)
-	if err != nil || !first.GetSend() || len(first.GetExporters().GetComponentHealthMap()) != 3 || first.GetExporters().GetStatus() != "ok" {
-		t.Fatalf("first: %v %v", first, err)
+	exporters := func(ms uint64, counts *settingspb.ExportCounts, x ...*settingspb.Exporter) func(*settingspb.AgentStep) {
+		return func(s *settingspb.AgentStep) {
+			s.Input = &settingspb.AgentStep_Exporters{Exporters: &settingspb.AgentExporters{Exporters: x, Counts: counts}}
+		}
 	}
-	if again, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil, nil); err != nil || again.GetSend() {
-		t.Fatalf("again: %v %v", again, err)
+	f := startFlow(t, l, declaring, true, nil)
+	f.step(0, func(s *settingspb.AgentStep) { s.Input = &settingspb.AgentStep_Built{Built: &settingspb.AgentBuilt{Service: "checkout"}} })
+	f.step(0, exporters(0, &settingspb.ExportCounts{}))
+	first := f.health().GetComponentHealthMap()["exporters"]
+	if len(first.GetComponentHealthMap()) != 3 || first.GetStatus() != "ok" {
+		t.Fatalf("first: %v", f.out)
 	}
-	// An exporter the gates can't reach: listed under its signal, ungoverned, healthy, and sent at once.
-	ungoverned, err := l.Health(ctx, &settingspb.ExportCounts{}, first, now+30_000, nil,
-		[]*settingspb.Exporter{{Signal: "traces", Name: "zipkin", Gated: false}})
-	child := ungoverned.GetExporters().GetComponentHealthMap()["traces"].GetComponentHealthMap()["zipkin"]
-	if err != nil || !ungoverned.GetSend() || child.GetStatus() != "ungoverned" || !child.GetHealthy() {
-		t.Fatalf("ungoverned: %v %v", ungoverned, err)
+	if f.step(30_000, exporters(0, &settingspb.ExportCounts{})); f.health() != nil {
+		t.Fatalf("again: %v", f.out)
 	}
-	off := false
-	failed, err := l.Health(ctx, &settingspb.ExportCounts{Traces: &settingspb.SignalCounts{
-		ExportsFailed: 1, ItemsFailed: 512, LastFailed: true, LastError: "connection refused"}},
-		first, now+30_000, &settingspb.Settings{SendLogs: &off}, nil)
-	m := failed.GetExporters().GetComponentHealthMap()
-	if err != nil || !failed.GetSend() || failed.GetExporters().GetHealthy() ||
-		m["traces"].GetLastError() != "connection refused" || m["logs"].GetStatus() != "off" {
-		t.Fatalf("failed: %v %v", failed, err)
+	f.step(30_000, exporters(0, &settingspb.ExportCounts{}, &settingspb.Exporter{Signal: "traces", Name: "zipkin"}))
+	child := f.health().GetComponentHealthMap()["exporters"].GetComponentHealthMap()["traces"].GetComponentHealthMap()["zipkin"]
+	if child.GetStatus() != "ungoverned" || !child.GetHealthy() {
+		t.Fatalf("ungoverned: %v", f.out)
+	}
+	f.step(31_000, func(s *settingspb.AgentStep) {
+		s.Input = &settingspb.AgentStep_Timer{Timer: &settingspb.ExportCounts{Traces: &settingspb.SignalCounts{
+			ExportsFailed: 1, ItemsFailed: 512, LastFailed: true, LastError: "connection refused"}}}
+	})
+	f.step(31_000, exporters(0, &settingspb.ExportCounts{Traces: &settingspb.SignalCounts{
+		ExportsFailed: 1, ItemsFailed: 512, LastFailed: true, LastError: "connection refused"}}))
+	m := f.state().GetHealth().GetExporters()
+	if m.GetHealthy() || m.GetComponentHealthMap()["traces"].GetLastError() != "connection refused" {
+		t.Fatalf("failed: %v", m)
 	}
 }
 
@@ -738,8 +789,8 @@ func TestCompilingTheLayerLeavesNoGarbageResident(t *testing.T) {
 }
 
 // The shared start vectors (testdata/sdk-settings/start.json): the policy to start with comes from
-// the last config applied in the core's saved state, else from the policy kept before. A config
-// applied without a policy starts from the SDK's own settings, with a warning.
+// the last config applied in the core's saved state, else the SDK's own settings. A config applied
+// without a policy starts from the SDK's own settings, with a warning.
 func TestTheStartVectors(t *testing.T) {
 	ctx := context.Background()
 	l, err := New(ctx)
@@ -755,7 +806,6 @@ func TestTheStartVectors(t *testing.T) {
 		Cases []struct {
 			Name      string  `json:"name"`
 			CoreState *string `json:"core_state"`
-			Saved     *string `json:"saved"`
 			Want      string  `json:"want"`
 			Warns     bool    `json:"warns"`
 		} `json:"cases"`
@@ -764,24 +814,18 @@ func TestTheStartVectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range v.Cases {
-		var coreState, saved []byte
+		var coreState []byte
 		if c.CoreState != nil {
 			if coreState, err = hex.DecodeString(*c.CoreState); err != nil {
 				t.Fatal(err)
 			}
 		}
-		if c.Saved != nil {
-			saved = []byte(*c.Saved)
+		f := startFlow(t, l, everySetting, true, coreState)
+		if got := string(f.state().GetCurrent()); got != c.Want {
+			t.Errorf("%s: started from %s, want %s", c.Name, got, c.Want)
 		}
-		loaded, err := l.LoadFrom(ctx, coreState, saved, everySetting, 0)
-		if err != nil {
-			t.Fatalf("%s: %v", c.Name, err)
-		}
-		if string(loaded.GetCurrent()) != c.Want {
-			t.Errorf("%s: started from %s, want %s", c.Name, loaded.GetCurrent(), c.Want)
-		}
-		if (loaded.GetWarning() != "") != c.Warns {
-			t.Errorf("%s: warning %q, want one: %v", c.Name, loaded.GetWarning(), c.Warns)
+		if f.warned() != c.Warns {
+			t.Errorf("%s: warned %v, want %v", c.Name, f.warned(), c.Warns)
 		}
 	}
 }

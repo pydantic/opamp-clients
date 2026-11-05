@@ -4,8 +4,7 @@
 // The interface to the SDK settings layer, written in Rust and compiled to WebAssembly. It decides
 // what an OpenTelemetry SDK does with the settings an OpAMP server sends it, the same way in every
 // language; the language's integration only carries out the decision on its SDK. It keeps nothing
-// between calls: the host keeps the settings documents it is handed (`current`, and the one saved
-// for the next start) and passes them back.
+// between calls: the host keeps what it is handed (the agent flow's `agent`) and passes it back.
 //
 // The settings come from the Logfire SDK policy: the remote config's only file,
 // "logfire-sdk-policy.json", a "logfire-sdk-policy/v1" document. See docs/sdk-settings.md.
@@ -26,7 +25,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file opamp/sdk/v1/settings.proto.
  */
 export const file_opamp_sdk_v1_settings: GenFile = /*@__PURE__*/
-  fileDesc("ChtvcGFtcC9zZGsvdjEvc2V0dGluZ3MucHJvdG8SDG9wYW1wLnNkay52MSKaBwoIU2V0dGluZ3MSGgoNc2FtcGxpbmdfcmF0ZRgBIAEoAUgAiAEBEhgKC3NlbmRfdHJhY2VzGAIgASgISAGIAQESGQoMc2VuZF9tZXRyaWNzGAMgASgISAKIAQESHgoRc2VuZF9zZWxmX21ldHJpY3MYFCABKAhIA4gBARIWCglzZW5kX2xvZ3MYBCABKAhIBIgBARIjChZzZW5kX2xvZ3NfbWluX3NldmVyaXR5GAkgASgNSAWIAQESMgoOc2FtcGxpbmdfcnVsZXMYCiADKAsyGi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlEjgKFnNlbmRfbG9nc19zY29wZV9sZXZlbHMYCyADKAsyGC5vcGFtcC5zZGsudjEuU2NvcGVMZXZlbBIXCg9kcm9wX2F0dHJpYnV0ZXMYDCADKAkSFwoPbWFza19hdHRyaWJ1dGVzGA0gAygJEicKGnNhbXBsaW5nX3RyYWNlc19wZXJfc2Vjb25kGA4gASgBSAaIAQESIQoUc2VuZF9sb2dzX3Blcl9zZWNvbmQYDyABKAFIB4gBARI4ChtkZWFjdGl2YXRlX2luc3RydW1lbnRhdGlvbnMYBSABKAsyEy5vcGFtcC5zZGsudjEuTmFtZXMSLAofZGVhY3RpdmF0ZV9hbGxfaW5zdHJ1bWVudGF0aW9ucxgGIAEoCEgIiAEBEjIKBmN1c3RvbRgQIAMoCzIiLm9wYW1wLnNkay52MS5TZXR0aW5ncy5DdXN0b21FbnRyeRIWCg5zY3J1Yl9kZWZhdWx0cxgSIAEoCBIWCg5zY3J1Yl9wYXR0ZXJucxgTIAMoCRotCgtDdXN0b21FbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQhAKDl9zYW1wbGluZ19yYXRlQg4KDF9zZW5kX3RyYWNlc0IPCg1fc2VuZF9tZXRyaWNzQhQKEl9zZW5kX3NlbGZfbWV0cmljc0IMCgpfc2VuZF9sb2dzQhkKF19zZW5kX2xvZ3NfbWluX3NldmVyaXR5Qh0KG19zYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZEIXChVfc2VuZF9sb2dzX3Blcl9zZWNvbmRCIgogX2RlYWN0aXZhdGVfYWxsX2luc3RydW1lbnRhdGlvbnNKBAgIEAlKBAgREBJKBAgHEAhSGW9wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXMi+wEKDFNhbXBsaW5nUnVsZRIMCgRyYXRlGAEgASgBEhEKBG5hbWUYAiABKAlIAIgBARIpCgRraW5kGAMgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kSAGIAQESEQoEcGF0aBgEIAEoCUgCiAEBEj4KCmF0dHJpYnV0ZXMYBSADKAsyKi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlLkF0dHJpYnV0ZXNFbnRyeRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIHCgVfbmFtZUIHCgVfa2luZEIHCgVfcGF0aCIzCgpTY29wZUxldmVsEg8KB3BhdHRlcm4YASABKAkSFAoMbWluX3NldmVyaXR5GAIgASgNIhYKBU5hbWVzEg0KBW5hbWVzGAEgAygJIi4KBEhvc3QSDAoEbGl2ZRgBIAMoCRISCgpuZXh0X3N0YXJ0GAMgAygJSgQIAhADIoMBCgRMb2FkEhIKBXNhdmVkGAEgASgMSACIAQESIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEEhcKCmNvcmVfc3RhdGUYBCABKAxIAYgBAUIICgZfc2F2ZWRCDQoLX2NvcmVfc3RhdGUipAEKBkxvYWRlZBIoCghzZXR0aW5ncxgBIAEoCzIWLm9wYW1wLnNkay52MS5TZXR0aW5ncxIPCgdjdXJyZW50GAIgASgMEjIKCWVmZmVjdGl2ZRgDIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIPCgd3YXJuaW5nGAQgASgJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgFIAEoBCKbAQoGRGVjaWRlEjEKBmNvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnEg8KB2N1cnJlbnQYAiABKAwSEAoIYXRfc3RhcnQYAyABKAwSIAoEaG9zdBgFIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAYgASgESgQIBBAFIiIKBFBsYW4SEQoEc2F2ZRgBIAEoDEgAiAEBQgcKBV9zYXZlIqYBCgZDb21taXQSJAoGZGVjaWRlGAEgASgLMhQub3BhbXAuc2RrLnYxLkRlY2lkZRIpCgVzYXZlZBgCIAEoDjIaLm9wYW1wLnNkay52MS5Db21taXQuU2F2ZWQSDQoFZXJyb3IYAyABKAkiPAoFU2F2ZWQSEQoNU0FWRURfTk9XSEVSRRAAEg4KClNBVkVEX0RPTkUQARIQCgxTQVZFRF9GQUlMRUQQAiLlAQoIRGVjaXNpb24SMgoGc3RhdHVzGAEgASgLMiIub3BhbXAucHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzEiUKBWFwcGx5GAIgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAyABKAwSMgoJZWZmZWN0aXZlGAUgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhcKD3BlbmRpbmdfcmVzdGFydBgGIAMoCRIaChJyZWZyZXNoX2F0X3VuaXhfbXMYByABKARKBAgEEAUiYwoHUmVmcmVzaBIPCgdjdXJyZW50GAEgASgMEhAKCGF0X3N0YXJ0GAIgASgMEiAKBGhvc3QYAyABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgEIAEoBCKWAQoJUmVmcmVzaGVkEigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEjIKCWVmZmVjdGl2ZRgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIaChJyZWZyZXNoX2F0X3VuaXhfbXMYAyABKAQSDwoHd2FybmluZxgEIAEoCSLMAQoGSGVhbHRoEioKBmNvdW50cxgBIAEoCzIaLm9wYW1wLnNkay52MS5FeHBvcnRDb3VudHMSLAoIcHJldmlvdXMYAiABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0EhMKC25vd191bml4X21zGAMgASgEEigKCHNldHRpbmdzGAQgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEikKCWV4cG9ydGVycxgFIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlciKRAQoMRXhwb3J0Q291bnRzEioKBnRyYWNlcxgBIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMSKwoHbWV0cmljcxgCIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMSKAoEbG9ncxgDIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMikQEKDFNpZ25hbENvdW50cxISCgpleHBvcnRzX29rGAEgASgEEhYKDmV4cG9ydHNfZmFpbGVkGAIgASgEEhQKDGl0ZW1zX2ZhaWxlZBgDIAEoBBIWCg5pdGVtc19maWx0ZXJlZBgEIAEoBBITCgtsYXN0X2ZhaWxlZBgFIAEoCBISCgpsYXN0X2Vycm9yGAYgASgJImYKDEhlYWx0aFJlcG9ydBIMCgRzZW5kGAEgASgIEjIKCWV4cG9ydGVycxgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkNvbXBvbmVudEhlYWx0aBIUCgxzZW50X3VuaXhfbXMYAyABKAQibQoIRGVzY3JpYmUSKgoIcmVzb3VyY2UYASADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIgCgRob3N0GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQibwoKQ29tcG9uZW50cxIqCglpbnZlbnRvcnkYASABKAsyFy5vcGFtcC5zZGsudjEuSW52ZW50b3J5EiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgDIAEoBCLMAQoJSW52ZW50b3J5EhMKC2ludGVncmF0aW9uGAEgASgJEhsKE2ludGVncmF0aW9uX3ZlcnNpb24YAiABKAkSFAoMc2RrX2xhbmd1YWdlGAMgASgJEhMKC3Nka192ZXJzaW9uGAQgASgJEjcKEGluc3RydW1lbnRhdGlvbnMYBSADKAsyHS5vcGFtcC5zZGsudjEuSW5zdHJ1bWVudGF0aW9uEikKCWV4cG9ydGVycxgGIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlciIwCg9JbnN0cnVtZW50YXRpb24SDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJIkwKCEV4cG9ydGVyEg4KBnNpZ25hbBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWdhdGVkGAMgASgIEhMKC2Rlc3RpbmF0aW9uGAQgASgJInQKCUV4cG9ydGVycxIqCgVmb3VuZBgBIAMoCzIbLm9wYW1wLnNkay52MS5Gb3VuZEV4cG9ydGVyEiEKA2VudhgCIAMoCzIULm9wYW1wLnNkay52MS5FbnZWYXISGAoQZGVmYXVsdF9wcm90b2NvbBgDIAEoCSJgCg1Gb3VuZEV4cG9ydGVyEg4KBnNpZ25hbBgBIAEoCRIMCgRraW5kGAIgASgJEg0KBWdhdGVkGAMgASgIEhAKCGVuZHBvaW50GAQgASgJEhAKCGZyb21fZW52GAUgASgIIiUKBkVudlZhchIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJInUKEEV4cG9ydGVyc0RlY2lkZWQSKQoJZXhwb3J0ZXJzGAEgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyEhAKCGdvdmVybmVkGAIgAygJEhIKCnVuZ292ZXJuZWQYAyADKAkSEAoId2FybmluZ3MYBCADKAkiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdzGAEgASgMEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYxLlNwYW5TdGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dSZWNvcmRIABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0dHJpYnV0ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVuSABCBwoFaW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1wLnNkay52MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1wLnNkay52MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9HUxABImEKCENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdyZWNvcmRzGAQgASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5vcGFtcC5wcm90by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkSEAoIc2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJEiQKBGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0cmlidXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBhcmVudBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2YWx1YXRlZBIPCgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVkYWN0ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5GAYgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFzc2VkGAUgAygEQgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQYAiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQAkIHCgVfcnVsZSKNAwoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAuc2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEuRGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVzY3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFsdWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVzaEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIuCgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNIABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SAASLAoJZXhwb3J0ZXJzGAkgASgLMhcub3BhbXAuc2RrLnYxLkV4cG9ydGVyc0gAQgYKBGNhbGwi5gMKBVJlcGx5EiYKBmxvYWRlZBgBIAEoCzIULm9wYW1wLnNkay52MS5Mb2FkZWRIABIqCghkZWNpc2lvbhgCIAEoCzIWLm9wYW1wLnNkay52MS5EZWNpc2lvbkgAEjcKC2Rlc2NyaXB0aW9uGAMgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlvbkgAEg8KBWVycm9yGAQgASgJSAASLAoJZXZhbHVhdGVkGAUgASgLMhcub3BhbXAuc2RrLnYxLkV2YWx1YXRlZEgAEiwKCXJlZnJlc2hlZBgGIAEoCzIXLm9wYW1wLnNkay52MS5SZWZyZXNoZWRIABIzCg1oZWFsdGhfcmVwb3J0GAcgASgLMhoub3BhbXAuc2RrLnYxLkhlYWx0aFJlcG9ydEgAEkMKFGF2YWlsYWJsZV9jb21wb25lbnRzGAggASgLMiMub3BhbXAucHJvdG8udjEuQXZhaWxhYmxlQ29tcG9uZW50c0gAEiIKBHBsYW4YCSABKAsyEi5vcGFtcC5zZGsudjEuUGxhbkgAEjsKEWV4cG9ydGVyc19kZWNpZGVkGAogASgLMh4ub3BhbXAuc2RrLnYxLkV4cG9ydGVyc0RlY2lkZWRIAEIICgZyZXN1bHQqmQEKCFNwYW5LaW5kEhkKFVNQQU5fS0lORF9VTlNQRUNJRklFRBAAEhYKElNQQU5fS0lORF9JTlRFUk5BTBABEhQKEFNQQU5fS0lORF9TRVJWRVIQAhIUChBTUEFOX0tJTkRfQ0xJRU5UEAMSFgoSU1BBTl9LSU5EX1BST0RVQ0VSEAQSFgoSU1BBTl9LSU5EX0NPTlNVTUVSEAUqhwEKBlBhcmVudBIPCgtQQVJFTlRfTk9ORRAAEhgKFFBBUkVOVF9MT0NBTF9TQU1QTEVEEAESGgoWUEFSRU5UX0xPQ0FMX1VOU0FNUExFRBACEhkKFVBBUkVOVF9SRU1PVEVfU0FNUExFRBADEhsKF1BBUkVOVF9SRU1PVEVfVU5TQU1QTEVEEARCjQEKHmRldi5weWRhbnRpYy5sb2dmaXJlLmZsZWV0LnNka0INU2V0dGluZ3NQcm90b1pBZ2l0aHViLmNvbS9weWRhbnRpYy9vcGFtcC1jbGllbnRzL2dvL29wYW1wL3Nka3NldHRpbmdzL3NldHRpbmdzcGKqAhhMb2dmaXJlLkZsZWV0LkNsaWVudC5TZGtiBnByb3RvMw", [file_opamp_v1_anyvalue, file_opamp_v1_opamp]);
+  fileDesc("ChtvcGFtcC9zZGsvdjEvc2V0dGluZ3MucHJvdG8SDG9wYW1wLnNkay52MSKaBwoIU2V0dGluZ3MSGgoNc2FtcGxpbmdfcmF0ZRgBIAEoAUgAiAEBEhgKC3NlbmRfdHJhY2VzGAIgASgISAGIAQESGQoMc2VuZF9tZXRyaWNzGAMgASgISAKIAQESHgoRc2VuZF9zZWxmX21ldHJpY3MYFCABKAhIA4gBARIWCglzZW5kX2xvZ3MYBCABKAhIBIgBARIjChZzZW5kX2xvZ3NfbWluX3NldmVyaXR5GAkgASgNSAWIAQESMgoOc2FtcGxpbmdfcnVsZXMYCiADKAsyGi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlEjgKFnNlbmRfbG9nc19zY29wZV9sZXZlbHMYCyADKAsyGC5vcGFtcC5zZGsudjEuU2NvcGVMZXZlbBIXCg9kcm9wX2F0dHJpYnV0ZXMYDCADKAkSFwoPbWFza19hdHRyaWJ1dGVzGA0gAygJEicKGnNhbXBsaW5nX3RyYWNlc19wZXJfc2Vjb25kGA4gASgBSAaIAQESIQoUc2VuZF9sb2dzX3Blcl9zZWNvbmQYDyABKAFIB4gBARI4ChtkZWFjdGl2YXRlX2luc3RydW1lbnRhdGlvbnMYBSABKAsyEy5vcGFtcC5zZGsudjEuTmFtZXMSLAofZGVhY3RpdmF0ZV9hbGxfaW5zdHJ1bWVudGF0aW9ucxgGIAEoCEgIiAEBEjIKBmN1c3RvbRgQIAMoCzIiLm9wYW1wLnNkay52MS5TZXR0aW5ncy5DdXN0b21FbnRyeRIWCg5zY3J1Yl9kZWZhdWx0cxgSIAEoCBIWCg5zY3J1Yl9wYXR0ZXJucxgTIAMoCRotCgtDdXN0b21FbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQhAKDl9zYW1wbGluZ19yYXRlQg4KDF9zZW5kX3RyYWNlc0IPCg1fc2VuZF9tZXRyaWNzQhQKEl9zZW5kX3NlbGZfbWV0cmljc0IMCgpfc2VuZF9sb2dzQhkKF19zZW5kX2xvZ3NfbWluX3NldmVyaXR5Qh0KG19zYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZEIXChVfc2VuZF9sb2dzX3Blcl9zZWNvbmRCIgogX2RlYWN0aXZhdGVfYWxsX2luc3RydW1lbnRhdGlvbnNKBAgIEAlKBAgREBJKBAgHEAhSGW9wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXMi+wEKDFNhbXBsaW5nUnVsZRIMCgRyYXRlGAEgASgBEhEKBG5hbWUYAiABKAlIAIgBARIpCgRraW5kGAMgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kSAGIAQESEQoEcGF0aBgEIAEoCUgCiAEBEj4KCmF0dHJpYnV0ZXMYBSADKAsyKi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlLkF0dHJpYnV0ZXNFbnRyeRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIHCgVfbmFtZUIHCgVfa2luZEIHCgVfcGF0aCIzCgpTY29wZUxldmVsEg8KB3BhdHRlcm4YASABKAkSFAoMbWluX3NldmVyaXR5GAIgASgNIhYKBU5hbWVzEg0KBW5hbWVzGAEgAygJIi4KBEhvc3QSDAoEbGl2ZRgBIAMoCRISCgpuZXh0X3N0YXJ0GAMgAygJSgQIAhADIvABCgpBZ2VudFN0YXJ0EiAKBGhvc3QYASABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBIRCglzdGF0ZV9kaXIYAiABKAgSFwoKY29yZV9zdGF0ZRgDIAEoDEgAiAEBEhAKCGVuZHBvaW50GAUgASgJEhQKDGluc3RhbmNlX3VpZBgHIAEoDBInCgVoaW50cxgIIAEoCzIYLm9wYW1wLnNkay52MS5BZ2VudEhpbnRzEhMKC25vd191bml4X21zGAkgASgEEhMKC25vd19tb25vX21zGAogASgEQg0KC19jb3JlX3N0YXRlSgQIBBAFSgQIBhAHIlQKCkFnZW50SGludHMSDwoHcmVmdXNlZBgBIAEoCRIRCglub3RfZm91bmQYAiABKAkSEwoLdW5yZWFjaGFibGUYAyABKAkSDQoFZXJyb3IYBCABKAkiswQKCUFnZW50U3RlcBINCgVhZ2VudBgBIAEoDBITCgtub3dfdW5peF9tcxgCIAEoBBITCgtub3dfbW9ub19tcxgDIAEoBBI6Cg1yZW1vdGVfY29uZmlnGAQgASgLMiEub3BhbXAucHJvdG8udjEuQWdlbnRSZW1vdGVDb25maWdIABIxCgljb25uZWN0ZWQYBSABKAsyHC5vcGFtcC5zZGsudjEuQWdlbnRDb25uZWN0ZWRIABI6Cg5jb25uZWN0X2ZhaWxlZBgGIAEoCzIgLm9wYW1wLnNkay52MS5BZ2VudENvbm5lY3RGYWlsZWRIABIeChRpbnN0YW5jZV91aWRfY2hhbmdlZBgHIAEoDEgAEhcKDXVpZF9ub3Rfc2F2ZWQYCCABKAlIABIiChhzdGF0ZV9mcm9tX25ld2VyX3ZlcnNpb24YCSABKA1IABItCgdzdG9wcGVkGAogASgLMhoub3BhbXAuc2RrLnYxLkFnZW50U3RvcHBlZEgAEisKBXRpbWVyGAsgASgLMhoub3BhbXAuc2RrLnYxLkV4cG9ydENvdW50c0gAEjEKCWV4cG9ydGVycxgMIAEoCzIcLm9wYW1wLnNkay52MS5BZ2VudEV4cG9ydGVyc0gAEiIKBGhvc3QYDSABKAsyEi5vcGFtcC5zZGsudjEuSG9zdEgAEikKBWJ1aWx0GA4gASgLMhgub3BhbXAuc2RrLnYxLkFnZW50QnVpbHRIAEIHCgVpbnB1dCJICgpBZ2VudEJ1aWx0Eg8KB3NlcnZpY2UYASABKAkSKQoJZXhwb3J0ZXJzGAIgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyIiIKDkFnZW50Q29ubmVjdGVkEhAKCGVuZHBvaW50GAEgASgJIkYKEkFnZW50Q29ubmVjdEZhaWxlZBIQCghlbmRwb2ludBgBIAEoCRIOCgZzdGF0dXMYAiABKA0SDgoGZGV0YWlsGAMgASgJIh0KDEFnZW50U3RvcHBlZBINCgVlcnJvchgBIAEoCSJnCg5BZ2VudEV4cG9ydGVycxIpCglleHBvcnRlcnMYASADKAsyFi5vcGFtcC5zZGsudjEuRXhwb3J0ZXISKgoGY291bnRzGAIgASgLMhoub3BhbXAuc2RrLnYxLkV4cG9ydENvdW50cyKVAQoLQWdlbnRPdXRwdXQSDQoFYWdlbnQYASABKAwSKgoHZWZmZWN0cxgCIAMoCzIZLm9wYW1wLnNkay52MS5BZ2VudEVmZmVjdBIXCg93YWtlX2F0X21vbm9fbXMYAyABKAQSMgoJZWZmZWN0aXZlGAQgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnIpoCCgtBZ2VudEVmZmVjdBInCgVhcHBseRgBIAEoCzIWLm9wYW1wLnNkay52MS5TZXR0aW5nc0gAEjQKCWVmZmVjdGl2ZRgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZ0gAEjQKBnN0YXR1cxgDIAEoCzIiLm9wYW1wLnByb3RvLnYxLlJlbW90ZUNvbmZpZ1N0YXR1c0gAEjEKBmhlYWx0aBgEIAEoCzIfLm9wYW1wLnByb3RvLnYxLkNvbXBvbmVudEhlYWx0aEgAEhIKCHNhdmVfdWlkGAUgASgJSAASJQoDbG9nGAYgASgLMhYub3BhbXAuc2RrLnYxLkFnZW50TG9nSABCCAoGZWZmZWN0IoQBCghBZ2VudExvZxIrCgVsZXZlbBgBIAEoDjIcLm9wYW1wLnNkay52MS5BZ2VudExvZy5MZXZlbBIMCgR0ZXh0GAIgASgJIj0KBUxldmVsEgkKBURFQlVHEAASCAoESU5GTxABEgoKBk5PVElDRRACEggKBFdBUk4QAxIJCgVFUlJPUhAEIpsECgpBZ2VudFN0YXRlEiAKBGhvc3QYASABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBIRCglzdGF0ZV9kaXIYAiABKAgSDwoHY3VycmVudBgDIAEoDBIQCghhdF9zdGFydBgEIAEoDBIRCgllZmZlY3RpdmUYBSABKAkSKQoJZXhwb3J0ZXJzGAYgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyEioKBmhlYWx0aBgHIAEoCzIaLm9wYW1wLnNkay52MS5IZWFsdGhSZXBvcnQSHwoScmVmcmVzaF9hdF91bml4X21zGAggASgESACIAQESIAoTcmVmcmVzaF9kdWVfbW9ub19tcxgJIAEoBEgBiAEBEhoKEmhlYWx0aF9kdWVfbW9ub19tcxgKIAEoBBIXCg9zdGFydGVkX3VuaXhfbXMYCyABKAQSEAoIZW5kcG9pbnQYDCABKAkSDwoHc2VydmljZRgNIAEoCRILCgN1aWQYDiABKAkSJwoFaGludHMYDyABKAsyGC5vcGFtcC5zZGsudjEuQWdlbnRIaW50cxIMCgRldmVyGBAgASgIEg8KB2ZhaWxpbmcYESABKAgSFQoNYXNrZWRfdW5peF9tcxgSIAEoBBIVCg1hc2tlZF9tb25vX21zGBMgASgEQhUKE19yZWZyZXNoX2F0X3VuaXhfbXNCFgoUX3JlZnJlc2hfZHVlX21vbm9fbXMikQEKDEV4cG9ydENvdW50cxIqCgZ0cmFjZXMYASABKAsyGi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzEisKB21ldHJpY3MYAiABKAsyGi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzEigKBGxvZ3MYAyABKAsyGi5vcGFtcC5zZGsudjEuU2lnbmFsQ291bnRzIpEBCgxTaWduYWxDb3VudHMSEgoKZXhwb3J0c19vaxgBIAEoBBIWCg5leHBvcnRzX2ZhaWxlZBgCIAEoBBIUCgxpdGVtc19mYWlsZWQYAyABKAQSFgoOaXRlbXNfZmlsdGVyZWQYBCABKAQSEwoLbGFzdF9mYWlsZWQYBSABKAgSEgoKbGFzdF9lcnJvchgGIAEoCSJmCgxIZWFsdGhSZXBvcnQSDAoEc2VuZBgBIAEoCBIyCglleHBvcnRlcnMYAiABKAsyHy5vcGFtcC5wcm90by52MS5Db21wb25lbnRIZWFsdGgSFAoMc2VudF91bml4X21zGAMgASgEIm0KCERlc2NyaWJlEioKCHJlc291cmNlGAEgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEIm8KCkNvbXBvbmVudHMSKgoJaW52ZW50b3J5GAEgASgLMhcub3BhbXAuc2RrLnYxLkludmVudG9yeRIgCgRob3N0GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQizAEKCUludmVudG9yeRITCgtpbnRlZ3JhdGlvbhgBIAEoCRIbChNpbnRlZ3JhdGlvbl92ZXJzaW9uGAIgASgJEhQKDHNka19sYW5ndWFnZRgDIAEoCRITCgtzZGtfdmVyc2lvbhgEIAEoCRI3ChBpbnN0cnVtZW50YXRpb25zGAUgAygLMh0ub3BhbXAuc2RrLnYxLkluc3RydW1lbnRhdGlvbhIpCglleHBvcnRlcnMYBiADKAsyFi5vcGFtcC5zZGsudjEuRXhwb3J0ZXIiMAoPSW5zdHJ1bWVudGF0aW9uEgwKBG5hbWUYASABKAkSDwoHdmVyc2lvbhgCIAEoCSJMCghFeHBvcnRlchIOCgZzaWduYWwYASABKAkSDAoEbmFtZRgCIAEoCRINCgVnYXRlZBgDIAEoCBITCgtkZXN0aW5hdGlvbhgEIAEoCSJ0CglFeHBvcnRlcnMSKgoFZm91bmQYASADKAsyGy5vcGFtcC5zZGsudjEuRm91bmRFeHBvcnRlchIhCgNlbnYYAiADKAsyFC5vcGFtcC5zZGsudjEuRW52VmFyEhgKEGRlZmF1bHRfcHJvdG9jb2wYAyABKAkiYAoNRm91bmRFeHBvcnRlchIOCgZzaWduYWwYASABKAkSDAoEa2luZBgCIAEoCRINCgVnYXRlZBgDIAEoCBIQCghlbmRwb2ludBgEIAEoCRIQCghmcm9tX2VudhgFIAEoCCIlCgZFbnZWYXISDAoEbmFtZRgBIAEoCRINCgV2YWx1ZRgCIAEoCSJ1ChBFeHBvcnRlcnNEZWNpZGVkEikKCWV4cG9ydGVycxgBIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlchIQCghnb3Zlcm5lZBgCIAMoCRISCgp1bmdvdmVybmVkGAMgAygJEhAKCHdhcm5pbmdzGAQgAygJIoICCghFdmFsdWF0ZRIQCghzZXR0aW5ncxgBIAEoDBIgCgRob3N0GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYByABKAQSJwoEc3BhbhgDIAEoCzIXLm9wYW1wLnNkay52MS5TcGFuU3RhcnRIABImCgNsb2cYBCABKAsyFy5vcGFtcC5zZGsudjEuTG9nUmVjb3JkSAASLgoKYXR0cmlidXRlcxgFIAEoCzIYLm9wYW1wLnNkay52MS5BdHRyaWJ1dGVzSAASIwoDY2FwGAYgASgLMhQub3BhbXAuc2RrLnYxLkNhcFJ1bkgAQgcKBWlucHV0In0KBkNhcFJ1bhIrCgZzaWduYWwYASABKA4yGy5vcGFtcC5zZGsudjEuQ2FwUnVuLlNpZ25hbBImCgZldmVudHMYAiADKAsyFi5vcGFtcC5zZGsudjEuQ2FwRXZlbnQiHgoGU2lnbmFsEgoKBlRSQUNFUxAAEggKBExPR1MQASJhCghDYXBFdmVudBINCgVhdF9ucxgBIAEoBBIkCgZwYXJlbnQYAiABKA4yFC5vcGFtcC5zZGsudjEuUGFyZW50Eg8KB3NhbXBsZWQYAyABKAgSDwoHcmVjb3JkcxgEIAEoBCJiCgpBdHRyaWJ1dGVzEiwKCmF0dHJpYnV0ZXMYASADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5GAIgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUiLAoJTG9nUmVjb3JkEg0KBXNjb3BlGAEgASgJEhAKCHNldmVyaXR5GAIgASgNIpMBCglTcGFuU3RhcnQSDAoEbmFtZRgBIAEoCRIkCgRraW5kGAIgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kEiwKCmF0dHJpYnV0ZXMYAyADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIkCgZwYXJlbnQYBCABKA4yFC5vcGFtcC5zZGsudjEuUGFyZW50IsoBCglFdmFsdWF0ZWQSDwoHcmVmdXNlZBgBIAEoCRIsCghzYW1wbGluZxgCIAEoCzIaLm9wYW1wLnNkay52MS5TcGFuU2FtcGxpbmcSEQoEa2VwdBgDIAEoCEgAiAEBEioKCHJlZGFjdGVkGAQgAygLMhgub3BhbXAucHJvdG8udjEuS2V5VmFsdWUSJgoEYm9keRgGIAEoCzIYLm9wYW1wLnByb3RvLnYxLkFueVZhbHVlEg4KBnBhc3NlZBgFIAMoBEIHCgVfa2VwdCKyAQoMU3BhblNhbXBsaW5nEisKA2hvdxgBIAEoDjIeLm9wYW1wLnNkay52MS5TcGFuU2FtcGxpbmcuSG93EhYKDnBhcmVudF9zYW1wbGVkGAIgASgIEgwKBHJhdGUYAyABKAESEQoEcnVsZRgEIAEoDUgAiAEBIjMKA0hvdxIRCg1GT0xMT1dfUEFSRU5UEAASCAoEUkFURRABEg8KC0FQUF9TQU1QTEVSEAJCBwoFX3J1bGUixQIKB1JlcXVlc3QSKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVzY3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFsdWF0ZUgAEi4KCmNvbXBvbmVudHMYByABKAsyGC5vcGFtcC5zZGsudjEuQ29tcG9uZW50c0gAEiwKCWV4cG9ydGVycxgJIAEoCzIXLm9wYW1wLnNkay52MS5FeHBvcnRlcnNIABIvCgthZ2VudF9zdGFydBgKIAEoCzIYLm9wYW1wLnNkay52MS5BZ2VudFN0YXJ0SAASLQoKYWdlbnRfc3RlcBgLIAEoCzIXLm9wYW1wLnNkay52MS5BZ2VudFN0ZXBIAEIGCgRjYWxsSgQIARACSgQIAhADSgQIBRAGSgQIBhAHSgQICBAJItwCCgVSZXBseRI3CgtkZXNjcmlwdGlvbhgDIAEoCzIgLm9wYW1wLnByb3RvLnYxLkFnZW50RGVzY3JpcHRpb25IABIPCgVlcnJvchgEIAEoCUgAEiwKCWV2YWx1YXRlZBgFIAEoCzIXLm9wYW1wLnNkay52MS5FdmFsdWF0ZWRIABJDChRhdmFpbGFibGVfY29tcG9uZW50cxgIIAEoCzIjLm9wYW1wLnByb3RvLnYxLkF2YWlsYWJsZUNvbXBvbmVudHNIABI7ChFleHBvcnRlcnNfZGVjaWRlZBgKIAEoCzIeLm9wYW1wLnNkay52MS5FeHBvcnRlcnNEZWNpZGVkSAASMQoMYWdlbnRfb3V0cHV0GAsgASgLMhkub3BhbXAuc2RrLnYxLkFnZW50T3V0cHV0SABCCAoGcmVzdWx0SgQIARACSgQIAhADSgQIBhAHSgQIBxAISgQICRAKKpkBCghTcGFuS2luZBIZChVTUEFOX0tJTkRfVU5TUEVDSUZJRUQQABIWChJTUEFOX0tJTkRfSU5URVJOQUwQARIUChBTUEFOX0tJTkRfU0VSVkVSEAISFAoQU1BBTl9LSU5EX0NMSUVOVBADEhYKElNQQU5fS0lORF9QUk9EVUNFUhAEEhYKElNQQU5fS0lORF9DT05TVU1FUhAFKocBCgZQYXJlbnQSDwoLUEFSRU5UX05PTkUQABIYChRQQVJFTlRfTE9DQUxfU0FNUExFRBABEhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBMRUQQAhIZChVQQVJFTlRfUkVNT1RFX1NBTVBMRUQQAxIbChdQQVJFTlRfUkVNT1RFX1VOU0FNUExFRBAEQo0BCh5kZXYucHlkYW50aWMubG9nZmlyZS5mbGVldC5zZGtCDVNldHRpbmdzUHJvdG9aQWdpdGh1Yi5jb20vcHlkYW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFtcC9zZGtzZXR0aW5ncy9zZXR0aW5nc3BiqgIYTG9nZmlyZS5GbGVldC5DbGllbnQuU2RrYgZwcm90bzM", [file_opamp_v1_anyvalue, file_opamp_v1_opamp]);
 
 /**
  * Settings, typed. Every field left unset is the SDK's own value. In debug mode (debug_until) the
@@ -307,416 +306,639 @@ export const HostSchema: GenMessage<Host> = /*@__PURE__*/
   messageDesc(file_opamp_sdk_v1_settings, 4);
 
 /**
- * At start, before the SDK is built: the settings of the last config applied.
+ * The agent flow: the layer's decisions over time, as a step machine shaped like the client core.
+ * AgentStart once, before the SDK is built; then AgentStep for each thing that happens (a remote
+ * config, a client notification, the timer). Each answers an AgentOutput: carry out its effects in
+ * order, keep one timer for wake_at_mono_ms (replacing any earlier one), and pass `agent` back with
+ * the next step, as it came. The host keeps no settings document, no timer of its own and no
+ * wording: put Apply in force on the SDK, hand Effective, Status and Health to the client, write
+ * SaveUid's file, and say each Log line. Steps for one agent are made one at a time, in order.
  *
- * @generated from message opamp.sdk.v1.Load
+ * @generated from message opamp.sdk.v1.AgentStart
  */
-export type Load = Message<"opamp.sdk.v1.Load"> & {
+export type AgentStart = Message<"opamp.sdk.v1.AgentStart"> & {
   /**
-   * The document this host kept itself (sdk-settings.json, before the core kept the last config
-   * applied): read only when core_state holds no config applied. Unset: none.
-   *
-   * @generated from field: optional bytes saved = 1;
-   */
-  saved?: Uint8Array | undefined;
-
-  /**
-   * @generated from field: opamp.sdk.v1.Host host = 2;
+   * @generated from field: opamp.sdk.v1.Host host = 1;
    */
   host?: Host | undefined;
 
   /**
-   * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-   * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+   * the host keeps state across restarts
    *
-   * @generated from field: uint64 now_unix_ms = 3;
+   * @generated from field: bool state_dir = 2;
+   */
+  stateDir: boolean;
+
+  /**
+   * The client's saved state, as the host keeps it: the policy to start with is the last config
+   * applied in it, read with the core's own decoding. Unset: none.
+   *
+   * @generated from field: optional bytes core_state = 3;
+   */
+  coreState?: Uint8Array | undefined;
+
+  /**
+   * as configured: the lines name it as it is safe to log
+   *
+   * @generated from field: string endpoint = 5;
+   */
+  endpoint: string;
+
+  /**
+   * 16 bytes
+   *
+   * @generated from field: bytes instance_uid = 7;
+   */
+  instanceUid: Uint8Array;
+
+  /**
+   * SetupStarted.hints
+   *
+   * @generated from field: opamp.sdk.v1.AgentHints hints = 8;
+   */
+  hints?: AgentHints | undefined;
+
+  /**
+   * the wall clock, in milliseconds since the Unix epoch
+   *
+   * @generated from field: uint64 now_unix_ms = 9;
    */
   nowUnixMs: bigint;
 
   /**
-   * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-   * settings come from the last config applied in it, read with the core's own decoding, even
-   * after an endpoint change. Unset: none.
+   * a monotonic clock, in milliseconds
    *
-   * @generated from field: optional bytes core_state = 4;
+   * @generated from field: uint64 now_mono_ms = 10;
    */
-  coreState?: Uint8Array | undefined;
+  nowMonoMs: bigint;
 };
 
 /**
- * Describes the message opamp.sdk.v1.Load.
- * Use `create(LoadSchema)` to create a new message.
+ * Describes the message opamp.sdk.v1.AgentStart.
+ * Use `create(AgentStartSchema)` to create a new message.
  */
-export const LoadSchema: GenMessage<Load> = /*@__PURE__*/
+export const AgentStartSchema: GenMessage<AgentStart> = /*@__PURE__*/
   messageDesc(file_opamp_sdk_v1_settings, 5);
 
 /**
- * @generated from message opamp.sdk.v1.Loaded
- */
-export type Loaded = Message<"opamp.sdk.v1.Loaded"> & {
-  /**
-   * put all of it in force, next-start ones too
-   *
-   * @generated from field: opamp.sdk.v1.Settings settings = 1;
-   */
-  settings?: Settings | undefined;
-
-  /**
-   * keep it: the document in force now
-   *
-   * @generated from field: bytes current = 2;
-   */
-  current: Uint8Array;
-
-  /**
-   * report it
-   *
-   * @generated from field: opamp.proto.v1.EffectiveConfig effective = 3;
-   */
-  effective?: EffectiveConfig | undefined;
-
-  /**
-   * the saved settings were unreadable, and why
-   *
-   * @generated from field: string warning = 4;
-   */
-  warning: string;
-
-  /**
-   * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-   * any earlier one. 0: nothing to wait for. See Refresh.
-   *
-   * @generated from field: uint64 refresh_at_unix_ms = 5;
-   */
-  refreshAtUnixMs: bigint;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Loaded.
- * Use `create(LoadedSchema)` to create a new message.
- */
-export const LoadedSchema: GenMessage<Loaded> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 6);
-
-/**
- * A remote config arrived. Answered in two steps: Decide says what to save for the next start
- * (Plan); the host saves it, and Commit, with how that went, gives the answer (Decision). The
- * layer decides; the host only says what became of the save.
+ * What to check when the server can't be reached, as the core's Setup words it.
  *
- * @generated from message opamp.sdk.v1.Decide
+ * @generated from message opamp.sdk.v1.AgentHints
  */
-export type Decide = Message<"opamp.sdk.v1.Decide"> & {
+export type AgentHints = Message<"opamp.sdk.v1.AgentHints"> & {
   /**
-   * required: without it the reply is an error
+   * HTTP 401 or 403
    *
-   * @generated from field: opamp.proto.v1.AgentRemoteConfig config = 1;
+   * @generated from field: string refused = 1;
    */
-  config?: AgentRemoteConfig | undefined;
+  refused: string;
 
   /**
-   * from the last Loaded or Decision
+   * HTTP 404
    *
-   * @generated from field: bytes current = 2;
+   * @generated from field: string not_found = 2;
    */
-  current: Uint8Array;
+  notFound: string;
 
   /**
-   * Loaded.current, as it was at start
+   * no response
    *
-   * @generated from field: bytes at_start = 3;
+   * @generated from field: string unreachable = 3;
    */
-  atStart: Uint8Array;
+  unreachable: string;
 
   /**
-   * @generated from field: opamp.sdk.v1.Host host = 5;
-   */
-  host?: Host | undefined;
-
-  /**
-   * as Load's
+   * any other status
    *
-   * @generated from field: uint64 now_unix_ms = 6;
-   */
-  nowUnixMs: bigint;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Decide.
- * Use `create(DecideSchema)` to create a new message.
- */
-export const DecideSchema: GenMessage<Decide> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 7);
-
-/**
- * @generated from message opamp.sdk.v1.Plan
- */
-export type Plan = Message<"opamp.sdk.v1.Plan"> & {
-  /**
-   * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-   * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-   *
-   * @generated from field: optional bytes save = 1;
-   */
-  save?: Uint8Array | undefined;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Plan.
- * Use `create(PlanSchema)` to create a new message.
- */
-export const PlanSchema: GenMessage<Plan> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 8);
-
-/**
- * The answer to a remote config, once the host has done what Plan asked.
- *
- * @generated from message opamp.sdk.v1.Commit
- */
-export type Commit = Message<"opamp.sdk.v1.Commit"> & {
-  /**
-   * required: the request Plan answered, as it was
-   *
-   * @generated from field: opamp.sdk.v1.Decide decide = 1;
-   */
-  decide?: Decide | undefined;
-
-  /**
-   * @generated from field: opamp.sdk.v1.Commit.Saved saved = 2;
-   */
-  saved: Commit_Saved;
-
-  /**
-   * SAVED_FAILED: why
-   *
-   * @generated from field: string error = 3;
+   * @generated from field: string error = 4;
    */
   error: string;
 };
 
 /**
- * Describes the message opamp.sdk.v1.Commit.
- * Use `create(CommitSchema)` to create a new message.
+ * Describes the message opamp.sdk.v1.AgentHints.
+ * Use `create(AgentHintsSchema)` to create a new message.
  */
-export const CommitSchema: GenMessage<Commit> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 9);
+export const AgentHintsSchema: GenMessage<AgentHints> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 6);
 
 /**
- * @generated from enum opamp.sdk.v1.Commit.Saved
+ * @generated from message opamp.sdk.v1.AgentStep
  */
-export enum Commit_Saved {
+export type AgentStep = Message<"opamp.sdk.v1.AgentStep"> & {
   /**
-   * Nothing saved: the host keeps no state across restarts (no state directory), or Plan asked
-   * for no save. A config that changes a next-start setting is then refused.
+   * the last AgentOutput.agent, as it came
    *
-   * @generated from enum value: SAVED_NOWHERE = 0;
+   * @generated from field: bytes agent = 1;
    */
-  NOWHERE = 0,
+  agent: Uint8Array;
 
   /**
-   * saved
+   * as AgentStart's
    *
-   * @generated from enum value: SAVED_DONE = 1;
-   */
-  DONE = 1,
-
-  /**
-   * the save failed: the config is refused
-   *
-   * @generated from enum value: SAVED_FAILED = 2;
-   */
-  FAILED = 2,
-}
-
-/**
- * Describes the enum opamp.sdk.v1.Commit.Saved.
- */
-export const Commit_SavedSchema: GenEnum<Commit_Saved> = /*@__PURE__*/
-  enumDesc(file_opamp_sdk_v1_settings, 9, 0);
-
-/**
- * @generated from message opamp.sdk.v1.Decision
- */
-export type Decision = Message<"opamp.sdk.v1.Decision"> & {
-  /**
-   * APPLIED or FAILED, with the config's hash: report it
-   *
-   * @generated from field: opamp.proto.v1.RemoteConfigStatus status = 1;
-   */
-  status?: RemoteConfigStatus | undefined;
-
-  /**
-   * APPLIED: put the live ones in force; unset when FAILED
-   *
-   * @generated from field: opamp.sdk.v1.Settings apply = 2;
-   */
-  apply?: Settings | undefined;
-
-  /**
-   * keep it: the document in force now
-   *
-   * @generated from field: bytes current = 3;
-   */
-  current: Uint8Array;
-
-  /**
-   * report it
-   *
-   * @generated from field: opamp.proto.v1.EffectiveConfig effective = 5;
-   */
-  effective?: EffectiveConfig | undefined;
-
-  /**
-   * next-start settings in force after a restart
-   *
-   * @generated from field: repeated string pending_restart = 6;
-   */
-  pendingRestart: string[];
-
-  /**
-   * as Loaded's
-   *
-   * @generated from field: uint64 refresh_at_unix_ms = 7;
-   */
-  refreshAtUnixMs: bigint;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Decision.
- * Use `create(DecisionSchema)` to create a new message.
- */
-export const DecisionSchema: GenMessage<Decision> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 10);
-
-/**
- * The timer from refresh_at_unix_ms went off: what is in force now. Debug mode ends here, with
- * or without the server. Call it under the same lock as Decide and Commit, and drop a timer's call
- * when a Commit came after the timer was armed (a generation counter): that Commit armed its own.
- * Apply the settings and report the effective config, as after a Commit.
- *
- * @generated from message opamp.sdk.v1.Refresh
- */
-export type Refresh = Message<"opamp.sdk.v1.Refresh"> & {
-  /**
-   * from the last Loaded or Decision
-   *
-   * @generated from field: bytes current = 1;
-   */
-  current: Uint8Array;
-
-  /**
-   * Loaded.current, as it was at start
-   *
-   * @generated from field: bytes at_start = 2;
-   */
-  atStart: Uint8Array;
-
-  /**
-   * @generated from field: opamp.sdk.v1.Host host = 3;
-   */
-  host?: Host | undefined;
-
-  /**
-   * @generated from field: uint64 now_unix_ms = 4;
-   */
-  nowUnixMs: bigint;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Refresh.
- * Use `create(RefreshSchema)` to create a new message.
- */
-export const RefreshSchema: GenMessage<Refresh> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 11);
-
-/**
- * @generated from message opamp.sdk.v1.Refreshed
- */
-export type Refreshed = Message<"opamp.sdk.v1.Refreshed"> & {
-  /**
-   * put the live ones in force
-   *
-   * @generated from field: opamp.sdk.v1.Settings settings = 1;
-   */
-  settings?: Settings | undefined;
-
-  /**
-   * report it
-   *
-   * @generated from field: opamp.proto.v1.EffectiveConfig effective = 2;
-   */
-  effective?: EffectiveConfig | undefined;
-
-  /**
-   * as Loaded's
-   *
-   * @generated from field: uint64 refresh_at_unix_ms = 3;
-   */
-  refreshAtUnixMs: bigint;
-
-  /**
-   * `current` no longer reads on this clock, and why: the SDK's own settings
-   *
-   * @generated from field: string warning = 4;
-   */
-  warning: string;
-};
-
-/**
- * Describes the message opamp.sdk.v1.Refreshed.
- * Use `create(RefreshedSchema)` to create a new message.
- */
-export const RefreshedSchema: GenMessage<Refreshed> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 12);
-
-/**
- * Export health, from the counts the gates keep: call it from the same timer as Refresh, every
- * 30 s, and pass back the report it answered last time. When `send`, put `exporters` under the
- * agent's health `component_health_map["exporters"]` (the top-level `healthy` stays the
- * application's) and call set_health; otherwise send nothing.
- *
- * @generated from message opamp.sdk.v1.Health
- */
-export type Health = Message<"opamp.sdk.v1.Health"> & {
-  /**
-   * cumulative since start
-   *
-   * @generated from field: opamp.sdk.v1.ExportCounts counts = 1;
-   */
-  counts?: ExportCounts | undefined;
-
-  /**
-   * the last HealthReport answered; none at the first call
-   *
-   * @generated from field: opamp.sdk.v1.HealthReport previous = 2;
-   */
-  previous?: HealthReport | undefined;
-
-  /**
-   * @generated from field: uint64 now_unix_ms = 3;
+   * @generated from field: uint64 now_unix_ms = 2;
    */
   nowUnixMs: bigint;
 
   /**
-   * in force: a send_* false reports that signal off
-   *
-   * @generated from field: opamp.sdk.v1.Settings settings = 4;
+   * @generated from field: uint64 now_mono_ms = 3;
    */
-  settings?: Settings | undefined;
+  nowMonoMs: bigint;
 
   /**
-   * as the inventory lists them: one child each under its signal
+   * @generated from oneof opamp.sdk.v1.AgentStep.input
+   */
+  input: {
+    /**
+     * the client's remote config notification
+     *
+     * @generated from field: opamp.proto.v1.AgentRemoteConfig remote_config = 4;
+     */
+    value: AgentRemoteConfig;
+    case: "remoteConfig";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentConnected connected = 5;
+     */
+    value: AgentConnected;
+    case: "connected";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentConnectFailed connect_failed = 6;
+     */
+    value: AgentConnectFailed;
+    case: "connectFailed";
+  } | {
+    /**
+     * 16 bytes: the server named the instance anew
+     *
+     * @generated from field: bytes instance_uid_changed = 7;
+     */
+    value: Uint8Array;
+    case: "instanceUidChanged";
+  } | {
+    /**
+     * SaveUid failed, and why
+     *
+     * @generated from field: string uid_not_saved = 8;
+     */
+    value: string;
+    case: "uidNotSaved";
+  } | {
+    /**
+     * the notification's state format
+     *
+     * @generated from field: uint32 state_from_newer_version = 9;
+     */
+    value: number;
+    case: "stateFromNewerVersion";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentStopped stopped = 10;
+     */
+    value: AgentStopped;
+    case: "stopped";
+  } | {
+    /**
+     * wake_at_mono_ms came: what the gates counted since start
+     *
+     * @generated from field: opamp.sdk.v1.ExportCounts timer = 11;
+     */
+    value: ExportCounts;
+    case: "timer";
+  } | {
+    /**
+     * the inventory's exporters changed
+     *
+     * @generated from field: opamp.sdk.v1.AgentExporters exporters = 12;
+     */
+    value: AgentExporters;
+    case: "exporters";
+  } | {
+    /**
+     * what the host carries out changed
+     *
+     * @generated from field: opamp.sdk.v1.Host host = 13;
+     */
+    value: Host;
+    case: "host";
+  } | {
+    /**
+     * the SDK is built, before the client starts
+     *
+     * @generated from field: opamp.sdk.v1.AgentBuilt built = 14;
+     */
+    value: AgentBuilt;
+    case: "built";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentStep.
+ * Use `create(AgentStepSchema)` to create a new message.
+ */
+export const AgentStepSchema: GenMessage<AgentStep> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 7);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentBuilt
+ */
+export type AgentBuilt = Message<"opamp.sdk.v1.AgentBuilt"> & {
+  /**
+   * the resource's service.name; empty: none
    *
-   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 5;
+   * @generated from field: string service = 1;
+   */
+  service: string;
+
+  /**
+   * as the inventory lists them (Exporters' answer)
+   *
+   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 2;
    */
   exporters: Exporter[];
 };
 
 /**
- * Describes the message opamp.sdk.v1.Health.
- * Use `create(HealthSchema)` to create a new message.
+ * Describes the message opamp.sdk.v1.AgentBuilt.
+ * Use `create(AgentBuiltSchema)` to create a new message.
  */
-export const HealthSchema: GenMessage<Health> = /*@__PURE__*/
+export const AgentBuiltSchema: GenMessage<AgentBuilt> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 8);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentConnected
+ */
+export type AgentConnected = Message<"opamp.sdk.v1.AgentConnected"> & {
+  /**
+   * the one the client uses now; empty: the configured one
+   *
+   * @generated from field: string endpoint = 1;
+   */
+  endpoint: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentConnected.
+ * Use `create(AgentConnectedSchema)` to create a new message.
+ */
+export const AgentConnectedSchema: GenMessage<AgentConnected> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 9);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentConnectFailed
+ */
+export type AgentConnectFailed = Message<"opamp.sdk.v1.AgentConnectFailed"> & {
+  /**
+   * as AgentConnected's
+   *
+   * @generated from field: string endpoint = 1;
+   */
+  endpoint: string;
+
+  /**
+   * the HTTP status; 0: no response
+   *
+   * @generated from field: uint32 status = 2;
+   */
+  status: number;
+
+  /**
+   * @generated from field: string detail = 3;
+   */
+  detail: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentConnectFailed.
+ * Use `create(AgentConnectFailedSchema)` to create a new message.
+ */
+export const AgentConnectFailedSchema: GenMessage<AgentConnectFailed> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 10);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentStopped
+ */
+export type AgentStopped = Message<"opamp.sdk.v1.AgentStopped"> & {
+  /**
+   * why it stopped on its own; empty: it was asked to
+   *
+   * @generated from field: string error = 1;
+   */
+  error: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentStopped.
+ * Use `create(AgentStoppedSchema)` to create a new message.
+ */
+export const AgentStoppedSchema: GenMessage<AgentStopped> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 11);
+
+/**
+ * Export health is asked again at once, from `counts`.
+ *
+ * @generated from message opamp.sdk.v1.AgentExporters
+ */
+export type AgentExporters = Message<"opamp.sdk.v1.AgentExporters"> & {
+  /**
+   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 1;
+   */
+  exporters: Exporter[];
+
+  /**
+   * as timer's
+   *
+   * @generated from field: opamp.sdk.v1.ExportCounts counts = 2;
+   */
+  counts?: ExportCounts | undefined;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentExporters.
+ * Use `create(AgentExportersSchema)` to create a new message.
+ */
+export const AgentExportersSchema: GenMessage<AgentExporters> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 12);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentOutput
+ */
+export type AgentOutput = Message<"opamp.sdk.v1.AgentOutput"> & {
+  /**
+   * keep it and pass it back; never read it
+   *
+   * @generated from field: bytes agent = 1;
+   */
+  agent: Uint8Array;
+
+  /**
+   * carry them out in order
+   *
+   * @generated from field: repeated opamp.sdk.v1.AgentEffect effects = 2;
+   */
+  effects: AgentEffect[];
+
+  /**
+   * step with timer then; 0: only on an input
+   *
+   * @generated from field: uint64 wake_at_mono_ms = 3;
+   */
+  wakeAtMonoMs: bigint;
+
+  /**
+   * in force now (the client's first status takes it)
+   *
+   * @generated from field: opamp.proto.v1.EffectiveConfig effective = 4;
+   */
+  effective?: EffectiveConfig | undefined;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentOutput.
+ * Use `create(AgentOutputSchema)` to create a new message.
+ */
+export const AgentOutputSchema: GenMessage<AgentOutput> = /*@__PURE__*/
   messageDesc(file_opamp_sdk_v1_settings, 13);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentEffect
+ */
+export type AgentEffect = Message<"opamp.sdk.v1.AgentEffect"> & {
+  /**
+   * @generated from oneof opamp.sdk.v1.AgentEffect.effect
+   */
+  effect: {
+    /**
+     * put in force: live settings, next-start ones and custom
+     *
+     * @generated from field: opamp.sdk.v1.Settings apply = 1;
+     */
+    value: Settings;
+    case: "apply";
+  } | {
+    /**
+     * set_effective_config
+     *
+     * @generated from field: opamp.proto.v1.EffectiveConfig effective = 2;
+     */
+    value: EffectiveConfig;
+    case: "effective";
+  } | {
+    /**
+     * set_remote_config_status
+     *
+     * @generated from field: opamp.proto.v1.RemoteConfigStatus status = 3;
+     */
+    value: RemoteConfigStatus;
+    case: "status";
+  } | {
+    /**
+     * set_health (merge the application's own status in, if any)
+     *
+     * @generated from field: opamp.proto.v1.ComponentHealth health = 4;
+     */
+    value: ComponentHealth;
+    case: "health";
+  } | {
+    /**
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     *
+     * @generated from field: string save_uid = 5;
+     */
+    value: string;
+    case: "saveUid";
+  } | {
+    /**
+     * say it, prefixed as the integration prefixes its lines
+     *
+     * @generated from field: opamp.sdk.v1.AgentLog log = 6;
+     */
+    value: AgentLog;
+    case: "log";
+  } | { case: undefined; value?: undefined };
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentEffect.
+ * Use `create(AgentEffectSchema)` to create a new message.
+ */
+export const AgentEffectSchema: GenMessage<AgentEffect> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 14);
+
+/**
+ * @generated from message opamp.sdk.v1.AgentLog
+ */
+export type AgentLog = Message<"opamp.sdk.v1.AgentLog"> & {
+  /**
+   * @generated from field: opamp.sdk.v1.AgentLog.Level level = 1;
+   */
+  level: AgentLog_Level;
+
+  /**
+   * @generated from field: string text = 2;
+   */
+  text: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentLog.
+ * Use `create(AgentLogSchema)` to create a new message.
+ */
+export const AgentLogSchema: GenMessage<AgentLog> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 15);
+
+/**
+ * @generated from enum opamp.sdk.v1.AgentLog.Level
+ */
+export enum AgentLog_Level {
+  /**
+   * only with the integration's debug output on
+   *
+   * @generated from enum value: DEBUG = 0;
+   */
+  DEBUG = 0,
+
+  /**
+   * @generated from enum value: INFO = 1;
+   */
+  INFO = 1,
+
+  /**
+   * info said even where no logger is set up
+   *
+   * @generated from enum value: NOTICE = 2;
+   */
+  NOTICE = 2,
+
+  /**
+   * @generated from enum value: WARN = 3;
+   */
+  WARN = 3,
+
+  /**
+   * the SDK is no longer managed
+   *
+   * @generated from enum value: ERROR = 4;
+   */
+  ERROR = 4,
+}
+
+/**
+ * Describes the enum opamp.sdk.v1.AgentLog.Level.
+ */
+export const AgentLog_LevelSchema: GenEnum<AgentLog_Level> = /*@__PURE__*/
+  enumDesc(file_opamp_sdk_v1_settings, 15, 0);
+
+/**
+ * AgentOutput.agent, decoded: the agent between steps. Hosts keep it as bytes and never read it.
+ * It lives only as long as the process, so its fields may change in any release.
+ *
+ * @generated from message opamp.sdk.v1.AgentState
+ */
+export type AgentState = Message<"opamp.sdk.v1.AgentState"> & {
+  /**
+   * @generated from field: opamp.sdk.v1.Host host = 1;
+   */
+  host?: Host | undefined;
+
+  /**
+   * @generated from field: bool state_dir = 2;
+   */
+  stateDir: boolean;
+
+  /**
+   * @generated from field: bytes current = 3;
+   */
+  current: Uint8Array;
+
+  /**
+   * @generated from field: bytes at_start = 4;
+   */
+  atStart: Uint8Array;
+
+  /**
+   * @generated from field: string effective = 5;
+   */
+  effective: string;
+
+  /**
+   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 6;
+   */
+  exporters: Exporter[];
+
+  /**
+   * @generated from field: opamp.sdk.v1.HealthReport health = 7;
+   */
+  health?: HealthReport | undefined;
+
+  /**
+   * @generated from field: optional uint64 refresh_at_unix_ms = 8;
+   */
+  refreshAtUnixMs?: bigint | undefined;
+
+  /**
+   * @generated from field: optional uint64 refresh_due_mono_ms = 9;
+   */
+  refreshDueMonoMs?: bigint | undefined;
+
+  /**
+   * @generated from field: uint64 health_due_mono_ms = 10;
+   */
+  healthDueMonoMs: bigint;
+
+  /**
+   * @generated from field: uint64 started_unix_ms = 11;
+   */
+  startedUnixMs: bigint;
+
+  /**
+   * @generated from field: string endpoint = 12;
+   */
+  endpoint: string;
+
+  /**
+   * @generated from field: string service = 13;
+   */
+  service: string;
+
+  /**
+   * @generated from field: string uid = 14;
+   */
+  uid: string;
+
+  /**
+   * @generated from field: opamp.sdk.v1.AgentHints hints = 15;
+   */
+  hints?: AgentHints | undefined;
+
+  /**
+   * @generated from field: bool ever = 16;
+   */
+  ever: boolean;
+
+  /**
+   * @generated from field: bool failing = 17;
+   */
+  failing: boolean;
+
+  /**
+   * @generated from field: uint64 asked_unix_ms = 18;
+   */
+  askedUnixMs: bigint;
+
+  /**
+   * @generated from field: uint64 asked_mono_ms = 19;
+   */
+  askedMonoMs: bigint;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.AgentState.
+ * Use `create(AgentStateSchema)` to create a new message.
+ */
+export const AgentStateSchema: GenMessage<AgentState> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 16);
 
 /**
  * @generated from message opamp.sdk.v1.ExportCounts
@@ -743,7 +965,7 @@ export type ExportCounts = Message<"opamp.sdk.v1.ExportCounts"> & {
  * Use `create(ExportCountsSchema)` to create a new message.
  */
 export const ExportCountsSchema: GenMessage<ExportCounts> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 14);
+  messageDesc(file_opamp_sdk_v1_settings, 17);
 
 /**
  * What a signal's gate counted since start, after the exporter's own retries.
@@ -795,7 +1017,7 @@ export type SignalCounts = Message<"opamp.sdk.v1.SignalCounts"> & {
  * Use `create(SignalCountsSchema)` to create a new message.
  */
 export const SignalCountsSchema: GenMessage<SignalCounts> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 15);
+  messageDesc(file_opamp_sdk_v1_settings, 18);
 
 /**
  * @generated from message opamp.sdk.v1.HealthReport
@@ -832,7 +1054,7 @@ export type HealthReport = Message<"opamp.sdk.v1.HealthReport"> & {
  * Use `create(HealthReportSchema)` to create a new message.
  */
 export const HealthReportSchema: GenMessage<HealthReport> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 16);
+  messageDesc(file_opamp_sdk_v1_settings, 19);
 
 /**
  * The agent description, from the SDK's resource, with the policy format and the controls the
@@ -847,14 +1069,14 @@ export type Describe = Message<"opamp.sdk.v1.Describe"> & {
   resource: KeyValue[];
 
   /**
-   * as Load's; unset, it lists no control
+   * as AgentStart's; unset, it lists no control
    *
    * @generated from field: opamp.sdk.v1.Host host = 2;
    */
   host?: Host | undefined;
 
   /**
-   * as Load's: debug is listed only with a clock
+   * the wall clock: debug is listed only with one
    *
    * @generated from field: uint64 now_unix_ms = 3;
    */
@@ -866,7 +1088,7 @@ export type Describe = Message<"opamp.sdk.v1.Describe"> & {
  * Use `create(DescribeSchema)` to create a new message.
  */
 export const DescribeSchema: GenMessage<Describe> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 17);
+  messageDesc(file_opamp_sdk_v1_settings, 20);
 
 /**
  * What the instance runs, for a server's view of its fleet (docs/available-components.md): call
@@ -884,14 +1106,14 @@ export type Components = Message<"opamp.sdk.v1.Components"> & {
   inventory?: Inventory | undefined;
 
   /**
-   * as Load's
+   * as AgentStart's
    *
    * @generated from field: opamp.sdk.v1.Host host = 2;
    */
   host?: Host | undefined;
 
   /**
-   * as Load's: debug mode is carried out only with a clock
+   * the wall clock: debug mode is carried out only with one
    *
    * @generated from field: uint64 now_unix_ms = 3;
    */
@@ -903,7 +1125,7 @@ export type Components = Message<"opamp.sdk.v1.Components"> & {
  * Use `create(ComponentsSchema)` to create a new message.
  */
 export const ComponentsSchema: GenMessage<Components> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 18);
+  messageDesc(file_opamp_sdk_v1_settings, 21);
 
 /**
  * @generated from message opamp.sdk.v1.Inventory
@@ -955,7 +1177,7 @@ export type Inventory = Message<"opamp.sdk.v1.Inventory"> & {
  * Use `create(InventorySchema)` to create a new message.
  */
 export const InventorySchema: GenMessage<Inventory> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 19);
+  messageDesc(file_opamp_sdk_v1_settings, 22);
 
 /**
  * @generated from message opamp.sdk.v1.Instrumentation
@@ -981,7 +1203,7 @@ export type Instrumentation = Message<"opamp.sdk.v1.Instrumentation"> & {
  * Use `create(InstrumentationSchema)` to create a new message.
  */
 export const InstrumentationSchema: GenMessage<Instrumentation> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 20);
+  messageDesc(file_opamp_sdk_v1_settings, 23);
 
 /**
  * @generated from message opamp.sdk.v1.Exporter
@@ -1023,7 +1245,7 @@ export type Exporter = Message<"opamp.sdk.v1.Exporter"> & {
  * Use `create(ExporterSchema)` to create a new message.
  */
 export const ExporterSchema: GenMessage<Exporter> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 21);
+  messageDesc(file_opamp_sdk_v1_settings, 24);
 
 /**
  * The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
@@ -1058,7 +1280,7 @@ export type Exporters = Message<"opamp.sdk.v1.Exporters"> & {
  * Use `create(ExportersSchema)` to create a new message.
  */
 export const ExportersSchema: GenMessage<Exporters> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 22);
+  messageDesc(file_opamp_sdk_v1_settings, 25);
 
 /**
  * @generated from message opamp.sdk.v1.FoundExporter
@@ -1106,7 +1328,7 @@ export type FoundExporter = Message<"opamp.sdk.v1.FoundExporter"> & {
  * Use `create(FoundExporterSchema)` to create a new message.
  */
 export const FoundExporterSchema: GenMessage<FoundExporter> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 23);
+  messageDesc(file_opamp_sdk_v1_settings, 26);
 
 /**
  * @generated from message opamp.sdk.v1.EnvVar
@@ -1128,7 +1350,7 @@ export type EnvVar = Message<"opamp.sdk.v1.EnvVar"> & {
  * Use `create(EnvVarSchema)` to create a new message.
  */
 export const EnvVarSchema: GenMessage<EnvVar> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 24);
+  messageDesc(file_opamp_sdk_v1_settings, 27);
 
 /**
  * @generated from message opamp.sdk.v1.ExportersDecided
@@ -1168,7 +1390,7 @@ export type ExportersDecided = Message<"opamp.sdk.v1.ExportersDecided"> & {
  * Use `create(ExportersDecidedSchema)` to create a new message.
  */
 export const ExportersDecidedSchema: GenMessage<ExportersDecided> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 25);
+  messageDesc(file_opamp_sdk_v1_settings, 28);
 
 /**
  * Test-only: what the reference matchers make of one input under a settings document, so that
@@ -1190,7 +1412,7 @@ export type Evaluate = Message<"opamp.sdk.v1.Evaluate"> & {
   host?: Host | undefined;
 
   /**
-   * as Load's: debug mode folded in
+   * the wall clock: debug mode folded in
    *
    * @generated from field: uint64 now_unix_ms = 7;
    */
@@ -1231,7 +1453,7 @@ export type Evaluate = Message<"opamp.sdk.v1.Evaluate"> & {
  * Use `create(EvaluateSchema)` to create a new message.
  */
 export const EvaluateSchema: GenMessage<Evaluate> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 26);
+  messageDesc(file_opamp_sdk_v1_settings, 29);
 
 /**
  * A run of a rate cap from a full bucket: sampling_traces_per_second's for spans,
@@ -1257,7 +1479,7 @@ export type CapRun = Message<"opamp.sdk.v1.CapRun"> & {
  * Use `create(CapRunSchema)` to create a new message.
  */
 export const CapRunSchema: GenMessage<CapRun> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 27);
+  messageDesc(file_opamp_sdk_v1_settings, 30);
 
 /**
  * @generated from enum opamp.sdk.v1.CapRun.Signal
@@ -1278,7 +1500,7 @@ export enum CapRun_Signal {
  * Describes the enum opamp.sdk.v1.CapRun.Signal.
  */
 export const CapRun_SignalSchema: GenEnum<CapRun_Signal> = /*@__PURE__*/
-  enumDesc(file_opamp_sdk_v1_settings, 27, 0);
+  enumDesc(file_opamp_sdk_v1_settings, 30, 0);
 
 /**
  * @generated from message opamp.sdk.v1.CapEvent
@@ -1318,7 +1540,7 @@ export type CapEvent = Message<"opamp.sdk.v1.CapEvent"> & {
  * Use `create(CapEventSchema)` to create a new message.
  */
 export const CapEventSchema: GenMessage<CapEvent> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 28);
+  messageDesc(file_opamp_sdk_v1_settings, 31);
 
 /**
  * A span's, span event's, span link's or log record's attributes, and a log record's body.
@@ -1344,7 +1566,7 @@ export type Attributes = Message<"opamp.sdk.v1.Attributes"> & {
  * Use `create(AttributesSchema)` to create a new message.
  */
 export const AttributesSchema: GenMessage<Attributes> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 29);
+  messageDesc(file_opamp_sdk_v1_settings, 32);
 
 /**
  * A log record at the log gate.
@@ -1372,7 +1594,7 @@ export type LogRecord = Message<"opamp.sdk.v1.LogRecord"> & {
  * Use `create(LogRecordSchema)` to create a new message.
  */
 export const LogRecordSchema: GenMessage<LogRecord> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 30);
+  messageDesc(file_opamp_sdk_v1_settings, 33);
 
 /**
  * What a sampler sees when a span starts.
@@ -1410,7 +1632,7 @@ export type SpanStart = Message<"opamp.sdk.v1.SpanStart"> & {
  * Use `create(SpanStartSchema)` to create a new message.
  */
 export const SpanStartSchema: GenMessage<SpanStart> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 31);
+  messageDesc(file_opamp_sdk_v1_settings, 34);
 
 /**
  * @generated from message opamp.sdk.v1.Evaluated
@@ -1464,7 +1686,7 @@ export type Evaluated = Message<"opamp.sdk.v1.Evaluated"> & {
  * Use `create(EvaluatedSchema)` to create a new message.
  */
 export const EvaluatedSchema: GenMessage<Evaluated> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 32);
+  messageDesc(file_opamp_sdk_v1_settings, 35);
 
 /**
  * @generated from message opamp.sdk.v1.SpanSampling
@@ -1498,7 +1720,7 @@ export type SpanSampling = Message<"opamp.sdk.v1.SpanSampling"> & {
  * Use `create(SpanSamplingSchema)` to create a new message.
  */
 export const SpanSamplingSchema: GenMessage<SpanSampling> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 33);
+  messageDesc(file_opamp_sdk_v1_settings, 36);
 
 /**
  * @generated from enum opamp.sdk.v1.SpanSampling.How
@@ -1530,7 +1752,7 @@ export enum SpanSampling_How {
  * Describes the enum opamp.sdk.v1.SpanSampling.How.
  */
 export const SpanSampling_HowSchema: GenEnum<SpanSampling_How> = /*@__PURE__*/
-  enumDesc(file_opamp_sdk_v1_settings, 33, 0);
+  enumDesc(file_opamp_sdk_v1_settings, 36, 0);
 
 /**
  * @generated from message opamp.sdk.v1.Request
@@ -1540,18 +1762,6 @@ export type Request = Message<"opamp.sdk.v1.Request"> & {
    * @generated from oneof opamp.sdk.v1.Request.call
    */
   call: {
-    /**
-     * @generated from field: opamp.sdk.v1.Load load = 1;
-     */
-    value: Load;
-    case: "load";
-  } | {
-    /**
-     * @generated from field: opamp.sdk.v1.Decide decide = 2;
-     */
-    value: Decide;
-    case: "decide";
-  } | {
     /**
      * @generated from field: opamp.sdk.v1.Describe describe = 3;
      */
@@ -1565,34 +1775,28 @@ export type Request = Message<"opamp.sdk.v1.Request"> & {
     case: "evaluate";
   } | {
     /**
-     * @generated from field: opamp.sdk.v1.Refresh refresh = 5;
-     */
-    value: Refresh;
-    case: "refresh";
-  } | {
-    /**
-     * @generated from field: opamp.sdk.v1.Health health = 6;
-     */
-    value: Health;
-    case: "health";
-  } | {
-    /**
      * @generated from field: opamp.sdk.v1.Components components = 7;
      */
     value: Components;
     case: "components";
   } | {
     /**
-     * @generated from field: opamp.sdk.v1.Commit commit = 8;
-     */
-    value: Commit;
-    case: "commit";
-  } | {
-    /**
      * @generated from field: opamp.sdk.v1.Exporters exporters = 9;
      */
     value: Exporters;
     case: "exporters";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentStart agent_start = 10;
+     */
+    value: AgentStart;
+    case: "agentStart";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentStep agent_step = 11;
+     */
+    value: AgentStep;
+    case: "agentStep";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1601,7 +1805,7 @@ export type Request = Message<"opamp.sdk.v1.Request"> & {
  * Use `create(RequestSchema)` to create a new message.
  */
 export const RequestSchema: GenMessage<Request> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 34);
+  messageDesc(file_opamp_sdk_v1_settings, 37);
 
 /**
  * @generated from message opamp.sdk.v1.Reply
@@ -1611,18 +1815,6 @@ export type Reply = Message<"opamp.sdk.v1.Reply"> & {
    * @generated from oneof opamp.sdk.v1.Reply.result
    */
   result: {
-    /**
-     * @generated from field: opamp.sdk.v1.Loaded loaded = 1;
-     */
-    value: Loaded;
-    case: "loaded";
-  } | {
-    /**
-     * @generated from field: opamp.sdk.v1.Decision decision = 2;
-     */
-    value: Decision;
-    case: "decision";
-  } | {
     /**
      * @generated from field: opamp.proto.v1.AgentDescription description = 3;
      */
@@ -1644,34 +1836,22 @@ export type Reply = Message<"opamp.sdk.v1.Reply"> & {
     case: "evaluated";
   } | {
     /**
-     * @generated from field: opamp.sdk.v1.Refreshed refreshed = 6;
-     */
-    value: Refreshed;
-    case: "refreshed";
-  } | {
-    /**
-     * @generated from field: opamp.sdk.v1.HealthReport health_report = 7;
-     */
-    value: HealthReport;
-    case: "healthReport";
-  } | {
-    /**
      * @generated from field: opamp.proto.v1.AvailableComponents available_components = 8;
      */
     value: AvailableComponents;
     case: "availableComponents";
   } | {
     /**
-     * @generated from field: opamp.sdk.v1.Plan plan = 9;
-     */
-    value: Plan;
-    case: "plan";
-  } | {
-    /**
      * @generated from field: opamp.sdk.v1.ExportersDecided exporters_decided = 10;
      */
     value: ExportersDecided;
     case: "exportersDecided";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.AgentOutput agent_output = 11;
+     */
+    value: AgentOutput;
+    case: "agentOutput";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1680,7 +1860,7 @@ export type Reply = Message<"opamp.sdk.v1.Reply"> & {
  * Use `create(ReplySchema)` to create a new message.
  */
 export const ReplySchema: GenMessage<Reply> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 35);
+  messageDesc(file_opamp_sdk_v1_settings, 38);
 
 /**
  * As OTLP numbers them.

@@ -111,12 +111,13 @@ func (a *agent) lookAtGlobals() {
 	if a.stopped || !a.noticeReplaced() {
 		return
 	}
-	a.reportReplaced(a.now())
+	a.reportReplaced()
 }
 
-// reportReplaced sends the inventory and export health now that a provider was replaced: the
-// policy in force stays as it is. Before there is a client, start sends the inventory. Under a.mu.
-func (a *agent) reportReplaced(now time.Time) {
+// reportReplaced sends the inventory, and tells the flow the exporters now (export health is
+// asked again at once): the policy in force stays as it is. Before there is a client, start sends
+// the inventory. Under a.mu.
+func (a *agent) reportReplaced() {
 	if a.reporter == nil {
 		a.relist = true // start sends it
 		return
@@ -124,8 +125,7 @@ func (a *agent) reportReplaced(now time.Time) {
 	if c := a.components(context.Background()); c != nil {
 		a.reporter.SetAvailableComponents(c)
 	}
-	a.reportHealth(now)
-	a.arm()
+	a.exportersNow()
 }
 
 // noticeReplaced compares the global providers with Setup's, and says whether a signal is

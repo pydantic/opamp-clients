@@ -503,33 +503,29 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 	if len(v.Cases) < 25 {
 		t.Fatalf("%d cases: the file changed shape?", len(v.Cases))
 	}
-	layer := testLayer(t)
 	for _, c := range v.Cases {
 		t.Run(c.Name, func(t *testing.T) {
 			host := goHost()
 			if c.Host != nil {
 				host = c.Host
 			}
-			d, err := layer.DecideAt(context.Background(), remote(c.Document), nil, nil, host, vectorNow, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			status, apply, effective := decideAt(t, host, c.Document, vectorNow)
 			if c.Refused != "" {
-				if d.GetStatus().GetStatus() != failed_ || d.GetStatus().GetErrorMessage() != c.Refused {
-					t.Fatalf("status %v, want FAILED %q", d.GetStatus(), c.Refused)
+				if status.GetStatus() != failed_ || status.GetErrorMessage() != c.Refused {
+					t.Fatalf("status %v, want FAILED %q", status, c.Refused)
 				}
-				if d.GetApply() != nil {
+				if apply != nil {
 					t.Fatal("a refused config hands nothing over")
 				}
 				return
 			}
-			if d.GetStatus().GetStatus() != applied {
-				t.Fatalf("status %v", d.GetStatus())
+			if status.GetStatus() != applied {
+				t.Fatalf("status %v", status)
 			}
 			controls := NewControls()
 			var tld told
 			controls.app.onChange(tld.f)
-			controls.Apply(d.GetApply())
+			controls.Apply(apply)
 			if got := controls.app.snapshot(); !sameMap(got, c.Custom) {
 				t.Fatalf("in force %v, want %v", got, c.Custom)
 			}
@@ -543,7 +539,7 @@ func TestTheSharedCustomVectorsReachTheApplicationAsTheLayerDecides(t *testing.T
 				slices.Sort(keys)
 				tld.want(t, change{c.Custom, keys})
 			}
-			if got := string(d.GetEffective().GetConfigMap().GetConfigMap()[policyFile].GetBody()); c.Effective != "" && got != c.Effective {
+			if got := string(effective.GetConfigMap().GetConfigMap()[policyFile].GetBody()); c.Effective != "" && got != c.Effective {
 				t.Fatalf("effective %s, want %s", got, c.Effective)
 			}
 		})
@@ -628,9 +624,6 @@ func TestAWrongCustomEntryFailsTheConfigAndNothingChanges(t *testing.T) {
 		t.Fatalf("effective %s", got)
 	}
 	tld.want(t, change{m{"a": "1"}, []string{"a"}})
-	if _, err := os.Stat(filepath.Join(dir, "sdk-settings.json")); err == nil {
-		t.Fatal("sdk-settings.json written: the client keeps the config applied")
-	}
 }
 
 func TestAConfigWithoutCustomPutsEveryKeyBackToItsDefault(t *testing.T) {
@@ -685,7 +678,7 @@ func TestARefreshWithTheSameMapTellsNothing(t *testing.T) {
 	ft.set(vectorNow + 300_000) // a refresh while debug mode lasts
 	ft.set(vectorNow + 600_000) // and its end
 	a.mu.Lock()
-	rate, refreshAt := *a.controls.Sampler.rate, a.refreshAt
+	rate, refreshAt := *a.controls.Sampler.rate, flowRefreshAt(t, a)
 	a.mu.Unlock()
 	if rate != 0.1 || refreshAt != 0 {
 		t.Fatalf("debug mode didn't end on the timer: rate %v, refresh at %d", rate, refreshAt)

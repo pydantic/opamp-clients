@@ -11,6 +11,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/open-telemetry/opamp-go/protobufs"
+
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/match"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
@@ -36,14 +38,27 @@ func settings(t *testing.T, doc json.RawMessage, now uint64) *settingspb.Setting
 	if now == 0 {
 		now = vectorNow
 	}
-	loaded, err := l.LoadAt(context.Background(), doc, host, now)
+	ctx := context.Background()
+	out, err := l.Start(ctx, &settingspb.AgentStart{Host: host, InstanceUid: make([]byte, 16), NowUnixMs: now, NowMonoMs: now})
+	if err == nil {
+		out, err = l.Step(ctx, &settingspb.AgentStep{Agent: out.GetAgent(), NowUnixMs: now, NowMonoMs: now,
+			Input: &settingspb.AgentStep_RemoteConfig{RemoteConfig: &protobufs.AgentRemoteConfig{ConfigHash: []byte("h"),
+				Config: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{
+					"logfire-sdk-policy.json": {Body: doc, ContentType: "application/json"}}}}}})
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.GetWarning() != "" {
-		t.Fatalf("the layer refused %s: %s", doc, loaded.GetWarning())
+	for _, e := range out.GetEffects() {
+		if e.GetStatus().GetStatus() == protobufs.RemoteConfigStatuses_RemoteConfigStatuses_FAILED {
+			t.Fatalf("the layer refused %s: %s", doc, e.GetStatus().GetErrorMessage())
+		}
+		if e.GetApply() != nil {
+			return e.GetApply()
+		}
 	}
-	return loaded.GetSettings()
+	t.Fatalf("the layer applied nothing of %s", doc)
+	return nil
 }
 
 func vectors[T any](t *testing.T, name string) T {

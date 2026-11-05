@@ -4,8 +4,7 @@
 // The interface to the SDK settings layer, written in Rust and compiled to WebAssembly. It decides
 // what an OpenTelemetry SDK does with the settings an OpAMP server sends it, the same way in every
 // language; the language's integration only carries out the decision on its SDK. It keeps nothing
-// between calls: the host keeps the settings documents it is handed (`current`, and the one saved
-// for the next start) and passes them back.
+// between calls: the host keeps what it is handed (the agent flow's `agent`) and passes it back.
 //
 // The settings come from the Logfire SDK policy: the remote config's only file,
 // "logfire-sdk-policy.json", a "logfire-sdk-policy/v1" document. See docs/sdk-settings.md.
@@ -148,55 +147,59 @@ func (Parent) EnumDescriptor() ([]byte, []int) {
 	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{1}
 }
 
-type Commit_Saved int32
+type AgentLog_Level int32
 
 const (
-	// Nothing saved: the host keeps no state across restarts (no state directory), or Plan asked
-	// for no save. A config that changes a next-start setting is then refused.
-	Commit_SAVED_NOWHERE Commit_Saved = 0
-	Commit_SAVED_DONE    Commit_Saved = 1 // saved
-	Commit_SAVED_FAILED  Commit_Saved = 2 // the save failed: the config is refused
+	AgentLog_DEBUG  AgentLog_Level = 0 // only with the integration's debug output on
+	AgentLog_INFO   AgentLog_Level = 1
+	AgentLog_NOTICE AgentLog_Level = 2 // info said even where no logger is set up
+	AgentLog_WARN   AgentLog_Level = 3
+	AgentLog_ERROR  AgentLog_Level = 4 // the SDK is no longer managed
 )
 
-// Enum value maps for Commit_Saved.
+// Enum value maps for AgentLog_Level.
 var (
-	Commit_Saved_name = map[int32]string{
-		0: "SAVED_NOWHERE",
-		1: "SAVED_DONE",
-		2: "SAVED_FAILED",
+	AgentLog_Level_name = map[int32]string{
+		0: "DEBUG",
+		1: "INFO",
+		2: "NOTICE",
+		3: "WARN",
+		4: "ERROR",
 	}
-	Commit_Saved_value = map[string]int32{
-		"SAVED_NOWHERE": 0,
-		"SAVED_DONE":    1,
-		"SAVED_FAILED":  2,
+	AgentLog_Level_value = map[string]int32{
+		"DEBUG":  0,
+		"INFO":   1,
+		"NOTICE": 2,
+		"WARN":   3,
+		"ERROR":  4,
 	}
 )
 
-func (x Commit_Saved) Enum() *Commit_Saved {
-	p := new(Commit_Saved)
+func (x AgentLog_Level) Enum() *AgentLog_Level {
+	p := new(AgentLog_Level)
 	*p = x
 	return p
 }
 
-func (x Commit_Saved) String() string {
+func (x AgentLog_Level) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (Commit_Saved) Descriptor() protoreflect.EnumDescriptor {
+func (AgentLog_Level) Descriptor() protoreflect.EnumDescriptor {
 	return file_opamp_sdk_v1_settings_proto_enumTypes[2].Descriptor()
 }
 
-func (Commit_Saved) Type() protoreflect.EnumType {
+func (AgentLog_Level) Type() protoreflect.EnumType {
 	return &file_opamp_sdk_v1_settings_proto_enumTypes[2]
 }
 
-func (x Commit_Saved) Number() protoreflect.EnumNumber {
+func (x AgentLog_Level) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use Commit_Saved.Descriptor instead.
-func (Commit_Saved) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{9, 0}
+// Deprecated: Use AgentLog_Level.Descriptor instead.
+func (AgentLog_Level) EnumDescriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{15, 0}
 }
 
 type CapRun_Signal int32
@@ -242,7 +245,7 @@ func (x CapRun_Signal) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use CapRun_Signal.Descriptor instead.
 func (CapRun_Signal) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27, 0}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{30, 0}
 }
 
 type SpanSampling_How int32
@@ -291,7 +294,7 @@ func (x SpanSampling_How) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SpanSampling_How.Descriptor instead.
 func (SpanSampling_How) EnumDescriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{33, 0}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{36, 0}
 }
 
 // Settings, typed. Every field left unset is the SDK's own value. In debug mode (debug_until) the
@@ -742,38 +745,43 @@ func (x *Host) GetNextStart() []string {
 	return nil
 }
 
-// At start, before the SDK is built: the settings of the last config applied.
-type Load struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// The document this host kept itself (sdk-settings.json, before the core kept the last config
-	// applied): read only when core_state holds no config applied. Unset: none.
-	Saved []byte `protobuf:"bytes,1,opt,name=saved,proto3,oneof" json:"saved,omitempty"`
-	Host  *Host  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
-	// The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-	// against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
-	NowUnixMs uint64 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
-	// The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-	// settings come from the last config applied in it, read with the core's own decoding, even
-	// after an endpoint change. Unset: none.
-	CoreState     []byte `protobuf:"bytes,4,opt,name=core_state,json=coreState,proto3,oneof" json:"core_state,omitempty"`
+// The agent flow: the layer's decisions over time, as a step machine shaped like the client core.
+// AgentStart once, before the SDK is built; then AgentStep for each thing that happens (a remote
+// config, a client notification, the timer). Each answers an AgentOutput: carry out its effects in
+// order, keep one timer for wake_at_mono_ms (replacing any earlier one), and pass `agent` back with
+// the next step, as it came. The host keeps no settings document, no timer of its own and no
+// wording: put Apply in force on the SDK, hand Effective, Status and Health to the client, write
+// SaveUid's file, and say each Log line. Steps for one agent are made one at a time, in order.
+type AgentStart struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Host     *Host                  `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	StateDir bool                   `protobuf:"varint,2,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"` // the host keeps state across restarts
+	// The client's saved state, as the host keeps it: the policy to start with is the last config
+	// applied in it, read with the core's own decoding. Unset: none.
+	CoreState     []byte      `protobuf:"bytes,3,opt,name=core_state,json=coreState,proto3,oneof" json:"core_state,omitempty"`
+	Endpoint      string      `protobuf:"bytes,5,opt,name=endpoint,proto3" json:"endpoint,omitempty"`                          // as configured: the lines name it as it is safe to log
+	InstanceUid   []byte      `protobuf:"bytes,7,opt,name=instance_uid,json=instanceUid,proto3" json:"instance_uid,omitempty"` // 16 bytes
+	Hints         *AgentHints `protobuf:"bytes,8,opt,name=hints,proto3" json:"hints,omitempty"`                                // SetupStarted.hints
+	NowUnixMs     uint64      `protobuf:"varint,9,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`    // the wall clock, in milliseconds since the Unix epoch
+	NowMonoMs     uint64      `protobuf:"varint,10,opt,name=now_mono_ms,json=nowMonoMs,proto3" json:"now_mono_ms,omitempty"`   // a monotonic clock, in milliseconds
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Load) Reset() {
-	*x = Load{}
+func (x *AgentStart) Reset() {
+	*x = AgentStart{}
 	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Load) String() string {
+func (x *AgentStart) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Load) ProtoMessage() {}
+func (*AgentStart) ProtoMessage() {}
 
-func (x *Load) ProtoReflect() protoreflect.Message {
+func (x *AgentStart) ProtoReflect() protoreflect.Message {
 	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -785,267 +793,93 @@ func (x *Load) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Load.ProtoReflect.Descriptor instead.
-func (*Load) Descriptor() ([]byte, []int) {
+// Deprecated: Use AgentStart.ProtoReflect.Descriptor instead.
+func (*AgentStart) Descriptor() ([]byte, []int) {
 	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *Load) GetSaved() []byte {
-	if x != nil {
-		return x.Saved
-	}
-	return nil
-}
-
-func (x *Load) GetHost() *Host {
+func (x *AgentStart) GetHost() *Host {
 	if x != nil {
 		return x.Host
 	}
 	return nil
 }
 
-func (x *Load) GetNowUnixMs() uint64 {
+func (x *AgentStart) GetStateDir() bool {
 	if x != nil {
-		return x.NowUnixMs
+		return x.StateDir
 	}
-	return 0
+	return false
 }
 
-func (x *Load) GetCoreState() []byte {
+func (x *AgentStart) GetCoreState() []byte {
 	if x != nil {
 		return x.CoreState
 	}
 	return nil
 }
 
-type Loaded struct {
-	state     protoimpl.MessageState     `protogen:"open.v1"`
-	Settings  *Settings                  `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`   // put all of it in force, next-start ones too
-	Current   []byte                     `protobuf:"bytes,2,opt,name=current,proto3" json:"current,omitempty"`     // keep it: the document in force now
-	Effective *protobufs.EffectiveConfig `protobuf:"bytes,3,opt,name=effective,proto3" json:"effective,omitempty"` // report it
-	Warning   string                     `protobuf:"bytes,4,opt,name=warning,proto3" json:"warning,omitempty"`     // the saved settings were unreadable, and why
-	// When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-	// any earlier one. 0: nothing to wait for. See Refresh.
-	RefreshAtUnixMs uint64 `protobuf:"varint,5,opt,name=refresh_at_unix_ms,json=refreshAtUnixMs,proto3" json:"refresh_at_unix_ms,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *Loaded) Reset() {
-	*x = Loaded{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Loaded) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Loaded) ProtoMessage() {}
-
-func (x *Loaded) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[6]
+func (x *AgentStart) GetEndpoint() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Loaded.ProtoReflect.Descriptor instead.
-func (*Loaded) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *Loaded) GetSettings() *Settings {
-	if x != nil {
-		return x.Settings
-	}
-	return nil
-}
-
-func (x *Loaded) GetCurrent() []byte {
-	if x != nil {
-		return x.Current
-	}
-	return nil
-}
-
-func (x *Loaded) GetEffective() *protobufs.EffectiveConfig {
-	if x != nil {
-		return x.Effective
-	}
-	return nil
-}
-
-func (x *Loaded) GetWarning() string {
-	if x != nil {
-		return x.Warning
+		return x.Endpoint
 	}
 	return ""
 }
 
-func (x *Loaded) GetRefreshAtUnixMs() uint64 {
+func (x *AgentStart) GetInstanceUid() []byte {
 	if x != nil {
-		return x.RefreshAtUnixMs
-	}
-	return 0
-}
-
-// A remote config arrived. Answered in two steps: Decide says what to save for the next start
-// (Plan); the host saves it, and Commit, with how that went, gives the answer (Decision). The
-// layer decides; the host only says what became of the save.
-type Decide struct {
-	state         protoimpl.MessageState       `protogen:"open.v1"`
-	Config        *protobufs.AgentRemoteConfig `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`                  // required: without it the reply is an error
-	Current       []byte                       `protobuf:"bytes,2,opt,name=current,proto3" json:"current,omitempty"`                // from the last Loaded or Decision
-	AtStart       []byte                       `protobuf:"bytes,3,opt,name=at_start,json=atStart,proto3" json:"at_start,omitempty"` // Loaded.current, as it was at start
-	Host          *Host                        `protobuf:"bytes,5,opt,name=host,proto3" json:"host,omitempty"`
-	NowUnixMs     uint64                       `protobuf:"varint,6,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // as Load's
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Decide) Reset() {
-	*x = Decide{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Decide) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Decide) ProtoMessage() {}
-
-func (x *Decide) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Decide.ProtoReflect.Descriptor instead.
-func (*Decide) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *Decide) GetConfig() *protobufs.AgentRemoteConfig {
-	if x != nil {
-		return x.Config
+		return x.InstanceUid
 	}
 	return nil
 }
 
-func (x *Decide) GetCurrent() []byte {
+func (x *AgentStart) GetHints() *AgentHints {
 	if x != nil {
-		return x.Current
+		return x.Hints
 	}
 	return nil
 }
 
-func (x *Decide) GetAtStart() []byte {
-	if x != nil {
-		return x.AtStart
-	}
-	return nil
-}
-
-func (x *Decide) GetHost() *Host {
-	if x != nil {
-		return x.Host
-	}
-	return nil
-}
-
-func (x *Decide) GetNowUnixMs() uint64 {
+func (x *AgentStart) GetNowUnixMs() uint64 {
 	if x != nil {
 		return x.NowUnixMs
 	}
 	return 0
 }
 
-type Plan struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-	// then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-	Save          []byte `protobuf:"bytes,1,opt,name=save,proto3,oneof" json:"save,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Plan) Reset() {
-	*x = Plan{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Plan) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Plan) ProtoMessage() {}
-
-func (x *Plan) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[8]
+func (x *AgentStart) GetNowMonoMs() uint64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.NowMonoMs
 	}
-	return mi.MessageOf(x)
+	return 0
 }
 
-// Deprecated: Use Plan.ProtoReflect.Descriptor instead.
-func (*Plan) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *Plan) GetSave() []byte {
-	if x != nil {
-		return x.Save
-	}
-	return nil
-}
-
-// The answer to a remote config, once the host has done what Plan asked.
-type Commit struct {
+// What to check when the server can't be reached, as the core's Setup words it.
+type AgentHints struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Decide        *Decide                `protobuf:"bytes,1,opt,name=decide,proto3" json:"decide,omitempty"` // required: the request Plan answered, as it was
-	Saved         Commit_Saved           `protobuf:"varint,2,opt,name=saved,proto3,enum=opamp.sdk.v1.Commit_Saved" json:"saved,omitempty"`
-	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"` // SAVED_FAILED: why
+	Refused       string                 `protobuf:"bytes,1,opt,name=refused,proto3" json:"refused,omitempty"`                   // HTTP 401 or 403
+	NotFound      string                 `protobuf:"bytes,2,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"` // HTTP 404
+	Unreachable   string                 `protobuf:"bytes,3,opt,name=unreachable,proto3" json:"unreachable,omitempty"`           // no response
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`                       // any other status
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Commit) Reset() {
-	*x = Commit{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[9]
+func (x *AgentHints) Reset() {
+	*x = AgentHints{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Commit) String() string {
+func (x *AgentHints) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Commit) ProtoMessage() {}
+func (*AgentHints) ProtoMessage() {}
 
-func (x *Commit) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[9]
+func (x *AgentHints) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,145 +890,77 @@ func (x *Commit) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Commit.ProtoReflect.Descriptor instead.
-func (*Commit) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{9}
+// Deprecated: Use AgentHints.ProtoReflect.Descriptor instead.
+func (*AgentHints) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *Commit) GetDecide() *Decide {
+func (x *AgentHints) GetRefused() string {
 	if x != nil {
-		return x.Decide
+		return x.Refused
 	}
-	return nil
+	return ""
 }
 
-func (x *Commit) GetSaved() Commit_Saved {
+func (x *AgentHints) GetNotFound() string {
 	if x != nil {
-		return x.Saved
+		return x.NotFound
 	}
-	return Commit_SAVED_NOWHERE
+	return ""
 }
 
-func (x *Commit) GetError() string {
+func (x *AgentHints) GetUnreachable() string {
+	if x != nil {
+		return x.Unreachable
+	}
+	return ""
+}
+
+func (x *AgentHints) GetError() string {
 	if x != nil {
 		return x.Error
 	}
 	return ""
 }
 
-type Decision struct {
-	state           protoimpl.MessageState        `protogen:"open.v1"`
-	Status          *protobufs.RemoteConfigStatus `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`                                               // APPLIED or FAILED, with the config's hash: report it
-	Apply           *Settings                     `protobuf:"bytes,2,opt,name=apply,proto3" json:"apply,omitempty"`                                                 // APPLIED: put the live ones in force; unset when FAILED
-	Current         []byte                        `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`                                             // keep it: the document in force now
-	Effective       *protobufs.EffectiveConfig    `protobuf:"bytes,5,opt,name=effective,proto3" json:"effective,omitempty"`                                         // report it
-	PendingRestart  []string                      `protobuf:"bytes,6,rep,name=pending_restart,json=pendingRestart,proto3" json:"pending_restart,omitempty"`         // next-start settings in force after a restart
-	RefreshAtUnixMs uint64                        `protobuf:"varint,7,opt,name=refresh_at_unix_ms,json=refreshAtUnixMs,proto3" json:"refresh_at_unix_ms,omitempty"` // as Loaded's
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *Decision) Reset() {
-	*x = Decision{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Decision) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Decision) ProtoMessage() {}
-
-func (x *Decision) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Decision.ProtoReflect.Descriptor instead.
-func (*Decision) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *Decision) GetStatus() *protobufs.RemoteConfigStatus {
-	if x != nil {
-		return x.Status
-	}
-	return nil
-}
-
-func (x *Decision) GetApply() *Settings {
-	if x != nil {
-		return x.Apply
-	}
-	return nil
-}
-
-func (x *Decision) GetCurrent() []byte {
-	if x != nil {
-		return x.Current
-	}
-	return nil
-}
-
-func (x *Decision) GetEffective() *protobufs.EffectiveConfig {
-	if x != nil {
-		return x.Effective
-	}
-	return nil
-}
-
-func (x *Decision) GetPendingRestart() []string {
-	if x != nil {
-		return x.PendingRestart
-	}
-	return nil
-}
-
-func (x *Decision) GetRefreshAtUnixMs() uint64 {
-	if x != nil {
-		return x.RefreshAtUnixMs
-	}
-	return 0
-}
-
-// The timer from refresh_at_unix_ms went off: what is in force now. Debug mode ends here, with
-// or without the server. Call it under the same lock as Decide and Commit, and drop a timer's call
-// when a Commit came after the timer was armed (a generation counter): that Commit armed its own.
-// Apply the settings and report the effective config, as after a Commit.
-type Refresh struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Current       []byte                 `protobuf:"bytes,1,opt,name=current,proto3" json:"current,omitempty"`                // from the last Loaded or Decision
-	AtStart       []byte                 `protobuf:"bytes,2,opt,name=at_start,json=atStart,proto3" json:"at_start,omitempty"` // Loaded.current, as it was at start
-	Host          *Host                  `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
-	NowUnixMs     uint64                 `protobuf:"varint,4,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
+type AgentStep struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Agent     []byte                 `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`                             // the last AgentOutput.agent, as it came
+	NowUnixMs uint64                 `protobuf:"varint,2,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // as AgentStart's
+	NowMonoMs uint64                 `protobuf:"varint,3,opt,name=now_mono_ms,json=nowMonoMs,proto3" json:"now_mono_ms,omitempty"`
+	// Types that are valid to be assigned to Input:
+	//
+	//	*AgentStep_RemoteConfig
+	//	*AgentStep_Connected
+	//	*AgentStep_ConnectFailed
+	//	*AgentStep_InstanceUidChanged
+	//	*AgentStep_UidNotSaved
+	//	*AgentStep_StateFromNewerVersion
+	//	*AgentStep_Stopped
+	//	*AgentStep_Timer
+	//	*AgentStep_Exporters
+	//	*AgentStep_Host
+	//	*AgentStep_Built
+	Input         isAgentStep_Input `protobuf_oneof:"input"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Refresh) Reset() {
-	*x = Refresh{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[11]
+func (x *AgentStep) Reset() {
+	*x = AgentStep{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Refresh) String() string {
+func (x *AgentStep) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Refresh) ProtoMessage() {}
+func (*AgentStep) ProtoMessage() {}
 
-func (x *Refresh) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[11]
+func (x *AgentStep) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,137 +971,231 @@ func (x *Refresh) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Refresh.ProtoReflect.Descriptor instead.
-func (*Refresh) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{11}
+// Deprecated: Use AgentStep.ProtoReflect.Descriptor instead.
+func (*AgentStep) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *Refresh) GetCurrent() []byte {
+func (x *AgentStep) GetAgent() []byte {
 	if x != nil {
-		return x.Current
+		return x.Agent
 	}
 	return nil
 }
 
-func (x *Refresh) GetAtStart() []byte {
-	if x != nil {
-		return x.AtStart
-	}
-	return nil
-}
-
-func (x *Refresh) GetHost() *Host {
-	if x != nil {
-		return x.Host
-	}
-	return nil
-}
-
-func (x *Refresh) GetNowUnixMs() uint64 {
+func (x *AgentStep) GetNowUnixMs() uint64 {
 	if x != nil {
 		return x.NowUnixMs
 	}
 	return 0
 }
 
-type Refreshed struct {
-	state           protoimpl.MessageState     `protogen:"open.v1"`
-	Settings        *Settings                  `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"`                                           // put the live ones in force
-	Effective       *protobufs.EffectiveConfig `protobuf:"bytes,2,opt,name=effective,proto3" json:"effective,omitempty"`                                         // report it
-	RefreshAtUnixMs uint64                     `protobuf:"varint,3,opt,name=refresh_at_unix_ms,json=refreshAtUnixMs,proto3" json:"refresh_at_unix_ms,omitempty"` // as Loaded's
-	Warning         string                     `protobuf:"bytes,4,opt,name=warning,proto3" json:"warning,omitempty"`                                             // `current` no longer reads on this clock, and why: the SDK's own settings
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *Refreshed) Reset() {
-	*x = Refreshed{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Refreshed) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Refreshed) ProtoMessage() {}
-
-func (x *Refreshed) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[12]
+func (x *AgentStep) GetNowMonoMs() uint64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Refreshed.ProtoReflect.Descriptor instead.
-func (*Refreshed) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *Refreshed) GetSettings() *Settings {
-	if x != nil {
-		return x.Settings
-	}
-	return nil
-}
-
-func (x *Refreshed) GetEffective() *protobufs.EffectiveConfig {
-	if x != nil {
-		return x.Effective
-	}
-	return nil
-}
-
-func (x *Refreshed) GetRefreshAtUnixMs() uint64 {
-	if x != nil {
-		return x.RefreshAtUnixMs
+		return x.NowMonoMs
 	}
 	return 0
 }
 
-func (x *Refreshed) GetWarning() string {
+func (x *AgentStep) GetInput() isAgentStep_Input {
 	if x != nil {
-		return x.Warning
+		return x.Input
+	}
+	return nil
+}
+
+func (x *AgentStep) GetRemoteConfig() *protobufs.AgentRemoteConfig {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_RemoteConfig); ok {
+			return x.RemoteConfig
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetConnected() *AgentConnected {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Connected); ok {
+			return x.Connected
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetConnectFailed() *AgentConnectFailed {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_ConnectFailed); ok {
+			return x.ConnectFailed
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetInstanceUidChanged() []byte {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_InstanceUidChanged); ok {
+			return x.InstanceUidChanged
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetUidNotSaved() string {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_UidNotSaved); ok {
+			return x.UidNotSaved
+		}
 	}
 	return ""
 }
 
-// Export health, from the counts the gates keep: call it from the same timer as Refresh, every
-// 30 s, and pass back the report it answered last time. When `send`, put `exporters` under the
-// agent's health `component_health_map["exporters"]` (the top-level `healthy` stays the
-// application's) and call set_health; otherwise send nothing.
-type Health struct {
+func (x *AgentStep) GetStateFromNewerVersion() uint32 {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_StateFromNewerVersion); ok {
+			return x.StateFromNewerVersion
+		}
+	}
+	return 0
+}
+
+func (x *AgentStep) GetStopped() *AgentStopped {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Stopped); ok {
+			return x.Stopped
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetTimer() *ExportCounts {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Timer); ok {
+			return x.Timer
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetExporters() *AgentExporters {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Exporters); ok {
+			return x.Exporters
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetHost() *Host {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Host); ok {
+			return x.Host
+		}
+	}
+	return nil
+}
+
+func (x *AgentStep) GetBuilt() *AgentBuilt {
+	if x != nil {
+		if x, ok := x.Input.(*AgentStep_Built); ok {
+			return x.Built
+		}
+	}
+	return nil
+}
+
+type isAgentStep_Input interface {
+	isAgentStep_Input()
+}
+
+type AgentStep_RemoteConfig struct {
+	RemoteConfig *protobufs.AgentRemoteConfig `protobuf:"bytes,4,opt,name=remote_config,json=remoteConfig,proto3,oneof"` // the client's remote config notification
+}
+
+type AgentStep_Connected struct {
+	Connected *AgentConnected `protobuf:"bytes,5,opt,name=connected,proto3,oneof"`
+}
+
+type AgentStep_ConnectFailed struct {
+	ConnectFailed *AgentConnectFailed `protobuf:"bytes,6,opt,name=connect_failed,json=connectFailed,proto3,oneof"`
+}
+
+type AgentStep_InstanceUidChanged struct {
+	InstanceUidChanged []byte `protobuf:"bytes,7,opt,name=instance_uid_changed,json=instanceUidChanged,proto3,oneof"` // 16 bytes: the server named the instance anew
+}
+
+type AgentStep_UidNotSaved struct {
+	UidNotSaved string `protobuf:"bytes,8,opt,name=uid_not_saved,json=uidNotSaved,proto3,oneof"` // SaveUid failed, and why
+}
+
+type AgentStep_StateFromNewerVersion struct {
+	StateFromNewerVersion uint32 `protobuf:"varint,9,opt,name=state_from_newer_version,json=stateFromNewerVersion,proto3,oneof"` // the notification's state format
+}
+
+type AgentStep_Stopped struct {
+	Stopped *AgentStopped `protobuf:"bytes,10,opt,name=stopped,proto3,oneof"`
+}
+
+type AgentStep_Timer struct {
+	Timer *ExportCounts `protobuf:"bytes,11,opt,name=timer,proto3,oneof"` // wake_at_mono_ms came: what the gates counted since start
+}
+
+type AgentStep_Exporters struct {
+	Exporters *AgentExporters `protobuf:"bytes,12,opt,name=exporters,proto3,oneof"` // the inventory's exporters changed
+}
+
+type AgentStep_Host struct {
+	Host *Host `protobuf:"bytes,13,opt,name=host,proto3,oneof"` // what the host carries out changed
+}
+
+type AgentStep_Built struct {
+	Built *AgentBuilt `protobuf:"bytes,14,opt,name=built,proto3,oneof"` // the SDK is built, before the client starts
+}
+
+func (*AgentStep_RemoteConfig) isAgentStep_Input() {}
+
+func (*AgentStep_Connected) isAgentStep_Input() {}
+
+func (*AgentStep_ConnectFailed) isAgentStep_Input() {}
+
+func (*AgentStep_InstanceUidChanged) isAgentStep_Input() {}
+
+func (*AgentStep_UidNotSaved) isAgentStep_Input() {}
+
+func (*AgentStep_StateFromNewerVersion) isAgentStep_Input() {}
+
+func (*AgentStep_Stopped) isAgentStep_Input() {}
+
+func (*AgentStep_Timer) isAgentStep_Input() {}
+
+func (*AgentStep_Exporters) isAgentStep_Input() {}
+
+func (*AgentStep_Host) isAgentStep_Input() {}
+
+func (*AgentStep_Built) isAgentStep_Input() {}
+
+type AgentBuilt struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Counts        *ExportCounts          `protobuf:"bytes,1,opt,name=counts,proto3" json:"counts,omitempty"`     // cumulative since start
-	Previous      *HealthReport          `protobuf:"bytes,2,opt,name=previous,proto3" json:"previous,omitempty"` // the last HealthReport answered; none at the first call
-	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"`
-	Settings      *Settings              `protobuf:"bytes,4,opt,name=settings,proto3" json:"settings,omitempty"`   // in force: a send_* false reports that signal off
-	Exporters     []*Exporter            `protobuf:"bytes,5,rep,name=exporters,proto3" json:"exporters,omitempty"` // as the inventory lists them: one child each under its signal
+	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`     // the resource's service.name; empty: none
+	Exporters     []*Exporter            `protobuf:"bytes,2,rep,name=exporters,proto3" json:"exporters,omitempty"` // as the inventory lists them (Exporters' answer)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *Health) Reset() {
-	*x = Health{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[13]
+func (x *AgentBuilt) Reset() {
+	*x = AgentBuilt{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *Health) String() string {
+func (x *AgentBuilt) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Health) ProtoMessage() {}
+func (*AgentBuilt) ProtoMessage() {}
 
-func (x *Health) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[13]
+func (x *AgentBuilt) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1346,44 +1206,680 @@ func (x *Health) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Health.ProtoReflect.Descriptor instead.
-func (*Health) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{13}
+// Deprecated: Use AgentBuilt.ProtoReflect.Descriptor instead.
+func (*AgentBuilt) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *Health) GetCounts() *ExportCounts {
+func (x *AgentBuilt) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *AgentBuilt) GetExporters() []*Exporter {
+	if x != nil {
+		return x.Exporters
+	}
+	return nil
+}
+
+type AgentConnected struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Endpoint      string                 `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"` // the one the client uses now; empty: the configured one
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentConnected) Reset() {
+	*x = AgentConnected{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentConnected) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentConnected) ProtoMessage() {}
+
+func (x *AgentConnected) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentConnected.ProtoReflect.Descriptor instead.
+func (*AgentConnected) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AgentConnected) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+type AgentConnectFailed struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Endpoint      string                 `protobuf:"bytes,1,opt,name=endpoint,proto3" json:"endpoint,omitempty"` // as AgentConnected's
+	Status        uint32                 `protobuf:"varint,2,opt,name=status,proto3" json:"status,omitempty"`    // the HTTP status; 0: no response
+	Detail        string                 `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentConnectFailed) Reset() {
+	*x = AgentConnectFailed{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentConnectFailed) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentConnectFailed) ProtoMessage() {}
+
+func (x *AgentConnectFailed) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentConnectFailed.ProtoReflect.Descriptor instead.
+func (*AgentConnectFailed) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AgentConnectFailed) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *AgentConnectFailed) GetStatus() uint32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
+func (x *AgentConnectFailed) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
+}
+
+type AgentStopped struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"` // why it stopped on its own; empty: it was asked to
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentStopped) Reset() {
+	*x = AgentStopped{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentStopped) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentStopped) ProtoMessage() {}
+
+func (x *AgentStopped) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentStopped.ProtoReflect.Descriptor instead.
+func (*AgentStopped) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AgentStopped) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// Export health is asked again at once, from `counts`.
+type AgentExporters struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Exporters     []*Exporter            `protobuf:"bytes,1,rep,name=exporters,proto3" json:"exporters,omitempty"`
+	Counts        *ExportCounts          `protobuf:"bytes,2,opt,name=counts,proto3" json:"counts,omitempty"` // as timer's
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentExporters) Reset() {
+	*x = AgentExporters{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentExporters) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentExporters) ProtoMessage() {}
+
+func (x *AgentExporters) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentExporters.ProtoReflect.Descriptor instead.
+func (*AgentExporters) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AgentExporters) GetExporters() []*Exporter {
+	if x != nil {
+		return x.Exporters
+	}
+	return nil
+}
+
+func (x *AgentExporters) GetCounts() *ExportCounts {
 	if x != nil {
 		return x.Counts
 	}
 	return nil
 }
 
-func (x *Health) GetPrevious() *HealthReport {
+type AgentOutput struct {
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	Agent         []byte                     `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`                                        // keep it and pass it back; never read it
+	Effects       []*AgentEffect             `protobuf:"bytes,2,rep,name=effects,proto3" json:"effects,omitempty"`                                    // carry them out in order
+	WakeAtMonoMs  uint64                     `protobuf:"varint,3,opt,name=wake_at_mono_ms,json=wakeAtMonoMs,proto3" json:"wake_at_mono_ms,omitempty"` // step with timer then; 0: only on an input
+	Effective     *protobufs.EffectiveConfig `protobuf:"bytes,4,opt,name=effective,proto3" json:"effective,omitempty"`                                // in force now (the client's first status takes it)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentOutput) Reset() {
+	*x = AgentOutput{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentOutput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentOutput) ProtoMessage() {}
+
+func (x *AgentOutput) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[13]
 	if x != nil {
-		return x.Previous
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentOutput.ProtoReflect.Descriptor instead.
+func (*AgentOutput) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AgentOutput) GetAgent() []byte {
+	if x != nil {
+		return x.Agent
 	}
 	return nil
 }
 
-func (x *Health) GetNowUnixMs() uint64 {
+func (x *AgentOutput) GetEffects() []*AgentEffect {
 	if x != nil {
-		return x.NowUnixMs
+		return x.Effects
+	}
+	return nil
+}
+
+func (x *AgentOutput) GetWakeAtMonoMs() uint64 {
+	if x != nil {
+		return x.WakeAtMonoMs
 	}
 	return 0
 }
 
-func (x *Health) GetSettings() *Settings {
+func (x *AgentOutput) GetEffective() *protobufs.EffectiveConfig {
 	if x != nil {
-		return x.Settings
+		return x.Effective
 	}
 	return nil
 }
 
-func (x *Health) GetExporters() []*Exporter {
+type AgentEffect struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Effect:
+	//
+	//	*AgentEffect_Apply
+	//	*AgentEffect_Effective
+	//	*AgentEffect_Status
+	//	*AgentEffect_Health
+	//	*AgentEffect_SaveUid
+	//	*AgentEffect_Log
+	Effect        isAgentEffect_Effect `protobuf_oneof:"effect"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentEffect) Reset() {
+	*x = AgentEffect{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentEffect) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentEffect) ProtoMessage() {}
+
+func (x *AgentEffect) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentEffect.ProtoReflect.Descriptor instead.
+func (*AgentEffect) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AgentEffect) GetEffect() isAgentEffect_Effect {
+	if x != nil {
+		return x.Effect
+	}
+	return nil
+}
+
+func (x *AgentEffect) GetApply() *Settings {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_Apply); ok {
+			return x.Apply
+		}
+	}
+	return nil
+}
+
+func (x *AgentEffect) GetEffective() *protobufs.EffectiveConfig {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_Effective); ok {
+			return x.Effective
+		}
+	}
+	return nil
+}
+
+func (x *AgentEffect) GetStatus() *protobufs.RemoteConfigStatus {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_Status); ok {
+			return x.Status
+		}
+	}
+	return nil
+}
+
+func (x *AgentEffect) GetHealth() *protobufs.ComponentHealth {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_Health); ok {
+			return x.Health
+		}
+	}
+	return nil
+}
+
+func (x *AgentEffect) GetSaveUid() string {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_SaveUid); ok {
+			return x.SaveUid
+		}
+	}
+	return ""
+}
+
+func (x *AgentEffect) GetLog() *AgentLog {
+	if x != nil {
+		if x, ok := x.Effect.(*AgentEffect_Log); ok {
+			return x.Log
+		}
+	}
+	return nil
+}
+
+type isAgentEffect_Effect interface {
+	isAgentEffect_Effect()
+}
+
+type AgentEffect_Apply struct {
+	Apply *Settings `protobuf:"bytes,1,opt,name=apply,proto3,oneof"` // put in force: live settings, next-start ones and custom
+}
+
+type AgentEffect_Effective struct {
+	Effective *protobufs.EffectiveConfig `protobuf:"bytes,2,opt,name=effective,proto3,oneof"` // set_effective_config
+}
+
+type AgentEffect_Status struct {
+	Status *protobufs.RemoteConfigStatus `protobuf:"bytes,3,opt,name=status,proto3,oneof"` // set_remote_config_status
+}
+
+type AgentEffect_Health struct {
+	Health *protobufs.ComponentHealth `protobuf:"bytes,4,opt,name=health,proto3,oneof"` // set_health (merge the application's own status in, if any)
+}
+
+type AgentEffect_SaveUid struct {
+	SaveUid string `protobuf:"bytes,5,opt,name=save_uid,json=saveUid,proto3,oneof"` // write it to the state directory's instance-uid; on failure, uid_not_saved
+}
+
+type AgentEffect_Log struct {
+	Log *AgentLog `protobuf:"bytes,6,opt,name=log,proto3,oneof"` // say it, prefixed as the integration prefixes its lines
+}
+
+func (*AgentEffect_Apply) isAgentEffect_Effect() {}
+
+func (*AgentEffect_Effective) isAgentEffect_Effect() {}
+
+func (*AgentEffect_Status) isAgentEffect_Effect() {}
+
+func (*AgentEffect_Health) isAgentEffect_Effect() {}
+
+func (*AgentEffect_SaveUid) isAgentEffect_Effect() {}
+
+func (*AgentEffect_Log) isAgentEffect_Effect() {}
+
+type AgentLog struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Level         AgentLog_Level         `protobuf:"varint,1,opt,name=level,proto3,enum=opamp.sdk.v1.AgentLog_Level" json:"level,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentLog) Reset() {
+	*x = AgentLog{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentLog) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentLog) ProtoMessage() {}
+
+func (x *AgentLog) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentLog.ProtoReflect.Descriptor instead.
+func (*AgentLog) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AgentLog) GetLevel() AgentLog_Level {
+	if x != nil {
+		return x.Level
+	}
+	return AgentLog_DEBUG
+}
+
+func (x *AgentLog) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+// AgentOutput.agent, decoded: the agent between steps. Hosts keep it as bytes and never read it.
+// It lives only as long as the process, so its fields may change in any release.
+type AgentState struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Host             *Host                  `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	StateDir         bool                   `protobuf:"varint,2,opt,name=state_dir,json=stateDir,proto3" json:"state_dir,omitempty"`
+	Current          []byte                 `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
+	AtStart          []byte                 `protobuf:"bytes,4,opt,name=at_start,json=atStart,proto3" json:"at_start,omitempty"`
+	Effective        string                 `protobuf:"bytes,5,opt,name=effective,proto3" json:"effective,omitempty"`
+	Exporters        []*Exporter            `protobuf:"bytes,6,rep,name=exporters,proto3" json:"exporters,omitempty"`
+	Health           *HealthReport          `protobuf:"bytes,7,opt,name=health,proto3" json:"health,omitempty"`
+	RefreshAtUnixMs  *uint64                `protobuf:"varint,8,opt,name=refresh_at_unix_ms,json=refreshAtUnixMs,proto3,oneof" json:"refresh_at_unix_ms,omitempty"`
+	RefreshDueMonoMs *uint64                `protobuf:"varint,9,opt,name=refresh_due_mono_ms,json=refreshDueMonoMs,proto3,oneof" json:"refresh_due_mono_ms,omitempty"`
+	HealthDueMonoMs  uint64                 `protobuf:"varint,10,opt,name=health_due_mono_ms,json=healthDueMonoMs,proto3" json:"health_due_mono_ms,omitempty"`
+	StartedUnixMs    uint64                 `protobuf:"varint,11,opt,name=started_unix_ms,json=startedUnixMs,proto3" json:"started_unix_ms,omitempty"`
+	Endpoint         string                 `protobuf:"bytes,12,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Service          string                 `protobuf:"bytes,13,opt,name=service,proto3" json:"service,omitempty"`
+	Uid              string                 `protobuf:"bytes,14,opt,name=uid,proto3" json:"uid,omitempty"`
+	Hints            *AgentHints            `protobuf:"bytes,15,opt,name=hints,proto3" json:"hints,omitempty"`
+	Ever             bool                   `protobuf:"varint,16,opt,name=ever,proto3" json:"ever,omitempty"`
+	Failing          bool                   `protobuf:"varint,17,opt,name=failing,proto3" json:"failing,omitempty"`
+	AskedUnixMs      uint64                 `protobuf:"varint,18,opt,name=asked_unix_ms,json=askedUnixMs,proto3" json:"asked_unix_ms,omitempty"`
+	AskedMonoMs      uint64                 `protobuf:"varint,19,opt,name=asked_mono_ms,json=askedMonoMs,proto3" json:"asked_mono_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AgentState) Reset() {
+	*x = AgentState{}
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentState) ProtoMessage() {}
+
+func (x *AgentState) ProtoReflect() protoreflect.Message {
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentState.ProtoReflect.Descriptor instead.
+func (*AgentState) Descriptor() ([]byte, []int) {
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *AgentState) GetHost() *Host {
+	if x != nil {
+		return x.Host
+	}
+	return nil
+}
+
+func (x *AgentState) GetStateDir() bool {
+	if x != nil {
+		return x.StateDir
+	}
+	return false
+}
+
+func (x *AgentState) GetCurrent() []byte {
+	if x != nil {
+		return x.Current
+	}
+	return nil
+}
+
+func (x *AgentState) GetAtStart() []byte {
+	if x != nil {
+		return x.AtStart
+	}
+	return nil
+}
+
+func (x *AgentState) GetEffective() string {
+	if x != nil {
+		return x.Effective
+	}
+	return ""
+}
+
+func (x *AgentState) GetExporters() []*Exporter {
 	if x != nil {
 		return x.Exporters
 	}
 	return nil
+}
+
+func (x *AgentState) GetHealth() *HealthReport {
+	if x != nil {
+		return x.Health
+	}
+	return nil
+}
+
+func (x *AgentState) GetRefreshAtUnixMs() uint64 {
+	if x != nil && x.RefreshAtUnixMs != nil {
+		return *x.RefreshAtUnixMs
+	}
+	return 0
+}
+
+func (x *AgentState) GetRefreshDueMonoMs() uint64 {
+	if x != nil && x.RefreshDueMonoMs != nil {
+		return *x.RefreshDueMonoMs
+	}
+	return 0
+}
+
+func (x *AgentState) GetHealthDueMonoMs() uint64 {
+	if x != nil {
+		return x.HealthDueMonoMs
+	}
+	return 0
+}
+
+func (x *AgentState) GetStartedUnixMs() uint64 {
+	if x != nil {
+		return x.StartedUnixMs
+	}
+	return 0
+}
+
+func (x *AgentState) GetEndpoint() string {
+	if x != nil {
+		return x.Endpoint
+	}
+	return ""
+}
+
+func (x *AgentState) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+func (x *AgentState) GetUid() string {
+	if x != nil {
+		return x.Uid
+	}
+	return ""
+}
+
+func (x *AgentState) GetHints() *AgentHints {
+	if x != nil {
+		return x.Hints
+	}
+	return nil
+}
+
+func (x *AgentState) GetEver() bool {
+	if x != nil {
+		return x.Ever
+	}
+	return false
+}
+
+func (x *AgentState) GetFailing() bool {
+	if x != nil {
+		return x.Failing
+	}
+	return false
+}
+
+func (x *AgentState) GetAskedUnixMs() uint64 {
+	if x != nil {
+		return x.AskedUnixMs
+	}
+	return 0
+}
+
+func (x *AgentState) GetAskedMonoMs() uint64 {
+	if x != nil {
+		return x.AskedMonoMs
+	}
+	return 0
 }
 
 type ExportCounts struct {
@@ -1397,7 +1893,7 @@ type ExportCounts struct {
 
 func (x *ExportCounts) Reset() {
 	*x = ExportCounts{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[14]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1409,7 +1905,7 @@ func (x *ExportCounts) String() string {
 func (*ExportCounts) ProtoMessage() {}
 
 func (x *ExportCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[14]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1422,7 +1918,7 @@ func (x *ExportCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportCounts.ProtoReflect.Descriptor instead.
 func (*ExportCounts) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{14}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ExportCounts) GetTraces() *SignalCounts {
@@ -1461,7 +1957,7 @@ type SignalCounts struct {
 
 func (x *SignalCounts) Reset() {
 	*x = SignalCounts{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[15]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1473,7 +1969,7 @@ func (x *SignalCounts) String() string {
 func (*SignalCounts) ProtoMessage() {}
 
 func (x *SignalCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[15]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1486,7 +1982,7 @@ func (x *SignalCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SignalCounts.ProtoReflect.Descriptor instead.
 func (*SignalCounts) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{15}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SignalCounts) GetExportsOk() uint64 {
@@ -1547,7 +2043,7 @@ type HealthReport struct {
 
 func (x *HealthReport) Reset() {
 	*x = HealthReport{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[16]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1559,7 +2055,7 @@ func (x *HealthReport) String() string {
 func (*HealthReport) ProtoMessage() {}
 
 func (x *HealthReport) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[16]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1572,7 +2068,7 @@ func (x *HealthReport) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthReport.ProtoReflect.Descriptor instead.
 func (*HealthReport) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{16}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *HealthReport) GetSend() bool {
@@ -1601,15 +2097,15 @@ func (x *HealthReport) GetSentUnixMs() uint64 {
 type Describe struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      []*protobufs.KeyValue  `protobuf:"bytes,1,rep,name=resource,proto3" json:"resource,omitempty"`
-	Host          *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`                               // as Load's; unset, it lists no control
-	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // as Load's: debug is listed only with a clock
+	Host          *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`                               // as AgentStart's; unset, it lists no control
+	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // the wall clock: debug is listed only with one
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Describe) Reset() {
 	*x = Describe{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[17]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +2117,7 @@ func (x *Describe) String() string {
 func (*Describe) ProtoMessage() {}
 
 func (x *Describe) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[17]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +2130,7 @@ func (x *Describe) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Describe.ProtoReflect.Descriptor instead.
 func (*Describe) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{17}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Describe) GetResource() []*protobufs.KeyValue {
@@ -1666,15 +2162,15 @@ func (x *Describe) GetNowUnixMs() uint64 {
 type Components struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Inventory     *Inventory             `protobuf:"bytes,1,opt,name=inventory,proto3" json:"inventory,omitempty"`
-	Host          *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`                               // as Load's
-	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // as Load's: debug mode is carried out only with a clock
+	Host          *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`                               // as AgentStart's
+	NowUnixMs     uint64                 `protobuf:"varint,3,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // the wall clock: debug mode is carried out only with one
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Components) Reset() {
 	*x = Components{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[18]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1686,7 +2182,7 @@ func (x *Components) String() string {
 func (*Components) ProtoMessage() {}
 
 func (x *Components) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[18]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1699,7 +2195,7 @@ func (x *Components) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Components.ProtoReflect.Descriptor instead.
 func (*Components) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{18}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Components) GetInventory() *Inventory {
@@ -1737,7 +2233,7 @@ type Inventory struct {
 
 func (x *Inventory) Reset() {
 	*x = Inventory{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[19]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1749,7 +2245,7 @@ func (x *Inventory) String() string {
 func (*Inventory) ProtoMessage() {}
 
 func (x *Inventory) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[19]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1762,7 +2258,7 @@ func (x *Inventory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Inventory.ProtoReflect.Descriptor instead.
 func (*Inventory) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{19}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Inventory) GetIntegration() string {
@@ -1817,7 +2313,7 @@ type Instrumentation struct {
 
 func (x *Instrumentation) Reset() {
 	*x = Instrumentation{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[20]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1829,7 +2325,7 @@ func (x *Instrumentation) String() string {
 func (*Instrumentation) ProtoMessage() {}
 
 func (x *Instrumentation) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[20]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1842,7 +2338,7 @@ func (x *Instrumentation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Instrumentation.ProtoReflect.Descriptor instead.
 func (*Instrumentation) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{20}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Instrumentation) GetName() string {
@@ -1874,7 +2370,7 @@ type Exporter struct {
 
 func (x *Exporter) Reset() {
 	*x = Exporter{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[21]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1886,7 +2382,7 @@ func (x *Exporter) String() string {
 func (*Exporter) ProtoMessage() {}
 
 func (x *Exporter) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[21]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1899,7 +2395,7 @@ func (x *Exporter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Exporter.ProtoReflect.Descriptor instead.
 func (*Exporter) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{21}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *Exporter) GetSignal() string {
@@ -1944,7 +2440,7 @@ type Exporters struct {
 
 func (x *Exporters) Reset() {
 	*x = Exporters{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1956,7 +2452,7 @@ func (x *Exporters) String() string {
 func (*Exporters) ProtoMessage() {}
 
 func (x *Exporters) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[22]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1969,7 +2465,7 @@ func (x *Exporters) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Exporters.ProtoReflect.Descriptor instead.
 func (*Exporters) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{22}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Exporters) GetFound() []*FoundExporter {
@@ -2008,7 +2504,7 @@ type FoundExporter struct {
 
 func (x *FoundExporter) Reset() {
 	*x = FoundExporter{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2020,7 +2516,7 @@ func (x *FoundExporter) String() string {
 func (*FoundExporter) ProtoMessage() {}
 
 func (x *FoundExporter) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[23]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2033,7 +2529,7 @@ func (x *FoundExporter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FoundExporter.ProtoReflect.Descriptor instead.
 func (*FoundExporter) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{23}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *FoundExporter) GetSignal() string {
@@ -2081,7 +2577,7 @@ type EnvVar struct {
 
 func (x *EnvVar) Reset() {
 	*x = EnvVar{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2093,7 +2589,7 @@ func (x *EnvVar) String() string {
 func (*EnvVar) ProtoMessage() {}
 
 func (x *EnvVar) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[24]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2106,7 +2602,7 @@ func (x *EnvVar) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnvVar.ProtoReflect.Descriptor instead.
 func (*EnvVar) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{24}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *EnvVar) GetName() string {
@@ -2135,7 +2631,7 @@ type ExportersDecided struct {
 
 func (x *ExportersDecided) Reset() {
 	*x = ExportersDecided{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2147,7 +2643,7 @@ func (x *ExportersDecided) String() string {
 func (*ExportersDecided) ProtoMessage() {}
 
 func (x *ExportersDecided) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[25]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2160,7 +2656,7 @@ func (x *ExportersDecided) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportersDecided.ProtoReflect.Descriptor instead.
 func (*ExportersDecided) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{25}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ExportersDecided) GetExporters() []*Exporter {
@@ -2197,7 +2693,7 @@ type Evaluate struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	Settings  []byte                 `protobuf:"bytes,1,opt,name=settings,proto3" json:"settings,omitempty"` // a settings document, as a server sends it
 	Host      *Host                  `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
-	NowUnixMs uint64                 `protobuf:"varint,7,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // as Load's: debug mode folded in
+	NowUnixMs uint64                 `protobuf:"varint,7,opt,name=now_unix_ms,json=nowUnixMs,proto3" json:"now_unix_ms,omitempty"` // the wall clock: debug mode folded in
 	// Types that are valid to be assigned to Input:
 	//
 	//	*Evaluate_Span
@@ -2211,7 +2707,7 @@ type Evaluate struct {
 
 func (x *Evaluate) Reset() {
 	*x = Evaluate{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2223,7 +2719,7 @@ func (x *Evaluate) String() string {
 func (*Evaluate) ProtoMessage() {}
 
 func (x *Evaluate) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[26]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2236,7 +2732,7 @@ func (x *Evaluate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evaluate.ProtoReflect.Descriptor instead.
 func (*Evaluate) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{26}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Evaluate) GetSettings() []byte {
@@ -2344,7 +2840,7 @@ type CapRun struct {
 
 func (x *CapRun) Reset() {
 	*x = CapRun{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2356,7 +2852,7 @@ func (x *CapRun) String() string {
 func (*CapRun) ProtoMessage() {}
 
 func (x *CapRun) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[27]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2369,7 +2865,7 @@ func (x *CapRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapRun.ProtoReflect.Descriptor instead.
 func (*CapRun) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{27}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *CapRun) GetSignal() CapRun_Signal {
@@ -2398,7 +2894,7 @@ type CapEvent struct {
 
 func (x *CapEvent) Reset() {
 	*x = CapEvent{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2410,7 +2906,7 @@ func (x *CapEvent) String() string {
 func (*CapEvent) ProtoMessage() {}
 
 func (x *CapEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[28]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2423,7 +2919,7 @@ func (x *CapEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CapEvent.ProtoReflect.Descriptor instead.
 func (*CapEvent) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{28}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *CapEvent) GetAtNs() uint64 {
@@ -2465,7 +2961,7 @@ type Attributes struct {
 
 func (x *Attributes) Reset() {
 	*x = Attributes{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2477,7 +2973,7 @@ func (x *Attributes) String() string {
 func (*Attributes) ProtoMessage() {}
 
 func (x *Attributes) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[29]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2490,7 +2986,7 @@ func (x *Attributes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Attributes.ProtoReflect.Descriptor instead.
 func (*Attributes) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{29}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *Attributes) GetAttributes() []*protobufs.KeyValue {
@@ -2518,7 +3014,7 @@ type LogRecord struct {
 
 func (x *LogRecord) Reset() {
 	*x = LogRecord{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2530,7 +3026,7 @@ func (x *LogRecord) String() string {
 func (*LogRecord) ProtoMessage() {}
 
 func (x *LogRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[30]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2543,7 +3039,7 @@ func (x *LogRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogRecord.ProtoReflect.Descriptor instead.
 func (*LogRecord) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{30}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *LogRecord) GetScope() string {
@@ -2573,7 +3069,7 @@ type SpanStart struct {
 
 func (x *SpanStart) Reset() {
 	*x = SpanStart{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2585,7 +3081,7 @@ func (x *SpanStart) String() string {
 func (*SpanStart) ProtoMessage() {}
 
 func (x *SpanStart) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[31]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2598,7 +3094,7 @@ func (x *SpanStart) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanStart.ProtoReflect.Descriptor instead.
 func (*SpanStart) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{31}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SpanStart) GetName() string {
@@ -2643,7 +3139,7 @@ type Evaluated struct {
 
 func (x *Evaluated) Reset() {
 	*x = Evaluated{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2655,7 +3151,7 @@ func (x *Evaluated) String() string {
 func (*Evaluated) ProtoMessage() {}
 
 func (x *Evaluated) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[32]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2668,7 +3164,7 @@ func (x *Evaluated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Evaluated.ProtoReflect.Descriptor instead.
 func (*Evaluated) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{32}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Evaluated) GetRefused() string {
@@ -2725,7 +3221,7 @@ type SpanSampling struct {
 
 func (x *SpanSampling) Reset() {
 	*x = SpanSampling{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2737,7 +3233,7 @@ func (x *SpanSampling) String() string {
 func (*SpanSampling) ProtoMessage() {}
 
 func (x *SpanSampling) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[33]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2750,7 +3246,7 @@ func (x *SpanSampling) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpanSampling.ProtoReflect.Descriptor instead.
 func (*SpanSampling) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{33}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *SpanSampling) GetHow() SpanSampling_How {
@@ -2785,15 +3281,12 @@ type Request struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Call:
 	//
-	//	*Request_Load
-	//	*Request_Decide
 	//	*Request_Describe
 	//	*Request_Evaluate
-	//	*Request_Refresh
-	//	*Request_Health
 	//	*Request_Components
-	//	*Request_Commit
 	//	*Request_Exporters
+	//	*Request_AgentStart
+	//	*Request_AgentStep
 	Call          isRequest_Call `protobuf_oneof:"call"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2801,7 +3294,7 @@ type Request struct {
 
 func (x *Request) Reset() {
 	*x = Request{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2813,7 +3306,7 @@ func (x *Request) String() string {
 func (*Request) ProtoMessage() {}
 
 func (x *Request) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[34]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2826,30 +3319,12 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Request.ProtoReflect.Descriptor instead.
 func (*Request) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{34}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *Request) GetCall() isRequest_Call {
 	if x != nil {
 		return x.Call
-	}
-	return nil
-}
-
-func (x *Request) GetLoad() *Load {
-	if x != nil {
-		if x, ok := x.Call.(*Request_Load); ok {
-			return x.Load
-		}
-	}
-	return nil
-}
-
-func (x *Request) GetDecide() *Decide {
-	if x != nil {
-		if x, ok := x.Call.(*Request_Decide); ok {
-			return x.Decide
-		}
 	}
 	return nil
 }
@@ -2872,37 +3347,10 @@ func (x *Request) GetEvaluate() *Evaluate {
 	return nil
 }
 
-func (x *Request) GetRefresh() *Refresh {
-	if x != nil {
-		if x, ok := x.Call.(*Request_Refresh); ok {
-			return x.Refresh
-		}
-	}
-	return nil
-}
-
-func (x *Request) GetHealth() *Health {
-	if x != nil {
-		if x, ok := x.Call.(*Request_Health); ok {
-			return x.Health
-		}
-	}
-	return nil
-}
-
 func (x *Request) GetComponents() *Components {
 	if x != nil {
 		if x, ok := x.Call.(*Request_Components); ok {
 			return x.Components
-		}
-	}
-	return nil
-}
-
-func (x *Request) GetCommit() *Commit {
-	if x != nil {
-		if x, ok := x.Call.(*Request_Commit); ok {
-			return x.Commit
 		}
 	}
 	return nil
@@ -2917,16 +3365,26 @@ func (x *Request) GetExporters() *Exporters {
 	return nil
 }
 
+func (x *Request) GetAgentStart() *AgentStart {
+	if x != nil {
+		if x, ok := x.Call.(*Request_AgentStart); ok {
+			return x.AgentStart
+		}
+	}
+	return nil
+}
+
+func (x *Request) GetAgentStep() *AgentStep {
+	if x != nil {
+		if x, ok := x.Call.(*Request_AgentStep); ok {
+			return x.AgentStep
+		}
+	}
+	return nil
+}
+
 type isRequest_Call interface {
 	isRequest_Call()
-}
-
-type Request_Load struct {
-	Load *Load `protobuf:"bytes,1,opt,name=load,proto3,oneof"`
-}
-
-type Request_Decide struct {
-	Decide *Decide `protobuf:"bytes,2,opt,name=decide,proto3,oneof"`
 }
 
 type Request_Describe struct {
@@ -2937,58 +3395,44 @@ type Request_Evaluate struct {
 	Evaluate *Evaluate `protobuf:"bytes,4,opt,name=evaluate,proto3,oneof"`
 }
 
-type Request_Refresh struct {
-	Refresh *Refresh `protobuf:"bytes,5,opt,name=refresh,proto3,oneof"`
-}
-
-type Request_Health struct {
-	Health *Health `protobuf:"bytes,6,opt,name=health,proto3,oneof"`
-}
-
 type Request_Components struct {
 	Components *Components `protobuf:"bytes,7,opt,name=components,proto3,oneof"`
-}
-
-type Request_Commit struct {
-	Commit *Commit `protobuf:"bytes,8,opt,name=commit,proto3,oneof"`
 }
 
 type Request_Exporters struct {
 	Exporters *Exporters `protobuf:"bytes,9,opt,name=exporters,proto3,oneof"`
 }
 
-func (*Request_Load) isRequest_Call() {}
+type Request_AgentStart struct {
+	AgentStart *AgentStart `protobuf:"bytes,10,opt,name=agent_start,json=agentStart,proto3,oneof"`
+}
 
-func (*Request_Decide) isRequest_Call() {}
+type Request_AgentStep struct {
+	AgentStep *AgentStep `protobuf:"bytes,11,opt,name=agent_step,json=agentStep,proto3,oneof"`
+}
 
 func (*Request_Describe) isRequest_Call() {}
 
 func (*Request_Evaluate) isRequest_Call() {}
 
-func (*Request_Refresh) isRequest_Call() {}
-
-func (*Request_Health) isRequest_Call() {}
-
 func (*Request_Components) isRequest_Call() {}
 
-func (*Request_Commit) isRequest_Call() {}
-
 func (*Request_Exporters) isRequest_Call() {}
+
+func (*Request_AgentStart) isRequest_Call() {}
+
+func (*Request_AgentStep) isRequest_Call() {}
 
 type Reply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Result:
 	//
-	//	*Reply_Loaded
-	//	*Reply_Decision
 	//	*Reply_Description
 	//	*Reply_Error
 	//	*Reply_Evaluated
-	//	*Reply_Refreshed
-	//	*Reply_HealthReport
 	//	*Reply_AvailableComponents
-	//	*Reply_Plan
 	//	*Reply_ExportersDecided
+	//	*Reply_AgentOutput
 	Result        isReply_Result `protobuf_oneof:"result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2996,7 +3440,7 @@ type Reply struct {
 
 func (x *Reply) Reset() {
 	*x = Reply{}
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3008,7 +3452,7 @@ func (x *Reply) String() string {
 func (*Reply) ProtoMessage() {}
 
 func (x *Reply) ProtoReflect() protoreflect.Message {
-	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[35]
+	mi := &file_opamp_sdk_v1_settings_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3021,30 +3465,12 @@ func (x *Reply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reply.ProtoReflect.Descriptor instead.
 func (*Reply) Descriptor() ([]byte, []int) {
-	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{35}
+	return file_opamp_sdk_v1_settings_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *Reply) GetResult() isReply_Result {
 	if x != nil {
 		return x.Result
-	}
-	return nil
-}
-
-func (x *Reply) GetLoaded() *Loaded {
-	if x != nil {
-		if x, ok := x.Result.(*Reply_Loaded); ok {
-			return x.Loaded
-		}
-	}
-	return nil
-}
-
-func (x *Reply) GetDecision() *Decision {
-	if x != nil {
-		if x, ok := x.Result.(*Reply_Decision); ok {
-			return x.Decision
-		}
 	}
 	return nil
 }
@@ -3076,37 +3502,10 @@ func (x *Reply) GetEvaluated() *Evaluated {
 	return nil
 }
 
-func (x *Reply) GetRefreshed() *Refreshed {
-	if x != nil {
-		if x, ok := x.Result.(*Reply_Refreshed); ok {
-			return x.Refreshed
-		}
-	}
-	return nil
-}
-
-func (x *Reply) GetHealthReport() *HealthReport {
-	if x != nil {
-		if x, ok := x.Result.(*Reply_HealthReport); ok {
-			return x.HealthReport
-		}
-	}
-	return nil
-}
-
 func (x *Reply) GetAvailableComponents() *protobufs.AvailableComponents {
 	if x != nil {
 		if x, ok := x.Result.(*Reply_AvailableComponents); ok {
 			return x.AvailableComponents
-		}
-	}
-	return nil
-}
-
-func (x *Reply) GetPlan() *Plan {
-	if x != nil {
-		if x, ok := x.Result.(*Reply_Plan); ok {
-			return x.Plan
 		}
 	}
 	return nil
@@ -3121,16 +3520,17 @@ func (x *Reply) GetExportersDecided() *ExportersDecided {
 	return nil
 }
 
+func (x *Reply) GetAgentOutput() *AgentOutput {
+	if x != nil {
+		if x, ok := x.Result.(*Reply_AgentOutput); ok {
+			return x.AgentOutput
+		}
+	}
+	return nil
+}
+
 type isReply_Result interface {
 	isReply_Result()
-}
-
-type Reply_Loaded struct {
-	Loaded *Loaded `protobuf:"bytes,1,opt,name=loaded,proto3,oneof"`
-}
-
-type Reply_Decision struct {
-	Decision *Decision `protobuf:"bytes,2,opt,name=decision,proto3,oneof"`
 }
 
 type Reply_Description struct {
@@ -3145,29 +3545,17 @@ type Reply_Evaluated struct {
 	Evaluated *Evaluated `protobuf:"bytes,5,opt,name=evaluated,proto3,oneof"`
 }
 
-type Reply_Refreshed struct {
-	Refreshed *Refreshed `protobuf:"bytes,6,opt,name=refreshed,proto3,oneof"`
-}
-
-type Reply_HealthReport struct {
-	HealthReport *HealthReport `protobuf:"bytes,7,opt,name=health_report,json=healthReport,proto3,oneof"`
-}
-
 type Reply_AvailableComponents struct {
 	AvailableComponents *protobufs.AvailableComponents `protobuf:"bytes,8,opt,name=available_components,json=availableComponents,proto3,oneof"`
-}
-
-type Reply_Plan struct {
-	Plan *Plan `protobuf:"bytes,9,opt,name=plan,proto3,oneof"`
 }
 
 type Reply_ExportersDecided struct {
 	ExportersDecided *ExportersDecided `protobuf:"bytes,10,opt,name=exporters_decided,json=exportersDecided,proto3,oneof"`
 }
 
-func (*Reply_Loaded) isReply_Result() {}
-
-func (*Reply_Decision) isReply_Result() {}
+type Reply_AgentOutput struct {
+	AgentOutput *AgentOutput `protobuf:"bytes,11,opt,name=agent_output,json=agentOutput,proto3,oneof"`
+}
 
 func (*Reply_Description) isReply_Result() {}
 
@@ -3175,15 +3563,11 @@ func (*Reply_Error) isReply_Result() {}
 
 func (*Reply_Evaluated) isReply_Result() {}
 
-func (*Reply_Refreshed) isReply_Result() {}
-
-func (*Reply_HealthReport) isReply_Result() {}
-
 func (*Reply_AvailableComponents) isReply_Result() {}
 
-func (*Reply_Plan) isReply_Result() {}
-
 func (*Reply_ExportersDecided) isReply_Result() {}
+
+func (*Reply_AgentOutput) isReply_Result() {}
 
 var File_opamp_sdk_v1_settings_proto protoreflect.FileDescriptor
 
@@ -3246,62 +3630,105 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x04Host\x12\x12\n" +
 	"\x04live\x18\x01 \x03(\tR\x04live\x12\x1d\n" +
 	"\n" +
-	"next_start\x18\x03 \x03(\tR\tnextStartJ\x04\b\x02\x10\x03\"\xa6\x01\n" +
-	"\x04Load\x12\x19\n" +
-	"\x05saved\x18\x01 \x01(\fH\x00R\x05saved\x88\x01\x01\x12&\n" +
-	"\x04host\x18\x02 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
-	"\vnow_unix_ms\x18\x03 \x01(\x04R\tnowUnixMs\x12\"\n" +
+	"next_start\x18\x03 \x03(\tR\tnextStartJ\x04\b\x02\x10\x03\"\xbf\x02\n" +
 	"\n" +
-	"core_state\x18\x04 \x01(\fH\x01R\tcoreState\x88\x01\x01B\b\n" +
-	"\x06_savedB\r\n" +
-	"\v_core_state\"\xdc\x01\n" +
-	"\x06Loaded\x122\n" +
-	"\bsettings\x18\x01 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x12\x18\n" +
-	"\acurrent\x18\x02 \x01(\fR\acurrent\x12=\n" +
-	"\teffective\x18\x03 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigR\teffective\x12\x18\n" +
-	"\awarning\x18\x04 \x01(\tR\awarning\x12+\n" +
-	"\x12refresh_at_unix_ms\x18\x05 \x01(\x04R\x0frefreshAtUnixMs\"\xc6\x01\n" +
-	"\x06Decide\x129\n" +
-	"\x06config\x18\x01 \x01(\v2!.opamp.proto.v1.AgentRemoteConfigR\x06config\x12\x18\n" +
-	"\acurrent\x18\x02 \x01(\fR\acurrent\x12\x19\n" +
-	"\bat_start\x18\x03 \x01(\fR\aatStart\x12&\n" +
-	"\x04host\x18\x05 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
-	"\vnow_unix_ms\x18\x06 \x01(\x04R\tnowUnixMsJ\x04\b\x04\x10\x05\"(\n" +
-	"\x04Plan\x12\x17\n" +
-	"\x04save\x18\x01 \x01(\fH\x00R\x04save\x88\x01\x01B\a\n" +
-	"\x05_save\"\xbc\x01\n" +
-	"\x06Commit\x12,\n" +
-	"\x06decide\x18\x01 \x01(\v2\x14.opamp.sdk.v1.DecideR\x06decide\x120\n" +
-	"\x05saved\x18\x02 \x01(\x0e2\x1a.opamp.sdk.v1.Commit.SavedR\x05saved\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error\"<\n" +
-	"\x05Saved\x12\x11\n" +
-	"\rSAVED_NOWHERE\x10\x00\x12\x0e\n" +
+	"AgentStart\x12&\n" +
+	"\x04host\x18\x01 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1b\n" +
+	"\tstate_dir\x18\x02 \x01(\bR\bstateDir\x12\"\n" +
 	"\n" +
-	"SAVED_DONE\x10\x01\x12\x10\n" +
-	"\fSAVED_FAILED\x10\x02\"\xa9\x02\n" +
-	"\bDecision\x12:\n" +
-	"\x06status\x18\x01 \x01(\v2\".opamp.proto.v1.RemoteConfigStatusR\x06status\x12,\n" +
-	"\x05apply\x18\x02 \x01(\v2\x16.opamp.sdk.v1.SettingsR\x05apply\x12\x18\n" +
-	"\acurrent\x18\x03 \x01(\fR\acurrent\x12=\n" +
-	"\teffective\x18\x05 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigR\teffective\x12'\n" +
-	"\x0fpending_restart\x18\x06 \x03(\tR\x0ependingRestart\x12+\n" +
-	"\x12refresh_at_unix_ms\x18\a \x01(\x04R\x0frefreshAtUnixMsJ\x04\b\x04\x10\x05\"\x86\x01\n" +
-	"\aRefresh\x12\x18\n" +
-	"\acurrent\x18\x01 \x01(\fR\acurrent\x12\x19\n" +
-	"\bat_start\x18\x02 \x01(\fR\aatStart\x12&\n" +
-	"\x04host\x18\x03 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1e\n" +
-	"\vnow_unix_ms\x18\x04 \x01(\x04R\tnowUnixMs\"\xc5\x01\n" +
-	"\tRefreshed\x122\n" +
-	"\bsettings\x18\x01 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x12=\n" +
-	"\teffective\x18\x02 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigR\teffective\x12+\n" +
-	"\x12refresh_at_unix_ms\x18\x03 \x01(\x04R\x0frefreshAtUnixMs\x12\x18\n" +
-	"\awarning\x18\x04 \x01(\tR\awarning\"\xfe\x01\n" +
-	"\x06Health\x122\n" +
-	"\x06counts\x18\x01 \x01(\v2\x1a.opamp.sdk.v1.ExportCountsR\x06counts\x126\n" +
-	"\bprevious\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.HealthReportR\bprevious\x12\x1e\n" +
-	"\vnow_unix_ms\x18\x03 \x01(\x04R\tnowUnixMs\x122\n" +
-	"\bsettings\x18\x04 \x01(\v2\x16.opamp.sdk.v1.SettingsR\bsettings\x124\n" +
-	"\texporters\x18\x05 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\"\xa8\x01\n" +
+	"core_state\x18\x03 \x01(\fH\x00R\tcoreState\x88\x01\x01\x12\x1a\n" +
+	"\bendpoint\x18\x05 \x01(\tR\bendpoint\x12!\n" +
+	"\finstance_uid\x18\a \x01(\fR\vinstanceUid\x12.\n" +
+	"\x05hints\x18\b \x01(\v2\x18.opamp.sdk.v1.AgentHintsR\x05hints\x12\x1e\n" +
+	"\vnow_unix_ms\x18\t \x01(\x04R\tnowUnixMs\x12\x1e\n" +
+	"\vnow_mono_ms\x18\n" +
+	" \x01(\x04R\tnowMonoMsB\r\n" +
+	"\v_core_stateJ\x04\b\x04\x10\x05J\x04\b\x06\x10\a\"{\n" +
+	"\n" +
+	"AgentHints\x12\x18\n" +
+	"\arefused\x18\x01 \x01(\tR\arefused\x12\x1b\n" +
+	"\tnot_found\x18\x02 \x01(\tR\bnotFound\x12 \n" +
+	"\vunreachable\x18\x03 \x01(\tR\vunreachable\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xd8\x05\n" +
+	"\tAgentStep\x12\x14\n" +
+	"\x05agent\x18\x01 \x01(\fR\x05agent\x12\x1e\n" +
+	"\vnow_unix_ms\x18\x02 \x01(\x04R\tnowUnixMs\x12\x1e\n" +
+	"\vnow_mono_ms\x18\x03 \x01(\x04R\tnowMonoMs\x12H\n" +
+	"\rremote_config\x18\x04 \x01(\v2!.opamp.proto.v1.AgentRemoteConfigH\x00R\fremoteConfig\x12<\n" +
+	"\tconnected\x18\x05 \x01(\v2\x1c.opamp.sdk.v1.AgentConnectedH\x00R\tconnected\x12I\n" +
+	"\x0econnect_failed\x18\x06 \x01(\v2 .opamp.sdk.v1.AgentConnectFailedH\x00R\rconnectFailed\x122\n" +
+	"\x14instance_uid_changed\x18\a \x01(\fH\x00R\x12instanceUidChanged\x12$\n" +
+	"\ruid_not_saved\x18\b \x01(\tH\x00R\vuidNotSaved\x129\n" +
+	"\x18state_from_newer_version\x18\t \x01(\rH\x00R\x15stateFromNewerVersion\x126\n" +
+	"\astopped\x18\n" +
+	" \x01(\v2\x1a.opamp.sdk.v1.AgentStoppedH\x00R\astopped\x122\n" +
+	"\x05timer\x18\v \x01(\v2\x1a.opamp.sdk.v1.ExportCountsH\x00R\x05timer\x12<\n" +
+	"\texporters\x18\f \x01(\v2\x1c.opamp.sdk.v1.AgentExportersH\x00R\texporters\x12(\n" +
+	"\x04host\x18\r \x01(\v2\x12.opamp.sdk.v1.HostH\x00R\x04host\x120\n" +
+	"\x05built\x18\x0e \x01(\v2\x18.opamp.sdk.v1.AgentBuiltH\x00R\x05builtB\a\n" +
+	"\x05input\"\\\n" +
+	"\n" +
+	"AgentBuilt\x12\x18\n" +
+	"\aservice\x18\x01 \x01(\tR\aservice\x124\n" +
+	"\texporters\x18\x02 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\",\n" +
+	"\x0eAgentConnected\x12\x1a\n" +
+	"\bendpoint\x18\x01 \x01(\tR\bendpoint\"`\n" +
+	"\x12AgentConnectFailed\x12\x1a\n" +
+	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\rR\x06status\x12\x16\n" +
+	"\x06detail\x18\x03 \x01(\tR\x06detail\"$\n" +
+	"\fAgentStopped\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"z\n" +
+	"\x0eAgentExporters\x124\n" +
+	"\texporters\x18\x01 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\x122\n" +
+	"\x06counts\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.ExportCountsR\x06counts\"\xbe\x01\n" +
+	"\vAgentOutput\x12\x14\n" +
+	"\x05agent\x18\x01 \x01(\fR\x05agent\x123\n" +
+	"\aeffects\x18\x02 \x03(\v2\x19.opamp.sdk.v1.AgentEffectR\aeffects\x12%\n" +
+	"\x0fwake_at_mono_ms\x18\x03 \x01(\x04R\fwakeAtMonoMs\x12=\n" +
+	"\teffective\x18\x04 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigR\teffective\"\xca\x02\n" +
+	"\vAgentEffect\x12.\n" +
+	"\x05apply\x18\x01 \x01(\v2\x16.opamp.sdk.v1.SettingsH\x00R\x05apply\x12?\n" +
+	"\teffective\x18\x02 \x01(\v2\x1f.opamp.proto.v1.EffectiveConfigH\x00R\teffective\x12<\n" +
+	"\x06status\x18\x03 \x01(\v2\".opamp.proto.v1.RemoteConfigStatusH\x00R\x06status\x129\n" +
+	"\x06health\x18\x04 \x01(\v2\x1f.opamp.proto.v1.ComponentHealthH\x00R\x06health\x12\x1b\n" +
+	"\bsave_uid\x18\x05 \x01(\tH\x00R\asaveUid\x12*\n" +
+	"\x03log\x18\x06 \x01(\v2\x16.opamp.sdk.v1.AgentLogH\x00R\x03logB\b\n" +
+	"\x06effect\"\x91\x01\n" +
+	"\bAgentLog\x122\n" +
+	"\x05level\x18\x01 \x01(\x0e2\x1c.opamp.sdk.v1.AgentLog.LevelR\x05level\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\"=\n" +
+	"\x05Level\x12\t\n" +
+	"\x05DEBUG\x10\x00\x12\b\n" +
+	"\x04INFO\x10\x01\x12\n" +
+	"\n" +
+	"\x06NOTICE\x10\x02\x12\b\n" +
+	"\x04WARN\x10\x03\x12\t\n" +
+	"\x05ERROR\x10\x04\"\xe6\x05\n" +
+	"\n" +
+	"AgentState\x12&\n" +
+	"\x04host\x18\x01 \x01(\v2\x12.opamp.sdk.v1.HostR\x04host\x12\x1b\n" +
+	"\tstate_dir\x18\x02 \x01(\bR\bstateDir\x12\x18\n" +
+	"\acurrent\x18\x03 \x01(\fR\acurrent\x12\x19\n" +
+	"\bat_start\x18\x04 \x01(\fR\aatStart\x12\x1c\n" +
+	"\teffective\x18\x05 \x01(\tR\teffective\x124\n" +
+	"\texporters\x18\x06 \x03(\v2\x16.opamp.sdk.v1.ExporterR\texporters\x122\n" +
+	"\x06health\x18\a \x01(\v2\x1a.opamp.sdk.v1.HealthReportR\x06health\x120\n" +
+	"\x12refresh_at_unix_ms\x18\b \x01(\x04H\x00R\x0frefreshAtUnixMs\x88\x01\x01\x122\n" +
+	"\x13refresh_due_mono_ms\x18\t \x01(\x04H\x01R\x10refreshDueMonoMs\x88\x01\x01\x12+\n" +
+	"\x12health_due_mono_ms\x18\n" +
+	" \x01(\x04R\x0fhealthDueMonoMs\x12&\n" +
+	"\x0fstarted_unix_ms\x18\v \x01(\x04R\rstartedUnixMs\x12\x1a\n" +
+	"\bendpoint\x18\f \x01(\tR\bendpoint\x12\x18\n" +
+	"\aservice\x18\r \x01(\tR\aservice\x12\x10\n" +
+	"\x03uid\x18\x0e \x01(\tR\x03uid\x12.\n" +
+	"\x05hints\x18\x0f \x01(\v2\x18.opamp.sdk.v1.AgentHintsR\x05hints\x12\x12\n" +
+	"\x04ever\x18\x10 \x01(\bR\x04ever\x12\x18\n" +
+	"\afailing\x18\x11 \x01(\bR\afailing\x12\"\n" +
+	"\rasked_unix_ms\x18\x12 \x01(\x04R\vaskedUnixMs\x12\"\n" +
+	"\rasked_mono_ms\x18\x13 \x01(\x04R\vaskedMonoMsB\x15\n" +
+	"\x13_refresh_at_unix_msB\x16\n" +
+	"\x14_refresh_due_mono_ms\"\xa8\x01\n" +
 	"\fExportCounts\x122\n" +
 	"\x06traces\x18\x01 \x01(\v2\x1a.opamp.sdk.v1.SignalCountsR\x06traces\x124\n" +
 	"\ametrics\x18\x02 \x01(\v2\x1a.opamp.sdk.v1.SignalCountsR\ametrics\x12.\n" +
@@ -3422,33 +3849,30 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\rFOLLOW_PARENT\x10\x00\x12\b\n" +
 	"\x04RATE\x10\x01\x12\x0f\n" +
 	"\vAPP_SAMPLER\x10\x02B\a\n" +
-	"\x05_rule\"\xdf\x03\n" +
-	"\aRequest\x12(\n" +
-	"\x04load\x18\x01 \x01(\v2\x12.opamp.sdk.v1.LoadH\x00R\x04load\x12.\n" +
-	"\x06decide\x18\x02 \x01(\v2\x14.opamp.sdk.v1.DecideH\x00R\x06decide\x124\n" +
+	"\x05_rule\"\x87\x03\n" +
+	"\aRequest\x124\n" +
 	"\bdescribe\x18\x03 \x01(\v2\x16.opamp.sdk.v1.DescribeH\x00R\bdescribe\x124\n" +
-	"\bevaluate\x18\x04 \x01(\v2\x16.opamp.sdk.v1.EvaluateH\x00R\bevaluate\x121\n" +
-	"\arefresh\x18\x05 \x01(\v2\x15.opamp.sdk.v1.RefreshH\x00R\arefresh\x12.\n" +
-	"\x06health\x18\x06 \x01(\v2\x14.opamp.sdk.v1.HealthH\x00R\x06health\x12:\n" +
+	"\bevaluate\x18\x04 \x01(\v2\x16.opamp.sdk.v1.EvaluateH\x00R\bevaluate\x12:\n" +
 	"\n" +
 	"components\x18\a \x01(\v2\x18.opamp.sdk.v1.ComponentsH\x00R\n" +
-	"components\x12.\n" +
-	"\x06commit\x18\b \x01(\v2\x14.opamp.sdk.v1.CommitH\x00R\x06commit\x127\n" +
-	"\texporters\x18\t \x01(\v2\x17.opamp.sdk.v1.ExportersH\x00R\texportersB\x06\n" +
-	"\x04call\"\xdd\x04\n" +
-	"\x05Reply\x12.\n" +
-	"\x06loaded\x18\x01 \x01(\v2\x14.opamp.sdk.v1.LoadedH\x00R\x06loaded\x124\n" +
-	"\bdecision\x18\x02 \x01(\v2\x16.opamp.sdk.v1.DecisionH\x00R\bdecision\x12D\n" +
+	"components\x127\n" +
+	"\texporters\x18\t \x01(\v2\x17.opamp.sdk.v1.ExportersH\x00R\texporters\x12;\n" +
+	"\vagent_start\x18\n" +
+	" \x01(\v2\x18.opamp.sdk.v1.AgentStartH\x00R\n" +
+	"agentStart\x128\n" +
+	"\n" +
+	"agent_step\x18\v \x01(\v2\x17.opamp.sdk.v1.AgentStepH\x00R\tagentStepB\x06\n" +
+	"\x04callJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x05\x10\x06J\x04\b\x06\x10\aJ\x04\b\b\x10\t\"\xaf\x03\n" +
+	"\x05Reply\x12D\n" +
 	"\vdescription\x18\x03 \x01(\v2 .opamp.proto.v1.AgentDescriptionH\x00R\vdescription\x12\x16\n" +
 	"\x05error\x18\x04 \x01(\tH\x00R\x05error\x127\n" +
-	"\tevaluated\x18\x05 \x01(\v2\x17.opamp.sdk.v1.EvaluatedH\x00R\tevaluated\x127\n" +
-	"\trefreshed\x18\x06 \x01(\v2\x17.opamp.sdk.v1.RefreshedH\x00R\trefreshed\x12A\n" +
-	"\rhealth_report\x18\a \x01(\v2\x1a.opamp.sdk.v1.HealthReportH\x00R\fhealthReport\x12X\n" +
-	"\x14available_components\x18\b \x01(\v2#.opamp.proto.v1.AvailableComponentsH\x00R\x13availableComponents\x12(\n" +
-	"\x04plan\x18\t \x01(\v2\x12.opamp.sdk.v1.PlanH\x00R\x04plan\x12M\n" +
+	"\tevaluated\x18\x05 \x01(\v2\x17.opamp.sdk.v1.EvaluatedH\x00R\tevaluated\x12X\n" +
+	"\x14available_components\x18\b \x01(\v2#.opamp.proto.v1.AvailableComponentsH\x00R\x13availableComponents\x12M\n" +
 	"\x11exporters_decided\x18\n" +
-	" \x01(\v2\x1e.opamp.sdk.v1.ExportersDecidedH\x00R\x10exportersDecidedB\b\n" +
-	"\x06result*\x99\x01\n" +
+	" \x01(\v2\x1e.opamp.sdk.v1.ExportersDecidedH\x00R\x10exportersDecided\x12>\n" +
+	"\fagent_output\x18\v \x01(\v2\x19.opamp.sdk.v1.AgentOutputH\x00R\vagentOutputB\b\n" +
+	"\x06resultJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03J\x04\b\x06\x10\aJ\x04\b\a\x10\bJ\x04\b\t\x10\n" +
+	"*\x99\x01\n" +
 	"\bSpanKind\x12\x19\n" +
 	"\x15SPAN_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12SPAN_KIND_INTERNAL\x10\x01\x12\x14\n" +
@@ -3477,11 +3901,11 @@ func file_opamp_sdk_v1_settings_proto_rawDescGZIP() []byte {
 }
 
 var file_opamp_sdk_v1_settings_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_opamp_sdk_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
+var file_opamp_sdk_v1_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_opamp_sdk_v1_settings_proto_goTypes = []any{
 	(SpanKind)(0),                         // 0: opamp.sdk.v1.SpanKind
 	(Parent)(0),                           // 1: opamp.sdk.v1.Parent
-	(Commit_Saved)(0),                     // 2: opamp.sdk.v1.Commit.Saved
+	(AgentLog_Level)(0),                   // 2: opamp.sdk.v1.AgentLog.Level
 	(CapRun_Signal)(0),                    // 3: opamp.sdk.v1.CapRun.Signal
 	(SpanSampling_How)(0),                 // 4: opamp.sdk.v1.SpanSampling.How
 	(*Settings)(nil),                      // 5: opamp.sdk.v1.Settings
@@ -3489,125 +3913,129 @@ var file_opamp_sdk_v1_settings_proto_goTypes = []any{
 	(*ScopeLevel)(nil),                    // 7: opamp.sdk.v1.ScopeLevel
 	(*Names)(nil),                         // 8: opamp.sdk.v1.Names
 	(*Host)(nil),                          // 9: opamp.sdk.v1.Host
-	(*Load)(nil),                          // 10: opamp.sdk.v1.Load
-	(*Loaded)(nil),                        // 11: opamp.sdk.v1.Loaded
-	(*Decide)(nil),                        // 12: opamp.sdk.v1.Decide
-	(*Plan)(nil),                          // 13: opamp.sdk.v1.Plan
-	(*Commit)(nil),                        // 14: opamp.sdk.v1.Commit
-	(*Decision)(nil),                      // 15: opamp.sdk.v1.Decision
-	(*Refresh)(nil),                       // 16: opamp.sdk.v1.Refresh
-	(*Refreshed)(nil),                     // 17: opamp.sdk.v1.Refreshed
-	(*Health)(nil),                        // 18: opamp.sdk.v1.Health
-	(*ExportCounts)(nil),                  // 19: opamp.sdk.v1.ExportCounts
-	(*SignalCounts)(nil),                  // 20: opamp.sdk.v1.SignalCounts
-	(*HealthReport)(nil),                  // 21: opamp.sdk.v1.HealthReport
-	(*Describe)(nil),                      // 22: opamp.sdk.v1.Describe
-	(*Components)(nil),                    // 23: opamp.sdk.v1.Components
-	(*Inventory)(nil),                     // 24: opamp.sdk.v1.Inventory
-	(*Instrumentation)(nil),               // 25: opamp.sdk.v1.Instrumentation
-	(*Exporter)(nil),                      // 26: opamp.sdk.v1.Exporter
-	(*Exporters)(nil),                     // 27: opamp.sdk.v1.Exporters
-	(*FoundExporter)(nil),                 // 28: opamp.sdk.v1.FoundExporter
-	(*EnvVar)(nil),                        // 29: opamp.sdk.v1.EnvVar
-	(*ExportersDecided)(nil),              // 30: opamp.sdk.v1.ExportersDecided
-	(*Evaluate)(nil),                      // 31: opamp.sdk.v1.Evaluate
-	(*CapRun)(nil),                        // 32: opamp.sdk.v1.CapRun
-	(*CapEvent)(nil),                      // 33: opamp.sdk.v1.CapEvent
-	(*Attributes)(nil),                    // 34: opamp.sdk.v1.Attributes
-	(*LogRecord)(nil),                     // 35: opamp.sdk.v1.LogRecord
-	(*SpanStart)(nil),                     // 36: opamp.sdk.v1.SpanStart
-	(*Evaluated)(nil),                     // 37: opamp.sdk.v1.Evaluated
-	(*SpanSampling)(nil),                  // 38: opamp.sdk.v1.SpanSampling
-	(*Request)(nil),                       // 39: opamp.sdk.v1.Request
-	(*Reply)(nil),                         // 40: opamp.sdk.v1.Reply
-	nil,                                   // 41: opamp.sdk.v1.Settings.CustomEntry
-	nil,                                   // 42: opamp.sdk.v1.SamplingRule.AttributesEntry
-	(*protobufs.EffectiveConfig)(nil),     // 43: opamp.proto.v1.EffectiveConfig
-	(*protobufs.AgentRemoteConfig)(nil),   // 44: opamp.proto.v1.AgentRemoteConfig
-	(*protobufs.RemoteConfigStatus)(nil),  // 45: opamp.proto.v1.RemoteConfigStatus
-	(*protobufs.ComponentHealth)(nil),     // 46: opamp.proto.v1.ComponentHealth
-	(*protobufs.KeyValue)(nil),            // 47: opamp.proto.v1.KeyValue
-	(*protobufs.AnyValue)(nil),            // 48: opamp.proto.v1.AnyValue
-	(*protobufs.AgentDescription)(nil),    // 49: opamp.proto.v1.AgentDescription
-	(*protobufs.AvailableComponents)(nil), // 50: opamp.proto.v1.AvailableComponents
+	(*AgentStart)(nil),                    // 10: opamp.sdk.v1.AgentStart
+	(*AgentHints)(nil),                    // 11: opamp.sdk.v1.AgentHints
+	(*AgentStep)(nil),                     // 12: opamp.sdk.v1.AgentStep
+	(*AgentBuilt)(nil),                    // 13: opamp.sdk.v1.AgentBuilt
+	(*AgentConnected)(nil),                // 14: opamp.sdk.v1.AgentConnected
+	(*AgentConnectFailed)(nil),            // 15: opamp.sdk.v1.AgentConnectFailed
+	(*AgentStopped)(nil),                  // 16: opamp.sdk.v1.AgentStopped
+	(*AgentExporters)(nil),                // 17: opamp.sdk.v1.AgentExporters
+	(*AgentOutput)(nil),                   // 18: opamp.sdk.v1.AgentOutput
+	(*AgentEffect)(nil),                   // 19: opamp.sdk.v1.AgentEffect
+	(*AgentLog)(nil),                      // 20: opamp.sdk.v1.AgentLog
+	(*AgentState)(nil),                    // 21: opamp.sdk.v1.AgentState
+	(*ExportCounts)(nil),                  // 22: opamp.sdk.v1.ExportCounts
+	(*SignalCounts)(nil),                  // 23: opamp.sdk.v1.SignalCounts
+	(*HealthReport)(nil),                  // 24: opamp.sdk.v1.HealthReport
+	(*Describe)(nil),                      // 25: opamp.sdk.v1.Describe
+	(*Components)(nil),                    // 26: opamp.sdk.v1.Components
+	(*Inventory)(nil),                     // 27: opamp.sdk.v1.Inventory
+	(*Instrumentation)(nil),               // 28: opamp.sdk.v1.Instrumentation
+	(*Exporter)(nil),                      // 29: opamp.sdk.v1.Exporter
+	(*Exporters)(nil),                     // 30: opamp.sdk.v1.Exporters
+	(*FoundExporter)(nil),                 // 31: opamp.sdk.v1.FoundExporter
+	(*EnvVar)(nil),                        // 32: opamp.sdk.v1.EnvVar
+	(*ExportersDecided)(nil),              // 33: opamp.sdk.v1.ExportersDecided
+	(*Evaluate)(nil),                      // 34: opamp.sdk.v1.Evaluate
+	(*CapRun)(nil),                        // 35: opamp.sdk.v1.CapRun
+	(*CapEvent)(nil),                      // 36: opamp.sdk.v1.CapEvent
+	(*Attributes)(nil),                    // 37: opamp.sdk.v1.Attributes
+	(*LogRecord)(nil),                     // 38: opamp.sdk.v1.LogRecord
+	(*SpanStart)(nil),                     // 39: opamp.sdk.v1.SpanStart
+	(*Evaluated)(nil),                     // 40: opamp.sdk.v1.Evaluated
+	(*SpanSampling)(nil),                  // 41: opamp.sdk.v1.SpanSampling
+	(*Request)(nil),                       // 42: opamp.sdk.v1.Request
+	(*Reply)(nil),                         // 43: opamp.sdk.v1.Reply
+	nil,                                   // 44: opamp.sdk.v1.Settings.CustomEntry
+	nil,                                   // 45: opamp.sdk.v1.SamplingRule.AttributesEntry
+	(*protobufs.AgentRemoteConfig)(nil),   // 46: opamp.proto.v1.AgentRemoteConfig
+	(*protobufs.EffectiveConfig)(nil),     // 47: opamp.proto.v1.EffectiveConfig
+	(*protobufs.RemoteConfigStatus)(nil),  // 48: opamp.proto.v1.RemoteConfigStatus
+	(*protobufs.ComponentHealth)(nil),     // 49: opamp.proto.v1.ComponentHealth
+	(*protobufs.KeyValue)(nil),            // 50: opamp.proto.v1.KeyValue
+	(*protobufs.AnyValue)(nil),            // 51: opamp.proto.v1.AnyValue
+	(*protobufs.AgentDescription)(nil),    // 52: opamp.proto.v1.AgentDescription
+	(*protobufs.AvailableComponents)(nil), // 53: opamp.proto.v1.AvailableComponents
 }
 var file_opamp_sdk_v1_settings_proto_depIdxs = []int32{
 	6,  // 0: opamp.sdk.v1.Settings.sampling_rules:type_name -> opamp.sdk.v1.SamplingRule
 	7,  // 1: opamp.sdk.v1.Settings.send_logs_scope_levels:type_name -> opamp.sdk.v1.ScopeLevel
 	8,  // 2: opamp.sdk.v1.Settings.deactivate_instrumentations:type_name -> opamp.sdk.v1.Names
-	41, // 3: opamp.sdk.v1.Settings.custom:type_name -> opamp.sdk.v1.Settings.CustomEntry
+	44, // 3: opamp.sdk.v1.Settings.custom:type_name -> opamp.sdk.v1.Settings.CustomEntry
 	0,  // 4: opamp.sdk.v1.SamplingRule.kind:type_name -> opamp.sdk.v1.SpanKind
-	42, // 5: opamp.sdk.v1.SamplingRule.attributes:type_name -> opamp.sdk.v1.SamplingRule.AttributesEntry
-	9,  // 6: opamp.sdk.v1.Load.host:type_name -> opamp.sdk.v1.Host
-	5,  // 7: opamp.sdk.v1.Loaded.settings:type_name -> opamp.sdk.v1.Settings
-	43, // 8: opamp.sdk.v1.Loaded.effective:type_name -> opamp.proto.v1.EffectiveConfig
-	44, // 9: opamp.sdk.v1.Decide.config:type_name -> opamp.proto.v1.AgentRemoteConfig
-	9,  // 10: opamp.sdk.v1.Decide.host:type_name -> opamp.sdk.v1.Host
-	12, // 11: opamp.sdk.v1.Commit.decide:type_name -> opamp.sdk.v1.Decide
-	2,  // 12: opamp.sdk.v1.Commit.saved:type_name -> opamp.sdk.v1.Commit.Saved
-	45, // 13: opamp.sdk.v1.Decision.status:type_name -> opamp.proto.v1.RemoteConfigStatus
-	5,  // 14: opamp.sdk.v1.Decision.apply:type_name -> opamp.sdk.v1.Settings
-	43, // 15: opamp.sdk.v1.Decision.effective:type_name -> opamp.proto.v1.EffectiveConfig
-	9,  // 16: opamp.sdk.v1.Refresh.host:type_name -> opamp.sdk.v1.Host
-	5,  // 17: opamp.sdk.v1.Refreshed.settings:type_name -> opamp.sdk.v1.Settings
-	43, // 18: opamp.sdk.v1.Refreshed.effective:type_name -> opamp.proto.v1.EffectiveConfig
-	19, // 19: opamp.sdk.v1.Health.counts:type_name -> opamp.sdk.v1.ExportCounts
-	21, // 20: opamp.sdk.v1.Health.previous:type_name -> opamp.sdk.v1.HealthReport
-	5,  // 21: opamp.sdk.v1.Health.settings:type_name -> opamp.sdk.v1.Settings
-	26, // 22: opamp.sdk.v1.Health.exporters:type_name -> opamp.sdk.v1.Exporter
-	20, // 23: opamp.sdk.v1.ExportCounts.traces:type_name -> opamp.sdk.v1.SignalCounts
-	20, // 24: opamp.sdk.v1.ExportCounts.metrics:type_name -> opamp.sdk.v1.SignalCounts
-	20, // 25: opamp.sdk.v1.ExportCounts.logs:type_name -> opamp.sdk.v1.SignalCounts
-	46, // 26: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
-	47, // 27: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
-	9,  // 28: opamp.sdk.v1.Describe.host:type_name -> opamp.sdk.v1.Host
-	24, // 29: opamp.sdk.v1.Components.inventory:type_name -> opamp.sdk.v1.Inventory
-	9,  // 30: opamp.sdk.v1.Components.host:type_name -> opamp.sdk.v1.Host
-	25, // 31: opamp.sdk.v1.Inventory.instrumentations:type_name -> opamp.sdk.v1.Instrumentation
-	26, // 32: opamp.sdk.v1.Inventory.exporters:type_name -> opamp.sdk.v1.Exporter
-	28, // 33: opamp.sdk.v1.Exporters.found:type_name -> opamp.sdk.v1.FoundExporter
-	29, // 34: opamp.sdk.v1.Exporters.env:type_name -> opamp.sdk.v1.EnvVar
-	26, // 35: opamp.sdk.v1.ExportersDecided.exporters:type_name -> opamp.sdk.v1.Exporter
-	9,  // 36: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
-	36, // 37: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
-	35, // 38: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
-	34, // 39: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
-	32, // 40: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
-	3,  // 41: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
-	33, // 42: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
-	1,  // 43: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
-	47, // 44: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
-	48, // 45: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
-	0,  // 46: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
-	47, // 47: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
-	1,  // 48: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
-	38, // 49: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
-	47, // 50: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
-	48, // 51: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
-	4,  // 52: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
-	10, // 53: opamp.sdk.v1.Request.load:type_name -> opamp.sdk.v1.Load
-	12, // 54: opamp.sdk.v1.Request.decide:type_name -> opamp.sdk.v1.Decide
-	22, // 55: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
-	31, // 56: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
-	16, // 57: opamp.sdk.v1.Request.refresh:type_name -> opamp.sdk.v1.Refresh
-	18, // 58: opamp.sdk.v1.Request.health:type_name -> opamp.sdk.v1.Health
-	23, // 59: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
-	14, // 60: opamp.sdk.v1.Request.commit:type_name -> opamp.sdk.v1.Commit
-	27, // 61: opamp.sdk.v1.Request.exporters:type_name -> opamp.sdk.v1.Exporters
-	11, // 62: opamp.sdk.v1.Reply.loaded:type_name -> opamp.sdk.v1.Loaded
-	15, // 63: opamp.sdk.v1.Reply.decision:type_name -> opamp.sdk.v1.Decision
-	49, // 64: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
-	37, // 65: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
-	17, // 66: opamp.sdk.v1.Reply.refreshed:type_name -> opamp.sdk.v1.Refreshed
-	21, // 67: opamp.sdk.v1.Reply.health_report:type_name -> opamp.sdk.v1.HealthReport
-	50, // 68: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
-	13, // 69: opamp.sdk.v1.Reply.plan:type_name -> opamp.sdk.v1.Plan
-	30, // 70: opamp.sdk.v1.Reply.exporters_decided:type_name -> opamp.sdk.v1.ExportersDecided
-	71, // [71:71] is the sub-list for method output_type
-	71, // [71:71] is the sub-list for method input_type
-	71, // [71:71] is the sub-list for extension type_name
-	71, // [71:71] is the sub-list for extension extendee
-	0,  // [0:71] is the sub-list for field type_name
+	45, // 5: opamp.sdk.v1.SamplingRule.attributes:type_name -> opamp.sdk.v1.SamplingRule.AttributesEntry
+	9,  // 6: opamp.sdk.v1.AgentStart.host:type_name -> opamp.sdk.v1.Host
+	11, // 7: opamp.sdk.v1.AgentStart.hints:type_name -> opamp.sdk.v1.AgentHints
+	46, // 8: opamp.sdk.v1.AgentStep.remote_config:type_name -> opamp.proto.v1.AgentRemoteConfig
+	14, // 9: opamp.sdk.v1.AgentStep.connected:type_name -> opamp.sdk.v1.AgentConnected
+	15, // 10: opamp.sdk.v1.AgentStep.connect_failed:type_name -> opamp.sdk.v1.AgentConnectFailed
+	16, // 11: opamp.sdk.v1.AgentStep.stopped:type_name -> opamp.sdk.v1.AgentStopped
+	22, // 12: opamp.sdk.v1.AgentStep.timer:type_name -> opamp.sdk.v1.ExportCounts
+	17, // 13: opamp.sdk.v1.AgentStep.exporters:type_name -> opamp.sdk.v1.AgentExporters
+	9,  // 14: opamp.sdk.v1.AgentStep.host:type_name -> opamp.sdk.v1.Host
+	13, // 15: opamp.sdk.v1.AgentStep.built:type_name -> opamp.sdk.v1.AgentBuilt
+	29, // 16: opamp.sdk.v1.AgentBuilt.exporters:type_name -> opamp.sdk.v1.Exporter
+	29, // 17: opamp.sdk.v1.AgentExporters.exporters:type_name -> opamp.sdk.v1.Exporter
+	22, // 18: opamp.sdk.v1.AgentExporters.counts:type_name -> opamp.sdk.v1.ExportCounts
+	19, // 19: opamp.sdk.v1.AgentOutput.effects:type_name -> opamp.sdk.v1.AgentEffect
+	47, // 20: opamp.sdk.v1.AgentOutput.effective:type_name -> opamp.proto.v1.EffectiveConfig
+	5,  // 21: opamp.sdk.v1.AgentEffect.apply:type_name -> opamp.sdk.v1.Settings
+	47, // 22: opamp.sdk.v1.AgentEffect.effective:type_name -> opamp.proto.v1.EffectiveConfig
+	48, // 23: opamp.sdk.v1.AgentEffect.status:type_name -> opamp.proto.v1.RemoteConfigStatus
+	49, // 24: opamp.sdk.v1.AgentEffect.health:type_name -> opamp.proto.v1.ComponentHealth
+	20, // 25: opamp.sdk.v1.AgentEffect.log:type_name -> opamp.sdk.v1.AgentLog
+	2,  // 26: opamp.sdk.v1.AgentLog.level:type_name -> opamp.sdk.v1.AgentLog.Level
+	9,  // 27: opamp.sdk.v1.AgentState.host:type_name -> opamp.sdk.v1.Host
+	29, // 28: opamp.sdk.v1.AgentState.exporters:type_name -> opamp.sdk.v1.Exporter
+	24, // 29: opamp.sdk.v1.AgentState.health:type_name -> opamp.sdk.v1.HealthReport
+	11, // 30: opamp.sdk.v1.AgentState.hints:type_name -> opamp.sdk.v1.AgentHints
+	23, // 31: opamp.sdk.v1.ExportCounts.traces:type_name -> opamp.sdk.v1.SignalCounts
+	23, // 32: opamp.sdk.v1.ExportCounts.metrics:type_name -> opamp.sdk.v1.SignalCounts
+	23, // 33: opamp.sdk.v1.ExportCounts.logs:type_name -> opamp.sdk.v1.SignalCounts
+	49, // 34: opamp.sdk.v1.HealthReport.exporters:type_name -> opamp.proto.v1.ComponentHealth
+	50, // 35: opamp.sdk.v1.Describe.resource:type_name -> opamp.proto.v1.KeyValue
+	9,  // 36: opamp.sdk.v1.Describe.host:type_name -> opamp.sdk.v1.Host
+	27, // 37: opamp.sdk.v1.Components.inventory:type_name -> opamp.sdk.v1.Inventory
+	9,  // 38: opamp.sdk.v1.Components.host:type_name -> opamp.sdk.v1.Host
+	28, // 39: opamp.sdk.v1.Inventory.instrumentations:type_name -> opamp.sdk.v1.Instrumentation
+	29, // 40: opamp.sdk.v1.Inventory.exporters:type_name -> opamp.sdk.v1.Exporter
+	31, // 41: opamp.sdk.v1.Exporters.found:type_name -> opamp.sdk.v1.FoundExporter
+	32, // 42: opamp.sdk.v1.Exporters.env:type_name -> opamp.sdk.v1.EnvVar
+	29, // 43: opamp.sdk.v1.ExportersDecided.exporters:type_name -> opamp.sdk.v1.Exporter
+	9,  // 44: opamp.sdk.v1.Evaluate.host:type_name -> opamp.sdk.v1.Host
+	39, // 45: opamp.sdk.v1.Evaluate.span:type_name -> opamp.sdk.v1.SpanStart
+	38, // 46: opamp.sdk.v1.Evaluate.log:type_name -> opamp.sdk.v1.LogRecord
+	37, // 47: opamp.sdk.v1.Evaluate.attributes:type_name -> opamp.sdk.v1.Attributes
+	35, // 48: opamp.sdk.v1.Evaluate.cap:type_name -> opamp.sdk.v1.CapRun
+	3,  // 49: opamp.sdk.v1.CapRun.signal:type_name -> opamp.sdk.v1.CapRun.Signal
+	36, // 50: opamp.sdk.v1.CapRun.events:type_name -> opamp.sdk.v1.CapEvent
+	1,  // 51: opamp.sdk.v1.CapEvent.parent:type_name -> opamp.sdk.v1.Parent
+	50, // 52: opamp.sdk.v1.Attributes.attributes:type_name -> opamp.proto.v1.KeyValue
+	51, // 53: opamp.sdk.v1.Attributes.body:type_name -> opamp.proto.v1.AnyValue
+	0,  // 54: opamp.sdk.v1.SpanStart.kind:type_name -> opamp.sdk.v1.SpanKind
+	50, // 55: opamp.sdk.v1.SpanStart.attributes:type_name -> opamp.proto.v1.KeyValue
+	1,  // 56: opamp.sdk.v1.SpanStart.parent:type_name -> opamp.sdk.v1.Parent
+	41, // 57: opamp.sdk.v1.Evaluated.sampling:type_name -> opamp.sdk.v1.SpanSampling
+	50, // 58: opamp.sdk.v1.Evaluated.redacted:type_name -> opamp.proto.v1.KeyValue
+	51, // 59: opamp.sdk.v1.Evaluated.body:type_name -> opamp.proto.v1.AnyValue
+	4,  // 60: opamp.sdk.v1.SpanSampling.how:type_name -> opamp.sdk.v1.SpanSampling.How
+	25, // 61: opamp.sdk.v1.Request.describe:type_name -> opamp.sdk.v1.Describe
+	34, // 62: opamp.sdk.v1.Request.evaluate:type_name -> opamp.sdk.v1.Evaluate
+	26, // 63: opamp.sdk.v1.Request.components:type_name -> opamp.sdk.v1.Components
+	30, // 64: opamp.sdk.v1.Request.exporters:type_name -> opamp.sdk.v1.Exporters
+	10, // 65: opamp.sdk.v1.Request.agent_start:type_name -> opamp.sdk.v1.AgentStart
+	12, // 66: opamp.sdk.v1.Request.agent_step:type_name -> opamp.sdk.v1.AgentStep
+	52, // 67: opamp.sdk.v1.Reply.description:type_name -> opamp.proto.v1.AgentDescription
+	40, // 68: opamp.sdk.v1.Reply.evaluated:type_name -> opamp.sdk.v1.Evaluated
+	53, // 69: opamp.sdk.v1.Reply.available_components:type_name -> opamp.proto.v1.AvailableComponents
+	33, // 70: opamp.sdk.v1.Reply.exporters_decided:type_name -> opamp.sdk.v1.ExportersDecided
+	18, // 71: opamp.sdk.v1.Reply.agent_output:type_name -> opamp.sdk.v1.AgentOutput
+	72, // [72:72] is the sub-list for method output_type
+	72, // [72:72] is the sub-list for method input_type
+	72, // [72:72] is the sub-list for extension type_name
+	72, // [72:72] is the sub-list for extension extendee
+	0,  // [0:72] is the sub-list for field type_name
 }
 
 func init() { file_opamp_sdk_v1_settings_proto_init() }
@@ -3618,37 +4046,51 @@ func file_opamp_sdk_v1_settings_proto_init() {
 	file_opamp_sdk_v1_settings_proto_msgTypes[0].OneofWrappers = []any{}
 	file_opamp_sdk_v1_settings_proto_msgTypes[1].OneofWrappers = []any{}
 	file_opamp_sdk_v1_settings_proto_msgTypes[5].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[8].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[26].OneofWrappers = []any{
+	file_opamp_sdk_v1_settings_proto_msgTypes[7].OneofWrappers = []any{
+		(*AgentStep_RemoteConfig)(nil),
+		(*AgentStep_Connected)(nil),
+		(*AgentStep_ConnectFailed)(nil),
+		(*AgentStep_InstanceUidChanged)(nil),
+		(*AgentStep_UidNotSaved)(nil),
+		(*AgentStep_StateFromNewerVersion)(nil),
+		(*AgentStep_Stopped)(nil),
+		(*AgentStep_Timer)(nil),
+		(*AgentStep_Exporters)(nil),
+		(*AgentStep_Host)(nil),
+		(*AgentStep_Built)(nil),
+	}
+	file_opamp_sdk_v1_settings_proto_msgTypes[14].OneofWrappers = []any{
+		(*AgentEffect_Apply)(nil),
+		(*AgentEffect_Effective)(nil),
+		(*AgentEffect_Status)(nil),
+		(*AgentEffect_Health)(nil),
+		(*AgentEffect_SaveUid)(nil),
+		(*AgentEffect_Log)(nil),
+	}
+	file_opamp_sdk_v1_settings_proto_msgTypes[16].OneofWrappers = []any{}
+	file_opamp_sdk_v1_settings_proto_msgTypes[29].OneofWrappers = []any{
 		(*Evaluate_Span)(nil),
 		(*Evaluate_Log)(nil),
 		(*Evaluate_Attributes)(nil),
 		(*Evaluate_Cap)(nil),
 	}
-	file_opamp_sdk_v1_settings_proto_msgTypes[32].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[33].OneofWrappers = []any{}
-	file_opamp_sdk_v1_settings_proto_msgTypes[34].OneofWrappers = []any{
-		(*Request_Load)(nil),
-		(*Request_Decide)(nil),
+	file_opamp_sdk_v1_settings_proto_msgTypes[35].OneofWrappers = []any{}
+	file_opamp_sdk_v1_settings_proto_msgTypes[36].OneofWrappers = []any{}
+	file_opamp_sdk_v1_settings_proto_msgTypes[37].OneofWrappers = []any{
 		(*Request_Describe)(nil),
 		(*Request_Evaluate)(nil),
-		(*Request_Refresh)(nil),
-		(*Request_Health)(nil),
 		(*Request_Components)(nil),
-		(*Request_Commit)(nil),
 		(*Request_Exporters)(nil),
+		(*Request_AgentStart)(nil),
+		(*Request_AgentStep)(nil),
 	}
-	file_opamp_sdk_v1_settings_proto_msgTypes[35].OneofWrappers = []any{
-		(*Reply_Loaded)(nil),
-		(*Reply_Decision)(nil),
+	file_opamp_sdk_v1_settings_proto_msgTypes[38].OneofWrappers = []any{
 		(*Reply_Description)(nil),
 		(*Reply_Error)(nil),
 		(*Reply_Evaluated)(nil),
-		(*Reply_Refreshed)(nil),
-		(*Reply_HealthReport)(nil),
 		(*Reply_AvailableComponents)(nil),
-		(*Reply_Plan)(nil),
 		(*Reply_ExportersDecided)(nil),
+		(*Reply_AgentOutput)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3656,7 +4098,7 @@ func file_opamp_sdk_v1_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_opamp_sdk_v1_settings_proto_rawDesc), len(file_opamp_sdk_v1_settings_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   38,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
