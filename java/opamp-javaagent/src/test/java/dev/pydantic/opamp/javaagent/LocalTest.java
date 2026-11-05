@@ -94,6 +94,53 @@ class LocalTest {
     }
     // Every name of the module carries its telemetry's one scope; none embedded: not known.
     assertEquals(Map.of("spring-webmvc", "io.opentelemetry.spring-webmvc-6.0",
-        "spring-webmvc-6.0", "io.opentelemetry.spring-webmvc-6.0", "jdbc", ""), scopes);
+        "spring-webmvc-6.0", "io.opentelemetry.spring-webmvc-6.0", "jdbc", "", "example-kafka", ""), scopes);
+  }
+
+  private static List<String> names(List<SettingsProto.Instrumentation> listed) {
+    return listed.stream().map(SettingsProto.Instrumentation::getName).sorted().toList();
+  }
+
+  @Test
+  void onlyTheInstrumentationsWhoseLibraryTheApplicationHasAreListedAndOneThatComesLaterIsAdded(@TempDir Path dir)
+      throws Exception {
+    Inventory inventory = new Inventory();
+    List<ClassLoader> loaders = new java.util.ArrayList<>(List.of(LocalTest.class.getClassLoader()));
+    inventory.loaders = () -> loaders;
+    // The Kafka module's class isn't on the class path: every module is there, it isn't listed.
+    assertEquals(List.of("example-kafka", "jdbc", "spring-webmvc", "spring-webmvc-6.0"),
+        names(Inventory.instrumentations(LocalTest.class.getClassLoader())));
+    assertEquals(List.of("jdbc", "spring-webmvc", "spring-webmvc-6.0"), names(inventory.applying()));
+    assertFalse(inventory.look()); // looked there already: nothing new
+    // The library comes later, in a class loader the application makes (a class file is what the
+    // agent looks for).
+    java.nio.file.Files.createDirectories(dir.resolve("com/example/kafka"));
+    java.nio.file.Files.write(dir.resolve("com/example/kafka/Producer.class"), new byte[0]);
+    loaders.add(new java.net.URLClassLoader(new java.net.URL[] {dir.toUri().toURL()}, null));
+    assertTrue(inventory.look());
+    assertEquals(List.of("example-kafka", "jdbc", "spring-webmvc", "spring-webmvc-6.0"), names(inventory.applying()));
+    assertFalse(inventory.look());
+  }
+
+  @Test
+  void theClassesATypeMatcherNamesAreReadFromItsDescription() {
+    assertEquals(List.of("akka.dispatch.Dispatcher"), Inventory.Type.classesNamed("name(equals(akka.dispatch.Dispatcher))"));
+    assertEquals(List.of("reactor.core.publisher.Flux", "reactor.core.publisher.Hooks"),
+        Inventory.Type.classesNamed("name(in(reactor.core.publisher.Flux, reactor.core.publisher.Hooks))"));
+    assertEquals(List.of("java.sql.Connection"),
+        Inventory.Type.classesNamed("safeHasSuperType(safeErasure(name(equals(java.sql.Connection))))"));
+    assertEquals(List.of("okhttp3.OkHttpClient$Builder"), Inventory.Type.classesNamed("name(equals(okhttp3.OkHttpClient$Builder))"));
+    // A method's name, a pattern, a word ending in "in": no class.
+    assertEquals(List.of(), Inventory.Type.classesNamed("named(equals(execute))"));
+    assertEquals(List.of(), Inventory.Type.classesNamed("name(startsWith(java.net.))"));
+    assertEquals(List.of(), Inventory.Type.classesNamed("join(a.b)"));
+    // One that matches nothing never applies; one that names no class, by its class loader matcher.
+    ClassLoader here = LocalTest.class.getClassLoader();
+    assertFalse(new Inventory.Type(net.bytebuddy.matcher.ElementMatchers.any(), List.of(), true).appliesIn(here));
+    assertTrue(new Inventory.Type(net.bytebuddy.matcher.ElementMatchers.any(), List.of(), false).appliesIn(here));
+    assertTrue(new Inventory.Type(net.bytebuddy.matcher.ElementMatchers.any(), List.of("java.sql.Connection"), false)
+        .appliesIn(here));
+    assertFalse(new Inventory.Type(net.bytebuddy.matcher.ElementMatchers.none(), List.of("java.sql.Connection"), false)
+        .appliesIn(here));
   }
 }

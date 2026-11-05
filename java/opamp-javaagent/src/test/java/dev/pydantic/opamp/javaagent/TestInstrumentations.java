@@ -11,9 +11,9 @@ import io.opentelemetry.sdk.trace.export.SpanExporter;
 import java.util.List;
 
 /**
- * What the agent's jar provides, as the tests' class path provides it (src/test/resources): two
- * instrumentation modules, as the agent's are named, one with its library's version embedded, and
- * an exporter of a name of its own.
+ * What the agent's jar provides, as the tests' class path provides it (src/test/resources): three
+ * instrumentation modules, as the agent's are named, one with its library's version embedded and one
+ * whose library isn't there, and an exporter of a name of its own.
  */
 public final class TestInstrumentations {
   private TestInstrumentations() {}
@@ -45,6 +45,29 @@ public final class TestInstrumentations {
     @Override
     public List<TypeInstrumentation> typeInstrumentations() {
       return List.of();
+    }
+  }
+
+  /**
+   * As the agent's Kafka module: its type instrumentation names the library's class, and the class
+   * loader matcher is left to any. The tests' class path hasn't the library: it doesn't apply.
+   */
+  public static final class Kafka extends InstrumentationModule {
+    public Kafka() {
+      super("example-kafka");
+    }
+
+    @Override
+    public List<TypeInstrumentation> typeInstrumentations() {
+      return List.of(new TypeInstrumentation() {
+        @Override
+        public net.bytebuddy.matcher.ElementMatcher<net.bytebuddy.description.type.TypeDescription> typeMatcher() {
+          return net.bytebuddy.matcher.ElementMatchers.named("com.example.kafka.Producer");
+        }
+
+        @Override
+        public void transform(io.opentelemetry.javaagent.extension.instrumentation.TypeTransformer transformer) {}
+      });
     }
   }
 

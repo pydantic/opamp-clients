@@ -877,9 +877,9 @@ final class Extension {
     };
     // Export health from the first message: the layer always sends its first report.
     health(controls.counts(), inForce, wallClock.getAsLong());
-    // The inventory, once: the agent builds its SDK and instrumentations once, and the settings it
-    // carries out (its host, the application's own among them once they're read) don't change
-    // while it runs.
+    // The inventory: the agent builds its SDK once, and the settings it carries out (its host, the
+    // application's own among them once they're read) don't change while it runs. An
+    // instrumentation whose library comes later is added on the timer (healthTick).
     components = layer().components(inventory.build(), host(), wallClock.getAsLong());
     OpampClient.Status status = new OpampClient.Status(layer().describe(attributes(resource), host(), wallClock.getAsLong()), health, effective,
         null, components);
@@ -1089,6 +1089,32 @@ final class Extension {
     } catch (RuntimeException e) {
       // A periodic task that throws is never run again.
       LOG.log(Level.WARNING, "OpAMP: export health", e);
+    }
+    try {
+      relistIfApplying();
+    } catch (RuntimeException | LinkageError e) {
+      LOG.log(Level.WARNING, "OpAMP: the inventory", e);
+    }
+  }
+
+  /**
+   * An instrumentation whose library has come since (a class loader the application made once it
+   * ran): the inventory with it, sent again.
+   */
+  void relistIfApplying() {
+    if (!inventory.look()) {
+      return;
+    }
+    SettingsProto.Inventory built = inventory.build();
+    Opamp.AvailableComponents c;
+    synchronized (this) {
+      components = layer().components(built, host(), wallClock.getAsLong());
+      c = components;
+    }
+    OpampClient opamp = client.getNow(null);
+    if (opamp != null) {
+      // The agent's request, not the application's.
+      InstrumentationUtil.suppressInstrumentation(() -> opamp.setAvailableComponents(c));
     }
   }
 
