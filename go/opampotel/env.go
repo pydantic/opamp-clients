@@ -29,10 +29,6 @@ type server struct {
 	stateDir  string        // "": none
 	stateLock *os.File      // the default state directory's lock, held while the process runs; nil for a named one
 	heartbeat time.Duration // 0: the client's default
-	// metricsUngated: the metrics reader is autoexport's own (a pull exporter, or producers), so
-	// send_metrics is not declared to the settings layer. A policy that overrides the metrics
-	// export is then refused, not answered as done.
-	metricsUngated bool
 	// shown is the endpoint as it is safe to log; hints, what to check when the server can't be
 	// reached, naming what gave the endpoint and the headers (the option or the variable).
 	shown string

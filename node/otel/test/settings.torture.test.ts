@@ -775,7 +775,7 @@ async function run(mode: Mode, seed: number): Promise<Reached> {
     const freshLogging = new LoggerProvider({
       processors: [new BatchLogRecordProcessor({ exporter: fresh.logs(freshLogs as never), maxExportBatchSize: 5, scheduledDelayMillis: 1 })],
     });
-    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv({}), BigInt(agent.wall));
+    const d = LAYER.decide(config(final), EMPTY, EMPTY, hostFromEnv(), BigInt(agent.wall));
     assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
     fresh.apply(d.apply);
 

@@ -34,9 +34,9 @@ health again once the exports fail (after the exporter's retries), and again onc
 Then check_truth (examples/integrations.py), once for each setup Setups.java makes, a second
 agent extension built here and given to the agent only when EXAMPLE_SETUP names a setup:
 extension-processor (a span processor, a log record processor and a metric reader of its own,
-exporting to the same sink) and extension-sampler (a sampler of its own). Each setting the server
-offers must show in the telemetry or be named as set aside, and the set-aside settings must be
-exactly what the setup takes from the extension's control.
+exporting to a second sink) and extension-sampler (a sampler of its own). Each setting the server
+offers must show in the telemetry or be named as set aside; only the extension's sampler sets any
+aside (its settings), and the extension's own exporters are reported ungoverned.
 
 Then check_app_settings (examples/integrations.py, its own runs 7 and 8): App.java reads the
 feature flag example.feature (AppSettings.get), which the server turns on and off, and is told of
@@ -459,9 +459,8 @@ def check_matching_settings(launch_, target_: Path, listen: str) -> bool:
 
 
 #: What another extension's span processor, log record processor and metric reader (Setups.java)
-#: take from the extension's control: their signals' gates, set aside. The sampler stays its own.
-EXTENSION_PROCESSOR = {"send_traces", "send_metrics", "send_logs", "send_logs_level", "send_logs_level_by_scope",
-                       "send_logs_per_second", "mask_attributes", "drop_attributes"}
+#: export through, beside the agent's: an exporter of each signal past the gates, reported ungoverned.
+EXTENSION_PROCESSOR = frozenset({"traces", "metrics", "logs"})
 #: What another extension's sampler (Setups.java) takes: the settings the extension's sampler holds.
 EXTENSION_SAMPLER = {"sampling_rate", "sampling_rules", "sampling_traces_per_second"}
 
@@ -473,10 +472,10 @@ CHECKS = {
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "matching": lambda: check_matching_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
-    "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", EXTENSION_PROCESSOR,
-                                                     listen=LISTEN),
+    "truth-extension-processor": lambda: check_truth(launch, TARGET, "extension-processor", set(), listen=LISTEN,
+                                                     ungoverned=EXTENSION_PROCESSOR, host=HOST),
     "truth-extension-sampler": lambda: check_truth(launch, TARGET, "extension-sampler", EXTENSION_SAMPLER,
-                                                   listen=LISTEN),
+                                                   listen=LISTEN, host=HOST),
 }
 
 if __name__ == "__main__":

@@ -150,7 +150,8 @@ class DeclarativeTest {
         """), inventory);
     assertNull(m.getMeterProvider());
     assertNull(m.getLoggerProvider());
-    assertEquals(List.of(Inventory.exporter("traces", "console", true)), inventory.build().getExportersList());
+    assertEquals(List.of(dev.pydantic.opamp.sdk.SettingsProto.Exporter.newBuilder().setSignal("traces").setName("console")
+        .setGated(true).build()), inventory.build().getExportersList());
     OpenTelemetrySdk sdk = DeclarativeConfiguration.create(m).getSdk();
     try {
       String tracing = sdk.getSdkTracerProvider().toString();
@@ -256,9 +257,10 @@ class DeclarativeTest {
   }
 
   @Test
-  void aSignalThroughAProcessorOfItsOwnHasNoneOfItsSettingsCarriedOut(@TempDir Path dir) throws Exception {
+  void aProcessorOfItsOwnIsUngovernedAndItsSignalsSettingsStillApply(@TempDir Path dir) throws Exception {
     // Saved before: the metrics export off. The file's spans go through a processor of its own, past
-    // the gate, so the agent cannot stop them: a policy that switches the traces off is refused.
+    // the gates: it is reported ungoverned, and a policy that switches the traces off is applied to
+    // every exporter the agent gates.
     String saved = v1("signal_exports", exports("", "off", ""));
     Files.writeString(dir.resolve("sdk-settings.json"), saved);
     System.setProperty("otel.opamp.endpoint", "http://server/v1/opamp");
@@ -279,11 +281,13 @@ class DeclarativeTest {
       assertTrue(e.controls.gates.sendTraces());
       assertFalse(e.controls.gates.sendMetrics()); // the reader is the agent's: gated
       assertEquals(full(saved), ExtensionTest.effective(e));
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(v1("signal_exports", exports("off", "", ""))));
-      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
-      assertEquals("signal_exports.traces: this SDK cannot apply the requested override", s.getErrorMessage());
-      assertTrue(e.controls.gates.sendTraces());
-      assertEquals(full(saved), ExtensionTest.effective(e));
+      assertTrue(e.inventory.listed().stream().anyMatch(x -> x.getSignal().equals("traces")
+          && x.getName().equals("own_processor") && !x.getGated()), e.inventory.listed().toString());
+      String off = v1("signal_exports", exports("off", "", ""));
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(off));
+      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
+      assertFalse(e.controls.gates.sendTraces());
+      assertEquals(full(off), ExtensionTest.effective(e));
     } finally {
       System.clearProperty("otel.opamp.endpoint");
       System.clearProperty("otel.opamp.state.dir");

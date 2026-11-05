@@ -139,7 +139,7 @@ test("vectors: custom.json's cases through the layer, with each case's host", ()
   assert.ok(VECTORS.cases.length >= 15);
   for (const c of VECTORS.cases) {
     // Without a host, the host this package declares, which carries out every control.
-    const host: HostInit = c.host ?? hostFromEnv({});
+    const host: HostInit = c.host ?? hostFromEnv();
     const d = LAYER.decide(config(c.document), EMPTY, EMPTY, host, 0n);
     if (c.refused !== undefined) {
       assert.equal(d.status?.status, FAILED, c.name);
@@ -633,7 +633,7 @@ test("custom is declared live always, whatever builds the exporters", () => {
     {}, { OTEL_TRACES_EXPORTER: "zipkin" }, { OTEL_LOGS_EXPORTER: "none", OTEL_METRICS_EXPORTER: "none" },
     { OTEL_TRACES_EXPORTER: "zipkin", OTEL_LOGS_EXPORTER: "something", OTEL_METRICS_EXPORTER: "prometheus" },
   ]) {
-    const host = hostFromEnv(env);
+    const host = hostFromEnv();
     assert.ok(host.live?.includes("custom"), JSON.stringify(env));
     assert.ok(!host.nextStart?.includes("custom"), JSON.stringify(env));
   }

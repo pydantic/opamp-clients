@@ -22,6 +22,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 import opamp.proto.v1.Anyvalue;
 import opamp.proto.v1.Opamp;
@@ -156,7 +158,7 @@ class SdkSettingsTest {
     assertEquals("h", attribute(desc, "host.name"));
     String every = "head_sampling,signal_exports.traces,signal_exports.metrics,signal_exports.logs,sampling_rules,"
         + "trace_rate_limit,log_levels,log_rate_limit,attribute_redaction,debug,app_settings,instrumentations,"
-        + "scrubbing";
+        + "scrubbing,self_monitoring";
     record Case(SettingsProto.Host host, long now, String controls) {}
     for (Case c : List.of(
         new Case(EVERY, NOW, every),
@@ -189,7 +191,7 @@ class SdkSettingsTest {
       "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
       "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns",
       "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
-      "send_traces"))
+      "send_self_metrics", "send_traces"))
       .addAllNextStart(List.of("deactivate_all_instrumentations", "deactivate_instrumentations")).build();
   /** {@link #DECLARING} with the application's own settings ({@code custom}) too. */
   static final SettingsProto.Host EVERY = DECLARING.toBuilder().addLive("custom").build();
@@ -265,22 +267,59 @@ class SdkSettingsTest {
 
   @Test
   void exportHealthIsSentAtTheFirstCallAndOnAFailureAndHeldWhileNothingChanges() {
-    SettingsProto.HealthReport first = layer.health(SettingsProto.ExportCounts.getDefaultInstance(), null, NOW, null);
+    SettingsProto.HealthReport first = layer.health(SettingsProto.ExportCounts.getDefaultInstance(), null, NOW, null, List.of());
     assertTrue(first.getSend());
     assertEquals(3, first.getExporters().getComponentHealthMapCount());
     assertEquals("ok", first.getExporters().getStatus());
-    assertFalse(layer.health(SettingsProto.ExportCounts.getDefaultInstance(), first, NOW + 30_000, null).getSend());
+    assertFalse(layer.health(SettingsProto.ExportCounts.getDefaultInstance(), first, NOW + 30_000, null, List.of()).getSend());
     SettingsProto.HealthReport failed = layer.health(SettingsProto.ExportCounts.newBuilder()
         .setTraces(SettingsProto.SignalCounts.newBuilder().setExportsFailed(1).setItemsFailed(512).setLastFailed(true)
             .setLastError("connection refused")).build(),
-        first, NOW + 30_000, SettingsProto.Settings.newBuilder().setSendLogs(false).build());
+        first, NOW + 30_000, SettingsProto.Settings.newBuilder().setSendLogs(false).build(),
+        List.of(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("zipkin").build()));
     assertTrue(failed.getSend());
+    // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
+    Opamp.ComponentHealth zipkin = failed.getExporters().getComponentHealthMapMap().get("traces")
+        .getComponentHealthMapMap().get("zipkin");
+    assertEquals("ungoverned", zipkin.getStatus());
+    assertTrue(zipkin.getHealthy());
     assertFalse(failed.getExporters().getHealthy());
     assertEquals("connection refused", failed.getExporters().getComponentHealthMapMap().get("traces").getLastError());
     assertEquals("off", failed.getExporters().getComponentHealthMapMap().get("logs").getStatus());
   }
 
   static final ObjectMapper JSON = new ObjectMapper();
+
+  /** testdata/exporters.json, each case through Exporters: what is decided, compared whole. */
+  @TestFactory
+  Stream<DynamicTest> theExportersVectors() throws IOException {
+    List<DynamicTest> tests = new ArrayList<>();
+    for (JsonNode c : JSON.readTree(testdata().resolve("exporters.json").toFile()).get("cases")) {
+      tests.add(DynamicTest.dynamicTest(c.get("name").asText(), () -> {
+        List<SettingsProto.FoundExporter> found = new ArrayList<>();
+        for (JsonNode f : c.get("found")) {
+          found.add(SettingsProto.FoundExporter.newBuilder().setSignal(f.path("signal").asText())
+              .setKind(f.path("kind").asText()).setGated(f.path("gated").asBoolean())
+              .setEndpoint(f.path("endpoint").asText()).setFromEnv(f.path("from_env").asBoolean()).build());
+        }
+        Map<String, String> env = new TreeMap<>();
+        c.path("env").fields().forEachRemaining(v -> env.put(v.getKey(), v.getValue().asText()));
+        SettingsProto.ExportersDecided got = layer.exporters(found, env, c.path("default_protocol").asText());
+        var out = JSON.createObjectNode();
+        var exporters = out.putArray("exporters");
+        got.getExportersList().forEach(e -> exporters.addObject().put("signal", e.getSignal()).put("name", e.getName())
+            .put("gated", e.getGated()).put("destination", e.getDestination()));
+        var governed = out.putArray("governed");
+        got.getGovernedList().forEach(governed::add);
+        var ungoverned = out.putArray("ungoverned");
+        got.getUngovernedList().forEach(ungoverned::add);
+        var warnings = out.putArray("warnings");
+        got.getWarningsList().forEach(warnings::add);
+        assertEquals(c.get("want"), out);
+      }));
+    }
+    return tests.stream();
+  }
 
   /** testdata/components.json, each case through Components, compared as the vectors' about says. */
   @TestFactory
@@ -340,7 +379,8 @@ class SdkSettingsTest {
     i.path("instrumentations").forEach(x -> b.addInstrumentations(SettingsProto.Instrumentation.newBuilder()
         .setName(x.path("name").asText()).setVersion(x.path("version").asText())));
     i.path("exporters").forEach(x -> b.addExporters(SettingsProto.Exporter.newBuilder()
-        .setSignal(x.path("signal").asText()).setName(x.path("name").asText()).setGated(x.path("gated").asBoolean())));
+        .setSignal(x.path("signal").asText()).setName(x.path("name").asText()).setGated(x.path("gated").asBoolean())
+        .setDestination(x.path("destination").asText())));
     return b.build();
   }
 
@@ -361,7 +401,8 @@ class SdkSettingsTest {
 
   /**
    * The components as the vectors give them: sdk (key to text), instrumentations (name to version,
-   * null when none), exporters (signal to name to gated) and settings (key to applies).
+   * null when none), exporters (signal to identity to gated), destinations (signal to identity to
+   * destination, for those with one) and settings (key to applies).
    */
   static JsonNode components(Opamp.AvailableComponents c) {
     ObjectNode out = JSON.createObjectNode();
@@ -372,14 +413,21 @@ class SdkSettingsTest {
         instrumentations.put(name, d.getMetadataList().stream().filter(kv -> kv.getKey().equals("version"))
             .map(SdkSettingsTest::text).findFirst().orElse(null)));
     ObjectNode exporters = out.putObject("exporters");
+    ObjectNode destinations = out.putObject("destinations");
     c.getComponentsMap().get("exporters").getSubComponentMapMap().forEach((signal, d) -> {
       ObjectNode names = exporters.putObject(signal);
       d.getSubComponentMapMap().forEach((name, e) -> {
-        assertEquals(1, e.getMetadataCount(), signal + "/" + name);
         Anyvalue.KeyValue gated = e.getMetadata(0);
         assertEquals("gated", gated.getKey());
         assertTrue(gated.getValue().hasBoolValue(), signal + "/" + name + ": gated is a boolean");
         names.put(name, gated.getValue().getBoolValue());
+        // Then where it sends, for one that says: nothing else.
+        e.getMetadataList().stream().skip(1).forEach(kv -> {
+          assertEquals("destination", kv.getKey(), signal + "/" + name);
+          ObjectNode sent = destinations.has(signal) ? (ObjectNode) destinations.get(signal)
+              : destinations.putObject(signal);
+          sent.put(name, text(kv));
+        });
       });
     });
     ObjectNode settings = out.putObject("settings");

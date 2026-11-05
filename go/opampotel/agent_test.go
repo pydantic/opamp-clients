@@ -648,16 +648,11 @@ func TestTheHostDeclaresEverySettingThisPackageCarriesOut(t *testing.T) {
 		len(h.GetNextStart()) != 0 {
 		t.Fatalf("live %v, next start %v", h.GetLive(), h.GetNextStart())
 	}
-	for _, k := range (&server{metricsUngated: true}).host().GetLive() {
-		if k == "send_metrics" {
-			t.Fatal("send_metrics declared beside a metrics reader of autoexport's own")
-		}
-	}
 }
 
-// A metrics reader of autoexport's own is not gated. So a policy that switches the metrics export
-// off is refused, and the server does not see metrics stopped while they go on.
-func TestSendMetricsIsRefusedWhenTheMetricsReaderIsAutoexportsOwn(t *testing.T) {
+// A metrics reader of autoexport's own can't be gated: it is listed ungoverned, and a policy that
+// switches the metrics export off is APPLIED all the same, in force on everything else.
+func TestAMetricsReaderOfAutoexportsOwnIsListedUngovernedAndThePolicyApplied(t *testing.T) {
 	for _, tc := range []struct {
 		env   map[string]string
 		gated bool
@@ -672,23 +667,15 @@ func TestSendMetricsIsRefusedWhenTheMetricsReaderIsAutoexportsOwn(t *testing.T) 
 		if metricsGated(getenv) != tc.gated {
 			t.Fatalf("%v: gated %v, want %v", tc.env, !tc.gated, tc.gated)
 		}
-		srv := &server{endpoint: "http://127.0.0.1:1", metricsUngated: !tc.gated}
-		a, err := newAgent(context.Background(), srv, NewControls(), "")
+		a, err := newAgent(context.Background(), &server{endpoint: "http://127.0.0.1:1"}, NewControls(), "")
 		if err != nil {
 			t.Fatal(err)
 		}
 		doc := v1("signal_exports", exports("off", "off", ""))
 		st := a.remoteConfig(context.Background(), remote(doc))
-		want, eff := applied, doc
-		if !tc.gated {
-			want, eff = failed_, v1()
-			if st.GetErrorMessage() != "signal_exports.metrics: this SDK cannot apply the requested override" {
-				t.Fatalf("%v: refused with %q", tc.env, st.GetErrorMessage())
-			}
-		}
-		if st.GetStatus() != want || effectiveBody(a) != full(t, eff) || a.controls.gates.Load().metrics == tc.gated ||
-			a.controls.gates.Load().traces != !tc.gated {
-			t.Fatalf("%v: status %v, effective %s, sending metrics %v", tc.env, st, effectiveBody(a), a.controls.gates.Load().metrics)
+		if st.GetStatus() != applied || effectiveBody(a) != full(t, doc) || a.controls.gates.Load().metrics ||
+			a.controls.gates.Load().traces {
+			t.Fatalf("%v: status %v, effective %s", tc.env, st, effectiveBody(a))
 		}
 		_ = a.layer.Close(context.Background())
 	}

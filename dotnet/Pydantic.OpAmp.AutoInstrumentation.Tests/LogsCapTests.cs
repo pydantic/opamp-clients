@@ -117,6 +117,29 @@ public class LogsCapTests
         Assert.Equal(2, Through(controls, two).Count);
     }
 
+    // Regression: the OTLP exporter's retry of a failed export (the same bytes, a new request) went
+    // through the gate afresh: its records were charged to the cap again and dropped, counted filtered.
+    [Fact]
+    public void ARetryOfAFailedExportIsSentAsFirstDecided()
+    {
+        var controls = this.Controls();
+        controls.Apply(Vectors.Settings(Policy.Of(("log_rate_limit", """{"records_per_second":2}"""))));
+        var export = Logs(ScopeLogs("a", [Record(9, "1"), Record(9, "2"), Record(9, "3")]));
+        var sink = new Sink { Answer = _ => new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable) };
+        using var client = new HttpClient(new GateHandler(controls, Signal.Logs) { InnerHandler = sink });
+        HttpRequestMessage Attempt() => new(HttpMethod.Post, "http://collector/v1/logs")
+        {
+            Content = new ByteArrayContent(export) { Headers = { ContentType = new MediaTypeHeaderValue("application/x-protobuf") } },
+        };
+        client.Send(Attempt());
+        sink.Answer = null;
+        client.Send(Attempt());
+        Assert.Equal(["1", "2"], ReadLogs(sink.Exports[1].Message).Select(r => r.Body));
+        Assert.Equal(1UL, controls.Tally.Counts().Logs.ItemsFiltered);
+        // Once sent, the same bytes again are a new export: the bucket is empty.
+        Assert.Empty(Through(controls, export));
+    }
+
     [Fact]
     public void ADroppedLogsExportTakesNoTokens()
     {
@@ -129,15 +152,13 @@ public class LogsCapTests
     }
 
     [Fact]
-    public void ThePluginDeclaresItWhereTheLogsAreGated()
+    public void ThePluginDeclaresItWhateverTheLogsExportersAre()
     {
-        var otlp = Agent.Prepare(n => n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : null, (_, _) => { })!;
-        Assert.Contains("send_logs_per_second", otlp.HostNow(providersBuilt: false).Live);
-        var none = Agent.Prepare(n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_LOGS_EXPORTER" => "otlp,console", _ => null }, (_, _) => { })!;
-        Assert.DoesNotContain("send_logs_per_second", none.HostNow(providersBuilt: false).Live);
-        var refused = none.RemoteConfig(Vectors.Config(Policy.Of(("log_rate_limit", """{"records_per_second":5}"""))));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("log_rate_limit: records_per_second: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Null(none.Controls.Policy(Signal.Logs).Cap);
+        var both = Agent.Prepare(n => n switch { "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp", "OTEL_LOGS_EXPORTER" => "otlp,console", _ => null }, (_, _) => { })!;
+        Assert.Contains("send_logs_per_second", both.HostNow(providersBuilt: false).Live);
+        Assert.Equal(RemoteConfigStatuses.Applied, both.RemoteConfig(Vectors.Config(Policy.Of(("log_rate_limit", """{"records_per_second":5}""")))).Status);
+        Assert.NotNull(both.Controls.Policy(Signal.Logs).Cap);
+        // The OTLP exporter is behind the gate; the console one is reported ungoverned.
+        Assert.Equal(["otlp:True", "console:False"], both.Inventory().Exporters.Where(e => e.Signal == "logs").Select(e => $"{e.Name}:{e.Gated}"));
     }
 }

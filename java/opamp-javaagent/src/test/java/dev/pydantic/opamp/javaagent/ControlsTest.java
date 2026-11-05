@@ -259,6 +259,60 @@ class ControlsTest {
   }
 
   @Test
+  void everyLogExporterSendsTheSameCappedRecordsFromOneBudget() {
+    // Two exporters, each behind its own processor, which hands it its own copy of each record.
+    Controls c = new Controls();
+    long[] now = {0};
+    c.nanoTime = () -> now[0];
+    var first = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var second = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var provider = io.opentelemetry.sdk.logs.SdkLoggerProvider.builder()
+        .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(c.logs(first)))
+        .addLogRecordProcessor(io.opentelemetry.sdk.logs.export.SimpleLogRecordProcessor.create(c.logs(second)))
+        .build();
+    var logger = provider.get("app");
+    java.util.function.Function<io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter,
+        java.util.List<String>> bodies = out -> out.getFinishedLogRecordItems().stream()
+            .map(r -> r.getBodyValue().asString()).toList();
+    c.apply(settings(every("log_rate_limit", override("\"records_per_second\":3"))));
+    for (int i = 0; i < 5; i++) {
+      logger.logRecordBuilder().setBody("r" + i).emit();
+    }
+    // One decision a record: both send r0 to r2, and the bucket paid for three, not six.
+    assertEquals(java.util.List.of("r0", "r1", "r2"), bodies.apply(first));
+    assertEquals(java.util.List.of("r0", "r1", "r2"), bodies.apply(second));
+    assertEquals(0, c.logDecisions.size()); // every gate saw each: nothing kept
+    now[0] = 500_000_000L; // half a second: 1.5 tokens, so one record each
+    logger.logRecordBuilder().setBody("r5").emit();
+    logger.logRecordBuilder().setBody("r6").emit();
+    assertEquals("r5", bodies.apply(first).get(3));
+    assertEquals(bodies.apply(first), bodies.apply(second));
+    assertEquals(4, bodies.apply(second).size());
+    provider.close();
+  }
+
+  @Test
+  void repeatsOfARecordInOneBatchAreDecidedOnceEachForEveryExporter() {
+    // Regression: two records alike in every field (one logged twice in the same tick) shared one
+    // decision, the last repeat's, so the second exporter sent fewer than the first.
+    Controls c = new Controls();
+    c.nanoTime = () -> 0L;
+    var first = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var second = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var toFirst = c.logs(first);
+    var toSecond = c.logs(second);
+    c.apply(settings(every("log_rate_limit", override("\"records_per_second\":1"))));
+    var r = io.opentelemetry.sdk.testing.logs.TestLogRecordData.builder()
+        .setInstrumentationScopeInfo(io.opentelemetry.sdk.common.InstrumentationScopeInfo.create("app"))
+        .setObservedTimestamp(1, java.util.concurrent.TimeUnit.SECONDS).setBody("again").build();
+    toFirst.export(java.util.List.of(r, r));
+    toSecond.export(java.util.List.of(r, r));
+    assertEquals(1, first.getFinishedLogRecordItems().size());
+    assertEquals(1, second.getFinishedLogRecordItems().size());
+    assertEquals(0, c.logDecisions.size()); // both gates had both repeats: nothing kept
+  }
+
+  @Test
   void redactionChangesWhatIsExportedNotTheApplicationsSpansOrRecords() {
     Controls c = new Controls();
     var gated = InMemorySpanExporter.create();
@@ -513,6 +567,30 @@ class ControlsTest {
     public io.opentelemetry.sdk.common.CompletableResultCode shutdown() {
       return io.opentelemetry.sdk.common.CompletableResultCode.ofSuccess();
     }
+  }
+
+  // Regression: an error inside a gate (here a span redaction can't read) went up to the
+  // processor, which dropped the batch with nothing counted: Fleet never showed it.
+  @Test
+  void anErrorInsideAGateFailsTheExportAndIsCounted() {
+    Controls c = new Controls();
+    c.apply(settings(every("attribute_redaction", override("\"mask\":[\"k\"]"))));
+    Scripted exporter = new Scripted();
+    var span = io.opentelemetry.sdk.testing.trace.TestSpanData.builder().setName("s")
+        .setKind(io.opentelemetry.api.trace.SpanKind.INTERNAL).setStartEpochNanos(1).setEndEpochNanos(2)
+        .setHasEnded(true).setStatus(io.opentelemetry.sdk.trace.data.StatusData.unset()).build();
+    var unreadable = new io.opentelemetry.sdk.trace.data.DelegatingSpanData(span) {
+      @Override
+      public io.opentelemetry.api.common.Attributes getAttributes() {
+        throw new IllegalArgumentException("no attributes");
+      }
+    };
+    var result = c.spans(exporter).export(java.util.List.of(unreadable, span));
+    assertFalse(result.isSuccess());
+    var t = c.counts().getTraces();
+    assertEquals(1, t.getExportsFailed());
+    assertEquals(2, t.getItemsFailed());
+    assertEquals("gate: no attributes", t.getLastError());
   }
 
   @Test

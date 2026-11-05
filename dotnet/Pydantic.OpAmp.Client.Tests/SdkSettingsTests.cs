@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Google.Protobuf;
 using OpAmp.Proto.V1;
 using Pydantic.OpAmp.Client.Sdk;
@@ -65,7 +66,7 @@ public class SdkSettingsTests
             {
                 "head_sampling", "signal_exports.traces", "signal_exports.metrics", "signal_exports.logs", "sampling_rules",
                 "trace_rate_limit", "log_levels", "log_rate_limit", "attribute_redaction", "debug", "app_settings",
-                "instrumentations", "scrubbing",
+                "instrumentations", "scrubbing", "self_monitoring",
             },
             Strings(all["logfire.opamp.supported_controls"]));
 
@@ -193,7 +194,7 @@ public class SdkSettingsTests
             "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
             "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns",
             "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second", "send_metrics",
-            "send_traces",
+            "send_self_metrics", "send_traces",
         },
         NextStart = { "deactivate_all_instrumentations", "deactivate_instrumentations" },
     };
@@ -264,11 +265,42 @@ public class SdkSettingsTests
             },
             first,
             Now + 30_000,
-            new Settings { SendLogs = false });
+            new Settings { SendLogs = false },
+            [new Exporter { Signal = "traces", Name = "zipkin" }]);
         Assert.True(failed.Send);
+        // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
+        var zipkin = failed.Exporters.ComponentHealthMap["traces"].ComponentHealthMap["zipkin"];
+        Assert.Equal("ungoverned", zipkin.Status);
+        Assert.True(zipkin.Healthy);
         Assert.False(failed.Exporters.Healthy);
         Assert.Equal("connection refused", failed.Exporters.ComponentHealthMap["traces"].LastError);
         Assert.Equal("off", failed.Exporters.ComponentHealthMap["logs"].Status);
+    }
+
+    // Every case of testdata/exporters.json through the wrapper: what is decided, compared whole.
+    [Fact]
+    public void TheExportersVectors()
+    {
+        using var layer = new SdkSettings();
+        foreach (var c in Cases("exporters.json"))
+        {
+            string Text(JsonElement e, string k) => e.TryGetProperty(k, out var v) ? v.GetString()! : string.Empty;
+            bool Flag(JsonElement e, string k) => e.TryGetProperty(k, out var v) && v.GetBoolean();
+            var found = c.GetProperty("found").EnumerateArray().Select(f => new FoundExporter
+            {
+                Signal = Text(f, "signal"), Kind = Text(f, "kind"), Gated = Flag(f, "gated"), Endpoint = Text(f, "endpoint"),
+                FromEnv = Flag(f, "from_env"),
+            }).ToList();
+            var env = c.TryGetProperty("env", out var e) ? e.EnumerateObject().Select(p => KeyValuePair.Create(p.Name, p.Value.GetString()!)).ToList() : [];
+            var got = layer.Exporters(found, env, Text(c, "default_protocol"));
+            var actual = JsonSerializer.Serialize(new
+            {
+                exporters = got.Exporters.Select(x => new { signal = x.Signal, name = x.Name, gated = x.Gated, destination = x.Destination }),
+                governed = got.Governed, ungoverned = got.Ungoverned, warnings = got.Warnings,
+            });
+            var want = JsonSerializer.Serialize(c.GetProperty("want"));
+            Assert.True(JsonNode.DeepEquals(JsonNode.Parse(want), JsonNode.Parse(actual)), $"{c.GetProperty("name")}: {actual}");
+        }
     }
 
     // Every case of testdata/components.json through the wrapper: each component the case gives
@@ -303,6 +335,20 @@ public class SdkSettingsTests
                     s => s.Name, s => s.Value.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetBoolean()));
                 var actual = got.Components["exporters"].SubComponentMap.ToDictionary(
                     s => s.Key, s => s.Value.SubComponentMap.ToDictionary(e => e.Key, e => Assert.Single(e.Value.Metadata, m => m.Key == "gated").Value.BoolValue));
+                Assert.Equal(expected, actual);
+            }
+
+            if (want.TryGetProperty("destinations", out var destinations))
+            {
+                // Where each exporter sends, for those that say: signal to identity to destination.
+                var expected = destinations.EnumerateObject().ToDictionary(
+                    s => s.Name, s => s.Value.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetString()!));
+                var actual = got.Components["exporters"].SubComponentMap
+                    .Select(s => (s.Key, Sent: s.Value.SubComponentMap
+                        .Where(e => e.Value.Metadata.Any(m => m.Key == "destination"))
+                        .ToDictionary(e => e.Key, e => e.Value.Metadata.Single(m => m.Key == "destination").Value.StringValue)))
+                    .Where(s => s.Sent.Count > 0)
+                    .ToDictionary(s => s.Key, s => s.Sent);
                 Assert.Equal(expected, actual);
             }
 
@@ -388,6 +434,7 @@ public class SdkSettingsTests
                 Signal = Text(e, "signal"),
                 Name = Text(e, "name"),
                 Gated = e.TryGetProperty("gated", out var g) && g.GetBoolean(),
+                Destination = e.TryGetProperty("destination", out var d) ? d.GetString() : string.Empty,
             }));
         }
 

@@ -64,7 +64,7 @@ LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z: the clock the documents are decided at (debug_until is against it).
 NOW = 1_791_979_200_000
 #: What the SDK declares, as a real agent does: a policy that overrides a setting the host leaves out is refused.
-HOST = pydantic_opamp_otel.sdk_host(["otlp"])
+HOST = pydantic_opamp_otel.sdk_host()
 #: How long the applier flips, in seconds, per run.
 FLIPPING = 0.6
 #: The bound on a run: past it, something is stuck.

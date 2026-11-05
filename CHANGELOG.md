@@ -21,10 +21,29 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
+  mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
+  `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
+  refused at start, saying what to set (#109).
 - Go: the `go/logfirepolicyprocessor` module is gone; its last release is v0.2.0 (#80).
 - Go, Python, Node.js, Java, .NET: an OpAMP endpoint without a scheme (`opamp.example.com/v1/opamp`)
   is refused. OpAMP stays off, the SDK runs unmanaged, and the core's warning names the setting.
   Add `https://` or `wss://`. On core 0.12.0, which the clients now pin (#92).
+- Go, Python, Node.js, Java, .NET: the SDK policy governs every exporter the SDK exports through,
+  not just the ones the integration builds: the console, a processor added later, another
+  plugin's OTLP exporter, the Logfire SDK's console and OTLP exporters. A policy that was FAILED or
+  set aside because another exporter was there is now APPLIED and in force on all of them, and one
+  decision per span or log record holds for every exporter it reaches (one rate cap budget per
+  process). What the gates can't reach (a processor that holds its own exporter, a pulled metric
+  reader, a global provider of the application's own, a non-OTLP exporter in .NET) is reported
+  ungoverned instead of narrowing what the SDK declares: `gated: false` in the inventory and the
+  status `ungoverned`, healthy, in export health. Only another sampler in place of the SDK's still
+  leaves the sampler's controls undeclared.
+- Go, Python, Node.js, Java, .NET: an exporter's inventory key is its identity, its name and
+  `@host:port` where it sends somewhere known (`otlp@api.honeycomb.io:443`), with the metadata
+  `destination` (`scheme://host:port`, never a path or credentials); a server that read `otlp`
+  reads `otlp@...`. Export health lists every exporter under its signal, `governed` or
+  `ungoverned`. Needs core 0.15.0.
 
 ### Added
 
@@ -49,6 +68,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
+  warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
+  language. An OTLP exporter built from the variables now lists its signal's path under HTTP
+  (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
+  warnings read the same in every SDK. On core 0.15.0 (#109).
 - Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
   install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
   package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the

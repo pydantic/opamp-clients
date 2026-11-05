@@ -377,16 +377,13 @@ def check_settings() -> bool:
 
 # --- check_truth's setups (setups.cjs) ----------------------------------------------------------
 
-#: What a tracer provider the application registers in place of the register's takes from the
-#: package's control: its own spans go past the sampler and the trace gate, so the settings either
-#: holds are set aside. Redaction too, which needs every span and log record.
-OWN_TRACER_PROVIDER = {"send_traces", "sampling_rate", "sampling_rules", "sampling_traces_per_second",
-                       "mask_attributes", "drop_attributes"}
-#: A logger provider of its own: the log gate's settings, and redaction.
-OWN_LOGGER_PROVIDER = {"send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-                       "mask_attributes", "drop_attributes"}
-#: A meter provider of its own: send_metrics.
-OWN_METER_PROVIDER = {"send_metrics"}
+#: The signal a provider the application registers in place of the register's (setups.cjs) takes
+#: past the package's sampler and gates, reported as an ungoverned app_provider. Nothing is set
+#: aside. The http instrumentation keeps the register's tracer and meter, so its spans and metrics
+#: stay governed; the application's log records all go to its own logger provider.
+OWN_TRACER_PROVIDER = frozenset({"traces"})
+OWN_LOGGER_PROVIDER = frozenset({"logs"})
+OWN_METER_PROVIDER = frozenset({"metrics"})
 
 
 def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
@@ -422,14 +419,13 @@ CHECKS = {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))
     for app in ["app.cjs", "app.mjs"]
 } | {
-    # The application's own spans aren't an instrumentation's: deactivate_all_instrumentations
-    # doesn't stop them, and the check can't tell them apart, so it isn't judged there.
-    "truth-own-tracer-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-tracer-provider",
-                                                                     OWN_TRACER_PROVIDER)),
-    "truth-own-logger-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-logger-provider",
-                                                                     OWN_LOGGER_PROVIDER, switch_at_once=True)),
-    "truth-own-meter-provider": of("app.cjs", lambda d: check_truth(launch, d, "own-meter-provider",
-                                                                    OWN_METER_PROVIDER, switch_at_once=True)),
+    "truth-own-tracer-provider": of("app.cjs", lambda d: check_truth(
+        launch, d, "own-tracer-provider", set(), switch_at_once=True, ungoverned=OWN_TRACER_PROVIDER)),
+    "truth-own-logger-provider": of("app.cjs", lambda d: check_truth(
+        launch, d, "own-logger-provider", set(), switch_at_once=True, ungoverned=OWN_LOGGER_PROVIDER,
+        past=OWN_LOGGER_PROVIDER)),
+    "truth-own-meter-provider": of("app.cjs", lambda d: check_truth(
+        launch, d, "own-meter-provider", set(), switch_at_once=True, ungoverned=OWN_METER_PROVIDER)),
 }
 
 if __name__ == "__main__":

@@ -26,7 +26,6 @@ public final class OpampDeclarativeCustomizerProvider implements DeclarativeConf
         return model;
       }
       try {
-        e.notGated(Declarative.ungated(model));
         return Declarative.wrap(model, e.inventory);
       } catch (RuntimeException err) {
         // Better unmanaged than answering for controls that aren't there.

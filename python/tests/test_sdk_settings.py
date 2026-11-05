@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from pydantic_opamp_client import anyvalue_pb2, opamp_pb2
-from pydantic_opamp_client.sdk import SdkSettings
+from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
 
 from _policy import FILE, V1, config, effective, full, policy
 
@@ -19,7 +19,7 @@ FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
 LIVE = ["custom", "debug_sampling_rate", "debug_send_logs_level", "debug_until", "drop_attributes", "mask_attributes",
         "sampling_rate", "sampling_rules", "sampling_traces_per_second", "scrub_defaults", "scrub_patterns", "send_logs",
         "send_logs_level",
-        "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_traces"]
+        "send_logs_level_by_scope", "send_logs_per_second", "send_metrics", "send_self_metrics", "send_traces"]
 NEXT_START = ["deactivate_all_instrumentations", "deactivate_instrumentations"]
 NOW = 1_791_979_200_000  # 2026-10-14T12:00:00Z
 
@@ -296,12 +296,14 @@ def inventory_of(case: dict):
         instrumentations=[settings_pb2.Instrumentation(name=i.get("name", ""), version=i.get("version", ""))
                           for i in inv.get("instrumentations", [])],
         exporters=[settings_pb2.Exporter(signal=e.get("signal", ""), name=e.get("name", ""),
-                                         gated=e.get("gated", False)) for e in inv.get("exporters", [])])
+                                         gated=e.get("gated", False), destination=e.get("destination", ""))
+                   for e in inv.get("exporters", [])])
 
 
 def components_json(c: opamp_pb2.AvailableComponents) -> dict:
     """The components as the vectors give them: sdk (key to text), instrumentations (name to
-    version or None), exporters (signal to name to gated) and settings (key to applies)."""
+    version or None), exporters (signal to identity to gated), destinations (signal to identity to
+    destination, for those with one) and settings (key to applies)."""
 
     def text(d: opamp_pb2.ComponentDetails, key: str) -> str | None:
         found = [kv.value for kv in d.metadata if kv.key == key]
@@ -321,6 +323,9 @@ def components_json(c: opamp_pb2.AvailableComponents) -> dict:
         "instrumentations": {n: text(d, "version") for n, d in parts["instrumentations"].sub_component_map.items()},
         "exporters": {s: {n: gated(e) for n, e in d.sub_component_map.items()}
                       for s, d in parts["exporters"].sub_component_map.items()},
+        "destinations": {s: to for s, d in parts["exporters"].sub_component_map.items()
+                         if (to := {n: text(e, "destination") for n, e in d.sub_component_map.items()
+                                    if text(e, "destination") is not None})},
         "settings": {k: text(d, "applies") for k, d in parts["settings"].sub_component_map.items()},
     }
 
@@ -339,6 +344,21 @@ def test_the_inventory_without_a_host_lists_no_setting() -> None:
     # No host: one that declares nothing, as for load and decide.
     got = components_json(SdkSettings().components(inventory_of({}), None, NOW))
     assert got["settings"] == {}
+
+
+EXPORTERS = json.loads((VECTORS / "exporters.json").read_text(encoding="utf-8"))["cases"]
+
+
+@pytest.mark.parametrize("case", EXPORTERS, ids=[c["name"] for c in EXPORTERS])
+def test_the_exporters_vectors(case: dict) -> None:
+    """testdata/sdk-settings/exporters.json through the module: what is decided of the exporters found."""
+    found = [settings_pb2.FoundExporter(**f) for f in case["found"]]
+    got = SdkSettings().exporters(found, case.get("env", {}), case.get("default_protocol", ""))
+    assert {
+        "exporters": [{"signal": e.signal, "name": e.name, "gated": e.gated, "destination": e.destination}
+                      for e in got.exporters],
+        "governed": list(got.governed), "ungoverned": list(got.ungoverned), "warnings": list(got.warnings),
+    } == case["want"]
 
 
 START = json.loads((VECTORS / "start.json").read_text(encoding="utf-8"))["cases"]

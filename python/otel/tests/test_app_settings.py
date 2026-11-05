@@ -291,7 +291,7 @@ def test_callbacks_added_and_removed_from_other_threads_while_changes_are_told()
 
 @pytest.mark.parametrize("case", VECTORS["cases"], ids=[c["name"] for c in VECTORS["cases"]])
 def test_the_shared_vectors_reach_the_application_as_the_layer_decides(case):
-    host = pydantic_opamp_otel.sdk_host(["otlp"])
+    host = pydantic_opamp_otel.sdk_host()
     if "host" in case:
         host = settings_pb2.Host(live=case["host"].get("live", []), next_start=case["host"].get("next_start", []))
     d = LAYER.decide(config(case["document"]), policy().encode(), policy().encode(), host)
@@ -413,7 +413,7 @@ def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path)
 
 def test_under_another_configurator_the_application_still_reads_its_settings(tmp_path):
     agent = prepared(tmp_path)
-    agent.host = pydantic_opamp_otel.sdk_host(["otlp"], configured=False)
+    agent.host = pydantic_opamp_otel.sdk_host(configured=False, governed=False)
     # The rate is not this package's to carry out here: a policy that overrides it is refused.
     s = agent.remote_config(config(values({"a": "1"}, head_sampling={"ratio": 0.5})))
     assert s.status == FAILED

@@ -192,10 +192,46 @@ class InventoryTest {
 
   @Test
   void withNoExporterConfiguredTheSdksDefaultOtlpIsListed() {
+    // Where it sends: the SDK's default protocol, gRPC (the agent sets http/protobuf, port 4318).
+    assertEquals(List.of(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("otlp").setGated(true)
+        .setDestination("http://localhost:4317").build()), configured(Map.of()).build().getExportersList());
+    java.util.function.Function<Map<String, String>, String> sendsTo =
+        props -> configured(props).listed().get(0).getDestination();
+    assertEquals("http://localhost:4318/v1/traces", sendsTo.apply(Map.of("otel.exporter.otlp.protocol", "http/protobuf")));
+    // The signal's endpoint before the shared one, whether a variable or a system property gave it.
+    assertEquals("https://a:4318/v1/traces", sendsTo.apply(Map.of("otel.exporter.otlp.endpoint", "https://b",
+        "otel.exporter.otlp.traces.endpoint", "https://a:4318/v1/traces")));
+    assertEquals("https://b", sendsTo.apply(Map.of("otel.exporter.otlp.endpoint", "https://b")));
+    assertEquals("http://localhost:9411/api/v2/spans", sendsTo.apply(Map.of("otel.traces.exporter", "zipkin")));
+    assertEquals("", sendsTo.apply(Map.of("otel.traces.exporter", "console")));
+  }
+
+  @Test
+  void aFailingExportersCallKeepsTheNamesAndThrowsNothing() {
+    Inventory inventory = configured(Map.of());
+    List<SettingsProto.Exporter> before = inventory.listed();
+    assertEquals(1, before.size());
+    // As a trapped core would: reporting only. What was listed keeps its name; what is new since
+    // is listed as found.
+    inventory.layer = () -> {
+      throw new IllegalStateException("the core trapped");
+    };
+    inventory.outside("traces", List.of("Another"));
+    assertEquals(List.of(before.get(0), SettingsProto.Exporter.newBuilder().setSignal("traces").setName("Another")
+        .build()), inventory.listed());
+    // Regression: one listed as found carried its raw endpoint, credentials and all.
+    inventory.exporters("logs", List.of(SettingsProto.FoundExporter.newBuilder().setSignal("logs").setKind("Mine")
+        .setEndpoint("https://user:hunter2@col:4318/v1/logs?token=t").build()));
+    assertEquals("", inventory.listed().stream().filter(e -> e.getName().equals("Mine")).findFirst().orElseThrow()
+        .getDestination());
+  }
+
+  /** An inventory of the traces exporters autoconfigure builds under {@code props}. */
+  private static Inventory configured(Map<String, String> props) {
     Inventory inventory = new Inventory();
     inventory.configured("traces", io.opentelemetry.sdk.autoconfigure.spi.internal.DefaultConfigProperties
-        .createFromMap(Map.of()));
-    assertEquals(List.of(Inventory.exporter("traces", "otlp", true)), inventory.build().getExportersList());
+        .createFromMap(props));
+    return inventory;
   }
 
   @Test
@@ -212,7 +248,7 @@ class InventoryTest {
   }
 
   @Test
-  void underAConfigurationFileEachExporterIsListedOnceByItsNameAndAProcessorOfItsOwnIsUngated() {
+  void underAConfigurationFileEachExporterIsListedByItsNameAndWhereItSendsAndAProcessorOfItsOwnIsUngoverned() {
     Inventory inventory = new Inventory();
     Declarative.wrap(DeclarativeTest.model("""
         file_format: "1.1"
@@ -244,8 +280,10 @@ class InventoryTest {
                   otlp_grpc:
         """), inventory);
     Opamp.AvailableComponents c = Vectors.LAYER.components(inventory.build(), Extension.HOST, Vectors.NOW);
-    assertEquals(Map.of("traces", Map.of("otlp", true, "console", true, "kafka_processor", false),
-        "metrics", Map.of("otlp", true, "prometheus", true), "logs", Map.of("otlp", true)), exporters(c));
+    // OTLP over HTTP and over gRPC send to different ports: two exporters, each by its destination.
+    assertEquals(Map.of("traces", Map.of("otlp@localhost:4318", true, "console", true, "kafka_processor", false),
+        "metrics", Map.of("otlp@localhost:4317", true, "prometheus", true),
+        "logs", Map.of("otlp@localhost:4318", true, "otlp@localhost:4317", true)), exporters(c));
   }
 
   @Test

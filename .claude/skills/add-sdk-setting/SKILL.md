@@ -93,10 +93,14 @@ and testing it.
 ## The host: declare only what you carry out
 
 Each integration passes a `Host{live, next_start}` to the layer. A setting left out is not
-carried out, and its control is left out of `supported_controls`. Declare a signal's settings
-only where every exporter of that signal goes through the integration's gate, and the sampler's
-settings only where the integration's sampler is in force. When the application adds its own
-processor, provider or sampler (`check_truth`'s setups), the integration narrows the host.
+carried out, and its control is left out of `supported_controls`. The policy governs every
+exporter the SDK exports through, so declare the gates' settings always: put the gate in front
+of every exporter the integration can reach, and report one it can't as ungoverned (`gated:
+false` in the inventory, status `ungoverned` in export health), never by declaring less. Decide
+each span or log record once for every exporter it reaches (one rate cap budget per process).
+Declare the sampler's settings only where the integration's sampler is in force: when another
+sampler takes its place, the integration narrows the host. A processor or provider the
+application adds (`check_truth`'s setups) is governed or reported ungoverned, never narrowed.
 
 | Integration | Where the host is built | Carries it out |
 |---|---|---|

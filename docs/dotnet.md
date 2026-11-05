@@ -74,7 +74,7 @@ alone.) Give the agent's status to `Start`, so the first message reports it in f
 | Headers | `Headers`, sent with every request and WebSocket upgrade | |
 | TLS | `Tls = new OpAmpTlsOptions { ... }`: `CaPem`, `IncludeSystemCas`, `ClientCertPem` and `ClientKeyPem`, `MinVersion`, `MaxVersion` | [README](../dotnet/README.md#tls-and-proxies) |
 | Proxy | `Proxy` (a `Uri`), `ProxyResolveLocally`, or `DirectConnection` for none. Without one, the environment's | [README](../dotnet/README.md#tls-and-proxies) |
-| Who speaks HTTP | `Mode = OpAmpMode.Core` (the default) or `OpAmpMode.Platform` (`HttpClient` and `ClientWebSocket`); setting `HttpClient` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
+| Who speaks HTTP | `Mode = OpAmpMode.Core` (the default) or `OpAmpMode.Platform` (`HttpClient` and `ClientWebSocket`; advanced); `HttpClient` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `StateFile`: kept across restarts, for the agent's user alone | [state-file.md](state-file.md) |
 | Instance UID | `InstanceUid` (16 bytes), or null for one the core makes; `RequestInstanceUid` to have the server assign it; `client.InstanceUid` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `Capabilities` (`AgentCapabilities` bits, as a `ulong`). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |

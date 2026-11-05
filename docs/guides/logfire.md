@@ -40,15 +40,14 @@ its sampler in front of the Logfire SDK's head sampling, and its gates in front 
 to Logfire. Without `OTEL_OPAMP_ENDPOINT` (or `endpoint=`), `configure_logfire()` is
 `logfire.configure()`.
 
-Pass `console=False` (or set `LOGFIRE_CONSOLE=false`). The console shows every span and log as
-it is, past the gates, so with it on the server can still sample but a policy that overrides
-`signal_exports`, the log controls, `attribute_redaction` or `scrubbing` is refused. The same
-goes for span processors, log record processors or metric readers given in the arguments, and for
-the OTLP exporters the Logfire SDK adds for `OTEL_EXPORTER_OTLP_*ENDPOINT`.
+The policy governs every destination, not only Logfire: the console, span processors, log record
+processors and metric readers given in the arguments, and the OTLP exporters the Logfire SDK adds
+for `OTEL_EXPORTER_OTLP_*ENDPOINT` all get the same gates. A span the policy drops or redacts is
+dropped or redacted everywhere it would go.
 
 [python-otel.md](../python-otel.md#the-logfire-sdk-configure_logfire) has the whole reference:
 which Logfire SDK versions, what it does differently from `logfire.configure()`, and what is
-set aside when.
+reported when an exporter can't be governed.
 
 ## An OpenTelemetry SDK, exporting to Logfire
 

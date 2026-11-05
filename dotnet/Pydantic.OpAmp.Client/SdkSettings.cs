@@ -95,13 +95,16 @@ public sealed class SdkSettings : IDisposable
     /// <summary>
     /// Export health, from the gates' counts since start: whether to send it now, and the entry for the
     /// agent health's <c>component_health_map["exporters"]</c>. <paramref name="previous"/>: what the
-    /// last call answered (null at the first); <paramref name="settings"/>: those in force.
+    /// last call answered (null at the first); <paramref name="settings"/>: those in force;
+    /// <paramref name="exporters"/>: each as the inventory lists it, reported governed or ungoverned
+    /// under its signal.
     /// </summary>
-    public HealthReport Health(ExportCounts counts, HealthReport? previous, ulong nowUnixMs, Settings? settings = null) =>
-        Do(new Request
-        {
-            Health = new Health { Counts = counts, Previous = previous, NowUnixMs = nowUnixMs, Settings = settings },
-        }).HealthReport;
+    public HealthReport Health(ExportCounts counts, HealthReport? previous, ulong nowUnixMs, Settings? settings = null, IEnumerable<Exporter>? exporters = null)
+    {
+        var health = new Health { Counts = counts, Previous = previous, NowUnixMs = nowUnixMs, Settings = settings };
+        health.Exporters.Add(exporters ?? []);
+        return Do(new Request { Health = health }).HealthReport;
+    }
 
     /// <summary>
     /// The agent description, from the SDK's resource attributes. It also names the policy format the
@@ -124,6 +127,21 @@ public sealed class SdkSettings : IDisposable
     /// </summary>
     public AvailableComponents Components(Inventory inventory, Host? host = null, ulong nowUnixMs = 0) =>
         Do(new Request { Components = new Components { Inventory = inventory, Host = host, NowUnixMs = nowUnixMs } }).AvailableComponents;
+
+    /// <summary>
+    /// What Fleet is told of the exporters an integration found on its SDK's providers, decided the
+    /// same in every language: the name each is listed under, where it sends (its own endpoint, else
+    /// the <c>OTEL_EXPORTER_*</c> variables in <paramref name="env"/>), the governed and ungoverned
+    /// signals, and a warning for each ungoverned exporter. At start and when the providers change.
+    /// </summary>
+    public ExportersDecided Exporters(IEnumerable<FoundExporter> found, IEnumerable<KeyValuePair<string, string>>? env = null,
+        string defaultProtocol = "")
+    {
+        var call = new Exporters { Found = { found }, DefaultProtocol = defaultProtocol };
+        call.Env.AddRange((env ?? []).Where(kv => kv.Key.StartsWith("OTEL_EXPORTER_", StringComparison.Ordinal))
+            .Select(kv => new EnvVar { Name = kv.Key, Value = kv.Value }));
+        return Do(new Request { Exporters = call }).ExportersDecided;
+    }
 
     /// <inheritdoc/>
     public void Dispose()

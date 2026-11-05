@@ -37,9 +37,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * What another agent extension puts into the SDK past the gates (docs/javaagent.md): a processor
- * or reader of its own, or a sampler in place of the extension's. The settings it escapes are set
- * aside, named as unsupported, and never answered as carried out; everything else is carried out
- * as before.
+ * or reader of its own, reported ungoverned while the policy still governs every exporter the agent
+ * built; or a sampler in place of the extension's, whose settings are set aside, named as
+ * unsupported, and never answered as carried out.
  */
 class OutsideTest {
   /**
@@ -76,6 +76,12 @@ class OutsideTest {
 
   static Set<String> live(Extension e) {
     return new TreeSet<>(e.host().getLiveList());
+  }
+
+  /** The exporters the inventory lists ungoverned, as signal/name. */
+  static List<String> ungoverned(Extension e) {
+    return e.inventory.listed().stream().filter(x -> !x.getGated()).map(x -> x.getSignal() + "/" + x.getName())
+        .toList();
   }
 
   private static final String UNSUPPORTED = "this SDK cannot apply the requested override";
@@ -147,11 +153,12 @@ class OutsideTest {
     Extension e = Extension.forTest(null);
     try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> { })) {
       assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      assertEquals(List.of(), ungoverned(e));
     }
   }
 
   @Test
-  void aProcessorOrReaderAnotherExtensionAddsSetsItsSignalsGateAside(@TempDir Path dir) throws Exception {
+  void aProcessorOrReaderAnotherExtensionAddsIsReportedUngoverned(@TempDir Path dir) throws Exception {
     Extension e = Extension.forTest(null);
     InMemorySpanExporter spans = InMemorySpanExporter.create();
     try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> b
@@ -159,47 +166,28 @@ class OutsideTest {
         .addLoggerProviderCustomizer((l, c) -> l.addLogRecordProcessor(
             SimpleLogRecordProcessor.create(InMemoryLogRecordExporter.create())))
         .addMeterProviderCustomizer((m, c) -> m.registerMetricReader(InMemoryMetricReader.create())))) {
-      Set<String> gated = new TreeSet<>();
-      Extension.GATED.values().forEach(gated::addAll);
-      Set<String> declared = live(e);
-      assertTrue(declared.stream().noneMatch(gated::contains), declared.toString());
-      assertTrue(declared.containsAll(List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
-          "debug_until", "debug_sampling_rate")), declared.toString());
-
-      // A policy that overrides a gate's control is refused, naming it, and changes nothing.
-      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(Vectors.every(
-          "head_sampling", Vectors.override("\"ratio\":0.5"), "signal_exports", Vectors.exports("off", "off", ""),
-          "log_levels", Vectors.override("\"level\":\"warn\""))));
-      assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED, s.getStatus());
-      assertEquals("signal_exports.traces: " + UNSUPPORTED, s.getErrorMessage());
-      assertTrue(e.controls.gates.sendTraces());
-      // One that overrides only what the extension still carries out is applied.
-      String sampled = Vectors.v1("head_sampling", Vectors.override("\"ratio\":0.5"));
-      s = e.remoteConfig(ExtensionTest.config(sampled));
+      // Every setting still declared: the policy governs every exporter the agent built.
+      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      String off = Vectors.every("signal_exports", Vectors.exports("off", "off", ""),
+          "log_levels", Vectors.override("\"level\":\"warn\""));
+      Opamp.RemoteConfigStatus s = e.remoteConfig(ExtensionTest.config(off));
       assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, s.getStatus());
-      assertEquals(Vectors.full(sampled), ExtensionTest.effective(e));
-      assertTrue(e.controls.gates.sendTraces());
+      assertEquals(Vectors.full(off), ExtensionTest.effective(e));
+      assertFalse(e.controls.gates.sendTraces());
+      assertFalse(e.controls.gates.sendMetrics());
 
-      // The inventory lists what the other extension added, ungated, beside the configured ones.
+      // The inventory lists what the other extension added, ungoverned, beside the configured ones.
       Map<String, Map<String, Object>> listed = InventoryTest.exporters(
           Vectors.LAYER.components(e.inventory.build(), e.host(), Vectors.NOW));
       assertEquals(Map.of("console", true, "InMemorySpanExporter", false), listed.get("traces"));
       assertEquals(Map.of("console", true, "InMemoryLogRecordExporter", false), listed.get("logs"));
       assertEquals(Map.of("console", true, "InMemoryMetricReader", false), listed.get("metrics"));
-    }
-  }
-
-  @Test
-  void onlyTheSignalsAnotherExtensionsProcessorReachesAreSetAside(@TempDir Path dir) {
-    Extension e = Extension.forTest(null);
-    try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> b.addTracerProviderCustomizer(
-        (t, c) -> t.addSpanProcessor(SimpleSpanProcessor.create(InMemorySpanExporter.create()))))) {
-      Set<String> declared = live(e);
-      assertFalse(declared.contains("send_traces"), declared.toString());
-      // Redaction is at the span and log gates both: one of them escaped is enough.
-      assertFalse(declared.contains("mask_attributes"), declared.toString());
-      assertTrue(declared.containsAll(List.of("send_logs", "send_logs_level", "send_metrics", "sampling_rate")),
-          declared.toString());
+      // And so does export health: a child each, the ungoverned one healthy all the same.
+      Opamp.ComponentHealth traces = e.health(e.controls.counts(), e.inForce(), Vectors.NOW)
+          .getComponentHealthMapMap().get("exporters").getComponentHealthMapMap().get("traces");
+      assertEquals("ungoverned", traces.getComponentHealthMapMap().get("InMemorySpanExporter").getStatus());
+      assertTrue(traces.getComponentHealthMapMap().get("InMemorySpanExporter").getHealthy());
+      assertEquals("governed", traces.getComponentHealthMapMap().get("console").getStatus());
     }
   }
 
@@ -210,7 +198,7 @@ class OutsideTest {
         .addTracerProviderCustomizer((t, c) -> t.addSpanProcessorFirst(new OnStart()))
         .addSpanProcessorCustomizer((p, c) -> new Wrapping(p))
         .addLogRecordProcessorCustomizer((p, c) -> new WrappingLogs(p)))) {
-      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      assertEquals(List.of(), ungoverned(e));
     }
   }
 
@@ -250,26 +238,26 @@ class OutsideTest {
   @Test
   void elasticsSpanLoggerIsLeftAloneWhileNothingCanSwitchItOn(@TempDir Path dir) {
     // EDOT Java adds its span logger to every SDK; without its own OpAMP client, nothing switches
-    // it on, so every setting is still carried out.
+    // it on, so nothing escapes the gates.
     Extension e = Extension.forTest(null);
     try (InventoryTest.Sdk sdk = sdk(e, props(dir), b -> b.addTracerProviderCustomizer((t, c) -> t.addSpanProcessor(
         SimpleSpanProcessor.create(new co.elastic.otel.logging.AgentLog.DebugLogSpanExporter()))))) {
-      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      assertEquals(List.of(), ungoverned(e));
     }
   }
 
   @Test
   void elasticsSpanLoggerIsOutsideWithElasticsCentralConfiguration(@TempDir Path dir) {
     // With EDOT's own OpAMP client, Elastic's central configuration can switch the logger on: the
-    // spans it writes then pass no gate.
+    // spans it writes then pass no gate, and it is listed ungoverned.
     Extension e = Extension.forTest(null);
     Map<String, String> props = props(dir);
     props.put(OpampCustomizerProvider.ELASTIC_OPAMP_ENDPOINT, "http://127.0.0.1:1/v1/opamp");
     try (InventoryTest.Sdk sdk = sdk(e, props, b -> b.addTracerProviderCustomizer((t, c) -> t.addSpanProcessor(
         SimpleSpanProcessor.create(new co.elastic.otel.logging.AgentLog.DebugLogSpanExporter()))))) {
-      Set<String> declared = live(e);
-      assertFalse(declared.contains("send_traces"), declared.toString());
-      assertTrue(declared.contains("send_metrics"), declared.toString());
+      assertEquals(new TreeSet<>(Extension.HOST.getLiveList()), live(e));
+      assertEquals(Map.of("console", true, "DebugLogSpanExporter", false), InventoryTest.exporters(
+          Vectors.LAYER.components(e.inventory.build(), e.host(), Vectors.NOW)).get("traces"));
     }
   }
 

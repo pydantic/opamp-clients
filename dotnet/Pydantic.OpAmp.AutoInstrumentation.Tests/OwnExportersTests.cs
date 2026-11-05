@@ -16,9 +16,9 @@ namespace Pydantic.OpAmp.AutoInstrumentation.Tests;
 
 /// <summary>
 /// Telemetry the plugin's gates don't carry: another plugin's exporters and processors, and the
-/// application's own SDK under <c>OTEL_DOTNET_AUTO_SETUP_SDK=false</c>. The settings they take
-/// from the gates are set aside: a policy that overrides them is refused, and in the policy in
-/// force they are reported local, never answered APPLIED and left undone.
+/// application's own SDK under <c>OTEL_DOTNET_AUTO_SETUP_SDK=false</c>. Each is reported to the
+/// server as ungoverned, in the inventory and export health; the policy still governs every
+/// exporter the gates are in front of, so nothing is set aside.
 /// </summary>
 public class OwnExportersTests
 {
@@ -38,7 +38,7 @@ public class OwnExportersTests
     private static string InForce(Agent agent) => Policy.Overrides(agent.Effective);
 
     /// <summary>An exporter of another plugin's: OTLP, but built by it, not through the plugin's options hook.</summary>
-    private static OtlpExporterOptions OwnOptions() => new() { Endpoint = new Uri("http://127.0.0.1:1/v1/traces"), Protocol = OtlpExportProtocol.HttpProtobuf };
+    private static OtlpExporterOptions OwnOptions() => new() { Endpoint = new Uri("http://127.0.0.1:2/v1/traces"), Protocol = OtlpExportProtocol.HttpProtobuf };
 
     /// <summary>
     /// The tracer provider as automatic instrumentation builds it, the plugin's hooks called on it,
@@ -55,8 +55,13 @@ public class OwnExportersTests
             })
             .Let(agent.WrapSampler).Let(more).Build();
 
+    /// <summary>The exporters the agent last listed, as signal/identity: whether gated.</summary>
+    private static Dictionary<string, bool> Listed(Agent agent) =>
+        agent.Sdk.Components!.Components["exporters"].SubComponentMap.SelectMany(s => s.Value.SubComponentMap.Select(e =>
+            (Key: $"{s.Key}/{e.Key}", Gated: e.Value.Metadata.Single(m => m.Key == "gated").Value.BoolValue))).ToDictionary(e => e.Key, e => e.Gated);
+
     [Fact]
-    public void AnotherPluginsSpanExporterSetsTheTracesGatesSettingsAside()
+    public void AnotherPluginsSpanExporterIsReportedUngoverned()
     {
         var agent = Prepared();
         using var tracing = Tracing(agent, b => b.AddProcessor(new BatchActivityExportProcessor(new OtlpTraceExporter(OwnOptions()))));
@@ -64,17 +69,16 @@ public class OwnExportersTests
         try
         {
             agent.Start([]);
-            var status = agent.RemoteConfig(Config(Policy.Of(
-                ("head_sampling", """{"ratio":0.5}"""), ("signal_exports.traces", """{"enabled":false}"""),
-                ("attribute_redaction", """{"drop":["secret"]}"""))));
-            Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
-            Assert.Equal($"signal_exports.traces: {Unsupported}", status.ErrorMessage);
-            Assert.True(agent.Controls.SendTraces); // not carried out: the other exporter sends
-            // The sampler is the plugin's still.
-            Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.HeadSampling(0.5))).Status);
-            Assert.Equal("""{"head_sampling":{"ratio":0.5}}""", InForce(agent));
-            Assert.All(agent.Sdk.Components!.Components["exporters"].SubComponentMap["traces"].SubComponentMap.Values,
-                e => Assert.False(e.Metadata.Single(m => m.Key == "gated").Value.BoolValue));
+            // The plugin's exporter by where it sends, gated; the other plugin's ungoverned.
+            Assert.Equal(new Dictionary<string, bool> { ["traces/otlp@127.0.0.1:1"] = true, ["traces/otlp@127.0.0.1:2"] = false },
+                Listed(agent).Where(e => e.Key.StartsWith("traces/", StringComparison.Ordinal)).ToDictionary());
+            var policy = Policy.Of(("head_sampling", """{"ratio":0.5}"""), ("signal_exports.traces", """{"enabled":false}"""),
+                ("attribute_redaction", """{"drop":["secret"]}"""));
+            Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(policy)).Status);
+            Assert.False(agent.Controls.SendTraces);
+            Assert.Equal(Policy.Overrides(policy), InForce(agent));
+            var health = agent.Sdk.LastHealth!.Exporters.ComponentHealthMap["traces"].ComponentHealthMap;
+            Assert.Contains(health.Values, h => h.Status == "ungoverned" && h.Healthy);
         }
         finally
         {
@@ -82,9 +86,9 @@ public class OwnExportersTests
         }
     }
 
-    // The plugin's own gated exporter, alone, is no reason: its signal is given, whatever the endpoint's path.
+    // The plugin's own gated exporter, alone, is governed: its signal is given, whatever the endpoint's path.
     [Fact]
-    public void ThePluginsOwnGatedExporterAloneSetsNothingAside()
+    public void ThePluginsOwnGatedExporterAloneIsGoverned()
     {
         var agent = Prepared();
         using var tracing = Tracing(agent, _ => { });
@@ -92,6 +96,7 @@ public class OwnExportersTests
         try
         {
             agent.Start([]);
+            Assert.All(agent.Inventory().Exporters.Where(e => e.Signal == "traces"), e => Assert.True(e.Gated));
             var policy = Policy.Of(("signal_exports.traces", """{"enabled":false}"""), ("attribute_redaction", """{"drop":["secret"]}"""));
             Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(policy)).Status);
             Assert.False(agent.Controls.SendTraces);
@@ -105,10 +110,10 @@ public class OwnExportersTests
 
     // Automatic instrumentation builds a logger provider for each logger factory, once the
     // application creates one: after the agent started, and after a config may be in force. The
-    // plugin's processor in it has the agent check again on its first record, and the overrides the
-    // other processor takes are set aside, reported local.
+    // plugin's processor in it has the agent check again on its first record: the other plugin's
+    // exporter is reported ungoverned, and the policy in force stays.
     [Fact]
-    public async Task AnotherPluginsLogProcessorSetsTheLogsGatesSettingsAsideOnceItsProviderIsBuilt()
+    public async Task AnotherPluginsLogExporterIsReportedUngovernedOnceItsProviderIsBuilt()
     {
         var agent = Prepared();
         try
@@ -117,7 +122,6 @@ public class OwnExportersTests
             var policy = Policy.Of(("signal_exports.logs", """{"enabled":false}"""), ("log_levels", """{"level":"warn"}"""));
             Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(policy)).Status);
             Assert.False(agent.Controls.SendLogs);
-            Assert.Equal(Policy.Overrides(policy), InForce(agent));
 
             var logs = new Own<LogRecord>();
             using (var factory = LoggerFactory.Create(b => b.AddOpenTelemetry(o =>
@@ -128,19 +132,44 @@ public class OwnExportersTests
                    })))
             {
                 factory.CreateLogger("app").LogWarning("one");
-                await Until(() => agent.Controls.SendLogs, "the logs' export set aside");
-                Assert.Equal("{}", InForce(agent));
-                Assert.Equal(0u, agent.Controls.LogsFloor);
-                // And the next policy is decided under that host: refused.
-                var capped = agent.RemoteConfig(Config(Policy.Of(("log_rate_limit", """{"records_per_second":1}"""))));
-                Assert.Equal(RemoteConfigStatuses.Failed, capped.Status);
-                Assert.Equal($"log_rate_limit: records_per_second: {Unsupported}", capped.ErrorMessage);
+                await Until(() => Listed(agent).ContainsKey("logs/Own"), "the other plugin's exporter listed");
+                Assert.False(Listed(agent)["logs/Own"]);
+                Assert.Equal("ungoverned", agent.Sdk.LastHealth!.Exporters.ComponentHealthMap["logs"].ComponentHealthMap["Own"].Status);
+                Assert.False(agent.Controls.SendLogs);
+                Assert.Equal(Policy.Overrides(policy), InForce(agent));
+                var cap = Policy.Of(("log_rate_limit", """{"records_per_second":1}"""));
+                Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(cap)).Status);
             }
+        }
+        finally
+        {
+            agent.Stop(TimeSpan.Zero);
+        }
+    }
 
-            // A provider disposed exports nothing more: the logs gate holds every log record exported again.
-            var cap = Policy.Of(("log_rate_limit", """{"records_per_second":1}"""));
-            Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(cap, "again")).Status);
-            Assert.Equal(Policy.Overrides(cap), InForce(agent));
+    // Regression: another plugin's OTLP log exporter, added before the plugin's own, was taken for
+    // it (both are named otlp), so it was never listed ungoverned. Pairing also needs gated to agree.
+    [Fact]
+    public async Task AnotherPluginsOtlpLogExporterAddedFirstIsStillReportedUngoverned()
+    {
+        var agent = Prepared();
+        try
+        {
+            agent.Start([]);
+            var other = new OtlpExporterOptions { Endpoint = new Uri("http://127.0.0.1:2/v1/logs"), Protocol = OtlpExportProtocol.HttpProtobuf };
+            using (var factory = LoggerFactory.Create(b => b.AddOpenTelemetry(o =>
+                   {
+                       agent.Watch(o);
+                       o.AddProcessor(new BatchLogRecordExportProcessor(new OtlpLogExporter(other))); // another plugin's, first
+                       o.AddOtlpExporter(e => agent.Gate(e, Signal.Logs));
+                   })))
+            {
+                factory.CreateLogger("app").LogWarning("one");
+                await Until(() => Listed(agent).ContainsKey("logs/otlp@127.0.0.1:2"), "the other plugin's exporter listed");
+                var logs = Listed(agent).Where(e => e.Key.StartsWith("logs/", StringComparison.Ordinal)).ToList();
+                Assert.Equal([false, true], logs.Select(e => e.Value).Order());
+                Assert.False(Listed(agent)["logs/otlp@127.0.0.1:2"]);
+            }
         }
         finally
         {
@@ -149,27 +178,25 @@ public class OwnExportersTests
     }
 
     // With OTEL_DOTNET_AUTO_SETUP_SDK=false the application builds its tracer and meter providers
-    // itself: their exporters and sampler aren't the plugin's. The logs still are.
+    // itself: their exporters and sampler aren't the plugin's. Their exporters are reported as one
+    // ungoverned app_provider each; the sampler's settings aren't declared. The logs are the plugin's.
     [Fact]
-    public void WhenTheApplicationSetsUpItsOwnSdkTracesAndMetricsAreSetAside()
+    public void WhenTheApplicationSetsUpItsOwnSdkItsProvidersAreReportedUngoverned()
     {
         var agent = Prepared(new() { ["OTEL_DOTNET_AUTO_SETUP_SDK"] = "false" });
         var host = agent.HostNow(providersBuilt: true);
-        foreach (var key in new[] { "send_traces", "send_metrics", "sampling_rate", "sampling_rules", "sampling_traces_per_second", "drop_attributes", "mask_attributes" })
+        foreach (var key in new[] { "sampling_rate", "sampling_rules", "sampling_traces_per_second" })
         {
             Assert.DoesNotContain(key, host.Live);
         }
 
-        foreach (var key in new[] { "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second" })
+        foreach (var key in new[] { "send_traces", "send_metrics", "drop_attributes", "send_logs", "send_logs_level", "send_logs_per_second" })
         {
             Assert.Contains(key, host.Live);
         }
 
-        Assert.Equal(["logs"], agent.Inventory().Exporters.Select(e => e.Signal).Distinct());
-        // Traces exported nowhere by automatic instrumentation say nothing of the application's own.
-        var none = Prepared(new() { ["OTEL_DOTNET_AUTO_SETUP_SDK"] = "false", ["OTEL_TRACES_EXPORTER"] = "none" });
-        Assert.DoesNotContain("drop_attributes", none.HostNow(providersBuilt: true).Live);
-        Assert.Contains("drop_attributes", Prepared(new() { ["OTEL_TRACES_EXPORTER"] = "none" }).HostNow(providersBuilt: true).Live);
+        Assert.Equal(["logs/otlp:True", "metrics/app_provider:False", "traces/app_provider:False"],
+            agent.Inventory().Exporters.Select(e => $"{e.Signal}/{e.Name}:{e.Gated}").Order(StringComparer.Ordinal));
     }
 
     private static async Task Until(Func<bool> done, string what)

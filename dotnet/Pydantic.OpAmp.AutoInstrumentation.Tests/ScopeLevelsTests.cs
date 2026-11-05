@@ -168,7 +168,7 @@ public class ScopeLevelsTests
     // Declared where the logs gate is: every logs exporter is OTLP. Where it is not, the layer
     // refuses a policy that overrides the scopes, as it refuses one that overrides the level.
     [Fact]
-    public void ThePluginDeclaresItOnlyWhereTheLogsAreGated()
+    public void ThePluginDeclaresItWhateverTheLogsExportersAre()
     {
         var doc = Policy.Of(("log_levels", """{"scopes":{"noisy":"off"}}"""));
         var otlp = Agent.Prepare(n => n == "OTEL_OPAMP_ENDPOINT" ? "http://127.0.0.1:1/v1/opamp" : null, (_, _) => { })!;
@@ -177,17 +177,16 @@ public class ScopeLevelsTests
         Assert.Equal(LogLevels.Off, otlp.Controls.LogLevels.Threshold("noisy"));
         Assert.Equal("""{"log_levels":{"scopes":{"noisy":"off"}}}""", Policy.Overrides(otlp.Effective));
 
+        // A console exporter the gates aren't in front of is reported ungoverned: the levels still
+        // govern every exporter they are.
         var console = Agent.Prepare(n => n switch
         {
             "OTEL_OPAMP_ENDPOINT" => "http://127.0.0.1:1/v1/opamp",
             "OTEL_LOGS_EXPORTER" => "console",
             _ => null,
         }, (_, _) => { })!;
-        Assert.DoesNotContain("send_logs_level_by_scope", console.HostNow(providersBuilt: false).Live);
-        var refused = console.RemoteConfig(Vectors.Config(doc));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("log_levels: scopes: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Equal(0u, console.Controls.LogLevels.Threshold("noisy")); // nothing could hold it
-        Assert.Equal("{}", Policy.Overrides(console.Effective));
+        Assert.Contains("send_logs_level_by_scope", console.HostNow(providersBuilt: false).Live);
+        Assert.Equal(RemoteConfigStatuses.Applied, console.RemoteConfig(Vectors.Config(doc)).Status);
+        Assert.Contains(console.Inventory().Exporters, e => e.Signal == "logs" && e.Name == "console" && !e.Gated);
     }
 }

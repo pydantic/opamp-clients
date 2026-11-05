@@ -53,8 +53,8 @@ type SDK struct {
 
 	agent    *agent
 	shutdown []func(context.Context) error
-	// exporters are those it built, for the inventory.
-	exporters []*settingspb.Exporter
+	// found are the exporters it built, as found, for the layer to decide the inventory's.
+	found []*settingspb.FoundExporter
 }
 
 // Setup builds the SDK and, when OTEL_OPAMP_ENDPOINT or WithEndpoint names a server, joins the
@@ -82,7 +82,6 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 		}
 	}()
 	if srv != nil {
-		srv.metricsUngated = !metricsGated(getenv)
 		controls := NewControls()
 		controls.app = theAppSettings // what AppSetting reads
 		if s.agent, err = newAgent(ctx, srv, controls, getenv("OTEL_RESOURCE_ATTRIBUTES")); err != nil {
@@ -120,7 +119,7 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 	if err := s.metrics(ctx, getenv); err != nil {
 		return nil, err
 	}
-	if err := s.logs(ctx); err != nil {
+	if err := s.logs(ctx, getenv); err != nil {
 		return nil, err
 	}
 	// The globals only once all of it is built: a failed Setup leaves them as they were.
@@ -129,8 +128,9 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 	otel.SetMeterProvider(s.MeterProvider)
 	global.SetLoggerProvider(s.LoggerProvider)
 	if s.agent != nil {
-		s.agent.exporters = s.exporters
+		s.agent.found = s.found
 		s.agent.ours = providers{tracer: s.TracerProvider, meter: s.MeterProvider, logger: s.LoggerProvider}
+		s.agent.decide(ctx)
 		s.agent.start(ctx, s.Resource)
 	}
 	return s, nil
@@ -179,7 +179,7 @@ func (s *SDK) metrics(ctx context.Context, getenv func(string) string) error {
 	opts := []sdkmetric.Option{sdkmetric.WithResource(s.Resource)}
 	if reader != nil {
 		opts = append(opts, sdkmetric.WithReader(reader))
-		// Gated as the host says: an exporter that metricsGated says is not gated leaves send_metrics undeclared.
+		// Gated where Setup built the reader around a gate; autoexport's own reader is reported ungoverned.
 		s.built("metrics", metricsExporter(getenv), s.Controls != nil && metricsGated(getenv))
 	}
 	mp := sdkmetric.NewMeterProvider(opts...)
@@ -200,7 +200,7 @@ func metricsExporter(getenv func(string) string) string {
 }
 
 // metricsGated says whether metricReader builds the metrics reader around a gated exporter, so
-// send_metrics can stop it. Known from the variables alone, before the SDK is built.
+// send_metrics can stop it; else it is reported ungoverned. Known from the variables alone.
 func metricsGated(getenv func(string) string) bool {
 	if strings.TrimSpace(getenv("OTEL_METRICS_PRODUCERS")) != "" {
 		return false
@@ -215,14 +215,11 @@ func metricsGated(getenv func(string) string) bool {
 // metricReader is autoexport's reader for OTEL_METRICS_EXPORTER, with the exporter gated. A
 // reader can't be wrapped outside the SDK, so this builds the push exporters autoexport does
 // (otlp over either protocol, console) the same way, around a gated exporter. Anything else (a
-// pull exporter such as prometheus, or OTEL_METRICS_PRODUCERS) is autoexport's own, and the
-// server can't stop it.
+// pull exporter such as prometheus, or OTEL_METRICS_PRODUCERS) is autoexport's own: the gate
+// can't reach it, so it is reported ungoverned (and warned about, as agent.decide says).
 func (s *SDK) metricReader(ctx context.Context, getenv func(string) string) (sdkmetric.Reader, error) {
 	name := metricsExporter(getenv)
 	if s.Controls == nil || !metricsGated(getenv) {
-		if s.Controls != nil {
-			slog.Warn("opamp: the metrics exporter is autoexport's own: the server can't stop it", "exporter", name)
-		}
 		r, err := autoexport.NewMetricReader(ctx)
 		if err != nil || autoexport.IsNoneMetricReader(r) {
 			return nil, err
@@ -256,7 +253,7 @@ func (s *SDK) metricReader(ctx context.Context, getenv func(string) string) (sdk
 	return sdkmetric.NewPeriodicReader(s.Controls.Metrics(exporter)), nil
 }
 
-func (s *SDK) logs(ctx context.Context) error {
+func (s *SDK) logs(ctx context.Context, getenv func(string) string) error {
 	exporter, err := autoexport.NewLogExporter(ctx)
 	if err != nil {
 		return fmt.Errorf("logs exporter: %w", err)
@@ -278,8 +275,9 @@ func (s *SDK) logs(ctx context.Context) error {
 	return nil
 }
 
-// built keeps an exporter it built for a signal, under the name OTEL_*_EXPORTER gives it, and
-// whether a gate wraps it.
-func (s *SDK) built(signal, name string, gated bool) {
-	s.exporters = append(s.exporters, &settingspb.Exporter{Signal: signal, Name: name, Gated: gated})
+// built keeps an exporter it built for a signal from the variables, as found: under the name
+// OTEL_*_EXPORTER gives it, and whether a gate wraps it. The layer decides its name and, from the
+// OTEL_EXPORTER_* variables, where it sends (agent.decide).
+func (s *SDK) built(signal, kind string, gated bool) {
+	s.found = append(s.found, &settingspb.FoundExporter{Signal: signal, Kind: kind, Gated: gated, FromEnv: true})
 }

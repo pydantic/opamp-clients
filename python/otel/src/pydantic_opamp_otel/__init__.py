@@ -10,8 +10,8 @@ distribution plug in:
   turns the next-start ones into the instrumentation's own switches; gives the instance its UID.
 - ``Configurator`` (``opentelemetry_configurator``): builds the SDK with a sampler and exporters
   the server's settings can change while it runs, and the instance UID as service.instance.id.
-- ``GatedOtlpMetricExporter`` (``opentelemetry_metrics_exporter``): the OTLP metric exporter,
-  stoppable (metrics have no export-processor hook to wrap).
+  Once it is built, ``govern`` puts the gates in front of every exporter on its providers, however
+  it got there; what can't be gated is reported to the server as ungoverned.
 - ``start`` (``_opentelemetry_opamp``, upstream's experimental OpAMP hook): starts the OpAMP
   client once the SDK is built.
 - ``configure``: the same in one call, for an application that sets its SDK up in code rather
@@ -65,7 +65,8 @@ from . import app_settings
 from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
-__all__ = ["Configurator", "Distro", "GatedOtlpMetricExporter", "app_settings", "configure", "configure_logfire", "start"]
+__all__ = ["Configurator", "Distro", "GatedMetricExporter", "app_settings", "configure", "configure_logfire", "govern",
+           "start"]
 
 _log = logging.getLogger(__name__)
 
@@ -622,10 +623,18 @@ class Controls:
         # Last: a callback the application gave sees the SDK's settings already in force.
         self.app.put(s.custom)
 
-    def spans(self, to: SpanExporter, log_spans: bool = False) -> SpanExporter:
+    def spans(self, to: SpanExporter, log_spans: bool = False, redact: bool = True) -> SpanExporter:
         """The trace gate in front of `to`. With `log_spans`, the Logfire SDK's logs (spans whose
-        `logfire.span_type` is `log`) go through the log controls in its place."""
-        return _GatedSpanExporter(to, self, log_spans)
+        `logfire.span_type` is `log`) go through the log controls in its place. `redact=False`
+        leaves redaction to a `redacting` exporter further in, under an exporter that retries:
+        the gate then decides and counts each span once, however often it is retried."""
+        return _GatedSpanExporter(to, self, log_spans, redact)
+
+    def redacting(self, to: SpanExporter) -> SpanExporter:
+        """Redaction and scrubbing alone in front of `to`, for a gate made with `redact=False`:
+        a span a retrying exporter re-sends, or makes (Logfire's body-too-large span), is
+        redacted each time it is sent, and never decided or counted again."""
+        return _RedactingSpanExporter(to, self)
 
     def logs(self, to: LogRecordExporter) -> LogRecordExporter:
         return _GatedLogExporter(to, self)
@@ -673,7 +682,7 @@ def _log_span_kept(span, floor: int | None, levels: tuple[tuple[str, int], ...])
     return level_keeps(floor, number)
 
 
-def _logs_gated(batch, g: Gates, kept) -> list:
+def _logs_gated(batch, g: Gates, kept, gate: object) -> list:
     """send_logs, then the levels (`kept`), then the rate cap: what of `batch` is exported."""
     if not g.send_logs:
         return []
@@ -681,8 +690,8 @@ def _logs_gated(batch, g: Gates, kept) -> list:
     if floor is not None or levels:
         batch = [r for r in batch if kept(r, floor, levels)]
     if cap is not None and batch:
-        # The first records the tokens allow; the rest are dropped from the end.
-        batch = list(batch)[:cap.take(len(batch))]
+        # The first records the tokens allow, each decided once for every exporter it reaches.
+        batch = cap.admitted(list(batch), gate)
     return list(batch)
 
 
@@ -701,18 +710,48 @@ def _export_parts(parts: list[tuple[Counts, int]], export):
     return result
 
 
+def _send(sent: list[bool], export, batch):
+    """Hand `batch` to the exporter, noting in `sent` that what is raised from here on is its own."""
+    sent.append(True)
+    return export(batch)
+
+
+def _gate_failed(parts: list[tuple[Counts, int]], e: Exception) -> None:
+    """An error inside a gate (a value redaction can't walk): the export fails, counted as failed
+    for each signal's items, where the processor would drop it with nothing counted."""
+    why = f"gate: {str(e) or type(e).__name__}"
+    _log.warning("OpAMP: an export was dropped by an error in the policy gate: %s", why)
+    for counts, items in parts:
+        if items:
+            counts.failed(items, why)
+
+
 class _GatedSpanExporter(SpanExporter):
-    def __init__(self, to: SpanExporter, controls: Controls, log_spans: bool = False) -> None:
-        self._to, self._c, self._log_spans = to, controls, log_spans
+    def __init__(self, to: SpanExporter, controls: Controls, log_spans: bool = False, redact: bool = True) -> None:
+        self._to, self._c, self._log_spans, self._redact = to, controls, log_spans, redact
 
     def export(self, spans):
         """send_traces (the log controls, for a Logfire log), then redaction and scrubbing. What
         the gates drop is counted as filtered; a batch left empty isn't exported."""
+        sent: list[bool] = []
+        try:
+            return self._export(spans, sent)
+        except Exception as e:
+            if sent:  # the exporter's own error, counted as it came: raised as before
+                raise
+            try:
+                logs = sum(1 for s in spans if _is_log_span(s)) if self._log_spans else 0
+            except Exception:  # noqa: BLE001 - the error may be the spans' own
+                logs = 0
+            _gate_failed([(self._c.traces, len(spans) - logs), (self._c.logs_counts, logs)], e)
+            return SpanExportResult.FAILURE
+
+    def _export(self, spans, sent: list[bool]):
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         logs = [s for s in spans if _is_log_span(s)] if self._log_spans else []
         traces = [s for s in spans if not _is_log_span(s)] if logs else list(spans)
         if logs:
-            kept = _logs_gated(logs, g, _log_span_kept)
+            kept = _logs_gated(logs, g, _log_span_kept, self)
             c.logs_counts.filtered(len(logs) - len(kept))
             logs = kept
         if not g.send_traces:
@@ -723,9 +762,26 @@ class _GatedSpanExporter(SpanExporter):
         out = [s for s in spans if id(s) in keep] if logs else traces
         if not out:
             return SpanExportResult.SUCCESS
-        if g.redactor:
+        if g.redactor and self._redact:
             out = [_redacted_span(span, g.redactor) for span in out]
-        return _export_parts([(c.traces, len(traces)), (c.logs_counts, len(logs))], lambda: self._to.export(out))
+        return _export_parts([(c.traces, len(traces)), (c.logs_counts, len(logs))], lambda: _send(sent, self._to.export, out))
+
+    def shutdown(self) -> None:
+        self._to.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._to.force_flush(timeout_millis)
+
+
+class _RedactingSpanExporter(SpanExporter):
+    """Controls.redacting: the gates' redaction alone, with the latest document's redactor."""
+
+    def __init__(self, to: SpanExporter, controls: Controls) -> None:
+        self._to, self._c = to, controls
+
+    def export(self, spans):
+        r = self._c.gates.redactor
+        return self._to.export([_redacted_span(span, r) for span in spans] if r else spans)
 
     def shutdown(self) -> None:
         self._to.shutdown()
@@ -742,17 +798,29 @@ class _GatedLogExporter(LogRecordExporter):
         """send_logs, then the levels, then the rate cap, then redaction and scrubbing (of the
         attributes and the body); a batch left empty isn't
         exported. What they drop is counted as filtered."""
+        sent: list[bool] = []
+        try:
+            return self._export(batch, sent)
+        except Exception as e:
+            if sent:  # the exporter's own error, counted as it came: raised as before
+                raise
+            from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
+
+            _gate_failed([(self._c.logs_counts, len(batch))], e)
+            return LogRecordExportResult.FAILURE
+
+    def _export(self, batch, sent: list[bool]):
         c, g = self._c, self._c.gates  # one document's gates for the whole export
         counts, given = c.logs_counts, len(batch)
         if g.send_logs and g.logs_min_severity is None and not g.logs_scope_levels and g.logs_cap is None \
                 and not g.redactor:
-            return _export(counts, given, lambda: self._to.export(batch))
-        batch = _logs_gated(batch, g, _kept)
+            return _export(counts, given, lambda: _send(sent, self._to.export, batch))
+        batch = _logs_gated(batch, g, _kept, self)
         if g.redactor and batch:
             batch = [_redacted_record(r, g.redactor) for r in batch]
         counts.filtered(given - len(batch))
         if batch:
-            return _export(counts, len(batch), lambda: self._to.export(batch))
+            return _export(counts, len(batch), lambda: _send(sent, self._to.export, batch))
         from opentelemetry.sdk._logs.export import LogRecordExportResult  # noqa: PLC0415
 
         return LogRecordExportResult.SUCCESS
@@ -865,19 +933,6 @@ DEBUG = ("debug_until", "debug_sampling_rate", "debug_send_logs_level")
 INSTRUMENTATIONS = ("deactivate_instrumentations", "deactivate_all_instrumentations")
 
 
-def gated_metric_exporters(names: list[str]) -> list[str]:
-    """The metric exporters as the SDK is to build them: the OTLP one in the package's gate (the
-    ``opamp`` exporter, which builds OTLP inside it); metrics have no export-processor hook."""
-    return ["opamp" if n == "otlp" else n for n in names]
-
-
-def _every_metric_exporter_gated(names: list[str]) -> bool:
-    """Whether every metric exporter the SDK builds from `names` goes through the gate (``none``,
-    in any case, is none). One that doesn't (prometheus, console, otlp_proto_http) keeps exporting
-    whatever send_metrics says, so then it isn't carried out at all, rather than by half."""
-    return all(n == "opamp" or not n or n.lower() == "none" for n in gated_metric_exporters(names))
-
-
 def read_if_there(path: Path) -> bytes | None:
     """The file's bytes, or None if there is none."""
     try:
@@ -886,29 +941,22 @@ def read_if_there(path: Path) -> bytes | None:
         return None
 
 
-def sdk_host(metrics_exporters: list[str], configured: bool = True, auto_instrumented: bool = True,
-             config_file: bool = False, span_processors: bool = False,
-             log_processors: bool = False) -> settings_pb2.Host:
-    """What this package carries out, declared from what it builds (docs/sdk-settings.md, "The
-    host"); the layer sets aside every setting not named. Where its Configurator built the SDK
-    (`configured`), the sampler and the trace and log gates are its own, but not a span or log
-    record processor the application passed in (`span_processors`, `log_processors`): that one
-    exports past the gate. send_metrics where every metric exporter (`metrics_exporters`, as
-    named) is gated, unless a declarative configuration file (`config_file`) built them. The
-    instrumentation switches, at the next start, only under opentelemetry-instrument
-    (`auto_instrumented`). The application's own settings (custom)
-    always: the application reads them, whoever built the SDK."""
+def sdk_host(configured: bool = True, auto_instrumented: bool = True, governed: bool = True) -> settings_pb2.Host:
+    """What this package carries out (docs/sdk-settings.md, "The host"); the layer sets aside every
+    setting not named. The sampler is its own only where its Configurator (or configure_logfire)
+    built the SDK (`configured`). The gates are in front of every exporter on the SDK's providers
+    (`governed`: the global providers are the SDK's), however it was built: an exporter or
+    processor past them is reported as ungoverned, never a reason to declare less (contracts'
+    "What a policy governs"). The instrumentation switches, at the next start, only under
+    opentelemetry-instrument (`auto_instrumented`). The application's own settings (custom) always:
+    the application reads them, whoever built the SDK."""
     live: list[str] = [APP_SETTINGS]
     if configured:
-        live += SAMPLER + DEBUG
-        if not span_processors:
-            live += TRACE_GATE
-        if not log_processors:
-            live += LOG_GATE
-        if not span_processors and not log_processors:
-            live += REDACTION
-    if not config_file and _every_metric_exporter_gated(metrics_exporters):
-        live.append("send_metrics")
+        live += SAMPLER
+    if governed:
+        live += TRACE_GATE + LOG_GATE + REDACTION + ("send_metrics",)
+    if configured and governed:
+        live += DEBUG
     return settings_pb2.Host(live=live, next_start=INSTRUMENTATIONS if auto_instrumented else ())
 
 
@@ -920,10 +968,6 @@ def _undeclared(host: settings_pb2.Host) -> list[str]:
 
 #: The package as published, which the inventory names.
 PACKAGE = "pydantic-opamp-otel"
-#: Exporter entry points by the name OTEL_*_EXPORTER gives them in every language: the OTLP ones
-#: by their protocol, and this package's gated OTLP metric exporter, are `otlp`.
-_EXPORTER_NAMES = {"otlp_proto_grpc": "otlp", "otlp_proto_http": "otlp", "opamp": "otlp", "zipkin_json": "zipkin",
-                   "zipkin_proto": "zipkin"}
 
 
 def instrumentations() -> list[settings_pb2.Instrumentation]:
@@ -946,10 +990,11 @@ def instrumentations() -> list[settings_pb2.Instrumentation]:
     return out
 
 
-def _exporter_name(signal: str, kind: type) -> str:
-    """An exporter's (or a metric reader's) name: its entry point's, as OTEL_*_EXPORTER names it,
-    or else its type's. Only entry points whose module is loaded are looked at: one that isn't
-    can't be this one, and nothing is imported to find out."""
+def _exporter_kind(signal: str, kind: type) -> str:
+    """What an exporter (or a metric reader) is known as, for the core to name it: its entry
+    point's name, as OTEL_*_EXPORTER gives it, for that exporter or one it subclasses (the Logfire
+    SDK's OTLP exporters are `otlp_proto_http`); else its type's. Only entry points whose module is
+    loaded are looked at: one that isn't can't be this one, and nothing is imported to find out."""
     from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
 
     names = []
@@ -960,81 +1005,222 @@ def _exporter_name(signal: str, kind: type) -> str:
             continue
         for part in attr.strip().split("."):
             found = getattr(found, part, None)
-        if found is kind:
-            names.append(_EXPORTER_NAMES.get(ep.name, ep.name))
+        if isinstance(found, type) and issubclass(kind, found):
+            names.append(ep.name)
     return min(names) if names else kind.__name__
 
 
-def _processors_exporter(processor):
-    """The exporter a span or log record processor exports to (the SDK's batch and simple ones),
-    or None: a processor that isn't an export processor, or one whose exporter it can't see."""
-    batch = getattr(processor, "_batch_processor", None)
-    for holder, attr in ((batch, "_exporter"), (processor, "span_exporter"), (processor, "_exporter")):
-        exporter = getattr(holder, attr, None) if holder is not None else None
-        if exporter is not None:
-            return exporter
-    return None
+#: Where an exporter that wraps another keeps it: the Logfire SDK's wrappers (`wrapped_exporter`,
+#: `exporter`), its console log exporter (`span_exporter`), and this package's gates (`_to`).
+_WRAPPED = ("_to", "wrapped_exporter", "exporter", "span_exporter", "_exporter")
+#: The deepest a chain of processors or wrapped exporters is followed.
+_DEEPEST = 16
 
 
-def exporters(tracer_provider, meter_provider, logger_provider) -> list[settings_pb2.Exporter]:
-    """The exporters the SDK was built with, read off its providers once it is built, each with
-    whether the package's send_* gate wraps it: the trace and log exporters its configurator put
-    behind its export processors, and its OTLP metric exporter. Everything else (a span processor
-    given to configure(), a declarative configuration file's exporters, a Prometheus reader) is
-    ungated, as the host says (sdk_host). A provider that isn't the SDK's has none."""
-    out = []
-    multi = getattr(tracer_provider, "_active_span_processor", None)
-    for p in getattr(multi, "_span_processors", ()):
-        e = _processors_exporter(p)
-        if e is not None:
-            gated = isinstance(e, _GatedSpanExporter)
-            inner = e._to if gated else e  # noqa: SLF001
-            out.append(settings_pb2.Exporter(signal="traces", name=_exporter_name("traces", type(inner)), gated=gated))
-    for reader in getattr(meter_provider, "_metric_readers", ()):
-        # A push exporter is under a periodic reader; a pull one (Prometheus) is the reader itself.
-        inner = getattr(reader, "_exporter", None)
-        inner = reader if inner is None else inner
-        out.append(settings_pb2.Exporter(signal="metrics", name=_exporter_name("metrics", type(inner)),
-                                         gated=isinstance(inner, GatedOtlpMetricExporter)))
-    multi = getattr(logger_provider, "_multi_log_record_processor", None)
-    for p in getattr(multi, "_log_record_processors", ()):
-        e = _processors_exporter(p)
-        if e is not None:
-            gated = isinstance(e, _GatedLogExporter)
-            inner = e._to if gated else e  # noqa: SLF001
-            out.append(settings_pb2.Exporter(signal="logs", name=_exporter_name("logs", type(inner)), gated=gated))
+def _chain(exporter) -> list:
+    """`exporter` and the exporters it wraps, outermost first."""
+    out: list = []
+    while exporter is not None and len(out) < _DEEPEST and all(exporter is not x for x in out):
+        out.append(exporter)
+        exporter = next((w for a in _WRAPPED if (w := getattr(exporter, a, None)) is not None
+                         and isinstance(w, (SpanExporter, LogRecordExporter, MetricExporter))), None)
     return out
 
 
-def inventory(host: settings_pb2.Host | None = None, tracer_provider=None, meter_provider=None,
-              logger_provider=None, listed: list[tuple[str, str]] | None = None) -> settings_pb2.Inventory:
-    """What the package lists of itself and the SDK it runs (docs/available-components.md): the
-    global providers unless others are given. Under `host`, a signal whose send_* setting it
-    can't carry out has no gated exporter: the OTLP metric exporter beside one the package can't
-    stop is gated, but send_metrics is not declared, so nothing reaches it. `listed`: the gated
-    exporters (signal, name) built outside the providers' reach (configure_logfire's), in place of
-    reading them off the providers."""
+def _gated(exporter) -> bool:
+    """Whether one of this package's gates is in `exporter`'s chain (configure_logfire puts its
+    own under the Logfire SDK's retry wrappers)."""
+    return any(isinstance(e, (_GatedSpanExporter, _GatedLogExporter, GatedMetricExporter)) for e in _chain(exporter))
+
+
+def _endpoint(exporter) -> str:
+    """Where `exporter` sends, as it holds it (an OTLP exporter's endpoint, which the SDK resolved
+    from the OTEL_* variables when built from them); "" if not known."""
+    for e in _chain(exporter):
+        endpoint = getattr(e, "_endpoint", None)
+        if isinstance(endpoint, str) and endpoint:
+            return endpoint
+    return ""
+
+
+def _found(signal: str, exporter, gated: bool) -> settings_pb2.FoundExporter:
+    """An exporter as found, for the core to decide its name and destination: known by the
+    innermost exporter in its chain."""
+    inner = [e for e in _chain(exporter) if not isinstance(e, (_GatedSpanExporter, _GatedLogExporter,
+                                                                GatedMetricExporter))]
+    kind = type(inner[-1] if inner else exporter)
+    return settings_pb2.FoundExporter(signal=signal, kind=_exporter_kind(signal, kind), gated=gated,
+                                      endpoint=_endpoint(exporter))
+
+
+class Governed:
+    """What `govern` found on the providers: each exporter (governed or not) as found, and once
+    `decide`d, as the inventory lists them with the core's warnings; and whether the providers were
+    the SDK's at all."""
+
+    def __init__(self) -> None:
+        self.found: list[settings_pb2.FoundExporter] = []
+        self.exporters: list[settings_pb2.Exporter] = []
+        self.warnings: list[str] = []
+        self.sdk = {"traces": False, "metrics": False, "logs": False}
+        self._seen: set[int] = set()
+
+    def decide(self, layer: SdkSettings, env: Mapping[str, str], listed_as: dict[bytes, settings_pb2.Exporter]
+               | None = None) -> Governed:
+        """What the core decides of the exporters found (`SdkSettings.exporters`): the same names,
+        destinations and warnings as every other SDK's. The OTEL_* variables in `env` are read.
+        Reporting only: should the call fail, nothing is raised, and each exporter keeps the name
+        `listed_as` holds from an earlier decision (kept up to date here), a new one listed as found."""
+        listed_as = {} if listed_as is None else listed_as
+        keys = [f.SerializeToString(deterministic=True) for f in self.found]
+        try:
+            decided = layer.exporters(self.found, dict(env), "grpc")
+        except Exception:  # noqa: BLE001 - the gates are in place; only the report is missing
+            _log.warning("OpAMP: can't list the exporters; they are governed all the same", exc_info=True)
+            # Listed as found: its kind, and no destination (only the core strips an endpoint's
+            # credentials and path).
+            self.exporters = [listed_as.get(k) or settings_pb2.Exporter(signal=f.signal, name=f.kind, gated=f.gated)
+                              for k, f in zip(keys, self.found)]
+            return self
+        self.exporters, self.warnings = list(decided.exporters), list(decided.warnings)
+        if len(self.exporters) == len(keys):
+            listed_as.update(zip(keys, self.exporters))
+        return self
+
+    def first_time(self, o) -> bool:
+        if id(o) in self._seen:
+            return False
+        self._seen.add(id(o))
+        return True
+
+
+def _sdk_provider(provider):
+    """The SDK's provider behind `provider` (the Logfire SDK's proxies hold it as `provider`)."""
+    for _ in range(_DEEPEST):
+        inner = getattr(provider, "provider", None)
+        if inner is None or inner is provider:
+            break
+        provider = inner
+    return provider
+
+
+def _govern_spans(p, controls: Controls, log_spans: bool, found: Governed, depth: int = 0) -> None:
+    """Put the trace gate in front of the exporter of every SDK export processor under `p`, in
+    place; list each exporter, and each one held by a processor this package can't wrap
+    (ungoverned). A processor that holds no exporter is the application's logic: left alone."""
+    from opentelemetry.sdk.trace import SpanProcessor  # noqa: PLC0415
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor  # noqa: PLC0415
+
+    if depth > _DEEPEST or not found.first_time(p):
+        return
+    wrap = lambda e: e if _gated(e) else controls.spans(e, log_spans)  # noqa: E731
+    if isinstance(p, SimpleSpanProcessor):
+        p.span_exporter = wrap(p.span_exporter)
+        found.found.append(_found("traces", p.span_exporter, True))
+    elif isinstance(p, BatchSpanProcessor) and getattr(getattr(p, "_batch_processor", None), "_exporter", None):
+        p._batch_processor._exporter = wrap(p._batch_processor._exporter)  # noqa: SLF001
+        found.found.append(_found("traces", p._batch_processor._exporter, True))  # noqa: SLF001
+    elif (children := getattr(p, "_span_processors", None)) is not None:
+        for child in children:
+            _govern_spans(child, controls, log_spans, found, depth + 1)
+    elif isinstance(child := getattr(p, "processor", None), SpanProcessor):
+        _govern_spans(child, controls, log_spans, found, depth + 1)
+    else:
+        for held in vars(p).values() if hasattr(p, "__dict__") else ():
+            if isinstance(held, SpanExporter):
+                found.found.append(_found("traces", held, _gated(held)))
+
+
+def _govern_logs(p, controls: Controls, found: Governed, depth: int = 0) -> None:
+    """_govern_spans for log record processors and the log gate."""
+    from opentelemetry.sdk._logs import LogRecordProcessor  # noqa: PLC0415
+    from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor  # noqa: PLC0415
+
+    if depth > _DEEPEST or not found.first_time(p):
+        return
+    wrap = lambda e: e if _gated(e) else controls.logs(e)  # noqa: E731
+    if isinstance(p, SimpleLogRecordProcessor) and getattr(p, "_exporter", None) is not None:
+        p._exporter = wrap(p._exporter)  # noqa: SLF001
+        found.found.append(_found("logs", p._exporter, True))  # noqa: SLF001
+    elif isinstance(p, BatchLogRecordProcessor) and getattr(getattr(p, "_batch_processor", None), "_exporter", None):
+        p._batch_processor._exporter = wrap(p._batch_processor._exporter)  # noqa: SLF001
+        found.found.append(_found("logs", p._batch_processor._exporter, True))  # noqa: SLF001
+    elif (children := getattr(p, "_log_record_processors", None)) is not None:
+        for child in children:
+            _govern_logs(child, controls, found, depth + 1)
+    elif isinstance(child := getattr(p, "processor", None), LogRecordProcessor):
+        _govern_logs(child, controls, found, depth + 1)
+    else:
+        for held in vars(p).values() if hasattr(p, "__dict__") else ():
+            if isinstance(held, LogRecordExporter):
+                found.found.append(_found("logs", held, _gated(held)))
+
+
+def _govern_readers(provider, found: Governed) -> None:
+    """The metric gate in front of every push exporter's periodic reader; a reader that pulls
+    (Prometheus) can't be gated: listed ungoverned."""
+    from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader  # noqa: PLC0415
+
+    for reader in getattr(provider, "_metric_readers", ()):
+        if not found.first_time(reader):
+            continue
+        exporter = getattr(reader, "_exporter", None)
+        if isinstance(reader, PeriodicExportingMetricReader) and isinstance(exporter, MetricExporter):
+            if not _gated(exporter):
+                reader._exporter = exporter = GatedMetricExporter(exporter)  # noqa: SLF001
+            found.found.append(_found("metrics", exporter, True))
+        else:
+            found.found.append(settings_pb2.FoundExporter(signal="metrics", kind=_exporter_kind("metrics", type(reader))))
+
+
+def govern(controls: Controls, tracer_provider=None, meter_provider=None, logger_provider=None,
+           log_spans: bool = False, layer: SdkSettings | None = None,
+           env: Mapping[str, str] | None = None, listed_as: dict[bytes, settings_pb2.Exporter] | None = None) -> Governed:
+    """Put the gates in front of every exporter the SDK's providers export through (the global
+    ones unless others are given), however the SDK was built: its exporters, a processor passed
+    to the configurator, a declarative configuration file's, the Logfire SDK's console and the
+    OTLP exporters it adds. Idempotent: an exporter already gated is left as it is. What can't be
+    gated is listed ungoverned, for the inventory and export health; the core names each and says
+    where it sends (`layer`, `env`: the process's by default; `listed_as`: see `Governed.decide`). `log_spans`: the Logfire SDK's
+    logs are spans, which its span exporters see; they go through the log controls."""
+    from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
+    from opentelemetry.sdk._logs import LoggerProvider  # noqa: PLC0415
+    from opentelemetry.sdk.metrics import MeterProvider  # noqa: PLC0415
+    from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
+
+    found = Governed()
+    tracers = [p for p in (tracer_provider or trace.get_tracer_provider(),) if p is not None]
+    for p in tracers + [_sdk_provider(p) for p in tracers]:
+        if isinstance(p, TracerProvider):
+            found.sdk["traces"] = True
+            _govern_spans(p._active_span_processor, controls, log_spans, found)  # noqa: SLF001
+    meter = _sdk_provider(meter_provider or metrics.get_meter_provider())
+    if isinstance(meter, MeterProvider):
+        found.sdk["metrics"] = True
+        _govern_readers(meter, found)
+    loggers = [p for p in (logger_provider or _logs.get_logger_provider(),) if p is not None]
+    for p in loggers + [_sdk_provider(p) for p in loggers]:
+        multi = getattr(p, "_multi_log_record_processor", None)
+        if multi is not None:
+            found.sdk["logs"] = found.sdk["logs"] or isinstance(p, LoggerProvider) or p is not _sdk_provider(p)
+            _govern_logs(multi, controls, found)
+    return found.decide(layer or SdkSettings(), os.environ if env is None else env, listed_as)
+
+
+def inventory(exporters: list[settings_pb2.Exporter]) -> settings_pb2.Inventory:
+    """What the package lists of itself and the SDK it runs (docs/available-components.md), with
+    `exporters` as `govern` found them."""
     from importlib.metadata import PackageNotFoundError, version  # noqa: PLC0415
 
-    from opentelemetry import _logs, metrics, trace  # noqa: PLC0415
     from opentelemetry.sdk.version import __version__ as sdk_version  # noqa: PLC0415
 
     try:
         own = version(PACKAGE)
     except PackageNotFoundError:
         own = ""
-    if listed is not None:
-        built = [settings_pb2.Exporter(signal=signal, name=name, gated=True) for signal, name in listed]
-    else:
-        built = exporters(tracer_provider or trace.get_tracer_provider(), meter_provider or metrics.get_meter_provider(),
-                          logger_provider or _logs.get_logger_provider())
-    if host is not None:
-        carried = {*host.live, *host.next_start}
-        for e in built:
-            e.gated = e.gated and f"send_{e.signal}" in carried
     return settings_pb2.Inventory(
         integration=PACKAGE, integration_version=own, sdk_language="python", sdk_version=sdk_version,
-        instrumentations=instrumentations(), exporters=built)
+        instrumentations=instrumentations(), exporters=exporters)
 
 
 class Agent:
@@ -1049,17 +1235,18 @@ class Agent:
         self.current = b"{}"
         self.effective = opamp_pb2.EffectiveConfig()
         self.uid: uuid.UUID | None = None
-        #: The package's Configurator built the SDK, so the sampler and exporters are its own.
+        #: The package's Configurator (or configure_logfire) built the SDK, so the sampler is its own.
         self.configured = False
-        #: What the Configurator was given besides: span and log record processors of the
-        #: application's own (which export past the gates), and metric exporters by name.
-        self.span_processors = False
-        self.log_processors = False
-        self.extra_metric_exporters: list[str] = []
-        #: The gated exporters configure_logfire built, for the inventory (None: read off the providers).
-        self.listed_exporters: list[tuple[str, str]] | None = None
-        #: configure_logfire built the SDK (the Logfire SDK's own), for what the warnings say.
+        #: configure_logfire built the SDK: its logs are spans, which go through the log controls.
         self.logfire = False
+        #: Every exporter on the SDK's providers, governed or not, as govern found them last.
+        self.exporters: list[settings_pb2.Exporter] = []
+        #: The exporters as found, which the core decides `exporters` from.
+        self.found: list[settings_pb2.FoundExporter] = []
+        #: Each exporter as the core last listed it, by what was found (`Governed.decide`).
+        self._listed_as: dict[bytes, settings_pb2.Exporter] = {}
+        #: The warnings said: a processor added later doesn't say them again.
+        self._warned: set[str] = set()
         self.client: Client | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         # Reentrant: a decision under it re-arms the timer, which takes it too.
@@ -1081,7 +1268,6 @@ class Agent:
         self._started_ns = time.time_ns()
         self._saved: bytes | None = None
         self._core_state: bytes | None = None
-        self._metric_exporters: list[str] = []
         self._auto_instrumented = True
         self._hooked = False
         self._inherited: tuple = ()
@@ -1108,10 +1294,9 @@ class Agent:
         if self.setup is None:
             return
         self.layer = SdkSettings()
-        names = [n.strip() for n in env.get("OTEL_METRICS_EXPORTER", "otlp").split(",")]
-        self._metric_exporters = names
         self._auto_instrumented = auto_instrumented
-        self.host = sdk_host(names, auto_instrumented=auto_instrumented)
+        # Until the SDK is built, as if this package built it; start() says what it found.
+        self.host = sdk_host(auto_instrumented=auto_instrumented)
         saved = core_state = None
         if self.setup.state_dir is not None:
             try:
@@ -1135,7 +1320,6 @@ class Agent:
         disabled = disabled_instrumentations(self.loaded.settings, env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", ""))
         if disabled is not None:
             env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] = disabled
-        env["OTEL_METRICS_EXPORTER"] = ",".join(gated_metric_exporters(names))
         # The UID reaches the SDK through the Configurator, not the environment: a child process
         # inherits the environment, and would join the fleet as this instance.
         self.uid = self._identity(env)
@@ -1179,27 +1363,26 @@ class Agent:
         """Once the SDK is built: join the fleet, on a thread of the client's own."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
             return
-        # What was built is known now: the settings it cannot carry out are declared no more, so
-        # a policy that overrides one is refused. The settings loaded at start are loaded again,
-        # under the host as built.
-        config_file = bool(os.environ.get("OTEL_CONFIG_FILE"))
-        built = self._built_host()
+        # What was built is known now: the gates go in front of every exporter on its providers,
+        # what can't be gated is reported (never refused), and the host is what this package can
+        # carry out of it. The settings loaded at start are loaded again, under the host as built.
+        found = govern(self.controls, log_spans=self.logfire, layer=self.layer, listed_as=self._listed_as)
+        self.found, self.exporters = found.found, found.exporters
+        self._warn(found.warnings)
+        built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
+                         governed=any(found.sdk.values()))
         if built != self.host:
             self.host = built
             lost = ", ".join(_undeclared(built))
-            if config_file:
-                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler and "
-                             "exporters aren't this package's: %s can't be carried out", lost)
-            elif not self.configured:
+            if not any(found.sdk.values()):
+                _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
+                             "export passes this package's gates: %s can't be carried out", lost)
+            elif os.environ.get("OTEL_CONFIG_FILE"):
+                _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
+                             "package's: %s can't be carried out", lost)
+            else:
                 _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
                              "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
-            elif self.logfire:
-                _log.warning("OpAMP: the Logfire SDK's console, or a processor, metric reader or OTLP exporter "
-                             "it was given, exports past this package's gates: %s can't be carried out "
-                             "(console=False keeps the console out)", lost)
-            else:
-                _log.warning("OpAMP: the processors or metric exporters passed to the configurator export "
-                             "past this package's gates: %s can't be carried out", lost)
             self.loaded = self.layer.load(self._saved, self.host, self.wall_ms(), core_state=self._core_state)
             self.current = self.loaded.current
             self.effective = self.loaded.effective
@@ -1259,37 +1442,30 @@ class Agent:
             if hasattr(os, "register_at_fork"):
                 os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
 
-    def _built_host(self) -> settings_pb2.Host:
-        """What the package carries out of the SDK as built (sdk_host), as it knows it now."""
-        return sdk_host(self._metric_exporters + self.extra_metric_exporters, configured=self.configured,
-                        auto_instrumented=self._auto_instrumented,
-                        config_file=bool(os.environ.get("OTEL_CONFIG_FILE")),
-                        span_processors=self.span_processors, log_processors=self.log_processors)
+    def _warn(self, warnings: list[str]) -> None:
+        """Say, once each, what exports past the gates (the core's words): the policy is in force on
+        everything else, and the server is told (inventory and export health)."""
+        for warning in warnings:
+            if warning not in self._warned:
+                self._warned.add(warning)
+                _log.warning("OpAMP: %s", warning)
 
-    def processor_added(self, signal: str) -> None:
-        """The application added a span (`signal` "traces") or log record ("logs") processor to
-        the SDK once it was built: it exports past the gate, as one passed to the configurator
-        does. The gate's settings are declared no more, and what is in force is decided again and
-        reported, so the settings it can't carry out are named as set aside from now on rather
-        than left answered as done."""
+    def processor_added(self, processor, signal: str) -> None:
+        """The application is adding a span (`signal` "traces") or log record ("logs") processor
+        to the SDK once it was built: its exporter gets the gate, as every other does. One the
+        package can't gate is reported as ungoverned; nothing is refused or set aside."""
         with self._lock:
+            found = Governed()
             if signal == "traces":
-                if self.span_processors:
-                    return
-                self.span_processors = True
+                _govern_spans(processor, self.controls, self.logfire, found)
             else:
-                if self.log_processors:
-                    return
-                self.log_processors = True
-            built = self._built_host()
-            if built == self.host or self.layer is None:
+                _govern_logs(processor, self.controls, found)
+            if not found.found:
                 return
-            lost = [k for k in _undeclared(built) if k not in _undeclared(self.host)]
-            self.host = built
-            _log.warning("OpAMP: a %s processor added to the SDK once it was built exports past this package's "
-                         "gate: %s can't be carried out", "span" if signal == "traces" else "log record",
-                         ", ".join(lost))
-            self._refresh()
+            found.found[:0] = self.found
+            found.decide(self.layer, os.environ, self._listed_as)
+            self.found, self.exporters = found.found, found.exporters
+            self._warn(found.warnings)
             if self.client is not None and self.components is not None:
                 components = self._components()
                 if components is not None:
@@ -1297,12 +1473,11 @@ class Agent:
 
     def _components(self) -> opamp_pb2.AvailableComponents | None:
         """The inventory, once the SDK is built, as the available components: under the same host
-        and clock as the decisions. Nothing the package lists changes while it runs (the host is
-        settled by now), so it is sent once; None, unreported, should it fail."""
+        and clock as the decisions. Sent at start, and again when a processor added later changes
+        the exporters; None, unreported, should it fail."""
         assert self.layer is not None
         try:
-            self.components = self.layer.components(inventory(self.host, listed=self.listed_exporters), self.host,
-                                                     self.wall_ms())
+            self.components = self.layer.components(inventory(self.exporters), self.host, self.wall_ms())
         except Exception:  # noqa: BLE001 - reporting: the instance is managed without it
             _log.warning("OpAMP: can't list what this SDK runs", exc_info=True)
             self.components = None
@@ -1368,7 +1543,8 @@ class Agent:
         HEALTH_INTERVAL seconds. It says whether to send it: at once on a change of health or
         status, at most a minute apart while only the counters move."""
         assert self.layer is not None
-        report = self.layer.health(self.controls.counts(), self._health, self.wall_ms(), self._applied)
+        report = self.layer.health(self.controls.counts(), self._health, self.wall_ms(), self._applied,
+                                   self.exporters)
         self._health = report
         self._health_next = self.monotonic() + HEALTH_INTERVAL
         return report
@@ -1663,17 +1839,12 @@ class Configurator(_OTelSDKConfigurator):
             logs = kwargs.get("export_log_record_processor") or BatchLogRecordProcessor
             kwargs["export_log_record_processor"] = lambda exporter: logs(AGENT.controls.logs(exporter))
             kwargs["resource_attributes"] = {**(kwargs.get("resource_attributes") or {}), _INSTANCE_ID: str(AGENT.uid)}
-            # Metric exporters named in code go through the gate as the variable's do; processors
-            # passed in export past the gates, which the host then declares (sdk_host).
-            if kwargs.get("metric_exporter_names"):
-                kwargs["metric_exporter_names"] = gated_metric_exporters(list(kwargs["metric_exporter_names"]))
-            AGENT.extra_metric_exporters = list(kwargs.get("metric_exporter_names") or [])
-            AGENT.span_processors = bool(kwargs.get("span_processors"))
-            AGENT.log_processors = bool(kwargs.get("log_record_processors"))
-            # With a declarative configuration file (newer SDKs) the SDK ignores all of the above.
+            # Processors and metric exporters passed in get their gates once the SDK is built
+            # (govern, at start), as every exporter does. With a declarative configuration file
+            # (newer SDKs) the SDK ignores all of the above, the sampler included.
             AGENT.configured = not os.environ.get("OTEL_CONFIG_FILE")
         super()._configure(**kwargs)
-        if AGENT.on and AGENT.configured:
+        if AGENT.on:
             _watch_processors()
         if AGENT.on and not AGENT.configured:
             # The file's SDK skips upstream's OpAMP hook (start): join the fleet from here, with
@@ -1686,7 +1857,8 @@ class Configurator(_OTelSDKConfigurator):
 
 def _watch_processors() -> None:
     """Once the configurator has built the SDK: a span or log record processor the application
-    adds to its providers from then on is told to the agent (Agent.processor_added), then added."""
+    adds to its providers from then on is told to the agent first (Agent.processor_added), which
+    puts the gate in front of its exporter, then added."""
     from opentelemetry import _logs, trace  # noqa: PLC0415
     from opentelemetry.sdk._logs import LoggerProvider  # noqa: PLC0415
     from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
@@ -1695,7 +1867,10 @@ def _watch_processors() -> None:
         add = getattr(provider, method)
 
         def added(*args, **kwargs):
-            AGENT.processor_added(signal)
+            # Given by position or by its name (span_processor, log_record_processor).
+            processor = args[0] if args else next(iter(kwargs.values()), None)
+            if processor is not None:
+                AGENT.processor_added(processor, signal)
             return add(*args, **kwargs)
 
         setattr(provider, method, added)
@@ -1708,19 +1883,15 @@ def _watch_processors() -> None:
         watched(logger_provider, "add_log_record_processor", "logs")
 
 
-class GatedOtlpMetricExporter(MetricExporter):
-    """The OTLP metric exporter the protocol variables choose (as ``otlp`` would), or nothing
-    while the server says not to send metrics."""
+class GatedMetricExporter(MetricExporter):
+    """A metric exporter, or nothing while the server says not to send metrics: govern puts one in
+    front of every periodic reader's exporter (metrics have no export processor to wrap)."""
 
-    def __init__(self, **kwargs) -> None:
-        from opentelemetry.sdk._configuration import _get_exporter_entry_point  # noqa: PLC0415
-        from opentelemetry.util._importlib_metadata import entry_points  # noqa: PLC0415
-
-        name = _get_exporter_entry_point("otlp", "metrics")
-        (ep,) = entry_points(group="opentelemetry_metrics_exporter", name=name)
-        self._to: MetricExporter = ep.load()(**kwargs)
-        super().__init__(preferred_temporality=self._to._preferred_temporality,  # noqa: SLF001
-                         preferred_aggregation=self._to._preferred_aggregation)  # noqa: SLF001
+    def __init__(self, to: MetricExporter) -> None:
+        self._to = to
+        # The reader asks the exporter it holds; an exporter not built on MetricExporter may have none.
+        super().__init__(preferred_temporality=getattr(to, "_preferred_temporality", None),
+                         preferred_aggregation=getattr(to, "_preferred_aggregation", None))
 
     def export(self, metrics_data, timeout_millis: float = 10_000, **kwargs) -> MetricExportResult:
         counts, points = AGENT.controls.metrics, _points(metrics_data)

@@ -132,9 +132,9 @@ final class Declarative {
   /**
    * Last, so the controls wrap what every other customizer configured: the sampler, and every
    * exporter of the span and log processors and metric readers the model names, each in an
-   * {@code opamp} component, and listed in {@code inventory}. A processor or reader of another kind
-   * (a component of its own) isn't reached, so its signal's settings aren't declared ({@link
-   * #ungated}): it is listed by its name, ungated.
+   * {@code opamp} component, and listed in {@code inventory}. A span or log processor of another
+   * kind (a component of its own) isn't reached: it is listed by its name, ungoverned, and the
+   * policy still governs every other exporter.
    */
   static OpenTelemetryConfigurationModel wrap(OpenTelemetryConfigurationModel m, Inventory inventory) {
     if (m.getTracerProvider() != null) {
@@ -144,7 +144,7 @@ final class Declarative {
         inner(sampler).forEach(live::withAdditionalProperty);
       }
       m.getTracerProvider().withSampler(new SamplerModel().withAdditionalProperty(NAME, live));
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (SpanProcessorModel p : list(m.getTracerProvider().getProcessors())) {
         if (p.getBatch() != null) {
           p.getBatch().withExporter(spans(p.getBatch().getExporter(), built));
@@ -152,30 +152,30 @@ final class Declarative {
         if (p.getSimple() != null) {
           p.getSimple().withExporter(spans(p.getSimple().getExporter(), built));
         }
-        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.exporter("traces", k, false)));
+        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.found("traces", k, false, "")));
       }
       inventory.exporters("traces", built);
     }
     if (m.getMeterProvider() != null) {
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (MetricReaderModel r : list(m.getMeterProvider().getReaders())) {
         if (r.getPeriodic() != null && r.getPeriodic().getExporter() != null) {
           PushMetricExporterPropertyModel gated = new PushMetricExporterPropertyModel();
           inner(r.getPeriodic().getExporter()).forEach(gated::withAdditionalProperty);
-          listed("metrics", gated.getAdditionalProperties().keySet(), built);
+          listed("metrics", gated.getAdditionalProperties(), built);
           r.getPeriodic().withExporter(new PushMetricExporterModel().withAdditionalProperty(NAME, gated));
         }
         if (r.getPull() != null && r.getPull().getExporter() != null) {
           PullMetricExporterPropertyModel gated = new PullMetricExporterPropertyModel();
           inner(r.getPull().getExporter()).forEach(gated::withAdditionalProperty);
-          listed("metrics", gated.getAdditionalProperties().keySet(), built);
+          listed("metrics", gated.getAdditionalProperties(), built);
           r.getPull().withExporter(new PullMetricExporterModel().withAdditionalProperty(NAME, gated));
         }
       }
       inventory.exporters("metrics", built);
     }
     if (m.getLoggerProvider() != null) {
-      List<SettingsProto.Exporter> built = new ArrayList<>();
+      List<SettingsProto.FoundExporter> built = new ArrayList<>();
       for (LogRecordProcessorModel p : list(m.getLoggerProvider().getProcessors())) {
         if (p.getBatch() != null) {
           p.getBatch().withExporter(logs(p.getBatch().getExporter(), built));
@@ -183,7 +183,7 @@ final class Declarative {
         if (p.getSimple() != null) {
           p.getSimple().withExporter(logs(p.getSimple().getExporter(), built));
         }
-        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.exporter("logs", k, false)));
+        p.getAdditionalProperties().keySet().forEach(k -> built.add(Inventory.found("logs", k, false, "")));
       }
       inventory.exporters("logs", built);
     }
@@ -191,66 +191,39 @@ final class Declarative {
   }
 
   /**
-   * The signals the model sends past the gates: a span or log processor that is neither batch nor
-   * simple, or a metric reader neither periodic nor pull, is a component of its own, which {@link
-   * #wrap} doesn't reach, so the server's settings for that signal can't be carried out.
+   * The exporter a part of the model names (its one key: {@code otlp_http}, {@code console}, a
+   * component of its own), gated, onto {@code built}: with its {@code endpoint}, else (no variables
+   * are read under a model) the default for its kind, as the layer decides.
    */
-  static Set<String> ungated(OpenTelemetryConfigurationModel m) {
-    Set<String> out = new LinkedHashSet<>();
-    if (m.getTracerProvider() != null && list(m.getTracerProvider().getProcessors()).stream()
-        .anyMatch(p -> p.getBatch() == null && p.getSimple() == null)) {
-      out.add("traces");
-    }
-    if (m.getMeterProvider() != null && list(m.getMeterProvider().getReaders()).stream()
-        .anyMatch(r -> r.getPeriodic() == null && r.getPull() == null)) {
-      out.add("metrics");
-    }
-    if (m.getLoggerProvider() != null && list(m.getLoggerProvider().getProcessors()).stream()
-        .anyMatch(p -> p.getBatch() == null && p.getSimple() == null)) {
-      out.add("logs");
-    }
-    return out;
-  }
-
-  /**
-   * An exporter the model names, as {@code OTEL_*_EXPORTER} names it: {@code otlp_http} and
-   * {@code otlp_grpc} are {@code otlp}, {@code prometheus/development} is {@code prometheus}; any
-   * other by its name in the model ({@code console}, {@code zipkin}, a component of its own).
-   */
-  static String exporterName(String model) {
-    return switch (model) {
-      case "otlp_http", "otlp_grpc" -> "otlp";
-      case "prometheus/development" -> "prometheus";
-      default -> model;
-    };
-  }
-
-  /** The exporter a part of the model names (its one key), gated, onto {@code built}. */
-  private static void listed(String signal, Set<String> keys, List<SettingsProto.Exporter> built) {
-    keys.forEach(k -> built.add(Inventory.exporter(signal, exporterName(k), true)));
+  private static void listed(String signal, Map<String, Object> exporter, List<SettingsProto.FoundExporter> built) {
+    exporter.forEach((k, v) -> {
+      Object endpoint = v instanceof Map<?, ?> m ? m.get("endpoint") : null;
+      String given = endpoint instanceof String e ? e.trim() : "";
+      built.add(Inventory.found(signal, k, true, given).toBuilder().setFromEnv(given.isEmpty()).build());
+    });
   }
 
   private static <T> List<T> list(List<T> l) {
     return l == null ? List.of() : l;
   }
 
-  private static SpanExporterModel spans(SpanExporterModel exporter, List<SettingsProto.Exporter> built) {
+  private static SpanExporterModel spans(SpanExporterModel exporter, List<SettingsProto.FoundExporter> built) {
     if (exporter == null) {
       return null;
     }
     SpanExporterPropertyModel gated = new SpanExporterPropertyModel();
     inner(exporter).forEach(gated::withAdditionalProperty);
-    listed("traces", gated.getAdditionalProperties().keySet(), built);
+    listed("traces", gated.getAdditionalProperties(), built);
     return new SpanExporterModel().withAdditionalProperty(NAME, gated);
   }
 
-  private static LogRecordExporterModel logs(LogRecordExporterModel exporter, List<SettingsProto.Exporter> built) {
+  private static LogRecordExporterModel logs(LogRecordExporterModel exporter, List<SettingsProto.FoundExporter> built) {
     if (exporter == null) {
       return null;
     }
     LogRecordExporterPropertyModel gated = new LogRecordExporterPropertyModel();
     inner(exporter).forEach(gated::withAdditionalProperty);
-    listed("logs", gated.getAdditionalProperties().keySet(), built);
+    listed("logs", gated.getAdditionalProperties(), built);
     return new LogRecordExporterModel().withAdditionalProperty(NAME, gated);
   }
 

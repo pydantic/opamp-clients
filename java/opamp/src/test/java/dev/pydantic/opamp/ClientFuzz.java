@@ -200,7 +200,7 @@ public final class ClientFuzz {
       if (coreMode) {
         b.mode(OpampClient.Mode.CORE).streamsPlatform(net).directConnection().spliceDownloads((more & 1) != 0);
       } else {
-        b.httpClient(http);
+        b.mode(OpampClient.Mode.PLATFORM).httpClient(http);
       }
       config = b.build();
     }

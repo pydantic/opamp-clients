@@ -24,9 +24,6 @@ opamp = "pydantic_opamp_otel:Distro"
 [project.entry-points.opentelemetry_configurator]
 opamp = "pydantic_opamp_otel:Configurator"
 
-[project.entry-points.opentelemetry_metrics_exporter]
-opamp = "pydantic_opamp_otel:GatedOtlpMetricExporter"
-
 [project.entry-points._opentelemetry_opamp]
 post_sdk_init_function = "pydantic_opamp_otel:start"
 

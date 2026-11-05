@@ -81,7 +81,7 @@ agent's status to `start`, so the first message reports it in full.
 | Headers | `header(name, value)`, sent with every request and WebSocket upgrade | |
 | TLS | `tls(Tls.builder()...build())`: `trustedCa`, `includeSystemCas`, `clientCertificate`, `minVersion`, `maxVersion` | [README](../java/opamp/README.md#tls-and-proxies) |
 | Proxy | `proxy(url)`, `proxyResolveLocally(true)`, or `directConnection()` for none. Without one, the environment's | [README](../java/opamp/README.md#tls-and-proxies) |
-| Who speaks HTTP | `mode(OpampClient.Mode.CORE)` (the default) or `mode(OpampClient.Mode.PLATFORM)` (`java.net.http.HttpClient`); `httpClient(...)` selects platform mode | [sdks.md](sdks.md#core-mode-and-platform-mode) |
+| Who speaks HTTP | `mode(OpampClient.Mode.CORE)` (the default) or `mode(OpampClient.Mode.PLATFORM)` (`java.net.http.HttpClient`; advanced); `httpClient(...)` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
 | State file | `stateFile(Path)`: kept across restarts, for the agent's user alone | [state-file.md](state-file.md) |
 | Instance UID | `builder(endpoint, instanceUid)` (16 bytes), or `builder(endpoint)` for one the core makes; `requestInstanceUid(true)` to have the server assign it; `client.instanceUid()` is the one in use | [instance-uid.md](instance-uid.md) |
 | Capabilities | `capabilities(long)` (`AgentCapabilities` bits). `ReportsStatus`, `ReportsHeartbeat` and the `Reports*` bit of each status you set are added for you | |

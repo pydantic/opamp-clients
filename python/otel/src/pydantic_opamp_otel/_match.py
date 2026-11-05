@@ -11,7 +11,9 @@ from __future__ import annotations
 import math
 import threading
 import time
-from collections.abc import Callable, Mapping
+import weakref
+from collections import OrderedDict
+from collections.abc import Callable, Mapping, Sequence
 
 #: SeverityNumber past every other: the threshold of a scope that is `off`.
 SEVERITY_OFF = 0xFFFF
@@ -92,25 +94,107 @@ class Bucket:
     second on a monotonic clock, up to max(per_second, 1); a take of n gets the whole tokens there
     are, up to n. In floats, in the layer's order. Thread-safe."""
 
+    #: How many decisions of items that can't be weakly referenced `admitted` holds on to.
+    REMEMBERED = 65536
+
     def __init__(self, per_second: float, clock: Callable[[], int] = time.monotonic_ns) -> None:
         self.per_second = per_second
         self._capacity = max(per_second, 1.0)
         self._tokens = self._capacity
         self._last: int | None = None
         self._clock = clock
-        self._lock = threading.Lock()
+        # Re-entrant: an item can be collected, and its decision forgotten, while the lock is held.
+        self._lock = threading.RLock()
+        #: id(item) -> (a weak reference to it, each repeat's decision in the batch it was decided
+        #: in, ids of the gates that had it): kept while the item lives, so a slower exporter's queue
+        #: never outlasts its decision, and dropped with it, so its id can't be another's meanwhile.
+        self._decided: dict[int, tuple[weakref.ref, list[bool], set[int]]] = {}
+        #: Items that can't be weakly referenced (none of the SDK's), held instead, the oldest
+        #: forgotten past REMEMBERED.
+        self._held: OrderedDict[int, tuple[object, list[bool], set[int]]] = OrderedDict()
+
+    def admitted(self, items: list, gate: object) -> list:
+        """The items within the cap, in order, for the exporter behind `gate`: one decision per
+        item, shared by every exporter the item reaches (one budget for the process). An item
+        another gate decided keeps that answer, each repeat of it in a batch its own; the rest take
+        tokens together, the first that fit admitted. The same gate seeing an item again is a new
+        export of it, decided afresh."""
+        with self._lock:
+            at: dict[int, list[int]] = {}
+            for k, item in enumerate(items):
+                at.setdefault(id(item), []).append(k)
+            answers: list[bool | None] = [None] * len(items)
+            fresh: list[int] = []
+            kept: dict[int, list[bool]] = {}
+            for key, places in at.items():
+                item = items[places[0]]
+                seen = self._find(key, item)
+                if seen is not None and id(gate) not in seen[2]:
+                    decided = seen[1]
+                    for j, k in enumerate(places[:len(decided)]):
+                        answers[k] = decided[j]
+                    fresh.extend(places[len(decided):])
+                    seen[2].add(id(gate))
+                    kept[key] = decided
+                else:
+                    fresh.extend(places)
+            fresh.sort()
+            granted = self._take(len(fresh)) if fresh else 0
+            new: dict[int, list[bool]] = {}
+            for n, k in enumerate(fresh):
+                answers[k] = n < granted
+                key = id(items[k])
+                if key in kept:
+                    kept[key].append(n < granted)  # a repeat beyond those another gate decided
+                else:
+                    new.setdefault(key, []).append(n < granted)
+            for key, decided in new.items():
+                self._remember(items[at[key][0]], decided, id(gate))
+            return [i for i, a in zip(items, answers) if a]
+
+    def _find(self, key: int, item: object) -> tuple[object, list[bool], set[int]] | None:
+        """The decision remembered for `item`, if it is this item's."""
+        weak = self._decided.get(key)
+        if weak is not None:
+            return weak if weak[0]() is item else None
+        held = self._held.get(key)
+        return held if held is not None and held[0] is item else None
+
+    def _remember(self, item: object, decided: list[bool], gate: int) -> None:
+        """Keep `item`'s decision, made by `gate`, for as long as it lives."""
+        key = id(item)
+        try:
+            ref = weakref.ref(item, lambda r, key=key: self._forget(key, r))
+        except TypeError:
+            self._held[key] = (item, decided, {gate})
+            self._held.move_to_end(key)
+            while len(self._held) > self.REMEMBERED:
+                self._held.popitem(last=False)
+            return
+        self._decided[key] = (ref, decided, {gate})
+
+    def _forget(self, key: int, ref: weakref.ref) -> None:
+        """An item is gone: its decision with it (unless its id already belongs to another)."""
+        with self._lock:
+            weak = self._decided.get(key)
+            if weak is not None and weak[0] is ref:
+                del self._decided[key]
 
     def take(self, n: int) -> int:
         """Take up to `n` tokens now; how many were taken. A clock that goes back refills nothing."""
         with self._lock:
-            now = self._clock()
-            last = now if self._last is None else self._last
-            elapsed = max(now - last, 0) / 1e9
-            self._tokens = min(self._tokens + elapsed * self.per_second, self._capacity)
-            self._last = max(last, now)
-            taken = min(float(n), math.floor(self._tokens))
-            self._tokens -= taken
-            return int(taken)
+            return self._take(n)
+
+    def _take(self, n: int) -> int:
+        """take, under the lock."""
+        now = self._clock()
+        last = now if self._last is None else self._last
+        elapsed = max(now - last, 0) / 1e9
+        self._tokens = min(self._tokens + elapsed * self.per_second, self._capacity)
+        self._last = max(last, now)
+        taken = min(float(n), math.floor(self._tokens))
+        self._tokens -= taken
+        return int(taken)
 
 
 def rebucket(old: Bucket | None, per_second: float | None, clock: Callable[[], int]) -> Bucket | None:
@@ -372,7 +456,9 @@ class Scrubber:
     def value(self, key: str | None, value):
         """A value as scrubbing leaves it (an attribute's, a map member's, a sequence's item, or a
         log body), or _UNCHANGED: `key` is the attribute or member it is the value of (None: a
-        body or an item). The value itself is never changed."""
+        body or an item). The value itself is never changed. Values are walked as the OTLP
+        encoder writes them: any Sequence but text and bytes as an array, any Mapping as a map
+        whose members are named str(key)."""
         if key is not None:
             what = self.key(key)
             if what is self.KEEP:
@@ -382,17 +468,17 @@ class Scrubber:
         if isinstance(value, str):
             r = self.text(value)
             return self._UNCHANGED if r is None else r
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, Sequence) and not isinstance(value, (bytes, bytearray)):
             items, changed = list(value), False
             for i, item in enumerate(items):
                 r = self.value(None, item)
                 if r is not self._UNCHANGED:
                     items[i], changed = r, True
-            return (type(value)(items) if isinstance(value, tuple) else items) if changed else self._UNCHANGED
+            return (tuple(items) if isinstance(value, tuple) else items) if changed else self._UNCHANGED
         if isinstance(value, Mapping):
             members, changed = dict(value), False
             for k, v in value.items():
-                r = self.value(k, v)
+                r = self.value(k if isinstance(k, str) else str(k), v)
                 if r is not self._UNCHANGED:
                     members[k], changed = r, True
             return members if changed else self._UNCHANGED

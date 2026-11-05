@@ -26,7 +26,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file opamp/sdk/v1/settings.proto.
  */
 export const file_opamp_sdk_v1_settings: GenFile = /*@__PURE__*/
-  fileDesc("ChtvcGFtcC9zZGsvdjEvc2V0dGluZ3MucHJvdG8SDG9wYW1wLnNkay52MSLkBgoIU2V0dGluZ3MSGgoNc2FtcGxpbmdfcmF0ZRgBIAEoAUgAiAEBEhgKC3NlbmRfdHJhY2VzGAIgASgISAGIAQESGQoMc2VuZF9tZXRyaWNzGAMgASgISAKIAQESFgoJc2VuZF9sb2dzGAQgASgISAOIAQESIwoWc2VuZF9sb2dzX21pbl9zZXZlcml0eRgJIAEoDUgEiAEBEjIKDnNhbXBsaW5nX3J1bGVzGAogAygLMhoub3BhbXAuc2RrLnYxLlNhbXBsaW5nUnVsZRI4ChZzZW5kX2xvZ3Nfc2NvcGVfbGV2ZWxzGAsgAygLMhgub3BhbXAuc2RrLnYxLlNjb3BlTGV2ZWwSFwoPZHJvcF9hdHRyaWJ1dGVzGAwgAygJEhcKD21hc2tfYXR0cmlidXRlcxgNIAMoCRInChpzYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZBgOIAEoAUgFiAEBEiEKFHNlbmRfbG9nc19wZXJfc2Vjb25kGA8gASgBSAaIAQESOAobZGVhY3RpdmF0ZV9pbnN0cnVtZW50YXRpb25zGAUgASgLMhMub3BhbXAuc2RrLnYxLk5hbWVzEiwKH2RlYWN0aXZhdGVfYWxsX2luc3RydW1lbnRhdGlvbnMYBiABKAhIB4gBARIyCgZjdXN0b20YECADKAsyIi5vcGFtcC5zZGsudjEuU2V0dGluZ3MuQ3VzdG9tRW50cnkSFgoOc2NydWJfZGVmYXVsdHMYEiABKAgSFgoOc2NydWJfcGF0dGVybnMYEyADKAkaLQoLQ3VzdG9tRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIQCg5fc2FtcGxpbmdfcmF0ZUIOCgxfc2VuZF90cmFjZXNCDwoNX3NlbmRfbWV0cmljc0IMCgpfc2VuZF9sb2dzQhkKF19zZW5kX2xvZ3NfbWluX3NldmVyaXR5Qh0KG19zYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZEIXChVfc2VuZF9sb2dzX3Blcl9zZWNvbmRCIgogX2RlYWN0aXZhdGVfYWxsX2luc3RydW1lbnRhdGlvbnNKBAgIEAlKBAgREBJKBAgHEAhSGW9wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXMi+wEKDFNhbXBsaW5nUnVsZRIMCgRyYXRlGAEgASgBEhEKBG5hbWUYAiABKAlIAIgBARIpCgRraW5kGAMgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kSAGIAQESEQoEcGF0aBgEIAEoCUgCiAEBEj4KCmF0dHJpYnV0ZXMYBSADKAsyKi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlLkF0dHJpYnV0ZXNFbnRyeRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIHCgVfbmFtZUIHCgVfa2luZEIHCgVfcGF0aCIzCgpTY29wZUxldmVsEg8KB3BhdHRlcm4YASABKAkSFAoMbWluX3NldmVyaXR5GAIgASgNIhYKBU5hbWVzEg0KBW5hbWVzGAEgAygJIi4KBEhvc3QSDAoEbGl2ZRgBIAMoCRISCgpuZXh0X3N0YXJ0GAMgAygJSgQIAhADIoMBCgRMb2FkEhIKBXNhdmVkGAEgASgMSACIAQESIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEEhcKCmNvcmVfc3RhdGUYBCABKAxIAYgBAUIICgZfc2F2ZWRCDQoLX2NvcmVfc3RhdGUipAEKBkxvYWRlZBIoCghzZXR0aW5ncxgBIAEoCzIWLm9wYW1wLnNkay52MS5TZXR0aW5ncxIPCgdjdXJyZW50GAIgASgMEjIKCWVmZmVjdGl2ZRgDIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIPCgd3YXJuaW5nGAQgASgJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgFIAEoBCKbAQoGRGVjaWRlEjEKBmNvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnEg8KB2N1cnJlbnQYAiABKAwSEAoIYXRfc3RhcnQYAyABKAwSIAoEaG9zdBgFIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAYgASgESgQIBBAFIiIKBFBsYW4SEQoEc2F2ZRgBIAEoDEgAiAEBQgcKBV9zYXZlIqYBCgZDb21taXQSJAoGZGVjaWRlGAEgASgLMhQub3BhbXAuc2RrLnYxLkRlY2lkZRIpCgVzYXZlZBgCIAEoDjIaLm9wYW1wLnNkay52MS5Db21taXQuU2F2ZWQSDQoFZXJyb3IYAyABKAkiPAoFU2F2ZWQSEQoNU0FWRURfTk9XSEVSRRAAEg4KClNBVkVEX0RPTkUQARIQCgxTQVZFRF9GQUlMRUQQAiLlAQoIRGVjaXNpb24SMgoGc3RhdHVzGAEgASgLMiIub3BhbXAucHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzEiUKBWFwcGx5GAIgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAyABKAwSMgoJZWZmZWN0aXZlGAUgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhcKD3BlbmRpbmdfcmVzdGFydBgGIAMoCRIaChJyZWZyZXNoX2F0X3VuaXhfbXMYByABKARKBAgEEAUiYwoHUmVmcmVzaBIPCgdjdXJyZW50GAEgASgMEhAKCGF0X3N0YXJ0GAIgASgMEiAKBGhvc3QYAyABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgEIAEoBCKWAQoJUmVmcmVzaGVkEigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEjIKCWVmZmVjdGl2ZRgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIaChJyZWZyZXNoX2F0X3VuaXhfbXMYAyABKAQSDwoHd2FybmluZxgEIAEoCSKhAQoGSGVhbHRoEioKBmNvdW50cxgBIAEoCzIaLm9wYW1wLnNkay52MS5FeHBvcnRDb3VudHMSLAoIcHJldmlvdXMYAiABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0EhMKC25vd191bml4X21zGAMgASgEEigKCHNldHRpbmdzGAQgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzIpEBCgxFeHBvcnRDb3VudHMSKgoGdHJhY2VzGAEgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cxIrCgdtZXRyaWNzGAIgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cxIoCgRsb2dzGAMgASgLMhoub3BhbXAuc2RrLnYxLlNpZ25hbENvdW50cyKRAQoMU2lnbmFsQ291bnRzEhIKCmV4cG9ydHNfb2sYASABKAQSFgoOZXhwb3J0c19mYWlsZWQYAiABKAQSFAoMaXRlbXNfZmFpbGVkGAMgASgEEhYKDml0ZW1zX2ZpbHRlcmVkGAQgASgEEhMKC2xhc3RfZmFpbGVkGAUgASgIEhIKCmxhc3RfZXJyb3IYBiABKAkiZgoMSGVhbHRoUmVwb3J0EgwKBHNlbmQYASABKAgSMgoJZXhwb3J0ZXJzGAIgASgLMh8ub3BhbXAucHJvdG8udjEuQ29tcG9uZW50SGVhbHRoEhQKDHNlbnRfdW5peF9tcxgDIAEoBCJtCghEZXNjcmliZRIqCghyZXNvdXJjZRgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgDIAEoBCJvCgpDb21wb25lbnRzEioKCWludmVudG9yeRgBIAEoCzIXLm9wYW1wLnNkay52MS5JbnZlbnRvcnkSIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEIswBCglJbnZlbnRvcnkSEwoLaW50ZWdyYXRpb24YASABKAkSGwoTaW50ZWdyYXRpb25fdmVyc2lvbhgCIAEoCRIUCgxzZGtfbGFuZ3VhZ2UYAyABKAkSEwoLc2RrX3ZlcnNpb24YBCABKAkSNwoQaW5zdHJ1bWVudGF0aW9ucxgFIAMoCzIdLm9wYW1wLnNkay52MS5JbnN0cnVtZW50YXRpb24SKQoJZXhwb3J0ZXJzGAYgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyIjAKD0luc3RydW1lbnRhdGlvbhIMCgRuYW1lGAEgASgJEg8KB3ZlcnNpb24YAiABKAkiNwoIRXhwb3J0ZXISDgoGc2lnbmFsGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFZ2F0ZWQYAyABKAgiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdzGAEgASgMEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYxLlNwYW5TdGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dSZWNvcmRIABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0dHJpYnV0ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVuSABCBwoFaW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1wLnNkay52MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1wLnNkay52MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9HUxABImEKCENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdyZWNvcmRzGAQgASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5vcGFtcC5wcm90by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkSEAoIc2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJEiQKBGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0cmlidXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBhcmVudBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2YWx1YXRlZBIPCgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVkYWN0ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5GAYgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFzc2VkGAUgAygEQgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQYAiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQAkIHCgVfcnVsZSLfAgoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAuc2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEuRGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVzY3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFsdWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVzaEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIuCgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNIABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SABCBgoEY2FsbCKpAwoFUmVwbHkSJgoGbG9hZGVkGAEgASgLMhQub3BhbXAuc2RrLnYxLkxvYWRlZEgAEioKCGRlY2lzaW9uGAIgASgLMhYub3BhbXAuc2RrLnYxLkRlY2lzaW9uSAASNwoLZGVzY3JpcHRpb24YAyABKAsyIC5vcGFtcC5wcm90by52MS5BZ2VudERlc2NyaXB0aW9uSAASDwoFZXJyb3IYBCABKAlIABIsCglldmFsdWF0ZWQYBSABKAsyFy5vcGFtcC5zZGsudjEuRXZhbHVhdGVkSAASLAoJcmVmcmVzaGVkGAYgASgLMhcub3BhbXAuc2RrLnYxLlJlZnJlc2hlZEgAEjMKDWhlYWx0aF9yZXBvcnQYByABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0SAASQwoUYXZhaWxhYmxlX2NvbXBvbmVudHMYCCABKAsyIy5vcGFtcC5wcm90by52MS5BdmFpbGFibGVDb21wb25lbnRzSAASIgoEcGxhbhgJIAEoCzISLm9wYW1wLnNkay52MS5QbGFuSABCCAoGcmVzdWx0KpkBCghTcGFuS2luZBIZChVTUEFOX0tJTkRfVU5TUEVDSUZJRUQQABIWChJTUEFOX0tJTkRfSU5URVJOQUwQARIUChBTUEFOX0tJTkRfU0VSVkVSEAISFAoQU1BBTl9LSU5EX0NMSUVOVBADEhYKElNQQU5fS0lORF9QUk9EVUNFUhAEEhYKElNQQU5fS0lORF9DT05TVU1FUhAFKocBCgZQYXJlbnQSDwoLUEFSRU5UX05PTkUQABIYChRQQVJFTlRfTE9DQUxfU0FNUExFRBABEhoKFlBBUkVOVF9MT0NBTF9VTlNBTVBMRUQQAhIZChVQQVJFTlRfUkVNT1RFX1NBTVBMRUQQAxIbChdQQVJFTlRfUkVNT1RFX1VOU0FNUExFRBAEQoYBChZkZXYucHlkYW50aWMub3BhbXAuc2RrQg1TZXR0aW5nc1Byb3RvWkFnaXRodWIuY29tL3B5ZGFudGljL29wYW1wLWNsaWVudHMvZ28vb3BhbXAvc2Rrc2V0dGluZ3Mvc2V0dGluZ3NwYqoCGVB5ZGFudGljLk9wQW1wLkNsaWVudC5TZGtiBnByb3RvMw", [file_opamp_v1_anyvalue, file_opamp_v1_opamp]);
+  fileDesc("ChtvcGFtcC9zZGsvdjEvc2V0dGluZ3MucHJvdG8SDG9wYW1wLnNkay52MSKaBwoIU2V0dGluZ3MSGgoNc2FtcGxpbmdfcmF0ZRgBIAEoAUgAiAEBEhgKC3NlbmRfdHJhY2VzGAIgASgISAGIAQESGQoMc2VuZF9tZXRyaWNzGAMgASgISAKIAQESHgoRc2VuZF9zZWxmX21ldHJpY3MYFCABKAhIA4gBARIWCglzZW5kX2xvZ3MYBCABKAhIBIgBARIjChZzZW5kX2xvZ3NfbWluX3NldmVyaXR5GAkgASgNSAWIAQESMgoOc2FtcGxpbmdfcnVsZXMYCiADKAsyGi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlEjgKFnNlbmRfbG9nc19zY29wZV9sZXZlbHMYCyADKAsyGC5vcGFtcC5zZGsudjEuU2NvcGVMZXZlbBIXCg9kcm9wX2F0dHJpYnV0ZXMYDCADKAkSFwoPbWFza19hdHRyaWJ1dGVzGA0gAygJEicKGnNhbXBsaW5nX3RyYWNlc19wZXJfc2Vjb25kGA4gASgBSAaIAQESIQoUc2VuZF9sb2dzX3Blcl9zZWNvbmQYDyABKAFIB4gBARI4ChtkZWFjdGl2YXRlX2luc3RydW1lbnRhdGlvbnMYBSABKAsyEy5vcGFtcC5zZGsudjEuTmFtZXMSLAofZGVhY3RpdmF0ZV9hbGxfaW5zdHJ1bWVudGF0aW9ucxgGIAEoCEgIiAEBEjIKBmN1c3RvbRgQIAMoCzIiLm9wYW1wLnNkay52MS5TZXR0aW5ncy5DdXN0b21FbnRyeRIWCg5zY3J1Yl9kZWZhdWx0cxgSIAEoCBIWCg5zY3J1Yl9wYXR0ZXJucxgTIAMoCRotCgtDdXN0b21FbnRyeRILCgNrZXkYASABKAkSDQoFdmFsdWUYAiABKAk6AjgBQhAKDl9zYW1wbGluZ19yYXRlQg4KDF9zZW5kX3RyYWNlc0IPCg1fc2VuZF9tZXRyaWNzQhQKEl9zZW5kX3NlbGZfbWV0cmljc0IMCgpfc2VuZF9sb2dzQhkKF19zZW5kX2xvZ3NfbWluX3NldmVyaXR5Qh0KG19zYW1wbGluZ190cmFjZXNfcGVyX3NlY29uZEIXChVfc2VuZF9sb2dzX3Blcl9zZWNvbmRCIgogX2RlYWN0aXZhdGVfYWxsX2luc3RydW1lbnRhdGlvbnNKBAgIEAlKBAgREBJKBAgHEAhSGW9wYW1wX3BvbGxpbmdfaW50ZXJ2YWxfbXMi+wEKDFNhbXBsaW5nUnVsZRIMCgRyYXRlGAEgASgBEhEKBG5hbWUYAiABKAlIAIgBARIpCgRraW5kGAMgASgOMhYub3BhbXAuc2RrLnYxLlNwYW5LaW5kSAGIAQESEQoEcGF0aBgEIAEoCUgCiAEBEj4KCmF0dHJpYnV0ZXMYBSADKAsyKi5vcGFtcC5zZGsudjEuU2FtcGxpbmdSdWxlLkF0dHJpYnV0ZXNFbnRyeRoxCg9BdHRyaWJ1dGVzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4AUIHCgVfbmFtZUIHCgVfa2luZEIHCgVfcGF0aCIzCgpTY29wZUxldmVsEg8KB3BhdHRlcm4YASABKAkSFAoMbWluX3NldmVyaXR5GAIgASgNIhYKBU5hbWVzEg0KBW5hbWVzGAEgAygJIi4KBEhvc3QSDAoEbGl2ZRgBIAMoCRISCgpuZXh0X3N0YXJ0GAMgAygJSgQIAhADIoMBCgRMb2FkEhIKBXNhdmVkGAEgASgMSACIAQESIAoEaG9zdBgCIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAMgASgEEhcKCmNvcmVfc3RhdGUYBCABKAxIAYgBAUIICgZfc2F2ZWRCDQoLX2NvcmVfc3RhdGUipAEKBkxvYWRlZBIoCghzZXR0aW5ncxgBIAEoCzIWLm9wYW1wLnNkay52MS5TZXR0aW5ncxIPCgdjdXJyZW50GAIgASgMEjIKCWVmZmVjdGl2ZRgDIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIPCgd3YXJuaW5nGAQgASgJEhoKEnJlZnJlc2hfYXRfdW5peF9tcxgFIAEoBCKbAQoGRGVjaWRlEjEKBmNvbmZpZxgBIAEoCzIhLm9wYW1wLnByb3RvLnYxLkFnZW50UmVtb3RlQ29uZmlnEg8KB2N1cnJlbnQYAiABKAwSEAoIYXRfc3RhcnQYAyABKAwSIAoEaG9zdBgFIAEoCzISLm9wYW1wLnNkay52MS5Ib3N0EhMKC25vd191bml4X21zGAYgASgESgQIBBAFIiIKBFBsYW4SEQoEc2F2ZRgBIAEoDEgAiAEBQgcKBV9zYXZlIqYBCgZDb21taXQSJAoGZGVjaWRlGAEgASgLMhQub3BhbXAuc2RrLnYxLkRlY2lkZRIpCgVzYXZlZBgCIAEoDjIaLm9wYW1wLnNkay52MS5Db21taXQuU2F2ZWQSDQoFZXJyb3IYAyABKAkiPAoFU2F2ZWQSEQoNU0FWRURfTk9XSEVSRRAAEg4KClNBVkVEX0RPTkUQARIQCgxTQVZFRF9GQUlMRUQQAiLlAQoIRGVjaXNpb24SMgoGc3RhdHVzGAEgASgLMiIub3BhbXAucHJvdG8udjEuUmVtb3RlQ29uZmlnU3RhdHVzEiUKBWFwcGx5GAIgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEg8KB2N1cnJlbnQYAyABKAwSMgoJZWZmZWN0aXZlGAUgASgLMh8ub3BhbXAucHJvdG8udjEuRWZmZWN0aXZlQ29uZmlnEhcKD3BlbmRpbmdfcmVzdGFydBgGIAMoCRIaChJyZWZyZXNoX2F0X3VuaXhfbXMYByABKARKBAgEEAUiYwoHUmVmcmVzaBIPCgdjdXJyZW50GAEgASgMEhAKCGF0X3N0YXJ0GAIgASgMEiAKBGhvc3QYAyABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgEIAEoBCKWAQoJUmVmcmVzaGVkEigKCHNldHRpbmdzGAEgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEjIKCWVmZmVjdGl2ZRgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkVmZmVjdGl2ZUNvbmZpZxIaChJyZWZyZXNoX2F0X3VuaXhfbXMYAyABKAQSDwoHd2FybmluZxgEIAEoCSLMAQoGSGVhbHRoEioKBmNvdW50cxgBIAEoCzIaLm9wYW1wLnNkay52MS5FeHBvcnRDb3VudHMSLAoIcHJldmlvdXMYAiABKAsyGi5vcGFtcC5zZGsudjEuSGVhbHRoUmVwb3J0EhMKC25vd191bml4X21zGAMgASgEEigKCHNldHRpbmdzGAQgASgLMhYub3BhbXAuc2RrLnYxLlNldHRpbmdzEikKCWV4cG9ydGVycxgFIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlciKRAQoMRXhwb3J0Q291bnRzEioKBnRyYWNlcxgBIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMSKwoHbWV0cmljcxgCIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMSKAoEbG9ncxgDIAEoCzIaLm9wYW1wLnNkay52MS5TaWduYWxDb3VudHMikQEKDFNpZ25hbENvdW50cxISCgpleHBvcnRzX29rGAEgASgEEhYKDmV4cG9ydHNfZmFpbGVkGAIgASgEEhQKDGl0ZW1zX2ZhaWxlZBgDIAEoBBIWCg5pdGVtc19maWx0ZXJlZBgEIAEoBBITCgtsYXN0X2ZhaWxlZBgFIAEoCBISCgpsYXN0X2Vycm9yGAYgASgJImYKDEhlYWx0aFJlcG9ydBIMCgRzZW5kGAEgASgIEjIKCWV4cG9ydGVycxgCIAEoCzIfLm9wYW1wLnByb3RvLnYxLkNvbXBvbmVudEhlYWx0aBIUCgxzZW50X3VuaXhfbXMYAyABKAQibQoIRGVzY3JpYmUSKgoIcmVzb3VyY2UYASADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRIgCgRob3N0GAIgASgLMhIub3BhbXAuc2RrLnYxLkhvc3QSEwoLbm93X3VuaXhfbXMYAyABKAQibwoKQ29tcG9uZW50cxIqCglpbnZlbnRvcnkYASABKAsyFy5vcGFtcC5zZGsudjEuSW52ZW50b3J5EiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgDIAEoBCLMAQoJSW52ZW50b3J5EhMKC2ludGVncmF0aW9uGAEgASgJEhsKE2ludGVncmF0aW9uX3ZlcnNpb24YAiABKAkSFAoMc2RrX2xhbmd1YWdlGAMgASgJEhMKC3Nka192ZXJzaW9uGAQgASgJEjcKEGluc3RydW1lbnRhdGlvbnMYBSADKAsyHS5vcGFtcC5zZGsudjEuSW5zdHJ1bWVudGF0aW9uEikKCWV4cG9ydGVycxgGIAMoCzIWLm9wYW1wLnNkay52MS5FeHBvcnRlciIwCg9JbnN0cnVtZW50YXRpb24SDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJIkwKCEV4cG9ydGVyEg4KBnNpZ25hbBgBIAEoCRIMCgRuYW1lGAIgASgJEg0KBWdhdGVkGAMgASgIEhMKC2Rlc3RpbmF0aW9uGAQgASgJInQKCUV4cG9ydGVycxIqCgVmb3VuZBgBIAMoCzIbLm9wYW1wLnNkay52MS5Gb3VuZEV4cG9ydGVyEiEKA2VudhgCIAMoCzIULm9wYW1wLnNkay52MS5FbnZWYXISGAoQZGVmYXVsdF9wcm90b2NvbBgDIAEoCSJgCg1Gb3VuZEV4cG9ydGVyEg4KBnNpZ25hbBgBIAEoCRIMCgRraW5kGAIgASgJEg0KBWdhdGVkGAMgASgIEhAKCGVuZHBvaW50GAQgASgJEhAKCGZyb21fZW52GAUgASgIIiUKBkVudlZhchIMCgRuYW1lGAEgASgJEg0KBXZhbHVlGAIgASgJInUKEEV4cG9ydGVyc0RlY2lkZWQSKQoJZXhwb3J0ZXJzGAEgAygLMhYub3BhbXAuc2RrLnYxLkV4cG9ydGVyEhAKCGdvdmVybmVkGAIgAygJEhIKCnVuZ292ZXJuZWQYAyADKAkSEAoId2FybmluZ3MYBCADKAkiggIKCEV2YWx1YXRlEhAKCHNldHRpbmdzGAEgASgMEiAKBGhvc3QYAiABKAsyEi5vcGFtcC5zZGsudjEuSG9zdBITCgtub3dfdW5peF9tcxgHIAEoBBInCgRzcGFuGAMgASgLMhcub3BhbXAuc2RrLnYxLlNwYW5TdGFydEgAEiYKA2xvZxgEIAEoCzIXLm9wYW1wLnNkay52MS5Mb2dSZWNvcmRIABIuCgphdHRyaWJ1dGVzGAUgASgLMhgub3BhbXAuc2RrLnYxLkF0dHJpYnV0ZXNIABIjCgNjYXAYBiABKAsyFC5vcGFtcC5zZGsudjEuQ2FwUnVuSABCBwoFaW5wdXQifQoGQ2FwUnVuEisKBnNpZ25hbBgBIAEoDjIbLm9wYW1wLnNkay52MS5DYXBSdW4uU2lnbmFsEiYKBmV2ZW50cxgCIAMoCzIWLm9wYW1wLnNkay52MS5DYXBFdmVudCIeCgZTaWduYWwSCgoGVFJBQ0VTEAASCAoETE9HUxABImEKCENhcEV2ZW50Eg0KBWF0X25zGAEgASgEEiQKBnBhcmVudBgCIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQSDwoHc2FtcGxlZBgDIAEoCBIPCgdyZWNvcmRzGAQgASgEImIKCkF0dHJpYnV0ZXMSLAoKYXR0cmlidXRlcxgBIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiYKBGJvZHkYAiABKAsyGC5vcGFtcC5wcm90by52MS5BbnlWYWx1ZSIsCglMb2dSZWNvcmQSDQoFc2NvcGUYASABKAkSEAoIc2V2ZXJpdHkYAiABKA0ikwEKCVNwYW5TdGFydBIMCgRuYW1lGAEgASgJEiQKBGtpbmQYAiABKA4yFi5vcGFtcC5zZGsudjEuU3BhbktpbmQSLAoKYXR0cmlidXRlcxgDIAMoCzIYLm9wYW1wLnByb3RvLnYxLktleVZhbHVlEiQKBnBhcmVudBgEIAEoDjIULm9wYW1wLnNkay52MS5QYXJlbnQiygEKCUV2YWx1YXRlZBIPCgdyZWZ1c2VkGAEgASgJEiwKCHNhbXBsaW5nGAIgASgLMhoub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZxIRCgRrZXB0GAMgASgISACIAQESKgoIcmVkYWN0ZWQYBCADKAsyGC5vcGFtcC5wcm90by52MS5LZXlWYWx1ZRImCgRib2R5GAYgASgLMhgub3BhbXAucHJvdG8udjEuQW55VmFsdWUSDgoGcGFzc2VkGAUgAygEQgcKBV9rZXB0IrIBCgxTcGFuU2FtcGxpbmcSKwoDaG93GAEgASgOMh4ub3BhbXAuc2RrLnYxLlNwYW5TYW1wbGluZy5Ib3cSFgoOcGFyZW50X3NhbXBsZWQYAiABKAgSDAoEcmF0ZRgDIAEoARIRCgRydWxlGAQgASgNSACIAQEiMwoDSG93EhEKDUZPTExPV19QQVJFTlQQABIICgRSQVRFEAESDwoLQVBQX1NBTVBMRVIQAkIHCgVfcnVsZSKNAwoHUmVxdWVzdBIiCgRsb2FkGAEgASgLMhIub3BhbXAuc2RrLnYxLkxvYWRIABImCgZkZWNpZGUYAiABKAsyFC5vcGFtcC5zZGsudjEuRGVjaWRlSAASKgoIZGVzY3JpYmUYAyABKAsyFi5vcGFtcC5zZGsudjEuRGVzY3JpYmVIABIqCghldmFsdWF0ZRgEIAEoCzIWLm9wYW1wLnNkay52MS5FdmFsdWF0ZUgAEigKB3JlZnJlc2gYBSABKAsyFS5vcGFtcC5zZGsudjEuUmVmcmVzaEgAEiYKBmhlYWx0aBgGIAEoCzIULm9wYW1wLnNkay52MS5IZWFsdGhIABIuCgpjb21wb25lbnRzGAcgASgLMhgub3BhbXAuc2RrLnYxLkNvbXBvbmVudHNIABImCgZjb21taXQYCCABKAsyFC5vcGFtcC5zZGsudjEuQ29tbWl0SAASLAoJZXhwb3J0ZXJzGAkgASgLMhcub3BhbXAuc2RrLnYxLkV4cG9ydGVyc0gAQgYKBGNhbGwi5gMKBVJlcGx5EiYKBmxvYWRlZBgBIAEoCzIULm9wYW1wLnNkay52MS5Mb2FkZWRIABIqCghkZWNpc2lvbhgCIAEoCzIWLm9wYW1wLnNkay52MS5EZWNpc2lvbkgAEjcKC2Rlc2NyaXB0aW9uGAMgASgLMiAub3BhbXAucHJvdG8udjEuQWdlbnREZXNjcmlwdGlvbkgAEg8KBWVycm9yGAQgASgJSAASLAoJZXZhbHVhdGVkGAUgASgLMhcub3BhbXAuc2RrLnYxLkV2YWx1YXRlZEgAEiwKCXJlZnJlc2hlZBgGIAEoCzIXLm9wYW1wLnNkay52MS5SZWZyZXNoZWRIABIzCg1oZWFsdGhfcmVwb3J0GAcgASgLMhoub3BhbXAuc2RrLnYxLkhlYWx0aFJlcG9ydEgAEkMKFGF2YWlsYWJsZV9jb21wb25lbnRzGAggASgLMiMub3BhbXAucHJvdG8udjEuQXZhaWxhYmxlQ29tcG9uZW50c0gAEiIKBHBsYW4YCSABKAsyEi5vcGFtcC5zZGsudjEuUGxhbkgAEjsKEWV4cG9ydGVyc19kZWNpZGVkGAogASgLMh4ub3BhbXAuc2RrLnYxLkV4cG9ydGVyc0RlY2lkZWRIAEIICgZyZXN1bHQqmQEKCFNwYW5LaW5kEhkKFVNQQU5fS0lORF9VTlNQRUNJRklFRBAAEhYKElNQQU5fS0lORF9JTlRFUk5BTBABEhQKEFNQQU5fS0lORF9TRVJWRVIQAhIUChBTUEFOX0tJTkRfQ0xJRU5UEAMSFgoSU1BBTl9LSU5EX1BST0RVQ0VSEAQSFgoSU1BBTl9LSU5EX0NPTlNVTUVSEAUqhwEKBlBhcmVudBIPCgtQQVJFTlRfTk9ORRAAEhgKFFBBUkVOVF9MT0NBTF9TQU1QTEVEEAESGgoWUEFSRU5UX0xPQ0FMX1VOU0FNUExFRBACEhkKFVBBUkVOVF9SRU1PVEVfU0FNUExFRBADEhsKF1BBUkVOVF9SRU1PVEVfVU5TQU1QTEVEEARChgEKFmRldi5weWRhbnRpYy5vcGFtcC5zZGtCDVNldHRpbmdzUHJvdG9aQWdpdGh1Yi5jb20vcHlkYW50aWMvb3BhbXAtY2xpZW50cy9nby9vcGFtcC9zZGtzZXR0aW5ncy9zZXR0aW5nc3BiqgIZUHlkYW50aWMuT3BBbXAuQ2xpZW50LlNka2IGcHJvdG8z", [file_opamp_v1_anyvalue, file_opamp_v1_opamp]);
 
 /**
  * Settings, typed. Every field left unset is the SDK's own value. In debug mode (debug_until) the
@@ -56,6 +56,13 @@ export type Settings = Message<"opamp.sdk.v1.Settings"> & {
    * @generated from field: optional bool send_metrics = 3;
    */
   sendMetrics?: boolean | undefined;
+
+  /**
+   * Export SDK self-metrics independently of application metric exports.
+   *
+   * @generated from field: optional bool send_self_metrics = 20;
+   */
+  sendSelfMetrics?: boolean | undefined;
 
   /**
    * @generated from field: optional bool send_logs = 4;
@@ -695,6 +702,13 @@ export type Health = Message<"opamp.sdk.v1.Health"> & {
    * @generated from field: opamp.sdk.v1.Settings settings = 4;
    */
   settings?: Settings | undefined;
+
+  /**
+   * as the inventory lists them: one child each under its signal
+   *
+   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 5;
+   */
+  exporters: Exporter[];
 };
 
 /**
@@ -798,7 +812,8 @@ export type HealthReport = Message<"opamp.sdk.v1.HealthReport"> & {
    * Healthy unless a signal's last export failed; status ok, failing or off (every signal off);
    * one child per signal (traces, metrics, logs), each with healthy, status (ok, failing, off),
    * last_error, and the integer attributes exports.ok, exports.failed, items.failed and
-   * items.filtered. Not `send`: the one last sent.
+   * items.filtered, and under it one child per exporter of that signal (keyed as the inventory
+   * keys it) with status governed or ungoverned, always healthy. Not `send`: the one last sent.
    *
    * @generated from field: opamp.proto.v1.ComponentHealth exporters = 2;
    */
@@ -987,11 +1002,20 @@ export type Exporter = Message<"opamp.sdk.v1.Exporter"> & {
   name: string;
 
   /**
-   * the integration's send_* switch reaches it
+   * governed: the policy's gates are in front of it
    *
    * @generated from field: bool gated = 3;
    */
   gated: boolean;
+
+  /**
+   * Where it sends, as the exporter was given it (an endpoint URL, or host:port); empty: nowhere
+   * or not known. The layer keeps only the scheme, host and port, so a credential in it never
+   * leaves the process.
+   *
+   * @generated from field: string destination = 4;
+   */
+  destination: string;
 };
 
 /**
@@ -1000,6 +1024,151 @@ export type Exporter = Message<"opamp.sdk.v1.Exporter"> & {
  */
 export const ExporterSchema: GenMessage<Exporter> = /*@__PURE__*/
   messageDesc(file_opamp_sdk_v1_settings, 21);
+
+/**
+ * The exporters the integration found on its SDK's providers, as facts (docs/available-components.md): what
+ * is decided of them is the same in every language. Call it at start and whenever the providers
+ * change; pass ExportersDecided.exporters as Inventory.exporters, and log its warnings.
+ *
+ * @generated from message opamp.sdk.v1.Exporters
+ */
+export type Exporters = Message<"opamp.sdk.v1.Exporters"> & {
+  /**
+   * @generated from field: repeated opamp.sdk.v1.FoundExporter found = 1;
+   */
+  found: FoundExporter[];
+
+  /**
+   * the process's environment (only OTEL_EXPORTER_* is read)
+   *
+   * @generated from field: repeated opamp.sdk.v1.EnvVar env = 2;
+   */
+  env: EnvVar[];
+
+  /**
+   * the SDK's OTLP protocol with none set: grpc or http/protobuf
+   *
+   * @generated from field: string default_protocol = 3;
+   */
+  defaultProtocol: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.Exporters.
+ * Use `create(ExportersSchema)` to create a new message.
+ */
+export const ExportersSchema: GenMessage<Exporters> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 22);
+
+/**
+ * @generated from message opamp.sdk.v1.FoundExporter
+ */
+export type FoundExporter = Message<"opamp.sdk.v1.FoundExporter"> & {
+  /**
+   * traces, metrics or logs
+   *
+   * @generated from field: string signal = 1;
+   */
+  signal: string;
+
+  /**
+   * What the integration knows it as: an OTEL_*_EXPORTER name, an entry point's, its type's name,
+   * or app_provider (a global provider of the application's own).
+   *
+   * @generated from field: string kind = 2;
+   */
+  kind: string;
+
+  /**
+   * the policy's gates are in front of it
+   *
+   * @generated from field: bool gated = 3;
+   */
+  gated: boolean;
+
+  /**
+   * as the exporter holds it; empty: not known
+   *
+   * @generated from field: string endpoint = 4;
+   */
+  endpoint: string;
+
+  /**
+   * built from OTEL_*_EXPORTER: the variables say where, if it doesn't
+   *
+   * @generated from field: bool from_env = 5;
+   */
+  fromEnv: boolean;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.FoundExporter.
+ * Use `create(FoundExporterSchema)` to create a new message.
+ */
+export const FoundExporterSchema: GenMessage<FoundExporter> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 23);
+
+/**
+ * @generated from message opamp.sdk.v1.EnvVar
+ */
+export type EnvVar = Message<"opamp.sdk.v1.EnvVar"> & {
+  /**
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string value = 2;
+   */
+  value: string;
+};
+
+/**
+ * Describes the message opamp.sdk.v1.EnvVar.
+ * Use `create(EnvVarSchema)` to create a new message.
+ */
+export const EnvVarSchema: GenMessage<EnvVar> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 24);
+
+/**
+ * @generated from message opamp.sdk.v1.ExportersDecided
+ */
+export type ExportersDecided = Message<"opamp.sdk.v1.ExportersDecided"> & {
+  /**
+   * Inventory.exporters, in the order found
+   *
+   * @generated from field: repeated opamp.sdk.v1.Exporter exporters = 1;
+   */
+  exporters: Exporter[];
+
+  /**
+   * the signals with exporters, every one governed
+   *
+   * @generated from field: repeated string governed = 2;
+   */
+  governed: string[];
+
+  /**
+   * the signals with an exporter past the gates
+   *
+   * @generated from field: repeated string ungoverned = 3;
+   */
+  ungoverned: string[];
+
+  /**
+   * one line per ungoverned exporter identity
+   *
+   * @generated from field: repeated string warnings = 4;
+   */
+  warnings: string[];
+};
+
+/**
+ * Describes the message opamp.sdk.v1.ExportersDecided.
+ * Use `create(ExportersDecidedSchema)` to create a new message.
+ */
+export const ExportersDecidedSchema: GenMessage<ExportersDecided> = /*@__PURE__*/
+  messageDesc(file_opamp_sdk_v1_settings, 25);
 
 /**
  * Test-only: what the reference matchers make of one input under a settings document, so that
@@ -1062,7 +1231,7 @@ export type Evaluate = Message<"opamp.sdk.v1.Evaluate"> & {
  * Use `create(EvaluateSchema)` to create a new message.
  */
 export const EvaluateSchema: GenMessage<Evaluate> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 22);
+  messageDesc(file_opamp_sdk_v1_settings, 26);
 
 /**
  * A run of a rate cap from a full bucket: sampling_traces_per_second's for spans,
@@ -1088,7 +1257,7 @@ export type CapRun = Message<"opamp.sdk.v1.CapRun"> & {
  * Use `create(CapRunSchema)` to create a new message.
  */
 export const CapRunSchema: GenMessage<CapRun> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 23);
+  messageDesc(file_opamp_sdk_v1_settings, 27);
 
 /**
  * @generated from enum opamp.sdk.v1.CapRun.Signal
@@ -1109,7 +1278,7 @@ export enum CapRun_Signal {
  * Describes the enum opamp.sdk.v1.CapRun.Signal.
  */
 export const CapRun_SignalSchema: GenEnum<CapRun_Signal> = /*@__PURE__*/
-  enumDesc(file_opamp_sdk_v1_settings, 23, 0);
+  enumDesc(file_opamp_sdk_v1_settings, 27, 0);
 
 /**
  * @generated from message opamp.sdk.v1.CapEvent
@@ -1149,7 +1318,7 @@ export type CapEvent = Message<"opamp.sdk.v1.CapEvent"> & {
  * Use `create(CapEventSchema)` to create a new message.
  */
 export const CapEventSchema: GenMessage<CapEvent> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 24);
+  messageDesc(file_opamp_sdk_v1_settings, 28);
 
 /**
  * A span's, span event's, span link's or log record's attributes, and a log record's body.
@@ -1175,7 +1344,7 @@ export type Attributes = Message<"opamp.sdk.v1.Attributes"> & {
  * Use `create(AttributesSchema)` to create a new message.
  */
 export const AttributesSchema: GenMessage<Attributes> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 25);
+  messageDesc(file_opamp_sdk_v1_settings, 29);
 
 /**
  * A log record at the log gate.
@@ -1203,7 +1372,7 @@ export type LogRecord = Message<"opamp.sdk.v1.LogRecord"> & {
  * Use `create(LogRecordSchema)` to create a new message.
  */
 export const LogRecordSchema: GenMessage<LogRecord> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 26);
+  messageDesc(file_opamp_sdk_v1_settings, 30);
 
 /**
  * What a sampler sees when a span starts.
@@ -1241,7 +1410,7 @@ export type SpanStart = Message<"opamp.sdk.v1.SpanStart"> & {
  * Use `create(SpanStartSchema)` to create a new message.
  */
 export const SpanStartSchema: GenMessage<SpanStart> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 27);
+  messageDesc(file_opamp_sdk_v1_settings, 31);
 
 /**
  * @generated from message opamp.sdk.v1.Evaluated
@@ -1295,7 +1464,7 @@ export type Evaluated = Message<"opamp.sdk.v1.Evaluated"> & {
  * Use `create(EvaluatedSchema)` to create a new message.
  */
 export const EvaluatedSchema: GenMessage<Evaluated> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 28);
+  messageDesc(file_opamp_sdk_v1_settings, 32);
 
 /**
  * @generated from message opamp.sdk.v1.SpanSampling
@@ -1329,7 +1498,7 @@ export type SpanSampling = Message<"opamp.sdk.v1.SpanSampling"> & {
  * Use `create(SpanSamplingSchema)` to create a new message.
  */
 export const SpanSamplingSchema: GenMessage<SpanSampling> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 29);
+  messageDesc(file_opamp_sdk_v1_settings, 33);
 
 /**
  * @generated from enum opamp.sdk.v1.SpanSampling.How
@@ -1361,7 +1530,7 @@ export enum SpanSampling_How {
  * Describes the enum opamp.sdk.v1.SpanSampling.How.
  */
 export const SpanSampling_HowSchema: GenEnum<SpanSampling_How> = /*@__PURE__*/
-  enumDesc(file_opamp_sdk_v1_settings, 29, 0);
+  enumDesc(file_opamp_sdk_v1_settings, 33, 0);
 
 /**
  * @generated from message opamp.sdk.v1.Request
@@ -1418,6 +1587,12 @@ export type Request = Message<"opamp.sdk.v1.Request"> & {
      */
     value: Commit;
     case: "commit";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.Exporters exporters = 9;
+     */
+    value: Exporters;
+    case: "exporters";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1426,7 +1601,7 @@ export type Request = Message<"opamp.sdk.v1.Request"> & {
  * Use `create(RequestSchema)` to create a new message.
  */
 export const RequestSchema: GenMessage<Request> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 30);
+  messageDesc(file_opamp_sdk_v1_settings, 34);
 
 /**
  * @generated from message opamp.sdk.v1.Reply
@@ -1491,6 +1666,12 @@ export type Reply = Message<"opamp.sdk.v1.Reply"> & {
      */
     value: Plan;
     case: "plan";
+  } | {
+    /**
+     * @generated from field: opamp.sdk.v1.ExportersDecided exporters_decided = 10;
+     */
+    value: ExportersDecided;
+    case: "exportersDecided";
   } | { case: undefined; value?: undefined };
 };
 
@@ -1499,7 +1680,7 @@ export type Reply = Message<"opamp.sdk.v1.Reply"> & {
  * Use `create(ReplySchema)` to create a new message.
  */
 export const ReplySchema: GenMessage<Reply> = /*@__PURE__*/
-  messageDesc(file_opamp_sdk_v1_settings, 31);
+  messageDesc(file_opamp_sdk_v1_settings, 35);
 
 /**
  * As OTLP numbers them.

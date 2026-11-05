@@ -68,8 +68,9 @@ Every control is carried out, EDOT's own additions included:
 - **EDOT's span logger.** EDOT adds a span logger to every SDK, which writes spans to the agent's
   log once Elastic's central configuration turns debug logging on. With EDOT's OpAMP client off
   nothing can, so the extension leaves it alone. With `ELASTIC_OTEL_OPAMP_ENDPOINT` set, it counts
-  as an exporter past the gate. The trace gate's controls (`signal_exports.traces`,
-  `attribute_redaction`, `scrubbing`) are then set aside, and the agent logs a WARNING naming it.
+  as an exporter past the gates: it is reported to the server as ungoverned
+  (`DebugLogSpanExporter`, `gated` false), and the agent logs a WARNING naming it. Every control
+  is still carried out on the spans the agent's own exporters send.
 
 EDOT's agent writes its own log, and the extension's lines in it, to standard output.
 

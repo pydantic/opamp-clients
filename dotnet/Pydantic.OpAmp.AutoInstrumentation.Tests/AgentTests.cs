@@ -309,8 +309,14 @@ public class AgentTests
         Agent.Await(new TaskCompletionSource().Task, TimeSpan.Zero); // never ends: given up on
     }
 
+    /// <summary>Each signal's exporters in the inventory, by name: whether gated.</summary>
+    private static Dictionary<string, Dictionary<string, bool>> Listed(Agent agent) =>
+        agent.Inventory().Exporters.GroupBy(e => e.Signal).ToDictionary(g => g.Key, g => g.ToDictionary(e => e.Name, e => e.Gated));
+
+    // An exporter no gate is in front of (console) is reported ungoverned, and narrows nothing: a
+    // policy that switches its signal off is APPLIED to every exporter the gates govern.
     [Fact]
-    public void AnOverrideOfASignalThatCantBeStoppedIsRefused()
+    public void AnExporterNoGateIsInFrontOfIsReportedUngovernedAndThePolicyApplied()
     {
         var p = new Process
         {
@@ -320,20 +326,18 @@ public class AgentTests
             },
         };
         var agent = p.Prepare()!;
-        Assert.Equal(new[] { "send_traces" }, agent.HostNow(providersBuilt: false).Undeclared());
+        Assert.Empty(agent.HostNow(providersBuilt: false).Undeclared());
+        Assert.Equal(new Dictionary<string, bool> { ["console"] = false }, Listed(agent)["traces"]);
         var status = agent.RemoteConfig(Config(Policy.Stop("traces", "logs")));
-        Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
-        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", status.ErrorMessage);
-        Assert.True(agent.Controls.SendTraces); // nothing could stop it
-        Assert.True(agent.Controls.SendLogs); // a refused policy changes nothing
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("logs"))).Status);
+        Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
+        Assert.False(agent.Controls.SendTraces);
         Assert.False(agent.Controls.SendLogs);
     }
 
-    // OTLP beside another exporter: only OTLP could be stopped, so the setting is not carried out
-    // at all, rather than half (and the OTLP one is not gated either). A policy that overrides it is refused.
+    // OTLP beside another exporter: the OTLP one is gated, governed by the policy, and the other
+    // reported ungoverned.
     [Fact]
-    public void ASignalWithAnotherExporterBesideOtlpIsNotCarriedOut()
+    public void OtlpBesideAnotherExporterIsGatedAndTheOtherReportedUngoverned()
     {
         var p = new Process
         {
@@ -345,28 +349,25 @@ public class AgentTests
             },
         };
         var agent = p.Prepare()!;
-        Assert.Equal(new[] { "send_metrics" }, agent.HostNow(providersBuilt: false).Undeclared());
-        Assert.DoesNotContain("send_metrics", agent.HostNow(providersBuilt: true).Live);
-        var status = agent.RemoteConfig(Config(Policy.Stop("metrics", "logs")));
-        Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
-        Assert.Equal("signal_exports.metrics: this SDK cannot apply the requested override", status.ErrorMessage);
-        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("logs"))).Status);
-        Assert.True(agent.Controls.SendMetrics);
+        Assert.Empty(agent.HostNow(providersBuilt: true).Undeclared().Where(u => u.StartsWith("send_", StringComparison.Ordinal)));
+        Assert.Equal(new Dictionary<string, bool> { ["otlp"] = true, ["console"] = false }, Listed(agent)["metrics"]);
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(Policy.Stop("metrics", "logs"))).Status);
+        Assert.False(agent.Controls.SendMetrics);
         Assert.False(agent.Controls.SendLogs);
         // The server is told what is in force.
-        Assert.Equal("""{"signal_exports.logs":{"enabled":false}}""", Policy.Overrides(agent.Effective));
+        Assert.Equal("""{"signal_exports.logs":{"enabled":false},"signal_exports.metrics":{"enabled":false}}""", Policy.Overrides(agent.Effective));
 
         var options = new OpenTelemetry.Exporter.OtlpExporterOptions();
         var own = options.HttpClientFactory;
         agent.Gate(options, Signal.Metrics);
-        Assert.Same(own, options.HttpClientFactory);
+        Assert.NotSame(own, options.HttpClientFactory);
     }
 
     // The SDK's exporters build TLS from these variables into their own HTTP clients; a gate's
-    // carries the same. Ones it can't use leave every exporter as it is: no signal can be
-    // stopped. A signal's own TLS variables the SDK doesn't read: they stop nothing.
+    // carries the same. Ones it can't use leave every exporter as it is, reported ungoverned. A
+    // signal's own TLS variables the SDK doesn't read: they change nothing.
     [Fact]
-    public void TlsTheGateCantCarryLeavesEverySignalAsItIs()
+    public void TlsTheGateCantCarryLeavesEveryExporterAsItIsAndUngoverned()
     {
         var pki = new TlsTests.Pki();
         var with = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir() } };
@@ -375,20 +376,21 @@ public class AgentTests
             with.Env[k] = v!;
         }
 
-        Assert.DoesNotContain(with.Prepare()!.HostNow(providersBuilt: false).Undeclared(), u => u.StartsWith("send_", StringComparison.Ordinal));
+        Assert.All(Listed(with.Prepare()!).Values.SelectMany(s => s.Values), Assert.True);
         var own = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir(), ["OTEL_EXPORTER_OTLP_METRICS_CLIENT_CERTIFICATE"] = "/etc/tls/client.pem" } };
-        Assert.DoesNotContain(own.Prepare()!.HostNow(providersBuilt: false).Undeclared(), u => u.StartsWith("send_", StringComparison.Ordinal));
+        Assert.All(Listed(own.Prepare()!).Values.SelectMany(s => s.Values), Assert.True);
         var unusable = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = TempDir(), ["OTEL_EXPORTER_OTLP_CERTIFICATE"] = "/nonexistent/ca.pem" } };
         var agent = unusable.Prepare()!;
-        Assert.Equal(new[] { "send_traces", "send_metrics", "send_logs", "send_logs_level" }, agent.HostNow(providersBuilt: false).Undeclared().Where(u => u.StartsWith("send_", StringComparison.Ordinal)));
-        var refused = agent.RemoteConfig(Config(Policy.Stop("traces")));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("signal_exports.traces: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.True(agent.Controls.SendTraces); // nothing could stop it
+        Assert.Empty(agent.HostNow(providersBuilt: false).Undeclared().Where(u => u.StartsWith("send_", StringComparison.Ordinal)));
+        Assert.All(Listed(agent).Values.SelectMany(s => s.Values), Assert.False);
+        var options = new OpenTelemetry.Exporter.OtlpExporterOptions();
+        var factory = options.HttpClientFactory;
+        agent.Gate(options, Signal.Traces);
+        Assert.Same(factory, options.HttpClientFactory); // left as it is
     }
 
     [Fact]
-    public void UnderFileBasedConfigurationOnlySamplingIsCarriedOut()
+    public void UnderFileBasedConfigurationTheInstrumentationSwitchesArentCarriedOut()
     {
         var p = new Process { Env = { ["OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED"] = "true", ["OTEL_OPAMP_STATE_DIR"] = TempDir() } };
         var first = p.Prepare()!;
@@ -401,26 +403,23 @@ public class AgentTests
         var next = new Process { Env = { ["OTEL_EXPERIMENTAL_FILE_BASED_CONFIGURATION_ENABLED"] = "true", ["OTEL_OPAMP_STATE_DIR"] = p.Env["OTEL_OPAMP_STATE_DIR"] } };
         var agent = next.Prepare()!;
         Assert.Empty(next.Set);
-        Assert.Equal(
-            new[] { "deactivate_instrumentations", "deactivate_all_instrumentations", "send_traces", "send_metrics", "send_logs", "send_logs_level" },
-            agent.HostNow(providersBuilt: false).Undeclared());
+        Assert.Equal(new[] { "deactivate_instrumentations", "deactivate_all_instrumentations" }, agent.HostNow(providersBuilt: false).Undeclared());
     }
 
-    // The logs floor is held at the OTLP logs exporter's gate: with no OTLP logs exporter, nothing holds it.
+    // The logs floor is held at the OTLP logs exporter's gate; a console logs exporter beside none
+    // is reported ungoverned, and the floor is still declared and applied.
     [Fact]
-    public void WithoutAnOtlpLogsExporterSendLogsLevelIsNotCarriedOut()
+    public void WithoutAnOtlpLogsExporterTheLogsExporterIsUngovernedAndTheFloorApplied()
     {
         var p = new Process { Env = { ["OTEL_LOGS_EXPORTER"] = "console" } };
         var agent = p.Prepare()!;
-        Assert.Equal(new[] { "send_logs", "send_logs_level" }, agent.HostNow(providersBuilt: false).Undeclared());
+        Assert.Empty(agent.HostNow(providersBuilt: false).Undeclared());
+        Assert.Equal(new Dictionary<string, bool> { ["console"] = false }, Listed(agent)["logs"]);
         var errors = Policy.Of(("log_levels", """{"level":"error"}"""));
-        var refused = agent.RemoteConfig(Config(errors));
-        Assert.Equal(RemoteConfigStatuses.Failed, refused.Status);
-        Assert.Equal("log_levels: level: this SDK cannot apply the requested override", refused.ErrorMessage);
-        Assert.Equal(0u, agent.Controls.LogsFloor); // nothing could hold it
+        Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(errors)).Status);
+        Assert.Equal(17u, agent.Controls.LogsFloor);
 
         var otlp = new Process().Prepare()!;
-        Assert.DoesNotContain("send_logs_level", otlp.HostNow(providersBuilt: false).Undeclared());
         Assert.Equal(RemoteConfigStatuses.Applied, otlp.RemoteConfig(Config(errors)).Status);
         Assert.Equal(17u, otlp.Controls.LogsFloor);
         otlp.RemoteConfig(Config(Policy.Local));

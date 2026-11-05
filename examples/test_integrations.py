@@ -17,6 +17,7 @@ import textwrap
 import time
 import unittest
 import unittest.mock
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -686,6 +687,66 @@ class Truth(unittest.TestCase):
         log.events += [{**e, "t": e["t"] + 0.1, "ends": [e["ends"][0] + 0.001]} for e in list(log.events)
                        if e["event"] == "otlp" and e["signal"] == "traces" and 110 < e["t"] < 120]
         self.assertEqual(failed(judge_truth(log.events, set())), [])
+
+    @staticmethod
+    def reported(log: Log, ungoverned: dict[str, str], status: str = "ungoverned", t: float = 1) -> Log:
+        """The inventory and an export health report: an OTLP exporter of each signal, gated, and
+        beside it each of `ungoverned`'s (signal: identity) not gated, its health child `status`."""
+        exporters = {s: {"components": {"otlp@127.0.0.1:1": {"metadata": {"gated": True}}}
+                         | ({ungoverned[s]: {"metadata": {"gated": False}}} if s in ungoverned else {})}
+                     for s in ("traces", "metrics", "logs")}
+        log.events.insert(1, {"event": "a2s", "t": t, "uid": UID, "disconnect": False, "fields": ["available_components"],
+                              "components": {"exporters": {"components": exporters}}})
+        children = {s: {"healthy": True, "status": "ok", "components": {
+            name: {"healthy": True, "status": "governed" if e["metadata"]["gated"] else status}
+            for name, e in d["components"].items()}} for s, d in exporters.items()}
+        log.events.insert(2, {"event": "a2s", "t": t + 0.1, "uid": UID, "disconnect": False, "fields": ["health"],
+                              "health": {"healthy": True, "components": {"exporters": {"components": children}}}})
+        return log
+
+    def test_an_exporter_past_the_gates_reported_ungoverned_and_sending_to_the_second_sink_passes(self):
+        log = self.reported(truth(), {"traces": "otlp@127.0.0.1:2"})
+        self.assertEqual(failed(judge_truth(log.events, set(), ungoverned=frozenset({"traces"}),
+                                            second=frozenset({"traces"}))), [])
+
+    def test_an_ungoverned_exporter_not_reported_so_or_not_sending_fails(self):
+        cases = {
+            "health says otherwise": (self.reported(truth(), {"logs": "x"}, status="governed"), {"logs"}, {"logs"},
+                                      "logs: export health reports them ungoverned"),
+            "nothing at the second sink": (self.reported(truth(), {"logs": "x"}), {"logs"}, set(),
+                                           "logs: the second sink received them"),
+            "not listed": (self.reported(truth(), {}), {"logs"}, {"logs"}, "the inventory reports ungoverned"),
+            "one more listed": (self.reported(truth(), {"metrics": "x"}), set(), set(), "the inventory reports ungoverned"),
+        }
+        for name, (log, ungoverned, second, want) in cases.items():
+            with self.subTest(name):
+                out = failed(judge_truth(log.events, set(), ungoverned=frozenset(ungoverned), second=frozenset(second)))
+                self.assertTrue(out and out[0].startswith(want), out)
+
+    def test_a_signal_all_past_the_gates_needs_its_settings_in_force_alone(self):
+        # The application's own provider in place of the SDK's: no span reaches the first sink.
+        log = truth()
+        log.events = [e for e in log.events if not (e["event"] == "otlp" and e["signal"] == "traces")]
+        log = self.reported(log, {"traces": "app_provider"})
+        args = {"ungoverned": frozenset({"traces"}), "second": frozenset({"traces"})}
+        self.assertEqual(failed(judge_truth(log.events, set(), past=frozenset({"traces"}), **args)), [])
+        # Without `past`, the first sink shows none of it carried out.
+        self.assertIn("baseline: traces arrive", failed(judge_truth(log.events, set(), **args)))
+        # In force all the same: one set aside is still judged.
+        local = truth(local=frozenset({"send_traces"}))
+        local.events = [e for e in local.events if not (e["event"] == "otlp" and e["signal"] == "traces")]
+        out = failed(judge_truth(self.reported(local, {"traces": "app_provider"}).events, set(),
+                                 past=frozenset({"traces"}), **args))
+        self.assertEqual(len(out), 1)
+        self.assertIn("not expected: ['send_traces']", out[0])
+
+    def test_the_second_sink_takes_an_otlp_export_and_says_which_signal(self):
+        with integrations.second_sink("127.0.0.1:0") as (port, received):
+            request = urllib.request.Request(f"http://127.0.0.1:{port}/v1/logs", data=b"x", method="POST",
+                                             headers={"Content-Type": "application/x-protobuf"})
+            with urllib.request.urlopen(request, timeout=5) as answer:
+                self.assertEqual((answer.status, answer.read()), (200, b""))
+            self.assertEqual(received, {"logs"})
 
     def test_the_scenario_offers_each_policy_once_in_order(self):
         for at_once in (False, True):

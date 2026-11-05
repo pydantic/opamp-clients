@@ -70,37 +70,23 @@ final class Extension {
       "send_logs_level_by_scope", "send_logs_per_second", "debug_send_logs_level", "drop_attributes",
       "mask_attributes", "scrub_defaults", "scrub_patterns");
   static final List<String> NEXT_START = List.of("deactivate_instrumentations", "deactivate_all_instrumentations");
-  /** What each signal's gate holds: carried out only where every exporter of the signal is gated. */
-  static final Map<String, List<String>> GATED = Map.of(
-      "traces", List.of("send_traces", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns"),
-      "metrics", List.of("send_metrics"),
-      "logs", List.of("send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-          "debug_send_logs_level", "drop_attributes", "mask_attributes", "scrub_defaults", "scrub_patterns"));
   /** What the extension's sampler holds: carried out only where the SDK's sampler is the extension's. */
   static final List<String> SAMPLED = List.of("sampling_rate", "sampling_rules", "sampling_traces_per_second",
       "debug_sampling_rate");
   /**
-   * Every setting: autoconfigure wraps every exporter it builds, and so does a configuration file
-   * of batch and simple processors and periodic and pull readers ({@link Declarative#ungated}).
+   * Every setting. The policy governs every exporter the agent builds; one it can't reach (another
+   * extension's processor or reader, a component of the configuration file's own) is reported
+   * ungoverned in the inventory and export health, and never narrows what is declared.
    */
-  static final SettingsProto.Host HOST = host(Set.of());
-
-  /** The host where the exporters of {@code ungated} signals pass no gate of the agent's. */
-  static SettingsProto.Host host(Set<String> ungated) {
-    return host(ungated, false);
-  }
+  static final SettingsProto.Host HOST = host(false);
 
   /**
-   * The host where the exporters of {@code ungated} signals pass no gate of the agent's, and, with
-   * {@code samplerOutside}, the SDK samples with a sampler other than the extension's.
+   * The host: every setting but, with {@code samplerOutside}, those the extension's sampler holds,
+   * as the SDK samples with another extension's sampler.
    */
-  static SettingsProto.Host host(Set<String> ungated, boolean samplerOutside) {
-    Set<String> out = new HashSet<>();
-    ungated.forEach(signal -> out.addAll(GATED.get(signal)));
-    if (samplerOutside) {
-      out.addAll(SAMPLED);
-    }
-    return SettingsProto.Host.newBuilder().addAllLive(LIVE.stream().filter(k -> !out.contains(k)).toList())
+  static SettingsProto.Host host(boolean samplerOutside) {
+    return SettingsProto.Host.newBuilder()
+        .addAllLive(LIVE.stream().filter(k -> !samplerOutside || !SAMPLED.contains(k)).toList())
         .addAllNextStart(NEXT_START).build();
   }
 
@@ -136,6 +122,11 @@ final class Extension {
   final Outside outside = new Outside();
   /** What the agent runs, as the exporters were built: reported at start, as available components. */
   final Inventory inventory = new Inventory();
+
+  {
+    // The listed exporters are decided by the extension's own layer.
+    inventory.layer = this::layer;
+  }
   private volatile Opamp.AvailableComponents components;
   /** The wall clock, in milliseconds since the Unix epoch: what debug mode is decided by. */
   java.util.function.LongSupplier wallClock = System::currentTimeMillis;
@@ -154,12 +145,11 @@ final class Extension {
    */
   private boolean canSave;
   /**
-   * What the agent carries out ({@link #HOST}, narrowed by {@link #notGated}, {@link #outside} and
-   * {@link #built}); {@link #host} adds {@code custom}.
+   * What the agent carries out ({@link #HOST}, without the sampler's settings once {@link #built}
+   * finds another sampler); {@link #host} adds {@code custom}.
    */
   private SettingsProto.Host declared = HOST;
-  /** The signals whose telemetry goes past a gate, and whether the SDK's sampler isn't the extension's. */
-  private final Set<String> ungated = new java.util.TreeSet<>();
+  /** Whether the SDK samples with a sampler other than the extension's. */
   private boolean samplerOutside;
   /** The settings loaded at start: the next-start ones in force until the next restart. */
   private SettingsProto.Loaded loaded;
@@ -545,7 +535,6 @@ final class Extension {
   synchronized Map<String, String> properties(ConfigProperties config, Map<String, String> env) {
     hooked = true;
     declared = HOST;
-    ungated.clear();
     samplerOutside = false;
     if (!coreLoads(coreUnavailable.get())) {
       setup = null;
@@ -594,38 +583,18 @@ final class Extension {
   }
 
   /**
-   * Under a configuration file, once the model is read: the signals whose processors or readers
-   * aren't ones the agent gates. What their gates hold isn't carried out: the settings are loaded
-   * again without it, before the SDK is built.
-   */
-  synchronized void notGated(Set<String> signals) {
-    ungated.addAll(signals);
-    if (!narrow().isEmpty()) {
-      LOG.warning("OpAMP: the configuration file's " + String.join(", ", new java.util.TreeSet<>(signals))
-          + " pass a processor or reader other than batch, simple, periodic or pull, which the agent can't"
-          + " gate; the server's settings for them aren't carried out");
-    }
-  }
-
-  /**
    * Under autoconfigure, once every customizer has run: another extension added {@code added} (a
    * span or log record processor, or a metric reader, by name) to the SDK's {@code signal}, and
-   * what it exports goes past the gate. The gate's settings for that signal are set aside: the
-   * settings are loaded again without them, before the SDK is built. The inventory lists each as
-   * ungated.
+   * what it exports goes past the gates. Each is listed ungoverned in the inventory and export
+   * health; the policy still governs every exporter the agent built, so nothing is set aside.
    */
   synchronized void outside(String signal, List<String> added) {
     if (added.isEmpty()) {
       return;
     }
     inventory.outside(signal, added);
-    ungated.add(signal);
-    List<String> lost = narrow();
-    if (!lost.isEmpty()) {
-      LOG.warning("OpAMP: another extension added " + String.join(", ", added) + " to the SDK's " + signal
-          + ", which exports past this extension's gate; set aside, as it can't carry them out: "
-          + String.join(", ", lost));
-    }
+    // Decided at once, so the layer's warning for each is logged now.
+    inventory.listed();
   }
 
   /**
@@ -651,7 +620,7 @@ final class Extension {
    * The live settings it declares no more, in order (none: nothing changed).
    */
   private List<String> narrow() {
-    SettingsProto.Host narrowed = host(ungated, samplerOutside);
+    SettingsProto.Host narrowed = host(samplerOutside);
     if (narrowed.equals(declared) || loaded == null) {
       return List.of();
     }
@@ -1099,11 +1068,12 @@ final class Extension {
   /**
    * The agent health to send for these counts and settings at {@code nowUnixMs}, or null when the
    * layer says not to send. The top level stays healthy (the application's); export health is its
-   * {@code component_health_map["exporters"]}.
+   * {@code component_health_map["exporters"]}, with a child for each exporter the inventory lists.
    */
   synchronized Opamp.ComponentHealth health(SettingsProto.ExportCounts counts, SettingsProto.Settings settings,
       long nowUnixMs) {
-    SettingsProto.HealthReport r = layer().health(counts, healthReport, nowUnixMs, settings);
+    SettingsProto.HealthReport r = layer().health(counts, healthReport, nowUnixMs, settings,
+        inventory.listed());
     healthReport = r;
     if (!r.getSend()) {
       return null;

@@ -17,6 +17,8 @@ import {
   Commit_Saved,
   type Decision,
   type ExportCountsSchema,
+  type ExportersDecided,
+  type FoundExporterSchema,
   type HealthReport,
   type HostSchema,
   type InventorySchema,
@@ -40,6 +42,8 @@ export type HostInit = MessageInitShape<typeof HostSchema>;
 
 /** What the integration lists of itself and its SDK (docs/available-components.md#what-the-sdk-integrations-report). */
 export type InventoryInit = MessageInitShape<typeof InventorySchema>;
+/** An exporter as an integration found it on its SDK's providers, for `exporters`. */
+export type FoundExporterInit = MessageInitShape<typeof FoundExporterSchema>;
 
 let compiled: WebAssembly.Module | undefined;
 
@@ -148,15 +152,17 @@ export class SdkSettings {
   /**
    * Export health, from the gates' counts since start: whether to send it now, and the entry for
    * the agent health's `component_health_map["exporters"]`. `previous`: what the last call
-   * answered; `settings`: those in force.
+   * answered; `settings`: those in force; `exporters`: each exporter as the inventory lists it,
+   * reported governed or ungoverned under its signal.
    */
   health(
     counts: MessageInitShape<typeof ExportCountsSchema>,
     previous: HealthReport | undefined,
     nowUnixMs: bigint,
     settings?: MessageInitShape<typeof SettingsSchema>,
+    exporters: readonly { signal: string; name: string; gated: boolean; destination?: string }[] = [],
   ): HealthReport {
-    const r = this.#call({ call: { case: "health", value: { counts, previous, nowUnixMs, settings } } });
+    const r = this.#call({ call: { case: "health", value: { counts, previous, nowUnixMs, settings, exporters: [...exporters] } } });
     if (r.result.case !== "healthReport") throw new Error(`health answered ${r.result.case}`);
     return r.result.value;
   }
@@ -179,6 +185,20 @@ export class SdkSettings {
   components(inventory: InventoryInit, host?: HostInit, nowUnixMs = 0n): AvailableComponents {
     const r = this.#call({ call: { case: "components", value: { inventory, nowUnixMs, ...(host ? { host } : {}) } } });
     if (r.result.case !== "availableComponents") throw new Error(`components answered ${r.result.case}`);
+    return r.result.value;
+  }
+
+  /**
+   * What Fleet is told of the exporters found on the SDK's providers, decided the same in every
+   * language: the name each is listed under, where it sends (its own endpoint, else the
+   * `OTEL_EXPORTER_*` variables in `env`), the governed and ungoverned signals, and a warning for
+   * each ungoverned exporter. At start and when the providers change; never per span.
+   */
+  exporters(found: FoundExporterInit[], env: Record<string, string | undefined> = {}, defaultProtocol = ""): ExportersDecided {
+    const vars = Object.entries(env).flatMap(([name, value]) =>
+      name.startsWith("OTEL_EXPORTER_") && value !== undefined ? [{ name, value }] : []);
+    const r = this.#call({ call: { case: "exporters", value: { found, env: vars, defaultProtocol } } });
+    if (r.result.case !== "exportersDecided") throw new Error(`exporters answered ${r.result.case}`);
     return r.result.value;
   }
 

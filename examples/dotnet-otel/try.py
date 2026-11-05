@@ -43,9 +43,11 @@ told of each change (OpAmpAppSettings.OnChange) (docs/app-settings.md).
 
 Last, check_truth (examples/integrations.py) under the setups Setups.cs carries out, named in
 EXAMPLE_SETUP: plugin-exporters, a plugin of the application's own adding a span exporter and a
-log record processor; own-sdk, the application's own tracer and meter providers under
-OTEL_DOTNET_AUTO_SETUP_SDK=false. Each setting shows in the telemetry or is named as set aside,
-and the settings set aside are exactly those the setup takes from the plugin.
+log record processor exporting to a second sink; own-sdk, the application's own tracer and meter
+providers under OTEL_DOTNET_AUTO_SETUP_SDK=false, exporting there too. Each setting shows in the
+telemetry or is named as set aside; only own-sdk sets any aside (the sampler's settings: the
+plugin's sampler isn't in the application's provider), and what the gates aren't in front of is
+reported ungoverned.
 """
 from __future__ import annotations
 
@@ -452,14 +454,14 @@ def check_newer_settings(launch_, target_: Path, listen: str) -> bool:
 #: The plugin first (after EDOT's with --edot), then the application's own (Setups.cs), which automatic
 #: instrumentation calls after it.
 PLUGINS = PLUGIN + ":Example.ExtraExporters, App"
-#: What a span exporter and a log record processor of the application's own plugin take from the
-#: plugin's control: their gates' settings, set aside. The sampler stays the plugin's.
-PLUGIN_EXPORTERS = {"send_traces", "send_logs", "send_logs_level", "send_logs_level_by_scope", "send_logs_per_second",
-                    "mask_attributes", "drop_attributes"}
-#: What the application's own tracer and meter providers take (OTEL_DOTNET_AUTO_SETUP_SDK=false):
-#: the sampler and the traces and metrics gates. The logs stay automatic instrumentation's.
-OWN_SDK = {"send_traces", "send_metrics", "sampling_rate", "sampling_rules", "sampling_traces_per_second",
-           "mask_attributes", "drop_attributes"}
+#: The signals of the span exporter and log record processor the application's own plugin adds
+#: beside the plugin's gated exporters: reported ungoverned.
+PLUGIN_EXPORTERS = frozenset({"traces", "logs"})
+#: The application's own tracer and meter providers (OTEL_DOTNET_AUTO_SETUP_SDK=false): every span
+#: and metric past the gates (reported as app_provider), and the plugin's sampler not in them, so
+#: its settings set aside. The logs stay automatic instrumentation's, governed.
+OWN_SDK = frozenset({"traces", "metrics"})
+OWN_SDK_ASIDE = {"sampling_rate", "sampling_rules", "sampling_traces_per_second"}
 
 LISTEN = "127.0.0.1:0" if LOCAL else "0.0.0.0:0"
 CHECKS = {
@@ -469,10 +471,12 @@ CHECKS = {
     "rotation": lambda: check_rotation(launch, TARGET, listen=LISTEN, host=HOST),
     "newer": lambda: check_newer_settings(launch, TARGET, listen=LISTEN),
     "app": lambda: check_app_settings(launch, TARGET, listen=LISTEN),
-    "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", PLUGIN_EXPORTERS, listen=LISTEN,
-                                                  env={"OTEL_DOTNET_AUTO_PLUGINS": PLUGINS}),
-    "truth-own-sdk": lambda: check_truth(launch, TARGET, "own-sdk", OWN_SDK, listen=LISTEN,
-                                         env={"OTEL_DOTNET_AUTO_SETUP_SDK": "false"}),
+    "truth-plugin-exporters": lambda: check_truth(launch, TARGET, "plugin-exporters", set(), listen=LISTEN,
+                                                  env={"OTEL_DOTNET_AUTO_PLUGINS": PLUGINS},
+                                                  ungoverned=PLUGIN_EXPORTERS, host=HOST),
+    "truth-own-sdk": lambda: check_truth(launch, TARGET, "own-sdk", OWN_SDK_ASIDE, listen=LISTEN,
+                                         env={"OTEL_DOTNET_AUTO_SETUP_SDK": "false"},
+                                         ungoverned=OWN_SDK, past=OWN_SDK, host=HOST),
 }
 
 if __name__ == "__main__":

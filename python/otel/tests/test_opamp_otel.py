@@ -27,6 +27,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
 import pydantic_opamp_otel
+from _globals import sdk_globals
 from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
 from kept import keep_applied
 from pydantic_opamp_otel import Agent, Controls, Setup, disabled_instrumentations
@@ -47,7 +48,7 @@ def _own_state_home(tmp_path_factory, monkeypatch):
 
 def settings(doc: str):
     """The settings as the layer hands them to the package where it built the SDK."""
-    return LAYER.load(doc.encode(), pydantic_opamp_otel.sdk_host(["otlp"])).settings
+    return LAYER.load(doc.encode(), pydantic_opamp_otel.sdk_host()).settings
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
@@ -204,15 +205,21 @@ def described(server, configured: bool, tmp_path) -> dict:
     return out
 
 
-def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carries_out(server, tmp_path):
+def test_the_description_names_the_policy_formats_and_the_controls_this_sdk_carries_out(server, tmp_path,
+                                                                                      monkeypatch):
+    sdk_globals(monkeypatch)
     ours = described(server, True, tmp_path / "ours")
     assert ours["logfire.opamp.config_format"] == V1
     assert {"head_sampling", "signal_exports.traces", "sampling_rules", "debug", "app_settings",
             "instrumentations"} <= set(ours["logfire.opamp.supported_controls"])
-    # Under another configurator the sampler and the gates are not this package's.
+    # Under another configurator the sampler is not this package's; the gates are, on its SDK.
     other = described(server, False, tmp_path / "other")["logfire.opamp.supported_controls"]
-    assert "head_sampling" not in other and "signal_exports.traces" not in other
-    assert "app_settings" in other
+    assert "head_sampling" not in other and "debug" not in other
+    assert {"signal_exports.traces", "attribute_redaction", "app_settings"} <= set(other)
+    # With no SDK behind the global providers there is nothing to gate either.
+    monkeypatch.undo()
+    bare = described(server, False, tmp_path / "bare")["logfire.opamp.supported_controls"]
+    assert "signal_exports.traces" not in bare and "app_settings" in bare
 
 
 def test_a_next_start_change_is_applied_where_the_client_keeps_state_and_refused_where_none_is(tmp_path):
@@ -243,7 +250,8 @@ def test_the_settings_to_start_with_are_the_config_the_client_kept_applied_else_
     assert agent.controls.sampler._rate == 0.25
 
 
-def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_path):
+def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_path, monkeypatch):
+    sdk_globals(monkeypatch)
     # The server hears APPLIED once the client has saved the config with its state: a start after
     # that comes back to it, with no file of the package's own.
     offer = config(policy(head_sampling={"ratio": 0.5}, signal_exports=off("logs")))
@@ -296,10 +304,11 @@ def test_without_a_state_directory_a_next_start_change_is_failed():
     assert agent.remote_config(config(policy(head_sampling={"ratio": 0.5}))).status == APPLIED
 
 
-def test_one_uid_names_the_instance_is_kept_and_the_metric_exporter_is_gated(tmp_path):
+def test_one_uid_names_the_instance_and_is_kept_and_the_exporters_are_left_as_named(tmp_path):
     first, env1 = prepared(tmp_path, OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=prod,service.instance.id=x")
     assert first.uid.version == 7
-    assert env1["OTEL_METRICS_EXPORTER"] == "opamp"
+    # The exporters are the SDK's to build; the gates go in front of them once they are built.
+    assert "OTEL_METRICS_EXPORTER" not in env1
     # The user's only (docs/state-file.md): a mode of 0600, or on Windows an access-control list.
     assert private(tmp_path / "instance-uid")
     second, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,otlp")
@@ -325,24 +334,13 @@ def test_a_state_directory_it_cant_save_in_keeps_a_given_uuid(tmp_path):
     assert agent.uid.version == 7
 
 
-def test_send_metrics_is_not_carried_out_when_no_metric_exporter_can_be_stopped(tmp_path):
+def test_send_metrics_is_carried_out_beside_a_metric_reader_that_cant_be_stopped(tmp_path):
+    # A pull reader (prometheus) can't be gated: it is reported ungoverned once the SDK is built
+    # (test_inventory.py), and the policy is in force on every exporter that can.
     agent, _ = prepared(tmp_path, OTEL_METRICS_EXPORTER="console,prometheus")
     s = agent.remote_config(config(policy(signal_exports=off("metrics", "logs"))))
-    # Refused whole: nothing could stop the metrics, so nothing changes.
-    assert s.status == FAILED
-    assert s.error_message == "signal_exports.metrics: this SDK cannot apply the requested override"
-    assert agent.controls.send_metrics and agent.controls.send_logs
-    assert effective(agent) == {}
-    assert agent.remote_config(config(policy(signal_exports=off("logs")))).status == APPLIED
-    assert agent.controls.send_metrics and not agent.controls.send_logs
-    # Beside another, the OTLP exporter alone would stop: carried out by half is not carried out.
-    for names, carried in [(["otlp"], True), (["console", "otlp"], False), (["otlp", "prometheus"], False),
-                           (["none"], True), ([""], True), (["NONE"], True), (["console"], False),
-                           (["otlp_proto_http"], False)]:
-        assert ("send_metrics" in pydantic_opamp_otel.sdk_host(names).live) == carried, names
-        # Declared from the same rule that gates them: carried out exactly where every exporter is gated.
-        gated = pydantic_opamp_otel.gated_metric_exporters(names)
-        assert carried == all(n in ("opamp", "") or n.lower() == "none" for n in gated), names
+    assert s.status == APPLIED, s.error_message
+    assert not agent.controls.send_metrics and not agent.controls.send_logs
 
 
 def test_without_an_endpoint_nothing_changes():
@@ -368,6 +366,38 @@ class _Recording:
 
     def force_flush(self, *args, **kwargs):
         return True
+
+
+def test_a_retried_logfire_export_is_decided_and_counted_once_and_redacted_each_time():
+    """Regression: Logfire's RetryFewerSpansSpanExporter wrapped the gate, so halves re-sent after a
+    body-too-large error went through it again: the log cap charged twice dropped admitted log
+    spans, counted as both failed and filtered. The gate now sits above the retries, redaction
+    under them."""
+    from logfire._internal.exporters.otlp import BodyTooLargeError, RetryFewerSpansSpanExporter
+    from opentelemetry.sdk.trace import ReadableSpan
+    from opentelemetry.sdk.trace.export import SpanExportResult
+    from opentelemetry.sdk.util.instrumentation import InstrumentationScope
+
+    from pydantic_opamp_otel._logfire import _gated_spans
+
+    class Sender(_Recording):
+        def export(self, batch, *args, **kwargs):
+            if len(batch) > 2:
+                raise BodyTooLargeError(len(batch), 2)
+            self.batches.append(list(batch))
+            return SpanExportResult.SUCCESS
+
+    log = lambda name: ReadableSpan(name=name, attributes={"logfire.span_type": "log", "logfire.level_num": 9, "k": "v"},  # noqa: E731
+                                    instrumentation_scope=InstrumentationScope("logfire"))
+    c = Controls(clock=lambda: 0)
+    c.apply(settings(policy(log_rate_limit={"records_per_second": 4}, attribute_redaction={"mask": ["k"]})))
+    sender = Sender()
+    assert _gated_spans(c, RetryFewerSpansSpanExporter, sender).export([log(n) for n in "abcd"]) \
+        is SpanExportResult.SUCCESS
+    assert [[s.name for s in b] for b in sender.batches] == [["a", "b"], ["c", "d"]]
+    assert {s.attributes["k"] for b in sender.batches for s in b} == {"[REDACTED]"}
+    logs = c.counts().logs
+    assert (logs.exports_ok, logs.exports_failed, logs.items_failed, logs.items_filtered) == (1, 0, 0, 0)
 
 
 def test_logs_stop_and_start_with_send_logs():
@@ -460,20 +490,16 @@ def test_send_logs_level_drops_records_below_it_live():
 
 
 def test_send_logs_level_is_not_declared_with_send_logs_when_another_configurator_built_the_sdk():
-    live = list(pydantic_opamp_otel.sdk_host(["otlp"], configured=False).live)
+    live = list(pydantic_opamp_otel.sdk_host(configured=False, governed=False).live)
     assert "send_logs" not in live and "send_logs_level" not in live
-    assert "send_logs_level" in pydantic_opamp_otel.sdk_host(["otlp"]).live
+    assert "send_logs_level" in pydantic_opamp_otel.sdk_host().live
 
 
-def test_the_metric_exporter_is_the_otlp_one_the_protocol_picks_and_stops_with_send_metrics(monkeypatch):
-    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+def test_the_metric_gate_stops_its_exporter_with_send_metrics():
     from opentelemetry.sdk.metrics.export import MetricExportResult
 
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-    gated = pydantic_opamp_otel.GatedOtlpMetricExporter()
-    assert isinstance(gated._to, OTLPMetricExporter)
     inner = _Recording()
-    gated._to = inner
+    gated = pydantic_opamp_otel.GatedMetricExporter(inner)
     pydantic_opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
     try:
         assert gated.export("m") == MetricExportResult.SUCCESS
@@ -768,7 +794,9 @@ def test_settings_another_configurator_would_not_carry_out_are_refused(server, t
     assert effective(ours) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("traces")}
 
 
-def test_with_a_configuration_file_the_instance_is_managed_but_no_exporter_is_ours(server, tmp_path, monkeypatch):
+def test_with_a_configuration_file_the_instance_is_managed_and_gated_but_the_sampler_isnt_ours(server, tmp_path,
+                                                                                               monkeypatch):
+    sdk_globals(monkeypatch)
     monkeypatch.setenv("OTEL_CONFIG_FILE", str(tmp_path / "otel.yaml"))
     agent, _ = prepared(tmp_path, OTEL_OPAMP_ENDPOINT=server.endpoint)
     agent.start(Resource.create({"service.name": "checkout"}))  # what the Configurator does after the file's SDK
@@ -783,7 +811,9 @@ def test_with_a_configuration_file_the_instance_is_managed_but_no_exporter_is_ou
     assert s.status == FAILED
     assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
     assert switch.status == APPLIED
-    assert list(agent.host.live) == ["custom"]  # the application's own settings only
+    # The file's sampler isn't the package's; the gates go in front of the file's exporters.
+    assert not set(agent.host.live) & {*pydantic_opamp_otel.SAMPLER, *pydantic_opamp_otel.DEBUG}
+    assert {"custom", "send_traces", "mask_attributes"} <= set(agent.host.live)
     assert list(agent.host.next_start) == ["deactivate_instrumentations", "deactivate_all_instrumentations"]
     assert effective(agent) == {}  # the switch is pending the next start, which reads it
 
@@ -903,7 +933,7 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
         assert provider.sampler is agent.controls.sampler and agent.controls.sampler._rate == 0.5
         assert "deactivate_instrumentations" not in agent.host.next_start  # it instruments nothing
         (reader,) = metrics.get_meter_provider()._metric_readers
-        assert isinstance(reader._exporter, pydantic_opamp_otel.GatedOtlpMetricExporter)
+        assert isinstance(reader._exporter, pydantic_opamp_otel.GatedMetricExporter)
         print("uid", agent.uid)
     """)
     try:
@@ -996,44 +1026,40 @@ def test_in_code_the_instrumentation_switches_are_refused(tmp_path):
     assert s.status == FAILED
     assert s.error_message == "instrumentations: all_disabled: this SDK cannot apply the requested override"
     assert effective(agent) == {}
-    host = pydantic_opamp_otel.sdk_host(["otlp"], configured=False, auto_instrumented=False)
-    assert (list(host.live), list(host.next_start)) == (["custom", "send_metrics"], [])
+    host = pydantic_opamp_otel.sdk_host(configured=False, auto_instrumented=False, governed=False)
+    assert (list(host.live), list(host.next_start)) == (["custom"], [])
 
 
-def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_settings_arent_carried_out(tmp_path):
-    """configure()'s own span processor and a metric exporter named in code export past the
-    package's gates: a policy that overrides send_traces, send_metrics or redaction (which needs
-    every span) is refused, not answered as done while the spans and metrics keep going."""
+def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
+    """configure()'s own span processor and a metric exporter named in code get the package's gates
+    once the SDK is built, as every exporter does: a policy that turns the traces and metrics off
+    and redacts is APPLIED and in force on them."""
     answered = tmp_path / "answered"
-    offers = [config(policy(signal_exports=off("traces", "metrics", "logs"), attribute_redaction={"drop": ["x"]})),
-              config(policy(signal_exports=off("logs")))]
-    statuses: list[int] = []
+    offer = config(policy(signal_exports=off("traces", "metrics", "logs"), attribute_redaction={"drop": ["x"]}))
 
     def reply(msg):
+        if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
+            answered.touch()
         if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
-            statuses.append(msg.remote_config_status.status)
-            if msg.remote_config_status.status == APPLIED:
-                answered.touch()
             return None
-        # The refused policy first, then one the SDK carries out.
-        offer = offers[1] if FAILED in statuses else offers[0]
         return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import json, pathlib, time, pydantic_opamp_otel
+        import pathlib, time, pydantic_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
         pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1,
                              span_processors=[SimpleSpanProcessor(ConsoleSpanExporter())],
                              metric_exporter_names=["console"])
         agent = pydantic_opamp_otel.AGENT
+        trace.get_tracer("t").start_span("before", attributes={{"x": "secret"}}).end()
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
         trace.get_tracer("t").start_span("after").end()
-        assert agent.controls.send_traces and agent.controls.send_metrics and not agent.controls.send_logs
-        print("effective", agent.effective.config_map.config_map["logfire-sdk-policy.json"].body.decode())
+        assert not agent.controls.send_traces and not agent.controls.send_metrics
+        print("ungoverned", [e.name for e in agent.exporters if not e.gated])
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -1042,17 +1068,17 @@ def test_processors_and_exporters_passed_in_code_export_past_the_gates_so_their_
     finally:
         server.close()
     assert run.returncode == 0, run.stderr
-    assert '"name": "after"' in run.stdout  # the application's own processor still exports
-    assert json.loads(run.stdout.split("effective ")[-1]) == full(policy(signal_exports=off("logs")))
-    assert statuses.index(FAILED) < statuses.index(APPLIED)
-    assert "send_traces" in run.stderr  # warned at start
+    # The span processor given in code is gated: before the policy it exports, after it nothing.
+    assert '"name": "before"' in run.stdout and '"name": "after"' not in run.stdout
+    assert "ungoverned []" in run.stdout
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    assert not any(m.remote_config_status.status == FAILED for m in server.got)
 
 
-def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_and_says_so(tmp_path):
+def test_a_processor_added_once_the_sdk_is_built_gets_the_gates_and_the_policy_stays(tmp_path):
     """A span or log record processor the application adds to the SDK after the configurator built
-    it exports past the gates, as one passed in code does. The overrides in force through those gates
-    are then set aside: the effective config reports them local, and is reported again, rather than
-    leaving them in force while the new processor goes on exporting (#431)."""
+    it gets the gate in front of its exporter at once: the overrides stay in force and the new
+    exporter is reported as governed (#431 set them aside before)."""
     answered = tmp_path / "answered"
     offer = config(policy(head_sampling={"ratio": 1}, signal_exports=off("traces", "logs"),
                           attribute_redaction={"drop": ["x"]}))
@@ -1060,6 +1086,10 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
     def reply(msg):
         if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
             answered.touch()
+        if msg.HasField("available_components") and not msg.available_components.components:
+            # Sent only their hash: asked for in full, as a server that doesn't know them does.
+            return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid,
+                                           flags=opamp_pb2.ServerToAgentFlags_ReportAvailableComponents)
         if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
             return None
         return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
@@ -1075,17 +1105,13 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
-        def report(when):
-            print(when, agent.effective.config_map.config_map[{FILE!r}].body.decode())
-        report("before")
         trace.get_tracer_provider().add_span_processor(span_processor=SimpleSpanProcessor(ConsoleSpanExporter()))
-        report("spans")
-        _logs.get_logger_provider().add_log_record_processor(log_record_processor=BatchLogRecordProcessor(ConsoleLogExporter()))
-        report("logs")
+        _logs.get_logger_provider().add_log_record_processor(BatchLogRecordProcessor(ConsoleLogExporter()))
         trace.get_tracer("t").start_span("after").end()
-        assert agent.controls.send_traces and agent.controls.send_logs
-        assert agent.controls.sampler._rate == 1
-        time.sleep(0.5)  # the next heartbeat carries the effective config
+        assert not agent.controls.send_traces and not agent.controls.send_logs
+        print("effective", agent.effective.config_map.config_map[{FILE!r}].body.decode())
+        print("exporters", sorted((e.signal, e.name, e.gated) for e in agent.exporters))
+        time.sleep(0.5)  # the next heartbeat carries the components
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -1094,29 +1120,16 @@ def test_a_processor_added_once_the_sdk_is_built_sets_its_gates_settings_aside_a
     finally:
         server.close()
     assert run.returncode == 0, run.stderr
-    said = {line.split(" ", 1)[0]: overrides_in(json.loads(line.split(" ", 1)[1])) for line in run.stdout.splitlines()
-            if line.split(" ", 1)[0] in ("before", "spans", "logs")}
-    assert said["before"] == {"head_sampling": {"ratio": 1}, "signal_exports": off("traces", "logs"),
-                              "attribute_redaction": {"drop": ["x"]}}
-    # The span processor: the traces' export, and redaction, which needs every span, set aside.
-    assert said["spans"] == {"head_sampling": {"ratio": 1}, "signal_exports": off("logs")}
-    assert said["logs"] == {"head_sampling": {"ratio": 1}}
-    assert '"name": "after"' in run.stdout  # the application's own processor exports
-    assert "past this package's gate: send_traces" in run.stderr
-    # The server is told: the last effective config it got reports them local.
-    last = [m.effective_config for m in server.got if m.HasField("effective_config")][-1]
-    assert overrides(last) == {"head_sampling": {"ratio": 1}}
-
-
-def test_a_metric_exporter_beside_otlp_keeps_send_metrics_from_being_answered_done(tmp_path):
-    # OTLP beside prometheus. Only the OTLP one would stop, so neither does.
-    agent, env = prepared(tmp_path, OTEL_METRICS_EXPORTER="otlp,prometheus")
-    assert env["OTEL_METRICS_EXPORTER"] == "opamp,prometheus"
-    assert "send_metrics" not in agent.host.live
-    s = agent.remote_config(config(policy(signal_exports=off("metrics", "logs"))))
-    assert s.status == FAILED and agent.controls.send_metrics and agent.controls.send_logs
-    assert s.error_message == "signal_exports.metrics: this SDK cannot apply the requested override"
-    assert effective(agent) == {}
+    lines = dict(line.split(" ", 1) for line in run.stdout.splitlines() if line.split(" ", 1)[0] in
+                 ("effective", "exporters"))
+    assert overrides_in(json.loads(lines["effective"])) == {
+        "head_sampling": {"ratio": 1}, "signal_exports": off("traces", "logs"), "attribute_redaction": {"drop": ["x"]}}
+    assert lines["exporters"] == "[('logs', 'console', True), ('traces', 'console', True)]"
+    assert '"name": "after"' not in run.stdout  # the new processor's exporter is behind the gate
+    assert "past this package's gate" not in run.stderr
+    # The server is told the new exporters: the last components list them.
+    components = [m.available_components for m in server.got if m.available_components.components]
+    assert set(components[-1].components["exporters"].sub_component_map) == {"traces", "logs"}
 
 
 def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tmp_path):

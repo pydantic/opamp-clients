@@ -124,30 +124,33 @@ checked by `check_app_settings` (the check `app`): its example application reads
 |---|---|
 | `app_settings` | none of `/feature` before the first policy (the default); `/feature` once the flag is `on`, still after a policy with a bad value is FAILED naming `app_settings`, none once `app_settings` is local, again once it is `on` again; `/changed` three times (on, off, on), not for the FAILED policy or the same values sent again; after a restart with no offer, `/feature` from the start |
 
-`check_truth` (the checks `truth-<setup>`) runs an integration under a setup where a setting may
-not reach the telemetry: something the application does to the SDK beside the integration, named
-in `EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
+`check_truth` (the checks `truth-<setup>`) runs an integration under a setup that adds telemetry
+paths of its own: something the application does to the SDK beside the integration, named in
+`EXAMPLE_SETUP`. The server offers one setting a document, each beside `sampling_rate` 1 and left
 out again by the next: `send_traces`, `send_metrics`, `send_logs`, `sampling_rate` 0,
 `send_logs_level`, `send_logs_level_by_scope`, `sampling_rules`, `mask_attributes`,
 `drop_attributes` and both rate caps (and `deactivate_all_instrumentations` where it is live). Each
 must either show at the sink, measured as `check_signals` measures it, or be named as set aside in
-the effective config the agent reports. An APPLIED setting that is neither fails. So does a setup
-whose settings set aside differ from the ones its try.py expects: more is control given up, fewer
-is a table out of date.
+the effective config the agent reports. An APPLIED setting that is neither fails. The policy
+governs every exporter the integration's gates are in front of, so only a sampler of another's
+sets settings aside, and they must be the ones its try.py expects. What the setup exports past the
+gates goes to a second sink (`EXAMPLE_SECOND_SINK`): it must arrive there, and the inventory and
+export health must report it ungoverned, and nothing else. Where a signal's every exporter is past
+the gates, its settings need only be APPLIED and in force.
 
-| Integration | Setup | What the application does | Set aside |
-|---|---|---|---|
-| Python | `late-processor` | adds a span and a log record processor of its own, exporting over OTLP, once the SDK is built | the trace and log gates' settings and redaction; the sampler's stay |
-| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | the sampler's settings, `send_traces`, redaction and the instrumentation switches |
-| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | `send_metrics` |
-| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | the log settings and redaction |
-| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own | the sampler's settings, `send_traces` and redaction |
-| Node.js | `own-logger-provider` | the same for the logger provider | the log settings and redaction |
-| Node.js | `own-meter-provider` | the same for the meter provider | `send_metrics` |
-| Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | the trace, metric and log gates' settings and redaction; the sampler's stay |
-| Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | the sampler's settings |
-| .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | the trace and log gates' settings and redaction; the sampler's stay |
-| .NET plugin | `own-sdk` | sets `OTEL_DOTNET_AUTO_SETUP_SDK=false` and builds its own tracer and meter providers | `send_traces`, `send_metrics`, the sampler's settings and redaction; the logs' stay |
+| Integration | Setup | What the application does | Past the gates (second sink) | Set aside |
+|---|---|---|---|---|
+| Python | `late-processor` | once the SDK is built, adds a span and a log record batch processor (gated, to the first sink) and a span processor of its own kind that exports each span itself | that processor's traces | nothing |
+| Go | `global-tracer` | sets a tracer provider of its own as the global one after `Setup` | every span (`app_provider`) | nothing |
+| Go | `global-meter` | sets a meter provider of its own as the global one after `Setup` | every metric (`app_provider`) | nothing |
+| Go | `global-logger` | sets a logger provider of its own as the global one after `Setup` | every log record (`app_provider`) | nothing |
+| Node.js | `own-tracer-provider` | disables the SDK's global tracer provider and registers one of its own, tracing each request with it too | its own spans (`app_provider`); the http instrumentation's stay governed | nothing |
+| Node.js | `own-logger-provider` | the same for the logger provider | every log record (`app_provider`) | nothing |
+| Node.js | `own-meter-provider` | the same for the meter provider, counting each request with it | its own metrics (`app_provider`) | nothing |
+| Java agent | `extension-processor` | a second agent extension (`Setups.java`) adds a span processor, a log record processor and a metric reader | all three | nothing |
+| Java agent | `extension-sampler` | a second agent extension sets a sampler of its own in place of the extension's | nothing | the sampler's settings |
+| .NET plugin | `plugin-exporters` | a plugin of the application's own, listed after the integration's, adds an OTLP span exporter and a log record processor | both | nothing |
+| .NET plugin | `own-sdk` | sets `OTEL_DOTNET_AUTO_SETUP_SDK=false` and builds its own tracer and meter providers | every span and metric (`app_provider`); the logs stay governed | the sampler's settings |
 
 Logs and scenario files are saved under `target/integrations/<integration>/`.
 The OpAMP and telemetry listeners use independent ports. Each run stops its server and app.

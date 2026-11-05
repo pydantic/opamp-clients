@@ -3,6 +3,7 @@
 
 package dev.pydantic.opamp.javaagent;
 
+import dev.pydantic.opamp.sdk.SdkSettings;
 import dev.pydantic.opamp.sdk.SettingsProto;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.javaagent.extension.instrumentation.InstrumentationModule;
@@ -11,12 +12,16 @@ import io.opentelemetry.sdk.resources.Resource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -36,10 +41,22 @@ final class Inventory {
   private static final AttributeKey<String> SDK_LANGUAGE = AttributeKey.stringKey("telemetry.sdk.language");
   private static final AttributeKey<String> SDK_VERSION = AttributeKey.stringKey("telemetry.sdk.version");
 
-  /** The exporters the SDK was built with, by signal, as the customizers or the model named them. */
-  private final Map<String, List<SettingsProto.Exporter>> exporters = new TreeMap<>();
+  /** The exporters the SDK was built with, by signal, as found (the customizers or the model). */
+  private final Map<String, List<SettingsProto.FoundExporter>> exporters = new TreeMap<>();
   /** What another extension added past the gates, by signal ({@link #outside}). */
-  private final Map<String, List<SettingsProto.Exporter>> outside = new TreeMap<>();
+  private final Map<String, List<SettingsProto.FoundExporter>> outside = new TreeMap<>();
+  /** The {@code OTEL_EXPORTER_*} settings autoconfigure read, by their variables' names ({@link #configured}). */
+  private final Map<String, String> env = new TreeMap<>();
+  /** What decides the listed exporters from the found ones: the extension's layer. */
+  Supplier<SdkSettings> layer = Inventory::sharedLayer;
+  /** Each change to what was found, and the change {@link #decided} was decided at. */
+  private long changes;
+  private long decidedAt = -1;
+  private List<SettingsProto.Exporter> decided = List.of();
+  /** Each exporter as the layer last listed it, by what was found: should a call fail, it keeps its name. */
+  private final Map<SettingsProto.FoundExporter, SettingsProto.Exporter> listedAs = new HashMap<>();
+  /** The layer's warnings said so far: each once. */
+  private final Set<String> warned = new HashSet<>();
   /** The instrumentations the agent can run: its InstrumentationModules, read once, at start. */
   Supplier<List<SettingsProto.Instrumentation>> instrumentations =
       () -> instrumentations(Inventory.class.getClassLoader());
@@ -48,14 +65,26 @@ final class Inventory {
    * Under autoconfigure, from the customizer an exporter of {@code signal} ({@code traces},
    * {@code metrics} or {@code logs}) went through: the SDK builds one for each name
    * {@code otel.<signal>.exporter} gives ({@code otlp} when unset; {@code none}: none), and every
-   * one of them is in the extension's gate.
+   * one of them is in the extension's gate. Each with where it sends ({@link #destination}).
    */
   void configured(String signal, ConfigProperties config) {
-    List<SettingsProto.Exporter> built = new ArrayList<>();
+    List<SettingsProto.FoundExporter> built = new ArrayList<>();
     for (String name : names(config, signal)) {
-      built.add(exporter(signal, name, true));
+      built.add(found(signal, name, true, "").toBuilder().setFromEnv(true).build());
     }
-    exporters(signal, built);
+    synchronized (this) {
+      // The settings the layer reads to say where they send: autoconfigure's, whether a variable
+      // or a system property gave them, under the variable's name.
+      for (String key : List.of("otel.exporter.otlp.endpoint", "otel.exporter.otlp.protocol",
+          "otel.exporter.otlp." + signal + ".endpoint", "otel.exporter.otlp." + signal + ".protocol",
+          "otel.exporter.zipkin.endpoint")) {
+        String v = config.getString(key, "");
+        if (!v.isBlank()) {
+          env.put(key.toUpperCase(Locale.ROOT).replace('.', '_'), v);
+        }
+      }
+      exporters(signal, built);
+    }
   }
 
   /** The exporters of {@code otel.<signal>.exporter}, as the SDK reads it. */
@@ -66,21 +95,86 @@ final class Inventory {
 
   /**
    * What another extension added to the SDK's {@code signal} past the gate (a processor, by its
-   * exporter's class or its own, or a metric reader), each ungated, beside the configured ones.
+   * exporter's class or its own, or a metric reader), each ungoverned, beside the configured ones.
    */
   synchronized void outside(String signal, List<String> names) {
-    List<SettingsProto.Exporter> added = new ArrayList<>(outside.getOrDefault(signal, List.of()));
-    names.forEach(n -> added.add(exporter(signal, n, false)));
+    List<SettingsProto.FoundExporter> added = new ArrayList<>(outside.getOrDefault(signal, List.of()));
+    names.forEach(n -> added.add(found(signal, n, false, "")));
     outside.put(signal, List.copyOf(added));
+    changes++;
   }
 
-  /** The exporters of one signal, in place of any listed before. */
-  synchronized void exporters(String signal, List<SettingsProto.Exporter> built) {
+  /** The exporters of one signal as found, in place of any found before. */
+  synchronized void exporters(String signal, List<SettingsProto.FoundExporter> built) {
     exporters.put(signal, List.copyOf(built));
+    changes++;
   }
 
-  static SettingsProto.Exporter exporter(String signal, String name, boolean gated) {
-    return SettingsProto.Exporter.newBuilder().setSignal(signal).setName(name).setGated(gated).build();
+  /** An exporter as found: what it is known as ({@code otlp}, {@code otlp_http}, a class's name). */
+  static SettingsProto.FoundExporter found(String signal, String kind, boolean gated, String endpoint) {
+    return SettingsProto.FoundExporter.newBuilder().setSignal(signal).setKind(kind).setGated(gated)
+        .setEndpoint(endpoint).build();
+  }
+
+  /**
+   * Every exporter listed, governed or not, as the layer decides them in every SDK: what the
+   * inventory and export health report. Decided again only after a change; each warning the layer
+   * gives is logged once. The layer is called outside this lock (it takes the extension's). Never
+   * throws: should the call fail, each exporter keeps the name last decided, a new one listed as found.
+   */
+  List<SettingsProto.Exporter> listed() {
+    List<SettingsProto.FoundExporter> found = new ArrayList<>();
+    Map<String, String> vars;
+    long at;
+    synchronized (this) {
+      if (decidedAt == changes) {
+        return decided;
+      }
+      exporters.values().forEach(found::addAll);
+      outside.values().forEach(found::addAll);
+      vars = Map.copyOf(env);
+      at = changes;
+    }
+    SettingsProto.ExportersDecided d;
+    try {
+      // The SDK's own default; the agent sets http/protobuf, which autoconfigure then reads.
+      d = layer.get().exporters(found, vars, "grpc");
+    } catch (RuntimeException e) {
+      // Reporting only: the gates are in place, and the list stays as it was. One new since is
+      // listed as found, with no destination: only the layer strips an endpoint's credentials.
+      LOG.log(Level.WARNING, "OpAMP: can't list the exporters; they are governed all the same", e);
+      synchronized (this) {
+        return found.stream().map(f -> listedAs.getOrDefault(f, SettingsProto.Exporter.newBuilder()
+            .setSignal(f.getSignal()).setName(f.getKind()).setGated(f.getGated()).build())).toList();
+      }
+    }
+    synchronized (this) {
+      for (String w : d.getWarningsList()) {
+        if (warned.add(w)) {
+          LOG.warning("OpAMP: " + w);
+        }
+      }
+      if (at == changes) {
+        decided = List.copyOf(d.getExportersList());
+        decidedAt = at;
+      }
+      if (d.getExportersCount() == found.size()) {
+        for (int i = 0; i < found.size(); i++) {
+          listedAs.put(found.get(i), d.getExporters(i));
+        }
+      }
+    }
+    return List.copyOf(d.getExportersList());
+  }
+
+  /** A layer of the inventory's own, until the extension gives it its own. */
+  private static SdkSettings sharedLayer() {
+    return Shared.LAYER;
+  }
+
+  /** Holds the inventory's own layer, made on first use. */
+  private static final class Shared {
+    static final SdkSettings LAYER = new SdkSettings();
   }
 
   /**
@@ -94,9 +188,7 @@ final class Inventory {
     SettingsProto.Inventory.Builder b = SettingsProto.Inventory.newBuilder().setIntegration(PACKAGE)
         .setIntegrationVersion(VERSION).setSdkLanguage(language == null ? "java" : language)
         .setSdkVersion(version == null ? "" : version).addAllInstrumentations(instrumentations.get());
-    exporters.values().forEach(b::addAllExporters);
-    outside.values().forEach(b::addAllExporters);
-    return b.build();
+    return b.addAllExporters(listed()).build();
   }
 
   /**

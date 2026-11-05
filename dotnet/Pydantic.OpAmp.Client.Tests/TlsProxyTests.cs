@@ -403,6 +403,7 @@ public class TlsProxyTests
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(50),
                 Capabilities = (ulong)global::OpAmp.Proto.V1.AgentCapabilities.ReportsHeartbeat,
+                Mode = OpAmpMode.Platform,
                 HttpClient = app,
             },
             new OpAmpStatus(),
@@ -428,8 +429,8 @@ public class TlsProxyTests
         var ca = Pki.Pem(Pki.Ca);
         OpAmpClientOptions[] bad =
         [
-            new() { Endpoint = endpoint, HttpClient = app, Tls = new OpAmpTlsOptions() },
-            new() { Endpoint = endpoint, HttpClient = app, Proxy = new Uri("http://127.0.0.1:1") },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app, Tls = new OpAmpTlsOptions() },
+            new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app, Proxy = new Uri("http://127.0.0.1:1") },
             new() { Endpoint = endpoint, Proxy = new Uri("ftp://127.0.0.1:1") },
             new() { Endpoint = endpoint, Tls = new OpAmpTlsOptions { CaPem = "not a certificate" } },
             new() { Endpoint = endpoint, Tls = new OpAmpTlsOptions { CaPem = ca, ClientCertPem = Pki.Pem(Pki.Agent) } },

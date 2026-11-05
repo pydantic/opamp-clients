@@ -145,7 +145,7 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
   try {
     const r = await run("setTimeout(() => {}, 1500);", s.endpoint, undefined, undefined, {
       OTEL_NODE_ENABLED_INSTRUMENTATIONS: "http,express",
-      OTEL_TRACES_EXPORTER: "zipkin", // NodeSDK's: ungated, and send_traces not carried out
+      OTEL_TRACES_EXPORTER: "zipkin", // NodeSDK builds it; the gate goes in front of it at start
     });
     assert.deepEqual([r.code, r.signal], [0, null], r.out);
     const [first, full] = s.seen.components;
@@ -166,8 +166,8 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
     }
     const gated = Object.fromEntries(Object.entries(c.exporters!.subComponentMap).map(([signal, d]) =>
       [signal, Object.fromEntries(Object.entries(d.subComponentMap).map(([n, e]) => [n, e.metadata[0]?.value?.value.value]))]));
-    assert.deepEqual(gated, { traces: { zipkin: false } }); // metrics and logs: none
-    assert.equal(c.settings!.subComponentMap.send_traces, undefined);
+    assert.deepEqual(gated, { traces: { "zipkin@localhost:9411": true } }); // metrics and logs: none
+    assert.ok(c.settings!.subComponentMap.send_traces);
     assert.ok(c.settings!.subComponentMap.send_logs);
     // Sent in full once, as asked; unchanged after that, so left out. The capability on every message.
     assert.ok(s.seen.components.length > 2 && s.seen.components.slice(2).every((a) => a === undefined), r.out);

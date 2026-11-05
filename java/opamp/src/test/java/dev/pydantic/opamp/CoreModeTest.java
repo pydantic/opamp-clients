@@ -138,7 +138,9 @@ class CoreModeTest {
     assertEquals(OpampClient.Mode.CORE, OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.CORE).build().mode);
     assertEquals(OpampClient.Mode.CORE, OpampClient.Config.builder("ws://x").spliceDownloads(false).build().mode);
     assertEquals(OpampClient.Mode.PLATFORM, OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).build().mode);
-    assertEquals(OpampClient.Mode.PLATFORM, OpampClient.Config.builder("ws://x").httpClient(own).build().mode);
+    // Regression: an httpClient alone switched to platform mode silently; the mode must be named.
+    assertTrue(assertThrows(IllegalStateException.class, () -> OpampClient.Config.builder("ws://x").httpClient(own).build())
+        .getMessage().contains("needs platform mode"));
     assertEquals(OpampClient.Mode.PLATFORM,
         OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).httpClient(own).build().mode);
     assertTrue(assertThrows(IllegalStateException.class,
@@ -148,10 +150,10 @@ class CoreModeTest {
         () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).spliceDownloads(false).build())
         .getMessage().contains("spliceDownloads is core mode's"));
     assertTrue(assertThrows(IllegalStateException.class,
-        () -> OpampClient.Config.builder("ws://x").httpClient(own).spliceDownloads(false).build())
+        () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).httpClient(own).spliceDownloads(false).build())
         .getMessage().contains("spliceDownloads is core mode's"));
     assertTrue(assertThrows(IllegalStateException.class,
-        () -> OpampClient.Config.builder("ws://x").httpClient(own).proxyResolveLocally(true).build())
+        () -> OpampClient.Config.builder("ws://x").mode(OpampClient.Mode.PLATFORM).httpClient(own).proxyResolveLocally(true).build())
         .getMessage().contains("proxyResolveLocally is core mode's"));
   }
 

@@ -21,6 +21,7 @@ const MORE_CONTROLS = [
   "app_settings",
   "instrumentations",
   "scrubbing",
+  "self_monitoring",
 ] as const;
 
 type Fields = Record<string, unknown>;
@@ -38,6 +39,7 @@ export interface Overrides {
   app_settings?: Fields;
   instrumentations?: Fields;
   scrubbing?: Fields;
+  self_monitoring?: Fields;
 }
 
 /**

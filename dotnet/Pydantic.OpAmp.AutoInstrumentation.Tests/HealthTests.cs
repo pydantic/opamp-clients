@@ -119,6 +119,33 @@ public class HealthTests
         Assert.Equal("Connection refused (collector:4318)", m.LastError);
     }
 
+    // Regression: an error inside the gate (here a body it can't read) failed the export with
+    // nothing counted, so Fleet's Traffic and health never showed it.
+    [Fact]
+    public void AnErrorInsideTheGateIsAFailedExportAndStillThrown()
+    {
+        var controls = new Controls();
+        controls.Apply(Vectors.Settings(Policy.Of(("attribute_redaction", """{"mask":["k"]}"""))));
+        using var client = new HttpClient(new GateHandler(controls, Signal.Traces) { InnerHandler = new Sink() });
+        var request = new HttpRequestMessage(HttpMethod.Post, "http://collector/v1/traces") { Content = new Unreadable() };
+        Assert.Throws<IOException>(() => client.Send(request));
+        var t = controls.Tally.Counts().Traces;
+        Assert.Equal((1UL, "gate: the body broke"), (t.ExportsFailed, t.LastError));
+    }
+
+    private sealed class Unreadable : HttpContent
+    {
+        protected override Stream CreateContentReadStream(CancellationToken cancellationToken) => throw new IOException("the body broke");
+
+        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) => throw new IOException("the body broke");
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
+    }
+
     [Fact]
     public void WhatTheLevelsTheCapsAndRedactionsFailClosedDropIsCounted()
     {
@@ -158,8 +185,9 @@ public class HealthTests
     }
 
     // Every case of testdata/health.json through the agent: its counts reached through the tally's
-    // own calls, its settings as a remote config; the first step the agent's start (export health
-    // goes with the first message), each next the timer going off 30 s after the last.
+    // own calls, its settings as a remote config, its exporters as the inventory lists them; the
+    // first step the agent's start (export health goes with the first message), each next the
+    // timer going off 30 s after the last.
     [Fact]
     public void EveryHealthVectorThroughTheAgentsTimer()
     {
@@ -178,6 +206,7 @@ public class HealthTests
             try
             {
                 var had = new Dictionary<Signal, SignalCounts>();
+                var listed = new Inventory();
                 for (var i = 0; i < steps.Count; i++)
                 {
                     var step = steps[i];
@@ -199,10 +228,22 @@ public class HealthTests
                         had[signal] = want;
                     }
 
+                    listed = new Inventory();
+                    if (step.TryGetProperty("exporters", out var exporters))
+                    {
+                        listed.Exporters.Add(exporters.EnumerateArray().Select(e => new Exporter
+                        {
+                            Signal = e.GetProperty("signal").GetString(),
+                            Name = e.GetProperty("name").GetString(),
+                            Gated = e.TryGetProperty("gated", out var g) && g.GetBoolean(),
+                            Destination = e.TryGetProperty("destination", out var d) ? d.GetString() : string.Empty,
+                        }));
+                    }
+
                     var before = agent.Sdk.HealthSent;
                     if (i == 0)
                     {
-                        agent.Start([new("service.name", "health-test")]);
+                        agent.Sdk.Start([new("service.name", "health-test")], () => listed);
                     }
                     else
                     {
@@ -360,6 +401,16 @@ public class HealthTests
                 }
 
                 Entry(s.Value, child, $"{where} {s.Name}", failed);
+                if (s.Value.TryGetProperty("exporters", out var exporters))
+                {
+                    var wanted = exporters.EnumerateObject().ToDictionary(e => e.Name, e => e.Value.GetString());
+                    var got = child.ComponentHealthMap.ToDictionary(e => e.Key, e => (string?)e.Value.Status);
+                    if (!wanted.OrderBy(e => e.Key).SequenceEqual(got.OrderBy(e => e.Key)))
+                    {
+                        failed.Add($"{where} {s.Name}: exporters {string.Join(", ", got)}");
+                    }
+                }
+
                 if (s.Value.TryGetProperty("counters", out var counters))
                 {
                     foreach (var counter in counters.EnumerateObject())

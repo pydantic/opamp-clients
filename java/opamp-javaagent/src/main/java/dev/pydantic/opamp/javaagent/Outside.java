@@ -37,7 +37,8 @@ import java.util.logging.Logger;
  * thread details, or a baggage processor), the agent's baggage log record processor, and a batch
  * or simple processor around one of the extension's gates, and EDOT Java's span logger while
  * nothing can switch it on ({@link #ELASTIC_DEBUG_LOG}). Every other one is outside, as the
- * extension can't tell what it does with the telemetry.
+ * extension can't tell what it does with the telemetry: it is reported ungoverned, and the policy
+ * still governs every exporter the agent built.
  */
 final class Outside {
   private static final Logger LOG = Logger.getLogger(Extension.class.getName());
@@ -158,7 +159,7 @@ final class Outside {
       return f.get(builder);
     } catch (ReflectiveOperationException | RuntimeException err) {
       LOG.log(Level.WARNING, "OpAMP: can't read what the SDK's " + builder.getClass().getSimpleName() + " holds, so a "
-          + "processor or reader another extension adds isn't seen, and the settings it escapes are still answered", err);
+          + "processor or reader another extension adds isn't seen, nor reported to the server as ungoverned", err);
       return null;
     }
   }
