@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { create } from "@bufbuild/protobuf";
+import { create, fromJson, type JsonValue } from "@bufbuild/protobuf";
 
 import {
   AgentConfigObjectSchema,
@@ -18,13 +18,15 @@ import {
   KeyValueSchema,
   RemoteConfigStatuses,
 } from "../src/index.js";
-import { type FoundExporterInit, type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
+import { type FoundExporterInit, type HostInit, type InventoryInit, LocalSchema, SdkSettings, SpanKind } from "../src/sdk.js";
 import { config, full, off, overridden, policy, reported, V1 } from "./policy.js";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 const none = new Uint8Array();
+const POLICY_FILE = "logfire-sdk-policy.json";
+const LOCAL_FILE = "logfire-sdk-local.json";
 
 // A host that declares every setting: each live one at once, each next-start one at the next start.
 const declaring = {
@@ -357,7 +359,7 @@ interface ComponentsCase {
     integration_version?: string;
     sdk_language?: string;
     sdk_version?: string;
-    instrumentations?: { name?: string; version?: string }[];
+    instrumentations?: { name?: string; version?: string; scope?: string }[];
     exporters?: { signal?: string; name?: string; gated?: boolean }[];
   };
   host?: { live?: string[]; next_start?: string[] };
@@ -366,7 +368,8 @@ interface ComponentsCase {
 }
 
 /** The components as the vectors give them: sdk (key to text), instrumentations (name to version
- * or null), exporters (signal to name to gated) and settings (key to applies). */
+ * or null), scopes (name to scope or null), exporters (signal to name to gated) and settings (key
+ * to applies). */
 function shown(c: AvailableComponents): Record<string, unknown> {
   const meta = (d: ComponentDetails, key: string) => d.metadata.find((kv) => kv.key === key)?.value?.value;
   const text = (v: ReturnType<typeof meta>) => {
@@ -380,6 +383,7 @@ function shown(c: AvailableComponents): Record<string, unknown> {
   return {
     sdk: Object.fromEntries(sdk.metadata.map((kv) => [kv.key, text(kv.value?.value)])),
     instrumentations: subs(c.components.instrumentations, (d) => text(meta(d, "version"))),
+    scopes: subs(c.components.instrumentations, (d) => text(meta(d, "scope"))),
     exporters: subs(c.components.exporters, (signal, s) =>
       subs(signal, (e, name) => {
         const g = meta(e, "gated");
@@ -435,6 +439,37 @@ test("vectors: components.json, each inventory through Components", () => {
     assert.deepEqual(Object.keys(got.components).sort(), ["exporters", "instrumentations", "sdk", "settings"], c.name);
     const parts = shown(got);
     for (const [part, want] of Object.entries(c.want)) assert.deepEqual(parts[part], want, `${c.name}: ${part}`);
+  }
+});
+
+type LocalCase = {
+  name: string;
+  host?: { live?: string[]; next_start?: string[] };
+  local?: Record<string, unknown>;
+  now_unix_ms?: number;
+  want: string | null;
+};
+
+test("vectors: local.json, the host's local values reported beside the policy in force", () => {
+  const url = new URL("../../../../testdata/sdk-settings/local.json", import.meta.url);
+  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: LocalCase[] }).cases;
+  assert.ok(cases.length > 5);
+  const layer = new SdkSettings();
+  for (const c of cases) {
+    const without: HostInit = c.host ? { live: c.host.live ?? [], nextStart: c.host.next_start ?? [] } : declaring;
+    // Its fields by their proto names, as protobuf's JSON reads them.
+    const host: HostInit = c.local === undefined ? without
+      : { ...without, local: fromJson(LocalSchema, c.local as JsonValue) };
+    const files = layer.load(undefined, host, BigInt(c.now_unix_ms ?? 0)).effective!.configMap!.configMap;
+    const want = c.want === null ? [POLICY_FILE] : [LOCAL_FILE, POLICY_FILE];
+    assert.deepEqual(Object.keys(files).sort(), want, c.name);
+    if (c.want !== null) {
+      assert.equal(new TextDecoder().decode(files[LOCAL_FILE]!.body), c.want, c.name);
+      assert.equal(files[LOCAL_FILE]!.contentType, "application/json", c.name);
+    }
+    // Beside the policy, never in it.
+    const policyWithout = layer.load(undefined, without, BigInt(c.now_unix_ms ?? 0)).effective!.configMap!.configMap[POLICY_FILE]!;
+    assert.deepEqual(files[POLICY_FILE]!.body, policyWithout.body, `${c.name}: in the policy`);
   }
 });
 

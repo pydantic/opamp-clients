@@ -82,10 +82,19 @@ export function config(body: string | Uint8Array, hash = "h"): AgentRemoteConfig
   });
 }
 
-/** The policy an effective config reports, exactly as the layer writes it. It is the only file. */
+/** The SDK's own values, reported beside the policy in force (contracts' logfire-sdk-local/v1). */
+export const LOCAL_FILE = "logfire-sdk-local.json";
+
+/**
+ * The policy an effective config reports, exactly as the layer writes it. Beside it there is at
+ * most the SDK's own values, and no other file.
+ */
 export function reported(e: EffectiveConfig | undefined): string {
   const files = e?.configMap?.configMap ?? {};
-  if (Object.keys(files).join() !== FILE) throw new Error(`effective config files: ${Object.keys(files).join(", ")}`);
+  const names = Object.keys(files);
+  if (!names.includes(FILE) || names.some((n) => n !== FILE && n !== LOCAL_FILE)) {
+    throw new Error(`effective config files: ${names.join(", ")}`);
+  }
   return new TextDecoder().decode(files[FILE]!.body);
 }
 

@@ -576,27 +576,45 @@ export function setupFromEnv(env: NodeJS.ProcessEnv = process.env, code: Options
   return setup;
 }
 
-/** The sampler OTEL_TRACES_SAMPLER names, as the specification defines the values. */
-export function samplerFromEnv(env: NodeJS.ProcessEnv = process.env): Sampler {
+/**
+ * The sampler OTEL_TRACES_SAMPLER names, as the specification defines the values: its root (a
+ * ratio, or always on or off) and whether a span with a parent follows the parent instead.
+ */
+function samplerSpec(env: NodeJS.ProcessEnv, warn: boolean): { root: "on" | "off" | number; parentBased: boolean } {
   // Unset, not a number or out of range: 1, as NodeSDK.
   const ratio = () => {
-    const arg = num(env, "OTEL_TRACES_SAMPLER_ARG");
-    return new TraceIdRatioBasedSampler(arg !== undefined && arg >= 0 && arg <= 1 ? arg : 1);
+    const raw = str(env, "OTEL_TRACES_SAMPLER_ARG");
+    const arg = warn ? num(env, "OTEL_TRACES_SAMPLER_ARG") : raw === undefined ? undefined : Number(raw);
+    return arg !== undefined && arg >= 0 && arg <= 1 ? arg : 1;
   };
   switch ((str(env, "OTEL_TRACES_SAMPLER") ?? "parentbased_always_on").trim()) {
     case "always_on":
-      return new AlwaysOnSampler();
+      return { root: "on", parentBased: false };
     case "always_off":
-      return new AlwaysOffSampler();
+      return { root: "off", parentBased: false };
     case "traceidratio":
-      return ratio();
+      return { root: ratio(), parentBased: false };
     case "parentbased_always_off":
-      return new ParentBasedSampler({ root: new AlwaysOffSampler() });
+      return { root: "off", parentBased: true };
     case "parentbased_traceidratio":
-      return new ParentBasedSampler({ root: ratio() });
+      return { root: ratio(), parentBased: true };
     default:
-      return new ParentBasedSampler({ root: new AlwaysOnSampler() });
+      return { root: "on", parentBased: true };
   }
+}
+
+/** The sampler OTEL_TRACES_SAMPLER names, as the specification defines the values. */
+export function samplerFromEnv(env: NodeJS.ProcessEnv = process.env): Sampler {
+  const { root, parentBased } = samplerSpec(env, true);
+  const sampler = root === "on" ? new AlwaysOnSampler() : root === "off" ? new AlwaysOffSampler()
+    : new TraceIdRatioBasedSampler(root);
+  return parentBased ? new ParentBasedSampler({ root: sampler }) : sampler;
+}
+
+/** The share of new traces samplerFromEnv's sampler samples: always on is 1, always off 0. */
+export function samplingRateFromEnv(env: NodeJS.ProcessEnv = process.env): number {
+  const { root } = samplerSpec(env, false);
+  return root === "on" ? 1 : root === "off" ? 0 : root;
 }
 
 /**
@@ -1386,6 +1404,35 @@ export function hostFromEnv(): HostInit {
   };
 }
 
+/** What the SDK does without the server, for the local report (contracts' logfire-sdk-local/v1). */
+export type LocalInit = NonNullable<HostInit["local"]>;
+
+/**
+ * What the SDK register builds does without the server, as far as it can be told: its sampler's
+ * rate (samplerFromEnv's), and whether it exports each signal at all (exportersFromEnv's), for each
+ * signal whose exporters this package builds. A signal it leaves to NodeSDK (zipkin, prometheus)
+ * is left out, and so is the log level: the SDK has none of its own for the application's records.
+ */
+export function localFromEnv(env: NodeJS.ProcessEnv = process.env): LocalInit {
+  const out: LocalInit = { samplingRate: decimal(samplingRateFromEnv(env)) };
+  const signals = [["TRACES", "sendTraces"], ["METRICS", "sendMetrics"], ["LOGS", "sendLogs"]] as const;
+  for (const [signal, field] of signals) {
+    if (builds(signal, env)) out[field] = exporterNames(signal, env).length > 0;
+  }
+  return out;
+}
+
+/** A ratio as decimal text, as the local report takes it: "1", "0.25", "0.00001" (no exponent). */
+export function decimal(x: number): string {
+  const text = String(x);
+  if (!/e/i.test(text)) return text;
+  // Below 1e-6 String gives an exponent: the same digits, written out.
+  const [digits, exponent] = text.split(/e/i) as [string, string];
+  const [whole, fraction = ""] = digits.split(".") as [string, string?];
+  const shift = -Number(exponent);
+  return `0.${"0".repeat(shift - 1)}${whole}${fraction}`;
+}
+
 /** An exporter as the inventory and export health list it. */
 export type Exporter = { signal: string; name: string; gated: boolean; destination: string };
 
@@ -1596,7 +1643,8 @@ export function inventory(instrumentations: readonly Instrumentation[], exporter
     // deactivate_all_instrumentations): there is no name to list it under.
     instrumentations: instrumentations.flatMap((i) => {
       const name = switchName(i.instrumentationName);
-      return name === undefined ? [] : [{ name, version: i.instrumentationVersion ?? "" }];
+      // Its tracer, meter and logger are under its own name: the scope its telemetry is under.
+      return name === undefined ? [] : [{ name, version: i.instrumentationVersion ?? "", scope: i.instrumentationName }];
     }),
     exporters: [...exporters],
   };
@@ -1747,7 +1795,9 @@ export class Agent {
     this.exporters = [];
     this.found = [];
     this.#env = env;
-    this.host = hostFromEnv();
+    // What the SDK register builds does without the server; manage() narrows it away, as the
+    // application built its own.
+    this.host = { live: hostFromEnv().live, local: localFromEnv(env) };
     let saved: Uint8Array | undefined;
     let coreState: Uint8Array | undefined;
     const dir = this.setup.stateDir;
