@@ -14,8 +14,8 @@ import { after, test } from "node:test";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { SDK_INFO } from "@opentelemetry/core";
 import type { Instrumentation } from "@opentelemetry/instrumentation";
-import { type AvailableComponents, type ComponentDetails, RemoteConfigStatuses } from "@pydantic/logfire-opamp-client";
-import { SdkSettings } from "@pydantic/logfire-opamp-client/sdk";
+import { type AvailableComponents, type ComponentDetails, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { config as policyConfig, policy } from "./policy.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
@@ -91,12 +91,12 @@ test("a typical setup: the package, the SDK, each instrumentation by its short n
   const c = shown(agent.components());
   assert.equal(c.hash.length, 0); // the client computes it
   assert.deepEqual(c.sdk, {
-    "integration.name": "@pydantic/logfire-opamp-otel",
+    "integration.name": "@pydantic/logfire-fleet-otel",
     "integration.version": PACKAGE.version,
     "telemetry.sdk.language": "nodejs",
     "telemetry.sdk.version": SDK_INFO["telemetry.sdk.version"],
   });
-  assert.equal(PACKAGE.name, "@pydantic/logfire-opamp-otel");
+  assert.equal(PACKAGE.name, "@pydantic/logfire-fleet-otel");
   assert.deepEqual(c.instrumentations, { express: "0.66.0", fs: null, http: "0.222.0" });
   // NodeSDK builds the metrics beside prometheus: the OTLP exporter still gets its gate; the
   // Prometheus reader is pulled, so it can't, and is listed ungoverned.
@@ -137,7 +137,7 @@ test("no instrumentations, and every exporter set to none: the sdk and settings 
   const agent = built({ OTEL_TRACES_EXPORTER: "none", OTEL_METRICS_EXPORTER: "none", OTEL_LOGS_EXPORTER: "none" });
   const c = shown(agent.components());
   assert.deepEqual([c.instrumentations, c.exporters], [{}, {}]);
-  assert.equal(c.sdk["integration.name"], "@pydantic/logfire-opamp-otel");
+  assert.equal(c.sdk["integration.name"], "@pydantic/logfire-fleet-otel");
   // With none, there is nothing to stop: the send_* switches are still carried out.
   assert.equal(c.settings.send_traces, "at once");
   // Only that signal's: the others keep their default, otlp.
@@ -215,7 +215,7 @@ test("before the SDK is built, or with the package off, there is nothing to repo
   assert.equal(off.components(), undefined);
   // The inventory itself needs no agent.
   assert.deepEqual(inventory([]), {
-    integration: "@pydantic/logfire-opamp-otel",
+    integration: "@pydantic/logfire-fleet-otel",
     integrationVersion: PACKAGE.version,
     sdkLanguage: "nodejs",
     sdkVersion: SDK_INFO["telemetry.sdk.version"],

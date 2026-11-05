@@ -7,7 +7,7 @@
 // policy: string keys to values, which the SDK does not read but hands on as strings. The
 // application reads them here:
 //
-//     import { appSettings } from "@pydantic/logfire-opamp-otel";
+//     import { appSettings } from "@pydantic/logfire-fleet-otel";
 //
 //     if (appSettings.get("checkout.new_flow", "off") === "on") { ... }
 //     const verbose = appSettings.getBool("example.verbose", false);
@@ -17,7 +17,7 @@
 //
 // The package keeps one map per process, on globalThis: the register (`--import`) and the
 // application's own import see the same values even if they load the package by two paths. This
-// module is small on purpose, with nothing of the SDK in it: `@pydantic/logfire-opamp-otel/app-settings`
+// module is small on purpose, with nothing of the SDK in it: `@pydantic/logfire-fleet-otel/app-settings`
 // loads only it.
 
 import { diag } from "@opentelemetry/api";
@@ -180,7 +180,7 @@ export class AppSettings {
   }
 }
 
-const GLOBAL = Symbol.for("@pydantic/logfire-opamp-otel.appSettings");
+const GLOBAL = Symbol.for("@pydantic/logfire-fleet-otel.appSettings");
 
 /**
  * The package's: what the server's config puts in force, and what the application reads. One per

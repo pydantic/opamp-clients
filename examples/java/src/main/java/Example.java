@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 import com.google.protobuf.ByteString;
-import dev.pydantic.logfire.opamp.Notification;
-import dev.pydantic.logfire.opamp.OpampClient;
+import dev.pydantic.logfire.fleet.Notification;
+import dev.pydantic.logfire.fleet.OpampClient;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.SpanKind;

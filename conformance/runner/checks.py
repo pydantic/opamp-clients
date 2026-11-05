@@ -1395,9 +1395,9 @@ def uid_not_requested_after_restart(t: Trace) -> Result:
 # ------------------------------------------------------------------------------------------
 # HTTP as the core says (docs/how-it-works.md)
 
-# The core's default User-Agent: pydantic-opamp/<core version>, logfire-opamp/<core version> once
+# The core's default User-Agent: pydantic-opamp/<core version>, logfire-fleet/<core version> once
 # the core takes the SDKs' name (older cores sent "opamp-clients").
-CORE_USER_AGENT = re.compile(r"(pydantic|logfire)-opamp/[0-9]+\.[0-9]+\.[0-9]+|opamp-clients")
+CORE_USER_AGENT = re.compile(r"(pydantic-opamp|logfire-fleet)/[0-9]+\.[0-9]+\.[0-9]+|opamp-clients")
 
 
 @check("redirects_not_followed", "MUST", ["RULE-CLIENT-04"])

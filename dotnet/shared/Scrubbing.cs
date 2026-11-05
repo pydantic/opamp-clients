@@ -3,7 +3,7 @@
 
 using System.Text;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// scrub_defaults and scrub_patterns: the Logfire SDK's scrubbing, of the attributes redaction

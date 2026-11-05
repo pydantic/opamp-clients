@@ -37,7 +37,7 @@ PYPROJECTS = ["python/pyproject.toml", "python/core/pyproject.toml", "python/ote
 PACKAGE_JSONS = ["node/opamp/package.json", "node/otel/package.json"]
 POMS = ["java/opamp/pom.xml", "java/opamp-javaagent/pom.xml"]
 # The jars a pom builds beside its main one, by classifier: the agent extension's app-settings jar
-# is what applications compile against (dev.pydantic.logfire.opamp.AppSettings).
+# is what applications compile against (dev.pydantic.logfire.fleet.AppSettings).
 CLASSIFIERS = {"java/opamp-javaagent/pom.xml": ["app-settings"]}
 # The poms whose jar shades its dependencies in: what Central gets is the pom the shade plugin
 # reduces (target/dependency-reduced-pom.xml), without the dependencies the jar already holds.
@@ -48,10 +48,10 @@ POM_REQUIRED = ["name", "description", "url", "licenses/license/name", "develope
                 "scm/url", "scm/connection"]
 CENTRAL_JARS = ["", "-sources", "-javadoc"]
 POM_NS = {"m": "http://maven.apache.org/POM/4.0.0"}
-CSPROJS = ["dotnet/Logfire.OpAmp.Client/Logfire.OpAmp.Client.csproj",
-           "dotnet/Logfire.OpAmp.Core.Native/Logfire.OpAmp.Core.Native.csproj",
-           "dotnet/Logfire.OpAmp.AutoInstrumentation/Logfire.OpAmp.AutoInstrumentation.csproj",
-           "dotnet/Logfire.OpAmp.Extensions.Hosting/Logfire.OpAmp.Extensions.Hosting.csproj"]
+CSPROJS = ["dotnet/Logfire.Fleet.Client/Logfire.Fleet.Client.csproj",
+           "dotnet/Logfire.Fleet.Core.Native/Logfire.Fleet.Core.Native.csproj",
+           "dotnet/Logfire.Fleet.AutoInstrumentation/Logfire.Fleet.AutoInstrumentation.csproj",
+           "dotnet/Logfire.Fleet.Extensions.Hosting/Logfire.Fleet.Extensions.Hosting.csproj"]
 
 # What a package of ours must never hold: the cores' Rust sources and manifests.
 SOURCE = (".rs", "Cargo.toml", "Cargo.lock")
@@ -81,7 +81,7 @@ def stamp(version: str, root: Path = ROOT) -> None:
         text = sub_once(r'^version = "[^"]*"$', f'version = "{version}"', p.read_text(), rel)
         # Ours, in dependencies (indented list items, never the project's `name`): the client's
         # exact core, otel's exact client.
-        text = re.sub(r'^(\s+)"(logfire-opamp-(?:core|client))(?:==[^"]*)?"', rf'\1"\2=={version}"', text,
+        text = re.sub(r'^(\s+)"(logfire-fleet-(?:core|client))(?:==[^"]*)?"', rf'\1"\2=={version}"', text,
                       flags=re.M)
         p.write_text(text)
     names = [json.loads((root / rel).read_text())["name"] for rel in PACKAGE_JSONS]

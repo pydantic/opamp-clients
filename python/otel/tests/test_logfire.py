@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
-from logfire_opamp_client import opamp_pb2
+from logfire_fleet_client import opamp_pb2
 
 from _policy import policy
 from test_opamp_otel import APPLIED, FAILED, _child_env, _own_state_home, _Server, config  # noqa: F401 - the fixture
@@ -93,12 +93,12 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
 
     server._reply = reply
     child = textwrap.dedent(f"""
-        import pathlib, time, logfire, logfire_opamp_otel
-        logfire_opamp_otel.configure_logfire(
+        import pathlib, time, logfire, logfire_fleet_otel
+        logfire_fleet_otel.configure_logfire(
             endpoint={server.endpoint!r}, heartbeat_interval=0.1, {where},
             service_name="rocket", console={None if console else False!r}, metrics=False, send_to_logfire=True,
             inspect_arguments=False{extra})
-        agent = logfire_opamp_otel.AGENT
+        agent = logfire_fleet_otel.AGENT
         with logfire.span("before"):
             pass
         logfire.force_flush()
@@ -205,9 +205,9 @@ def test_the_logfire_sdks_console_is_governed_like_its_export_to_logfire(tmp_pat
 
 def test_without_an_endpoint_it_is_logfire_configure():
     child = textwrap.dedent("""
-        import logfire, logfire_opamp_otel
-        logfire_opamp_otel.configure_logfire(send_to_logfire=False, console=False)
-        assert not logfire_opamp_otel.AGENT.on
+        import logfire, logfire_fleet_otel
+        logfire_fleet_otel.configure_logfire(send_to_logfire=False, console=False)
+        assert not logfire_fleet_otel.AGENT.on
         assert logfire.DEFAULT_LOGFIRE_INSTANCE.config.send_to_logfire is False
     """)
     run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=_child_env())
@@ -247,8 +247,8 @@ def test_a_local_logfire_instance_is_described_by_its_own_resource(servers):
     itself from the instance's own resource, its service.name included."""
     server, _ = servers
     child = textwrap.dedent(f"""
-        import time, logfire_opamp_otel
-        logfire_opamp_otel.configure_logfire(endpoint={server.endpoint!r}, heartbeat_interval=0.1, local=True,
+        import time, logfire_fleet_otel
+        logfire_fleet_otel.configure_logfire(endpoint={server.endpoint!r}, heartbeat_interval=0.1, local=True,
                                               send_to_logfire=False, console=False, service_name="rocket-local")
         time.sleep(0.5)
     """)
@@ -307,7 +307,7 @@ def test_what_the_logfire_sdk_resolves_leaves_the_arguments_as_given(tmp_path, m
     """Resolving reads the Logfire SDK's variables as it does, without changing the options given:
     with no token or credentials file there is nothing to send with, whatever send_to_logfire says."""
     import logfire  # noqa: PLC0415
-    from logfire_opamp_otel._logfire import _config, _resolved  # noqa: PLC0415
+    from logfire_fleet_otel._logfire import _config, _resolved  # noqa: PLC0415
 
     monkeypatch.setenv("LOGFIRE_BASE_URL", "https://ingest.example.com")
     monkeypatch.delenv("LOGFIRE_TOKEN", raising=False)
@@ -324,10 +324,10 @@ def test_advanced_options_as_a_mapping_keep_their_log_record_processors(servers)
     beside the gated ones."""
     server, ingest = servers
     child = textwrap.dedent(f"""
-        import logfire, logfire_opamp_otel
+        import logfire, logfire_fleet_otel
         from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor, ConsoleLogExporter
         mine = SimpleLogRecordProcessor(ConsoleLogExporter())
-        logfire_opamp_otel.configure_logfire(
+        logfire_fleet_otel.configure_logfire(
             endpoint={server.endpoint!r}, heartbeat_interval=0.1, token="pylf_v1_us_test", send_to_logfire=True,
             console=False, metrics=False, advanced={{"base_url": {ingest.url!r}, "log_record_processors": [mine]}})
         given = logfire.DEFAULT_LOGFIRE_INSTANCE.config.advanced.log_record_processors

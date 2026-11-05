@@ -34,7 +34,7 @@ python app.py
 ```
 
 **Node.js** (Node.js 22 or later; run Fleet's install command in `node`, which adds
-`@pydantic/logfire-opamp-otel`):
+`@pydantic/logfire-fleet-otel`):
 
 ```bash
 cd node

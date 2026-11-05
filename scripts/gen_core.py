@@ -28,12 +28,12 @@ ROOT = Path(__file__).resolve().parent.parent
 GO_MODULE = "github.com/pydantic/opamp-clients/go"
 NODE = ROOT / "node" / "opamp"
 PROTOS = ["opamp/v1/opamp.proto", "opamp/v1/anyvalue.proto", "opamp/core/v1/core.proto"]
-PY = "python/src/logfire_opamp_client/_proto"
+PY = "python/src/logfire_fleet_client/_proto"
 # protoc 31.1 (protobuf 6.31.1), from grpcio-tools.
 PY_PROTOC = ["uvx", "--quiet", "--from", "grpcio-tools==1.75.0", "python", "-m", "grpc_tools.protoc"]
 PY_PACKAGES = ["", "/opamp", "/opamp/v1", "/opamp/core", "/opamp/core/v1"]
 JAVA = "java/opamp/src/main/java"
-DOTNET = "dotnet/Logfire.OpAmp.Client/Generated"
+DOTNET = "dotnet/Logfire.Fleet.Client/Generated"
 # Every generated file, relative to the repository root.
 TARGETS = [
     "go/opamp/internal/corepb/core.pb.go",
@@ -42,7 +42,7 @@ TARGETS = [
     *(f"{PY}/{p.replace('.proto', suffix)}" for p in PROTOS for suffix in ("_pb2.py", "_pb2.pyi")),
     f"{JAVA}/opamp/proto/v1/Opamp.java",
     f"{JAVA}/opamp/proto/v1/Anyvalue.java",
-    f"{JAVA}/dev/pydantic/logfire/opamp/core/CoreProto.java",
+    f"{JAVA}/dev/pydantic/logfire/fleet/core/CoreProto.java",
     f"{DOTNET}/Opamp.cs",
     f"{DOTNET}/Anyvalue.cs",
     f"{DOTNET}/Core.cs",

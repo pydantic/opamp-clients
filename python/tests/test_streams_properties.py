@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Core mode's byte-stream glue (src/logfire_opamp_client/_streams.py) over random plans (Hypothesis),
+"""Core mode's byte-stream glue (src/logfire_fleet_client/_streams.py) over random plans (Hypothesis),
 on fake transports so every cut is the plan's: the peer's bytes arrive in pieces cut anywhere
 (some before the core has heard the stream is open, or its TLS up), the core's writes are split
 anywhere, part of the body may be spliced to a file, and the core closes the stream at any point:
@@ -24,10 +24,10 @@ import os
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from logfire_opamp_client import Proxy
-from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from logfire_opamp_client._streams import Streams
-from logfire_opamp_client._transport import Transport
+from logfire_fleet_client import Proxy
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client._streams import Streams
+from logfire_fleet_client._transport import Transport
 
 
 class FakeTransport(asyncio.Transport):

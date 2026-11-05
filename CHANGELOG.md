@@ -182,18 +182,19 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
-- Python, Node.js, Java, .NET: the packages take Logfire's names. The 0.1.x names get no new
+- Python, Node.js, Java, .NET: the packages take Logfire Fleet's names. The 0.1.x names get no new
   versions; install the new ones and change the imports:
 
   | Was (0.1.x) | Now |
   | --- | --- |
-  | PyPI `pydantic-opamp-otel`, `pydantic-opamp-client`, `pydantic-opamp-core` | `logfire-opamp-otel`, `logfire-opamp-client`, `logfire-opamp-core` |
-  | `import pydantic_opamp_otel`, `pydantic_opamp_client` | `import logfire_opamp_otel`, `logfire_opamp_client` |
-  | npm `@pydantic/opamp-otel`, `@pydantic/opamp-client` | `@pydantic/logfire-opamp-otel`, `@pydantic/logfire-opamp-client` |
-  | Maven `dev.pydantic:opamp-client`, `dev.pydantic:opamp-javaagent-extension` | `dev.pydantic:logfire-opamp-client`, `dev.pydantic:logfire-opamp-javaagent-extension` |
-  | Java packages `dev.pydantic.opamp.*` | `dev.pydantic.logfire.opamp.*` |
-  | NuGet and namespaces `Pydantic.OpAmp.*` | `Logfire.OpAmp.*` |
-  | `OTEL_DOTNET_AUTO_PLUGINS="Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"` | `"Logfire.OpAmp.AutoInstrumentation.Plugin, Logfire.OpAmp.AutoInstrumentation"` |
+  | PyPI `pydantic-opamp-otel`, `pydantic-opamp-client`, `pydantic-opamp-core` | `logfire-fleet-otel`, `logfire-fleet-client`, `logfire-fleet-core` |
+  | `import pydantic_opamp_otel`, `pydantic_opamp_client` | `import logfire_fleet_otel`, `logfire_fleet_client` |
+  | npm `@pydantic/opamp-otel`, `@pydantic/opamp-client` | `@pydantic/logfire-fleet-otel`, `@pydantic/logfire-fleet-client` |
+  | Maven `dev.pydantic:opamp-client`, `dev.pydantic:opamp-javaagent-extension` | `dev.pydantic:logfire-fleet-client`, `dev.pydantic:logfire-fleet-javaagent-extension` |
+  | Java packages `dev.pydantic.opamp.*` | `dev.pydantic.logfire.fleet.*` |
+  | NuGet and namespaces `Pydantic.OpAmp.*` | `Logfire.Fleet.*` |
+  | .NET `AddPydanticOpAmp()` | `AddLogfireFleet()` |
+  | `OTEL_DOTNET_AUTO_PLUGINS="Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"` | `"Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation"` |
 
   The Python entry points keep their names (`OTEL_PYTHON_DISTRO=opamp`,
   `OTEL_PYTHON_CONFIGURATOR=opamp`), and the Go modules keep their paths.
@@ -226,7 +227,7 @@ Go or the Supervisor, which have not had a release with them:
   become the global one: the server heard APPLIED while the application's spans went past every
   gate, and the instance was described as `unknown_service` (#114).
 - Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
-  install logfire-opamp-otel`, `npm install @pydantic/logfire-opamp-otel`, Maven Central, `dotnet add
+  install logfire-fleet-otel`, `npm install @pydantic/logfire-fleet-otel`, Maven Central, `dotnet add
   package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
   docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
   tags (#124).

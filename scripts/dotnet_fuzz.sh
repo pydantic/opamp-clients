@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: MIT
 #
 # SharpFuzz (libFuzzer for .NET) on the .NET client's own code around the core: each target in
-# dotnet/Logfire.OpAmp.Client.Fuzz/Targets (ClientFuzz, CoreFuzz), one after another, for SECONDS
+# dotnet/Logfire.Fleet.Client.Fuzz/Targets (ClientFuzz, CoreFuzz), one after another, for SECONDS
 # each. The client's assembly is instrumented (sharpfuzz), not the protobufs nor the native core.
 # A target's corpus starts from its seeds and every input under
-# dotnet/Logfire.OpAmp.Client.Fuzz/crashes/<target>/, and lives under target/shim-fuzz/dotnet/<target>/
+# dotnet/Logfire.Fleet.Client.Fuzz/crashes/<target>/, and lives under target/shim-fuzz/dotnet/<target>/
 # (with its log and what it found). A crash fails the run: copy the input it wrote (crash-*) into
 # crashes/<target>/ and commit it, and every dotnet test runs it from then on (FuzzInputsTests).
 #
@@ -25,7 +25,7 @@ timeout=${FUZZ_TIMEOUT:-20}
 rss_mb=${FUZZ_RSS_MB:-2048}
 root=$(cd "$(dirname "$0")/.." && pwd)
 out="$root/target/shim-fuzz/dotnet"
-project="$root/dotnet/Logfire.OpAmp.Client.Fuzz"
+project="$root/dotnet/Logfire.Fleet.Client.Fuzz"
 mkdir -p "$out"
 
 targets=("$@")
@@ -52,14 +52,14 @@ native=()
 dotnet build "$project" -c Release --nologo -v quiet -o "$out/build" "${native[@]}"
 rm -rf "$out/run"
 cp -r "$out/build" "$out/run"
-"$out/tools/sharpfuzz" "$out/run/Logfire.OpAmp.Client.dll"
-exe="$out/run/Logfire.OpAmp.Client.Fuzz"
+"$out/tools/sharpfuzz" "$out/run/Logfire.Fleet.Client.dll"
+exe="$out/run/Logfire.Fleet.Client.Fuzz"
 
 failed=()
 for t in "${targets[@]}"; do
 	work="$out/$t"
 	mkdir -p "$work/corpus" "$work/artifacts"
-	"$out/build/Logfire.OpAmp.Client.Fuzz" seeds "$t" "$work/corpus" # instrumented, it runs only under the fuzzer
+	"$out/build/Logfire.Fleet.Client.Fuzz" seeds "$t" "$work/corpus" # instrumented, it runs only under the fuzzer
 	if [ -d "$project/crashes/$t" ]; then cp "$project/crashes/$t"/* "$work/corpus/"; fi
 	echo "== dotnet $t, ${seconds}s"
 	# Every target runs, whatever one before found.

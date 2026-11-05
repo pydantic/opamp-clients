@@ -1,6 +1,6 @@
 # .NET
 
-`Logfire.OpAmp.Client` is this repository's OpAMP client for .NET, in
+`Logfire.Fleet.Client` is this repository's OpAMP client for .NET, in
 [`dotnet/`](../dotnet/). It runs the shared core natively, as a library called through
 `LibraryImport` ([how-it-works.md](how-it-works.md)), and speaks plain HTTP or WebSocket, with
 TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for .NET 8 and .NET 10. Its
@@ -9,10 +9,10 @@ TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for 
 ## Install
 
 ```bash
-dotnet add package Logfire.OpAmp.Client
+dotnet add package Logfire.Fleet.Client
 ```
 
-It depends on `Logfire.OpAmp.Core.Native`, which holds the core's library for each platform
+It depends on `Logfire.Fleet.Core.Native`, which holds the core's library for each platform
 (Linux glibc and musl, macOS and Windows, on x64 and arm64) and nothing else; the build copies the
 one the application runs on to its output.
 
@@ -20,7 +20,7 @@ one the application runs on to its output.
 
 ```csharp
 using OpAmp.Proto.V1;
-using Logfire.OpAmp.Client;
+using Logfire.Fleet.Client;
 
 var client = OpAmpClient.Start(
     new OpAmpClientOptions
@@ -66,7 +66,7 @@ alone.) Give the agent's status to `Start`, so the first message reports it in f
 ## Options
 
 `OpAmpClientOptions`, `OpAmpTlsOptions` and `OpAmpStatus` are records with `init` properties, in
-`dotnet/Logfire.OpAmp.Client/OpAmpClient.cs` and `ClientTransport.cs`.
+`dotnet/Logfire.Fleet.Client/OpAmpClient.cs` and `ClientTransport.cs`.
 
 | What | Option | More |
 |---|---|---|
@@ -129,7 +129,7 @@ The callback gets an `OpAmpNotification`, a record with one nested record for ea
 ```bash
 scripts/fetch_core.py fetch   # the core's library, its test files and the adversary module
 cd dotnet
-dotnet test --project Logfire.OpAmp.Client.Tests
+dotnet test --project Logfire.Fleet.Client.Tests
 ```
 
 The tests need the .NET 10 SDK (`dotnet/global.json`, which also picks its test runner,
@@ -142,8 +142,8 @@ dotnet-core-platform,dotnet-core` ([conformance/README.md](../conformance/README
 ## OpenTelemetry
 
 To put automatic instrumentation under a server without writing code, use the plugin
-`Logfire.OpAmp.AutoInstrumentation`; for an SDK set up in code, `services.AddOpenTelemetry().WithOpAmp()`
-from `Logfire.OpAmp.Extensions.Hosting`. Both are in [dotnet-otel.md](dotnet-otel.md). To wire
+`Logfire.Fleet.AutoInstrumentation`; for an SDK set up in code, `services.AddOpenTelemetry().WithOpAmp()`
+from `Logfire.Fleet.Extensions.Hosting`. Both are in [dotnet-otel.md](dotnet-otel.md). To wire
 this client to an SDK by hand, see [sdks.md](sdks.md) and [examples/dotnet](../examples/dotnet/Program.cs).
-`Logfire.OpAmp.Client.Sdk.SdkSettings` runs the shared SDK settings layer
+`Logfire.Fleet.Client.Sdk.SdkSettings` runs the shared SDK settings layer
 ([sdk-settings.md](sdk-settings.md)).

@@ -2,13 +2,13 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 """The native core for every platform it ships to: the libraries the .NET package carries, and the
-Python wheels (logfire-opamp-core, one per platform holding just the library, and
-logfire-opamp-client, pure Python), on one Linux x64 machine, then checked and run where they will
+Python wheels (logfire-fleet-core, one per platform holding just the library, and
+logfire-fleet-client, pure Python), on one Linux x64 machine, then checked and run where they will
 run.
 
     scripts/native_dist.py build    # dist/native: runtimes/<rid>/native/, wheels/
-    scripts/native_dist.py pack     # dist/native/nuget: Logfire.OpAmp.Client with every runtime, and
-                                    # Logfire.OpAmp.Extensions.Hosting on it
+    scripts/native_dist.py pack     # dist/native/nuget: Logfire.Fleet.Client with every runtime, and
+                                    # Logfire.Fleet.Extensions.Hosting on it
     scripts/native_dist.py check    # each binary is the format and machine its name says
     scripts/native_dist.py smoke    # install and run them in Docker: glibc and musl, x64 and arm64
 
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist" / "native"
 PYTHON = ROOT / "python"
 sys.path.insert(0, str(PYTHON / "core"))
-import build_backend  # noqa: E402  (python/core: writes logfire-opamp-core's wheels)
+import build_backend  # noqa: E402  (python/core: writes logfire-fleet-core's wheels)
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ class Target:
     rid: str  # .NET's runtime identifier
     rust: str  # the Rust target (with zigbuild's glibc version, if any)
     tool: str  # zigbuild or xwin
-    plat: str  # logfire-opamp-core's wheel's platform tag
+    plat: str  # logfire-fleet-core's wheel's platform tag
     lib: str  # the library's file name
     magic: tuple[str, str]  # what `file` says of it: the format, and the machine
 
@@ -131,21 +131,21 @@ def check() -> None:
             problems.append(f"{t.rid}: {lib.name} is {says!r}, not {t.magic}")
         elif "not stripped" in says:
             problems.append(f"{t.rid}: {lib.name} has its symbol table")
-        found = [w for w in wheels if w.name.startswith("logfire_opamp_core-") and w.name.endswith(f"-py3-none-{t.plat}.whl")]
+        found = [w for w in wheels if w.name.startswith("logfire_fleet_core-") and w.name.endswith(f"-py3-none-{t.plat}.whl")]
         if len(found) != 1:
             problems.append(f"{t.rid}: {len(found)} core wheels for {t.plat}")
             continue
         with zipfile.ZipFile(found[0]) as z, tempfile.TemporaryDirectory() as d:
-            libs = [n for n in z.namelist() if not n.startswith("logfire_opamp_core-")]
-            if libs != [f"logfire_opamp_core/{t.lib}"]:
-                problems.append(f"{found[0].name}: holds {libs}, not logfire_opamp_core/{t.lib} alone")
+            libs = [n for n in z.namelist() if not n.startswith("logfire_fleet_core-")]
+            if libs != [f"logfire_fleet_core/{t.lib}"]:
+                problems.append(f"{found[0].name}: holds {libs}, not logfire_fleet_core/{t.lib} alone")
                 continue
             licenses = {n.split("/", 2)[2] for n in z.namelist() if n.split("/")[0].endswith(".dist-info")
                         and n.split("/")[1] == "licenses"}
             problems += [f"{found[0].name}: lacks .dist-info/licenses/{f}" for f in CORE_LICENSE if f not in licenses]
             if not all(m in (says := file_says(Path(z.extract(libs[0], d)))) for m in t.magic):
                 problems.append(f"{found[0].name}: {libs[0]} is {says!r}, not {t.magic}")
-    clients = [w for w in wheels if w.name.startswith("logfire_opamp_client-")]
+    clients = [w for w in wheels if w.name.startswith("logfire_fleet_client-")]
     if [w.name.endswith("-py3-none-any.whl") for w in clients] != [True]:
         problems.append(f"client wheels {[w.name for w in clients]}, not one for every platform")
     for w in clients:
@@ -154,10 +154,10 @@ def check() -> None:
     # .NET the same way: the core's package holds every target's library, with the core's license
     # (its license file) and notices, and nothing else; the client's holds no binary but its
     # assembly, and asks for that core package.
-    for name in ("Logfire.OpAmp.Core.Native", "Logfire.OpAmp.Client", "Logfire.OpAmp.Extensions.Hosting"):
+    for name in ("Logfire.Fleet.Core.Native", "Logfire.Fleet.Client", "Logfire.Fleet.Extensions.Hosting"):
         if (n := len(list((DIST / "nuget").glob(f"{name}.*.nupkg")))) != 1:
             problems.append(f"{n} {name} packages, not 1")
-    for p in (DIST / "nuget").glob("Logfire.OpAmp.Core.Native.*.nupkg"):
+    for p in (DIST / "nuget").glob("Logfire.Fleet.Core.Native.*.nupkg"):
         with zipfile.ZipFile(p) as z:
             got = sorted(n for n in z.namelist() if not nuget_meta(n))
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
@@ -166,19 +166,19 @@ def check() -> None:
             problems.append(f"{p.name}: holds {got}, not {want}")
         if f'<license type="file">{CORE_LICENSE[0]}</license>' not in spec:
             problems.append(f"{p.name}: its license isn't {CORE_LICENSE[0]}")
-    for p in (DIST / "nuget").glob("Logfire.OpAmp.Client.*.nupkg"):
+    for p in (DIST / "nuget").glob("Logfire.Fleet.Client.*.nupkg"):
         with zipfile.ZipFile(p) as z:
             problems += [f"{p.name}: ships {n}" for n in z.namelist() if n.startswith("runtimes/") or (n.endswith(BINARY) and not n.startswith("lib/"))]
-            problems += [f"{p.name}: lacks lib/{tfm}/Logfire.OpAmp.Client.dll" for tfm in FRAMEWORKS
-                         if f"lib/{tfm}/Logfire.OpAmp.Client.dll" not in z.namelist()]
+            problems += [f"{p.name}: lacks lib/{tfm}/Logfire.Fleet.Client.dll" for tfm in FRAMEWORKS
+                         if f"lib/{tfm}/Logfire.Fleet.Client.dll" not in z.namelist()]
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
-        if f'id="Logfire.OpAmp.Core.Native" version="[{core_version()}]"' not in spec:
-            problems.append(f"{p.name}: doesn't depend on Logfire.OpAmp.Core.Native {core_version()} exactly")
+        if f'id="Logfire.Fleet.Core.Native" version="[{core_version()}]"' not in spec:
+            problems.append(f"{p.name}: doesn't depend on Logfire.Fleet.Core.Native {core_version()} exactly")
     # The hosting package: its own assembly (and its docs) alone, on the client's package, with the
     # README its nuspec names for NuGet's page. What it shares with the plugin (dotnet/shared) is
     # compiled into it, never shipped as source.
-    for p in (DIST / "nuget").glob("Logfire.OpAmp.Extensions.Hosting.*.nupkg"):
-        assemblies = [f"lib/{tfm}/Logfire.OpAmp.Extensions.Hosting" for tfm in FRAMEWORKS]
+    for p in (DIST / "nuget").glob("Logfire.Fleet.Extensions.Hosting.*.nupkg"):
+        assemblies = [f"lib/{tfm}/Logfire.Fleet.Extensions.Hosting" for tfm in FRAMEWORKS]
         with zipfile.ZipFile(p) as z:
             spec = z.read(next(n for n in z.namelist() if n.endswith(".nuspec"))).decode()
             readme = re.search(r"<readme>([^</]+\.md)</readme>", spec)
@@ -186,8 +186,8 @@ def check() -> None:
         problems += [f"{p.name}: ships {n}" for n in payload
                      if n not in [f"{a}.{ext}" for a in assemblies for ext in ("dll", "xml")]]
         problems += [f"{p.name}: lacks {a}.dll" for a in assemblies if f"{a}.dll" not in payload]
-        if 'id="Logfire.OpAmp.Client"' not in spec:
-            problems.append(f"{p.name}: doesn't depend on Logfire.OpAmp.Client")
+        if 'id="Logfire.Fleet.Client"' not in spec:
+            problems.append(f"{p.name}: doesn't depend on Logfire.Fleet.Client")
     # The cores ship compiled only: no source distribution, and no wheel or package holds Rust
     # sources or manifests.
     problems += [f"{p.name}: a source distribution" for p in (DIST / "wheels").glob("*.tar.gz")]
@@ -213,23 +213,23 @@ def nuget_meta(name: str) -> bool:
             or ("/" not in name and name.endswith(".nuspec")))
 
 
-CORE_NATIVE = ROOT / "dotnet" / "Logfire.OpAmp.Core.Native"
+CORE_NATIVE = ROOT / "dotnet" / "Logfire.Fleet.Core.Native"
 
 
 def core_version() -> str:
-    """Logfire.OpAmp.Core.Native's version, which the client's package asks for exactly."""
+    """Logfire.Fleet.Core.Native's version, which the client's package asks for exactly."""
     import xml.etree.ElementTree as ET
 
-    return ET.parse(CORE_NATIVE / "Logfire.OpAmp.Core.Native.csproj").getroot().findtext("PropertyGroup/Version")
+    return ET.parse(CORE_NATIVE / "Logfire.Fleet.Core.Native.csproj").getroot().findtext("PropertyGroup/Version")
 
 
 def pack() -> None:
-    """Logfire.OpAmp.Core.Native with every platform's library, then the client on it, and the
+    """Logfire.Fleet.Core.Native with every platform's library, then the client on it, and the
     hosting package on the client."""
     nuget = DIST / "nuget"
     run(["dotnet", "pack", str(CORE_NATIVE), "-c", "Release", "--nologo", "-p:IsPackable=true",
          f"-p:OpAmpNativeRuntimes={DIST / 'runtimes'}", "-o", str(nuget)])
-    for project in ("Logfire.OpAmp.Client", "Logfire.OpAmp.Extensions.Hosting"):
+    for project in ("Logfire.Fleet.Client", "Logfire.Fleet.Extensions.Hosting"):
         run(["dotnet", "pack", str(ROOT / "dotnet" / project), "-c", "Release", "--nologo",
              "-p:IsPackable=true", f"-p:OpAmpCorePackage={core_version()}", f"-p:RestoreAdditionalProjectSources={nuget}",
              "-o", str(nuget)])
@@ -289,8 +289,8 @@ def smoke_cmds(ids: dict[tuple[str, str], str], version: str) -> list[list[str]]
         emulated = platform != "linux/amd64"
         cmds.append(["docker", "run", "--rm", "--platform", platform, "-v", f"{DIST / 'wheels'}:/wheels:ro",
                      "-v", f"{PYTHON / 'tests' / 'native_smoke.py'}:/smoke.py:ro", py, "sh", "-c",
-                     "pip install -q --no-index --find-links /wheels logfire-opamp-client 2>/dev/null"
-                     " || pip install -q --find-links /wheels logfire-opamp-client; python /smoke.py"])
+                     "pip install -q --no-index --find-links /wheels logfire-fleet-client 2>/dev/null"
+                     " || pip install -q --find-links /wheels logfire-fleet-client; python /smoke.py"])
         cmds.append(["docker", "run", "--rm", "--platform", platform, "-v", f"{DIST / 'nuget'}:/feed:ro",
                      "-v", f"{ROOT / 'dotnet' / 'smoke'}:/src:ro", "-e", "DOTNET_CLI_TELEMETRY_OPTOUT=1",
                      "-e", "DOTNET_NOLOGO=1",
@@ -305,8 +305,8 @@ def smoke() -> None:
 
     Every container at once, each with its own output, shown in order once all are done: one after
     another they were eight minutes of a twenty-minute job, most of it QEMU's, on idle cores."""
-    nupkg = next((DIST / "nuget").glob("Logfire.OpAmp.Client.*.nupkg"))
-    version = nupkg.name.removeprefix("Logfire.OpAmp.Client.").removesuffix(".nupkg")
+    nupkg = next((DIST / "nuget").glob("Logfire.Fleet.Client.*.nupkg"))
+    version = nupkg.name.removeprefix("Logfire.Fleet.Client.").removesuffix(".nupkg")
     ids = pinned([(platform, image) for platform, py, dotnet in SMOKE for image in (py, dotnet)])
     cmds = smoke_cmds(ids, version)
 

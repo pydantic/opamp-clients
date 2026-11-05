@@ -13,7 +13,7 @@ import pytest
 from _servers import MODES
 from aiohttp import web
 
-from logfire_opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from logfire_fleet_client import Client, Config, Notification, Status, opamp_pb2 as pb
 
 
 def test_with_no_uid_chosen_the_core_makes_one_and_the_client_says_which(tmp_path):

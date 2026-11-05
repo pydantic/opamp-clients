@@ -1,4 +1,4 @@
-# @pydantic/logfire-opamp-otel
+# @pydantic/logfire-fleet-otel
 
 OpenTelemetry auto-instrumentation for Node.js, under an OpAMP server: upstream's `register`, with
 the SDK managed by the server.
@@ -9,11 +9,11 @@ Install it into the application, then start the application with it in place of 
 `register`, with the server's address and key:
 
 ```bash
-npm install @pydantic/logfire-opamp-otel
+npm install @pydantic/logfire-fleet-otel
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
-node --import @pydantic/logfire-opamp-otel/register app.js
+node --import @pydantic/logfire-fleet-otel/register app.js
 ```
 
 It brings upstream's auto-instrumentations and OTLP exporters with it. In Logfire, **Fleet →
@@ -30,7 +30,7 @@ An application that starts its own NodeSDK, or the Logfire SDK (`logfire.configu
 that setup and calls `manage()` after it, in place of the register:
 
 ```js
-import { manage } from "@pydantic/logfire-opamp-otel";
+import { manage } from "@pydantic/logfire-fleet-otel";
 
 sdk.start();  // or logfire.configure({ ... })
 manage();
@@ -43,7 +43,7 @@ The application can read settings of its own the server sends (a feature flag, a
 default for when there are none ([app-settings.md](https://github.com/pydantic/opamp-clients/blob/main/docs/app-settings.md)):
 
 ```js
-import { appSettings } from "@pydantic/logfire-opamp-otel";
+import { appSettings } from "@pydantic/logfire-fleet-otel";
 
 if (appSettings.get("checkout.new_flow", "off") === "on") { /* ... */ }
 const unsubscribe = appSettings.onChange((settings, changed) => console.log("changed:", changed));

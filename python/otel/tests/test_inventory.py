@@ -15,8 +15,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from logfire_opamp_client import opamp_pb2
-from logfire_opamp_client.sdk import SdkSettings, settings_pb2
+from logfire_fleet_client import opamp_pb2
+from logfire_fleet_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogRecordExporter, SimpleLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
@@ -27,10 +27,10 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExport
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.util._importlib_metadata import entry_points
 
-import logfire_opamp_otel
+import logfire_fleet_otel
 from _globals import sdk_globals
 from _policy import config_map, policy
-from logfire_opamp_otel import Agent, Controls
+from logfire_fleet_otel import Agent, Controls
 
 LAYER = SdkSettings()
 #: 2026-10-14T12:00:00Z.
@@ -76,23 +76,23 @@ def instrumentors() -> dict[str, str]:
 def test_the_sdk_entry_is_this_package_and_the_python_sdk_it_runs():
     from opentelemetry.sdk.version import __version__
 
-    inv = logfire_opamp_otel.inventory([])
-    assert (inv.integration, inv.integration_version) == ("logfire-opamp-otel", version("logfire-opamp-otel"))
+    inv = logfire_fleet_otel.inventory([])
+    assert (inv.integration, inv.integration_version) == ("logfire-fleet-otel", version("logfire-fleet-otel"))
     assert (inv.sdk_language, inv.sdk_version) == ("python", __version__)
     assert parts(LAYER.components(inv))["sdk"] == {
-        "integration.name": "logfire-opamp-otel", "integration.version": version("logfire-opamp-otel"),
+        "integration.name": "logfire-fleet-otel", "integration.version": version("logfire-fleet-otel"),
         "telemetry.sdk.language": "python", "telemetry.sdk.version": __version__}
 
 
 def test_the_instrumentations_are_the_names_opentelemetry_instrument_matches_at_their_versions():
-    got = {i.name: i.version for i in logfire_opamp_otel.instrumentations()}
+    got = {i.name: i.version for i in logfire_fleet_otel.instrumentations()}
     assert got == instrumentors() and "aiohttp-client" in got  # the dev group's
     assert got["aiohttp-client"] == version("opentelemetry-instrumentation-aiohttp-client")
     # Each is a name the switch takes: it lands in the variable opentelemetry-instrument reads.
     local = policy().encode()
     s = LAYER.decide(_config(policy(instrumentations={"disabled": ["aiohttp-client"]})), local, local,
-                     logfire_opamp_otel.sdk_host(), save=lambda doc: None).apply
-    assert logfire_opamp_otel.disabled_instrumentations(s, "") == "aiohttp-client"
+                     logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply
+    assert logfire_fleet_otel.disabled_instrumentations(s, "") == "aiohttp-client"
 
 
 def _ep(name: str, dist) -> SimpleNamespace:
@@ -109,20 +109,20 @@ def test_an_instrumentation_whose_library_is_missing_is_left_out_and_one_without
     monkeypatch.setattr(metadata, "entry_points", lambda group: eps if group == "opentelemetry_instrumentor" else [])
     # django's library isn't installed: opentelemetry-instrument would skip it, so it can't run.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: "missing" if d is django else None)
-    got = logfire_opamp_otel.instrumentations()
+    got = logfire_fleet_otel.instrumentations()
     assert [(i.name, i.version) for i in got] == [("flask", "0.56b0"), ("bare", ""), ("nodist", "")]
     assert parts(LAYER.components(settings_pb2.Inventory(instrumentations=got)))["instrumentations"] == {
         "bare": None, "flask": "0.56b0", "nodist": None}
     # A requirement it can't read: listed, as opentelemetry-instrument would still try it.
     monkeypatch.setattr(deps, "get_dist_dependency_conflicts", lambda d: 1 / 0)
-    assert [i.name for i in logfire_opamp_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
+    assert [i.name for i in logfire_fleet_otel.instrumentations()] == ["flask", "django", "bare", "nodist"]
 
 
 def test_no_instrumentation_installed_is_an_empty_list(monkeypatch):
     import opentelemetry.util._importlib_metadata as metadata
 
     monkeypatch.setattr(metadata, "entry_points", lambda group: [])
-    inv = logfire_opamp_otel.inventory([])
+    inv = logfire_fleet_otel.inventory([])
     assert list(inv.instrumentations) == []
     got = parts(LAYER.components(inv))
     assert got["instrumentations"] == {} and got["exporters"] == {}
@@ -170,18 +170,18 @@ def test_every_exporter_on_the_sdks_providers_is_gated_and_what_cant_be_is_repor
     shown = io.StringIO()
     logs.add_log_record_processor(SimpleLogRecordProcessor(ConsoleLogRecordExporter(out=shown)))
     try:
-        got = logfire_opamp_otel.govern(c, traces, meters, logs)
+        got = logfire_fleet_otel.govern(c, traces, meters, logs)
         # Again: nothing is gated twice.
-        again = logfire_opamp_otel.govern(c, traces, meters, logs)
+        again = logfire_fleet_otel.govern(c, traces, meters, logs)
         assert listed(again.exporters) == listed(got.exporters)
         assert type(memory) is InMemorySpanExporter and traces._active_span_processor._span_processors[3].span_exporter._to is memory
         # The gate is in force on what was added past the package: send_traces stops it.
         c.apply(SdkSettings().decide(_config(policy(signal_exports={"traces": {"enabled": False}})),
-                                     b"{}", b"{}", logfire_opamp_otel.sdk_host(), save=lambda doc: None).apply)
+                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
         traces._active_span_processor._span_processors[3].on_end(_span())
         assert memory.get_finished_spans() == ()
         c.apply(SdkSettings().decide(_config(policy(signal_exports={"logs": {"enabled": False}})),
-                                     b"{}", b"{}", logfire_opamp_otel.sdk_host(), save=lambda doc: None).apply)
+                                     b"{}", b"{}", logfire_fleet_otel.sdk_host(), save=lambda doc: None).apply)
         logs.get_logger("t").emit(body="dropped")
         assert shown.getvalue() == ""
     finally:
@@ -213,9 +213,9 @@ def test_providers_that_arent_the_sdks_have_no_exporters():
     from opentelemetry.metrics import NoOpMeterProvider
     from opentelemetry.trace import NoOpTracerProvider
 
-    none = logfire_opamp_otel.govern(Controls(), NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider())
+    none = logfire_fleet_otel.govern(Controls(), NoOpTracerProvider(), NoOpMeterProvider(), NoOpLoggerProvider())
     assert none.exporters == [] and none.sdk == {"traces": False, "metrics": False, "logs": False}
-    empty = logfire_opamp_otel.govern(Controls(), TracerProvider(), MeterProvider(), LoggerProvider())
+    empty = logfire_fleet_otel.govern(Controls(), TracerProvider(), MeterProvider(), LoggerProvider())
     assert empty.exporters == [] and empty.sdk == {"traces": True, "metrics": True, "logs": True}
 
 
@@ -226,7 +226,7 @@ def test_an_exporter_type_no_entry_point_names_is_named_by_its_type_and_none_is_
     traces = TracerProvider()
     traces.add_span_processor(SimpleSpanProcessor(MySpanExporter()))
     before = set(sys.modules)
-    found = logfire_opamp_otel.govern(Controls(), traces, None, None)
+    found = logfire_fleet_otel.govern(Controls(), traces, None, None)
     assert listed(found.exporters) == [("traces", "MySpanExporter", True)]
     assert set(sys.modules) == before
 
@@ -278,7 +278,7 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     finally:
         server.close()
     for agent in (ours, theirs):
-        assert agent.components == LAYER.components(logfire_opamp_otel.inventory(agent.exporters), agent.host, NOW)
+        assert agent.components == LAYER.components(logfire_fleet_otel.inventory(agent.exporters), agent.host, NOW)
     settings = parts(ours.components)["settings"]
     assert settings["sampling_rules"] == settings["send_metrics"] == "at once"
     assert settings["deactivate_instrumentations"] == "next start"
@@ -287,7 +287,7 @@ def test_the_settings_listed_are_those_the_agents_host_carries_out_and_the_serve
     # application's own settings are handed on whoever built the SDK.
     declared = set(parts(theirs.components)["settings"])
     assert "custom" in declared and "deactivate_instrumentations" in declared
-    assert not declared & {*logfire_opamp_otel.SAMPLER, *logfire_opamp_otel.DEBUG}
+    assert not declared & {*logfire_fleet_otel.SAMPLER, *logfire_fleet_otel.DEBUG}
     assert declared >= {"send_traces", "send_metrics", "send_logs", "mask_attributes"}
     assert declared == {*theirs.host.live, *theirs.host.next_start}
     # The first message of each carries them in full, its hash set by the client.
@@ -312,7 +312,7 @@ def _without_hash(c: opamp_pb2.AvailableComponents) -> opamp_pb2.AvailableCompon
 def test_an_inventory_that_cant_be_listed_leaves_the_instance_managed(tmp_path, monkeypatch, caplog):
     import test_opamp_otel
 
-    monkeypatch.setattr(logfire_opamp_otel, "inventory", lambda exporters: 1 / 0)
+    monkeypatch.setattr(logfire_fleet_otel, "inventory", lambda exporters: 1 / 0)
     server = test_opamp_otel._Server()
     try:
         agent = _started(server, tmp_path, configured=True, OTEL_OPAMP_HEARTBEAT_INTERVAL="100ms")
@@ -362,8 +362,8 @@ def test_under_opentelemetry_instrument_the_inventory_is_what_it_built(tmp_path)
     finally:
         server.close()
     got = parts(sent)
-    assert got["sdk"] == {"integration.name": "logfire-opamp-otel",
-                          "integration.version": version("logfire-opamp-otel"),
+    assert got["sdk"] == {"integration.name": "logfire-fleet-otel",
+                          "integration.version": version("logfire-fleet-otel"),
                           "telemetry.sdk.language": "python", "telemetry.sdk.version": __version__}
     # Switched off, still listed: it can run.
     assert got["instrumentations"] == instrumentors()
@@ -391,10 +391,10 @@ def test_a_metric_exporter_beside_otlp_is_gated_too_and_send_metrics_is_listed(t
 def test_configure_gates_a_span_processor_it_was_given_and_lists_no_instrumentation_switch(tmp_path):
     server = _asking()
     child = textwrap.dedent(f"""
-        import time, logfire_opamp_otel
+        import time, logfire_fleet_otel
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-        logfire_opamp_otel.configure(endpoint={server.endpoint!r},
+        logfire_fleet_otel.configure(endpoint={server.endpoint!r},
                              span_processors=[SimpleSpanProcessor(InMemorySpanExporter())])
         time.sleep(0.5)
     """)
@@ -431,7 +431,7 @@ def test_a_failing_exporters_call_leaves_the_gates_in_place_and_raises_nothing(c
     memory = InMemorySpanExporter()
     traces.add_span_processor(SimpleSpanProcessor(memory))
     try:
-        got = logfire_opamp_otel.govern(c, traces, MeterProvider(), LoggerProvider(), layer=_FailingLayer())
+        got = logfire_fleet_otel.govern(c, traces, MeterProvider(), LoggerProvider(), layer=_FailingLayer())
     finally:
         traces.shutdown()
     assert got.exporters == [settings_pb2.Exporter(signal="traces", name="InMemorySpanExporter", gated=True)]
@@ -444,10 +444,10 @@ def test_a_failing_exporters_call_keeps_the_names_last_decided():
     # listed as it was found.
     otlp = settings_pb2.FoundExporter(signal="traces", kind="otlp_proto_grpc", gated=True, endpoint="col:4317")
     listed_as: dict = {}
-    first = logfire_opamp_otel.Governed()
+    first = logfire_fleet_otel.Governed()
     first.found = [otlp]
     assert [e.name for e in first.decide(LAYER, {}, listed_as).exporters] == ["otlp"]
-    later = logfire_opamp_otel.Governed()
+    later = logfire_fleet_otel.Governed()
     # Regression: one listed as found carried its raw endpoint, credentials and all, into the
     # inventory. Only the core makes a destination of an endpoint: none is listed without it.
     secret = "https://user:hunter2@col:4318/v1/traces?token=t"

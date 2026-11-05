@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""Core mode's streams and files (src/logfire_opamp_client/_streams.py): download files written off the
+"""Core mode's streams and files (src/logfire_fleet_client/_streams.py): download files written off the
 event loop, in order, hashed over exactly what was written, answered once (or not at all after a
 discard or a cancel); backpressure both ways; and the in-flight registry: a close or a shutdown
 ends what it names, a stream that connects (or finishes its TLS handshake) after its close is
@@ -21,13 +21,13 @@ import trustme
 from _servers import HttpProxy, OpampServer, Socks5Proxy
 from aiohttp import web
 
-from logfire_opamp_client import TLS, Client, Config, Notification, Proxy, Status
-from logfire_opamp_client import _streams
-from logfire_opamp_client import opamp_pb2 as pb
-from logfire_opamp_client._executor import download_path, downloads_dir
-from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from logfire_opamp_client._streams import Streams, proxy_choice
-from logfire_opamp_client._transport import Transport
+from logfire_fleet_client import TLS, Client, Config, Notification, Proxy, Status
+from logfire_fleet_client import _streams
+from logfire_fleet_client import opamp_pb2 as pb
+from logfire_fleet_client._executor import download_path, downloads_dir
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client._streams import Streams, proxy_choice
+from logfire_fleet_client._transport import Transport
 
 
 async def until(what: str, done: Callable[[], bool], seconds: float = 20) -> None:

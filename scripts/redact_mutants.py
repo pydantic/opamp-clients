@@ -34,9 +34,9 @@ TESTS = {
     "go": ["go", "-C", "go", "test", "-count=1", "./opamp", "-run",
            "^(TestSecretsChangeNothingShown|TestWhatIsNotSecretIsStillShown|TestEveryFieldIsPrinted)$"],
     # From dotnet/, where global.json picks the SDK and its test runner (Microsoft.Testing.Platform).
-    "dotnet": ["dotnet", "test", "--project", "Logfire.OpAmp.Client.Tests", "--framework", "net8.0",
+    "dotnet": ["dotnet", "test", "--project", "Logfire.Fleet.Client.Tests", "--framework", "net8.0",
                f"-p:OpAmpNativeLib={NATIVE_LIB}",
-               "--filter-class", "Logfire.OpAmp.Client.Tests.RedactionTests"],
+               "--filter-class", "Logfire.Fleet.Client.Tests.RedactionTests"],
 }
 # Where each test runs, under the copy's root.
 TEST_DIRS = {"dotnet": "dotnet"}

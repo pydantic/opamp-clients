@@ -4,24 +4,24 @@ An extension for the upstream OpenTelemetry Java agent that puts the agent under
 
 ## Quickstart
 
-Download the extension jar from Maven Central (`dev.pydantic:logfire-opamp-javaagent-extension`) next to
+Download the extension jar from Maven Central (`dev.pydantic:logfire-fleet-javaagent-extension`) next to
 the upstream agent, then start the application with both, with the server's address and key:
 
 ```bash
-V=0.2.0   # the latest: https://central.sonatype.com/artifact/dev.pydantic/logfire-opamp-javaagent-extension
-curl -sSfLO https://repo1.maven.org/maven2/dev/pydantic/logfire-opamp-javaagent-extension/$V/logfire-opamp-javaagent-extension-$V.jar
+V=0.2.0   # the latest: https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-javaagent-extension
+curl -sSfLO https://repo1.maven.org/maven2/dev/pydantic/logfire-fleet-javaagent-extension/$V/logfire-fleet-javaagent-extension-$V.jar
 curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 java -javaagent:opentelemetry-javaagent.jar \
-     -Dotel.javaagent.extensions=logfire-opamp-javaagent-extension-$V.jar \
+     -Dotel.javaagent.extensions=logfire-fleet-javaagent-extension-$V.jar \
      -jar checkout.jar
 ```
 
 In Logfire, **Fleet → Connect an application** gives the endpoint and the key.
 
-When it works, the logger `dev.pydantic.logfire.opamp.javaagent.Extension` says, at INFO (shown by
+When it works, the logger `dev.pydantic.logfire.fleet.javaagent.Extension` says, at INFO (shown by
 default):
 
 ```
@@ -32,8 +32,8 @@ When it can't connect, it warns once, with what to check. The instance keeps its
 restarts with no configuration ([default-state-dir.md](https://github.com/pydantic/opamp-clients/blob/main/docs/default-state-dir.md)).
 
 The server can also send the application settings of its own (a feature flag, a limit). The
-application reads them with `dev.pydantic.logfire.opamp.AppSettings`, from the extension's second jar,
-`dev.pydantic:logfire-opamp-javaagent-extension` with the classifier `app-settings`, which it compiles
+application reads them with `dev.pydantic.logfire.fleet.AppSettings`, from the extension's second jar,
+`dev.pydantic:logfire-fleet-javaagent-extension` with the classifier `app-settings`, which it compiles
 against and runs with; without the agent every read is its default:
 
 ```java

@@ -8,7 +8,7 @@ driver, examples/dotnet-otel.
 
 The library has to be a Linux one of the host's architecture whatever the host is (a Mac
 building for a Linux container, say). The .NET build is told where it is (-p:OpAmpNativeLib=...,
-see dotnet/Logfire.OpAmp.Client's project file) instead of taking its own, which its image hasn't
+see dotnet/Logfire.Fleet.Client's project file) instead of taking its own, which its image hasn't
 got.
 
 It is the library the core's release carries for Linux on this architecture (glibc 2.17, so it runs

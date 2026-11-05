@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-using Logfire.OpAmp.Client;
-using Logfire.OpAmp.Core;
+using Logfire.Fleet.Client;
+using Logfire.Fleet.Core;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// Says when the client connects, when it can't (once a run of failures, with what to check), and

@@ -156,8 +156,8 @@ def copy_jars() -> None:
     """The extension, and the application's side of its own settings (AppSettings), which the
     program compiles against and runs with (docs/app-settings.md)."""
     built = ROOT / "java/opamp-javaagent/target"
-    shutil.copy(built / "logfire-opamp-javaagent-extension-0.1.0-SNAPSHOT.jar", TARGET / "logfire-opamp-javaagent-extension.jar")
-    shutil.copy(built / "logfire-opamp-javaagent-extension-0.1.0-SNAPSHOT-app-settings.jar", TARGET / APP_SETTINGS)
+    shutil.copy(built / "logfire-fleet-javaagent-extension-0.1.0-SNAPSHOT.jar", TARGET / "logfire-fleet-javaagent-extension.jar")
+    shutil.copy(built / "logfire-fleet-javaagent-extension-0.1.0-SNAPSHOT-app-settings.jar", TARGET / APP_SETTINGS)
 
 
 HOST = "127.0.0.1" if LOCAL else "host.docker.internal"
@@ -178,7 +178,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         "OTEL_BSP_SCHEDULE_DELAY": "500",
     } | extra
     agent = TARGET if LOCAL else Path("/agent")
-    extensions = f"{agent}/logfire-opamp-javaagent-extension.jar"
+    extensions = f"{agent}/logfire-fleet-javaagent-extension.jar"
     if env.get("EXAMPLE_SETUP"):  # check_truth's setups: a second extension (Setups.java)
         extensions += f",{agent}/{SETUPS}"
     java = ["java", f"-javaagent:{agent}/{AGENT_JAR}", f"-Dotel.javaagent.extensions={extensions}",

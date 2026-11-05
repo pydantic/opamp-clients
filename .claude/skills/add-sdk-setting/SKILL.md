@@ -15,8 +15,8 @@ description: >
 - **One PR, every integration.** A setting ships with code, a runnable example and thorough tests
   in each integration in the same PR: Python (`python/otel`), Node.js (`node/otel`), Go
   (`go/opampotel`), the Java agent extension (`java/opamp-javaagent`), the .NET plugin
-  (`dotnet/Logfire.OpAmp.AutoInstrumentation`) and .NET `WithOpAmp()`
-  (`dotnet/Logfire.OpAmp.Extensions.Hosting`). Those are the six integrations of
+  (`dotnet/Logfire.Fleet.AutoInstrumentation`) and .NET `WithOpAmp()`
+  (`dotnet/Logfire.Fleet.Extensions.Hosting`). Those are the six integrations of
   [docs/sdk-settings.md](../../../docs/sdk-settings.md#where-each-setting-applies). Some docs
   mention a Rust integration; it is not in this repository, so don't add or describe one.
 - **Settings control the application's telemetry**: what is sampled, exported, redacted, capped,
@@ -104,12 +104,12 @@ application adds (`check_truth`'s setups) is governed or reported ungoverned, ne
 
 | Integration | Where the host is built | Carries it out |
 |---|---|---|
-| Python | `python/otel/src/logfire_opamp_otel/__init__.py` (`settings_pb2.Host(live=..., next_start=...)`, `LOG_GATE`) | same file, `_match.py` |
+| Python | `python/otel/src/logfire_fleet_otel/__init__.py` (`settings_pb2.Host(live=..., next_start=...)`, `LOG_GATE`) | same file, `_match.py` |
 | Node.js | `node/otel/src/index.ts` (`hostFromEnv`) | same file |
 | Go | `go/opampotel/agent.go` (`host()`, `carried`) | `go/opampotel/controls.go`, `caps.go`, `levels.go`, `redact.go`, `match.go` |
 | Java agent | `java/opamp-javaagent/.../javaagent/Extension.java` (`LIVE`, `NEXT_START`) | `Controls.java`, `LiveSampler.java`, `Redaction.java`, `TokenBucket.java` |
-| .NET plugin | `dotnet/Logfire.OpAmp.AutoInstrumentation/Agent.cs` (`new Host { ... }`) | `dotnet/shared/Controls.cs`, `Sampling.cs`, `Matching.cs`, `OtlpRewriter.cs` |
-| .NET `WithOpAmp` | `dotnet/Logfire.OpAmp.Extensions.Hosting/OpAmpAgent.cs`, `dotnet/shared/SdkAgent.cs` | `dotnet/shared/` |
+| .NET plugin | `dotnet/Logfire.Fleet.AutoInstrumentation/Agent.cs` (`new Host { ... }`) | `dotnet/shared/Controls.cs`, `Sampling.cs`, `Matching.cs`, `OtlpRewriter.cs` |
+| .NET `WithOpAmp` | `dotnet/Logfire.Fleet.Extensions.Hosting/OpAmpAgent.cs`, `dotnet/shared/SdkAgent.cs` | `dotnet/shared/` |
 
 ## Find the files a real change touched
 
@@ -184,9 +184,9 @@ python3 -m unittest examples/test_integrations.py examples/test_settings_cookboo
 mvn -q -B -DskipTests install -f java/opamp/pom.xml                                     # ~1 min, first
 mvn -q -B test -f java/opamp-javaagent/pom.xml -Dtest=ControlsTest                      # or ControlsTortureTest
 # .NET (as CI runs it; no dotnet here, CI is the only .NET build):
-#   cd dotnet && dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests
-#   cd dotnet && dotnet test --project Logfire.OpAmp.Extensions.Hosting.Tests
-#   cd dotnet && dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests --filter-class "*ConcurrencyTests"
+#   cd dotnet && dotnet test --project Logfire.Fleet.AutoInstrumentation.Tests
+#   cd dotnet && dotnet test --project Logfire.Fleet.Extensions.Hosting.Tests
+#   cd dotnet && dotnet test --project Logfire.Fleet.AutoInstrumentation.Tests --filter-class "*ConcurrencyTests"
 python3 examples/python-otel/try.py --list    # the checks; likewise node-otel, go-otel, javaagent, dotnet-otel
 ```
 

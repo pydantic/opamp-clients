@@ -46,18 +46,18 @@ class Stamp(unittest.TestCase):
 
     # A release never mixes versions: each of ours asks for the others at exactly this one.
     def test_ours_ask_for_each_other_exactly(self) -> None:
-        self.assertIn('"logfire-opamp-core==7.8.9"', self.read("python/pyproject.toml"))
-        self.assertIn('"logfire-opamp-client==7.8.9"', self.read("python/otel/pyproject.toml"))
+        self.assertIn('"logfire-fleet-core==7.8.9"', self.read("python/pyproject.toml"))
+        self.assertIn('"logfire-fleet-client==7.8.9"', self.read("python/otel/pyproject.toml"))
         otel = json.loads(self.read("node/otel/package.json"))
         client = json.loads(self.read("node/opamp/package.json"))["name"]
         self.assertEqual("7.8.9", otel["dependencies"][client])
         self.assertRegex(self.read("java/opamp-javaagent/pom.xml"),
-                         r"<artifactId>logfire-opamp-client</artifactId>\s*<version>7\.8\.9</version>")
+                         r"<artifactId>logfire-fleet-client</artifactId>\s*<version>7\.8\.9</version>")
 
     # Every NuGet package native_dist.py packs is stamped, the hosting package too.
     def test_every_packed_nuget_package_is_stamped(self) -> None:
         stamped = {Path(rel).stem for rel in sdk_release.CSPROJS}
-        for name in ("Logfire.OpAmp.Core.Native", "Logfire.OpAmp.Client", "Logfire.OpAmp.Extensions.Hosting"):
+        for name in ("Logfire.Fleet.Core.Native", "Logfire.Fleet.Client", "Logfire.Fleet.Extensions.Hosting"):
             self.assertIn(name, stamped)
 
     # pack copies each classified jar the pom really builds, by its name there.
@@ -89,7 +89,7 @@ class Stamp(unittest.TestCase):
     # The pin rewrites dependencies only: a stamped `name` is no project name at all.
     def test_names_stay_as_they_are(self) -> None:
         for rel in sdk_release.PYPROJECTS:
-            self.assertRegex(self.read(rel), r'\nname = "logfire-opamp-(core|client|otel)"\n', rel)
+            self.assertRegex(self.read(rel), r'\nname = "logfire-fleet-(core|client|otel)"\n', rel)
 
     def test_npm_packages_are_publishable(self) -> None:
         for rel in sdk_release.PACKAGE_JSONS:
@@ -167,10 +167,10 @@ class Check(unittest.TestCase):
     # Each package carrying the core, in whatever form, has the core's license and notices together.
     def test_a_package_carrying_the_core_without_its_license_fails(self) -> None:
         write_tgz(self.dist / "npm" / "client.tgz", ["package/core/opamp_core.wasm", "package/core/LICENSE.txt"])
-        write_zip(self.dist / "maven" / "client-1.2.3.jar", ["dev/pydantic/logfire/opamp/core/CoreModule.class"])
+        write_zip(self.dist / "maven" / "client-1.2.3.jar", ["dev/pydantic/logfire/fleet/core/CoreModule.class"])
         write_zip(self.native / "nuget" / "core.nupkg", ["runtimes/linux-x64/native/libopamp_native.so",
                                                          "LICENSE.txt", "x/THIRD_PARTY_NOTICES.txt"])
-        write_zip(self.native / "wheels" / "core-linux.whl", ["logfire_opamp_core/libopamp_native.so",
+        write_zip(self.native / "wheels" / "core-linux.whl", ["logfire_fleet_core/libopamp_native.so",
                                                               "c.dist-info/licenses/LICENSE.txt",
                                                               "c.dist-info/licenses/THIRD_PARTY_NOTICES.txt"])
         self.assertEqual([f"{n}: carries the core without LICENSE.txt and THIRD_PARTY_NOTICES.txt"

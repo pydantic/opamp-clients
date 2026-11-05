@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 using System.Reflection;
-using Logfire.OpAmp.Client;
-using Logfire.OpAmp.Core;
+using Logfire.Fleet.Client;
+using Logfire.Fleet.Core;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// Where the agent keeps its state: the directory named (<c>OTEL_OPAMP_STATE_DIR</c>, or the hosting

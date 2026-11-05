@@ -7,9 +7,9 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Logfire.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client.Sdk;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// What the built providers export through, read from them: each exporter, and whether the gate is

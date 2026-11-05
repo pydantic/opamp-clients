@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The application's own settings (docs/app-settings.md): what ``logfire_opamp_otel.app_settings`` gives the
+"""The application's own settings (docs/app-settings.md): what ``logfire_fleet_otel.app_settings`` gives the
 application to read, on its own and through the agent and the layer, with the shared vectors
 (testdata/sdk-settings/custom.json)."""
 
@@ -13,14 +13,14 @@ import time
 from pathlib import Path
 
 import pytest
-from logfire_opamp_client import opamp_pb2
-from logfire_opamp_client.sdk import SdkSettings, settings_pb2
+from logfire_fleet_client import opamp_pb2
+from logfire_fleet_client.sdk import SdkSettings, settings_pb2
 
-import logfire_opamp_otel
+import logfire_fleet_otel
 from _policy import FILE, config_map, overrides, policy
 from kept import keep_applied
-from logfire_opamp_otel import Agent, app_settings
-from logfire_opamp_otel.app_settings import AppSettings
+from logfire_fleet_otel import Agent, app_settings
+from logfire_fleet_otel.app_settings import AppSettings
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -209,7 +209,7 @@ def test_a_callback_that_raises_is_logged_and_the_rest_are_still_told(caplog):
 
     app.on_change(broken)
     app.on_change(told)
-    with caplog.at_level(logging.ERROR, logger="logfire_opamp_otel"):
+    with caplog.at_level(logging.ERROR, logger="logfire_fleet_otel"):
         app.put({"a": "1"})
         app.put({"a": "2"})
     assert [c[0] for c in told.calls] == [{"a": "1"}, {"a": "2"}]
@@ -291,7 +291,7 @@ def test_callbacks_added_and_removed_from_other_threads_while_changes_are_told()
 
 @pytest.mark.parametrize("case", VECTORS["cases"], ids=[c["name"] for c in VECTORS["cases"]])
 def test_the_shared_vectors_reach_the_application_as_the_layer_decides(case):
-    host = logfire_opamp_otel.sdk_host()
+    host = logfire_fleet_otel.sdk_host()
     if "host" in case:
         host = settings_pb2.Host(live=case["host"].get("live", []), next_start=case["host"].get("next_start", []))
     d = LAYER.decide(config(case["document"]), policy().encode(), policy().encode(), host)
@@ -376,7 +376,7 @@ def test_a_callback_that_raises_does_not_break_the_answer(tmp_path, caplog):
         raise ValueError("nope")
 
     agent.controls.app.on_change(broken)
-    with caplog.at_level(logging.ERROR, logger="logfire_opamp_otel"):
+    with caplog.at_level(logging.ERROR, logger="logfire_fleet_otel"):
         s = agent.remote_config(config(values({"a": "1"})))
     assert s.status == APPLIED
     assert agent.controls.app.get("a") == "1"
@@ -413,7 +413,7 @@ def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path)
 
 def test_under_another_configurator_the_application_still_reads_its_settings(tmp_path):
     agent = prepared(tmp_path)
-    agent.host = logfire_opamp_otel.sdk_host(configured=False, governed=False)
+    agent.host = logfire_fleet_otel.sdk_host(configured=False, governed=False)
     # The rate is not this package's to carry out here: a policy that overrides it is refused.
     s = agent.remote_config(config(values({"a": "1"}, head_sampling={"ratio": 0.5})))
     assert s.status == FAILED
@@ -449,19 +449,19 @@ def test_without_a_server_every_read_is_its_default():
 
 
 def test_the_module_reads_what_the_package_puts_in_force():
-    assert logfire_opamp_otel.AGENT.controls.app is app_settings.SETTINGS
-    assert logfire_opamp_otel.app_settings is app_settings
+    assert logfire_fleet_otel.AGENT.controls.app is app_settings.SETTINGS
+    assert logfire_fleet_otel.app_settings is app_settings
     for name in ("get", "get_bool", "get_int", "get_float", "snapshot", "on_change"):
         assert getattr(app_settings, name).__self__ is app_settings.SETTINGS
     # Through the package's agent, as the server's config would.
     told = Told()
     remove = app_settings.on_change(told)
     try:
-        logfire_opamp_otel.AGENT.controls.apply(settings_pb2.Settings(custom={"module.check": "on"}))
+        logfire_fleet_otel.AGENT.controls.apply(settings_pb2.Settings(custom={"module.check": "on"}))
         assert app_settings.get("module.check", "off") == "on"
         assert app_settings.get_bool("module.check", True) is True  # "on" isn't a boolean: the default
     finally:
-        logfire_opamp_otel.AGENT.controls.apply(settings_pb2.Settings())
+        logfire_fleet_otel.AGENT.controls.apply(settings_pb2.Settings())
         remove()
     assert app_settings.get("module.check", "off") == "off"
     assert [c[1] for c in told.calls] == [frozenset({"module.check"})] * 2

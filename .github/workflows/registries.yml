@@ -145,9 +145,9 @@ jobs:
       - name: The wheels, by what each pins
         run: |
           mkdir -p upload/core upload/client upload/otel
-          find sdk -name 'logfire_opamp_core-*.whl' -exec cp {} upload/core/ \;
-          find sdk -name 'logfire_opamp_client-*.whl' -exec cp {} upload/client/ \;
-          find sdk -name 'logfire_opamp_otel-*.whl' -exec cp {} upload/otel/ \;
+          find sdk -name 'logfire_fleet_core-*.whl' -exec cp {} upload/core/ \;
+          find sdk -name 'logfire_fleet_client-*.whl' -exec cp {} upload/client/ \;
+          find sdk -name 'logfire_fleet_otel-*.whl' -exec cp {} upload/otel/ \;
           ls -R upload
           for d in core client otel; do
             [ -n "$(ls upload/$d)" ] || { echo "::error::no $d wheel"; exit 1; }

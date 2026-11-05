@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 """The setups check_truth runs app.py under (examples/integrations.py): what an application does
-to the SDK that logfire-opamp-otel built, named in EXAMPLE_SETUP.
+to the SDK that logfire-fleet-otel built, named in EXAMPLE_SETUP.
 
 - ``late-processor``: once the SDK is built, the application adds a span processor and a log
   record processor, each exporting over OTLP to the same place as the SDK's; the package puts its

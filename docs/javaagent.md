@@ -12,13 +12,13 @@ Built and tested against agent 2.31.1 (SDK 1.66). It needs Java 17 or later.
 
 ## Use it
 
-Download the extension jar from Maven Central, `dev.pydantic:logfire-opamp-javaagent-extension`
-([the latest version](https://central.sonatype.com/artifact/dev.pydantic/logfire-opamp-javaagent-extension)),
+Download the extension jar from Maven Central, `dev.pydantic:logfire-fleet-javaagent-extension`
+([the latest version](https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-javaagent-extension)),
 next to the upstream agent:
 
 ```bash
 V=0.2.0
-curl -sSfLo logfire-opamp-javaagent-extension.jar https://repo1.maven.org/maven2/dev/pydantic/logfire-opamp-javaagent-extension/$V/logfire-opamp-javaagent-extension-$V.jar
+curl -sSfLo logfire-fleet-javaagent-extension.jar https://repo1.maven.org/maven2/dev/pydantic/logfire-fleet-javaagent-extension/$V/logfire-fleet-javaagent-extension-$V.jar
 curl -sSfLo opentelemetry-javaagent.jar https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.31.1/opentelemetry-javaagent-2.31.1.jar
 ```
 
@@ -31,7 +31,7 @@ OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:opentelemetry-javaagent.jar \
-     -Dotel.javaagent.extensions=logfire-opamp-javaagent-extension.jar \
+     -Dotel.javaagent.extensions=logfire-fleet-javaagent-extension.jar \
      -jar checkout.jar
 ```
 
@@ -114,7 +114,7 @@ extension still answers for the agent's SDK.
 
 ### Is it working?
 
-The extension says so on its `java.util.logging` logger, `dev.pydantic.logfire.opamp.javaagent.Extension`.
+The extension says so on its `java.util.logging` logger, `dev.pydantic.logfire.fleet.javaagent.Extension`.
 When the client first reaches the server it logs, at INFO, `OpAMP: connected to
 https://opamp.example.com/v1/opamp; this SDK is managed as checkout, instance <uid>`. When it
 can't, it logs one WARNING per run of failures, with what to check:
@@ -317,12 +317,12 @@ A pull reader (Prometheus) exports nothing, so nothing is counted for it.
 The server may send the application settings of its own in the policy's `app_settings` control
 (a feature flag, a verbosity, a limit), which the extension hands on rather than reads
 ([app-settings.md](app-settings.md)). The application reads them with
-`dev.pydantic.logfire.opamp.AppSettings`, from the extension's second jar,
-`logfire-opamp-javaagent-extension-<version>-app-settings.jar` (the `app-settings` classifier: four
+`dev.pydantic.logfire.fleet.AppSettings`, from the extension's second jar,
+`logfire-fleet-javaagent-extension-<version>-app-settings.jar` (the `app-settings` classifier: four
 classes, nothing else), which it compiles against and runs with:
 
 ```java
-import dev.pydantic.logfire.opamp.AppSettings;
+import dev.pydantic.logfire.fleet.AppSettings;
 
 if (AppSettings.get("checkout.new_flow", "off").equals("on")) {
   // ...
@@ -341,7 +341,7 @@ and are `def` for anything else; `snapshot()` is every value in force, an unmodi
 later change alters. A listener given to `onChange` gets the values in force (the same map) and
 the keys added, changed or removed (sorted), once per change, in order, one at a time, on the
 OpAMP client's thread: keep it quick. An exception it throws is caught and logged (SEVERE, on
-`dev.pydantic.logfire.opamp.AppSettings`); the others are still called and the config is still APPLIED.
+`dev.pydantic.logfire.fleet.AppSettings`); the others are still called and the config is still APPLIED.
 Closing what `onChange` returns removes it. Any thread may read, subscribe and unsubscribe at any
 time, and a reader sees the whole of one map or the whole of the next.
 
@@ -349,7 +349,7 @@ time, and a reader sees the whole of one map or the whole of the next.
 of its own, which the application's class loaders can't see, and the application's classes are
 out of the extension's sight too. The one class loader every other reaches is the bootstrap, where
 the agent itself keeps what it shares with instrumented code. So with an endpoint configured, the
-extension writes one class of its own, `dev.pydantic.logfire.opamp.internal.AppSettingsBridge` (the JDK's
+extension writes one class of its own, `dev.pydantic.logfire.fleet.internal.AppSettingsBridge` (the JDK's
 types alone in it), into a jar in a temporary directory of the agent user's and appends that to
 the bootstrap class path, through the `Instrumentation` the agent keeps. The application's
 `AppSettings` finds it with `Class.forName(name, true, null)` as it is loaded, whatever its own
@@ -378,7 +378,7 @@ No setting: always on. Once the agent has built its SDK, the extension reports w
 available components ([available-components.md](available-components.md#what-the-sdk-integrations-report)),
 built by the SDK settings layer as in every language:
 
-- `sdk`: the extension's Maven coordinates, `dev.pydantic:logfire-opamp-javaagent-extension`, and its
+- `sdk`: the extension's Maven coordinates, `dev.pydantic:logfire-fleet-javaagent-extension`, and its
   version; `telemetry.sdk.language` `java` and the version of the SDK the agent bundles.
 - `instrumentations`: every instrumentation module the agent can run (its own and any
   extension's), switched off or not, under each name `otel.instrumentation.<name>.enabled` takes

@@ -20,11 +20,11 @@ from urllib.parse import urlsplit
 import pytest
 import yarl
 
-from logfire_opamp_client._executor import Executor
-from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from logfire_opamp_client._core import Core
-from logfire_opamp_client._streams import proxy_choice
-from logfire_opamp_client._transport import TLS, Proxy, Transport
+from logfire_fleet_client._executor import Executor
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client._core import Core
+from logfire_fleet_client._streams import proxy_choice
+from logfire_fleet_client._transport import TLS, Proxy, Transport
 
 TABLES = next(p / "tests" / "shell-tables" for p in Path(__file__).resolve().parents
               if (p / "tests" / "shell-tables").is_dir())
@@ -280,7 +280,7 @@ def test_an_encrypted_key_without_its_password_is_refused_not_asked_for() -> Non
     """With no key_password, OpenSSL would ask for the pass phrase on the terminal, or read it from
     standard input: the client must refuse the key instead, whatever is there to read."""
     case = next(c for c in TLS_CASES if c["id"] == "client-key-encrypted")
-    code = (f"from logfire_opamp_client._transport import TLS\n"
+    code = (f"from logfire_fleet_client._transport import TLS\n"
             f"TLS(cert_file={str(TABLES / case['cert'])!r}, key_file={str(TABLES / case['key'])!r}).context()\n")
     # tls/gen.sh's pass phrase, there to be read.
     r = subprocess.run([sys.executable, "-c", code], input="secret\n", capture_output=True, text=True, timeout=60)

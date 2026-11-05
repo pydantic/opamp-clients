@@ -16,8 +16,8 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from logfire_opamp_client import Client, Config, Notification, Status, anyvalue_pb2
-from logfire_opamp_client import opamp_pb2 as pb
+from logfire_fleet_client import Client, Config, Notification, Status, anyvalue_pb2
+from logfire_fleet_client import opamp_pb2 as pb
 
 #: Who speaks HTTP and WebSocket (Config.mode): aiohttp, or the core over asyncio's streams.
 MODES = ["platform", "core"]

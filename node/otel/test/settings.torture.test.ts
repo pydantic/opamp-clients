@@ -88,8 +88,8 @@ import {
   SimpleSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { RemoteConfigStatuses } from "@pydantic/logfire-opamp-client";
-import { SdkSettings, type Settings } from "@pydantic/logfire-opamp-client/sdk";
+import { RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { config as policyConfig, type Overrides, policy } from "./policy.js";
 

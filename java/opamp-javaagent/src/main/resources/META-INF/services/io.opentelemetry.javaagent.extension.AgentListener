@@ -1,1 +1,1 @@
-dev.pydantic.logfire.opamp.javaagent.OpampAgentListener
+dev.pydantic.logfire.fleet.javaagent.OpampAgentListener

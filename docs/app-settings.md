@@ -135,11 +135,11 @@ Every integration gives the application the same five things, named as its langu
 
 | Language | Package | Read | Typed | Snapshot | Told of changes |
 |---|---|---|---|---|---|
-| Python | `logfire-opamp-otel` | `logfire_opamp_otel.app_settings.get(key, default=None)` | `get_bool`, `get_int`, `get_float` | `app_settings.snapshot()` → `Mapping[str, str]` | `app_settings.on_change(cb)` → a function that unsubscribes; `cb(settings, changed: frozenset[str])` |
+| Python | `logfire-fleet-otel` | `logfire_fleet_otel.app_settings.get(key, default=None)` | `get_bool`, `get_int`, `get_float` | `app_settings.snapshot()` → `Mapping[str, str]` | `app_settings.on_change(cb)` → a function that unsubscribes; `cb(settings, changed: frozenset[str])` |
 | Go | `github.com/pydantic/opamp-clients/go/opampotel` | `opampotel.AppSetting(key, def string) string` | `AppSettingBool`, `AppSettingInt` (`int64`), `AppSettingFloat` (`float64`) | `opampotel.AppSettings() map[string]string` (a copy) | `opampotel.OnAppSettingsChange(func(settings map[string]string, changed []string)) (remove func())` |
-| Node.js | `@pydantic/logfire-opamp-otel` | `appSettings.get(key, def)` | `getBool`, `getInt`, `getFloat` | `appSettings.snapshot()` → a frozen `Readonly<Record<string, string>>` | `appSettings.onChange((settings, changed: string[]) => void)` → `() => void` |
-| Java | the Java agent extension; the application compiles against its `app-settings` jar | `dev.pydantic.logfire.opamp.AppSettings.get(String key, String def)` | `getBoolean`, `getLong`, `getDouble` | `AppSettings.snapshot()` → an unmodifiable `Map<String, String>` | `AppSettings.onChange(AppSettingsListener)` → `AutoCloseable`; `void changed(Map<String, String> settings, Set<String> changed)`, the keys sorted |
-| .NET | `Logfire.OpAmp.AutoInstrumentation`, `WithOpAmp` (the type is in `Logfire.OpAmp.Client`, which both bring) | `Logfire.OpAmp.OpAmpAppSettings.Get(string key, string? defaultValue)` | `GetBool`, `GetInt64`, `GetDouble` | `OpAmpAppSettings.Snapshot()` → `IReadOnlyDictionary<string, string>` | `OpAmpAppSettings.OnChange(Action<IReadOnlyDictionary<string, string>, IReadOnlySet<string>>)` → `IDisposable`; the keys enumerated in ordinal order |
+| Node.js | `@pydantic/logfire-fleet-otel` | `appSettings.get(key, def)` | `getBool`, `getInt`, `getFloat` | `appSettings.snapshot()` → a frozen `Readonly<Record<string, string>>` | `appSettings.onChange((settings, changed: string[]) => void)` → `() => void` |
+| Java | the Java agent extension; the application compiles against its `app-settings` jar | `dev.pydantic.logfire.fleet.AppSettings.get(String key, String def)` | `getBoolean`, `getLong`, `getDouble` | `AppSettings.snapshot()` → an unmodifiable `Map<String, String>` | `AppSettings.onChange(AppSettingsListener)` → `AutoCloseable`; `void changed(Map<String, String> settings, Set<String> changed)`, the keys sorted |
+| .NET | `Logfire.Fleet.AutoInstrumentation`, `WithOpAmp` (the type is in `Logfire.Fleet.Client`, which both bring) | `Logfire.Fleet.OpAmpAppSettings.Get(string key, string? defaultValue)` | `GetBool`, `GetInt64`, `GetDouble` | `OpAmpAppSettings.Snapshot()` → `IReadOnlyDictionary<string, string>` | `OpAmpAppSettings.OnChange(Action<IReadOnlyDictionary<string, string>, IReadOnlySet<string>>)` → `IDisposable`; the keys enumerated in ordinal order |
 
 All five are built (Node.js: [node-otel.md](node-otel.md#the-applications-own-settings), Java:
 [javaagent.md](javaagent.md#the-applications-own-settings), .NET:
@@ -154,7 +154,7 @@ class loader that has it) finds it there. Node.js's `getInt` takes only safe int
 In Python:
 
 ```python
-from logfire_opamp_otel import app_settings
+from logfire_fleet_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...
@@ -166,7 +166,7 @@ def changed(settings, keys):
 unsubscribe = app_settings.on_change(changed)
 ```
 
-It works whoever built the SDK (`opentelemetry-instrument`, `logfire_opamp_otel.configure()`, another
+It works whoever built the SDK (`opentelemetry-instrument`, `logfire_fleet_otel.configure()`, another
 configurator, `OTEL_CONFIG_FILE`): the package declares `custom` always. A forked worker
 (gunicorn's) follows its parent's values, and its own callbacks are called there. Under
 `opentelemetry-instrument` the saved values are loaded before the application's code runs, so a
@@ -187,7 +187,7 @@ callback the application adds is told of the server's changes from then on, not 
   `AppSettingsExtensionTest`: the same but forked workers, with every `custom.json` case through
   the extension's `Decide`, a refresh, a failed setup, several class loaders, and the bridge
   loaded where only the JDK is seen; .NET
-  `dotnet/Logfire.OpAmp.AutoInstrumentation.Tests/AppSettingsTests.cs`, the same but forked
+  `dotnet/Logfire.Fleet.AutoInstrumentation.Tests/AppSettingsTests.cs`, the same but forked
   workers, with every `custom.json` case through the .NET wrapper's `Decide` and the plugin's
   agent).
 - End to end, `check_app_settings` in [examples/integrations.py](../examples/integrations.py):

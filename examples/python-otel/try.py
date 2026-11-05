@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""opentelemetry-instrument with logfire-opamp-otel, against the reference server.
+"""opentelemetry-instrument with logfire-fleet-otel, against the reference server.
 
     python3 examples/python-otel/try.py
     python3 examples/python-otel/try.py --edot   # the same checks with Elastic's distribution installed too
@@ -13,7 +13,7 @@ configurator, stays off.
 
 app.py has no OpenTelemetry code: the urllib instrumentation traces its requests. The checks are
 every integration's (examples/integrations.py), run for app.py and again for in_code.py, the same
-program with its SDK set up in code (logfire_opamp_otel.configure()) and the server given there, with no
+program with its SDK set up in code (logfire_fleet_otel.configure()) and the server given there, with no
 OTEL_OPAMP_* variable set. It instruments itself, so it refuses the instrumentation switch. For
 app.py, then check_next: the newer controls, one policy after another in one run against the same
 server and sink (docs/python-otel.md#the-newer-settings):
@@ -27,7 +27,7 @@ server and sink (docs/python-otel.md#the-newer-settings):
      no word from the server;
 and export health throughout: the metrics go to a port nothing listens on, so a health report
 follows the first one, when the timer finds the metric exports failing. Then check_app_settings:
-app.py reads the feature flag example.feature (logfire_opamp_otel.app_settings), which the server turns on
+app.py reads the feature flag example.feature (logfire_fleet_otel.app_settings), which the server turns on
 and off (docs/app-settings.md).
 """
 from __future__ import annotations
@@ -237,5 +237,5 @@ CHECKS = {
 
 if __name__ == "__main__":
     # Resolve the environment once, so the runs don't spend their time installing.
-    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import logfire_opamp_otel"], check=True),
+    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import logfire_fleet_otel"], check=True),
                  options=("--edot",)))

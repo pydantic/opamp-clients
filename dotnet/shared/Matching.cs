@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-using Logfire.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client.Sdk;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// The log levels a logs gate holds records to: <c>send_logs_level</c> (<see cref="Floor"/>) and

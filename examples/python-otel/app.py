@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """An application with no OpenTelemetry code at all: an HTTP request every 200 ms, and a log line
 for each. Run under ``opentelemetry-instrument``, its urllib instrumentation traces the requests
-(and measures them), the logging handler exports the lines; logfire-opamp-otel puts the SDK
+(and measures them), the logging handler exports the lines; logfire-fleet-otel puts the SDK
 under the OpAMP server.
 
 With APP_HEALTH_CHECKS set (try.py's next-settings run), each round also requests /health, as a
@@ -29,7 +29,7 @@ import sys
 import time
 import urllib.request
 
-from logfire_opamp_otel import app_settings
+from logfire_fleet_otel import app_settings
 
 if os.environ.get("EXAMPLE_SETUP"):  # check_truth's setups (setups.py): none otherwise
     import setups

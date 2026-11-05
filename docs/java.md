@@ -1,6 +1,6 @@
 # Java
 
-`dev.pydantic:logfire-opamp-client` is this repository's OpAMP client for Java, in
+`dev.pydantic:logfire-fleet-client` is this repository's OpAMP client for Java, in
 [`java/opamp/`](../java/opamp/). It runs the shared core with [Chicory](https://chicory.dev), the
 module compiled to JVM classes at build time: plain Java, nothing native
 ([how-it-works.md](how-it-works.md)). It speaks plain HTTP or WebSocket, with TLS and through
@@ -12,19 +12,19 @@ or later. Its [README](../java/opamp/README.md) has the full reference.
 ```xml
 <dependency>
   <groupId>dev.pydantic</groupId>
-  <artifactId>logfire-opamp-client</artifactId>
+  <artifactId>logfire-fleet-client</artifactId>
   <version>0.2.0</version>
 </dependency>
 ```
 
-Gradle: `implementation("dev.pydantic:logfire-opamp-client:0.2.0")`. The latest version is on
-[Maven Central](https://central.sonatype.com/artifact/dev.pydantic/logfire-opamp-client).
+Gradle: `implementation("dev.pydantic:logfire-fleet-client:0.2.0")`. The latest version is on
+[Maven Central](https://central.sonatype.com/artifact/dev.pydantic/logfire-fleet-client).
 
 ## Start and stop
 
 ```java
-import dev.pydantic.logfire.opamp.Notification;
-import dev.pydantic.logfire.opamp.OpampClient;
+import dev.pydantic.logfire.fleet.Notification;
+import dev.pydantic.logfire.fleet.OpampClient;
 import java.util.concurrent.CompletableFuture;
 import opamp.proto.v1.Anyvalue;
 import opamp.proto.v1.Opamp;
@@ -73,7 +73,7 @@ agent's status to `start`, so the first message reports it in full.
 
 `OpampClient.Config.builder(endpoint)` (or `builder(endpoint, instanceUid)`) returns a builder;
 `build()` checks the settings. `OpampClient.Status` is a record. Both are in
-`java/opamp/src/main/java/dev/pydantic/logfire/opamp/OpampClient.java`.
+`java/opamp/src/main/java/dev/pydantic/logfire/fleet/OpampClient.java`.
 
 | What | Option | More |
 |---|---|---|
@@ -163,5 +163,5 @@ client in both modes: `python3 conformance/runner/run.py --client java-core-plat
 To put an application under a server without writing code, use the extension for the
 OpenTelemetry Java agent: [javaagent.md](javaagent.md). To wire this client to an SDK by hand, see
 [sdks.md](sdks.md) and [examples/java](../examples/java/src/main/java/Example.java).
-`dev.pydantic.logfire.opamp.sdk.SdkSettings` runs the shared SDK settings layer
+`dev.pydantic.logfire.fleet.sdk.SdkSettings` runs the shared SDK settings layer
 ([sdk-settings.md](sdk-settings.md)).

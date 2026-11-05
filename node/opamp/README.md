@@ -1,4 +1,4 @@
-# @pydantic/logfire-opamp-client
+# @pydantic/logfire-fleet-client
 
 An [OpAMP](https://github.com/open-telemetry/opamp-spec) client for Node.js (22 or later), over
 plain HTTP or WebSocket.
@@ -14,7 +14,7 @@ other language's client here. In platform mode the package carries out the core'
 [`socks`](https://github.com/JoshGlazebrook/socks) package).
 
 ```ts
-import { AgentDescriptionSchema, Client, create } from "@pydantic/logfire-opamp-client";
+import { AgentDescriptionSchema, Client, create } from "@pydantic/logfire-fleet-client";
 
 const client = Client.start(
   { endpoint: "wss://opamp.example.com/v1/opamp", instanceUid, headers: { Authorization: "Bearer ..." } },

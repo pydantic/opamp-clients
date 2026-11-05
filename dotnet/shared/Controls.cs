@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Security.Cryptography;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Trace;
-using Logfire.OpAmp.Client.Sdk;
+using Logfire.Fleet.Client.Sdk;
 
-namespace Logfire.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>A signal an OTLP exporter sends.</summary>
 internal enum Signal

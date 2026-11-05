@@ -10,7 +10,7 @@ Each test runs in both modes (``MODES``). In core mode the client tells the core
 and each run has a raw server of its own (_adversary_raw.py: ``raw=PORT`` and ``tls=NAME`` in the
 endpoint's query), which the adversary opens streams to: it hands the client the stream effects
 (stream_open, stream_write, stream_start_tls, stream_splice, download_data, ...), which
-src/logfire_opamp_client/_streams.py carries out, and the platform's as well (http_request, ws_open,
+src/logfire_fleet_client/_streams.py carries out, and the platform's as well (http_request, ws_open,
 download), which core mode's client passes on to the executor, as a core's saves are: core mode's
 wiring (Streams is offered every effect first), its stop and its shutdown, with both kinds under
 way. Go's harness (go/opamp/adversary_properties_test.go) runs core mode the same way.
@@ -39,7 +39,7 @@ from _adversary_raw import reset
 from _wasm import WasmCore
 from aiohttp import WSMsgType, web
 
-from logfire_opamp_client import TLS, Client, Config, Notification, Status, opamp_pb2 as pb
+from logfire_fleet_client import TLS, Client, Config, Notification, Status, opamp_pb2 as pb
 
 PREFIX = "opamp-adversary"
 STOP_DEADLINE = 15.0  # stop must return within this

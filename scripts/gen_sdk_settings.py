@@ -26,17 +26,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PROTO = "opamp/sdk/v1/settings.proto"
 JAVA = "java/opamp/src/main/java"
-PY = "python/src/logfire_opamp_client/_proto"
+PY = "python/src/logfire_fleet_client/_proto"
 # The protoc of protobuf 6, as scripts/gen_core.py uses, so the code runs on protobuf 6 and 7.
 PY_PROTOC = ["uvx", "--quiet", "--from", "grpcio-tools==1.75.0", "python", "-m", "grpc_tools.protoc"]
 PY_PACKAGES = ["/opamp/sdk", "/opamp/sdk/v1"]
 NODE = ROOT / "node" / "opamp"
 GO_MODULE = "github.com/pydantic/opamp-clients/go"
-DOTNET = "dotnet/Logfire.OpAmp.Client"
+DOTNET = "dotnet/Logfire.Fleet.Client"
 # Every generated file, relative to the repository root. A language joins when its integration
 # does.
 TARGETS = [
-    f"{JAVA}/dev/pydantic/logfire/opamp/sdk/SettingsProto.java",
+    f"{JAVA}/dev/pydantic/logfire/fleet/sdk/SettingsProto.java",
     f"{PY}/opamp/sdk/v1/settings_pb2.py",
     f"{PY}/opamp/sdk/v1/settings_pb2.pyi",
     *(f"{PY}{d}/__init__.py" for d in PY_PACKAGES),

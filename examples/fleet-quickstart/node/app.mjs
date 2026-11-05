@@ -8,7 +8,7 @@
 // INFO records stop while the warnings and spans keep coming.
 //
 // Run it under the integration, which builds the SDK and connects it to Fleet:
-//   node --import @pydantic/logfire-opamp-otel/register app.mjs
+//   node --import @pydantic/logfire-fleet-otel/register app.mjs
 
 import { logs, SeverityNumber } from "@opentelemetry/api-logs";
 import { trace } from "@opentelemetry/api";

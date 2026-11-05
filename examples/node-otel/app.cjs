@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // An application with no OpenTelemetry setup at all: an HTTP request every 200 ms, and a log
-// record for each. Run with `node --import @pydantic/logfire-opamp-otel/register`, its http
+// record for each. Run with `node --import @pydantic/logfire-fleet-otel/register`, its http
 // instrumentation traces (and measures) the requests; the package puts the SDK under the OpAMP
 // server. The log records go through the OpenTelemetry logs API, the provider the register
 // installs; a logging library's instrumentation (pino, winston, bunyan) would send them the same way.
@@ -15,7 +15,7 @@
 const http = require("node:http");
 const { logs } = require("@opentelemetry/api-logs");
 // The application's settings alone, without the rest of the package: what the register filled in.
-const { appSettings } = require("@pydantic/logfire-opamp-otel/app-settings");
+const { appSettings } = require("@pydantic/logfire-fleet-otel/app-settings");
 
 // check_truth's setups (setups.cjs), before the application gets its loggers and tracers: none
 // otherwise, and nothing to call for each request.

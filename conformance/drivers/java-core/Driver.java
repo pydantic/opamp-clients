@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-import dev.pydantic.logfire.opamp.Notification;
-import dev.pydantic.logfire.opamp.OpampClient;
-import dev.pydantic.logfire.opamp.Tls;
+import dev.pydantic.logfire.fleet.Notification;
+import dev.pydantic.logfire.fleet.OpampClient;
+import dev.pydantic.logfire.fleet.Tls;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;

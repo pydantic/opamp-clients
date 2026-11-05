@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 
-from logfire_opamp_client import opamp_pb2
+from logfire_fleet_client import opamp_pb2
 
 FILE = "logfire-sdk-policy.json"
 V1 = "logfire-sdk-policy/v1"
