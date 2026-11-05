@@ -1132,6 +1132,120 @@ def test_a_processor_added_once_the_sdk_is_built_gets_the_gates_and_the_policy_s
     assert set(components[-1].components["exporters"].sub_component_map) == {"traces", "logs"}
 
 
+# An application that set its SDK up itself (contrib's way: a TracerProvider with its own
+# processor, set as the global one) and then puts it under the server: with manage(), or with
+# configure(), which finds the SDK set up and does what manage() does instead of building a second
+# one that couldn't become the global one (its policy APPLIED while the application's spans went
+# past every gate).
+@pytest.mark.parametrize("call", ["manage", "configure"])
+def test_an_sdk_the_application_set_up_itself_is_put_under_the_server(tmp_path, call):
+    answered = tmp_path / "answered"
+    offer = config(policy(attribute_redaction={"drop": ["x"]}))
+
+    def reply(msg):
+        if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
+            answered.touch()
+        if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
+            return None
+        return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
+
+    server = _Server(reply=reply)
+    child = textwrap.dedent(f"""
+        import pathlib, time, pydantic_opamp_otel
+        from opentelemetry import trace
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
+        provider = TracerProvider(resource=Resource.create({{"service.name": "mine"}}))
+        provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
+        trace.set_tracer_provider(provider)
+        pydantic_opamp_otel.{call}(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = pydantic_opamp_otel.AGENT
+        deadline = time.monotonic() + 10
+        while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        # One the application adds later gets the gate too.
+        class Late(ConsoleSpanExporter):
+            def export(self, spans):
+                for s in spans:
+                    print("LATE", dict(s.attributes))
+                return super().export([])
+        provider.add_span_processor(SimpleSpanProcessor(Late()))
+        trace.get_tracer("t").start_span("after", attributes={{"x": "secret", "y": "kept"}}).end()
+        print("exporters", sorted((e.signal, e.name, e.gated) for e in agent.exporters))
+        print("live", sorted(agent.host.live))
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env())
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    assert "Overriding of current TracerProvider" not in run.stderr
+    assert ("configure() builds none" in run.stderr) == (call == "configure")
+    # The application's own exporter is behind the gate: the policy's redaction reaches it.
+    assert '"name": "after"' in run.stdout and "secret" not in run.stdout and '"y": "kept"' in run.stdout
+    assert "LATE {'y': 'kept'}" in run.stdout
+    assert "('traces', 'console', True)" in run.stdout and "False" not in run.stdout.split("exporters", 1)[1]
+    # Its sampler is the application's: the sampling controls and debug mode aren't declared.
+    live = run.stdout.split("live ", 1)[1]
+    assert "sampling_rate" not in live and "debug_until" not in live and "send_traces" in live
+    assert "manage() keeps the application's own sampler" in run.stderr
+    assert any(m.remote_config_status.status == APPLIED for m in server.got)
+    # The instance is described by the application's own resource.
+    desc = next(m.agent_description for m in server.got if m.HasField("agent_description"))
+    assert {kv.key: kv.value.string_value for kv in desc.identifying_attributes}["service.name"] == "mine"
+
+
+def test_manage_refuses_a_policy_that_overrides_the_applications_sampler(tmp_path):
+    """Under manage() the sampler is the application's: a policy that overrides head_sampling is
+    refused (FAILED, naming it), and nothing of it is put in force."""
+    offer = config(policy(head_sampling={"ratio": 0.5}, attribute_redaction={"drop": ["x"]}))
+
+    def reply(msg):
+        if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
+            return None
+        return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
+
+    server = _Server(reply=reply)
+    child = textwrap.dedent(f"""
+        import time, pydantic_opamp_otel
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        trace.set_tracer_provider(TracerProvider())
+        pydantic_opamp_otel.manage(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        time.sleep(1.5)
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env())
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    failed = [m.remote_config_status for m in server.got if m.remote_config_status.status == FAILED]
+    assert failed and "head_sampling" in failed[0].error_message
+    assert not any(m.remote_config_status.status == APPLIED for m in server.got)
+
+
+def test_manage_without_an_sdk_says_how_to_call_it(tmp_path):
+    server = _Server(reply=lambda msg: None)
+    child = textwrap.dedent(f"""
+        import time
+        import pydantic_opamp_otel
+        pydantic_opamp_otel.manage(endpoint={server.endpoint!r})
+        time.sleep(1)
+    """)
+    try:
+        run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
+                             env=_child_env())
+    finally:
+        server.close()
+    assert run.returncode == 0, run.stderr
+    assert "manage() found no OpenTelemetry SDK set up" in run.stderr
+    # It doesn't join the fleet as an instance with nothing to govern.
+    assert server.got == []
+
+
 def test_a_state_directory_that_cant_be_written_is_the_clients_to_keep_trying(tmp_path):
     # The package saves nothing: the client keeps the config applied with its state, and until
     # that save lands the server hears APPLYING, not APPLIED (the client's own tests). The same

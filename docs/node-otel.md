@@ -83,6 +83,57 @@ listener still decides when to exit; one without ends as Node.js would have ende
 signal), once the goodbye is said and the telemetry flushed. Upstream's `register` leaves such a
 process running.
 
+### An SDK set up already: `manage()`
+
+An application that starts its own NodeSDK, as OpenTelemetry's docs show, or the Logfire SDK
+(`@pydantic/logfire-node`), keeps that setup and adds `manage()` after it, in place of `register`:
+
+```js
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { manage } from "@pydantic/opamp-otel";
+
+const sdk = new NodeSDK({ instrumentations: [getNodeAutoInstrumentations()] });
+sdk.start();  // the application's setup, as it was
+
+const opamp = manage();  // the server from OTEL_OPAMP_*, or manage({ endpoint, headers })
+process.on("SIGTERM", async () => {
+  await opamp.shutdown();  // goodbye to the server first
+  await sdk.shutdown();
+});
+```
+
+With the Logfire SDK it is the same, after `logfire.configure()`:
+
+```js
+import * as logfire from "@pydantic/logfire-node";
+import { manage } from "@pydantic/opamp-otel";
+
+logfire.configure({ serviceName: "checkout" });
+manage();
+```
+
+`manage()` takes the same four options as `register`, then the `OTEL_OPAMP_*` variables; without
+an endpoint it does nothing. Don't start `register` too: a process runs one SDK, and the second
+can't register its providers.
+
+- **Governed:** the gates go in front of every exporter on the global providers, so
+  `signal_exports`, the log controls, the rate caps, redaction and scrubbing apply to what the
+  application's own exporters send. Under the Logfire SDK (its resource's `telemetry.sdk.name` is
+  `logfire`), `logfire.info()` and the rest are spans whose `logfire.span_type` is `log`: those go
+  through the log controls (`log_levels` by `logfire.level_num`, `log_rate_limit`,
+  `signal_exports.logs`) and not the trace ones.
+- **Refused:** the sampler and the instrumentations are the application's, so `head_sampling`,
+  `sampling_rules`, `trace_rate_limit`, `debug` and `instrumentations` are. A policy that
+  overrides one is refused (FAILED, naming it), and a warning at start names them. `register`
+  sets up an SDK the server changes those in.
+- **Its resource:** the instance is described by the tracer provider's resource. The telemetry
+  keeps the application's own `service.instance.id`, which may differ from the OpAMP instance
+  UID.
+
+Call it once, after the SDK has started. With no SDK started it warns and the application runs
+unmanaged.
+
 ## What it does
 
 - **Joins the fleet** with one instance UID: the OpAMP instance UID, and `service.instance.id` in

@@ -60,7 +60,7 @@ public class SamplingTests
         Assert.Equal(0, spans.Of(health.TraceId));
         Assert.EndsWith("-00", health.Downstream);
         Assert.NotEqual(true, health.ChildRecorded);
-        Assert.Equal(3, spans.Of(api.TraceId)); // the request, its child, and the /echo it called
+        Assert.Equal(3, await spans.OfAtLeast(api.TraceId, 3)); // the request, its child, and the /echo it called
         Assert.Contains(spans.Exported, s => s.Root && s.Path == "/api/orders/1");
     }
 
@@ -76,7 +76,7 @@ public class SamplingTests
         var hidden = await app.Get("/private/x");
         var shown = await app.Get("/public/x");
         app.Services.GetRequiredService<TracerProvider>().ForceFlush();
-        Assert.Equal(0, spans.Of(hidden.TraceId));
-        Assert.Equal(3, spans.Of(shown.TraceId));
+        Assert.Equal(3, await spans.OfAtLeast(shown.TraceId, 3));
+        Assert.Equal(0, spans.Of(hidden.TraceId)); // checked after the wait, so a late span of it would show
     }
 }

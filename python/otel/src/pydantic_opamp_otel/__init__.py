@@ -66,7 +66,7 @@ from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keep
 from .app_settings import AppSettings
 
 __all__ = ["Configurator", "Distro", "GatedMetricExporter", "app_settings", "configure", "configure_logfire", "govern",
-           "start"]
+           "manage", "start"]
 
 _log = logging.getLogger(__name__)
 
@@ -1237,8 +1237,11 @@ class Agent:
         self.uid: uuid.UUID | None = None
         #: The package's Configurator (or configure_logfire) built the SDK, so the sampler is its own.
         self.configured = False
-        #: configure_logfire built the SDK: its logs are spans, which go through the log controls.
+        #: configure_logfire built the SDK, or manage() found the Logfire SDK's: its logs are spans,
+        #: which go through the log controls.
         self.logfire = False
+        #: manage() put the application's own SDK under the server: its sampler is the application's.
+        self.managed = False
         #: Every exporter on the SDK's providers, governed or not, as govern found them last.
         self.exporters: list[settings_pb2.Exporter] = []
         #: The exporters as found, which the core decides `exporters` from.
@@ -1377,6 +1380,9 @@ class Agent:
             if not any(found.sdk.values()):
                 _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
                              "export passes this package's gates: %s can't be carried out", lost)
+            elif self.managed:
+                _log.warning("OpAMP: manage() keeps the application's own sampler, so %s can't be carried "
+                             "out (configure() or opentelemetry-instrument set up one the server changes)", lost)
             elif os.environ.get("OTEL_CONFIG_FILE"):
                 _log.warning("OpAMP: the SDK was built from OTEL_CONFIG_FILE, so its sampler isn't this "
                              "package's: %s can't be carried out", lost)
@@ -1865,6 +1871,8 @@ def _watch_processors() -> None:
 
     def watched(provider, method: str, signal: str) -> None:
         add = getattr(provider, method)
+        if getattr(add, "_opamp_watched", False):
+            return
 
         def added(*args, **kwargs):
             # Given by position or by its name (span_processor, log_record_processor).
@@ -1873,6 +1881,7 @@ def _watch_processors() -> None:
                 AGENT.processor_added(processor, signal)
             return add(*args, **kwargs)
 
+        added._opamp_watched = True
         setattr(provider, method, added)
 
     tracer_provider = trace.get_tracer_provider()
@@ -1948,11 +1957,72 @@ def configure(*, endpoint: str | None = None, headers: Mapping[str, str] | None 
         )
         URLLibInstrumentor().instrument()
     """
+    if _own_sdk() is not None:
+        # The application built its SDK already: another one couldn't be set as the global one, and
+        # what the application sends would go past it. Its own is put under the server instead.
+        _log.warning("OpAMP: the OpenTelemetry SDK is set up already, so configure() builds none and puts "
+                     "that one under the server, as manage() does%s",
+                     f" (its arguments {', '.join(sorted(kwargs))} aren't used)" if kwargs else "")
+        manage(endpoint=endpoint, headers=headers, state_dir=state_dir, heartbeat_interval=heartbeat_interval)
+        return
     _otlp_defaults()
     AGENT.prepare(auto_instrumented=False, endpoint=endpoint, headers=headers, state_dir=state_dir,
                   heartbeat_interval=heartbeat_interval)
     # The SDK's configurator starts the client through the package's OpAMP hook (start).
     Configurator().configure(**kwargs)
+
+
+def _own_sdk():
+    """The OpenTelemetry SDK's tracer provider the application set as the global one (directly or
+    through the Logfire SDK's proxy), or None while there is none."""
+    from opentelemetry import trace  # noqa: PLC0415
+    from opentelemetry.sdk.trace import TracerProvider  # noqa: PLC0415
+
+    provider = _sdk_provider(trace.get_tracer_provider())
+    return provider if isinstance(provider, TracerProvider) else None
+
+
+def manage(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
+           state_dir: str | os.PathLike | None = None,
+           heartbeat_interval: timedelta | float | str | None = None) -> None:
+    """Put the SDK the application has already set up under the OpAMP server, as it is: built in
+    code (a ``TracerProvider`` with its processors), by another distro, or by ``logfire.configure()``.
+    Call it once, after that setup. The gates go in front of every exporter on the global
+    providers, and what can't be gated is reported to the server, never refused. The sampler stays
+    the application's, so the sampling controls and debug mode are refused; ``configure()``,
+    ``configure_logfire()`` or ``opentelemetry-instrument`` carry those out too. The instance is
+    described by the tracer provider's resource, which keeps its own ``service.instance.id``.
+
+    The server is given as to ``configure()``: ``endpoint``, ``headers``, ``state_dir`` and
+    ``heartbeat_interval``, else the OTEL_OPAMP_* variables. Without an endpoint it does nothing.
+    It never raises.
+
+    For example::
+
+        provider = TracerProvider(resource=Resource.create({"service.name": "checkout"}))
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        trace.set_tracer_provider(provider)
+        pydantic_opamp_otel.manage()
+    """
+    from opentelemetry import trace  # noqa: PLC0415
+
+    AGENT.prepare(auto_instrumented=False, endpoint=endpoint, headers=headers, state_dir=state_dir,
+                  heartbeat_interval=heartbeat_interval)
+    if not AGENT.on:
+        return
+    provider = _own_sdk()
+    if provider is None:
+        # Not started: a later call, once the SDK is set up, joins the fleet with it.
+        _log.warning("OpAMP: manage() found no OpenTelemetry SDK set up, so the application runs "
+                     "unmanaged: call it after the application sets its tracer provider (or use "
+                     "configure(), which sets one up)")
+        return
+    AGENT.managed = True
+    # A processor the application adds from now on gets its gate too.
+    _watch_processors()
+    # The Logfire SDK's logs are spans; its proxy is what it sets as the global provider.
+    AGENT.logfire = type(trace.get_tracer_provider()).__module__.split(".")[0] == "logfire"
+    AGENT.start(getattr(provider, "resource", None) or Resource.create({}))
 
 
 from ._logfire import configure_logfire  # noqa: E402 - it reads the package's AGENT

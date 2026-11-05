@@ -26,6 +26,16 @@ OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as c
 
 When it can't connect, it warns once, with what to check.
 
+An application that starts its own NodeSDK, or the Logfire SDK (`logfire.configure()`), keeps
+that setup and calls `manage()` after it, in place of the register:
+
+```js
+import { manage } from "@pydantic/opamp-otel";
+
+sdk.start();  // or logfire.configure({ ... })
+manage();
+```
+
 The instance keeps its UID across restarts with no configuration
 ([default-state-dir.md](https://github.com/pydantic/opamp-clients/blob/main/docs/default-state-dir.md)).
 

@@ -11,6 +11,8 @@ or any server that speaks [OpAMP](https://opentelemetry.io/docs/specs/opamp/). T
 |---|---|---|
 | An application instrumented with OpenTelemetry (sampling, what it sends, log levels, redaction, scrubbing) | this repository's integration for its language | [below](#an-application) |
 | An application on the Logfire SDK for Python | `configure_logfire()` in place of `logfire.configure()` | [guides/logfire.md](guides/logfire.md#the-logfire-sdk-for-python) |
+| An application on the Logfire SDK for JavaScript | `manage()` after `logfire.configure()` | [guides/logfire.md](guides/logfire.md#the-logfire-sdk-for-javascript) |
+| An application that sets its OpenTelemetry SDK up in code already (Python, Node.js) | `manage()` after that setup | [python-otel.md](python-otel.md#an-sdk-set-up-already-manage), [node-otel.md](node-otel.md#an-sdk-set-up-already-manage) |
 | A host or VM: a collector the server configures | the Supervisor, from its installer | [below](#a-host) |
 | A collector you already run, configured by your own tooling | the collector's `opamp` extension, reporting only | [collector.md](collector.md#a-collector-with-the-extension) |
 | A Kubernetes cluster | the OpenTelemetry Operator's OpAMP bridge (upstream's) | [guides/logfire.md](guides/logfire.md#a-kubernetes-cluster) |

@@ -47,6 +47,12 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Python, Node.js: `manage()` puts an SDK the application has already set up under the server, as
+  it is: one built in code (contrib's way), the application's own NodeSDK, or the Logfire SDK's
+  (`logfire.configure()`, in Node.js too). Call it after that setup. The policy governs that SDK's
+  exporters; its sampler stays the application's, so the sampling controls, debug mode and the
+  instrumentation switches are refused. In Node.js the Logfire SDK's logs (spans of
+  `logfire.span_type` `log`) go through the log controls. Needs core 0.15.0.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -68,6 +74,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
+- Python: `configure()` called once the application has set its SDK up already puts that SDK
+  under the server, as `manage()` does, and warns. Before, it built a second SDK that couldn't
+  become the global one: the server heard APPLIED while the application's spans went past every
+  gate, and the instance was described as `unknown_service`.
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP

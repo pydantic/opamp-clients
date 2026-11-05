@@ -6,10 +6,14 @@ redaction and scrubbing, the [Logfire SDK policy](../sdk-settings.md). There are
 
 | The application uses | How it joins the server | Languages |
 |---|---|---|
-| the Logfire SDK | `pydantic_opamp_otel.configure_logfire()` in place of `logfire.configure()` | Python |
+| the Logfire SDK for Python | `pydantic_opamp_otel.configure_logfire()` in place of `logfire.configure()` | Python |
+| the Logfire SDK for JavaScript | `manage()` from `@pydantic/opamp-otel`, after `logfire.configure()` | Node.js |
 | an OpenTelemetry SDK, exporting to Logfire over OTLP | this repository's integration for the language | Python, Go, Node.js, Java, .NET |
 
-The Logfire SDKs for JavaScript and Rust have no integration yet: [below](#the-other-logfire-sdks).
+An application whose OpenTelemetry SDK is set up in code already keeps it and calls `manage()`
+after it, in Python and Node.js ([python-otel.md](../python-otel.md#an-sdk-set-up-already-manage),
+[node-otel.md](../node-otel.md#an-sdk-set-up-already-manage)). The Logfire SDK for Rust has no
+integration yet.
 
 In Logfire the OpAMP server is Fleet, in each project: [Logfire Fleet](#logfire-fleet) says how
 to connect an application, a host or a Kubernetes cluster to it.
@@ -208,9 +212,26 @@ Deleting an installation in Fleet revokes its keys, and any write token issued w
 closes its connections. The telemetry it already sent stays in the project. A disconnected
 instance's record can be deleted on its own.
 
-## The other Logfire SDKs
+## The Logfire SDK for JavaScript
 
-The Logfire SDK for JavaScript (`@pydantic/logfire-node`) starts a NodeSDK of its own, and so
-does this repository's Node.js integration; a process runs one. For now, start a Node.js
-application with the integration's register and export to Logfire over OTLP, as above. The
-Logfire SDK for Rust has no integration here.
+Keep `logfire.configure()` as it is and call `manage()` after it (install `@pydantic/opamp-otel`
+as [node-otel.md](../node-otel.md#use-it) says):
+
+```js
+import * as logfire from "@pydantic/logfire-node";
+import { manage } from "@pydantic/opamp-otel";
+
+logfire.configure({ serviceName: "checkout" });
+manage();
+```
+
+with the same `OTEL_OPAMP_*` variables as above. The Logfire SDK still sends to Logfire with its
+own token. The gates go in front of its exporters, so `signal_exports`, the log levels and rate
+cap (on its `logfire.info()` and the rest), redaction and scrubbing apply to what reaches Logfire.
+Its head sampling stays the Logfire SDK's own (`sampling.head`): a policy that overrides the
+sampling controls or debug mode is refused. Don't add `node --import @pydantic/opamp-otel/register`
+too: it starts a second SDK, and the Logfire SDK's can't register its providers.
+
+## The Logfire SDK for Rust
+
+No integration yet.
