@@ -48,7 +48,7 @@ and date. Tests, CI and docs alone don't need a line.
   install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
   package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
   docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
-  tags (#PR).
+  tags (#124).
 - Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
   archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
   v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
