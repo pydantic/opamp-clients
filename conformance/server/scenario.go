@@ -49,6 +49,17 @@ type Scenario struct {
 	// Hold, when set, has the server answer nothing (hold.go): a client stops mid-connect or
 	// mid-download, and the log says when it let go.
 	Hold *Hold `json:"hold"`
+
+	// SDKFixture makes the server the SDK example fixture (fixture.go), with the three fields
+	// after it.
+	SDKFixture bool `json:"sdk_fixture"`
+	// EnrollmentKey, when set, is the bearer token the fixture requires (or a key it gave).
+	EnrollmentKey string `json:"enrollment_key"`
+	// AfterPromotion: what the fixture's operator does each time it confirms a key, in order:
+	// "rotate" or "move".
+	AfterPromotion []string `json:"after_promotion"`
+	// MoveHost: the host a move names (127.0.0.1 unless given).
+	MoveHost string `json:"move_host"`
 }
 
 // Hold: what the server holds, from FromS seconds after the driver's first request, until the

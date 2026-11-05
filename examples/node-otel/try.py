@@ -211,7 +211,8 @@ class Server:
         """`offers`: (message, overrides) pairs, each offered as a policy (integrations.offer())."""
         self.log = TARGET / f"{name}.jsonl"
         scenario = TARGET / f"{name}-scenario.json"
-        scenario.write_text(json.dumps({"server": {"faults": [offer(n, overrides) for n, overrides in offers]}}))
+        scenario.write_text(json.dumps({"server": {"sdk_fixture": True,
+                                                    "faults": [offer(n, overrides) for n, overrides in offers]}}))
         self.process = subprocess.Popen([str(TARGET / "server"), "-listen", listen, "-scenario", str(scenario),
                                          "-log", str(self.log)], stdout=subprocess.PIPE, text=True)
         listening = json.loads(self.process.stdout.readline())

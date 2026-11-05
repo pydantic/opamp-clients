@@ -100,6 +100,8 @@ type server struct {
 	hostileAnswered bool
 	// The listeners of redirecting downloads (redirect.go).
 	ports downloadPorts
+	// fixture: the SDK example fixture's state (fixture.go), when the scenario asks for it.
+	fixture *fixture
 }
 
 type wsConn struct {
@@ -158,6 +160,15 @@ func main() {
 	if c := sc.Credentials; c != nil {
 		s.accepted = map[string]bool{c.Bootstrap: true}
 	}
+	if sc.SDKFixture {
+		if s.fixture, err = newFixture(sc); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	} else if sc.EnrollmentKey != "" || sc.AfterPromotion != nil || sc.MoveHost != "" {
+		fmt.Fprintln(os.Stderr, "enrollment_key, after_promotion and move_host need sdk_fixture")
+		os.Exit(2)
+	}
 	if sc.Hostile != nil {
 		if s.hostilePort, err = s.startHostile(*listen); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -190,6 +201,14 @@ func main() {
 			ready["tls"] = files
 		}
 		ln = newLoggingListener(ln, s, cfg)
+	}
+	if s.fixture != nil {
+		ready["implementation"] = "go"
+		ln, err = s.fixtureListeners(ln, ready)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 	if sc.TLS == nil {
 		ln = rawListener{ln}
@@ -252,6 +271,9 @@ func main() {
 	})
 	srv := &http.Server{Handler: s.withRawHead(s.flagHostile(mux)), ConnContext: connContext}
 	go srv.Serve(ln)
+	if s.fixture != nil && s.fixture.moved != nil {
+		go srv.Serve(rawListener{s.fixture.moved})
+	}
 	// The endpoint a move offers (scenario credentials.move): the same server on another port.
 	if c := sc.Credentials; c != nil && c.Move {
 		host, _, _ := net.SplitHostPort(ln.Addr().String())
@@ -476,6 +498,10 @@ func (s *server) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.holding("messages") {
 		s.hold(r, "messages", upgrade)
+		return
+	}
+	if s.fixture != nil && !s.fixture.authorized(bearer(r)) {
+		s.refuse(w, r, upgrade)
 		return
 	}
 	if !s.authorized(r, upgrade) {
@@ -762,6 +788,9 @@ func (s *server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	n, faults := s.messageFaults()
 	s.logA2S(msg, n, req, "http", httpInfo)
+	if s.fixture != nil {
+		s.advance(n)
+	}
 
 	if has(faults, "tcp_drop") != nil {
 		// The server has the message; the connection goes before its reply (a reply lost on the
@@ -785,7 +814,7 @@ func (s *server) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		s.log.emit("s2a", map[string]any{"conn": req, "msg": n, "http_status": 503, "retry_after": int(f.RetryAfterS)})
 		return
 	}
-	resp, info := s.respond(msg, faults, n, endpoint(r, false))
+	resp, info := s.respond(msg, faults, n, endpoint(r, false), bearer(r))
 	if has(faults, "reject") != nil {
 		// Any status other than 413: a malformed message, answered with BAD_REQUEST.
 		resp = &protobufs.ServerToAgent{InstanceUid: msg.InstanceUid, ErrorResponse: &protobufs.ServerErrorResponse{
@@ -842,6 +871,7 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	url := endpoint(r, true)
+	token := bearer(r)
 
 	c.SetCloseHandler(func(code int, text string) error {
 		wc.wmu.Lock()
@@ -885,6 +915,9 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 		n, faults := s.messageFaults()
 		s.logA2S(msg, n, wc.id, "ws", via)
+		if s.fixture != nil {
+			s.advance(n)
+		}
 		if has(faults, "tcp_drop") != nil {
 			s.dropTCP(wc)
 			continue
@@ -905,7 +938,7 @@ func (s *server) handleWS(w http.ResponseWriter, r *http.Request) {
 			}}
 			info = map[string]any{"error": "UNAVAILABLE", "retry_after": f.RetryAfterS}
 		} else {
-			resp, info = s.respond(msg, faults, n, url)
+			resp, info = s.respond(msg, faults, n, url, token)
 			if has(faults, "reject") != nil {
 				resp = &protobufs.ServerToAgent{InstanceUid: msg.InstanceUid, ErrorResponse: &protobufs.ServerErrorResponse{
 					Type: protobufs.ServerErrorResponseType_ServerErrorResponseType_BadRequest, ErrorMessage: "rejected by scenario"}}
@@ -1021,7 +1054,7 @@ const serverCapabilities = uint64(protobufs.ServerCapabilities_ServerCapabilitie
 // client has. Checkers look at the logged field list for anything finer.
 func isFull(msg *protobufs.AgentToServer) bool { return msg.AgentDescription != nil }
 
-func (s *server) respond(msg *protobufs.AgentToServer, faults []Fault, n int, url string) (*protobufs.ServerToAgent, map[string]any) {
+func (s *server) respond(msg *protobufs.AgentToServer, faults []Fault, n int, url, token string) (*protobufs.ServerToAgent, map[string]any) {
 	info := map[string]any{}
 	s.mu.Lock()
 	seq := int64(msg.SequenceNum)
@@ -1228,6 +1261,9 @@ func (s *server) respond(msg *protobufs.AgentToServer, faults []Fault, n int, ur
 	if cs := s.hostileSettings(msg, n, url, info); cs != nil {
 		resp.ConnectionSettings = cs
 	}
+	if s.fixture != nil {
+		s.fixtureRespond(msg, token, url, resp, info)
+	}
 	return resp, info
 }
 
@@ -1299,6 +1335,9 @@ func (s *server) logA2S(msg *protobufs.AgentToServer, n, conn int, transport str
 	if ac := msg.AvailableComponents; ac != nil {
 		ev["available_components"] = map[string]any{"hash": hex.EncodeToString(ac.Hash),
 			"components": len(ac.Components)}
+	}
+	if s.fixture != nil {
+		described(msg, ev)
 	}
 	for k, v := range extra {
 		ev[k] = v

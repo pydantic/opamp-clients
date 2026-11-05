@@ -705,6 +705,79 @@ jobs:
           path: java/opamp-javaagent/target/surefire-reports/**
           if-no-files-found: ignore
 
+  # Each integration end to end: examples/<integration>/try.py, every check, each a run of the
+  # example application against the conformance suite's Go server as the SDK fixture and its sink
+  # (examples/integrations.py, conformance/server/fixture.go). A check waits on its scenario's clock
+  # (one message a second), not on the machine, so a job runs four at once. Java's and .NET's
+  # applications build and run in containers. Like conformance, not on a draft.
+  integrations-e2e:
+    name: ${{ matrix.name }}, end to end
+    if: ${{ github.event.pull_request.draft != true }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sdk: go-otel, name: Go SDK setup }
+          - { sdk: node-otel, name: Node.js auto-instrumentation }
+          - { sdk: python-otel, name: Python auto-instrumentation }
+          - { sdk: javaagent, name: Java agent extension }
+          - { sdk: dotnet-otel, name: .NET automatic instrumentation }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.CLIENTS_REPOSITORY }}
+          ref: ${{ env.CLIENTS_REF }}
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      # Every platform's library too: the .NET images take the Linux one (scripts/native_lib.py).
+      - name: The core, fetched and verified against the lock
+        uses: ./.github/actions/core
+        with:
+          all-platforms: "true"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      # The Go server, whatever the integration.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            conformance/**/go.sum
+            go/go.sum
+            go/opampotel/go.sum
+            examples/go-otel/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.sdk == 'node-otel'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+            examples/node-otel/logfire/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.sdk == 'python-otel'
+      - name: Every check (examples/${{ matrix.sdk }}/try.py)
+        env:
+          SDK: ${{ matrix.sdk }}
+        run: python3 "examples/$SDK/try.py" --jobs 4
+      - name: Keep the runs' event logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: integrations-e2e-${{ matrix.sdk }}
+          retention-days: 7
+          path: |
+            target/integrations/**/*.jsonl
+            target/integrations/**/*.stderr
+            target/integrations/**/*-scenario.json
+          if-no-files-found: ignore
+
   # ---------------------------------------------------------------- Native packaging
   # The wheels and the NuGet package from every platform's fetched library (fetch --all-platforms),
   # each checked for its format and machine.
@@ -1246,6 +1319,7 @@ jobs:
       - dotnet-fuzz
       - redact-mutants
       - integrations
+      - integrations-e2e
       - native-pack
       - native-smoke
       - collector-tests

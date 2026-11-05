@@ -5,9 +5,11 @@ Node.js and Go that you connect to Logfire Fleet and change from a policy while 
 of this page covers the integration checks.
 
 The OpenTelemetry SDK integrations run against a reference OpAMP server that plays each check's
-scenario, with a telemetry sink that receives the exported spans, metrics and logs. This
-repository does not build that server: `OPAMP_EXAMPLES_SERVER` names its binary, and without one
-the checks stop and say so. The Go conformance server is not part of these integration examples.
+scenario, with a telemetry sink that receives the exported spans, metrics and logs: the
+conformance suite's Go server ([conformance/server](../conformance/server)) as the SDK fixture
+(`fixture.go`), which the checks build with `go build` the first time they need it.
+`OPAMP_EXAMPLES_SERVER` names another binary to use in its place, one that takes the same flags,
+scenarios and log.
 
 Run one integration:
 
@@ -133,9 +135,9 @@ for that reason).
 A new check goes into its integration's `try.py`, in `CHECKS`, under a name of its own. Each run
 prints how long each check took.
 
-CI does not run these checks: they need the reference server's binary. It runs the checks' own
-tests (`examples/test_integrations.py`, `examples/test_settings_cookbook.py`) and each
-integration's unit tests.
+CI runs every check of each integration on every pull request that is not a draft (the job
+"…, end to end"), four at once, besides the checks' own tests (`examples/test_integrations.py`,
+`examples/test_settings_cookbook.py`) and each integration's unit tests.
 
 Every integration lets the application read its own settings ([docs/app-settings.md](../docs/app-settings.md)),
 checked by `check_app_settings` (the check `app`): its example application reads the flag

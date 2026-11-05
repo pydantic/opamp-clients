@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 """The end-to-end check every SDK integration passes (examples/<integration>/try.py).
 
-An instrumented application runs against the reference OpAMP server for these checks: built from
-its sources where they are (a Cargo.toml at the root), else the binary OPAMP_EXAMPLES_SERVER names.
+An instrumented application runs against the reference OpAMP server for these checks: the
+conformance suite's Go server (conformance/server) as the SDK fixture (its fixture.go), built
+here, or the binary OPAMP_EXAMPLES_SERVER names, which takes the same flags, scenarios and log.
 The SDK traces its HTTP requests. Two runs share one state directory.
 
 Each offer is a remote config whose only file is a Logfire SDK policy, `logfire-sdk-policy.json`
@@ -365,22 +366,17 @@ def app_settings_scenario(gap: int = 10) -> dict:
 
 @functools.cache
 def built_server() -> Path:
-    """The reference server: OPAMP_EXAMPLES_SERVER if set, else built from its sources, once a
-    process, where they are (a Cargo.toml at the root)."""
+    """The reference server: OPAMP_EXAMPLES_SERVER if set, else the conformance suite's Go server,
+    built once a process."""
     given = os.environ.get("OPAMP_EXAMPLES_SERVER")
     if given:
         if not Path(given).is_file():
             sys.exit(f"OPAMP_EXAMPLES_SERVER={given}: no such file")
         return Path(given).resolve()
-    if not (ROOT / "Cargo.toml").is_file():
-        sys.exit("the integration checks need their reference OpAMP server, whose sources aren't here: "
-                 "set OPAMP_EXAMPLES_SERVER to the path of its binary")
-    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "opamp-agents", "--example", "sdk-integrations"],
-                   cwd=ROOT, check=True)
-    cargo_target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
-    if not cargo_target.is_absolute():
-        cargo_target = ROOT / cargo_target
-    return cargo_target / "release" / "examples" / "sdk-integrations"
+    out = ROOT / "target" / "integrations" / "fixture-server"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["go", "build", "-o", str(out), "."], cwd=ROOT / "conformance" / "server", check=True)
+    return out
 
 
 def server_binary(target_: Path) -> Path:
@@ -428,13 +424,13 @@ def serving(scenario_: dict, name: str, listen: str, target_: Path):
     """The server, with `scenario_`, for the block: (OpAMP port, telemetry port, its log). It is
     stopped whatever happens."""
     path = target_ / f"{name}-scenario.json"
-    path.write_text(json.dumps(scenario_))
+    path.write_text(json.dumps({**scenario_, "server": {**scenario_["server"], "sdk_fixture": True}}))
     log = target_ / f"{name}.jsonl"
     server = subprocess.Popen([str(server_binary(target_)), "-listen", listen, "-scenario", str(path), "-log", str(log)],
                               stdout=subprocess.PIPE, text=True)
     try:
         listening = json.loads(server.stdout.readline())
-        assert listening["implementation"] == "rust"
+        assert listening["implementation"] in ("go", "rust"), listening
         yield listening["addr"].rsplit(":", 1)[1], listening["telemetry_addr"].rsplit(":", 1)[1], log
     finally:
         server.terminate()
@@ -1660,7 +1656,7 @@ def judge_offline_start(sink: list[dict], c: list[dict], started: float, up: flo
 
 
 def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
-                 env: dict[str, str] | None = None) -> bool:
+                 env: dict[str, str] | None = None, name: str = "outage") -> bool:
     """The OpAMP server goes away and comes back, and the application starts while it is away;
     every check printed, True when all pass. The telemetry goes to a sink of its own (a server
     whose OpAMP endpoint nobody is given), which stays up throughout; the OpAMP servers come and
@@ -1671,9 +1667,10 @@ def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", sec
     agent, comes up at the same endpoint and offers the drop (OUTAGE_DROP) at the agent's third
     message there (judge_outage). The next start, with the same state directory: no server at the
     endpoint until the application has made its requests, then server C, which offers nothing
-    (judge_offline_start)."""
+    (judge_offline_start). `name` names its logs and state: two checks of one application in one
+    directory, run at once, each give their own."""
     target_.mkdir(parents=True, exist_ok=True)
-    state = Path(tempfile.mkdtemp(prefix="state-outage-", dir=target_))
+    state = Path(tempfile.mkdtemp(prefix=f"state-{name}-", dir=target_))
     state.chmod(0o777)
     env = env or {}
     host = listen.rsplit(":", 1)[0]
@@ -1692,11 +1689,11 @@ def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", sec
         return on_wall(read_log(log), origin)
 
     try:
-        with serving({"server": {}}, "outage-sink", listen, target_) as (_, telemetry, sink_log):
+        with serving({"server": {}}, f"{name}-sink", listen, target_) as (_, telemetry, sink_log):
             port = at.rsplit(":", 1)[1]
-            stop = once(launch(port, telemetry, state, "outage", env))
+            stop = once(launch(port, telemetry, state, name, env))
             try:
-                with serving({"server": {"faults": [offer(1, OUTAGE_MASK)]}}, "outage-a", at, target_) as (_, _, a_log):
+                with serving({"server": {"faults": [offer(1, OUTAGE_MASK)]}}, f"{name}-a", at, target_) as (_, _, a_log):
                     def masked() -> bool:
                         st = statuses(wall(a_log))
                         return bool(st) and "[REDACTED]" in ending(wall(sink_log), st[0][0] + DRIFT, 1e9)
@@ -1704,7 +1701,7 @@ def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", sec
                 down = time.time() - origin
                 time.sleep(OUTAGE_S)
                 up = time.time() - origin
-                with serving({"server": {"faults": [offer(3, OUTAGE_DROP)]}}, "outage-b", at, target_) as (_, _, b_log):
+                with serving({"server": {"faults": [offer(3, OUTAGE_DROP)]}}, f"{name}-b", at, target_) as (_, _, b_log):
                     def dropped() -> bool:
                         b = wall(b_log)
                         offered = min((e["t"] for e in b if e["event"] == "s2a" and e.get("offer_config")), default=1e9)
@@ -1724,12 +1721,12 @@ def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", sec
             uid = next((e["uid"] for e in a if e["event"] == "a2s"), None)
 
             started = time.time() - origin
-            stop = once(launch(port, telemetry, state, "outage-again", env))
+            stop = once(launch(port, telemetry, state, f"{name}-again", env))
             try:
                 wait_for(lambda: len(pings(wall(sink_log), started)) > 3 * REQUESTS
                          and len(ending(wall(sink_log), started, 1e9)) > REQUESTS, seconds, 2)
                 up = time.time() - origin
-                with serving({"server": {}}, "outage-c", at, target_) as (_, _, c_log):
+                with serving({"server": {}}, f"{name}-c", at, target_) as (_, _, c_log):
                     wait_for(lambda: bool(effective_configs(wall(c_log))), seconds, MARGIN)
                     stop()
                     time.sleep(0.5)
