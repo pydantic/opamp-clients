@@ -11,11 +11,11 @@ doesn't connect.
 
 | Language | OpenTelemetry integration (start here) | Install | Client |
 |---|---|---|---|
-| Python | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) | `pip install pydantic-opamp-otel` | [`python/`](python/) (`pydantic-opamp-client`), [docs](docs/python.md) |
+| Python | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) | `pip install logfire-opamp-otel` | [`python/`](python/) (`logfire-opamp-client`), [docs](docs/python.md) |
 | Go | [`go/opampotel/`](go/opampotel/), [docs](docs/go-otel.md); also a Collector extension and Supervisor ([`go/opampextension/`](go/opampextension/), [`go/opampsupervisor/`](go/opampsupervisor/), [docs](docs/collector.md)) | `go get github.com/pydantic/opamp-clients/go/opampotel` | [`go/opamp/`](go/opamp/), [docs](docs/go.md) |
-| Node.js | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) | `npm install @pydantic/opamp-otel` | [`node/opamp/`](node/opamp/) (`@pydantic/opamp-client`), [docs](docs/node.md) |
-| Java | [`java/opamp-javaagent/`](java/opamp-javaagent/), [docs](docs/javaagent.md) | `dev.pydantic:opamp-javaagent-extension` from Maven Central | [`java/opamp/`](java/opamp/) (`dev.pydantic:opamp-client`), [docs](docs/java.md) |
-| .NET | [docs](docs/dotnet-otel.md) | `dotnet add package Pydantic.OpAmp.AutoInstrumentation` (or `.Extensions.Hosting`) | [`dotnet/`](dotnet/) (`Pydantic.OpAmp.Client`), [docs](docs/dotnet.md) |
+| Node.js | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) | `npm install @pydantic/logfire-opamp-otel` | [`node/opamp/`](node/opamp/) (`@pydantic/logfire-opamp-client`), [docs](docs/node.md) |
+| Java | [`java/opamp-javaagent/`](java/opamp-javaagent/), [docs](docs/javaagent.md) | `dev.pydantic:logfire-opamp-javaagent-extension` from Maven Central | [`java/opamp/`](java/opamp/) (`dev.pydantic:logfire-opamp-client`), [docs](docs/java.md) |
+| .NET | [docs](docs/dotnet-otel.md) | `dotnet add package Logfire.OpAmp.AutoInstrumentation` (or `.Extensions.Hosting`) | [`dotnet/`](dotnet/) (`Logfire.OpAmp.Client`), [docs](docs/dotnet.md) |
 
 [docs/how-it-works.md](docs/how-it-works.md) explains how the clients and the core fit together,
 [docs/sdks.md](docs/sdks.md) compares the SDKs, and [examples/](examples/) runs each one.

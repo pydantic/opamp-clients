@@ -13,7 +13,7 @@
 #
 # As every fuzzer here: an input that runs longer than FUZZ_TIMEOUT seconds (default 20) or needs more
 # than FUZZ_RSS_MB of memory (default 2048) fails as a crash does. Only the client's own classes are
-# instrumented (dev.pydantic.opamp.*): not the core's, compiled from its module, nor the protobufs.
+# instrumented (dev.pydantic.logfire.opamp.*): not the core's, compiled from its module, nor the protobufs.
 set -euo pipefail
 
 seconds=${1:?usage: java_fuzz.sh SECONDS [TARGET...]}
@@ -34,11 +34,11 @@ failed=()
 for t in "${targets[@]}"; do
 	work="$root/target/shim-fuzz/java/$t"
 	mkdir -p "$work/corpus" "$work/artifacts"
-	java -cp "$cp" dev.pydantic.opamp.FuzzInputsTest "$t" "$work/corpus"
+	java -cp "$cp" dev.pydantic.logfire.opamp.FuzzInputsTest "$t" "$work/corpus"
 	echo "== java $t, ${seconds}s"
 	# Every target runs, whatever one before found.
-	java -Xmx1g -cp "$cp" com.code_intelligence.jazzer.Jazzer "--target_class=dev.pydantic.opamp.$t" \
-		'--instrumentation_includes=dev.pydantic.opamp.*' "--reproducer_path=$work/artifacts" \
+	java -Xmx1g -cp "$cp" com.code_intelligence.jazzer.Jazzer "--target_class=dev.pydantic.logfire.opamp.$t" \
+		'--instrumentation_includes=dev.pydantic.logfire.opamp.*' "--reproducer_path=$work/artifacts" \
 		"-artifact_prefix=$work/artifacts/" "-max_total_time=$seconds" "-timeout=$timeout" \
 		"-rss_limit_mb=$rss_mb" "$work/corpus" > "$work/fuzz.log" 2>&1 ||
 		{ echo "::error::fuzz target java $t failed"; tail -n 80 "$work/fuzz.log"; failed+=("$t"); }

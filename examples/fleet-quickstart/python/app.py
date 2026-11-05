@@ -11,11 +11,11 @@ import time
 
 import logfire
 
-import pydantic_opamp_otel
+import logfire_opamp_otel
 
 # In place of `logfire.configure()`. The console is off so the terminal shows only the app's own
 # `order N sent` lines; Live view is where the telemetry goes.
-pydantic_opamp_otel.configure_logfire(service_name="fleet-quickstart", console=False)
+logfire_opamp_otel.configure_logfire(service_name="fleet-quickstart", console=False)
 
 for order in itertools.count(1):
     with logfire.span("checkout order {order}", order=order):

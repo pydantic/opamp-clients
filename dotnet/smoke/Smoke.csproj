@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Pydantic.OpAmp.Client" Version="$(OpAmpVersion)" />
+    <PackageReference Include="Logfire.OpAmp.Client" Version="$(OpAmpVersion)" />
   </ItemGroup>
 
 </Project>

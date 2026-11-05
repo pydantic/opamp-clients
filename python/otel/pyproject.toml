@@ -1,12 +1,12 @@
 [project]
-name = "pydantic-opamp-otel"
+name = "logfire-opamp-otel"
 version = "0.1.0"
 description = "OpenTelemetry auto-instrumentation under an OpAMP server: install it, and opentelemetry-instrument takes its SDK settings (sampling, what to send, which instrumentations run) from the server"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
-    "pydantic-opamp-client",
+    "logfire-opamp-client",
     # The OpAMP entry points (_opentelemetry_opamp) came with 1.43.
     "opentelemetry-sdk>=1.43",
     "opentelemetry-instrumentation>=0.64b0",
@@ -19,13 +19,13 @@ dependencies = [
 logfire = ["logfire>=5.1,<6"]
 
 [project.entry-points.opentelemetry_distro]
-opamp = "pydantic_opamp_otel:Distro"
+opamp = "logfire_opamp_otel:Distro"
 
 [project.entry-points.opentelemetry_configurator]
-opamp = "pydantic_opamp_otel:Configurator"
+opamp = "logfire_opamp_otel:Configurator"
 
 [project.entry-points._opentelemetry_opamp]
-post_sdk_init_function = "pydantic_opamp_otel:start"
+post_sdk_init_function = "logfire_opamp_otel:start"
 
 [project.urls]
 Repository = "https://github.com/pydantic/opamp-clients"
@@ -34,15 +34,15 @@ Repository = "https://github.com/pydantic/opamp-clients"
 dev = ["pytest>=9", "opentelemetry-instrumentation-aiohttp-client", "gevent>=25", "logfire>=5.1,<6", "backports.zstd>=1; python_version < '3.14'"]
 
 [tool.uv.sources]
-pydantic-opamp-client = { path = "..", editable = true }
-pydantic-opamp-core = { path = "../core" }
+logfire-opamp-client = { path = "..", editable = true }
+logfire-opamp-core = { path = "../core" }
 
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/pydantic_opamp_otel"]
+packages = ["src/logfire_opamp_otel"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

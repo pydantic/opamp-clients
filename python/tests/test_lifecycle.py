@@ -12,8 +12,8 @@ import time
 
 from aiohttp import web
 
-from pydantic_opamp_client import Client, Config, Status, _executor, opamp_pb2 as pb
-from pydantic_opamp_client._core import Core
+from logfire_opamp_client import Client, Config, Status, _executor, opamp_pb2 as pb
+from logfire_opamp_client._core import Core
 
 UID = bytes([0x42] * 16)
 

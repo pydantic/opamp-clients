@@ -21,7 +21,7 @@ import {
   RemoteConfigStatusSchema,
   RemoteConfigStatuses,
   create,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-opamp-client";
 
 const IDENTIFYING = new Set(["service.name", "service.namespace", "service.instance.id"]);
 

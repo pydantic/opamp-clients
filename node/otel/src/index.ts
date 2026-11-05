@@ -3,7 +3,7 @@
 
 // OpenTelemetry auto-instrumentation for Node.js under an OpAMP server (docs/node-otel.md).
 //
-// `node --import @pydantic/opamp-otel/register app.js` does what upstream's
+// `node --import @pydantic/logfire-opamp-otel/register app.js` does what upstream's
 // `@opentelemetry/auto-instrumentations-node/register` does (NodeSDK, every auto-instrumentation,
 // configured by the OTEL_* variables), and puts the SDK under the server named by
 // OTEL_OPAMP_ENDPOINT: a sampler, exporters and instrumentation tracers the server's settings can
@@ -16,7 +16,7 @@
 // read by key with a default, and a callback for when they change (docs/app-settings.md).
 //
 // What the settings mean, what to answer and what to report is the SDK settings layer's
-// (`@pydantic/opamp-client/sdk`), the same in every language; this package carries it out on the
+// (`@pydantic/logfire-opamp-client/sdk`), the same in every language; this package carries it out on the
 // Node.js SDK.
 
 import {
@@ -127,7 +127,7 @@ import {
   coreUnavailable,
   identifySetup,
   startSetup,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-opamp-client";
 import {
   type FoundExporterInit,
   type HealthReport,
@@ -139,7 +139,7 @@ import {
   SdkSettings,
   type Settings,
   settingsUnavailable,
-} from "@pydantic/opamp-client/sdk";
+} from "@pydantic/logfire-opamp-client/sdk";
 
 import { AppSettings, appSettings } from "./app-settings.js";
 import { asciiLower, globChars, Scrubbing } from "./scrub.js";
@@ -1393,7 +1393,7 @@ export type Exporter = { signal: string; name: string; gated: boolean; destinati
 export const APP_PROVIDER = "app_provider";
 
 /** Marks a gate this package put in front of an exporter, and holds that exporter. */
-const GATED = Symbol.for("@pydantic/opamp-otel.gated");
+const GATED = Symbol.for("@pydantic/logfire-opamp-otel.gated");
 type Gated = { [GATED]: object };
 
 /** The exporter behind this package's gate, if `e` is one. */

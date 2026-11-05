@@ -31,8 +31,10 @@ require that client version. The module proxy serves them, and caches each tag f
 `replace` in each `go.mod` only applies inside this repository. The Supervisor is installed from
 its packages, since `go install` refuses a module with a `replace`.
 
-The names are Pydantic's: `pydantic-opamp-*` on PyPI, `@pydantic/opamp-*` on npm, `dev.pydantic`
-on Maven Central and `Pydantic.OpAmp.*` on NuGet. Each scope or prefix must be ours on its registry
+The names are Logfire's: `logfire-opamp-*` on PyPI, `@pydantic/logfire-opamp-*` on npm,
+`dev.pydantic:logfire-opamp-*` on Maven Central and `Logfire.OpAmp.*` on NuGet. Up to 0.1.x the
+packages were `pydantic-opamp-*`, `@pydantic/opamp-*`, `dev.pydantic:opamp-*` and `Pydantic.OpAmp.*`;
+those names get no new versions. Each scope or prefix must be ours on its registry
 before the first upload: a name on a registry can't be taken back.
 
 ## What the maintainer sets up before the first release
@@ -59,7 +61,7 @@ of them.
   `pypi npm maven nuget`. Leave a registry out until its setup below is done.
 
 **PyPI** (pypi.org, Account, Publishing): a pending trusted publisher for each of
-`pydantic-opamp-core`, `pydantic-opamp-client` and `pydantic-opamp-otel`. Each has owner
+`logfire-opamp-core`, `logfire-opamp-client` and `logfire-opamp-otel`. Each has owner
 `pydantic`, repository `opamp-clients`, workflow `registries.yml` and environment `pypi`. The first
 upload creates the project. No token.
 
@@ -67,7 +69,7 @@ upload creates the project. No token.
 
 - The `@pydantic` scope must belong to an npm organization the maintainer administers.
 - A trusted publisher is added in a package's settings, so the package must exist first. Publish
-  the first version of `@pydantic/opamp-client` and `@pydantic/opamp-otel` by hand, from the
+  the first version of `@pydantic/logfire-opamp-client` and `@pydantic/logfire-opamp-otel` by hand, from the
   tarballs a run of this workflow built (its `sdk` artifact): `npm publish --access public <tgz>`.
 - Then, on each package, add a trusted publisher: GitHub Actions, owner `pydantic`, repository
   `opamp-clients`, workflow `registries.yml`, environment `npm`, with `npm publish` allowed.
@@ -83,7 +85,7 @@ upload creates the project. No token.
 
 **NuGet** (nuget.org):
 
-- Reserve the ID prefix `Pydantic.OpAmp` for the owning account (a request to nuget.org support).
+- Reserve the ID prefix `Logfire.OpAmp` for the owning account (a request to nuget.org support).
 - Add a trusted publishing policy (your username, Trusted Publishing): owner `pydantic`, repository
   `opamp-clients`, workflow file `registries.yml`, environment `nuget`.
 
@@ -91,6 +93,6 @@ upload creates the project. No token.
 
 A version on a registry is there for good: the fix is the next version. To keep users off a bad
 one in the meantime: PyPI, yank it (the project's Manage, Releases page); npm, `npm deprecate
-@pydantic/opamp-client@X.Y.Z "<why>"`; NuGet, unlist it (the package's Manage page); Go, a
+@pydantic/logfire-opamp-client@X.Y.Z "<why>"`; NuGet, unlist it (the package's Manage page); Go, a
 `retract` directive in the next version's `go.mod`. Maven Central can't hide a version: say what is
 wrong in the next release's notes.

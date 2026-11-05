@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.OpAmp.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// Export health's counts, per signal, cumulative since start: what the gates saw of each export

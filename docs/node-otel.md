@@ -1,6 +1,6 @@
 # OpenTelemetry auto-instrumentation for Node.js, under an OpAMP server
 
-`node/otel` is `@pydantic/opamp-otel`, upstream's auto-instrumentation `register` under an OpAMP
+`node/otel` is `@pydantic/logfire-opamp-otel`, upstream's auto-instrumentation `register` under an OpAMP
 server. It sets up what `@opentelemetry/auto-instrumentations-node/register` sets up: NodeSDK,
 every auto-instrumentation, configured by the `OTEL_*` variables. The SDK then joins the server's
 fleet and takes its settings from it: sampling, what to send and which instrumentations are on,
@@ -22,7 +22,7 @@ Install it into the application. It brings upstream's auto-instrumentations and 
 with it:
 
 ```bash
-npm install @pydantic/opamp-otel
+npm install @pydantic/logfire-opamp-otel
 ```
 
 Then start the application with it instead of upstream's `register`:
@@ -32,7 +32,7 @@ OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
-node --import @pydantic/opamp-otel/register app.js
+node --import @pydantic/logfire-opamp-otel/register app.js
 ```
 
 | Variable | |
@@ -54,7 +54,7 @@ variables. Headers given replace `OTEL_OPAMP_HEADERS` whole, and `stateDir: "non
 default state directory off, as the variable's `none`.
 
 ```js
-import { register } from "@pydantic/opamp-otel";
+import { register } from "@pydantic/logfire-opamp-otel";
 
 const { shutdown } = register({
   endpoint: "https://opamp.example.com/v1/opamp",
@@ -64,7 +64,7 @@ const { shutdown } = register({
 ```
 
 Called this way, the shutdown and the loader hook for `import` are the application's to arrange;
-`node --import @pydantic/opamp-otel/register` does both, and reads only the variables. A blank
+`node --import @pydantic/logfire-opamp-otel/register` does both, and reads only the variables. A blank
 `endpoint` or `stateDir` is not given (its variable applies). A value it can't use never stops the
 application: one of the wrong type (as plain JavaScript may pass, or a `heartbeatIntervalMs` that
 isn't a finite number) is warned about and not used; a `heartbeatIntervalMs` of 0 or less is warned
@@ -91,7 +91,7 @@ An application that starts its own NodeSDK, as OpenTelemetry's docs show, or the
 ```js
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { manage } from "@pydantic/opamp-otel";
+import { manage } from "@pydantic/logfire-opamp-otel";
 
 const sdk = new NodeSDK({ instrumentations: [getNodeAutoInstrumentations()] });
 sdk.start();  // the application's setup, as it was
@@ -107,7 +107,7 @@ With the Logfire SDK it is the same, after `logfire.configure()`:
 
 ```js
 import * as logfire from "@pydantic/logfire-node";
-import { manage } from "@pydantic/opamp-otel";
+import { manage } from "@pydantic/logfire-opamp-otel";
 
 logfire.configure({ serviceName: "checkout" });
 manage();
@@ -206,7 +206,7 @@ to the logger `OTEL_LOG_LEVEL` sets up, from the start. Without `OTEL_LOG_LEVEL`
 `diag` logger shows nothing, so the package's own warnings and errors (`OpAMP: ...`) go to the
 console (stderr) instead, and its INFO lines aren't shown.
 
-The rules are the SDK settings layer's (`@pydantic/opamp-client/sdk`), the same in every
+The rules are the SDK settings layer's (`@pydantic/logfire-opamp-client/sdk`), the same in every
 language. The package only carries them out on the Node.js SDK.
 
 ### Switching instrumentations off
@@ -470,9 +470,9 @@ sends, what is refused, when a callback is called) is [app-settings.md](app-sett
 Node.js the application reads them through `appSettings`:
 
 ```js
-import { appSettings } from "@pydantic/opamp-otel";
-// or, without loading the rest of the package: "@pydantic/opamp-otel/app-settings"
-// CommonJS: const { appSettings } = require("@pydantic/opamp-otel");
+import { appSettings } from "@pydantic/logfire-opamp-otel";
+// or, without loading the rest of the package: "@pydantic/logfire-opamp-otel/app-settings"
+// CommonJS: const { appSettings } = require("@pydantic/logfire-opamp-otel");
 
 if (appSettings.get("checkout.new_flow", "off") === "on") {
   // ...
@@ -525,7 +525,7 @@ and which export through something it can't switch off
 sends the hash at start, and the components in full when the server asks.
 
 ```json
-{"sdk": {"integration.name": "@pydantic/opamp-otel", "integration.version": "0.1.0",
+{"sdk": {"integration.name": "@pydantic/logfire-opamp-otel", "integration.version": "0.1.0",
          "telemetry.sdk.language": "nodejs", "telemetry.sdk.version": "2.11.0"},
  "instrumentations": {"express": {"version": "0.70.0"}, "http": {"version": "0.222.0"}, "...": {}},
  "exporters": {"traces": {"otlp@localhost:4318": {"gated": true, "destination": "http://localhost:4318"}},

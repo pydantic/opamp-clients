@@ -15,10 +15,10 @@ from _servers import MODES, HttpProxy, OpampServer, Socks5Proxy, run_client
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pydantic_opamp_client import TLS, Client, Config, Proxy, Status
-from pydantic_opamp_client._executor import Executor
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from pydantic_opamp_client._transport import Transport, _route
+from logfire_opamp_client import TLS, Client, Config, Proxy, Status
+from logfire_opamp_client._executor import Executor
+from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_opamp_client._transport import Transport, _route
 
 TRANSPORTS = ["http", "ws"]
 

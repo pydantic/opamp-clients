@@ -21,7 +21,7 @@ import {
 } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type AvailableComponents, type EffectiveConfig, RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { type AvailableComponents, type EffectiveConfig, RemoteConfigStatuses } from "@pydantic/logfire-opamp-client";
 
 import { Agent, APP_PROVIDER, samplerFromEnv, say, watchProviders } from "../src/index.js";
 import { config as configOf, off, overridden, policy } from "./policy.js";

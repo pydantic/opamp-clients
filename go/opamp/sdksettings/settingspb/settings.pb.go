@@ -3461,8 +3461,8 @@ const file_opamp_sdk_v1_settings_proto_rawDesc = "" +
 	"\x14PARENT_LOCAL_SAMPLED\x10\x01\x12\x1a\n" +
 	"\x16PARENT_LOCAL_UNSAMPLED\x10\x02\x12\x19\n" +
 	"\x15PARENT_REMOTE_SAMPLED\x10\x03\x12\x1b\n" +
-	"\x17PARENT_REMOTE_UNSAMPLED\x10\x04B\x86\x01\n" +
-	"\x16dev.pydantic.opamp.sdkB\rSettingsProtoZAgithub.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb\xaa\x02\x19Pydantic.OpAmp.Client.Sdkb\x06proto3"
+	"\x17PARENT_REMOTE_UNSAMPLED\x10\x04B\x8d\x01\n" +
+	"\x1edev.pydantic.logfire.opamp.sdkB\rSettingsProtoZAgithub.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb\xaa\x02\x18Logfire.OpAmp.Client.Sdkb\x06proto3"
 
 var (
 	file_opamp_sdk_v1_settings_proto_rawDescOnce sync.Once

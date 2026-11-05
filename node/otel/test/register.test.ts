@@ -26,7 +26,7 @@ import {
   ServerToAgentFlags,
   ServerToAgentSchema,
   toBinary,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-opamp-client";
 
 import { FILE, policy } from "./policy.js";
 
@@ -156,7 +156,7 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
     const c = full.components;
     assert.deepEqual(Object.keys(c).sort(), ["exporters", "instrumentations", "sdk", "settings"]);
     const meta = Object.fromEntries(c.sdk!.metadata.map((kv) => [kv.key, kv.value?.value.value]));
-    assert.equal(meta["integration.name"], "@pydantic/opamp-otel");
+    assert.equal(meta["integration.name"], "@pydantic/logfire-opamp-otel");
     assert.equal(meta["telemetry.sdk.language"], "nodejs");
     assert.match(String(meta["telemetry.sdk.version"]), /^\d+\.\d+\.\d+/);
     // The instrumentations the variables load, under the names deactivate_instrumentations takes.
@@ -560,7 +560,7 @@ test("a move nobody answers is FAILED, and the agent carries on where it was wit
  * module would. Removed at the test's end.
  */
 function spoiledCore(t: { after: (fn: () => void) => void }, spoil: (core: string) => void): string {
-  const real = realpathSync(fileURLToPath(new URL("../../node_modules/@pydantic/opamp-client/", import.meta.url)));
+  const real = realpathSync(fileURLToPath(new URL("../../node_modules/@pydantic/logfire-opamp-client/", import.meta.url)));
   const copy = mkdtempSync(join(tmpdir(), "opamp-core-copy-"));
   t.after(() => rmSync(copy, { recursive: true, force: true }));
   for (const part of ["package.json", "dist", "core"]) cpSync(join(real, part), join(copy, part), { recursive: true });
@@ -568,7 +568,7 @@ function spoiledCore(t: { after: (fn: () => void) => void }, spoil: (core: strin
   spoil(join(copy, "core"));
   const at = pathToFileURL(`${copy}/`).href;
   writeFileSync(join(copy, "hooks.mjs"), `
-    const to = { "@pydantic/opamp-client": "dist/src/index.js", "@pydantic/opamp-client/sdk": "dist/src/sdk.js" };
+    const to = { "@pydantic/logfire-opamp-client": "dist/src/index.js", "@pydantic/logfire-opamp-client/sdk": "dist/src/sdk.js" };
     export async function resolve(specifier, context, next) {
       return specifier in to ? { url: new URL(to[specifier], ${JSON.stringify(at)}).href, shortCircuit: true } : next(specifier, context);
     }`);

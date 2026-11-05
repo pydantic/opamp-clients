@@ -27,7 +27,7 @@ from aiohttp import WSMessage, WSMsgType, web
 from multidict import CIMultiDict
 
 from _sched_loop import Attempt, MemTransport, Network, SeededLoop
-from pydantic_opamp_client import opamp_pb2 as pb
+from logfire_opamp_client import opamp_pb2 as pb
 
 CAPABILITY = "io.example.schedules"
 OFFERS = ["none", "config", "custom", "package", "heartbeat"]

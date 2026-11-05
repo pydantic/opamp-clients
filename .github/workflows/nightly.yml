@@ -296,7 +296,7 @@ jobs:
       - name: .NET (FsCheck)
         if: ${{ !cancelled() }}
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*PropertyTests"
+        run: dotnet test --project Logfire.OpAmp.Client.Tests --framework net8.0 --filter-class "*PropertyTests"
 
   shells:
     # The schedule-exploring tests make this the longest night's work: one job per part, so a
@@ -421,7 +421,7 @@ jobs:
       - name: .NET
         if: matrix.part == '.NET'
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests" --filter-class "*AdversaryPropertyTests" --filter-class "*ScheduleTests*"
+        run: dotnet test --project Logfire.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests" --filter-class "*AdversaryPropertyTests" --filter-class "*ScheduleTests*"
 
   # The callback contract (docs/sdk-contract.md) in each SDK's callback model test, 5,000 runs
   # each (100 on a pull request). Each prints its seed; OPAMP_MODEL_SEED=<seed> replays a run.
@@ -487,7 +487,7 @@ jobs:
             10.0.x
       - if: matrix.sdk == 'dotnet'
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests"
+        run: dotnet test --project Logfire.OpAmp.Client.Tests --framework net8.0 --filter-class "*CallbackPropertyTests"
 
   # Each language's Controls flipped through seeded settings documents while workers emit spans and
   # records through the real SDK (the per-PR runs take a few seconds; here 150 runs each). A
@@ -561,7 +561,7 @@ jobs:
       - name: .NET
         if: ${{ !cancelled() }}
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests --framework net8.0 --filter-class "*ConcurrencyTests"
+        run: dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests --framework net8.0 --filter-class "*ConcurrencyTests"
 
   # The crash scenarios on a real file system that loses what wasn't flushed: LazyFS (FUSE) in a
   # container (conformance/lazyfs/), every driver's state file on a mount of its own. Each crash
@@ -701,6 +701,6 @@ jobs:
         if: matrix.sdk == 'dotnet'
         working-directory: dotnet
         run: |
-          dotnet test --project Pydantic.OpAmp.Client.Tests
-          dotnet test --project Pydantic.OpAmp.Extensions.Hosting.Tests
-          dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests
+          dotnet test --project Logfire.OpAmp.Client.Tests
+          dotnet test --project Logfire.OpAmp.Extensions.Hosting.Tests
+          dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests

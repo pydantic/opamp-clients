@@ -6,9 +6,9 @@ using System.Reflection;
 using System.Security.Cryptography;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.OpAmp.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>A signal an OTLP exporter sends.</summary>
 internal enum Signal

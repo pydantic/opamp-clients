@@ -3,7 +3,7 @@
 
 // Logfire SDK policies for the tests, as a server sends them (docs/sdk-settings.md).
 
-import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type EffectiveConfig } from "@pydantic/opamp-client";
+import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type EffectiveConfig } from "@pydantic/logfire-opamp-client";
 
 export const FILE = "logfire-sdk-policy.json";
 export const V1 = "logfire-sdk-policy/v1";

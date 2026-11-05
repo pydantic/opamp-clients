@@ -94,7 +94,7 @@ installers and conformance among them).
 |---|---|
 | `Supervisor e2e (upstream's suite)` | upstream's e2e suite times out or a step races; nothing in the PR touches `go/opampsupervisor` or `go/opampextension` |
 | `Python client (N/3)` | one test fails on timing and passes on re-run |
-| `.NET (Pydantic.OpAmp.Client.Tests)` | a TLS test in `TlsProxyTests.cs` (TLS 1.3, server trust) fails on timing |
+| `.NET (Logfire.OpAmp.Client.Tests)` | a TLS test in `TlsProxyTests.cs` (TLS 1.3, server trust) fails on timing |
 | Any Java job | Maven Central answers 502 while downloading dependencies |
 | Java agent `matching` check (try.py) | `send_logs_per_second` lets a few too many through in a window (18 in 14 s) |
 
@@ -125,7 +125,7 @@ if not, `python3 scripts/fetch_core.py fetch`.
 | `node/otel/` | `(cd node/opamp && npm run build) && cd node/otel && npm ci --no-audit --no-fund && npm exec -- tsc -p . && node --test dist/test/settings.test.js` (35 tests, ~10 s); all: `npm test` (as CI runs it) |
 | `java/opamp/` | (as CI runs it) `cd java/opamp && mvn -q -B package -Dtest=<Class>Test -Dsurefire.failIfNoSpecifiedTests=false`; Fray tests need JDK 25: `mvn -q -B -Pfray test -Dfray.only=true -Dfray.test=<Class>FrayTest` |
 | `java/opamp-javaagent/` | `mvn -q -B -DskipTests install -f java/opamp/pom.xml` (~1 min) `&& mvn -q -B test -f java/opamp-javaagent/pom.xml -Dtest=ControlsTest` (~25 s); all, as CI runs it: `mvn -q -B package -f java/opamp-javaagent/pom.xml` |
-| `dotnet/` | `apt-get install -y dotnet-sdk-8.0 dotnet-sdk-10.0` works in a cloud sandbox (both: the tests run net8.0 and net10.0). As CI runs it: `cd dotnet && dotnet test --project Pydantic.OpAmp.Client.Tests`, `dotnet test --project Pydantic.OpAmp.Extensions.Hosting.Tests`, `dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests`. Read your C# diff twice. |
+| `dotnet/` | `apt-get install -y dotnet-sdk-8.0 dotnet-sdk-10.0` works in a cloud sandbox (both: the tests run net8.0 and net10.0). As CI runs it: `cd dotnet && dotnet test --project Logfire.OpAmp.Client.Tests`, `dotnet test --project Logfire.OpAmp.Extensions.Hosting.Tests`, `dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests`. Read your C# diff twice. |
 | `examples/settings/`, `docs/sdk-settings.md` | `python3 -m unittest examples/test_settings_cookbook.py` |
 | `examples/<integration>/` | `python3 examples/<integration>/try.py --list`; with `OPAMP_EXAMPLES_SERVER` set, the checks you changed: `try.py --jobs 4 signals setup` |
 | `conformance/` clients, scenarios, drivers | `python3 conformance/runner/run.py --list`; one client and scenario: `python3 conformance/runner/run.py --server go --strict --client "=go-core" --scenario basic --transport http` (~35 s) |

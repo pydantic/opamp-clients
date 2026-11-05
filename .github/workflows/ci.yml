@@ -496,9 +496,9 @@ jobs:
       fail-fast: false
       matrix:
         project:
-          - Pydantic.OpAmp.Client.Tests
+          - Logfire.OpAmp.Client.Tests
           # The SDK set up in code, under an OpAMP server (WithOpAmp).
-          - Pydantic.OpAmp.Extensions.Hosting.Tests
+          - Logfire.OpAmp.Extensions.Hosting.Tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -694,7 +694,7 @@ jobs:
       - name: .NET automatic instrumentation plugin
         if: matrix.sdk == 'dotnet'
         working-directory: dotnet
-        run: dotnet test --project Pydantic.OpAmp.AutoInstrumentation.Tests
+        run: dotnet test --project Logfire.OpAmp.AutoInstrumentation.Tests
       - name: Keep the test reports
         if: (failure() || cancelled()) && matrix.sdk == 'java'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

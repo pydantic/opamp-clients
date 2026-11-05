@@ -7,9 +7,9 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.OpAmp.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// What the built providers export through, read from them: each exporter, and whether the gate is

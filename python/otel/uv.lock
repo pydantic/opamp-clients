@@ -1385,20 +1385,20 @@ wheels = [
 ]
 
 [[package]]
-name = "pydantic-opamp-client"
+name = "logfire-opamp-client"
 version = "0.1.0"
 source = { editable = "../" }
 dependencies = [
     { name = "aiohttp" },
     { name = "protobuf" },
-    { name = "pydantic-opamp-core" },
+    { name = "logfire-opamp-core" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12" },
     { name = "protobuf", specifier = ">=6.31.1,<8" },
-    { name = "pydantic-opamp-core", directory = "../core" },
+    { name = "logfire-opamp-core", directory = "../core" },
 ]
 
 [package.metadata.requires-dev]
@@ -1410,19 +1410,19 @@ dev = [
 ]
 
 [[package]]
-name = "pydantic-opamp-core"
+name = "logfire-opamp-core"
 version = "0.1.0"
 source = { directory = "../core" }
 
 [[package]]
-name = "pydantic-opamp-otel"
+name = "logfire-opamp-otel"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-instrumentation" },
     { name = "opentelemetry-sdk" },
-    { name = "pydantic-opamp-client" },
+    { name = "logfire-opamp-client" },
 ]
 
 [package.optional-dependencies]
@@ -1445,7 +1445,7 @@ requires-dist = [
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.43" },
     { name = "opentelemetry-instrumentation", specifier = ">=0.64b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.43" },
-    { name = "pydantic-opamp-client", editable = "../" },
+    { name = "logfire-opamp-client", editable = "../" },
 ]
 provides-extras = ["logfire"]
 

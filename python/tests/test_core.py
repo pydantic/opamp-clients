@@ -7,10 +7,10 @@ import struct
 
 import pytest
 
-from pydantic_opamp_client import CoreError
-from pydantic_opamp_client._core import Core
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from pydantic_opamp_client._proto.opamp.v1 import opamp_pb2 as pb
+from logfire_opamp_client import CoreError
+from logfire_opamp_client._core import Core
+from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_opamp_client._proto.opamp.v1 import opamp_pb2 as pb
 
 START = corepb.Input(start=corepb.Empty())
 TIMER = corepb.Input(timer=corepb.Empty())
@@ -77,7 +77,7 @@ def _records(path) -> list[tuple[int, int, bytes]]:
 def test_the_core_tap_records_every_crossing(tmp_path, monkeypatch) -> None:
     tap = tmp_path / "core.tap"
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tap))
-    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
+    monkeypatch.setattr("logfire_opamp_client._core._taps", 0)
     config = corepb.Config(instance_uid=bytes([7] * 16), endpoint="http://server/v1/opamp")
     core = Core(config)
     core.step(5, START)
@@ -109,6 +109,6 @@ def test_the_core_tap_records_every_crossing(tmp_path, monkeypatch) -> None:
 
 def test_a_tap_that_cant_be_opened_is_skipped(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tmp_path / "missing" / "core.tap"))
-    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
+    monkeypatch.setattr("logfire_opamp_client._core._taps", 0)
     Core(corepb.Config(instance_uid=bytes([7] * 16), endpoint="http://server/v1/opamp")).step(0, START)
     assert "OPAMP_CORE_TAP" in capsys.readouterr().err

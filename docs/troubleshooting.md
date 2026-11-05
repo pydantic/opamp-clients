@@ -8,10 +8,10 @@ when it connects, and says once, with what to check, when it can't.
 
 | Integration | Where | INFO lines shown (the first connection is always shown unless logging was set quieter) |
 |---|---|---|
-| Python ([python-otel.md](python-otel.md#is-it-working)) | the `pydantic_opamp_otel` logger; warnings and the first connection reach stderr | with a handler at INFO |
+| Python ([python-otel.md](python-otel.md#is-it-working)) | the `logfire_opamp_otel` logger; warnings and the first connection reach stderr | with a handler at INFO |
 | Go ([go-otel.md](go-otel.md#is-it-working)) | `slog`'s default logger | at slog's level |
 | Node.js ([node-otel.md](node-otel.md#is-it-working)) | OpenTelemetry's `diag` logger; warnings reach stderr | with `OTEL_LOG_LEVEL=info` |
-| Java ([javaagent.md](javaagent.md#is-it-working)) | the `java.util.logging` logger `dev.pydantic.opamp.javaagent.Extension` | at INFO |
+| Java ([javaagent.md](javaagent.md#is-it-working)) | the `java.util.logging` logger `dev.pydantic.logfire.opamp.javaagent.Extension` | at INFO |
 | .NET ([dotnet-otel.md](dotnet-otel.md#is-it-working)) | standard error; `WithOpAmp()` logs to the application's logger | with `OTEL_LOG_LEVEL=info` |
 | Supervisor ([collector.md](collector.md)) | Linux: the journal (`journalctl -u pydantic-opamp-supervisor`); macOS: `/opt/pydantic-opamp/var/log/supervisor.log`; Windows: the Application event log | always |
 

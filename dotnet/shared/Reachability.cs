@@ -1,10 +1,10 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-using Pydantic.OpAmp.Client;
-using Pydantic.OpAmp.Core;
+using Logfire.OpAmp.Client;
+using Logfire.OpAmp.Core;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// Says when the client connects, when it can't (once a run of failures, with what to check), and

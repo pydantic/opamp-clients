@@ -1,6 +1,6 @@
 # OpenTelemetry auto-instrumentation for Python, under an OpAMP server
 
-`python/otel` is `pydantic-opamp-otel`, a package for `opentelemetry-instrument`. With it
+`python/otel` is `logfire-opamp-otel`, a package for `opentelemetry-instrument`. With it
 installed, the SDK that auto-instrumentation sets up joins an OpAMP server's fleet and takes its
 settings from the server: sampling, what to send, which instrumentations run
 ([sdk-settings.md](sdk-settings.md)). The application needs no code, and the SDK and the
@@ -15,7 +15,7 @@ It plugs in through upstream's extension points, including the SDK's OpAMP hook
 Install it next to the instrumentations the application needs:
 
 ```bash
-pip install pydantic-opamp-otel opentelemetry-instrumentation-flask
+pip install logfire-opamp-otel opentelemetry-instrumentation-flask
 ```
 
 Then run the application under `opentelemetry-instrument` as usual, with the server's address:
@@ -53,7 +53,7 @@ answered as done ([the host](sdk-settings.md#the-host)). The package logs a warn
 
 ### Is it working?
 
-The package says so on the `pydantic_opamp_otel` logger. When the client first reaches the server it logs,
+The package says so on the `logfire_opamp_otel` logger. When the client first reaches the server it logs,
 at INFO, `OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed as checkout,
 instance <uid>`. That line reaches stderr even with INFO off, unless the application has logging
 handlers of its own, so a working SDK never looks like one that isn't loaded. When it can't, it logs one WARNING per run of failures, with what to check:
@@ -78,9 +78,9 @@ An application that sets its SDK up in code, rather than under `opentelemetry-in
 (Locust, say, whose gevent rules it out), gets the same with one call in place of that setup:
 
 ```python
-import pydantic_opamp_otel
+import logfire_opamp_otel
 
-pydantic_opamp_otel.configure()
+logfire_opamp_otel.configure()
 # then the application's own instrumentors, as before:
 RequestsInstrumentor().instrument()
 ```
@@ -92,7 +92,7 @@ above), set as the global ones, with the live sampler, the gated exporters and t
 above, or from the application, as `configure()`'s own arguments:
 
 ```python
-pydantic_opamp_otel.configure(
+logfire_opamp_otel.configure(
     endpoint="https://opamp.example.com/v1/opamp",
     headers={"Authorization": f"Bearer {settings.opamp_key}"},
 )
@@ -108,7 +108,7 @@ and with neither it is the default:
 | `state_dir` | `OTEL_OPAMP_STATE_DIR` | A directory (`str` or a path), or `"none"` for none, not even the default one. |
 | `heartbeat_interval` | `OTEL_OPAMP_HEARTBEAT_INTERVAL` | Seconds (`0.5`, `30`), a `timedelta`, or a string as the variable (`"30s"`, `"2m"`, `"1500"` for milliseconds). |
 
-A value it can't use is warned about on the `pydantic_opamp_otel` logger and is the default, as a variable
+A value it can't use is warned about on the `logfire_opamp_otel` logger and is the default, as a variable
 it can't read is: an endpoint that isn't a string leaves the SDK unmanaged, headers that aren't
 all strings are none (the warning doesn't show them), a `state_dir` that isn't a path is the
 default one, and an interval that isn't a positive duration (`0`, `-1`, `True`, NaN, `"soon"`) is
@@ -144,13 +144,13 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-import pydantic_opamp_otel
+import logfire_opamp_otel
 
 provider = TracerProvider(resource=Resource.create({"service.name": "checkout"}))
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 trace.set_tracer_provider(provider)  # the application's setup, as it was
 
-pydantic_opamp_otel.manage()  # the server from OTEL_OPAMP_*, or manage(endpoint=..., headers=...)
+logfire_opamp_otel.manage()  # the server from OTEL_OPAMP_*, or manage(endpoint=..., headers=...)
 ```
 
 `manage()` takes the server as `configure()` does (`endpoint`, `headers`, `state_dir`,
@@ -178,13 +178,13 @@ runs unmanaged.
 An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
-(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
+(`logfire-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
 
 ```python
 import logfire
-import pydantic_opamp_otel
+import logfire_opamp_otel
 
-pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+logfire_opamp_otel.configure_logfire(service_name="checkout", console=False)
 logfire.instrument_fastapi(app)  # the Logfire SDK's instrumentations, as before
 ```
 
@@ -317,7 +317,7 @@ path.
   keeps the parent's resource, `service.instance.id` included. When the parent stops it removes
   the file, and its children keep the settings in force.
 
-The rules are the SDK settings layer's (`pydantic_opamp_client.sdk`), the same in every language. The
+The rules are the SDK settings layer's (`logfire_opamp_client.sdk`), the same in every language. The
 package only carries them out on the Python SDK.
 
 ## The newer settings
@@ -343,7 +343,7 @@ local.
 ```
 
 No traces of health checks, served or made, every `checkout ...` trace, and a quarter of the
-rest. In the live sampler (`pydantic_opamp_otel.LiveSampler`), for a span with no parent only: the first
+rest. In the live sampler (`logfire_opamp_otel.LiveSampler`), for a span with no parent only: the first
 rule that matches sets the rate, applied by the SDK's `TraceIdRatioBased`; with none,
 `head_sampling`; with neither, the configured sampler (`OTEL_TRACES_SAMPLER`). A span with a
 parent follows it. What a rule sees is what the instrumentation passes when it starts the span:
@@ -459,7 +459,7 @@ The server may send the application settings of its own in the policy's `app_set
 ([app-settings.md](app-settings.md)):
 
 ```python
-from pydantic_opamp_otel import app_settings
+from logfire_opamp_otel import app_settings
 
 if app_settings.get("checkout.new_flow", "off") == "on":
     ...
@@ -479,7 +479,7 @@ No setting: always on. Once the SDK is built, the agent reports what it runs as 
 components, in the shape every language sends
 ([available-components.md](available-components.md#what-the-sdk-integrations-report)):
 
-- `sdk`: `pydantic-opamp-otel` and its version, `python`, and the `opentelemetry-sdk` version.
+- `sdk`: `logfire-opamp-otel` and its version, `python`, and the `opentelemetry-sdk` version.
 - `instrumentations`: every instrumentation `opentelemetry-instrument` can run, switched off or
   not, under its entry point's name (`flask`, `requests`, `aiohttp-client`), which is the name
   `OTEL_PYTHON_DISABLED_INSTRUMENTATIONS`, and so the `instrumentations` control, takes. Each has

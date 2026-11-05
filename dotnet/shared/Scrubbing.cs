@@ -3,7 +3,7 @@
 
 using System.Text;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// scrub_defaults and scrub_patterns: the Logfire SDK's scrubbing, of the attributes redaction

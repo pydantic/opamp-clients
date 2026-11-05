@@ -12,10 +12,10 @@ import time
 
 import pytest
 
-from pydantic_opamp_client import Client, Config, Status
-from pydantic_opamp_client import _executor as executor_module
-from pydantic_opamp_client._executor import Executor, read_state, save_state
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_opamp_client import Client, Config, Status
+from logfire_opamp_client import _executor as executor_module
+from logfire_opamp_client._executor import Executor, read_state, save_state
+from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 
 def test_saves_replace_what_was_saved_privately(tmp_path):

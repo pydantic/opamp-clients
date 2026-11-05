@@ -9,7 +9,7 @@ package opamp
 // otherwise the proxy resolves), the proxy core mode's rule picks for a URL (coreproxy.go), and the
 // files of downloads. It decides nothing: every byte it writes, the core wrote, and the core keeps
 // every time (it closes a stream it gives up on, and cancels a download's file). As
-// node/opamp/src/streams.ts and python/src/pydantic_opamp_client/_streams.py do.
+// node/opamp/src/streams.ts and python/src/logfire_opamp_client/_streams.py do.
 //
 // One register (inFlight, as the platform executor's) owns everything under way: each stream (its
 // connection, the goroutine connecting it, starting its TLS and reading it, the one writing it,

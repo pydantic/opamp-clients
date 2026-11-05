@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- .NET 8 and .NET 10, the supported LTS releases (docs/supported-versions.md). An SDK older
+         than 10 can't build net10.0, so it builds net8.0 alone: the Docker builds of the examples
+         and drivers on the 8.0 SDK image. A package is packed on SDK 10, with both
+         (scripts/native_dist.py check refuses one without). -->
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '10.0'))">net8.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageId>Logfire.OpAmp.Client</PackageId>
+    <Version>0.1.0</Version>
+    <Description>An OpAMP client for .NET, on the shared OpAMP core (Rust, as a native library)</Description>
+    <!-- Native: the LibraryImport declarations of Native.cs pass byte pointers. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <Authors>Pydantic</Authors>
+    <Company>Pydantic Services Inc.</Company>
+    <PackageProjectUrl>https://github.com/pydantic/opamp-clients</PackageProjectUrl>
+    <PackageTags>opentelemetry;opamp;observability;logfire</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.36.2" />
+  </ItemGroup>
+
+  <!--
+    The native core, beside the assembly. By default it is the one for the machine building, in
+    target/release (scripts/fetch_core.py puts it there), and copied to the output of every project
+    that references this one. OpAmpNativeLib names a library built elsewhere instead (a Linux one built in
+    a container, for a build in Docker: scripts/native_lib.py). Packed, the client carries no
+    library: it depends on Logfire.OpAmp.Core.Native, which holds one per platform
+    (OpAmpCorePackage: packing it, with the core package's version; the native job in CI).
+    The WebAssembly modules beside this file are not shipped: the tests run them as an oracle.
+  -->
+  <PropertyGroup>
+    <OpAmpRepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))</OpAmpRepoRoot>
+    <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('Windows'))">opamp_native.dll</OpAmpNativeName>
+    <OpAmpNativeName Condition="$([MSBuild]::IsOSPlatform('OSX'))">libopamp_native.dylib</OpAmpNativeName>
+    <OpAmpNativeName Condition="'$(OpAmpNativeName)' == ''">libopamp_native.so</OpAmpNativeName>
+    <OpAmpNativeLib Condition="'$(OpAmpNativeLib)' == '' and '$(OpAmpCorePackage)' == ''">$(OpAmpRepoRoot)target/release/$(OpAmpNativeName)</OpAmpNativeLib>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(OpAmpNativeLib)' != ''">
+    <None Include="$(OpAmpNativeLib)" Link="$([System.IO.Path]::GetFileName('$(OpAmpNativeLib)'))" CopyToOutputDirectory="PreserveNewest" Pack="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(OpAmpCorePackage)' != ''">
+    <PackageReference Include="Logfire.OpAmp.Core.Native" Version="[$(OpAmpCorePackage)]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Logfire.OpAmp.Client.Tests" />
+    <InternalsVisibleTo Include="Logfire.OpAmp.Client.Fuzz" />
+    <!-- The integrations fill OpAmpAppSettings (AppSettings.cs), which the application reads. -->
+    <InternalsVisibleTo Include="Logfire.OpAmp.AutoInstrumentation" />
+    <InternalsVisibleTo Include="Logfire.OpAmp.AutoInstrumentation.Tests" />
+    <InternalsVisibleTo Include="Logfire.OpAmp.Extensions.Hosting" />
+    <InternalsVisibleTo Include="Logfire.OpAmp.Extensions.Hosting.Tests" />
+  </ItemGroup>
+
+  <!-- The README NuGet shows on the package's page. -->
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

@@ -18,19 +18,19 @@ from pathlib import Path
 from types import MappingProxyType
 
 import pytest
-from pydantic_opamp_client import Notification, opamp_pb2
-from pydantic_opamp_client.sdk import SdkSettings, settings_pb2
+from logfire_opamp_client import Notification, opamp_pb2
+from logfire_opamp_client.sdk import SdkSettings, settings_pb2
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased, TraceIdRatioBased
 
-import pydantic_opamp_otel
+import logfire_opamp_otel
 from _globals import sdk_globals
 from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
 from kept import keep_applied
-from pydantic_opamp_otel import Agent, Controls, Setup, disabled_instrumentations
+from logfire_opamp_otel import Agent, Controls, Setup, disabled_instrumentations
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
 FAILED = opamp_pb2.RemoteConfigStatuses_FAILED
@@ -48,7 +48,7 @@ def _own_state_home(tmp_path_factory, monkeypatch):
 
 def settings(doc: str):
     """The settings as the layer hands them to the package where it built the SDK."""
-    return LAYER.load(doc.encode(), pydantic_opamp_otel.sdk_host()).settings
+    return LAYER.load(doc.encode(), logfire_opamp_otel.sdk_host()).settings
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
@@ -70,7 +70,7 @@ def prepared(tmp_path, **extra) -> tuple[Agent, dict]:
 def private(path) -> bool:
     """Whether the file is its user's only: a mode of 0600, or on Windows a list allowing the user alone."""
     if os.name == "nt":
-        from pydantic_opamp_client import _windows
+        from logfire_opamp_client import _windows
 
         return _windows.dacl(str(path)) == _windows.canonical(_windows.user_only())
     return path.stat().st_mode & 0o777 == 0o600
@@ -118,10 +118,10 @@ def test_next_start_settings_become_the_instrumentations_switch():
     assert disabled_instrumentations(settings(policy()), "") is None
 
 
-def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> pydantic_opamp_otel.Reachability:
+def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> logfire_opamp_otel.Reachability:
     """Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them."""
     s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": endpoint, "OTEL_OPAMP_STATE_DIR": "none"})
-    return pydantic_opamp_otel.Reachability(s.shown, service, uid, s.hints)
+    return logfire_opamp_otel.Reachability(s.shown, service, uid, s.hints)
 
 
 def test_settings_read_as_the_sdk_reads_its_own():
@@ -141,20 +141,20 @@ def test_a_bad_heartbeat_interval_warns_and_is_the_default(server, caplog):
     # As under opentelemetry-instrument, where an exception would skip all auto-instrumentation.
     for bad in ["soon", "-5s", "1h"]:
         caplog.clear()
-        with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+        with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
             s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": bad})
         assert s.heartbeat_ms == 0
         assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{bad}" is not a duration (as 1500, '
                                    "500ms, 30s or 2m): using the default"]
     # Longer than a day: a day, the longest.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s/v1/opamp", "OTEL_OPAMP_HEARTBEAT_INTERVAL": str(2**53)})
     assert s.heartbeat_ms == 86_400_000
     assert caplog.messages == [f'OpAMP: OTEL_OPAMP_HEARTBEAT_INTERVAL "{2**53}" is more than a day: a day it is, the longest']
     # A bad percent escape in the headers leaves that header out, with a warning naming it.
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://s", "OTEL_OPAMP_STATE_DIR": "none",
                             "OTEL_OPAMP_HEADERS": "a=x%zzy,b=%,c=%e9,d=ok%21"})
     assert s.headers == {"d": "ok!"}
@@ -348,7 +348,7 @@ def test_without_an_endpoint_nothing_changes():
     a = Agent()
     a.prepare(env)
     assert not a.on and env == {"OTEL_METRICS_EXPORTER": "otlp"}
-    assert pydantic_opamp_otel.AGENT is not a
+    assert logfire_opamp_otel.AGENT is not a
 
 
 class _Recording:
@@ -378,7 +378,7 @@ def test_a_retried_logfire_export_is_decided_and_counted_once_and_redacted_each_
     from opentelemetry.sdk.trace.export import SpanExportResult
     from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
-    from pydantic_opamp_otel._logfire import _gated_spans
+    from logfire_opamp_otel._logfire import _gated_spans
 
     class Sender(_Recording):
         def export(self, batch, *args, **kwargs):
@@ -490,22 +490,22 @@ def test_send_logs_level_drops_records_below_it_live():
 
 
 def test_send_logs_level_is_not_declared_with_send_logs_when_another_configurator_built_the_sdk():
-    live = list(pydantic_opamp_otel.sdk_host(configured=False, governed=False).live)
+    live = list(logfire_opamp_otel.sdk_host(configured=False, governed=False).live)
     assert "send_logs" not in live and "send_logs_level" not in live
-    assert "send_logs_level" in pydantic_opamp_otel.sdk_host().live
+    assert "send_logs_level" in logfire_opamp_otel.sdk_host().live
 
 
 def test_the_metric_gate_stops_its_exporter_with_send_metrics():
     from opentelemetry.sdk.metrics.export import MetricExportResult
 
     inner = _Recording()
-    gated = pydantic_opamp_otel.GatedMetricExporter(inner)
-    pydantic_opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
+    gated = logfire_opamp_otel.GatedMetricExporter(inner)
+    logfire_opamp_otel.AGENT.controls.apply(settings(policy(signal_exports=off("metrics"))))
     try:
         assert gated.export("m") == MetricExportResult.SUCCESS
         assert inner.batches == []
     finally:
-        pydantic_opamp_otel.AGENT.controls.apply(settings(policy()))
+        logfire_opamp_otel.AGENT.controls.apply(settings(policy()))
     assert gated.export("m") == "exported"
 
 
@@ -616,7 +616,7 @@ def test_a_remote_config_offered_at_once_is_answered_however_late_the_starting_t
     def status(msg, st):
         return msg.HasField("remote_config_status") and msg.remote_config_status.status == st
 
-    real = pydantic_opamp_otel.asyncio.run_coroutine_threadsafe
+    real = logfire_opamp_otel.asyncio.run_coroutine_threadsafe
 
     class Late:
         """The starting thread's wait, woken only once the agent has told the server APPLYING:
@@ -630,7 +630,7 @@ def test_a_remote_config_offered_at_once_is_answered_however_late_the_starting_t
             server.wait(lambda: any(status(m, opamp_pb2.RemoteConfigStatuses_APPLYING) for m in server.got))
             return out
 
-    monkeypatch.setattr(pydantic_opamp_otel.asyncio, "run_coroutine_threadsafe", lambda coro, loop: Late(real(coro, loop)))
+    monkeypatch.setattr(logfire_opamp_otel.asyncio, "run_coroutine_threadsafe", lambda coro, loop: Late(real(coro, loop)))
     agent = Agent()
     agent.configured = True  # as when the package's Configurator built the SDK
     try:
@@ -648,9 +648,9 @@ def test_the_goodbye_reaches_a_server_named_by_host_at_exit(server):
     # By the time atexit runs, the thread pool that resolves host names takes no more work: the
     # goodbye goes before it shuts down, and exit raises nothing either way.
     child = textwrap.dedent(f"""
-        import time, pydantic_opamp_otel
+        import time, logfire_opamp_otel
         from opentelemetry.sdk.resources import Resource
-        agent = pydantic_opamp_otel.AGENT
+        agent = logfire_opamp_otel.AGENT
         agent.prepare({{"OTEL_OPAMP_ENDPOINT": "http://localhost:{server.port}/v1/opamp"}})
         agent.start(Resource.create({{"service.name": "checkout"}}))
         while not agent.client._x._session:
@@ -674,9 +674,9 @@ def test_the_uid_reaches_the_sdk_not_the_environment_so_a_child_process_is_not_t
     assert child.uid != agent.uid
     # The configurator gives it to the SDK, over what the environment says.
     built = {}
-    monkeypatch.setattr(pydantic_opamp_otel._OTelSDKConfigurator, "_configure", lambda self, **kw: built.update(kw))
-    monkeypatch.setattr(pydantic_opamp_otel, "AGENT", agent)
-    pydantic_opamp_otel.Configurator()._configure(resource_attributes={"a": "b", "service.instance.id": "mine"})
+    monkeypatch.setattr(logfire_opamp_otel._OTelSDKConfigurator, "_configure", lambda self, **kw: built.update(kw))
+    monkeypatch.setattr(logfire_opamp_otel, "AGENT", agent)
+    logfire_opamp_otel.Configurator()._configure(resource_attributes={"a": "b", "service.instance.id": "mine"})
     assert built["resource_attributes"] == {"a": "b", "service.instance.id": str(agent.uid)}
     assert agent.configured
 
@@ -812,7 +812,7 @@ def test_with_a_configuration_file_the_instance_is_managed_and_gated_but_the_sam
     assert s.error_message == "head_sampling: this SDK cannot apply the requested override"
     assert switch.status == APPLIED
     # The file's sampler isn't the package's; the gates go in front of the file's exporters.
-    assert not set(agent.host.live) & {*pydantic_opamp_otel.SAMPLER, *pydantic_opamp_otel.DEBUG}
+    assert not set(agent.host.live) & {*logfire_opamp_otel.SAMPLER, *logfire_opamp_otel.DEBUG}
     assert {"custom", "send_traces", "mask_attributes"} <= set(agent.host.live)
     assert list(agent.host.next_start) == ["deactivate_instrumentations", "deactivate_all_instrumentations"]
     assert effective(agent) == {}  # the switch is pending the next start, which reads it
@@ -855,7 +855,7 @@ def test_the_instance_uid_changed_notification_is_saved(tmp_path):
 
 def test_a_state_from_a_newer_version_is_warned_about(tmp_path, caplog):
     agent, _ = prepared(tmp_path)
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         agent._notified(Notification("state_from_newer_version", state_version=2))
     assert caplog.messages == ["OpAMP: the saved state was written by a newer version of this SDK (state format 2), "
                                "which this one can't read: it is kept as it is, and this run saves nothing"]
@@ -870,9 +870,9 @@ def test_under_gevent_the_client_leaves_the_applications_own_event_loop_free(ser
     child = textwrap.dedent(f"""
         from gevent import monkey
         monkey.patch_all()
-        import asyncio, gevent, pydantic_opamp_otel
+        import asyncio, gevent, logfire_opamp_otel
         from opentelemetry.sdk.resources import Resource
-        agent = pydantic_opamp_otel.AGENT
+        agent = logfire_opamp_otel.AGENT
         agent.prepare({{"OTEL_OPAMP_ENDPOINT": "http://127.0.0.1:{server.port}/v1/opamp",
                         "OTEL_OPAMP_HEARTBEAT_INTERVAL": "100ms"}})
         agent.start(Resource.create({{"service.name": "load-generator"}}))
@@ -912,11 +912,11 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import pathlib, time, pydantic_opamp_otel
+        import pathlib, time, logfire_opamp_otel
         from opentelemetry import metrics, trace
         # The server given in code, as an application with its settings in its own config would.
-        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
-        agent = pydantic_opamp_otel.AGENT
+        logfire_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = logfire_opamp_otel.AGENT
         tracer = trace.get_tracer("t")
         tracer.start_span("before").end()
         trace.get_tracer_provider().force_flush()
@@ -933,7 +933,7 @@ def test_configure_sets_an_sdk_up_in_code_under_the_server(tmp_path):
         assert provider.sampler is agent.controls.sampler and agent.controls.sampler._rate == 0.5
         assert "deactivate_instrumentations" not in agent.host.next_start  # it instruments nothing
         (reader,) = metrics.get_meter_provider()._metric_readers
-        assert isinstance(reader._exporter, pydantic_opamp_otel.GatedMetricExporter)
+        assert isinstance(reader._exporter, logfire_opamp_otel.GatedMetricExporter)
         print("uid", agent.uid)
     """)
     try:
@@ -966,10 +966,10 @@ def test_configure_takes_the_server_in_code_end_to_end(tmp_path, given, variable
     server = _Server()
     given = {k: v.format(tmp=tmp_path) if isinstance(v, str) else v for k, v in given.items()}
     child = textwrap.dedent(f"""
-        import time, pydantic_opamp_otel
-        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, **{given!r})
+        import time, logfire_opamp_otel
+        logfire_opamp_otel.configure(endpoint={server.endpoint!r}, **{given!r})
         time.sleep(1.5)
-        print("state_dir", pydantic_opamp_otel.AGENT.setup.state_dir)
+        print("state_dir", logfire_opamp_otel.AGENT.setup.state_dir)
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
@@ -994,12 +994,12 @@ def test_configure_takes_the_server_in_code_end_to_end(tmp_path, given, variable
 
 def test_configure_without_an_endpoint_is_the_sdks_own_setup():
     child = textwrap.dedent("""
-        import os, pydantic_opamp_otel
+        import os, logfire_opamp_otel
         from opentelemetry import metrics, trace
         from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
         from opentelemetry.sdk.trace.sampling import ALWAYS_OFF
-        pydantic_opamp_otel.configure(sampler=ALWAYS_OFF, resource_attributes={"a": "b"})
+        logfire_opamp_otel.configure(sampler=ALWAYS_OFF, resource_attributes={"a": "b"})
         provider = trace.get_tracer_provider()
         assert provider.sampler is ALWAYS_OFF
         assert provider.resource.attributes["a"] == "b"
@@ -1007,7 +1007,7 @@ def test_configure_without_an_endpoint_is_the_sdks_own_setup():
         assert type(spans._batch_processor._exporter) is OTLPSpanExporter
         (reader,) = metrics.get_meter_provider()._metric_readers
         assert type(reader._exporter) is OTLPMetricExporter
-        assert os.environ["OTEL_METRICS_EXPORTER"] == "otlp" and pydantic_opamp_otel.AGENT.client is None
+        assert os.environ["OTEL_METRICS_EXPORTER"] == "otlp" and logfire_opamp_otel.AGENT.client is None
     """)
     run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,
                          env=_child_env(OTEL_EXPORTER_OTLP_ENDPOINT="http://127.0.0.1:9",
@@ -1026,7 +1026,7 @@ def test_in_code_the_instrumentation_switches_are_refused(tmp_path):
     assert s.status == FAILED
     assert s.error_message == "instrumentations: all_disabled: this SDK cannot apply the requested override"
     assert effective(agent) == {}
-    host = pydantic_opamp_otel.sdk_host(configured=False, auto_instrumented=False, governed=False)
+    host = logfire_opamp_otel.sdk_host(configured=False, auto_instrumented=False, governed=False)
     assert (list(host.live), list(host.next_start)) == (["custom"], [])
 
 
@@ -1046,13 +1046,13 @@ def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import pathlib, time, pydantic_opamp_otel
+        import pathlib, time, logfire_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1,
+        logfire_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1,
                              span_processors=[SimpleSpanProcessor(ConsoleSpanExporter())],
                              metric_exporter_names=["console"])
-        agent = pydantic_opamp_otel.AGENT
+        agent = logfire_opamp_otel.AGENT
         trace.get_tracer("t").start_span("before", attributes={{"x": "secret"}}).end()
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
@@ -1096,12 +1096,12 @@ def test_a_processor_added_once_the_sdk_is_built_gets_the_gates_and_the_policy_s
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import json, pathlib, time, pydantic_opamp_otel
+        import json, pathlib, time, logfire_opamp_otel
         from opentelemetry import _logs, trace
         from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, ConsoleLogExporter
         from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-        pydantic_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
-        agent = pydantic_opamp_otel.AGENT
+        logfire_opamp_otel.configure(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = logfire_opamp_otel.AGENT
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -1151,7 +1151,7 @@ def test_an_sdk_the_application_set_up_itself_is_put_under_the_server(tmp_path, 
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import pathlib, time, pydantic_opamp_otel
+        import pathlib, time, logfire_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -1159,8 +1159,8 @@ def test_an_sdk_the_application_set_up_itself_is_put_under_the_server(tmp_path, 
         provider = TracerProvider(resource=Resource.create({{"service.name": "mine"}}))
         provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
         trace.set_tracer_provider(provider)
-        pydantic_opamp_otel.{call}(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
-        agent = pydantic_opamp_otel.AGENT
+        logfire_opamp_otel.{call}(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        agent = logfire_opamp_otel.AGENT
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -1209,11 +1209,11 @@ def test_manage_refuses_a_policy_that_overrides_the_applications_sampler(tmp_pat
 
     server = _Server(reply=reply)
     child = textwrap.dedent(f"""
-        import time, pydantic_opamp_otel
+        import time, logfire_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.trace import TracerProvider
         trace.set_tracer_provider(TracerProvider())
-        pydantic_opamp_otel.manage(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
+        logfire_opamp_otel.manage(endpoint={server.endpoint!r}, heartbeat_interval=0.1)
         time.sleep(1.5)
     """)
     try:
@@ -1231,8 +1231,8 @@ def test_manage_without_an_sdk_says_how_to_call_it(tmp_path):
     server = _Server(reply=lambda msg: None)
     child = textwrap.dedent(f"""
         import time
-        import pydantic_opamp_otel
-        pydantic_opamp_otel.manage(endpoint={server.endpoint!r})
+        import logfire_opamp_otel
+        logfire_opamp_otel.manage(endpoint={server.endpoint!r})
         time.sleep(1)
     """)
     try:
@@ -1304,7 +1304,7 @@ def _expect(tmp_path, read, expected) -> None:
 @pytest.mark.parametrize("option", OPTIONS)
 def test_each_option_in_code_wins_over_its_variable_and_either_over_the_default(tmp_path, caplog, option, given):
     variable, in_code, as_variable, from_code, from_variable, default = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code} if given in ("code", "both") else {},
                                  {variable: as_variable} if given in ("variable", "both") else {})
     try:
@@ -1337,7 +1337,7 @@ def test_each_option_in_code_wins_over_its_variable_and_either_over_the_default(
 ])
 def test_the_forms_each_option_takes_in_code(tmp_path, caplog, option, in_code, expected):
     variable, _, as_variable, *_ = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code}, {variable: as_variable})
     _released(setup)
     assert read == expected
@@ -1348,7 +1348,7 @@ def test_the_forms_each_option_takes_in_code(tmp_path, caplog, option, in_code, 
 @pytest.mark.parametrize("option", ["endpoint", "state_dir", "heartbeat_interval"])
 def test_blank_in_code_is_not_given(tmp_path, caplog, option, blank):
     variable, _, as_variable, _, from_variable, default = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: blank}, {variable: as_variable})
         _released(setup)
         assert read == from_variable  # the variable's
@@ -1391,7 +1391,7 @@ def test_a_value_in_code_it_cannot_use_warns_and_is_the_default_never_raising(tm
                                                                                 expected, warning):
     # With the variable set too: the value in code displaced it, as a bad variable is the default.
     variable, _, as_variable, *_ = OPTIONS[option]
-    with caplog.at_level(logging.WARNING, logger="pydantic_opamp_otel"):
+    with caplog.at_level(logging.WARNING, logger="logfire_opamp_otel"):
         setup, read = _from_code(tmp_path, option, {option: in_code}, {variable: as_variable})
     try:
         _expect(tmp_path, read, expected)
@@ -1463,7 +1463,7 @@ def test_the_default_state_directory_gives_way(tmp_path):
 
 
 def test_connecting_failing_and_recovering_are_each_said_once(caplog):
-    caplog.set_level(logging.DEBUG, logger="pydantic_opamp_otel")
+    caplog.set_level(logging.DEBUG, logger="logfire_opamp_otel")
     uid = uuid.UUID(int=7)
     r = _reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid)
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
@@ -1494,7 +1494,7 @@ def test_the_first_connection_reaches_stderr_without_logging_of_the_applications
     root = logging.getLogger()
     monkeypatch.setattr(root, "handlers", [])
     monkeypatch.setattr(root, "level", logging.WARNING)
-    monkeypatch.setattr(logging.getLogger("pydantic_opamp_otel"), "level", logging.NOTSET)
+    monkeypatch.setattr(logging.getLogger("logfire_opamp_otel"), "level", logging.NOTSET)
     r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
     r.notified(Notification("connected"))
     r.notified(Notification("connect_failed", detail="connection refused"))
@@ -1516,7 +1516,7 @@ def test_the_first_connection_reaches_stderr_without_logging_of_the_applications
 def test_what_is_said_names_the_endpoint_in_use(caplog):
     """After the server moved the agent to another endpoint, what it says names the one the client
     uses now (logged without credentials), not the one configured."""
-    caplog.set_level(logging.INFO, logger="pydantic_opamp_otel")
+    caplog.set_level(logging.INFO, logger="logfire_opamp_otel")
     in_use: list[str | None] = [None]  # none yet: the configured one
     r = _reachability("https://a.example.com/v1/opamp")
     r.in_use = lambda: in_use[0]
@@ -1543,7 +1543,7 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     setup = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://other/v1/opamp", "OTEL_OPAMP_HEADERS": "a=b",
                             "OTEL_OPAMP_STATE_DIR": "none"}, **given)
     assert setup is not None
-    r = pydantic_opamp_otel.Reachability(setup.shown, "", None, setup.hints)
+    r = logfire_opamp_otel.Reachability(setup.shown, "", None, setup.hints)
     caplog.clear()
     for status in (401, 404, None):
         r.notified(Notification("connect_failed", status=status))
@@ -1561,18 +1561,18 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     ("wss://k:s@[::1]:4320/v1/opamp#x", "wss://[::1]:4320/v1/opamp"),
 ])
 def test_a_malformed_endpoint_is_logged_not_raised(endpoint, logged):
-    assert pydantic_opamp_otel.shown_endpoint(endpoint, "?") == logged
+    assert logfire_opamp_otel.shown_endpoint(endpoint, "?") == logged
 
 
 def test_an_endpoint_without_a_scheme_is_refused_and_one_the_client_cannot_speak_is_warned_about(caplog):
     # Without a scheme: no client starts, and the warning says why (taken as http://, the key would
     # go in the clear).
-    assert pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "u:p@opamp.example.com:4320/v1/opamp?k=v"}) is None
+    assert logfire_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "u:p@opamp.example.com:4320/v1/opamp?k=v"}) is None
     assert caplog.messages == ['OpAMP: off, as OTEL_OPAMP_ENDPOINT "opamp.example.com:4320/v1/opamp" has no scheme: no '
                                "OpAMP client is started; name it in full, as https://host/v1/opamp or wss://host/v1/opamp"]
     # A scheme the client doesn't speak: warned about at start, not only at each failed connect.
     caplog.clear()
-    assert pydantic_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None
+    assert logfire_opamp_otel.Setup.from_env({"OTEL_OPAMP_ENDPOINT": "ftp://u:p@opamp.example.com/v1/opamp?k=v"}) is not None
     assert caplog.messages == ['OpAMP: OTEL_OPAMP_ENDPOINT "ftp://opamp.example.com/v1/opamp" is not http(s):// or '
                                "ws(s)://, so the client can't reach it"]
 
@@ -1597,7 +1597,7 @@ def test_a_warning_reaches_stderr_once_whatever_the_root_logger_has(root):
     (OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED) used to swallow them: Python's last resort is
     skipped once any handler exists. Each shows on stderr exactly once, by the application's handler
     where it has one that takes warnings; an application that turned warnings off sees none."""
-    program = "import logging\n" + _ROOT_HANDLERS[root] + "\nimport pydantic_opamp_otel\npydantic_opamp_otel._log.warning('OpAMP: fix me')\n"
+    program = "import logging\n" + _ROOT_HANDLERS[root] + "\nimport logfire_opamp_otel\nlogfire_opamp_otel._log.warning('OpAMP: fix me')\n"
     err = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=60).stderr
     assert err.count("OpAMP: fix me") == (0 if root == "errors only" else 1), err
     assert ("app: OpAMP: fix me" in err) == (root in ("stderr", "otel+stderr")), err
@@ -1605,27 +1605,27 @@ def test_a_warning_reaches_stderr_once_whatever_the_root_logger_has(root):
 
 @pytest.mark.parametrize(("library", "reason"), [(None, "isn't installed"), (b"not a library", "can't be loaded")])
 def test_a_core_that_cant_be_loaded_is_said_once_and_the_sdk_runs_unmanaged(tmp_path, library, reason):
-    # An pydantic_opamp_core package without its library, or with a file that isn't one: the import and
+    # An logfire_opamp_core package without its library, or with a file that isn't one: the import and
     # configure() go through, the SDK works on its own settings, and one line says why.
-    core = tmp_path / "pydantic_opamp_core"
+    core = tmp_path / "logfire_opamp_core"
     core.mkdir()
     (core / "__init__.py").write_text("")
     if library is not None:
-        from pydantic_opamp_client import _native
+        from logfire_opamp_client import _native
         (core / _native._lib_name()).write_bytes(library)
     child = textwrap.dedent("""
-        import pydantic_opamp_otel
+        import logfire_opamp_otel
         from opentelemetry import trace
         from opentelemetry.sdk.trace.export import SimpleSpanProcessor
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-        pydantic_opamp_otel.configure(endpoint="http://127.0.0.1:9/v1/opamp")
-        pydantic_opamp_otel.AGENT.prepare()  # set up again: not said again
+        logfire_opamp_otel.configure(endpoint="http://127.0.0.1:9/v1/opamp")
+        logfire_opamp_otel.AGENT.prepare()  # set up again: not said again
         exporter = InMemorySpanExporter()
         trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))
         with trace.get_tracer("app").start_as_current_span("work"):
             pass
         assert [s.name for s in exporter.get_finished_spans()] == ["work"]
-        assert pydantic_opamp_otel.AGENT.setup is None and pydantic_opamp_otel.AGENT.client is None
+        assert logfire_opamp_otel.AGENT.setup is None and logfire_opamp_otel.AGENT.client is None
     """)
     env = {**os.environ, "PYTHONPATH": os.pathsep.join([str(tmp_path), *filter(None, [os.environ.get("PYTHONPATH")])]),
            "OTEL_TRACES_EXPORTER": "none", "OTEL_METRICS_EXPORTER": "none", "OTEL_LOGS_EXPORTER": "none"}
@@ -1651,9 +1651,9 @@ def test_the_off_switch_table_through_configure(case):
     child = textwrap.dedent(f"""
         import logging, sys
         logging.basicConfig(stream=sys.stdout, format="%(levelname)s %(message)s")
-        import pydantic_opamp_otel
-        pydantic_opamp_otel.configure(endpoint={endpoint!r})
-        print("client", pydantic_opamp_otel.AGENT.client is not None)
+        import logfire_opamp_otel
+        logfire_opamp_otel.configure(endpoint={endpoint!r})
+        print("client", logfire_opamp_otel.AGENT.client is not None)
     """)
     try:
         run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60,

@@ -7,7 +7,7 @@ import pytest
 from _servers import MODES
 from aiohttp import WSMsgType, web
 
-from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from logfire_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 
 def expected_sequence(got) -> list[int]:

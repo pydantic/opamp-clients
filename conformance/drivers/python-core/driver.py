@@ -13,7 +13,7 @@ import signal
 import sys
 import time
 
-from pydantic_opamp_client import TLS, Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from logfire_opamp_client import TLS, Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 
 PLATFORM = os.environ.get("OPAMP_PYTHON_MODE") == "platform"

@@ -14,7 +14,7 @@ import { trace } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { node } from "@opentelemetry/sdk-node";
 import { InMemorySpanExporter, type ReadableSpan, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { RemoteConfigStatuses } from "@pydantic/opamp-client";
+import { RemoteConfigStatuses } from "@pydantic/logfire-opamp-client";
 
 import { config, policy } from "./policy.js";
 import { Agent } from "../src/index.js";

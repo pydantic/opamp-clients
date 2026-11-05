@@ -16,10 +16,10 @@ import pytest
 import trustme
 from aiohttp import web
 
-from pydantic_opamp_client import TLS, Proxy
-from pydantic_opamp_client._executor import Executor, downloads_dir, location
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from pydantic_opamp_client._transport import Transport
+from logfire_opamp_client import TLS, Proxy
+from logfire_opamp_client._executor import Executor, downloads_dir, location
+from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_opamp_client._transport import Transport
 
 BODY = b"package" * 100
 

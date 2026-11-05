@@ -1,7 +1,7 @@
 # The SDK contract
 
 What an application can rely on from every OpAMP client in this repository (Go `go/opamp`, Python
-`python/`, Node.js `node/opamp`, Java `java/opamp`, .NET `dotnet/Pydantic.OpAmp.Client`): when its
+`python/`, Node.js `node/opamp`, Java `java/opamp`, .NET `dotnet/Logfire.OpAmp.Client`): when its
 callback runs, what a callback that fails does, which calls are allowed from where, and stop. The
 five run one core ([how-it-works.md](how-it-works.md)), so they keep one contract; where an SDK
 differs, this page says how.
@@ -129,14 +129,14 @@ The client core's own types are held to the same rule.
 - A callback model test in each SDK, in its own property framework, with a printed seed that replays
   a run: Go `go/opamp/callback_properties_test.go`, Python
   `python/tests/test_callback_properties.py`, Node.js `node/opamp/test/callback.properties.test.ts`,
-  Java `java/opamp/src/test/java/dev/pydantic/opamp/CallbackPropertiesTest.java`, .NET
-  `dotnet/Pydantic.OpAmp.Client.Tests/CallbackPropertyTests.cs`; 100 runs on a pull request,
+  Java `java/opamp/src/test/java/dev/pydantic/logfire/opamp/CallbackPropertiesTest.java`, .NET
+  `dotnet/Logfire.OpAmp.Client.Tests/CallbackPropertyTests.cs`; 100 runs on a pull request,
   5,000 nightly, in each mode of each SDK. Each runs random starts (with a saved remote config or none),
   calls from outside, from another thread and from the callback, a callback that fails on its k-th
   call, and stop from outside or from the callback, and checks the rules above after every step.
 - Secrets: a noninterference test in each SDK whose options types print what they hold (Python
   `python/tests/test_redaction.py`, Go `go/opamp/redact_test.go`, .NET
-  `dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs`) and the core's own noninterference
+  `dotnet/Logfire.OpAmp.Client.Tests/RedactionTests.cs`) and the core's own noninterference
   test: random secrets of one length, two runs, the same text. Each redaction dropped in turn
   must fail its test (each SDK's, by `scripts/redact_mutants.py`).
 - The schedule tests and the adversary of `spec/shell-contract.md` (put in place by

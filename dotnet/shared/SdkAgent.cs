@@ -5,11 +5,11 @@ using System.Text;
 using Google.Protobuf;
 using OpAmp.Proto.V1;
 using OpenTelemetry;
-using Pydantic.OpAmp.Client;
-using Pydantic.OpAmp.Client.Sdk;
-using Pydantic.OpAmp.Core;
+using Logfire.OpAmp.Client;
+using Logfire.OpAmp.Client.Sdk;
+using Logfire.OpAmp.Core;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// Where the server is: OTEL_OPAMP_*, or the hosting package's options, as the core's Setup decides
@@ -85,7 +85,7 @@ internal sealed record Server(
             start.Code.Endpoint = endpoint.OriginalString;
         }
 
-        start.Code.Headers.AddRange(headers.Select(h => new Pydantic.OpAmp.Core.Header { Name = h.Key, Value = h.Value }));
+        start.Code.Headers.AddRange(headers.Select(h => new Logfire.OpAmp.Core.Header { Name = h.Key, Value = h.Value }));
         if (stateDir is not null)
         {
             start.Code.StateDir = stateDir;

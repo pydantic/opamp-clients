@@ -12,10 +12,10 @@ import time
 
 from aiohttp import WSMsgType, web
 
-from pydantic_opamp_client import Client, Config, Status
-from pydantic_opamp_client._core import Core
-from pydantic_opamp_client._executor import Executor
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_opamp_client import Client, Config, Status
+from logfire_opamp_client._core import Core
+from logfire_opamp_client._executor import Executor
+from logfire_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 UID = bytes([0x42] * 16)
 
@@ -289,7 +289,7 @@ def test_stop_returns_when_the_core_says_and_steps_no_more(tmp_path, monkeypatch
     stepped no more."""
     tap = tmp_path / "tap"
     monkeypatch.setenv("OPAMP_CORE_TAP", str(tap))
-    monkeypatch.setattr("pydantic_opamp_client._core._taps", 0)
+    monkeypatch.setattr("logfire_opamp_client._core._taps", 0)
 
     async def run() -> None:
         server = await Silent().start()

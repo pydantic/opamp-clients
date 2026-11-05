@@ -6,7 +6,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using OpenTelemetry.Trace;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>What the OpAMP and SDK variables say, the same for the plugin and the hosting package.</summary>
 internal static partial class Variables

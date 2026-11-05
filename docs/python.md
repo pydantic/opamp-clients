@@ -1,6 +1,6 @@
 # Python
 
-`pydantic-opamp-client` is this repository's OpAMP client for Python (asyncio), in
+`logfire-opamp-client` is this repository's OpAMP client for Python (asyncio), in
 [`python/`](../python/). It runs the shared core natively, as a library loaded through `ctypes`
 ([how-it-works.md](how-it-works.md)), and speaks plain HTTP or WebSocket, with TLS and through
 HTTP or SOCKS5 proxies. It needs CPython 3.11 or later, free-threaded builds included. Its
@@ -9,10 +9,10 @@ HTTP or SOCKS5 proxies. It needs CPython 3.11 or later, free-threaded builds inc
 ## Install
 
 ```bash
-pip install pydantic-opamp-client
+pip install logfire-opamp-client
 ```
 
-It depends on `pydantic-opamp-core`, a wheel per platform (Linux glibc and musl, macOS and
+It depends on `logfire-opamp-core`, a wheel per platform (Linux glibc and musl, macOS and
 Windows, on x64 and arm64) that holds the core's library and nothing else; pip picks the one for
 the machine.
 
@@ -22,7 +22,7 @@ the machine.
 import asyncio
 import os
 
-from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
+from logfire_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2
 
 
 async def main() -> None:
@@ -64,7 +64,7 @@ first message reports it in full.
 
 ## Options
 
-`Config` and `Status` are dataclasses. Every option is in `python/src/pydantic_opamp_client/_client.py`.
+`Config` and `Status` are dataclasses. Every option is in `python/src/logfire_opamp_client/_client.py`.
 
 | What | Option | More |
 |---|---|---|
@@ -135,7 +135,7 @@ python-core-platform,python-core` ([conformance/README.md](../conformance/README
 
 ## OpenTelemetry
 
-To put an OpenTelemetry SDK under a server without writing code, use `pydantic-opamp-otel`:
+To put an OpenTelemetry SDK under a server without writing code, use `logfire-opamp-otel`:
 [python-otel.md](python-otel.md). To wire this client to an SDK by hand, see [sdks.md](sdks.md)
-and [examples/python](../examples/python/example.py). `pydantic_opamp_client.sdk` runs the shared SDK
+and [examples/python](../examples/python/example.py). `logfire_opamp_client.sdk` runs the shared SDK
 settings layer ([sdk-settings.md](sdk-settings.md)).

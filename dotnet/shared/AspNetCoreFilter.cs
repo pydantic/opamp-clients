@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using OpenTelemetry.Trace;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// Sampling rules for ASP.NET Core's requests. On .NET 8 the server activity reaches the sampler

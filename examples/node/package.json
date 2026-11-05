@@ -8,6 +8,6 @@
     "@opentelemetry/resources": "2.1.0",
     "@opentelemetry/sdk-trace-base": "2.1.0",
     "@opentelemetry/sdk-trace-node": "2.1.0",
-    "@pydantic/opamp-client": "file:../../node/opamp"
+    "@pydantic/logfire-opamp-client": "file:../../node/opamp"
   }
 }

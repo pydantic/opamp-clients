@@ -1,5 +1,5 @@
-dev.pydantic.opamp.javaagent.OpampComponentProviders$LiveSampler
-dev.pydantic.opamp.javaagent.OpampComponentProviders$Spans
-dev.pydantic.opamp.javaagent.OpampComponentProviders$Metrics
-dev.pydantic.opamp.javaagent.OpampComponentProviders$PullReader
-dev.pydantic.opamp.javaagent.OpampComponentProviders$Logs
+dev.pydantic.logfire.opamp.javaagent.OpampComponentProviders$LiveSampler
+dev.pydantic.logfire.opamp.javaagent.OpampComponentProviders$Spans
+dev.pydantic.logfire.opamp.javaagent.OpampComponentProviders$Metrics
+dev.pydantic.logfire.opamp.javaagent.OpampComponentProviders$PullReader
+dev.pydantic.logfire.opamp.javaagent.OpampComponentProviders$Logs

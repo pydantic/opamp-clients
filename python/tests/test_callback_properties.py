@@ -45,7 +45,7 @@ from aiohttp import WSMsgType, web
 from hypothesis import HealthCheck, Phase, settings, strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, rule, run_state_machine_as_test
 
-from pydantic_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
+from logfire_opamp_client import Client, Config, Notification, Status, anyvalue_pb2, opamp_pb2 as pb
 
 UID = bytes([0x42] * 16)
 CAPABILITY = "io.example.model"

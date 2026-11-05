@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""node --import @pydantic/opamp-otel/register, against the reference server.
+"""node --import @pydantic/logfire-opamp-otel/register, against the reference server.
 
     python3 examples/node-otel/try.py
 
@@ -34,7 +34,7 @@ Run 8, debug mode and export health:
      again, and says the traces exporter is failing.
 
 Then check_app_settings, for app.cjs and app.mjs: each reads the feature flag example.feature
-through appSettings (app.cjs from @pydantic/opamp-otel/app-settings, app.mjs from the package
+through appSettings (app.cjs from @pydantic/logfire-opamp-otel/app-settings, app.mjs from the package
 itself), which the server turns on and off (docs/app-settings.md). The package reaches them as
 an installed one would, by its name: examples/node-otel/node_modules holds a link to node/otel.
 """
@@ -68,7 +68,7 @@ def build() -> None:
         subprocess.run(["npm", "run", "build"], cwd=d, check=True, stdout=subprocess.DEVNULL)
     # in-code.mjs imports the package by name, and app.cjs and app.mjs require its appSettings by
     # name, as `npm install <this repository>/node/otel` in the application's directory would let them.
-    link = HERE / "node_modules" / "@pydantic" / "opamp-otel"
+    link = HERE / "node_modules" / "@pydantic" / "logfire-opamp-otel"
     link.parent.mkdir(parents=True, exist_ok=True)
     if not link.is_symlink():
         link.symlink_to(OTEL, target_is_directory=True)

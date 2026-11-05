@@ -49,7 +49,7 @@ OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:elastic-otel-javaagent.jar \
-     -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
+     -Dotel.javaagent.extensions=logfire-opamp-javaagent-extension.jar \
      -jar checkout.jar
 ```
 
@@ -82,13 +82,13 @@ against:
 
 ```xml
 <PackageReference Include="Elastic.OpenTelemetry.AutoInstrumentation" Version="1.6.1" />
-<PackageReference Include="Pydantic.OpAmp.AutoInstrumentation" Version="0.1.1" />
+<PackageReference Include="Logfire.OpAmp.AutoInstrumentation" Version="0.2.0" />
 ```
 
 List both plugins, EDOT's first, and start the application with `_instrument.sh`:
 
 ```bash
-OTEL_DOTNET_AUTO_PLUGINS="Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation" \
+OTEL_DOTNET_AUTO_PLUGINS="Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:Logfire.OpAmp.AutoInstrumentation.Plugin, Logfire.OpAmp.AutoInstrumentation" \
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
@@ -107,7 +107,7 @@ EDOT Python is a distro and a configurator, and so is this package. Only one of 
 choose this package's, and keep EDOT's instrumentations, sampler and resource detectors.
 
 ```bash
-pip install elastic-opentelemetry pydantic-opamp-otel
+pip install elastic-opentelemetry logfire-opamp-otel
 edot-bootstrap --action=install     # the instrumentations for what the application uses
 
 OTEL_PYTHON_DISTRO=opamp \
@@ -145,7 +145,7 @@ signal over OTLP/gRPC unless told otherwise.
 ## Node.js
 
 Not yet. `node --import @elastic/opentelemetry-node` starts EDOT's NodeSDK, and
-`node --import @pydantic/opamp-otel/register` starts this package's. A process can run only one:
+`node --import @pydantic/logfire-opamp-otel/register` starts this package's. A process can run only one:
 the second one's providers are refused as the global ones. To manage a Node.js application with a
 Logfire SDK policy, start it with this package's register. It runs the upstream
 auto-instrumentations, which EDOT Node.js also runs, without EDOT's additions.

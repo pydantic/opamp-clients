@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// Runs our .NET client (dotnet/Pydantic.OpAmp.Client: the shared core in Wasmtime) under the
+// Runs our .NET client (dotnet/Logfire.OpAmp.Client: the shared core in Wasmtime) under the
 // conformance driver contract (conformance/DRIVERS.md). It runs in core mode (the core
 // speaks HTTP, WebSocket, CONNECT and SOCKS5 itself, over .NET's sockets and SslStream), where
 // DRIVER_PROXY may also be socks5://user:password@host:port; OPAMP_DOTNET_MODE=platform runs it in
@@ -10,7 +10,7 @@
 using System.Globalization;
 using System.Text.Json;
 using OpAmp.Proto.V1;
-using Pydantic.OpAmp.Client;
+using Logfire.OpAmp.Client;
 
 var outLock = new object();
 

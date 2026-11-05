@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 using System.Reflection;
-using Pydantic.OpAmp.Client.Sdk;
+using Logfire.OpAmp.Client.Sdk;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.OpAmp.Otel;
 
 /// <summary>
 /// The inventory (docs/available-components.md): what the integration lists of itself and the SDK,

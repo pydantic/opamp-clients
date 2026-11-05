@@ -1,2 +1,2 @@
-dev.pydantic.opamp.javaagent.OpampDeclarativeCustomizerProvider
-dev.pydantic.opamp.javaagent.OpampDeclarativeCustomizerProvider$First
+dev.pydantic.logfire.opamp.javaagent.OpampDeclarativeCustomizerProvider
+dev.pydantic.logfire.opamp.javaagent.OpampDeclarativeCustomizerProvider$First

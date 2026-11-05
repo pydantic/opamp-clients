@@ -23,7 +23,7 @@ import {
   RemoteConfigStatuses,
   ServerToAgentSchema,
   toBinary,
-} from "@pydantic/opamp-client";
+} from "@pydantic/logfire-opamp-client";
 
 import { FILE, policy } from "./policy.js";
 

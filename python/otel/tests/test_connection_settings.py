@@ -12,10 +12,10 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
-from pydantic_opamp_client import opamp_pb2
+from logfire_opamp_client import opamp_pb2
 from opentelemetry.sdk.resources import Resource
 
-from pydantic_opamp_otel import Agent
+from logfire_opamp_otel import Agent
 
 TAKES_KEYS = (opamp_pb2.AgentCapabilities_AcceptsOpAMPConnectionSettings
               | opamp_pb2.AgentCapabilities_ReportsConnectionSettingsStatus)
