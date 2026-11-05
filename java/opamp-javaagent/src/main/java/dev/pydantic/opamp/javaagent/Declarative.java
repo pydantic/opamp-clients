@@ -69,7 +69,7 @@ final class Declarative {
    * it is.
    */
   static OpenTelemetryConfigurationModel setUp(Extension e, ConfigProperties config, OpenTelemetryConfigurationModel m) {
-    e.properties(config);
+    e.propertiesUnderFile(config);
     if (!e.on()) {
       return m;
     }

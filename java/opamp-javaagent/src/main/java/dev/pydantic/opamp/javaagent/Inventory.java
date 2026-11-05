@@ -198,8 +198,8 @@ final class Inventory {
    * say. Switched off or not: whether one runs is the agent's choice at start. A module's version
    * is its library's, as the agent's own instrumentations embed it
    * ({@code META-INF/io/opentelemetry/instrumentation/io.opentelemetry.<name>.properties}, the
-   * version its telemetry's scope carries); unknown for one that embeds none. Outside the agent:
-   * none.
+   * version its telemetry's scope carries), with that scope; both unknown for one that embeds
+   * none. Outside the agent: none.
    */
   static List<SettingsProto.Instrumentation> instrumentations(ClassLoader loader) {
     List<SettingsProto.Instrumentation> out = new ArrayList<>();
@@ -217,9 +217,10 @@ final class Inventory {
           LOG.log(Level.FINE, "OpAMP: an instrumentation module isn't readable", e);
           continue;
         }
-        String version = version(m);
+        Embedded embedded = embedded(m);
         for (String name : m.instrumentationNames()) {
-          out.add(SettingsProto.Instrumentation.newBuilder().setName(name).setVersion(version).build());
+          out.add(SettingsProto.Instrumentation.newBuilder().setName(name).setVersion(embedded.version())
+              .setScope(embedded.scope()).build());
         }
       }
     } catch (LinkageError | RuntimeException e) {
@@ -229,20 +230,27 @@ final class Inventory {
     return out;
   }
 
-  /** A module's version, from the first of its names that embeds one; empty when none does. */
-  private static String version(InstrumentationModule m) {
+  /** What a module embeds of its telemetry's scope: its version, and the scope's name. */
+  private record Embedded(String version, String scope) {}
+
+  /**
+   * A module's version, from the first of its names that embeds one, and the scope its telemetry
+   * carries: that name's, {@code io.opentelemetry.<name>}, which the file is named for. Both empty
+   * when none does.
+   */
+  private static Embedded embedded(InstrumentationModule m) {
     ClassLoader loader = m.getClass().getClassLoader();
     if (loader == null) {
-      return "";
+      return new Embedded("", "");
     }
     for (String name : m.instrumentationNames()) {
-      String v = property(loader.getResourceAsStream(
-          "META-INF/io/opentelemetry/instrumentation/io.opentelemetry." + name + ".properties"));
+      String scope = "io.opentelemetry." + name;
+      String v = property(loader.getResourceAsStream("META-INF/io/opentelemetry/instrumentation/" + scope + ".properties"));
       if (!v.isEmpty()) {
-        return v;
+        return new Embedded(v, scope);
       }
     }
-    return "";
+    return new Embedded("", "");
   }
 
   /** The {@code version} of a properties file; empty without one. */

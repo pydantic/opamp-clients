@@ -151,6 +151,12 @@ final class Extension {
   private SettingsProto.Host declared = HOST;
   /** Whether the SDK samples with a sampler other than the extension's. */
   private boolean samplerOutside;
+  /**
+   * What the SDK does without the server ({@link Local}), reported beside the policy in force:
+   * under autoconfigure, from its properties; null under a configuration file, whose model they
+   * don't describe.
+   */
+  private SettingsProto.Local local;
   /** The settings loaded at start: the next-start ones in force until the next restart. */
   private SettingsProto.Loaded loaded;
   private volatile ByteString current;
@@ -533,9 +539,22 @@ final class Extension {
 
   /** {@link #properties(ConfigProperties)}, with {@code env} for the user's state directory. */
   synchronized Map<String, String> properties(ConfigProperties config, Map<String, String> env) {
+    return properties(config, env, Local.of(config));
+  }
+
+  /**
+   * {@link #properties(ConfigProperties)} under a configuration file: the file's model builds the
+   * SDK, so the properties tell nothing of what it does without the server.
+   */
+  synchronized Map<String, String> propertiesUnderFile(ConfigProperties config) {
+    return properties(config, System.getenv(), null);
+  }
+
+  private Map<String, String> properties(ConfigProperties config, Map<String, String> env, SettingsProto.Local own) {
     hooked = true;
     declared = HOST;
     samplerOutside = false;
+    local = own;
     if (!coreLoads(coreUnavailable.get())) {
       setup = null;
       return Map.of();
@@ -626,6 +645,10 @@ final class Extension {
     }
     List<String> lost = declared.getLiveList().stream().filter(k -> !narrowed.getLiveList().contains(k)).toList();
     declared = narrowed;
+    if (samplerOutside && local != null) {
+      // The ratio was the sampler the properties name: another extension's samples instead.
+      local = local.toBuilder().clearSamplingRate().build();
+    }
     start(null, loaded.getCurrent().toByteArray());
     return lost;
   }
@@ -659,9 +682,13 @@ final class Extension {
     }
   }
 
-  /** What the extension declares to the layer: {@code custom} too where the application can read it. */
+  /**
+   * What the extension declares to the layer: {@code custom} too where the application can read it,
+   * and what the SDK does without the server, where it can be told.
+   */
   SettingsProto.Host host() {
-    return controls.app == null ? declared : withApp(declared);
+    SettingsProto.Host host = controls.app == null ? declared : withApp(declared);
+    return local == null ? host : host.toBuilder().setLocal(local).build();
   }
 
   /**

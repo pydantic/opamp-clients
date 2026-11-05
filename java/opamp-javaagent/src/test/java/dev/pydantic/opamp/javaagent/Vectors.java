@@ -4,6 +4,7 @@
 package dev.pydantic.opamp.javaagent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import opamp.proto.v1.Opamp;
 
 /**
@@ -61,6 +63,8 @@ final class Vectors {
 
   /** The remote config's only file. */
   static final String POLICY_FILE = "logfire-sdk-policy.json";
+  /** The SDK's own values, reported beside the policy in force. */
+  static final String LOCAL_FILE = "logfire-sdk-local.json";
 
   /** A remote config of one policy, as the server sends it. */
   static Opamp.AgentRemoteConfig config(String document) {
@@ -162,7 +166,9 @@ final class Vectors {
   /** The policy an effective config reports: the test fails if it holds another file. */
   static String effective(Opamp.EffectiveConfig e) {
     var files = e.getConfigMap().getConfigMapMap();
-    assertEquals(List.of(POLICY_FILE), List.copyOf(files.keySet()));
+    // Beside the policy, at most the SDK's own values (contracts' logfire-sdk-local/v1).
+    assertTrue(files.containsKey(POLICY_FILE) && Set.of(POLICY_FILE, LOCAL_FILE).containsAll(files.keySet()),
+        files.keySet().toString());
     assertEquals("application/json", files.get(POLICY_FILE).getContentType());
     return files.get(POLICY_FILE).getBody().toStringUtf8();
   }

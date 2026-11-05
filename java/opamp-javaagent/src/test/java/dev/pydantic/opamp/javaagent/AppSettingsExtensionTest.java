@@ -349,7 +349,9 @@ class AppSettingsExtensionTest {
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
     e.properties(DefaultConfigProperties.createFromMap(props(dir)));
     assertEquals(1, asked[0]);
-    assertEquals(Extension.HOST_WITH_APP, e.host());
+    // With what the SDK does of its own beside it, from the properties.
+    assertTrue(e.host().hasLocal());
+    assertEquals(Extension.HOST_WITH_APP, e.host().toBuilder().clearLocal().build());
   }
 
   @Test

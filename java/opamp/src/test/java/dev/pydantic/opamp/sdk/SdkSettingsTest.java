@@ -361,6 +361,72 @@ class SdkSettingsTest {
     return tests.stream();
   }
 
+  /**
+   * testdata/local.json: the host's local values, through Load, reported beside the policy in force
+   * as logfire-sdk-local.json, never in it.
+   */
+  @TestFactory
+  Stream<DynamicTest> theLocalVectors() throws IOException {
+    List<DynamicTest> tests = new ArrayList<>();
+    for (JsonNode c : JSON.readTree(testdata().resolve("local.json").toFile()).get("cases")) {
+      tests.add(DynamicTest.dynamicTest(c.get("name").asText(), () -> {
+        SettingsProto.Host without = host(c.path("host"));
+        SettingsProto.Host host = c.has("local") ? without.toBuilder().setLocal(local(c.get("local"))).build() : without;
+        long now = c.path("now_unix_ms").asLong(0);
+        Map<String, Opamp.AgentConfigObject> files = layer.loadFrom(null, null, host, now).getEffective().getConfigMap()
+            .getConfigMapMap();
+        JsonNode want = c.get("want");
+        List<String> names = want.isNull() ? List.of("logfire-sdk-policy.json")
+            : List.of("logfire-sdk-local.json", "logfire-sdk-policy.json");
+        assertEquals(names, files.keySet().stream().sorted().toList());
+        if (!want.isNull()) {
+          assertEquals(want.asText(), files.get("logfire-sdk-local.json").getBody().toStringUtf8());
+          assertEquals("application/json", files.get("logfire-sdk-local.json").getContentType());
+        }
+        // Beside the policy, never in it.
+        assertEquals(layer.loadFrom(null, null, without, now).getEffective().getConfigMap().getConfigMapMap()
+            .get("logfire-sdk-policy.json"), files.get("logfire-sdk-policy.json"));
+      }));
+    }
+    return tests.stream();
+  }
+
+  /** A case's local values, by their proto field names; each left out is unset. */
+  static SettingsProto.Local local(JsonNode l) {
+    SettingsProto.Local.Builder b = SettingsProto.Local.newBuilder();
+    if (l.has("sampling_rate")) {
+      b.setSamplingRate(l.get("sampling_rate").asText());
+    }
+    if (l.has("send_traces")) {
+      b.setSendTraces(l.get("send_traces").asBoolean());
+    }
+    if (l.has("send_metrics")) {
+      b.setSendMetrics(l.get("send_metrics").asBoolean());
+    }
+    if (l.has("send_logs")) {
+      b.setSendLogs(l.get("send_logs").asBoolean());
+    }
+    if (l.has("send_logs_level")) {
+      b.setSendLogsLevel(l.get("send_logs_level").asText());
+    }
+    if (l.has("send_self_metrics")) {
+      b.setSendSelfMetrics(l.get("send_self_metrics").asBoolean());
+    }
+    if (l.has("scrubbing")) {
+      SettingsProto.LocalScrubbing.Builder s = SettingsProto.LocalScrubbing.newBuilder()
+          .setDefaults(l.get("scrubbing").path("defaults").asBoolean());
+      l.get("scrubbing").path("patterns").forEach(p -> s.addPatterns(p.asText()));
+      b.setScrubbing(s);
+    }
+    if (l.has("instrumentations")) {
+      SettingsProto.LocalInstrumentations.Builder i = SettingsProto.LocalInstrumentations.newBuilder()
+          .setAllDisabled(l.get("instrumentations").path("all_disabled").asBoolean());
+      l.get("instrumentations").path("disabled").forEach(n -> i.addDisabled(n.asText()));
+      b.setInstrumentations(i);
+    }
+    return b.build();
+  }
+
   static Path testdata() {
     for (Path d = Path.of("").toAbsolutePath(); d != null; d = d.getParent()) {
       Path t = d.resolve("testdata/sdk-settings");
@@ -377,7 +443,7 @@ class SdkSettingsTest {
         .setIntegration(i.path("integration").asText()).setIntegrationVersion(i.path("integration_version").asText())
         .setSdkLanguage(i.path("sdk_language").asText()).setSdkVersion(i.path("sdk_version").asText());
     i.path("instrumentations").forEach(x -> b.addInstrumentations(SettingsProto.Instrumentation.newBuilder()
-        .setName(x.path("name").asText()).setVersion(x.path("version").asText())));
+        .setName(x.path("name").asText()).setVersion(x.path("version").asText()).setScope(x.path("scope").asText())));
     i.path("exporters").forEach(x -> b.addExporters(SettingsProto.Exporter.newBuilder()
         .setSignal(x.path("signal").asText()).setName(x.path("name").asText()).setGated(x.path("gated").asBoolean())
         .setDestination(x.path("destination").asText())));
@@ -401,8 +467,9 @@ class SdkSettingsTest {
 
   /**
    * The components as the vectors give them: sdk (key to text), instrumentations (name to version,
-   * null when none), exporters (signal to identity to gated), destinations (signal to identity to
-   * destination, for those with one) and settings (key to applies).
+   * null when none), scopes (name to scope, null when none), exporters (signal to identity to
+   * gated), destinations (signal to identity to destination, for those with one) and settings (key
+   * to applies).
    */
   static JsonNode components(Opamp.AvailableComponents c) {
     ObjectNode out = JSON.createObjectNode();
@@ -411,6 +478,10 @@ class SdkSettingsTest {
     ObjectNode instrumentations = out.putObject("instrumentations");
     c.getComponentsMap().get("instrumentations").getSubComponentMapMap().forEach((name, d) ->
         instrumentations.put(name, d.getMetadataList().stream().filter(kv -> kv.getKey().equals("version"))
+            .map(SdkSettingsTest::text).findFirst().orElse(null)));
+    ObjectNode scopes = out.putObject("scopes");
+    c.getComponentsMap().get("instrumentations").getSubComponentMapMap().forEach((name, d) ->
+        scopes.put(name, d.getMetadataList().stream().filter(kv -> kv.getKey().equals("scope"))
             .map(SdkSettingsTest::text).findFirst().orElse(null)));
     ObjectNode exporters = out.putObject("exporters");
     ObjectNode destinations = out.putObject("destinations");
