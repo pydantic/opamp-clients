@@ -1077,8 +1077,10 @@ class Governed:
             decided = layer.exporters(self.found, dict(env), "grpc")
         except Exception:  # noqa: BLE001 - the gates are in place; only the report is missing
             _log.warning("OpAMP: can't list the exporters; they are governed all the same", exc_info=True)
-            self.exporters = [listed_as.get(k) or settings_pb2.Exporter(
-                signal=f.signal, name=f.kind, gated=f.gated, destination=f.endpoint) for k, f in zip(keys, self.found)]
+            # Listed as found: its kind, and no destination (only the core strips an endpoint's
+            # credentials and path).
+            self.exporters = [listed_as.get(k) or settings_pb2.Exporter(signal=f.signal, name=f.kind, gated=f.gated)
+                              for k, f in zip(keys, self.found)]
             return self
         self.exporters, self.warnings = list(decided.exporters), list(decided.warnings)
         if len(self.exporters) == len(keys):

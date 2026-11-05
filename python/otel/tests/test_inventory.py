@@ -448,6 +448,9 @@ def test_a_failing_exporters_call_keeps_the_names_last_decided():
     first.found = [otlp]
     assert [e.name for e in first.decide(LAYER, {}, listed_as).exporters] == ["otlp"]
     later = pydantic_opamp_otel.Governed()
-    later.found = [otlp, settings_pb2.FoundExporter(signal="traces", kind="Mine", gated=False)]
+    # Regression: one listed as found carried its raw endpoint, credentials and all, into the
+    # inventory. Only the core makes a destination of an endpoint: none is listed without it.
+    secret = "https://user:hunter2@col:4318/v1/traces?token=t"
+    later.found = [otlp, settings_pb2.FoundExporter(signal="traces", kind="Mine", gated=False, endpoint=secret)]
     got = later.decide(_FailingLayer(), {}, listed_as).exporters
     assert [(e.name, e.gated, e.destination) for e in got] == [("otlp", True, "col:4317"), ("Mine", False, "")]

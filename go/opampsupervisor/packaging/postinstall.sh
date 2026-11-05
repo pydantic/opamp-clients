@@ -1,6 +1,7 @@
 #!/bin/sh
 # Makes the service's user, and tells systemd about the unit. The service starts once
-# pydantic-opamp-enroll has run.
+# pydantic-opamp-enroll has run; after a deb upgrade (configure, with the version it replaced) it
+# starts again on the new files. The rpm does that in posttrans.sh, after the old package's scripts.
 set -e
 if ! getent group pydantic-opamp >/dev/null; then
 	groupadd --system pydantic-opamp
@@ -23,4 +24,7 @@ if [ ! -e /etc/pydantic-opamp/log-groups ]; then
 fi
 if [ -d /run/systemd/system ]; then
 	systemctl daemon-reload
+fi
+if [ "${1:-}" = configure ] && [ -n "${2:-}" ]; then
+	/usr/lib/pydantic-opamp/pydantic-opamp-after-upgrade || true
 fi

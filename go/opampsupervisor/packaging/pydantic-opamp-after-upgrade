@@ -1,0 +1,38 @@
+#!/bin/sh
+# Copyright (c) 2026 Pydantic Services Inc.
+# SPDX-License-Identifier: MIT
+#
+# pydantic-opamp-after-upgrade: runs once a package upgrade is in place (the deb's postinst, the
+# rpm's posttrans, after the old package's scripts). It starts the collector this host ran again,
+# on the new files:
+#
+# - enrolled: pydantic-opamp-enroll --refresh writes the Supervisor's config again with this
+#   version's settings (a config edited by hand is kept) and restarts it, unless it was enrolled
+#   with --no-start;
+# - unmanaged (pydantic-otelcol-configure ran after the last enrollment): pydantic-otelcol.service
+#   is enabled and restarted, unless it was configured with --no-start.
+#
+# Packages up to 0.9.0 stopped and disabled both services on an upgrade, so whether one was
+# enabled says nothing here: which config is newest says which one this host runs.
+#
+# OPAMP_ENROLL_ROOT, SYSTEMCTL and OPAMP_ENROLL are for its tests.
+set -eu
+
+root=${OPAMP_ENROLL_ROOT:-}
+systemctl=${SYSTEMCTL:-systemctl}
+enroll=${OPAMP_ENROLL:-/usr/sbin/pydantic-opamp-enroll}
+etc=$root/etc/pydantic-opamp
+
+if [ -z "$root" ] && [ ! -d /run/systemd/system ]; then
+	exit 0
+fi
+if [ -f "$etc/otelcol.yaml" ] && { [ ! -f "$etc/supervisor.yaml" ] || [ "$etc/otelcol.yaml" -nt "$etc/supervisor.yaml" ]; }; then
+	if [ -f "$etc/otelcol.no-start" ]; then
+		exit 0
+	fi
+	"$systemctl" enable pydantic-otelcol.service
+	"$systemctl" restart pydantic-otelcol.service || echo "pydantic-opamp-after-upgrade: pydantic-otelcol.service didn't start; check it with: journalctl -u pydantic-otelcol.service" >&2
+elif [ -f "$etc/supervisor.yaml" ]; then
+	"$enroll" --refresh || echo "pydantic-opamp-after-upgrade: the Supervisor didn't come back connected; check it with: sudo /usr/lib/pydantic-opamp/opampsupervisor status --storage /var/lib/pydantic-opamp" >&2
+fi
+exit 0

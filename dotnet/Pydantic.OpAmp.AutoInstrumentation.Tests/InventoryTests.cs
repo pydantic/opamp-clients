@@ -109,6 +109,9 @@ public class InventoryTests
         agent.Sdk.DecideExporters = (_, _, _) => throw new InvalidOperationException("the core trapped");
         var traces = agent.Inventory().Exporters.Where(e => e.Signal == "traces").Select(e => e.Name);
         Assert.Equal(["otlp"], traces);
+        // Regression: one listed as found carried its raw endpoint, credentials and all.
+        var mine = agent.Sdk.Exporters([new(Signal.Logs, "Mine", false, "https://user:hunter2@col:4318/v1/logs?token=t")], "grpc");
+        Assert.Equal(("Mine", ""), (mine.Single().Name, mine.Single().Destination));
     }
 
     // What isn't a signal's own exporter isn't listed: prometheus is metrics' alone.

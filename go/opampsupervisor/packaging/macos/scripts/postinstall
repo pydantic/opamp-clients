@@ -2,12 +2,18 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
 #
-# Starts the Supervisor again after an upgrade, if the host is enrolled. A first install leaves
-# it stopped until pydantic-opamp-enroll has run.
+# Starts the Supervisor again after an upgrade, if the host is enrolled: pydantic-opamp-enroll
+# --refresh writes its config again with this version's settings (a config edited by hand is kept)
+# and loads it, unless it was enrolled with --no-start. A first install leaves it stopped until
+# pydantic-opamp-enroll has run.
 set -e
 mkdir -p /opt/pydantic-opamp/var/log
 chmod 0700 /opt/pydantic-opamp/var
 if [ -f /opt/pydantic-opamp/etc/supervisor.yaml ]; then
-	launchctl bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist
+	if ! /opt/pydantic-opamp/bin/pydantic-opamp-enroll --refresh; then
+		# Loaded with the config as it is, if --refresh stopped before loading it.
+		launchctl bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist 2>/dev/null || true
+		echo "the Supervisor didn't come back connected; check it with: sudo /opt/pydantic-opamp/bin/opampsupervisor status --storage /opt/pydantic-opamp/var" >&2
+	fi
 fi
 exit 0

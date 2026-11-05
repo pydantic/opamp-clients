@@ -153,17 +153,17 @@ jobs:
             [ -n "$(ls upload/$d)" ] || { echo "::error::no $d wheel"; exit 1; }
           done
       # skip-existing: a rerun after a partial upload skips the files PyPI already has.
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/core
           skip-existing: true
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/client
           skip-existing: true
-      - uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         if: env.PUBLISH == 'true'
         with:
           packages-dir: upload/otel
@@ -200,11 +200,11 @@ jobs:
           for tgz in sdk/sdk/npm/*-opamp-client-*.tgz sdk/sdk/npm/*-opamp-otel-*.tgz; do
             [ -f "$tgz" ] || { echo "::error::no $tgz"; exit 1; }
             spec=$(tar -xzOf "$tgz" package/package.json | python3 -c 'import json, sys; p = json.load(sys.stdin); print(p["name"] + "@" + p["version"])')
-            if [ "$PUBLISH" != true ]; then
-              npm publish --dry-run --access public "$tgz"
-            # A rerun: what npm already has is skipped (npm refuses a version twice).
-            elif [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
+            # A rerun: what npm already has is skipped (npm refuses a version twice, a dry run too).
+            if [ -n "$(npm view "$spec" version 2>/dev/null)" ]; then
               echo "::notice::$spec is on npm already, skipped"
+            elif [ "$PUBLISH" != true ]; then
+              npm publish --dry-run --access public "$tgz"
             else
               npm publish --provenance --access public "$tgz"
             fi

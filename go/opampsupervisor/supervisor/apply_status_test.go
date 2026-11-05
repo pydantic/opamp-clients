@@ -405,8 +405,9 @@ func TestOwnTelemetryValuesReachTheCollectorAsWritten(t *testing.T) {
 	exporter := conf.Get("service::telemetry::metrics::readers").([]any)[0].(map[string]any)["periodic"].(map[string]any)["exporter"].(map[string]any)["otlp"].(map[string]any)
 	unescape := func(s string) string { return strings.ReplaceAll(s, "$$", "$") }
 	require.Equal(t, endpoint, unescape(exporter["endpoint"].(string)))
-	headers := exporter["headers"].(map[string]any)
-	require.Equal(t, value, unescape(headers[`Author"ization`].(string)))
+	header := exporter["headers"].([]any)[0].(map[string]any)
+	require.Equal(t, `Author"ization`, unescape(header["name"].(string)))
+	require.Equal(t, value, unescape(header["value"].(string)))
 }
 
 // With the remote config policy on, the own telemetry destination must be one it allows. It went

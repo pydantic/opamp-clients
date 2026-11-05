@@ -77,6 +77,10 @@ and date. Tests, CI and docs alone don't need a line.
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
   (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
   warnings read the same in every SDK. On core 0.15.0 (#109).
+- Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
+  archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
+  v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
+  config the server sends can use any contrib component. The packages are about 100 MB larger.
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
@@ -85,10 +89,24 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
-- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
-  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
-  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
-  from starting, and enrolling only said it hadn't reported its status (#111).
+- Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
+  running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
+  `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
+  `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows). It writes the config again with this
+  version's settings, such as the Collector's own logs, and the last enrollment's options, keeping
+  the issued credentials, and starts the Supervisor again. A config edited by hand is kept, and so
+  is a `--restricted` one written by 0.9.0 or earlier.
+- Supervisor: the Collector's own telemetry settings (from a server's `own_metrics`, `own_logs` and
+  `own_traces` offers) are in the current declarative config format, so the Collector no longer
+  warns on every start that they use the deprecated v0.2.0 format.
+- Supervisor installers: the bundled Collector reports its version (its contrib release, 0.164.0)
+  as `service.version` on its own telemetry; it was empty.
+- .NET: the application's health set while the OpAMP client was starting (a health check that
+  runs at once) is reported. It was lost, and not reported again until the health changed (#112).
+- .NET, platform mode: a WebSocket connection cancelled just as the server accepted it is closed.
+  It could stay open (no reader, no close) until the garbage collector finalized it (#112).
+- .NET, core mode: no download file is made or written after stop returns. A file's write that
+  started late on a busy machine (after stop had stopped waiting for it) could still make it (#112).
 - Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.14.0, which the clients now pin.
   A WebSocket connection given up after the server said nothing for two heartbeat intervals now
   says goodbye first (`agent_disconnect`), as every other close the client makes does; before, the
@@ -155,6 +173,48 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## Supervisor 0.9.0 (2026-11-04)
+
+`go/opampsupervisor/v0.9.0`, on core 0.14.0. The Go modules are not released with it.
+
+### Changed
+
+- Supervisor installers (Linux, macOS, Windows, container image): the Supervisor declares
+  ReportsOwnMetrics and ReportsOwnLogs, so a server's `own_metrics` and `own_logs` offers send the
+  Collector's own metrics and logs where it says. A host enrolled before keeps its config until
+  the enroll script runs again (#116).
+- Supervisor: forked from contrib v0.164.1, was v0.163.0; takes upstream's
+  `agent::stop_grace_period` (#105).
+
+### Fixed
+
+- Supervisor Linux installers: `pydantic-opamp-enroll --ca-file` copies the bundle to
+  `/etc/pydantic-opamp/ca.pem` and points the config there. Before, a bundle under `/tmp` (which
+  the service can't see: it has a private `/tmp`) or in a home directory kept the Supervisor
+  from starting, and enrolling only said it hadn't reported its status (#111).
+- Supervisor: on core 0.14.0 (was 0.12.0). Over WebSocket, a connection the server has said
+  nothing on for two heartbeat intervals is given up (saying goodbye first) and made again, so a
+  host behind a proxy that lost its upstream no longer stays on a dead link for hours (#104, #106).
+
+The core and contrib entries in **Unreleased** stay there because they also apply to packages
+that have not had a release with them.
+
+## SDKs 0.1.1 (2026-11-04)
+
+The first release of the SDKs on their registries, from the tag `sdk/v0.1.1`, on core 0.14.0.
+
+- Python on PyPI: `pydantic-opamp-core`, `pydantic-opamp-client` and `pydantic-opamp-otel`.
+- Node.js on npm: `@pydantic/opamp-client` and `@pydantic/opamp-otel`, with provenance. The npm
+  packages also have a 0.1.0. It has the same contents, was published by hand, and has no
+  provenance. Use 0.1.1.
+- Java (Maven Central, `dev.pydantic`) and .NET (NuGet, `Pydantic.OpAmp.*`) are not on their
+  registries yet. A later `sdk/v*` release publishes them.
+
+This is the first release of these packages, so it lists no changes. Some entries in the
+**Unreleased** section above also apply to Python or Node.js. Version 0.1.1 already includes those
+changes. The entries stay in **Unreleased** because they also apply to Go, Java, .NET or the
+Supervisor, which have not had a release with them.
 
 ## Supervisor 0.8.0 (2026-10-29)
 

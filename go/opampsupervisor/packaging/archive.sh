@@ -1,6 +1,7 @@
 #!/bin/sh
-# Builds one release archive into packaging/dist: the Supervisor and the bundled collector (ocb,
-# collector.yaml), with the licenses and a README, for one OS and architecture. Run from anywhere:
+# Builds one release archive into packaging/dist: the Supervisor and the bundled collector
+# (upstream's otelcol-contrib, pinned in contrib.json), with the licenses and a README, for one OS
+# and architecture. Run from anywhere:
 #   VERSION=0.1.0 GOOS=linux GOARCH=amd64 go/opampsupervisor/packaging/archive.sh
 # GOOS is linux, darwin or windows; GOARCH is amd64 or arm64. Both binaries are cross-built, without
 # cgo. Linux and macOS get a .tar.gz, Windows a .zip.
@@ -18,9 +19,17 @@ work="dist/$name"
 rm -rf "$work" dist/otelcol
 mkdir -p "$work"
 
-# ocb itself runs here, so it is built for this machine; it then builds the collector for GOOS/GOARCH.
-GOOS= GOARCH= GOBIN="$PWD/dist/bin" go install go.opentelemetry.io/collector/cmd/builder@v0.164.0
-(cd .. && packaging/dist/bin/builder --config packaging/collector.yaml)
+# The fetcher runs here, so it is built for this machine; it fetches the collector for GOOS/GOARCH.
+# The release workflow runs this script on its tag's files: a tag from before contrib.json (up to
+# 0.9.0) still builds its own collector with ocb, from its collector.yaml.
+collector="upstream's OpenTelemetry Collector Contrib (otelcol-contrib), unchanged"
+if [ -f contrib.json ]; then
+	(cd .. && GOOS= GOARCH= go run ./internal/fetchcontrib -os "$GOOS" -arch "$GOARCH" -out "packaging/dist/otelcol/otelcol$exe")
+else
+	GOOS= GOARCH= GOBIN="$PWD/dist/bin" go install go.opentelemetry.io/collector/cmd/builder@v0.164.0
+	(cd .. && packaging/dist/bin/builder --config packaging/collector.yaml)
+	collector="an OpenTelemetry Collector built with this repository's opamp extension"
+fi
 cp "dist/otelcol/otelcol$exe" "$work/otelcol$exe"
 (cd .. && go build -trimpath -ldflags "-s -w" -o "packaging/$work/opampsupervisor$exe" .)
 cp ../../../LICENSE "$work/LICENSE"
@@ -32,7 +41,7 @@ cat >"$work/README.txt" <<EOF
 pydantic OpAMP Supervisor $VERSION ($GOOS/$GOARCH)
 
 opampsupervisor$exe  the Supervisor: upstream's OpAMP Supervisor on the shared client core
-otelcol$exe          an OpenTelemetry Collector built with this repository's opamp extension
+otelcol$exe          $collector
 
 Run the Supervisor with a config that names this collector as agent.executable:
   ./opampsupervisor$exe --config supervisor.yaml

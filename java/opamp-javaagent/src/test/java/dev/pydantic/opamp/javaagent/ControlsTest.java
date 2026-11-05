@@ -292,6 +292,27 @@ class ControlsTest {
   }
 
   @Test
+  void repeatsOfARecordInOneBatchAreDecidedOnceEachForEveryExporter() {
+    // Regression: two records alike in every field (one logged twice in the same tick) shared one
+    // decision, the last repeat's, so the second exporter sent fewer than the first.
+    Controls c = new Controls();
+    c.nanoTime = () -> 0L;
+    var first = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var second = io.opentelemetry.sdk.testing.exporter.InMemoryLogRecordExporter.create();
+    var toFirst = c.logs(first);
+    var toSecond = c.logs(second);
+    c.apply(settings(every("log_rate_limit", override("\"records_per_second\":1"))));
+    var r = io.opentelemetry.sdk.testing.logs.TestLogRecordData.builder()
+        .setInstrumentationScopeInfo(io.opentelemetry.sdk.common.InstrumentationScopeInfo.create("app"))
+        .setObservedTimestamp(1, java.util.concurrent.TimeUnit.SECONDS).setBody("again").build();
+    toFirst.export(java.util.List.of(r, r));
+    toSecond.export(java.util.List.of(r, r));
+    assertEquals(1, first.getFinishedLogRecordItems().size());
+    assertEquals(1, second.getFinishedLogRecordItems().size());
+    assertEquals(0, c.logDecisions.size()); // both gates had both repeats: nothing kept
+  }
+
+  @Test
   void redactionChangesWhatIsExportedNotTheApplicationsSpansOrRecords() {
     Controls c = new Controls();
     var gated = InMemorySpanExporter.create();

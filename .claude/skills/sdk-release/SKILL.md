@@ -175,7 +175,7 @@ python3 -m unittest scripts/test_sdk_release.py scripts/test_collector_release.p
 - Registries keep every version for good, and a name on a registry can't be taken back: every
   scope or prefix (`pydantic-opamp-*`, `@pydantic/opamp-*`, `dev.pydantic`, `Pydantic.OpAmp.*`) must
   be ours first.
-- The bundled collector reports an empty `version` (`collector.yaml`'s dist has none) and lists the
-  extension as `v0.0.0` (its local replace).
+- The bundled collector is upstream's `otelcol-contrib` (packaging/contrib.json); a new contrib
+  release means new pinned hashes there, checked against its Sigstore bundles.
 - Workflow runs, environments and variables: read-only REST at best; dispatching a workflow is a
   release step that needs the maintainer's in-thread words.

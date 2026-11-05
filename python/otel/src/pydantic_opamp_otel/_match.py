@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+import weakref
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 
@@ -93,7 +94,7 @@ class Bucket:
     second on a monotonic clock, up to max(per_second, 1); a take of n gets the whole tokens there
     are, up to n. In floats, in the layer's order. Thread-safe."""
 
-    #: How many items' decisions `admitted` remembers, so a second exporter gets the first's answer.
+    #: How many decisions of items that can't be weakly referenced `admitted` holds on to.
     REMEMBERED = 65536
 
     def __init__(self, per_second: float, clock: Callable[[], int] = time.monotonic_ns) -> None:
@@ -102,35 +103,82 @@ class Bucket:
         self._tokens = self._capacity
         self._last: int | None = None
         self._clock = clock
-        self._lock = threading.Lock()
-        #: id(item) -> (item, admitted, ids of the gates that had it): the item is kept so its id
-        #: can't be another's meanwhile.
-        self._decided: OrderedDict[int, tuple[object, bool, set[int]]] = OrderedDict()
+        # Re-entrant: an item can be collected, and its decision forgotten, while the lock is held.
+        self._lock = threading.RLock()
+        #: id(item) -> (a weak reference to it, each repeat's decision in the batch it was decided
+        #: in, ids of the gates that had it): kept while the item lives, so a slower exporter's queue
+        #: never outlasts its decision, and dropped with it, so its id can't be another's meanwhile.
+        self._decided: dict[int, tuple[weakref.ref, list[bool], set[int]]] = {}
+        #: Items that can't be weakly referenced (none of the SDK's), held instead, the oldest
+        #: forgotten past REMEMBERED.
+        self._held: OrderedDict[int, tuple[object, list[bool], set[int]]] = OrderedDict()
 
     def admitted(self, items: list, gate: object) -> list:
         """The items within the cap, in order, for the exporter behind `gate`: one decision per
         item, shared by every exporter the item reaches (one budget for the process). An item
-        another gate decided keeps that answer; the rest take tokens together, the first that fit
-        admitted. The same gate seeing an item again is a new export of it, decided afresh."""
+        another gate decided keeps that answer, each repeat of it in a batch its own; the rest take
+        tokens together, the first that fit admitted. The same gate seeing an item again is a new
+        export of it, decided afresh."""
         with self._lock:
-            answers: list[bool | None] = [None] * len(items)
-            fresh, now = [], set()
+            at: dict[int, list[int]] = {}
             for k, item in enumerate(items):
-                seen = self._decided.get(id(item))
-                if seen is not None and seen[0] is item and id(gate) not in seen[2] and id(item) not in now:
-                    answers[k] = seen[1]
+                at.setdefault(id(item), []).append(k)
+            answers: list[bool | None] = [None] * len(items)
+            fresh: list[int] = []
+            kept: dict[int, list[bool]] = {}
+            for key, places in at.items():
+                item = items[places[0]]
+                seen = self._find(key, item)
+                if seen is not None and id(gate) not in seen[2]:
+                    decided = seen[1]
+                    for j, k in enumerate(places[:len(decided)]):
+                        answers[k] = decided[j]
+                    fresh.extend(places[len(decided):])
                     seen[2].add(id(gate))
+                    kept[key] = decided
                 else:
-                    fresh.append(k)
-                now.add(id(item))
+                    fresh.extend(places)
+            fresh.sort()
             granted = self._take(len(fresh)) if fresh else 0
+            new: dict[int, list[bool]] = {}
             for n, k in enumerate(fresh):
-                self._decided[id(items[k])] = (items[k], n < granted, {id(gate)})
-                self._decided.move_to_end(id(items[k]))
                 answers[k] = n < granted
-            while len(self._decided) > self.REMEMBERED:
-                self._decided.popitem(last=False)
+                key = id(items[k])
+                if key in kept:
+                    kept[key].append(n < granted)  # a repeat beyond those another gate decided
+                else:
+                    new.setdefault(key, []).append(n < granted)
+            for key, decided in new.items():
+                self._remember(items[at[key][0]], decided, id(gate))
             return [i for i, a in zip(items, answers) if a]
+
+    def _find(self, key: int, item: object) -> tuple[object, list[bool], set[int]] | None:
+        """The decision remembered for `item`, if it is this item's."""
+        weak = self._decided.get(key)
+        if weak is not None:
+            return weak if weak[0]() is item else None
+        held = self._held.get(key)
+        return held if held is not None and held[0] is item else None
+
+    def _remember(self, item: object, decided: list[bool], gate: int) -> None:
+        """Keep `item`'s decision, made by `gate`, for as long as it lives."""
+        key = id(item)
+        try:
+            ref = weakref.ref(item, lambda r, key=key: self._forget(key, r))
+        except TypeError:
+            self._held[key] = (item, decided, {gate})
+            self._held.move_to_end(key)
+            while len(self._held) > self.REMEMBERED:
+                self._held.popitem(last=False)
+            return
+        self._decided[key] = (ref, decided, {gate})
+
+    def _forget(self, key: int, ref: weakref.ref) -> None:
+        """An item is gone: its decision with it (unless its id already belongs to another)."""
+        with self._lock:
+            weak = self._decided.get(key)
+            if weak is not None and weak[0] is ref:
+                del self._decided[key]
 
     def take(self, n: int) -> int:
         """Take up to `n` tokens now; how many were taken. A clock that goes back refills nothing."""

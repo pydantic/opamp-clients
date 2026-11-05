@@ -209,5 +209,10 @@ test("a failing Exporters call keeps the names last decided, and the application
   assert.deepEqual(a.exporters.filter((e) => e.name !== APP_PROVIDER), before.filter((e) => e.name !== APP_PROVIDER));
   assert.ok(a.exporters.some((e) => e.signal === "traces" && e.name === APP_PROVIDER && !e.gated));
   assert.ok(got.warned.some((w) => w.includes("can't list the exporters")), got.warned.join("\n"));
+  // Regression: one listed as found carried its raw endpoint, credentials and all.
+  a.found = [{ signal: "logs", kind: "Mine", gated: false, endpoint: "https://user:hunter2@col:4318/v1/logs?token=t" }];
+  a.ownProviders.delete("logs"); // earlier tests may have registered one: the API is global
+  a.providerOfItsOwn("logs"); // listed again
+  assert.equal(a.exporters.find((e) => e.name === "Mine")?.destination, "");
   trace.disable();
 });

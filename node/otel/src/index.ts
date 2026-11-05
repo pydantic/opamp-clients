@@ -624,34 +624,48 @@ export class Bucket {
     return taken;
   }
 
-  /** Each record's decision, and the gates that had it: shared by every exporter the record reaches. */
-  #decided = new WeakMap<object, { admitted: boolean; gates: Set<object> }>();
+  /**
+   * Each record's decision (one for each repeat of it in the batch it was decided in), and the
+   * gates that had it: shared by every exporter the record reaches, for as long as it lives.
+   */
+  #decided = new WeakMap<object, { admitted: boolean[]; gates: Set<object> }>();
 
   /**
    * The records within the cap at `nowNs`, in order, for the exporter behind `gate`: one decision
    * per record for every exporter it reaches (one budget for the process). A record another gate
-   * decided keeps that answer; the rest take tokens together, the first that fit admitted. The
-   * same gate seeing a record again is a new export of it, decided afresh.
+   * decided keeps that answer, each repeat of it in a batch its own; the rest take tokens
+   * together, the first that fit admitted. The same gate seeing a record again is a new export of
+   * it, decided afresh.
    */
   admitted<T extends object>(nowNs: number, records: readonly T[], gate: object): T[] {
     const answers: (boolean | undefined)[] = [];
     const fresh: number[] = [];
-    const now = new Set<object>();
+    // This batch's decision of each record, and how many of its repeats were met so far.
+    const now = new Map<object, { decision: { admitted: boolean[]; gates: Set<object> }; met: number }>();
     records.forEach((r, k) => {
-      const seen = this.#decided.get(r);
-      if (seen && !seen.gates.has(gate) && !now.has(r)) {
-        answers[k] = seen.admitted;
-        seen.gates.add(gate);
+      let mine = now.get(r);
+      if (!mine) {
+        const seen = this.#decided.get(r);
+        mine = { decision: seen && !seen.gates.has(gate) ? seen : { admitted: [], gates: new Set() }, met: 0 };
+        now.set(r, mine);
+      }
+      const j = mine.met++;
+      // A new decision is empty until the tokens are taken below: its repeats are all fresh.
+      if (j < mine.decision.admitted.length) {
+        answers[k] = mine.decision.admitted[j];
       } else {
         fresh.push(k);
       }
-      now.add(r);
     });
     const granted = fresh.length > 0 ? this.take(nowNs, fresh.length) : 0;
     fresh.forEach((k, n) => {
       answers[k] = n < granted;
-      this.#decided.set(records[k]!, { admitted: n < granted, gates: new Set([gate]) });
+      now.get(records[k]!)!.decision.admitted.push(n < granted); // a new record's, or a repeat beyond those decided
     });
+    for (const [r, { decision }] of now) {
+      decision.gates.add(gate);
+      this.#decided.set(r, decision);
+    }
     return records.filter((_, k) => answers[k]);
   }
 }
@@ -1044,15 +1058,18 @@ export class Controls {
 
   /**
    * Run a gate's export, so that an error inside it (a value redaction can't walk, an exporter
-   * that throws) fails the export, counted as failed with its `items`, instead of the processor
-   * dropping the batch with nothing counted.
+   * that throws) fails the export, counted as failed with its `items` less those it filtered out,
+   * instead of the processor dropping the batch with nothing counted. Synchronous: nothing else
+   * counts meanwhile.
    */
   #guarded(signal: "traces" | "metrics" | "logs", items: number, done: (r: ExportResult) => void, run: () => void): void {
+    const filtered = this.counts[signal].itemsFiltered;
     try {
       run();
     } catch (e) {
       const r: ExportResult = { code: 1, error: e instanceof Error ? e : new Error(String(e)) };
-      this.counts[signal].result(r, items);
+      // What the gate filtered out before the error is counted filtered already, not failed too.
+      this.counts[signal].result(r, items - (this.counts[signal].itemsFiltered - filtered));
       done(r);
     }
   }
@@ -1930,7 +1947,7 @@ export class Agent {
     } catch (e) {
       say.warn(`OpAMP: can't list the exporters; they are governed all the same: ${String(e)}`);
       this.exporters = found.map((f, i) => this.#listedAs.get(keys[i]!)
-        ?? { signal: f.signal ?? "", name: f.kind ?? "", gated: f.gated ?? false, destination: f.endpoint ?? "" });
+        ?? { signal: f.signal ?? "", name: f.kind ?? "", gated: f.gated ?? false, destination: "" });
       return;
     }
     this.exporters = d.exporters.map(({ signal, name, gated, destination }) => ({ signal, name, gated, destination }));
