@@ -11,6 +11,8 @@ import datetime as dt
 import sys
 import tomllib
 import unittest
+import urllib.error
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -77,3 +79,38 @@ class Platforms(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Fetch(unittest.TestCase):
+    def answers(self, *results):
+        calls = []
+
+        def urlopen(url, timeout):
+            calls.append(url)
+            r = results[len(calls) - 1]
+            if isinstance(r, Exception):
+                raise r
+            return mock.MagicMock(**{"__enter__.return_value.read.return_value": r})
+
+        return calls, mock.patch.object(ds.urllib.request, "urlopen", urlopen)
+
+    def error(self, code):
+        return urllib.error.HTTPError("u", code, "x", None, None)
+
+    def test_a_server_error_or_a_dropped_connection_is_tried_again(self):
+        calls, patch = self.answers(self.error(504), urllib.error.URLError("reset"), b"body")
+        with patch:
+            self.assertEqual(ds.fetch("u", wait=0), b"body")
+        self.assertEqual(len(calls), 3)
+
+    def test_a_client_error_is_not(self):
+        calls, patch = self.answers(self.error(404))
+        with patch, self.assertRaises(urllib.error.HTTPError):
+            ds.fetch("u", wait=0)
+        self.assertEqual(len(calls), 1)
+
+    def test_the_last_tries_error_is_raised(self):
+        calls, patch = self.answers(*[self.error(503)] * 4)
+        with patch, self.assertRaises(urllib.error.HTTPError):
+            ds.fetch("u", wait=0)
+        self.assertEqual(len(calls), 4)

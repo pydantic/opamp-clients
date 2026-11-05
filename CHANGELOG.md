@@ -47,12 +47,6 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
-- Python, Node.js: `manage()` puts an SDK the application has already set up under the server, as
-  it is: one built in code (contrib's way), the application's own NodeSDK, or the Logfire SDK's
-  (`logfire.configure()`, in Node.js too). Call it after that setup. The policy governs that SDK's
-  exporters; its sampler stays the application's, so the sampling controls, debug mode and the
-  instrumentation switches are refused. In Node.js the Logfire SDK's logs (spans of
-  `logfire.span_type` `log`) go through the log controls. Needs core 0.15.0.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -74,20 +68,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Python: `configure()` called once the application has set its SDK up already puts that SDK
-  under the server, as `manage()` does, and warns. Before, it built a second SDK that couldn't
-  become the global one: the server heard APPLIED while the application's spans went past every
-  gate, and the instance was described as `unknown_service`.
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.15.0, which the clients now pin. It
+  decides which exporters the SDK policy governs and how each is named (#109).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
   (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
   warnings read the same in every SDK. On core 0.15.0 (#109).
-- Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
-  install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
-  package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
-  docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
-  tags (#124).
 - Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
   archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
   v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
@@ -188,6 +175,43 @@ and date. Tests, CI and docs alone don't need a line.
   (the Go example, the conformance server), aiohttp 3.14.5 and OpenTelemetry Python 1.45.1
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
+
+## SDKs 0.1.2 (2026-11-05)
+
+`sdk/v0.1.2`, on core 0.15.0, for Python, Node.js, Java and .NET.
+
+These entries in **Unreleased** above are in 0.1.2. They stay there because they also apply to
+Go or the Supervisor, which have not had a release with them:
+
+- The SDK policy governs every exporter the SDK exports through (**Breaking**). The first
+  redaction or log policy no longer fails because the Logfire SDK's console or .NET's
+  `AddConsoleExporter` is there. What the gates can't reach is reported ungoverned (#109).
+- An exporter's inventory key is its identity (`otlp@host:port`) (**Breaking**), and the core
+  names each exporter and its warning, the same in every language (#109).
+- Java, .NET: an HTTP client of the application's no longer switches to platform mode silently
+  (**Breaking**) (#109).
+- On core 0.15.0.
+
+### Added
+
+- Python, Node.js: `manage()` puts an SDK the application has already set up under the server, as
+  it is: one built in code (contrib's way), the application's own NodeSDK, or the Logfire SDK's
+  (`logfire.configure()`, in Node.js too). Call it after that setup. The policy governs that SDK's
+  exporters; its sampler stays the application's, so the sampling controls, debug mode and the
+  instrumentation switches are refused. In Node.js the Logfire SDK's logs (spans of
+  `logfire.span_type` `log`) go through the log controls. Needs core 0.15.0 (#114).
+
+### Changed
+
+- Python: `configure()` called once the application has set its SDK up already puts that SDK
+  under the server, as `manage()` does, and warns. Before, it built a second SDK that couldn't
+  become the global one: the server heard APPLIED while the application's spans went past every
+  gate, and the instance was described as `unknown_service` (#114).
+- Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
+  install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
+  package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
+  docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
+  tags (#124).
 
 ## Supervisor 0.9.0 (2026-11-04)
 

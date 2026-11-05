@@ -14,7 +14,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,4 +71,38 @@ func TestFetch(t *testing.T) {
 
 func TestExtractNeedsTheBinary(t *testing.T) {
 	assert.ErrorContains(t, extract(archive(t, map[string]string{"README.md": "x"}), "otelcol-contrib", filepath.Join(t.TempDir(), "o")), "has no otelcol-contrib")
+}
+
+func TestFetchTriesAgainAfterAServerError(t *testing.T) {
+	retryWait = time.Millisecond
+	body := archive(t, map[string]string{"otelcol-contrib": "the collector"})
+	sum := sha256.Sum256(body)
+	var gets, missing atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/missing" {
+			missing.Add(1)
+			http.NotFound(w, r)
+			return
+		}
+		if gets.Add(1) < 3 {
+			w.WriteHeader(http.StatusGatewayTimeout)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	got, err := download(srv.Client(), srv.URL+"/archive", hex.EncodeToString(sum[:]))
+	require.NoError(t, err)
+	assert.Equal(t, body, got)
+	assert.Equal(t, int32(3), gets.Load(), "two 504s, then the archive")
+
+	_, err = download(srv.Client(), srv.URL+"/missing", "00")
+	assert.ErrorContains(t, err, "HTTP 404")
+	assert.Equal(t, int32(1), missing.Load(), "a 404 is not tried again")
+
+	gets.Store(-10)
+	_, err = download(srv.Client(), srv.URL+"/archive", "00")
+	assert.ErrorContains(t, err, "HTTP 504", "the last try's error, after every attempt")
+	assert.Equal(t, int32(-10+attempts), gets.Load())
 }
