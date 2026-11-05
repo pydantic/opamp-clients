@@ -110,7 +110,10 @@ go at one endpoint:
 The Python integration also runs it on the Logfire SDK (`outage-logfire`: `logfire_app.py`, set up
 with `configure_logfire()`, its spans sent where the Logfire SDK sends them) and on an SDK the
 application set up itself (`outage-manage`: `logfire.configure()` then `manage()`), and Node.js on
-its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`).
+its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`) and on the Logfire JS SDK
+(`outage-logfire`: `logfire/logfire-js.mjs`, `logfire.configure()` then `manage()`, its spans sent
+where the Logfire SDK sends them). The .NET integration also runs it on an SDK set up in code with
+`WithOpAmp()` (`outage-hosted`: `dotnet-otel/Hosted/`, no automatic instrumentation).
 
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
