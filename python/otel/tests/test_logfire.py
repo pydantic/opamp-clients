@@ -93,8 +93,9 @@ def how(request) -> str:
 def _setup(how: str, endpoint: str, args: str) -> str:
     """The child's line that sets the Logfire SDK up under the server at `endpoint`."""
     if how == "fleet":
-        return (f"logfire.configure(fleet=logfire.fleet.FleetOptions(endpoint={endpoint!r}, heartbeat_interval=0.1), "
-                f"{args})")
+        # Imported here: a Logfire SDK without the fleet option has no logfire.fleet.
+        return (f"logfire.configure(fleet=__import__('logfire.fleet').fleet.FleetOptions(endpoint={endpoint!r}, "
+                f"heartbeat_interval=0.1), {args})")
     return f"logfire_fleet_otel.configure_logfire(endpoint={endpoint!r}, heartbeat_interval=0.1, {args})"
 
 
@@ -116,7 +117,7 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
 
     server._reply = reply
     child = textwrap.dedent(f"""
-        import pathlib, time, logfire, logfire.fleet, logfire_fleet_otel
+        import pathlib, time, logfire, logfire_fleet_otel
         {_setup(how, server.endpoint, f"{where}, service_name='rocket', console={None if console else False!r}, "
                                       f"metrics=False, send_to_logfire=True, inspect_arguments=False{extra}")}
         agent = logfire_fleet_otel.AGENT
@@ -363,7 +364,7 @@ def test_the_policy_sits_where_configure_logfire_puts_it_in_the_logfire_sdks_exp
     decided and counted once), and redaction under them (a span the retries make is redacted too)."""
     server, ingest = servers
     child = textwrap.dedent(f"""
-        import logfire, logfire.fleet, logfire_fleet_otel
+        import logfire, logfire_fleet_otel
         from opentelemetry import trace
         from logfire_fleet_otel import _chain, _sdk_provider
         {_setup(how, server.endpoint, f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r}), '
