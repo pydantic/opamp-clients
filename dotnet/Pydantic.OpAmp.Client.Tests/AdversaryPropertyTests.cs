@@ -585,6 +585,7 @@ public partial class AdversaryPropertyTests
             // The run gets a moment for its connections to close; then nothing is left.
             var downloads = Executor.DownloadsDir(this.StateFile);
             var before = Listing(downloads);
+            var listedAt = DateTime.UtcNow;
             await Task.Delay(Settle);
             var counts = server.For(seed);
             if (counts.Open > 0)
@@ -635,10 +636,12 @@ public partial class AdversaryPropertyTests
             }
 
             var after = Listing(downloads);
-            var changed = after.Where(f => !before.TryGetValue(f.Key, out var b) || b != f.Value).Select(f => f.Key).ToArray();
+            var changed = after.Where(f => !before.TryGetValue(f.Key, out var b) || b != f.Value)
+                .Select(f => $"{f.Key} ({(before.TryGetValue(f.Key, out var b) ? $"{b.Size} bytes at {b.Written:HH:mm:ss.fffffff}" : "none")} at stop, {f.Value.Size} bytes at {f.Value.Written:HH:mm:ss.fffffff} after)")
+                .ToArray();
             if (changed.Length > 0)
             {
-                this.Fail($"download file(s) {string.Join(", ", changed)} appeared or changed after stop (S3, RULE-SHELL-07)");
+                this.Fail($"download file(s) {string.Join(", ", changed)} appeared or changed after stop (S3, RULE-SHELL-07); listed at stop at {listedAt:HH:mm:ss.fffffff}");
             }
 
             if (Volatile.Read(ref this.stopped) != 1)

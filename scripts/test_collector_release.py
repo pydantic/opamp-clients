@@ -60,6 +60,17 @@ class Pins(unittest.TestCase):
             found = cr.pins(root)
         self.assertEqual(cr.base(found), "v0.162.1", "the forks track contrib's release")
 
+    def test_a_manifests_dist_version_is_a_contrib_pin(self) -> None:
+        # The version the built collector reports names its contrib release, so it moves with them.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = tree(Path(tmp))
+            manifest = root / "go/ext/collector.yaml"
+            manifest.write_text("dist:\n  name: otelcol\n  version: 0.162.0\n" + manifest.read_text())
+            self.assertIn("go/ext/collector.yaml:3", cr.pins(root)["contrib"]["v0.162.0"])
+            manifest.write_text(manifest.read_text().replace("version: 0.162.0", "version: 0.161.0"))
+            with self.assertRaises(SystemExit):
+                cr.base(cr.pins(root))
+
     def test_contrib_on_another_minor_release_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = tree(Path(tmp))

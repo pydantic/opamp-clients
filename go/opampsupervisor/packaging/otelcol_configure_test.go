@@ -89,6 +89,13 @@ func TestOtelcolConfigureNoStart(t *testing.T) {
 	assert.Contains(t, out, "systemctl enable --now pydantic-otelcol.service")
 	_, err = os.Stat(filepath.Join(e.tools, "systemctl.log"))
 	assert.ErrorIs(t, err, os.ErrNotExist, "it touched the services")
+	// A package upgrade reads this, and doesn't start the collector; configuring it again to start
+	// removes it.
+	marker := filepath.Join(e.root, "etc/pydantic-opamp/otelcol.no-start")
+	assert.FileExists(t, marker)
+	out, err = e.configure(t, "lf-token", "--config", writeConfig(t, unmanagedConfig))
+	require.NoError(t, err, out)
+	assert.NoFileExists(t, marker)
 }
 
 // Nothing is written, and nothing started, without a token and a config.

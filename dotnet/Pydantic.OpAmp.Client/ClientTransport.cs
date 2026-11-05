@@ -231,14 +231,18 @@ internal sealed class ClientTransport : IClientTransport
         (serverOrigin ? this.Http : this.elsewhere ?? this.Http).SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
 
     /// <summary>
-    /// .NET can't take back a connect cleanly: a cancel cancels it and aborts the socket.
+    /// A cancel cancels the upgrade request (its connect, TLS and wait for the answer). A
+    /// connection that opens all the same is returned, and the caller closes it. Not
+    /// <c>ct.Register(ws.Abort)</c>: an abort after the 101 is read but before .NET wraps the
+    /// stream in its WebSocket marks the ClientWebSocket disposed with nothing yet to close, and
+    /// the WebSocket it then builds on the live connection is never disposed (left open until the
+    /// GC finalizes it).
     /// </summary>
     public async Task<System.Net.WebSockets.WebSocket> ConnectAsync(Uri url, IEnumerable<KeyValuePair<string, string>> headers, CancellationToken ct)
     {
         var ws = new System.Net.WebSockets.ClientWebSocket();
         try
         {
-            using var abort = ct.Register(ws.Abort);
             ws.Options.CollectHttpResponseDetails = true;
             foreach (var h in headers)
             {

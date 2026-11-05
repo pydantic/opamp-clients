@@ -1112,6 +1112,14 @@ internal sealed class Streams
         }
     }
 
+    private bool IsGone(DlFile f)
+    {
+        lock (this.gate)
+        {
+            return f.Gone;
+        }
+    }
+
     /// <summary>Carry <paramref name="f"/> forward (under the gate), unless that is under way.</summary>
     private void Pump(DlFile f)
     {
@@ -1196,16 +1204,25 @@ internal sealed class Streams
                         throw new IOException("no state file");
                     }
 
-                    // Made new: never one already there (a crashed run's).
+                    // Made new: never one already there (a crashed run's). Not once it is gone:
+                    // this thread can start late (a busy machine), after stop stopped waiting for it.
                     var handle = await FileOps.OffPool(() =>
                     {
+                        if (this.IsGone(f))
+                        {
+                            return null;
+                        }
+
                         this.x.Files.MakeDir(System.IO.Path.GetDirectoryName(path)!);
                         return this.x.Files.CreateNew(path, download: true);
                     }).ConfigureAwait(false);
-                    lock (this.gate)
+                    if (handle is not null)
                     {
-                        f.Handle = handle;
-                        f.Made = true;
+                        lock (this.gate)
+                        {
+                            f.Handle = handle;
+                            f.Made = true;
+                        }
                     }
 
                     continue;
@@ -1249,6 +1266,11 @@ internal sealed class Streams
                 long wrote = 0;
                 foreach (var b in bufs)
                 {
+                    if (this.IsGone(f))
+                    {
+                        break; // nothing more is written once it is gone (as above)
+                    }
+
                     await f.Handle!.WriteAsync(b, CancellationToken.None).ConfigureAwait(false);
                     f.Hash.AppendData(b);
                     wrote += b.Length;
