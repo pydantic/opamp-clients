@@ -29,6 +29,12 @@ internal sealed class OpAmpAgent : IDisposable
     private readonly bool gateable;
     private readonly OtlpTls? tls;
     private TracerProviderBuilder? tracing;
+
+    // Whether the sampler the live one wraps is the one OTEL_TRACES_SAMPLER names (not the application's own).
+    private bool envSampler;
+
+    // The providers the application built, once started: what they export through is the SDK's own.
+    private (TracerProvider? Tracing, MeterProvider? Metrics, LoggerProvider? Logs)? built;
     private ComponentHealth? health;
 
     public OpAmpAgent(IOptions<OpAmpOptions> options, IConfiguration? configuration = null)
@@ -141,7 +147,33 @@ internal sealed class OpAmpAgent : IDisposable
         // The application's own settings (docs/app-settings.md), which it reads with OpAmpAppSettings.
         h.Live.Add("custom");
 
+        if (providersBuilt && this.built is { } providers)
+        {
+            h.Local = this.LocalNow(providers.Tracing, providers.Metrics, providers.Logs);
+        }
+
         return h;
+    }
+
+    /// <summary>
+    /// What the SDK does without the server (contracts' logfire-sdk-local/v1), as far as it can be
+    /// told: the rate of the sampler OTEL_TRACES_SAMPLER names, where the live sampler wraps that one
+    /// and is in force; and whether each signal is exported at all (a provider of it that exports
+    /// through something). The log level is left out: the SDK has none of its own.
+    /// </summary>
+    internal Local LocalNow(TracerProvider? tracing, MeterProvider? metrics, LoggerProvider? logs)
+    {
+        var local = new Local();
+        if (this.envSampler && this.SamplerInForce())
+        {
+            local.SamplingRate = Variables.Decimal(Variables.SamplingRateFromEnv(this.getenv));
+        }
+
+        var exporters = Exporters.Read(tracing, metrics, logs);
+        local.SendTraces = exporters.Any(e => e.Signal == Signal.Traces);
+        local.SendMetrics = exporters.Any(e => e.Signal == Signal.Metrics);
+        local.SendLogs = exporters.Any(e => e.Signal == Signal.Logs);
+        return local;
     }
 
     /// <summary>
@@ -157,6 +189,7 @@ internal sealed class OpAmpAgent : IDisposable
 
         Samplers.TryConfigured(inner, out var configured);
         inner.SetSampler(this.Controls.Sampler.Wrap(configured ?? Variables.SamplerFromEnv(this.getenv)));
+        this.envSampler = configured is null;
         this.tracing = inner;
     }
 
@@ -217,6 +250,7 @@ internal sealed class OpAmpAgent : IDisposable
         // What the gates are in front of is known now: the rest is reported ungoverned, and warned
         // about as the inventory is first listed. The providers are read again before each
         // decision, and on the health timer.
+        this.built = (tracing, metrics, logs);
         this.Agent?.Start(resource, () => this.Inventory(Exporters.Read(tracing, metrics, logs), tracing, metrics, logs), this.health);
     }
 
@@ -234,7 +268,10 @@ internal sealed class OpAmpAgent : IDisposable
                 : [])
             .OfType<object>()
             .Select(i => i.GetType().Assembly)
-            .Select(a => new Instrumentation { Name = InstrumentationName(a.GetName().Name ?? string.Empty), Version = Inventories.Version(a) });
+            // Its scopes where they are known, else its assembly's name, which most of OpenTelemetry's
+            // instrumentations name their ActivitySource and Meter by.
+            .Select(a => Inventories.Scoped(InstrumentationName(a.GetName().Name ?? string.Empty), Inventories.Version(a),
+                a.GetName().Name ?? string.Empty));
         var exporters = this.Agent?.Exporters(built.Distinct().Select(e => e with { Gated = e.Gated && this.gateable }), "http/protobuf") ?? [];
         return Inventories.Of(typeof(OpAmpAgent).Assembly, instrumentations, exporters);
     }

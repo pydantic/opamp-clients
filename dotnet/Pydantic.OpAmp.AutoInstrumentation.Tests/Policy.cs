@@ -81,13 +81,20 @@ internal static class Policy
         },
     };
 
-    /// <summary>The policy an effective config reports. It is the only file, with the content type application/json.</summary>
+    /// <summary>The SDK's own values, reported beside the policy in force (contracts' logfire-sdk-local/v1).</summary>
+    public const string LocalFile = "logfire-sdk-local.json";
+
+    /// <summary>
+    /// The policy an effective config reports, with the content type application/json. Beside it
+    /// there is at most the SDK's own values, and no other file.
+    /// </summary>
     public static string Text(EffectiveConfig e)
     {
-        var file = Assert.Single(e.ConfigMap.ConfigMap);
-        Assert.Equal(File, file.Key);
-        Assert.Equal("application/json", file.Value.ContentType);
-        return file.Value.Body.ToStringUtf8();
+        var files = e.ConfigMap.ConfigMap;
+        Assert.Contains(File, files.Keys);
+        Assert.All(files.Keys, k => Assert.True(k == File || k == LocalFile, k));
+        Assert.Equal("application/json", files[File].ContentType);
+        return files[File].Body.ToStringUtf8();
     }
 
     /// <summary>

@@ -64,11 +64,7 @@ internal static partial class Variables
     /// </summary>
     public static Sampler SamplerFromEnv(Func<string, string?> getenv)
     {
-        Sampler Ratio()
-        {
-            var ok = double.TryParse(getenv("OTEL_TRACES_SAMPLER_ARG"), NumberStyles.Float, CultureInfo.InvariantCulture, out var r);
-            return new TraceIdRatioBasedSampler(ok && r is >= 0 and <= 1 ? r : 1);
-        }
+        Sampler Ratio() => new TraceIdRatioBasedSampler(SamplerArg(getenv));
 
         return getenv("OTEL_TRACES_SAMPLER")?.Trim().ToLowerInvariant() switch
         {
@@ -79,6 +75,41 @@ internal static partial class Variables
             "parentbased_traceidratio" => new ParentBasedSampler(Ratio()),
             _ => new ParentBasedSampler(new AlwaysOnSampler()),
         };
+    }
+
+    /// <summary>
+    /// The share of new traces <see cref="SamplerFromEnv"/>'s sampler samples: always on is 1,
+    /// always off 0, a ratio its argument.
+    /// </summary>
+    public static double SamplingRateFromEnv(Func<string, string?> getenv) =>
+        getenv("OTEL_TRACES_SAMPLER")?.Trim().ToLowerInvariant() switch
+        {
+            "always_off" or "parentbased_always_off" => 0,
+            "traceidratio" or "parentbased_traceidratio" => SamplerArg(getenv),
+            _ => 1,
+        };
+
+    /// <summary>OTEL_TRACES_SAMPLER_ARG as a ratio: one out of range, or not a number, is 1.</summary>
+    private static double SamplerArg(Func<string, string?> getenv) =>
+        double.TryParse(getenv("OTEL_TRACES_SAMPLER_ARG"), NumberStyles.Float, CultureInfo.InvariantCulture, out var r) && r is >= 0 and <= 1 ? r : 1;
+
+    /// <summary>
+    /// A ratio as decimal text, as the local report takes it: <c>1</c>, <c>0.25</c>,
+    /// <c>0.00001</c> (the shortest digits that read back as <paramref name="x"/>, never an exponent).
+    /// </summary>
+    public static string Decimal(double x)
+    {
+        var text = x.ToString("R", CultureInfo.InvariantCulture);
+        var e = text.IndexOfAny(['E', 'e']);
+        if (e < 0)
+        {
+            return text;
+        }
+
+        // Below 1e-5 the round trip format gives an exponent: the same digits, written out.
+        var digits = text[..e].Replace(".", string.Empty, StringComparison.Ordinal);
+        var exponent = int.Parse(text[(e + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+        return exponent < 0 ? "0." + new string('0', -exponent - 1) + digits : text;
     }
 
     /// <summary>The process environment, as a lookup.</summary>

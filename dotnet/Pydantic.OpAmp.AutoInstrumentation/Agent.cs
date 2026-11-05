@@ -30,6 +30,9 @@ internal sealed class Agent
     // Held weakly: a logger provider holds its watch, and one the application let go of goes with it.
     private readonly List<WeakReference<LogsWatch>> logs = [];
     private bool samplerWrapped;
+
+    // Whether the sampler the live one wraps is the one OTEL_TRACES_SAMPLER names (not the configuration's own).
+    private bool envSampler;
     private TracerProvider? tracing;
     private MeterProvider? metrics;
 
@@ -125,6 +128,7 @@ internal sealed class Agent
         {
             builder.SetSampler(this.Controls.Sampler.Wrap(Variables.SamplerFromEnv(this.getenv)));
             this.samplerWrapped = true;
+            this.envSampler = !this.fileConfig;
             return;
         }
 
@@ -138,6 +142,7 @@ internal sealed class Agent
 
             inner.SetSampler(this.Controls.Sampler.Wrap(configured ?? Variables.SamplerFromEnv(this.getenv)));
             this.samplerWrapped = true;
+            this.envSampler = configured is null && !this.fileConfig;
         });
     }
 
@@ -240,7 +245,7 @@ internal sealed class Agent
     internal Inventory Inventory(string? autoVersion = null)
     {
         autoVersion ??= AutoInstrumentationVersion();
-        var instrumentations = Env.Runnable.Select(name => new Instrumentation { Name = name, Version = autoVersion });
+        var instrumentations = Env.Runnable.Select(name => Inventories.Scoped(name, autoVersion));
         var configured = new List<Exporters.Built>();
         foreach (var signal in Enum.GetValues<Signal>())
         {
@@ -366,7 +371,49 @@ internal sealed class Agent
         // The application's own settings (docs/app-settings.md), which it reads with OpAmpAppSettings.
         h.Live.Add("custom");
 
+        if (providersBuilt)
+        {
+            h.Local = this.LocalNow();
+        }
+
         return h;
+    }
+
+    /// <summary>
+    /// What the SDK does without the server (contracts' logfire-sdk-local/v1), once the providers
+    /// are built, as far as it can be told: the rate of the sampler OTEL_TRACES_SAMPLER names, where
+    /// the live sampler wraps that one; and, for each signal automatic instrumentation builds the
+    /// provider of, whether it is exported at all (set up, with an exporter its variables name or one
+    /// the built providers export through). A signal the application or a configuration file sets
+    /// up is left out, and so is the log level: the SDK has none of its own.
+    /// </summary>
+    internal Local LocalNow()
+    {
+        var local = new Local();
+        if (this.samplerWrapped && this.envSampler)
+        {
+            local.SamplingRate = Variables.Decimal(Variables.SamplingRateFromEnv(this.getenv));
+        }
+
+        if (this.fileConfig)
+        {
+            return local;
+        }
+
+        var built = this.BuiltExporters().SelectMany(p => p).ToList();
+        bool Exports(Signal s) => Env.Enabled(this.getenv, s) && (Env.Exporters(this.getenv, s).Any() || built.Any(e => e.Signal == s));
+        if (Env.SetsUpSdk(this.getenv, Signal.Traces))
+        {
+            local.SendTraces = Exports(Signal.Traces);
+        }
+
+        if (Env.SetsUpSdk(this.getenv, Signal.Metrics))
+        {
+            local.SendMetrics = Exports(Signal.Metrics);
+        }
+
+        local.SendLogs = Exports(Signal.Logs);
+        return local;
     }
 
     /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>

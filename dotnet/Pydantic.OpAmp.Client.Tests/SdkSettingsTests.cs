@@ -326,7 +326,15 @@ public class SdkSettingsTests
             {
                 var expected = instrumentations.EnumerateObject().ToDictionary(
                     p => p.Name, p => p.Value.ValueKind == JsonValueKind.Null ? new Dictionary<string, string>() : new() { ["version"] = p.Value.GetString()! });
-                Assert.Equal(expected, got.Components["instrumentations"].SubComponentMap.ToDictionary(kv => kv.Key, kv => Metadata(kv.Value)));
+                Assert.Equal(expected, got.Components["instrumentations"].SubComponentMap.ToDictionary(
+                    kv => kv.Key, kv => Metadata(kv.Value).Where(m => m.Key != "scope").ToDictionary()));
+            }
+
+            if (want.TryGetProperty("scopes", out var scopes))
+            {
+                var expected = scopes.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ValueKind == JsonValueKind.Null ? null : p.Value.GetString());
+                Assert.Equal(expected, got.Components["instrumentations"].SubComponentMap.ToDictionary(
+                    kv => kv.Key, kv => Metadata(kv.Value).GetValueOrDefault("scope")));
             }
 
             if (want.TryGetProperty("exporters", out var exporters))
@@ -381,6 +389,41 @@ public class SdkSettingsTests
             layer.Components(reversed, Declaring(), Now).ToByteArray());
     }
 
+    // Every case of testdata/local.json through the wrapper: the host's local values, through Load,
+    // reported beside the policy in force as logfire-sdk-local.json, never in it.
+    [Fact]
+    public void TheLocalVectors()
+    {
+        using var layer = new SdkSettings();
+        var cases = Cases("local.json");
+        Assert.True(cases.Count > 5);
+        foreach (var c in cases)
+        {
+            var name = c.GetProperty("name").GetString();
+            var without = HostOf(c);
+            var host = without.Clone();
+            if (c.TryGetProperty("local", out var local))
+            {
+                // By its proto field names, which protobuf's JSON reads.
+                host.Local = Google.Protobuf.JsonParser.Default.Parse<Local>(local.GetRawText());
+            }
+
+            var now = c.TryGetProperty("now_unix_ms", out var n) ? n.GetUInt64() : 0;
+            var files = layer.Load(null, host, now).Effective.ConfigMap.ConfigMap;
+            var want = c.GetProperty("want");
+            var names = want.ValueKind == JsonValueKind.Null ? new[] { "logfire-sdk-policy.json" } : new[] { "logfire-sdk-local.json", "logfire-sdk-policy.json" };
+            Assert.True(names.SequenceEqual(files.Keys.Order(StringComparer.Ordinal)), $"{name}: {string.Join(", ", files.Keys)}");
+            if (want.ValueKind != JsonValueKind.Null)
+            {
+                Assert.True(want.GetString() == files["logfire-sdk-local.json"].Body.ToStringUtf8(), $"{name}: {files["logfire-sdk-local.json"].Body.ToStringUtf8()}");
+                Assert.Equal("application/json", files["logfire-sdk-local.json"].ContentType);
+            }
+
+            // Beside the policy, never in it.
+            Assert.Equal(layer.Load(null, without, now).Effective.ConfigMap.ConfigMap["logfire-sdk-policy.json"], files["logfire-sdk-policy.json"]);
+        }
+    }
+
     // Every case of testdata/start.json through the wrapper: the settings to start with come from the
     // policy of the last config applied in the core's saved state, else from the policy kept before.
     [Fact]
@@ -424,7 +467,7 @@ public class SdkSettingsTests
         };
         if (i.TryGetProperty("instrumentations", out var instrumentations))
         {
-            inventory.Instrumentations.Add(instrumentations.EnumerateArray().Select(e => new Instrumentation { Name = Text(e, "name"), Version = Text(e, "version") }));
+            inventory.Instrumentations.Add(instrumentations.EnumerateArray().Select(e => new Instrumentation { Name = Text(e, "name"), Version = Text(e, "version"), Scope = Text(e, "scope") }));
         }
 
         if (i.TryGetProperty("exporters", out var exporters))

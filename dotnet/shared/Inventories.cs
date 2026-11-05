@@ -28,6 +28,37 @@ internal static class Inventories
     };
 
     /// <summary>
+    /// The instrumentation scope an instrumentation's telemetry carries (the name of the
+    /// ActivitySource its spans come from on .NET 8 and later, or of the Meter for one that makes
+    /// metrics alone), by the name <c>deactivate_instrumentations</c> takes: for those whose scope is
+    /// known. A logging bridge's logs are under the application's own categories: none of its own.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> Scopes = new Dictionary<string, string>
+    {
+        ["aspnetcore"] = "Microsoft.AspNetCore",
+        ["entityframeworkcore"] = "OpenTelemetry.Instrumentation.EntityFrameworkCore",
+        ["grpcnetclient"] = "OpenTelemetry.Instrumentation.GrpcNetClient",
+        ["httpclient"] = "System.Net.Http",
+        ["masstransit"] = "MassTransit",
+        ["mysqlconnector"] = "MySqlConnector",
+        ["netruntime"] = "OpenTelemetry.Instrumentation.Runtime",
+        ["npgsql"] = "Npgsql",
+        ["nservicebus"] = "NServiceBus.Core",
+        ["process"] = "OpenTelemetry.Instrumentation.Process",
+        ["quartz"] = "OpenTelemetry.Instrumentation.Quartz",
+        ["sqlclient"] = "OpenTelemetry.Instrumentation.SqlClient",
+        ["stackexchangeredis"] = "OpenTelemetry.Instrumentation.StackExchangeRedis",
+        ["wcfclient"] = "OpenTelemetry.Instrumentation.Wcf",
+    };
+
+    /// <summary>
+    /// An instrumentation as the inventory lists it, with its scope: <see cref="Scopes"/>'s, else
+    /// <paramref name="otherwise"/> (empty: not known).
+    /// </summary>
+    public static Instrumentation Scoped(string name, string version, string otherwise = "") =>
+        new() { Name = name, Version = version, Scope = Scopes.GetValueOrDefault(name, otherwise) };
+
+    /// <summary>
     /// An assembly's version as its package's: the informational version without its build metadata
     /// (<c>1.19.1+abc</c> is <c>1.19.1</c>), else the assembly version's first three parts.
     /// </summary>
