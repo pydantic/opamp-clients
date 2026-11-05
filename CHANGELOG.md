@@ -79,6 +79,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
+  as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
+  replacing, and could have killed the new Collector. It now signals the process it was stopping
+  (#124).
 - Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
   running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
   `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new

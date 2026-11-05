@@ -4,7 +4,8 @@
 // Derived from opentelemetry-collector-contrib's cmd/opampsupervisor. Changed here: Start waits
 // for the previous run's watcher, so Stop can't take its exit for the new run's; StartOneShot
 // kills a one-shot Collector that ignores the shutdown signal, and returns all of its output;
-// SetExecutable switches the executable, for an installed update. The Collector doesn't inherit
+// SetExecutable switches the executable, for an installed update; Stop's kill deadline signals the
+// process it was stopping, never one a later Start runs. The Collector doesn't inherit
 // the Supervisor's OTEL_EXPORTER_OTLP_* variables (collector_env.go).
 
 package commander
@@ -548,6 +549,10 @@ func (c *Commander) Stop(ctx context.Context) error {
 	// killFailed so Stop can return an error instead of waiting forever for an
 	// exit that will never come.
 	killFailed := make(chan error, 1)
+	// Changed here: the process to kill, taken now. The goroutine can run after Stop has returned
+	// (the process exited as the deadline passed), when a Start may have replaced c.cmd: it must
+	// neither race that write nor kill the new process.
+	proc := c.cmd.Process
 	go func() {
 		<-waitCtx.Done()
 
@@ -562,7 +567,7 @@ func (c *Commander) Stop(ctx context.Context) error {
 			"Agent process is not responding to SIGTERM. Sending SIGKILL to kill forcibly.",
 			zap.Int("pid", pid),
 		)
-		if err := c.cmd.Process.Signal(os.Kill); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		if err := proc.Signal(os.Kill); err != nil && !errors.Is(err, os.ErrProcessDone) {
 			killFailed <- err
 		}
 	}()
