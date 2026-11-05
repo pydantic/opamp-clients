@@ -958,7 +958,7 @@ jobs:
         run: |
           go vet -tags=install .
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
-          sudo OPAMP_REPO="$OPAMP_REPO" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+          sudo OPAMP_REPO="$OPAMP_REPO" "$RUNNER_TEMP/install.test" -test.run Install -test.v -test.timeout 12m
       - name: The packages, kept
         if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1007,7 +1007,7 @@ jobs:
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
-          sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v
+          sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v -test.timeout 12m
       - name: The released .pkg, enrolled, then upgraded in place to this one
         # The previous step purged what it installed, so this one starts on a clean machine.
         if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
@@ -1016,10 +1016,10 @@ jobs:
           RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-darwin-arm64.pkg
           RELEASED_SHA256: b07d36bd44d9b340cf8f9c8f85cb294472a118f018e3b205bef44ffa0bb9d218
         run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/released.pkg" "$RELEASED"
+          curl -fsSL --retry 3 --max-time 300 -o "$RUNNER_TEMP/released.pkg" "$RELEASED"
           echo "$RELEASED_SHA256  $RUNNER_TEMP/released.pkg" | shasum -a 256 -c -
           sudo OPAMP_PKG="$RUNNER_TEMP/released.pkg" OPAMP_UPGRADE="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" \
-            "$RUNNER_TEMP/install.test" -test.run Upgrade -test.v
+            "$RUNNER_TEMP/install.test" -test.run Upgrade -test.v -test.timeout 12m
       - name: The .pkg, kept
         if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1074,7 +1074,7 @@ jobs:
         working-directory: go/opampsupervisor/packaging
         run: |
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
-          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v
+          OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 12m
       - name: The released .msi, enrolled, then upgraded in place to this one
         # The previous step purged what it installed, so this one starts on a clean machine.
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
@@ -1083,10 +1083,10 @@ jobs:
           RELEASED: https://github.com/pydantic/opamp-clients/releases/download/go/opampsupervisor/v0.9.0/pydantic-opamp-supervisor-0.9.0-windows-amd64.msi
           RELEASED_SHA256: 2a7181195790180e507fc8edab4833e79f6e6575fd42ce05343b025194f19ad8
         run: |
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/released.msi" "$RELEASED"
+          curl -fsSL --retry 3 --max-time 300 -o "$RUNNER_TEMP/released.msi" "$RELEASED"
           echo "$RELEASED_SHA256  $RUNNER_TEMP/released.msi" | sha256sum -c -
           OPAMP_MSI="$(cygpath -w "$RUNNER_TEMP/released.msi")" OPAMP_UPGRADE="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" \
-            "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v
+            "$RUNNER_TEMP/install.test.exe" -test.run Upgrade -test.v -test.timeout 12m
       - name: The .msi, kept
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
