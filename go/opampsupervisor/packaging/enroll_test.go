@@ -3,6 +3,8 @@
 package packaging
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -452,4 +455,173 @@ func TestEnrollWaitsForTheConnection(t *testing.T) {
 	assert.Contains(t, out, "doesn't trust the server's certificate")
 	assert.Contains(t, out, "can't connect to wss://opamp.example.com/v1/opamp yet; it keeps retrying")
 	assert.NotContains(t, out, "running and connected")
+}
+
+// --refresh, which a package upgrade runs, writes the config again from the last enrollment's
+// options, keeps the sealed credentials and starts the service again; it reads no token.
+func TestEnrollRefresh(t *testing.T) {
+	e := newEnrollment(t)
+	ca := filepath.Join(t.TempDir(), "given-ca.pem")
+	require.NoError(t, os.WriteFile(ca, []byte("a bundle"), 0o644))
+	out, err := e.run(t, "s3cr3t-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp", "--ca-file", ca,
+		"--restricted", "--log-path", "/srv/app/logs", "--host-logs", "--accept-packages")
+	require.NoError(t, err, out)
+	enrolled := e.read(t, "supervisor.yaml")
+	assert.NotContains(t, e.read(t, "enroll.options"), "s3cr3t-token")
+	assert.Equal(t, "--endpoint\nwss://opamp.example.com/v1/opamp\n--restricted\n--log-path\n/srv/app/logs\n--host-logs\n--accept-packages\n",
+		e.read(t, "enroll.options"))
+	require.NoError(t, os.Remove(ca), "--refresh reads the copy, not the bundle given")
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "systemctl.log")))
+
+	// An older package's config, without the settings this one writes.
+	require.NoError(t, os.WriteFile(filepath.Join(e.root, "etc/pydantic-opamp/supervisor.yaml"),
+		[]byte(strings.ReplaceAll(enrolled, "  reports_own_logs: true\n", "")), 0o640))
+	require.NoError(t, os.WriteFile(filepath.Join(e.root, "etc/pydantic-opamp/supervisor.yaml.sha256"),
+		[]byte(sha256Hex(strings.ReplaceAll(enrolled, "  reports_own_logs: true\n", ""))+"\n"), 0o600))
+	out, err = e.run(t, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp")
+	assert.Equal(t, enrolled, e.read(t, "supervisor.yaml"))
+	assert.Equal(t, "SEALED:--name=opamp-enroll-token:s3cr3t-token", e.read(t, "enroll-token.cred"))
+	assert.Equal(t, "a bundle", e.read(t, "ca.pem"))
+	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+	require.NoError(t, err)
+	assert.Equal(t, "disable --now pydantic-otelcol.service\nenable pydantic-opamp-supervisor.service\n"+
+		"restart pydantic-opamp-supervisor.service\n", string(log))
+}
+
+func sha256Hex(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// A config edited by hand since it was written is kept; the service still starts again.
+func TestEnrollRefreshKeepsAnEditedConfig(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "token", "--endpoint", "wss://opamp.example.com/v1/opamp")
+	require.NoError(t, err, out)
+	path := filepath.Join(e.root, "etc/pydantic-opamp/supervisor.yaml")
+	edited := e.read(t, "supervisor.yaml") + "# widened by hand\n"
+	require.NoError(t, os.WriteFile(path, []byte(edited), 0o640))
+	require.NoError(t, os.Remove(filepath.Join(e.tools, "systemctl.log")))
+
+	out, err = e.run(t, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "edited since it was written and is kept")
+	assert.Equal(t, edited, e.read(t, "supervisor.yaml"))
+	log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+	require.NoError(t, err)
+	assert.Contains(t, string(log), "restart pydantic-opamp-supervisor.service")
+}
+
+// An enrollment with --no-start stays stopped; one by an older package, which kept no options,
+// keeps its config and starts again; a host that isn't enrolled is refused.
+func TestEnrollRefreshWithoutOptions(t *testing.T) {
+	e := newEnrollment(t)
+	out, err := e.run(t, "", "--refresh")
+	require.Error(t, err, out)
+	assert.Contains(t, out, "isn't enrolled")
+
+	out, err = e.run(t, "token", "--endpoint", "wss://opamp.example.com/v1/opamp", "--no-start")
+	require.NoError(t, err, out)
+	out, err = e.run(t, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp; start the Supervisor with")
+	_, err = os.Stat(filepath.Join(e.tools, "systemctl.log"))
+	assert.ErrorIs(t, err, os.ErrNotExist, "--refresh started a --no-start enrollment")
+
+	out, err = e.run(t, "", "--refresh", "--plaintext")
+	require.Error(t, err, out)
+	assert.Contains(t, out, "takes no other options")
+
+	// Enrolled by an older package, which kept no options or checksum.
+	older := func(t *testing.T, args ...string) (enrollment, string) {
+		e := newEnrollment(t)
+		out, err := e.run(t, "token", append([]string{"--endpoint", "ws://opamp.example.com/v1/opamp", "--plaintext"}, args...)...)
+		require.NoError(t, err, out)
+		etc := filepath.Join(e.root, "etc/pydantic-opamp")
+		require.NoError(t, os.Remove(filepath.Join(etc, "enroll.options")))
+		require.NoError(t, os.Remove(filepath.Join(etc, "supervisor.yaml.sha256")))
+		cfg := strings.ReplaceAll(e.read(t, "supervisor.yaml"), "  reports_own_logs: true\n", "")
+		require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(cfg), 0o640))
+		return e, cfg
+	}
+	// Without --restricted, its options are in its config: it is written again, the old one kept.
+	e, cfg := older(t, "--accept-packages")
+	out, err = e.run(t, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "the old one is kept as")
+	assert.Equal(t, cfg, e.read(t, "supervisor.yaml.old"))
+	assert.Contains(t, e.read(t, "supervisor.yaml"), "  reports_own_logs: true\n")
+	assert.Equal(t, "--endpoint\nws://opamp.example.com/v1/opamp\n--plaintext\n--accept-packages\n", e.read(t, "enroll.options"))
+	assertPackages(t, e.loadEnrolled(t), true, "otelcol")
+
+	// A --restricted policy may have been changed by hand, and so may any setting the new config
+	// wouldn't keep: it stays, with no options saved, and the service starts again.
+	for name, edit := range map[string]func(string) string{
+		"restricted": func(cfg string) string { return cfg },
+		"storage directory edited": func(cfg string) string {
+			return strings.Replace(cfg, "  directory: /var/lib/pydantic-opamp\n", "  directory: /data/opamp\n", 1)
+		},
+		"header added": func(cfg string) string {
+			return strings.Replace(cfg, "  headers:\n", "  headers:\n    X-Team: infra\n", 1)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			args := []string{}
+			if name == "restricted" {
+				args = append(args, "--restricted")
+			}
+			e, cfg := older(t, args...)
+			cfg = edit(cfg)
+			require.NoError(t, os.WriteFile(filepath.Join(e.root, "etc/pydantic-opamp/supervisor.yaml"), []byte(cfg), 0o640))
+			out, err := e.run(t, "", "--refresh")
+			require.NoError(t, err, out)
+			assert.Contains(t, out, "with --restricted, or edited, and is kept")
+			assert.Equal(t, cfg, e.read(t, "supervisor.yaml"))
+			for _, name := range []string{"enroll.options", "enroll.options.migrated", "supervisor.yaml.old", "supervisor.yaml.tmp", "settings.tmp"} {
+				_, err := os.Stat(filepath.Join(e.root, "etc/pydantic-opamp", name))
+				assert.ErrorIs(t, err, os.ErrNotExist, name)
+			}
+			log, err := os.ReadFile(filepath.Join(e.tools, "systemctl.log"))
+			require.NoError(t, err)
+			assert.Contains(t, string(log), "restart pydantic-opamp-supervisor.service")
+		})
+	}
+}
+
+// After a package upgrade, the collector this host ran starts again: the Supervisor, refreshed,
+// when it was enrolled last; the unmanaged collector when pydantic-otelcol-configure ran after.
+func TestAfterUpgrade(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the upgrade script is for Linux")
+	}
+	run := func(t *testing.T, configs ...string) string {
+		root, tools := t.TempDir(), t.TempDir()
+		_, systemctl := fakeSystemd(t, tools)
+		enroll := filepath.Join(tools, "enroll")
+		require.NoError(t, os.WriteFile(enroll, []byte("#!/bin/sh\necho \"enroll $*\" >>"+filepath.Join(tools, "systemctl.log")+"\n"), 0o755))
+		etc := filepath.Join(root, "etc/pydantic-opamp")
+		require.NoError(t, os.MkdirAll(etc, 0o750))
+		now := time.Now()
+		for i, name := range configs {
+			path := filepath.Join(etc, name)
+			require.NoError(t, os.WriteFile(path, nil, 0o640))
+			stamp := now.Add(time.Duration(i-len(configs)) * time.Minute)
+			require.NoError(t, os.Chtimes(path, stamp, stamp))
+		}
+		cmd := exec.Command("./pydantic-opamp-after-upgrade")
+		cmd.Env = append(os.Environ(), "OPAMP_ENROLL_ROOT="+root, "SYSTEMCTL="+systemctl, "OPAMP_ENROLL="+enroll)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+		log, _ := os.ReadFile(filepath.Join(tools, "systemctl.log"))
+		return string(log)
+	}
+	assert.Empty(t, run(t), "not enrolled or configured: nothing starts")
+	assert.Equal(t, "enroll --refresh\n", run(t, "supervisor.yaml"))
+	assert.Equal(t, "enroll --refresh\n", run(t, "otelcol.yaml", "supervisor.yaml"))
+	unmanaged := "enable pydantic-otelcol.service\nrestart pydantic-otelcol.service\n"
+	assert.Equal(t, unmanaged, run(t, "otelcol.yaml"))
+	assert.Equal(t, unmanaged, run(t, "supervisor.yaml", "otelcol.yaml"))
+	assert.Empty(t, run(t, "supervisor.yaml", "otelcol.yaml", "otelcol.no-start"), "configured with --no-start: nothing starts")
 }

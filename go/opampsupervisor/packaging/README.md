@@ -28,8 +28,8 @@ code signing. `SHA256SUMS` covers the archives. `SHA256SUMS.installers` covers t
 OpAMP:
 
 - the Supervisor (this fork);
-- a collector for it to run, built with ocb from [collector.yaml](collector.yaml), with this
-  repository's opamp extension;
+- a collector for it to run: upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`),
+  unchanged, at `/usr/lib/pydantic-opamp/otelcol` (see [The bundled Collector](#the-bundled-collector));
 - a systemd unit;
 - `pydantic-opamp-enroll`.
 
@@ -140,8 +140,7 @@ and the Collector's log still goes to its standard output. A remote config's own
 `service::telemetry` settings for a signal take the place of the offer's. With `--restricted`,
 the offered endpoints must be allowed exporter endpoints, like the remote config's.
 
-Hosts enrolled before this keep their old `supervisor.yaml`: run the enroll script again to add
-them.
+A package upgrade adds them (see [Upgrades](#upgrades)).
 
 ### Unmanaged
 
@@ -207,12 +206,25 @@ REPO_BUCKET=gs://pydantic-opamp-packages REPO_URL=https://packages.pydantic.dev 
 
 Nothing runs it yet: no repository is hosted, and there is no signing key.
 
+### The bundled Collector
+
+Every package (deb, rpm, `.pkg`, `.msi`, the release archives and the container image) carries
+upstream's [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases)
+release as it is: every component contrib has works in a config the server sends, and the
+Supervisor configures it with contrib's own `opamp` extension. [contrib.json](contrib.json) pins
+the release and each platform's archive by SHA-256; `go run ./internal/fetchcontrib` (from
+`go/opampsupervisor`) downloads one, refuses it unless the hash matches, and extracts
+`otelcol-contrib`, installed as `otelcol`. To move to a new contrib release, set its version and
+the six hashes from the release's `.sha256` files, after checking each archive's
+`.sigstore.json` (signed by the open-telemetry/opentelemetry-collector-releases workflows) with
+`cosign verify-blob`.
+
 ### Releases
 
 [archive.sh](archive.sh) builds one release archive into `packaging/dist/`: `opampsupervisor` and
-`otelcol` (built with ocb from [collector.yaml](collector.yaml)), the licenses and a README, as a
-`.tar.gz` for Linux and macOS and a `.zip` for Windows. Both binaries are cross-built without cgo,
-so any machine builds every target:
+`otelcol` (upstream's `otelcol-contrib`), the licenses and a README, as a `.tar.gz` for Linux and
+macOS and a `.zip` for Windows. The Supervisor is cross-built without cgo and the collector is
+downloaded, so any machine builds every target:
 
 ```sh
 VERSION=0.1.0 GOOS=darwin GOARCH=arm64 go/opampsupervisor/packaging/archive.sh
@@ -552,6 +564,42 @@ checks out.
 
 CI runs them all, on Linux (with a throwaway signing key), macOS and Windows, and keeps the
 packages as artifacts.
+
+## Upgrades
+
+Installing a newer package over the installed one (apt, dnf, the `.pkg` or the `.msi`) upgrades
+in place. The host
+keeps its enrollment, its issued credentials and its instance UID, and needs no new key:
+
+- The enroll script keeps the options it was last run with, never a token, in `enroll.options`
+  beside the config, with the config's SHA-256 in `supervisor.yaml.sha256`.
+- After the upgrade, the package runs `pydantic-opamp-enroll --refresh` (`-Refresh` on Windows).
+  It writes the config again with this version's settings and those options, then starts the
+  Supervisor again, unless it was enrolled with `--no-start`. On Linux, the deb's postinst runs
+  it, and the rpm's posttrans does, through `pydantic-opamp-after-upgrade`. A host running the
+  unmanaged collector (`pydantic-otelcol-configure` ran after the last enrollment) gets that
+  service started again instead, unless it was configured with `--no-start`.
+- A config edited since the script wrote it is kept as it is, and the script says so. Run the
+  enroll script again with its options to write it anew.
+- A host enrolled by a package up to 0.9.0 has no `enroll.options`. Without `--restricted`, its
+  config holds all its options (the endpoint, the CA file, `--plaintext`, `--accept-packages`), so
+  they're read from it, and the config is written again only if the new one has every setting
+  the old one had (its lines but comments), with the old one kept as `supervisor.yaml.old`. One
+  edited by hand (another executable, storage directory or header) stays, and so does a
+  `--restricted` config, which may have been widened or narrowed by hand. Run the enroll script
+  again with its options to add the new settings. Those packages kept no `--no-start` choice,
+  so this upgrade starts the service.
+
+Packages up to 0.9.0 stopped and disabled the Linux services during an upgrade, and a Windows
+upgrade left the service stopped and set to start on demand. These packages start them again,
+including after an upgrade from one of those. Before stopping its services, Linux's `prerm`
+(`%preun`) now checks whether this is a removal; on an upgrade they keep running until the new
+package restarts them. CI installs the released 0.9.0 `.pkg` and `.msi`, enrolls them, and
+upgrades them in place to the package it built.
+
+The Supervisor can't be updated over OpAMP. A server's package offer
+([Collector updates from the server](#collector-updates-from-the-server)) replaces only the
+Collector it runs.
 
 ## Remove the installed Collector
 

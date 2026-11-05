@@ -1,6 +1,6 @@
 #!/bin/sh
-# Builds the Linux packages into packaging/dist: the bundled collector (ocb, collector.yaml), the
-# Supervisor, then a deb and an rpm (nfpm.yaml). Run from anywhere:
+# Builds the Linux packages into packaging/dist: the bundled collector (upstream's otelcol-contrib,
+# pinned in contrib.json), the Supervisor, then a deb and an rpm (nfpm.yaml). Run from anywhere:
 #   VERSION=0.1.0 ARCH=amd64 go/opampsupervisor/packaging/build.sh
 # ARCH is a Go architecture (amd64 or arm64); both binaries are cross-built, without cgo.
 # With SIGNING_KEY_FILE (an armored OpenPGP secret key, unlocked by SIGNING_KEY_PASSPHRASE if it
@@ -16,7 +16,7 @@ export VERSION ARCH GOOS=linux GOARCH="$ARCH" CGO_ENABLED=0
 export NFPM_PASSPHRASE="${SIGNING_KEY_PASSPHRASE:-}"
 
 mkdir -p dist
-(cd .. && go run go.opentelemetry.io/collector/cmd/builder@v0.164.0 --config packaging/collector.yaml)
+(cd .. && GOOS= GOARCH= go run ./internal/fetchcontrib -os linux -arch "$ARCH" -out packaging/dist/otelcol/otelcol)
 (cd .. && go build -trimpath -o packaging/dist/opampsupervisor .)
 for packager in deb rpm; do
 	GOOS= GOARCH= go run github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0 package \

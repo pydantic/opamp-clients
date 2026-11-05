@@ -191,3 +191,76 @@ func TestMacEnrollHostLogs(t *testing.T) {
 	assertHostLogs(t, p, enroll(), hostLogsConfig(t, "macos"), `configures receiver "macos_unified_logging"`)
 	require.ErrorContains(t, p.Check("", []byte(`receivers: {macos_unified_logging: {archive_path: /tmp/x.logarchive}}`)), "sets archive_path")
 }
+
+// --refresh, which the .pkg's postinstall runs on an upgrade, writes the config again with the
+// last enrollment's options, keeps the token and loads the daemon again; one an older package
+// wrote without --restricted is rewritten too, the old one kept; an edited one is kept.
+func TestMacEnrollRefresh(t *testing.T) {
+	root, tools := t.TempDir(), t.TempDir()
+	etc := filepath.Join(root, "opt/pydantic-opamp/etc")
+	ca := filepath.Join(t.TempDir(), "ca.pem")
+	require.NoError(t, os.WriteFile(ca, []byte("a bundle"), 0o644))
+	out, err := macEnroll(t, root, tools, "s3cr3t-token\n", "--endpoint", "wss://opamp.example.com/v1/opamp", "--ca-file", ca, "--accept-packages")
+	require.NoError(t, err, out)
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join(etc, name))
+		require.NoError(t, err)
+		return string(b)
+	}
+	enrolled := read("supervisor.yaml")
+	assert.Equal(t, "--endpoint\nwss://opamp.example.com/v1/opamp\n--ca-file\n"+ca+"\n--accept-packages\n", read("enroll.options"))
+	older := strings.ReplaceAll(enrolled, "  reports_own_logs: true\n", "")
+
+	for _, tt := range []struct {
+		name  string
+		setup func()
+	}{
+		{"options kept", func() {
+			require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml.sha256"), []byte(sha256Hex(older)+"\n"), 0o600))
+		}},
+		{"an older package's", func() {
+			require.NoError(t, os.Remove(filepath.Join(etc, "enroll.options")))
+			require.NoError(t, os.Remove(filepath.Join(etc, "supervisor.yaml.sha256")))
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(older), 0o600))
+			tt.setup()
+			require.NoError(t, os.RemoveAll(filepath.Join(tools, "launchctl.log")))
+			out, err := macEnroll(t, root, tools, "", "--refresh")
+			require.NoError(t, err, out)
+			assert.Contains(t, out, "refreshed with wss://opamp.example.com/v1/opamp")
+			assert.Equal(t, enrolled, read("supervisor.yaml"))
+			assert.Equal(t, "s3cr3t-token", read("enroll-token"))
+			log, err := os.ReadFile(filepath.Join(tools, "launchctl.log"))
+			require.NoError(t, err)
+			assert.Equal(t, "bootout system/dev.pydantic.opamp-supervisor\n"+
+				"bootstrap system /Library/LaunchDaemons/dev.pydantic.opamp-supervisor.plist\n", string(log))
+		})
+	}
+	assert.Equal(t, older, read("supervisor.yaml.old"))
+
+	// An older package's config with a setting the new one wouldn't keep stays as it is.
+	handEdited := strings.Replace(older, "  headers:\n", "  headers:\n    X-Team: infra\n", 1)
+	require.NotEqual(t, older, handEdited)
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(handEdited), 0o600))
+	require.NoError(t, os.Remove(filepath.Join(etc, "enroll.options")))
+	require.NoError(t, os.Remove(filepath.Join(etc, "supervisor.yaml.sha256")))
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "with --restricted, or edited, and is kept")
+	assert.Equal(t, handEdited, read("supervisor.yaml"))
+	_, err = os.Stat(filepath.Join(etc, "enroll.options"))
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(enrolled), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml.sha256"), []byte(sha256Hex(enrolled)+"\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "enroll.options"),
+		[]byte("--endpoint\nwss://opamp.example.com/v1/opamp\n--ca-file\n"+ca+"\n--accept-packages\n"), 0o600))
+
+	edited := enrolled + "# by hand\n"
+	require.NoError(t, os.WriteFile(filepath.Join(etc, "supervisor.yaml"), []byte(edited), 0o600))
+	out, err = macEnroll(t, root, tools, "", "--refresh")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "edited since it was written and is kept")
+	assert.Equal(t, edited, read("supervisor.yaml"))
+}

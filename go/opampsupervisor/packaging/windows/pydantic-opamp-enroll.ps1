@@ -6,6 +6,10 @@
 #
 #   $env:ENROLLMENT_TOKEN | & "$env:ProgramFiles\pydantic-opamp\pydantic-opamp-enroll.ps1" -Endpoint wss://opamp.example.com/v1/opamp
 #
+# -Refresh (the .msi runs it after an upgrade) writes the config again with the last enrollment's
+# options, kept in enroll.options, and its token, and starts the service again unless it was
+# enrolled with -NoStart. A config edited since it was written is kept.
+#
 # It writes the enrollment token to a file only SYSTEM and Administrators can read (never on the
 # command line), writes the Supervisor's config, and starts the service. The Supervisor seals its
 # state with a key protected by DPAPI for SYSTEM; the server's issued credentials then replace
@@ -14,7 +18,7 @@
 # OPAMP_ENROLL_ROOT is for its tests: the directory to write in place of ProgramData\pydantic-opamp.
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$Endpoint,
+    [string]$Endpoint,
     # Where to read the enrollment token; standard input by default.
     [string]$TokenFile,
     # Read the enrollment token and telemetry token from two standard-input lines.
@@ -40,6 +44,9 @@ param(
     [switch]$AcceptPackages,
     # Write the config and the token, but don't start the service.
     [switch]$NoStart,
+    # Write the config again with the last enrollment's options and token, and start the service
+    # again unless it was enrolled with -NoStart. A package upgrade runs this.
+    [switch]$Refresh,
     # Takes the token's lines when they're piped in, read below from $input. PowerShell pipes
     # standard input this way too (powershell -File): without it, they couldn't be bound.
     [Parameter(ValueFromPipeline = $true)]$PipedLine
@@ -51,6 +58,88 @@ function Fail([string]$message) {
     [Console]::Error.WriteLine("pydantic-opamp-enroll: $message")
     exit 1
 }
+
+function Note([string]$message) { [Console]::Error.WriteLine("pydantic-opamp-enroll: $message") }
+
+function Get-Root {
+    $root = $env:OPAMP_ENROLL_ROOT
+    if (-not $root) {
+        $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+            [Security.Principal.WindowsBuiltInRole]::Administrator)
+        if (-not $admin) { Fail 'run it as an administrator' }
+        $root = Join-Path $env:ProgramData 'pydantic-opamp'
+    }
+    $root
+}
+
+function Get-Sha256([string]$path) { (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+
+function Restart-Supervisor {
+    Set-Service -Name $service -StartupType Automatic
+    Restart-Service -Name $service
+}
+
+# Keep a config an older package wrote, and start the Supervisor again with it.
+function Keep-Legacy([string]$config) {
+    Note "$config was written by an older package with -Restricted, or edited, and is kept; run pydantic-opamp-enroll.ps1 again with its options to add this version's settings"
+    Restart-Supervisor
+    Write-Output "restarted the Supervisor ($service)"
+    exit 0
+}
+
+# A config's settings: its lines but comments and blank ones.
+function Get-Settings([string[]]$lines) { @($lines | Where-Object { $_ -notmatch '^\s*(#|$)' }) }
+
+$edited = $false
+$legacy = $null
+if ($Refresh) {
+    if ($Endpoint -or $TokenFile -or $TelemetryTokenStdin -or $CaFile -or $Plaintext -or $Restricted -or $ExporterEndpoint -or
+        $LogPath -or $HostLogs -or $AcceptPackages -or $NoStart) {
+        Fail "-Refresh takes no other options: it uses the last enrollment's"
+    }
+    $root = Get-Root
+    $config = Join-Path $root 'supervisor.yaml'
+    $optionsPath = Join-Path $root 'enroll.options'
+    if (-not (Test-Path -LiteralPath $config -PathType Leaf)) { Fail 'this host isn''t enrolled: run pydantic-opamp-enroll.ps1 -Endpoint URL first' }
+    if (-not (Test-Path -LiteralPath (Join-Path $root 'enroll-token') -PathType Leaf)) {
+        Fail "$root\enroll-token is missing: run pydantic-opamp-enroll.ps1 again with its options and the enrollment token"
+    }
+    if (-not (Test-Path -LiteralPath $optionsPath -PathType Leaf)) {
+        # Enrolled by a package older than -Refresh, which kept no options: only a config this
+        # script wrote without -Restricted says them all (its endpoint, CA file, and packages). A
+        # -Restricted policy may have been widened or narrowed by hand: it stays. The new config
+        # replaces it only if it has every setting the old one had (below).
+        $legacy = @(Get-Content -LiteralPath $config)
+        $oldEndpoint = $legacy | ForEach-Object { if ($_ -match '^  endpoint: "(.*)"$') { $Matches[1] } } | Select-Object -First 1
+        if (-not ($legacy[0] -like '# Written by pydantic-opamp-enroll*') -or ($legacy -contains '  remote_config_policy:') -or -not $oldEndpoint) {
+            Keep-Legacy $config
+        }
+        $oldCa = $legacy | ForEach-Object { if ($_ -match "^    ca_file: '(.*)'$") { $Matches[1] } } | Select-Object -First 1
+        $saved = [pscustomobject]@{ Endpoint = $oldEndpoint; CaFile = $oldCa; Plaintext = ($oldEndpoint -match '^(ws|http)://');
+            AcceptPackages = ($legacy -contains '  accepts_packages: true') }
+    } else {
+        $saved = Get-Content -LiteralPath $optionsPath -Raw | ConvertFrom-Json
+    }
+    $Endpoint = $saved.Endpoint
+    if ($saved.CaFile) { $CaFile = $saved.CaFile }
+    $Plaintext = [bool]$saved.Plaintext
+    $Restricted = [bool]$saved.Restricted
+    $ExporterEndpoint = @($saved.ExporterEndpoint | Where-Object { $_ })
+    $LogPath = @($saved.LogPath | Where-Object { $_ })
+    $HostLogs = [bool]$saved.HostLogs
+    $AcceptPackages = [bool]$saved.AcceptPackages
+    $NoStart = [bool]$saved.NoStart
+    $written = Join-Path $root 'supervisor.yaml.sha256'
+    if ((Test-Path -LiteralPath $written -PathType Leaf) -and (Get-Sha256 $config) -ne (Get-Content -LiteralPath $written -Raw).Trim()) {
+        $edited = $true
+        Note "$config was edited since it was written and is kept; run pydantic-opamp-enroll.ps1 again with its options to rewrite it with this version's settings"
+    }
+}
+if (-not $Endpoint) { Fail 'pass -Endpoint URL (or -Refresh, to write the last enrollment''s config again)' }
+# What -Refresh uses again: everything but where the tokens come from.
+$options = [ordered]@{ Endpoint = $Endpoint; CaFile = $CaFile; Plaintext = [bool]$Plaintext; Restricted = [bool]$Restricted;
+    ExporterEndpoint = @($ExporterEndpoint | Where-Object { $_ }); LogPath = @($LogPath | Where-Object { $_ }); HostLogs = [bool]$HostLogs;
+    AcceptPackages = [bool]$AcceptPackages; NoStart = [bool]$NoStart }
 
 if ($Endpoint -match '^(wss|https)://') {
 } elseif ($Endpoint -match '^(ws|http)://') {
@@ -91,29 +180,25 @@ foreach ($p in $LogPath) {
     }
 }
 
-$root = $env:OPAMP_ENROLL_ROOT
-if (-not $root) {
-    $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)
-    if (-not $admin) { Fail 'run it as an administrator' }
-    $root = Join-Path $env:ProgramData 'pydantic-opamp'
-}
+if (-not $Refresh) { $root = Get-Root }
 
-$token = if ($TokenFile) { Get-Content -LiteralPath $TokenFile -Raw }
-         elseif ($MyInvocation.ExpectingInput) { @($input) -join "`n" }
-         else { [Console]::In.ReadToEnd() }
 $telemetryToken = $null
-if ($TelemetryTokenStdin) {
-    if ($TokenFile) { Fail '-TelemetryTokenStdin cannot be combined with -TokenFile' }
-    $lines = @($token.TrimEnd([char[]]"`r`n") -split '\r?\n')
-    if ($lines.Count -ne 2) { Fail 'provide exactly two credential lines' }
-    $token, $telemetryToken = $lines
-    if ($telemetryToken -cnotmatch '^[A-Za-z0-9._~+/=-]+$') { Fail 'the telemetry token is empty or has invalid characters' }
+if (-not $Refresh) {
+    $token = if ($TokenFile) { Get-Content -LiteralPath $TokenFile -Raw }
+             elseif ($MyInvocation.ExpectingInput) { @($input) -join "`n" }
+             else { [Console]::In.ReadToEnd() }
+    if ($TelemetryTokenStdin) {
+        if ($TokenFile) { Fail '-TelemetryTokenStdin cannot be combined with -TokenFile' }
+        $lines = @($token.TrimEnd([char[]]"`r`n") -split '\r?\n')
+        if ($lines.Count -ne 2) { Fail 'provide exactly two credential lines' }
+        $token, $telemetryToken = $lines
+        if ($telemetryToken -cnotmatch '^[A-Za-z0-9._~+/=-]+$') { Fail 'the telemetry token is empty or has invalid characters' }
+    }
+    # The token goes into an HTTP header: one line, no surrounding space.
+    $token = "$token" -replace "[`r`n]", ''
+    if (-not $token) { Fail 'the enrollment token is empty' }
+    if ($token -cnotmatch '^[A-Za-z0-9._~+/=-]+$') { Fail "the enrollment token has characters a bearer token can't" }
 }
-# The token goes into an HTTP header: one line, no surrounding space.
-$token = "$token" -replace "[`r`n]", ''
-if (-not $token) { Fail 'the enrollment token is empty' }
-if ($token -cnotmatch '^[A-Za-z0-9._~+/=-]+$') { Fail "the enrollment token has characters a bearer token can't" }
 
 # Only SYSTEM (the service) and Administrators: set before anything secret is written.
 New-Item -ItemType Directory -Force -Path $root | Out-Null
@@ -135,7 +220,7 @@ function Write-Atomically([string]$path, [string]$content) {
 function Slashed([string]$path) { $path -replace '\\', '/' }
 $programs = Join-Path $env:ProgramFiles 'pydantic-opamp'
 $tokenPath = Join-Path $root 'enroll-token'
-Write-Atomically $tokenPath $token
+if (-not $Refresh) { Write-Atomically $tokenPath $token }
 # A YAML flow sequence of single-quoted strings (none holds a quote); [] for none.
 function YamlList([string[]]$items) { '[' + ((@($items) | Where-Object { $_ } | ForEach-Object { "'$_'" }) -join ', ') + ']' }
 # The collector executables the server offers are installed if this repository's release workflow
@@ -198,7 +283,7 @@ $policy = if ($Restricted) {
     "  # Any config the OpAMP server sends runs here. To limit what it may configure, and where it may`n  # send, run pydantic-opamp-enroll.ps1 again with -Restricted."
 }
 $tls = if ($CaFile) { "  tls:`n    ca_file: '$(Slashed $CaFile)'`n" } else { '' }
-Write-Atomically (Join-Path $root 'supervisor.yaml') @"
+$rendered = @"
 # Written by pydantic-opamp-enroll. Run it again to enroll with another server or token.
 server:
   endpoint: "$Endpoint"
@@ -241,13 +326,26 @@ storage:
   # The issued credentials, sealed with a key DPAPI protects for SYSTEM.
   state_key: dpapi
 "@
+if ($legacy) {
+    # One edited by hand (another executable, storage directory or header) is kept.
+    $new = Get-Settings ($rendered -split "\r?\n")
+    if (@(Get-Settings $legacy | Where-Object { $new -cnotcontains $_ }).Count -gt 0) { Keep-Legacy $config }
+    Copy-Item -LiteralPath $config -Destination "$config.old" -Force
+    Note "rewriting the config an older package wrote; the old one is kept as $config.old"
+}
+if (-not $edited) {
+    $configPath = Join-Path $root 'supervisor.yaml'
+    Write-Atomically $configPath $rendered
+    Write-Atomically (Join-Path $root 'supervisor.yaml.sha256') (Get-Sha256 $configPath)
+    Write-Atomically (Join-Path $root 'enroll.options') ($options | ConvertTo-Json)
+}
+$done = if ($Refresh) { 'refreshed' } else { 'enrolled' }
 
 if ($NoStart) {
-    Write-Output "enrolled with $Endpoint; start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
+    Write-Output "$done with $Endpoint; start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
 } else {
-    Set-Service -Name $service -StartupType Automatic
     $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    Restart-Service -Name $service
+    Restart-Supervisor
     # An install that can't reach its server (an untrusted certificate, a refused key) fails here,
     # with what to check, instead of reporting success; the service keeps retrying.
     $supervisor = if ($env:OPAMP_SUPERVISOR) { $env:OPAMP_SUPERVISOR } else { Join-Path $programs 'opampsupervisor.exe' }
@@ -257,5 +355,5 @@ if ($NoStart) {
         Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
         exit 1
     }
-    Write-Output "enrolled with $Endpoint; the Supervisor is running and connected ($service)"
+    Write-Output "$done with $Endpoint; the Supervisor is running and connected ($service)"
 }
