@@ -27,6 +27,11 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Supervisor installers and container image: the Collector runs with
+  `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
+  receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
+  those metrics fails when a component is in more than one pipeline (packaging/README.md,
+  "Pipeline item counts") (#120).
 - .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
   instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
   tests run on both. Building from source needs the .NET 10 SDK (#86).

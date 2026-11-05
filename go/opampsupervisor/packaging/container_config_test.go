@@ -41,12 +41,14 @@ func TestContainerConfigs(t *testing.T) {
 	open := loadContainerConfig(t, "supervisor.yaml")
 	assert.True(t, open.Capabilities.ReportsOwnMetrics)
 	assert.True(t, open.Capabilities.ReportsOwnLogs)
+	assert.Equal(t, []string{"--feature-gates=telemetry.newPipelineTelemetry"}, open.Agent.Arguments)
 	assert.False(t, open.Agent.RemoteConfigPolicy.Enabled(), "a policy in the default image config")
 	require.NoError(t, open.Agent.RemoteConfigPolicy.Check("", []byte(`exporters: {datadog: {api: {key: "${env:DD_API_KEY}"}}}`)))
 
 	restricted := loadContainerConfig(t, "supervisor-restricted.yaml")
 	assert.True(t, restricted.Capabilities.ReportsOwnMetrics)
 	assert.True(t, restricted.Capabilities.ReportsOwnLogs)
+	assert.Equal(t, []string{"--feature-gates=telemetry.newPipelineTelemetry"}, restricted.Agent.Arguments)
 	p := restricted.Agent.RemoteConfigPolicy
 	// The own telemetry Logfire offers stays inside the restricted policy.
 	require.NoError(t, p.Check(string(config.SpecialConfigFileOwnTelemetry), []byte(`service: {telemetry: {logs: {processors: [{batch: {exporter: {otlp: {protocol: http/protobuf, endpoint: "https://logfire-eu.pydantic.dev/v1/logs"}}}}]}}}`)))
