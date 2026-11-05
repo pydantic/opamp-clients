@@ -189,6 +189,7 @@ def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str]
     AGENT.configured = True
     AGENT.logfire = True
     instance = logfire.configure(**kwargs)
+    AGENT.logfire_config = getattr(instance, "config", None)
     AGENT.start(_resource(instance))
     return instance
 

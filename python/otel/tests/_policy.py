@@ -9,6 +9,8 @@ import json
 from pydantic_opamp_client import opamp_pb2
 
 FILE = "logfire-sdk-policy.json"
+#: The SDK's own values, reported beside the policy in force (contracts' logfire-sdk-local/v1).
+LOCAL_FILE = "logfire-sdk-local.json"
 V1 = "logfire-sdk-policy/v1"
 SIGNALS = ("traces", "metrics", "logs")
 # The controls a policy may leave out (as local).
@@ -55,9 +57,10 @@ def config_map(body: str | bytes | None) -> opamp_pb2.AgentConfigMap:
 
 
 def reported(e: opamp_pb2.EffectiveConfig) -> dict:
-    """The policy an effective config reports, parsed. It is the effective config's only file."""
+    """The policy an effective config reports, parsed. Beside it there is at most the SDK's own
+    values (logfire-sdk-local.json), and no other file."""
     files = e.config_map.config_map
-    assert list(files) == [FILE], list(files)
+    assert FILE in files and set(files) <= {FILE, LOCAL_FILE}, list(files)
     return json.loads(files[FILE].body)
 
 

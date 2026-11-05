@@ -200,13 +200,18 @@ VECTORS = Path(__file__).resolve().parents[2] / "testdata" / "sdk-settings"
 
 
 def host_of(case: dict):
-    """A case's host, as Host's fields; without one, a host that declares every setting."""
+    """A case's host, as Host's fields; without one, a host that declares every setting. Its local
+    values are the case's `local`, by their proto field names (left out: none)."""
+    from google.protobuf import json_format
     from pydantic_opamp_client.sdk import settings_pb2
 
     host = case.get("host")
-    if host is None:
-        return declaring()
-    return settings_pb2.Host(live=host.get("live", []), next_start=host.get("next_start", []))
+    out = declaring() if host is None else settings_pb2.Host(live=host.get("live", []),
+                                                             next_start=host.get("next_start", []))
+    if "local" in case:
+        # By its proto field names, which protobuf's JSON reads.
+        out.local.CopyFrom(json_format.ParseDict(case["local"], settings_pb2.Local()))
+    return out
 
 
 def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them() -> None:
@@ -293,7 +298,8 @@ def inventory_of(case: dict):
     return settings_pb2.Inventory(
         integration=inv.get("integration", ""), integration_version=inv.get("integration_version", ""),
         sdk_language=inv.get("sdk_language", ""), sdk_version=inv.get("sdk_version", ""),
-        instrumentations=[settings_pb2.Instrumentation(name=i.get("name", ""), version=i.get("version", ""))
+        instrumentations=[settings_pb2.Instrumentation(name=i.get("name", ""), version=i.get("version", ""),
+                                                       scope=i.get("scope", ""))
                           for i in inv.get("instrumentations", [])],
         exporters=[settings_pb2.Exporter(signal=e.get("signal", ""), name=e.get("name", ""),
                                          gated=e.get("gated", False), destination=e.get("destination", ""))
@@ -302,8 +308,9 @@ def inventory_of(case: dict):
 
 def components_json(c: opamp_pb2.AvailableComponents) -> dict:
     """The components as the vectors give them: sdk (key to text), instrumentations (name to
-    version or None), exporters (signal to identity to gated), destinations (signal to identity to
-    destination, for those with one) and settings (key to applies)."""
+    version or None), scopes (name to scope or None), exporters (signal to identity to gated),
+    destinations (signal to identity to destination, for those with one) and settings (key to
+    applies)."""
 
     def text(d: opamp_pb2.ComponentDetails, key: str) -> str | None:
         found = [kv.value for kv in d.metadata if kv.key == key]
@@ -321,6 +328,7 @@ def components_json(c: opamp_pb2.AvailableComponents) -> dict:
     return {
         "sdk": {kv.key: text(parts["sdk"], kv.key) for kv in parts["sdk"].metadata},
         "instrumentations": {n: text(d, "version") for n, d in parts["instrumentations"].sub_component_map.items()},
+        "scopes": {n: text(d, "scope") for n, d in parts["instrumentations"].sub_component_map.items()},
         "exporters": {s: {n: gated(e) for n, e in d.sub_component_map.items()}
                       for s, d in parts["exporters"].sub_component_map.items()},
         "destinations": {s: to for s, d in parts["exporters"].sub_component_map.items()
@@ -359,6 +367,28 @@ def test_the_exporters_vectors(case: dict) -> None:
                       for e in got.exporters],
         "governed": list(got.governed), "ungoverned": list(got.ungoverned), "warnings": list(got.warnings),
     } == case["want"]
+
+
+LOCAL = json.loads((VECTORS / "local.json").read_text(encoding="utf-8"))["cases"]
+LOCAL_FILE = "logfire-sdk-local.json"
+
+
+@pytest.mark.parametrize("case", LOCAL, ids=[c["name"] for c in LOCAL])
+def test_the_local_vectors(case: dict) -> None:
+    """testdata/sdk-settings/local.json through the module: the host's local values reported
+    beside the policy in force, never in it."""
+    host = host_of(case)
+    loaded = SdkSettings().load(None, host, case.get("now_unix_ms", 0))
+    files = loaded.effective.config_map.config_map
+    want = case["want"]
+    assert sorted(files) == sorted([FILE] + ([LOCAL_FILE] if want is not None else []))
+    if want is not None:
+        assert files[LOCAL_FILE].body == want.encode()
+        assert files[LOCAL_FILE].content_type == "application/json"
+    without = settings_pb2.Host()
+    without.CopyFrom(host)
+    without.ClearField("local")
+    assert files[FILE].body == SdkSettings().load(None, without, case.get("now_unix_ms", 0)).effective.config_map.config_map[FILE].body
 
 
 START = json.loads((VECTORS / "start.json").read_text(encoding="utf-8"))["cases"]

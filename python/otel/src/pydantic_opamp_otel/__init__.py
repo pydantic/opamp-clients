@@ -29,6 +29,7 @@ import asyncio
 import atexit
 import copy
 import dataclasses
+import decimal
 import concurrent.futures.thread  # noqa: F401 - its exit hook is registered before ours (see _at_exit)
 import logging
 import math
@@ -966,6 +967,74 @@ def _undeclared(host: settings_pb2.Host) -> list[str]:
     return [k for k in every if k not in host.live and k not in host.next_start]
 
 
+#: A policy's log levels (log_levels' `level`), by the SeverityNumber each starts at.
+_LEVELS = {1: "trace", 5: "debug", 9: "info", 13: "warn", 17: "error", 21: "fatal"}
+
+
+def _ratio(sampler) -> float | None:
+    """The share of new traces `sampler` samples, where it is one of the SDK's own that a ratio
+    names: a trace-ID ratio (under ParentBased or not), always on (1) or always off (0); this
+    package's sampler by the SDK's own one it wraps. None for any other: it can't be told."""
+    from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ParentBasedTraceIdRatio  # noqa: PLC0415
+
+    for _ in range(_DEEPEST):
+        if isinstance(sampler, LiveSampler):
+            sampler = sampler._configured  # noqa: SLF001
+        elif type(sampler) in (ParentBased, ParentBasedTraceIdRatio):
+            sampler = sampler._root  # noqa: SLF001
+        else:
+            break
+    if type(sampler) is TraceIdRatioBased:
+        return sampler.rate
+    return 1.0 if sampler is ALWAYS_ON else 0.0 if sampler is ALWAYS_OFF else None
+
+
+def _decimal(x: float) -> str:
+    """`x` as decimal text, as the local report takes a ratio: "1", "0.25", "0.00001"."""
+    text = format(decimal.Decimal(repr(x)), "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def local_settings(found: list[settings_pb2.FoundExporter], sdk: Mapping[str, bool], sampler=None,
+                   logfire_config=None, disabled: str | None = None) -> settings_pb2.Local:
+    """What the SDK does without the server, for the local report (contracts'
+    logfire-sdk-local/v1). A value it can't tell is left unset.
+
+    - sampling_rate: `sampler`'s ratio (the tracer provider's, this package's by the SDK's own
+      sampler it wraps), where `_ratio` can tell it.
+    - send_traces, send_metrics, send_logs: whether the SDK exports the signal at all, for each
+      signal whose provider is the SDK's (`sdk`): an exporter of it in `found` (as `govern` found
+      them), governed or not.
+    - send_logs_level: the Logfire SDK's own minimum level (`logfire_config`), where it is set to
+      one of the policy's levels. The OpenTelemetry SDK has none of its own.
+    - scrubbing: whether the Logfire SDK scrubs (it does unless `scrubbing=False`). Its own
+      patterns are regular expressions, which the policy's globs can't say, so none are listed.
+    - instrumentations: `disabled`, OTEL_PYTHON_DISABLED_INSTRUMENTATIONS as the application set
+      it, where opentelemetry-instrument loads them (None elsewhere: this package loads none).
+    """
+    out = settings_pb2.Local()
+    if sampler is not None and (ratio := _ratio(sampler)) is not None:
+        out.sampling_rate = _decimal(ratio)
+    for signal, setting in (("traces", "send_traces"), ("metrics", "send_metrics"), ("logs", "send_logs")):
+        if sdk.get(signal):
+            setattr(out, setting, any(f.signal == signal for f in found))
+    if logfire_config is not None:
+        level = _LEVELS.get(getattr(logfire_config, "min_level", 0))
+        if level is not None:
+            out.send_logs_level = level
+        if hasattr(logfire_config, "scrubbing"):
+            out.scrubbing.defaults = logfire_config.scrubbing is not False
+    if disabled is not None:
+        # As upstream reads it: comma-separated, each name stripped; "*" switches every one off.
+        names = [n.strip() for n in disabled.split(",") if n.strip()]
+        out.instrumentations.SetInParent()
+        if "*" in names:
+            out.instrumentations.all_disabled = True
+        else:
+            out.instrumentations.disabled.extend(dict.fromkeys(names))
+    return out
+
+
 #: The package as published, which the inventory names.
 PACKAGE = "pydantic-opamp-otel"
 
@@ -986,8 +1055,15 @@ def instrumentations() -> list[settings_pb2.Instrumentation]:
                 continue
         except Exception:  # noqa: BLE001 - a requirement it can't read: listed, as upstream would try it
             _log.debug("OpAMP: the requirements of %s", ep.name, exc_info=True)
-        out.append(settings_pb2.Instrumentation(name=ep.name, version=getattr(dist, "version", None) or ""))
+        out.append(settings_pb2.Instrumentation(name=ep.name, version=getattr(dist, "version", None) or "",
+                                                scope=_scope(ep)))
     return out
+
+
+def _scope(ep) -> str:
+    """The instrumentation scope an instrumentor's telemetry is under: its entry point's module
+    (upstream's instrumentations get their tracers and meters by their module's `__name__`)."""
+    return ep.value.partition(":")[0].strip()
 
 
 def _exporter_kind(signal: str, kind: type) -> str:
@@ -1242,6 +1318,13 @@ class Agent:
         self.logfire = False
         #: manage() put the application's own SDK under the server: its sampler is the application's.
         self.managed = False
+        #: The Logfire SDK's configuration, where it built the SDK: its own level and scrubbing.
+        self.logfire_config = None
+        #: OTEL_PYTHON_DISABLED_INSTRUMENTATIONS as the application set it, under
+        #: opentelemetry-instrument (None elsewhere), before the next-start settings are added.
+        self._own_disabled: str | None = None
+        #: The signals whose provider is the SDK's, as govern found them at start.
+        self._sdk_signals: dict[str, bool] = {}
         #: Every exporter on the SDK's providers, governed or not, as govern found them last.
         self.exporters: list[settings_pb2.Exporter] = []
         #: The exporters as found, which the core decides `exporters` from.
@@ -1298,6 +1381,8 @@ class Agent:
             return
         self.layer = SdkSettings()
         self._auto_instrumented = auto_instrumented
+        # configure_logfire() and manage() give it, once the SDK is built.
+        self.logfire_config = None
         # Until the SDK is built, as if this package built it; start() says what it found.
         self.host = sdk_host(auto_instrumented=auto_instrumented)
         saved = core_state = None
@@ -1320,7 +1405,9 @@ class Agent:
         self.effective = self.loaded.effective
         self._put_in_force(self.loaded.settings)
         self._arm(self.loaded.refresh_at_unix_ms)
-        disabled = disabled_instrumentations(self.loaded.settings, env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", ""))
+        own = env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", "")
+        self._own_disabled = own if auto_instrumented else None
+        disabled = disabled_instrumentations(self.loaded.settings, own)
         if disabled is not None:
             env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] = disabled
         # The UID reaches the SDK through the Configurator, not the environment: a child process
@@ -1374,8 +1461,10 @@ class Agent:
         self._warn(found.warnings)
         built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
                          governed=any(found.sdk.values()))
-        if built != self.host:
-            self.host = built
+        # And what it does without the server, reported beside the effective config.
+        self._sdk_signals = dict(found.sdk)
+        built.local.CopyFrom(self._local())
+        if list(built.live) != list(self.host.live) or list(built.next_start) != list(self.host.next_start):
             lost = ", ".join(_undeclared(built))
             if not any(found.sdk.values()):
                 _log.warning("OpAMP: the global providers aren't the OpenTelemetry SDK's, so nothing they "
@@ -1389,6 +1478,8 @@ class Agent:
             else:
                 _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
                              "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
+        if built != self.host:
+            self.host = built
             self.loaded = self.layer.load(self._saved, self.host, self.wall_ms(), core_state=self._core_state)
             self.current = self.loaded.current
             self.effective = self.loaded.effective
@@ -1448,6 +1539,11 @@ class Agent:
             if hasattr(os, "register_at_fork"):
                 os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
 
+    def _local(self) -> settings_pb2.Local:
+        """What the SDK does without the server (local_settings), as it was built and found."""
+        sampler = self.controls.sampler if self.configured else getattr(_own_sdk(), "sampler", None)
+        return local_settings(self.found, self._sdk_signals, sampler, self.logfire_config, self._own_disabled)
+
     def _warn(self, warnings: list[str]) -> None:
         """Say, once each, what exports past the gates (the core's words): the policy is in force on
         everything else, and the server is told (inventory and export health)."""
@@ -1472,6 +1568,11 @@ class Agent:
             found.decide(self.layer, os.environ, self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
+            # A signal's first exporter: the SDK exports it now, and the report says so.
+            local = self._local()
+            if self.host.HasField("local") and local != self.host.local:
+                self.host.local.CopyFrom(local)
+                self._refresh(self.wall_ms())
             if self.client is not None and self.components is not None:
                 components = self._components()
                 if components is not None:
@@ -2022,6 +2123,12 @@ def manage(*, endpoint: str | None = None, headers: Mapping[str, str] | None = N
     _watch_processors()
     # The Logfire SDK's logs are spans; its proxy is what it sets as the global provider.
     AGENT.logfire = type(trace.get_tracer_provider()).__module__.split(".")[0] == "logfire"
+    if AGENT.logfire:
+        # The proxy is the default instance's (logfire.configure() without local=True): its
+        # configuration has the Logfire SDK's own level and scrubbing. Loaded: its proxy is set.
+        import logfire  # noqa: PLC0415
+
+        AGENT.logfire_config = getattr(logfire.DEFAULT_LOGFIRE_INSTANCE, "config", None)
     AGENT.start(getattr(provider, "resource", None) or Resource.create({}))
 
 

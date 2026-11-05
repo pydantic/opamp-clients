@@ -242,6 +242,28 @@ def test_the_logfire_sdks_own_settings_still_hold_where_the_server_sets_none(tmp
     assert after["resource"]["team"] == "rocketeers" and after["resource"]["service.instance.id"] == uid
 
 
+def test_the_logfire_sdks_own_ratio_level_and_scrubbing_are_reported_as_local(tmp_path, servers):
+    """What the Logfire SDK does of its own, read from its configuration: the head ratio its
+    variable gives, its minimum level, and that it scrubs, or not."""
+    from pydantic_opamp_client.sdk import settings_pb2
+
+    server, ingest = servers
+    show = 'print("local", agent.host.local.SerializeToString().hex())'
+    run = _run(server, ingest, tmp_path, policy(), extra=', min_level="warn"', after=show,
+               env={"LOGFIRE_TRACE_SAMPLE_RATE": "0.25"})
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    local = settings_pb2.Local.FromString(bytes.fromhex(run.stdout.split("local ")[-1].split()[0]))
+    assert (local.sampling_rate, local.send_logs_level, local.scrubbing.defaults) == ("0.25", "warn", True)
+    # Its spans, its logs and its OpenTelemetry log records go to Logfire; metrics=False: none.
+    assert (local.send_traces, local.send_metrics, local.send_logs) == (True, False, True)
+    (tmp_path / "again").mkdir()
+    run = _run(server, ingest, tmp_path / "again", policy(), extra=", scrubbing=False", after=show)
+    assert run.returncode == 0, run.stderr
+    local = settings_pb2.Local.FromString(bytes.fromhex(run.stdout.split("local ")[-1].split()[0]))
+    assert local.sampling_rate == "1" and local.HasField("scrubbing") and not local.scrubbing.defaults
+    assert not local.HasField("send_logs_level")  # none set: every level is created
+
+
 def test_a_local_logfire_instance_is_described_by_its_own_resource(servers):
     """With local=True the Logfire SDK's providers aren't the global ones: the agent describes
     itself from the instance's own resource, its service.name included."""
