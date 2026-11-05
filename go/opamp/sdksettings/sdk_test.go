@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/open-telemetry/opamp-go/protobufs"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
@@ -601,8 +603,8 @@ func TestTheComponentsVectors(t *testing.T) {
 }
 
 // renderComponents is the components as the vectors write them: sdk (key to text),
-// instrumentations (name to version, nil when none), exporters (signal to name to gated) and
-// settings (key to applies), each always there.
+// instrumentations (name to version, nil when none), scopes (name to scope, nil when none),
+// exporters (signal to name to gated) and settings (key to applies), each always there.
 func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string]any {
 	t.Helper()
 	text := func(d *protobufs.ComponentDetails, key string) any {
@@ -641,6 +643,7 @@ func renderComponents(t *testing.T, a *protobufs.AvailableComponents) map[string
 	return map[string]any{
 		"sdk":              sdk,
 		"instrumentations": each(part("instrumentations"), func(d *protobufs.ComponentDetails) any { return text(d, "version") }),
+		"scopes":           each(part("instrumentations"), func(d *protobufs.ComponentDetails) any { return text(d, "scope") }),
 		"exporters": each(part("exporters"), func(signal *protobufs.ComponentDetails) any {
 			return each(signal, func(e *protobufs.ComponentDetails) any {
 				if md := e.GetMetadata(); len(md) >= 1 && md[0].GetKey() == "gated" {
@@ -734,6 +737,75 @@ func TestCompilingTheLayerLeavesNoGarbageResident(t *testing.T) {
 	}
 	if resident > 4<<20 {
 		t.Fatalf("%d MB of heap resident after compiling the layer", resident>>20)
+	}
+}
+
+// The shared local vectors (testdata/sdk-settings/local.json): the host's local values, through
+// Load, reported beside the policy in force as logfire-sdk-local.json, never in it.
+func TestTheLocalVectors(t *testing.T) {
+	ctx := context.Background()
+	l, err := New(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close(ctx)
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "testdata", "sdk-settings", "local.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var v struct {
+		Cases []struct {
+			Name string `json:"name"`
+			Host *struct {
+				Live      []string `json:"live"`
+				NextStart []string `json:"next_start"`
+			} `json:"host"`
+			Local json.RawMessage `json:"local"`
+			Now   uint64          `json:"now_unix_ms"`
+			Want  *string         `json:"want"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatal(err)
+	}
+	const localFile = "logfire-sdk-local.json"
+	for _, c := range v.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			without := everySetting
+			if c.Host != nil {
+				without = &settingspb.Host{Live: c.Host.Live, NextStart: c.Host.NextStart}
+			}
+			host := proto.Clone(without).(*settingspb.Host)
+			if c.Local != nil {
+				// By its proto field names, as protobuf's JSON reads them.
+				host.Local = &settingspb.Local{}
+				if err := protojson.Unmarshal(c.Local, host.Local); err != nil {
+					t.Fatal(err)
+				}
+			}
+			loaded, err := l.LoadFrom(ctx, nil, nil, host, c.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files := loaded.GetEffective().GetConfigMap().GetConfigMap()
+			if _, ok := files[localFile]; ok != (c.Want != nil) || len(files) != map[bool]int{true: 2, false: 1}[c.Want != nil] {
+				t.Fatalf("files %v, want the policy and the local values: %v", files, c.Want != nil)
+			}
+			if c.Want != nil && (string(files[localFile].GetBody()) != *c.Want || files[localFile].GetContentType() != "application/json") {
+				t.Errorf("local %s (%s), want %s", files[localFile].GetBody(), files[localFile].GetContentType(), *c.Want)
+			}
+			plain, err := l.LoadFrom(ctx, nil, nil, without, c.Now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !proto.Equal(files[policyFile], plain.GetEffective().GetConfigMap().GetConfigMap()[policyFile]) {
+				t.Errorf("the policy %s, want %s: never the local values in it", files[policyFile].GetBody(),
+					plain.GetEffective().GetConfigMap().GetConfigMap()[policyFile].GetBody())
+			}
+		})
+	}
+	if len(v.Cases) < 5 {
+		t.Fatalf("%d cases: local.json was cut short", len(v.Cases))
 	}
 }
 

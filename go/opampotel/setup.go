@@ -131,6 +131,7 @@ func setup(ctx context.Context, getenv func(string) string, opts ...Option) (_ *
 		s.agent.found = s.found
 		s.agent.ours = providers{tracer: s.TracerProvider, meter: s.MeterProvider, logger: s.LoggerProvider}
 		s.agent.decide(ctx)
+		s.agent.withLocal(localSettings(getenv, s.found))
 		s.agent.start(ctx, s.Resource)
 	}
 	return s, nil

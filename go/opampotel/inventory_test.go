@@ -135,8 +135,10 @@ func TestTheInventoryOfATypicalSetupReachesTheServer(t *testing.T) {
 	sdk.MeterProvider.Meter("orders.meter")
 	sdk.LoggerProvider.Logger("orders.db")
 
-	want := map[string]map[string]any{"otelhttp": {"version": "0.71.0"}, "autoexport": {"version": autoexportVersion},
-		"checkout.db": {}, "orders.http": {}, "orders.meter": {}, "orders.db": {}}
+	// Each with its whole scope name, the scope its telemetry carries.
+	want := map[string]map[string]any{"otelhttp": {"version": "0.71.0", "scope": otelhttp},
+		"autoexport": {"version": autoexportVersion, "scope": autoexportScope}, "checkout.db": {"scope": "checkout.db"},
+		"orders.http": {"scope": "orders.http"}, "orders.meter": {"scope": "orders.meter"}, "orders.db": {"scope": "orders.db"}}
 	var c *protobufs.AvailableComponents
 	eventually(t, "the instrumentations taken after Setup never reached the server", func() bool {
 		c = last()
@@ -213,7 +215,7 @@ func (r *fakeReporter) lastComponents() (*protobufs.AvailableComponents, int) {
 }
 
 // A new scope is reported, once; the same scope again isn't; a new version of it is, the versions
-// joined; two scopes that end in the same name are one.
+// joined; two scopes that end in the same name are one, listed with both scopes.
 func TestANewInstrumentationIsReportedOnce(t *testing.T) {
 	a, r := startedAgent(t, &server{endpoint: "http://127.0.0.1:1"})
 	tp := a.controls.TracerProvider(otel.GetTracerProvider())
@@ -228,7 +230,8 @@ func TestANewInstrumentationIsReportedOnce(t *testing.T) {
 		return listed(c.GetComponents()["instrumentations"])
 	}
 	tp.Tracer(otelhttp, trace.WithInstrumentationVersion("0.70.0"))
-	if got := instrumentations(1); !reflect.DeepEqual(got, map[string]map[string]any{"otelhttp": {"version": "0.70.0"}}) {
+	if got := instrumentations(1); !reflect.DeepEqual(got, map[string]map[string]any{"otelhttp": {"version": "0.70.0",
+		"scope": otelhttp}}) {
 		t.Fatalf("instrumentations %v", got)
 	}
 	tp.Tracer(otelhttp, trace.WithInstrumentationVersion("0.70.0"))
@@ -238,7 +241,8 @@ func TestANewInstrumentationIsReportedOnce(t *testing.T) {
 		t.Fatalf("the same scope again: reported %d times", got)
 	}
 	tp.Tracer("example.com/vendored/otelhttp", trace.WithInstrumentationVersion("0.71.0"))
-	if got := instrumentations(2); !reflect.DeepEqual(got, map[string]map[string]any{"otelhttp": {"version": "0.70.0,0.71.0"}}) {
+	if got := instrumentations(2); !reflect.DeepEqual(got, map[string]map[string]any{"otelhttp": {"version": "0.70.0,0.71.0",
+		"scope": "example.com/vendored/otelhttp," + otelhttp}}) {
 		t.Fatalf("instrumentations %v", got)
 	}
 }

@@ -110,7 +110,8 @@ func (s *seenScopes) keep(name, version string) bool {
 
 // instrumentations are the scopes as the inventory lists them, and the generation they are of:
 // each under the name deactivate_instrumentations takes (Off), the last path element of its scope
-// name, with the version it gave, else the version of the Go module it is in (build info).
+// name, with the version it gave, else the version of the Go module it is in (build info), and
+// its whole scope name.
 func (s *seenScopes) instrumentations() ([]*settingspb.Instrumentation, uint64) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -118,13 +119,14 @@ func (s *seenScopes) instrumentations() ([]*settingspb.Instrumentation, uint64) 
 	var out []*settingspb.Instrumentation
 	for name, versions := range s.seen {
 		if len(versions) == 0 { // only versions with a comma: listed with none
-			out = append(out, &settingspb.Instrumentation{Name: name[strings.LastIndexByte(name, '/')+1:]})
+			out = append(out, &settingspb.Instrumentation{Name: name[strings.LastIndexByte(name, '/')+1:], Scope: name})
 		}
 		for version := range versions {
 			if version == "" {
 				version = moduleVersion(name)
 			}
-			out = append(out, &settingspb.Instrumentation{Name: name[strings.LastIndexByte(name, '/')+1:], Version: version})
+			out = append(out, &settingspb.Instrumentation{Name: name[strings.LastIndexByte(name, '/')+1:], Version: version,
+				Scope: name})
 		}
 	}
 	return out, gen

@@ -19,6 +19,7 @@ import (
 
 	"github.com/pydantic/opamp-clients/go/opamp"
 	"github.com/pydantic/opamp-clients/go/opamp/sdksettings"
+	"github.com/pydantic/opamp-clients/go/opamp/sdksettings/settingspb"
 )
 
 // server is where the OpAMP server is, as the core's Setup decides it from Setup's options and
@@ -33,6 +34,8 @@ type server struct {
 	// reached, naming what gave the endpoint and the headers (the option or the variable).
 	shown string
 	hints *opamp.SetupHints
+	// local is what the SDK does without the server (localSettings), once Setup has built it.
+	local *settingspb.Local
 }
 
 // Option gives Setup one of the OTEL_OPAMP_* settings in code; it wins over the variable.
@@ -196,29 +199,65 @@ func serverFromEnv(getenv func(string) string, opts ...Option) *server {
 	return srv
 }
 
-// samplerFromEnv is the sampler OTEL_TRACES_SAMPLER names, as the SDK builds it when given none
-// (the SDK's own function is unexported): the specification's values, and an argument out of
-// range is 1.
-func samplerFromEnv(getenv func(string) string) sdktrace.Sampler {
-	ratio := func() sdktrace.Sampler {
+// head is the sampler OTEL_TRACES_SAMPLER names: its root (always on, always off, or a trace-ID
+// ratio of ratio) and whether a span with a parent follows the parent instead.
+type head struct {
+	always, never bool
+	ratio         float64
+	parentBased   bool
+}
+
+// headFromEnv reads OTEL_TRACES_SAMPLER and its argument as the specification defines the values;
+// an argument out of range is 1.
+func headFromEnv(getenv func(string) string) head {
+	ratio := func() float64 {
 		r, err := strconv.ParseFloat(strings.TrimSpace(getenv("OTEL_TRACES_SAMPLER_ARG")), 64)
 		if err != nil || r < 0 || r > 1 {
 			r = 1
 		}
-		return sdktrace.TraceIDRatioBased(r)
+		return r
 	}
 	switch strings.ToLower(strings.TrimSpace(getenv("OTEL_TRACES_SAMPLER"))) {
 	case "always_on":
-		return sdktrace.AlwaysSample()
+		return head{always: true}
 	case "always_off":
-		return sdktrace.NeverSample()
+		return head{never: true}
 	case "traceidratio":
-		return ratio()
+		return head{ratio: ratio()}
 	case "parentbased_always_off":
-		return sdktrace.ParentBased(sdktrace.NeverSample())
+		return head{never: true, parentBased: true}
 	case "parentbased_traceidratio":
-		return sdktrace.ParentBased(ratio())
+		return head{ratio: ratio(), parentBased: true}
 	default:
-		return sdktrace.ParentBased(sdktrace.AlwaysSample())
+		return head{always: true, parentBased: true}
 	}
+}
+
+// rate is the share of new traces the sampler samples: always on is 1, always off 0.
+func (h head) rate() float64 {
+	switch {
+	case h.always:
+		return 1
+	case h.never:
+		return 0
+	}
+	return h.ratio
+}
+
+// samplerFromEnv is the sampler OTEL_TRACES_SAMPLER names, as the SDK builds it when given none
+// (the SDK's own function is unexported): the specification's values, and an argument out of
+// range is 1.
+func samplerFromEnv(getenv func(string) string) sdktrace.Sampler {
+	h := headFromEnv(getenv)
+	root := sdktrace.TraceIDRatioBased(h.ratio)
+	switch {
+	case h.always:
+		root = sdktrace.AlwaysSample()
+	case h.never:
+		root = sdktrace.NeverSample()
+	}
+	if h.parentBased {
+		return sdktrace.ParentBased(root)
+	}
+	return root
 }

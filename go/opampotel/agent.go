@@ -35,10 +35,11 @@ import (
 // reach goes through a gate. What the gates can't reach (autoexport's own metrics reader, a
 // global provider the application sets in place of Setup's) is reported ungoverned, never a
 // reason to declare less (contracts' "What a policy governs"). The instrumentation switches are
-// at once too, so nothing waits for the next start.
+// at once too, so nothing waits for the next start. With it, what the SDK does without the
+// server, once Setup has built it (localSettings).
 func (s *server) host() *settingspb.Host {
 	return &settingspb.Host{Live: append([]string{"deactivate_instrumentations", "deactivate_all_instrumentations",
-		"send_metrics"}, carried...)}
+		"send_metrics"}, carried...), Local: s.local}
 }
 
 // carried are the live settings this package carries out whatever it built: those of its sampler,
