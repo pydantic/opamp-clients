@@ -1,7 +1,7 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.15.0-dev.2",
-  "commit": "2ba96b486db69c8002348cf39a259d462a7d83cd",
+  "version": "0.15.0",
+  "commit": "76b1866e1f434fc2287c1c918272c788b05c7612",
   "files": {
     "native-linux-arm64-libopamp_native.so": {
       "sha256": "f0aad61c288e66dd09253218c332a866b855e9005d1b1226e588e257664fd7dd",
@@ -28,25 +28,25 @@
       "lib": "libopamp_native.so"
     },
     "native-osx-arm64-libopamp_native.dylib": {
-      "sha256": "342a2217742e44b92a689d0a6e42840e18bde8108d2c64cd6fff600087663544",
+      "sha256": "b889800c808073b02b89af3d1c6c4340ca1413503ae3a77a343aa9bea2fd5930",
       "kind": "native",
       "target": "osx-arm64",
       "lib": "libopamp_native.dylib"
     },
     "native-osx-x64-libopamp_native.dylib": {
-      "sha256": "f1dda6fbf1552fb1363dbabb2e1a9642389c517d802091531602ef27c25bb73d",
+      "sha256": "cce5831c6b95b91821322530af7a82f3c544dd3c362c394253d91a64110a4197",
       "kind": "native",
       "target": "osx-x64",
       "lib": "libopamp_native.dylib"
     },
     "native-win-arm64-opamp_native.dll": {
-      "sha256": "62e9135e513d5c3b93a27921c29e23933c1cb07d410c41c9fbe78425418a1668",
+      "sha256": "ad4c69d93c28ae0db5f34938401a14e956b6fed0fdf3163f9b14a37baac642ec",
       "kind": "native",
       "target": "win-arm64",
       "lib": "opamp_native.dll"
     },
     "native-win-x64-opamp_native.dll": {
-      "sha256": "77b1335ba3f4fe03beeeefdf83533092ab073111c5feefbff4ec526733bf43e2",
+      "sha256": "71ce46bc7e36eef5d27c35073798b91f246a91204f41cc9ee958090b5cf6e385",
       "kind": "native",
       "target": "win-x64",
       "lib": "opamp_native.dll"
