@@ -21,7 +21,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from integrations import (APP_KEY, NOTE, PATTERNED_NOTE, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, SCRUBBED_NOTE, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
+from integrations import (APP_KEY, NOTE, OUTAGE_DROP, OUTAGE_MASK, judge_offline_start, judge_outage, PATTERNED_NOTE, POLICY_FILE, POLICY_V1, PROBE, RULE_HALF, SCRUBBED_NOTE, TAKES_KEYS, TRUTH, TRUTH_SWITCH, app_settings_scenario,  # noqa: E402
                           judge_truth, key_from_env, key_in_code, policy, scenario, truth_scenario,
                           judge_app_settings, judge_app_settings_restart, judge_first, judge_inventory,
                           judge_moved_start, judge_rotation, judge_own_key, judge_right_key, judge_second, judge_signals, judge_signals_restart,
@@ -1219,6 +1219,140 @@ class MovedStart(unittest.TestCase):
         log = moved_start()
         log.events.append({"event": "key_promoted", "t": 1, "uid": UID})
         self.assertEqual(failed(judge_moved_start(log.events)), ["with no new key to take"])
+
+
+MASKED = "[REDACTED]"
+
+
+def effective_of(overrides: dict[str, dict]) -> dict:
+    """The effective config of the policy with `overrides`, every other control local, as the
+    server's log gives it."""
+    return {POLICY_FILE: json.loads(policy(overrides, every=True))}
+
+
+def full(log: Log, t: float, uid: str = UID, effective: dict | None = None, status: str | None = None) -> Log:
+    """A message carrying the agent's description (a full report)."""
+    log.a2s(t, uid=uid, effective=effective, status=status)
+    log.events[-1]["full"] = True
+    return log
+
+
+def outage(unmasked_while_away: bool = False, quiet_while_away: bool = False, new_uid: bool = False,
+           forgot: bool = False, no_full: bool = False, drop_refused: bool = False,
+           url_after_drop: bool = False) -> tuple[Log, Log, Log]:
+    """check_outage's first run as it should go, (sink, server A, server B): the mask APPLIED on A
+    at 1, spans masked; A gone at 10 and back as B at 25, the application going on with its spans
+    masked; B hears the agent with its UID, its description and the mask as its effective config
+    (and the mask's APPLIED again), offers the drop at 27, APPLIED at 28, spans without a URL."""
+    sink, a, b = Log(), Log(), Log()
+    full(a, 0.5)
+    a.offer(0.9).a2s(1, status="APPLIED").a2s(2).a2s(9)
+    sink.pings(0, 40)
+    for t in range(2, 10):
+        sink.span(t, MASKED)
+    for t in range(12, 25):
+        if not quiet_while_away:
+            sink.span(t, PING if unmasked_while_away else MASKED)
+    mask = effective_of(OUTAGE_MASK)
+    if no_full:
+        b.a2s(25.5, uid="ff" * 16 if new_uid else UID, effective={} if forgot else mask)
+    else:
+        full(b, 25.5, uid="ff" * 16 if new_uid else UID, effective={} if forgot else mask, status="APPLIED")
+    b.a2s(26).offer(27).a2s(28, status="FAILED" if drop_refused else "APPLIED", error="no" if drop_refused else "")
+    for t in range(29, 36):
+        sink.span(t, PING if url_after_drop else "GET")
+    b.a2s(36).a2s(37, disconnect=True)
+    return sink, a, b
+
+
+class Outage(unittest.TestCase):
+    def judged(self, **kw) -> list[str]:
+        sink, a, b = outage(**kw)
+        return failed(judge_outage(sink.events, a.events, b.events, 10, 25))
+
+    def test_a_good_run_passes(self):
+        self.assertEqual(self.judged(), [])
+
+    def test_an_unmasked_span_while_the_server_is_away_fails(self):
+        self.assertEqual(self.judged(unmasked_while_away=True),
+                         ["and the policy holds: spans still exported, each URL [REDACTED] (0 of 11, "
+                          "['http://127.0.0.1:1/ping', 'http://127.0.0.1:1/ping'])"])
+
+    def test_no_spans_while_the_server_is_away_fails(self):
+        self.assertEqual(self.judged(quiet_while_away=True),
+                         ["and the policy holds: spans still exported, each URL [REDACTED] (0 of 0, [])"])
+
+    def test_a_new_uid_fails(self):
+        self.assertEqual(self.judged(new_uid=True), ["server B hears the agent again (5 messages), with the same UID"])
+
+    def test_forgetting_the_policy_kept_fails(self):
+        self.assertEqual(self.judged(forgot=True), ["and the mask, the policy it kept, as its effective config"])
+
+    def test_no_full_report_to_the_new_server_fails(self):
+        self.assertIn("the agent reports its whole state to the new server (its description) before any offer",
+                      self.judged(no_full=True))
+
+    def test_the_drop_refused_fails(self):
+        self.assertIn("server B: the drop APPLIED (['APPLIED', 'FAILED'])", self.judged(drop_refused=True))
+
+    def test_the_kept_masks_applied_again_is_not_taken_for_the_drops(self):
+        sink, a, b = outage()
+        b.events = [e for e in b.events if e.get("remote_config_status", {}).get("status") != "RemoteConfigStatuses_APPLIED"
+                    or e["t"] < 27]
+        self.assertIn("server B: the drop APPLIED (['APPLIED'])",
+                      failed(judge_outage(sink.events, a.events, b.events, 10, 25)))
+
+    def test_a_url_after_the_drop_fails(self):
+        self.assertEqual(self.judged(url_after_drop=True),
+                         ["then spans arrive, none with a URL (6, ['http://127.0.0.1:1/ping', 'http://127.0.0.1:1/ping'])"])
+
+    def test_the_policy_reported_with_its_keys_in_another_order_passes(self):
+        sink, a, b = outage()
+        doc = next(e for e in b.events if "effective" in e)["effective"][POLICY_FILE]
+        doc["attribute_redaction"]["mask"].reverse()
+        doc["head_sampling"]["ratio"] = 1.0
+        self.assertEqual(failed(judge_outage(sink.events, a.events, b.events, 10, 25)), [])
+
+
+def offline(url: bool = False, quiet: bool = False, uid: str = UID, forgot: bool = False) -> tuple[Log, Log]:
+    """check_outage's next start as it should go, (sink, server C): started at 0 with no server,
+    spans without a URL from the first; C up at 20 hears the agent with its UID and the drop."""
+    sink, c = Log().pings(0, 30), Log()
+    for t in range(1, 20):
+        if not quiet:
+            sink.span(t, PING if url and t == 1 else "GET")
+    full(c, 21, uid=uid, effective={} if forgot else effective_of(OUTAGE_DROP))
+    c.a2s(22).a2s(23, disconnect=True)
+    return sink, c
+
+
+class OfflineStart(unittest.TestCase):
+    def judged(self, **kw) -> list[str]:
+        sink, c = offline(**kw)
+        return failed(judge_offline_start(sink.events, c.events, 0, 20, UID))
+
+    def test_a_good_start_passes(self):
+        self.assertEqual(self.judged(), [])
+
+    def test_a_first_span_before_the_saved_policy_fails(self):
+        self.assertEqual(self.judged(url=True), ["traced from its first span on the policy it saved: none with a URL "
+                                                 "(19, ['http://127.0.0.1:1/ping'])"])
+
+    def test_no_spans_fails(self):
+        self.assertEqual(self.judged(quiet=True), ["traced from its first span on the policy it saved: none with a URL (0, [])"])
+
+    def test_another_uid_fails(self):
+        self.assertEqual(self.judged(uid="ff" * 16),
+                         ["once a server comes up there it hears the agent (3 messages), with the same UID"])
+
+    def test_starting_on_its_own_settings_fails(self):
+        self.assertEqual(self.judged(forgot=True), ["and the drop, the policy it started on, as its effective config"])
+
+    def test_an_application_held_up_by_the_server_fails(self):
+        sink, c = offline()
+        sink.events = [e for e in sink.events if e["event"] != "stray_request" or e["t"] > 20]
+        self.assertIn("with no server the application starts and makes its requests (0 in 20 s)",
+                      failed(judge_offline_start(sink.events, c.events, 0, 20, UID)))
 
 
 def seventh(early: bool = False, on: bool = True, failed_off: bool = False, stays_on: bool = False,

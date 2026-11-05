@@ -37,6 +37,10 @@ Then check_app_settings, for app.cjs and app.mjs: each reads the feature flag ex
 through appSettings (app.cjs from @pydantic/logfire-fleet-otel/app-settings, app.mjs from the package
 itself), which the server turns on and off (docs/app-settings.md). The package reaches them as
 an installed one would, by its name: examples/node-otel/node_modules holds a link to node/otel.
+
+check_outage (examples/integrations.py) runs for app.cjs, and again for manage.mjs, an application
+that sets its own NodeSDK up (its exporter, the http instrumentation) and then calls manage(): run
+with plain `node`, the server from OTEL_OPAMP_*.
 """
 from __future__ import annotations
 
@@ -54,7 +58,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_signals, check_truth, key_in_code, main,  # noqa: E402
+from integrations import (ROOT, check, check_app_settings, check_setup, check_rotation, check_outage, check_signals, check_truth, key_in_code, main,  # noqa: E402
                           offer, read_log, server_binary, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
@@ -96,6 +100,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
         # OTEL_OPAMP_*, here or inherited (a run may set one, to show the code wins).
         env = {k: v for k, v in env.items() if not k.startswith("OTEL_OPAMP_")}
         env.update(APP_OPAMP_URL=opamp_url(port), APP_OPAMP_TOKEN="example", APP_STATE_DIR=str(state))
+        command = ["node", str(HERE / APP)]
+    elif APP == "manage.mjs":  # its own NodeSDK, then manage(): no --import
         command = ["node", str(HERE / APP)]
     else:
         command = ["node", "--import", str(OTEL / "dist/src/register.js"), str(HERE / APP)]
@@ -414,6 +420,8 @@ CHECKS = {
     "setup-in-code": of("in-code.mjs", lambda d: check_setup(launch, d, key=key_in_code("APP_OPAMP_TOKEN"),
                                                              named="the headers given to register()")),
     "rotation": of("app.cjs", lambda d: check_rotation(launch, d)),
+    "outage": of("app.cjs", lambda d: check_outage(launch, d)),
+    "outage-manage": of("manage.mjs", lambda d: check_outage(launch, d)),
     "settings": check_settings,
 } | {
     f"app-{app.removeprefix('app.')}": of(app, lambda d: check_app_settings(launch, d))

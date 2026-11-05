@@ -94,6 +94,24 @@ starts it once more with the first endpoint still configured:
 | moves the agent to another port, with a third key | the agent takes it there, refusing no request, opens no connection to the first port after it, and is traced throughout |
 | (the next start) | the agent goes straight to the second port on the key it was given there, takes no new key, and none of its requests is refused |
 
+Then `check_outage` (the check `outage`) takes the OpAMP server away and starts the application
+while it is away. The telemetry goes to a sink that stays up throughout; the OpAMP servers come and
+go at one endpoint:
+
+| What happens | What the run checks |
+|---|---|
+| server A offers a policy that masks the URL | APPLIED; spans arrive with each URL `[REDACTED]` |
+| server A stops, and nothing listens for 15 s | the application goes on making requests, and its spans still arrive masked |
+| server B, a new server that knows nothing of the agent, comes up at the same endpoint | the agent comes back with the same UID, sends its whole state (its description) before any offer, and reports the masking policy it kept as its effective config |
+| server B offers a policy that drops the URL | APPLIED; spans arrive with no URL |
+| the next start, with nothing at the endpoint | the application starts and makes its requests, its spans without a URL from the first: it runs on the policy it saved, with no word from a server |
+| server C comes up there | the agent reports the same UID, and the dropping policy as its effective config |
+
+The Python integration also runs it on the Logfire SDK (`outage-logfire`: `logfire_app.py`, set up
+with `configure_logfire()`, its spans sent where the Logfire SDK sends them) and on an SDK the
+application set up itself (`outage-manage`: `logfire.configure()` then `manage()`), and Node.js on
+its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`).
+
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
 second), not on the machine, so with `--jobs` they take about as long as the longest of them:
