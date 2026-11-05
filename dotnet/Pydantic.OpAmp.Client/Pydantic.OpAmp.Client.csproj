@@ -18,6 +18,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>false</IsPackable>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <Authors>Pydantic</Authors>
+    <Company>Pydantic Services Inc.</Company>
+    <PackageProjectUrl>https://github.com/pydantic/opamp-clients</PackageProjectUrl>
+    <PackageTags>opentelemetry;opamp;observability;logfire</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
@@ -58,6 +63,11 @@
     <InternalsVisibleTo Include="Pydantic.OpAmp.AutoInstrumentation.Tests" />
     <InternalsVisibleTo Include="Pydantic.OpAmp.Extensions.Hosting" />
     <InternalsVisibleTo Include="Pydantic.OpAmp.Extensions.Hosting.Tests" />
+  </ItemGroup>
+
+  <!-- The README NuGet shows on the package's page. -->
+  <ItemGroup>
+    <None Include="../README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

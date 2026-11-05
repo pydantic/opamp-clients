@@ -12,22 +12,9 @@ TLS and through HTTP or SOCKS5 proxies. It needs .NET 8 or later, and ships for 
 dotnet add package Pydantic.OpAmp.Client
 ```
 
-The package is not on NuGet yet ([sdk-registries.md](sdk-registries.md)). It depends on
-`Pydantic.OpAmp.Core.Native`, which holds the core's library for each platform and nothing else.
-Until both are published, reference the project from a checkout:
-
-```bash
-scripts/fetch_core.py fetch   # the core release the lock pins, verified: this machine's library in target/release
-```
-
-```xml
-<ItemGroup>
-  <ProjectReference Include="/path/to/checkout/dotnet/Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
-</ItemGroup>
-```
-
-The build copies this machine's library to your project's output. It carries no other
-platform's.
+It depends on `Pydantic.OpAmp.Core.Native`, which holds the core's library for each platform
+(Linux glibc and musl, macOS and Windows, on x64 and arm64) and nothing else; the build copies the
+one the application runs on to its output.
 
 ## Start and stop
 

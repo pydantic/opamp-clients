@@ -9,13 +9,13 @@ host or a Kubernetes cluster to an OpAMP server, such as Logfire's Fleet
 supports, and [docs/troubleshooting.md](docs/troubleshooting.md) what to do when something
 doesn't connect.
 
-| Language | Client | OpenTelemetry integration |
-|---|---|---|
-| Python | [`python/`](python/), [docs](docs/python.md) | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) |
-| Go | [`go/opamp/`](go/opamp/), [docs](docs/go.md) | [`go/opampotel/`](go/opampotel/), [docs](docs/go-otel.md); also a Collector extension and Supervisor ([`go/opampextension/`](go/opampextension/), [`go/opampsupervisor/`](go/opampsupervisor/), [docs](docs/collector.md)) |
-| Node.js | [`node/opamp/`](node/opamp/), [docs](docs/node.md) | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) |
-| Java | [`java/opamp/`](java/opamp/), [docs](docs/java.md) | [`java/opamp-javaagent/`](java/opamp-javaagent/), [docs](docs/javaagent.md) |
-| .NET | [`dotnet/`](dotnet/), [docs](docs/dotnet.md) | [docs](docs/dotnet-otel.md) |
+| Language | OpenTelemetry integration (start here) | Install | Client |
+|---|---|---|---|
+| Python | [`python/otel/`](python/otel/), [docs](docs/python-otel.md) | `pip install pydantic-opamp-otel` | [`python/`](python/) (`pydantic-opamp-client`), [docs](docs/python.md) |
+| Go | [`go/opampotel/`](go/opampotel/), [docs](docs/go-otel.md); also a Collector extension and Supervisor ([`go/opampextension/`](go/opampextension/), [`go/opampsupervisor/`](go/opampsupervisor/), [docs](docs/collector.md)) | `go get github.com/pydantic/opamp-clients/go/opampotel` | [`go/opamp/`](go/opamp/), [docs](docs/go.md) |
+| Node.js | [`node/otel/`](node/otel/), [docs](docs/node-otel.md) | `npm install @pydantic/opamp-otel` | [`node/opamp/`](node/opamp/) (`@pydantic/opamp-client`), [docs](docs/node.md) |
+| Java | [`java/opamp-javaagent/`](java/opamp-javaagent/), [docs](docs/javaagent.md) | `dev.pydantic:opamp-javaagent-extension` from Maven Central | [`java/opamp/`](java/opamp/) (`dev.pydantic:opamp-client`), [docs](docs/java.md) |
+| .NET | [docs](docs/dotnet-otel.md) | `dotnet add package Pydantic.OpAmp.AutoInstrumentation` (or `.Extensions.Hosting`) | [`dotnet/`](dotnet/) (`Pydantic.OpAmp.Client`), [docs](docs/dotnet.md) |
 
 [docs/how-it-works.md](docs/how-it-works.md) explains how the clients and the core fit together,
 [docs/sdks.md](docs/sdks.md) compares the SDKs, and [examples/](examples/) runs each one.

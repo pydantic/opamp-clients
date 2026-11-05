@@ -13,6 +13,10 @@
     <Version>0.3.0</Version>
     <Description>The shared OpAMP client core for Pydantic.OpAmp.Client, compiled for each platform</Description>
     <RepositoryUrl>https://github.com/pydantic/opamp-clients</RepositoryUrl>
+    <Authors>Pydantic</Authors>
+    <Company>Pydantic Services Inc.</Company>
+    <PackageProjectUrl>https://github.com/pydantic/opamp-clients</PackageProjectUrl>
+    <PackageTags>opentelemetry;opamp;observability;logfire</PackageTags>
     <!-- The core's own license, not MIT: NuGet's license expressions take only SPDX's listed
          licenses (no LicenseRef-), so the package names its license file instead. -->
     <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
