@@ -47,6 +47,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
+  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
+  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
+  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
+  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
+  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
+  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
+  client.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
