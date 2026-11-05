@@ -36,7 +36,7 @@ from hypothesis import note as _note
 from hypothesis.errors import InvalidArgument
 
 from _sched_loop import MemTransport, Network, SeededLoop
-from pydantic_opamp_client._transport import Proxy, Transport, _ProxyConnector
+from logfire_fleet_client._transport import Proxy, Transport, _ProxyConnector
 
 HEAD_LIMIT = 16 * 1024
 CONNECT_TIMEOUT = 30.0

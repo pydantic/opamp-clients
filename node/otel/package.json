@@ -1,7 +1,7 @@
 {
-  "name": "@pydantic/opamp-otel",
+  "name": "@pydantic/logfire-fleet-otel",
   "version": "0.1.0",
-  "description": "OpenTelemetry auto-instrumentation for Node.js under an OpAMP server: node --import @pydantic/opamp-otel/register, and the SDK takes its settings (sampling, what to send and which instrumentations are on, while it runs) from the server",
+  "description": "OpenTelemetry auto-instrumentation for Node.js under an OpAMP server: node --import @pydantic/logfire-fleet-otel/register, and the SDK takes its settings (sampling, what to send and which instrumentations are on, while it runs) from the server",
   "license": "MIT",
   "private": true,
   "repository": {
@@ -51,7 +51,7 @@
     "@opentelemetry/sdk-metrics": "2.11.0",
     "@opentelemetry/sdk-node": "0.222.0",
     "@opentelemetry/sdk-trace-base": "2.11.0",
-    "@pydantic/opamp-client": "file:../opamp"
+    "@pydantic/logfire-fleet-client": "file:../opamp"
   },
   "devDependencies": {
     "@opentelemetry/otlp-transformer": "0.222.0",

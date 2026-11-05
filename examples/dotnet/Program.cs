@@ -9,7 +9,7 @@ using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Pydantic.OpAmp.Client;
+using Logfire.Fleet.Client;
 
 string[] identifying = ["service.name", "service.namespace", "service.instance.id"];
 

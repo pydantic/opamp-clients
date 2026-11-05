@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 using System.Reflection;
-using Pydantic.OpAmp.Client;
-using Pydantic.OpAmp.Core;
+using Logfire.Fleet.Client;
+using Logfire.Fleet.Core;
 
-namespace Pydantic.OpAmp.Otel;
+namespace Logfire.Fleet.Otel;
 
 /// <summary>
 /// Where the agent keeps its state: the directory named (<c>OTEL_OPAMP_STATE_DIR</c>, or the hosting

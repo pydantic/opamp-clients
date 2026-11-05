@@ -6,8 +6,8 @@ redaction and scrubbing, the [Logfire SDK policy](../sdk-settings.md). There are
 
 | The application uses | How it joins the server | Languages |
 |---|---|---|
-| the Logfire SDK for Python | `pydantic_opamp_otel.configure_logfire()` in place of `logfire.configure()` | Python |
-| the Logfire SDK for JavaScript | `manage()` from `@pydantic/opamp-otel`, after `logfire.configure()` | Node.js |
+| the Logfire SDK for Python | `logfire_fleet_otel.configure_logfire()` in place of `logfire.configure()` | Python |
+| the Logfire SDK for JavaScript | `manage()` from `@pydantic/logfire-fleet-otel`, after `logfire.configure()` | Node.js |
 | an OpenTelemetry SDK, exporting to Logfire over OTLP | this repository's integration for the language | Python, Go, Node.js, Java, .NET |
 
 An application whose OpenTelemetry SDK is set up in code already keeps it and calls `manage()`
@@ -25,9 +25,9 @@ the application gives `logfire.configure()` today:
 
 ```python
 import logfire
-import pydantic_opamp_otel
+import logfire_fleet_otel
 
-pydantic_opamp_otel.configure_logfire(service_name="checkout", console=False)
+logfire_fleet_otel.configure_logfire(service_name="checkout", console=False)
 logfire.instrument_httpx()  # the Logfire SDK's instrumentations, as before
 ```
 
@@ -63,7 +63,7 @@ under the server:
 |---|---|
 | Python | [python-otel.md](../python-otel.md) (`opentelemetry-instrument`) |
 | Go | [go-otel.md](../go-otel.md) |
-| Node.js | [node-otel.md](../node-otel.md) (`node --import @pydantic/opamp-otel/register`) |
+| Node.js | [node-otel.md](../node-otel.md) (`node --import @pydantic/logfire-fleet-otel/register`) |
 | Java | [javaagent.md](../javaagent.md) (the Java agent and the extension) |
 | .NET | [dotnet-otel.md](../dotnet-otel.md) (automatic instrumentation and the plugin) |
 
@@ -92,7 +92,7 @@ OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
 OTEL_OPAMP_STATE_DIR=/var/lib/checkout/opamp \
 java -javaagent:opentelemetry-javaagent.jar \
-     -Dotel.javaagent.extensions=opamp-javaagent-extension.jar \
+     -Dotel.javaagent.extensions=logfire-fleet-javaagent-extension.jar \
      -jar checkout.jar
 ```
 
@@ -214,12 +214,12 @@ instance's record can be deleted on its own.
 
 ## The Logfire SDK for JavaScript
 
-Keep `logfire.configure()` as it is and call `manage()` after it (install `@pydantic/opamp-otel`
+Keep `logfire.configure()` as it is and call `manage()` after it (install `@pydantic/logfire-fleet-otel`
 as [node-otel.md](../node-otel.md#use-it) says):
 
 ```js
 import * as logfire from "@pydantic/logfire-node";
-import { manage } from "@pydantic/opamp-otel";
+import { manage } from "@pydantic/logfire-fleet-otel";
 
 logfire.configure({ serviceName: "checkout" });
 manage();
@@ -229,7 +229,7 @@ with the same `OTEL_OPAMP_*` variables as above. The Logfire SDK still sends to 
 own token. The gates go in front of its exporters, so `signal_exports`, the log levels and rate
 cap (on its `logfire.info()` and the rest), redaction and scrubbing apply to what reaches Logfire.
 Its head sampling stays the Logfire SDK's own (`sampling.head`): a policy that overrides the
-sampling controls or debug mode is refused. Don't add `node --import @pydantic/opamp-otel/register`
+sampling controls or debug mode is refused. Don't add `node --import @pydantic/logfire-fleet-otel/register`
 too: it starts a second SDK, and the Logfire SDK's can't register its providers.
 
 ## The Logfire SDK for Rust

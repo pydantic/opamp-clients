@@ -36,14 +36,14 @@ import pytest
 from _servers import MODES
 from aiohttp import web
 
-from pydantic_opamp_client import Client, Config, Notification, Status, opamp_pb2 as pb
-from pydantic_opamp_client import _executor
-from pydantic_opamp_client._client import STOP_GRACE_S
-from pydantic_opamp_client._executor import Executor, _save, download_path, downloads_dir, read_state
-from pydantic_opamp_client._files import REAL, Files, Journal
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
-from pydantic_opamp_client._streams import Streams
-from pydantic_opamp_client._transport import Proxy, Transport
+from logfire_fleet_client import Client, Config, Notification, Status, opamp_pb2 as pb
+from logfire_fleet_client import _executor
+from logfire_fleet_client._client import STOP_GRACE_S
+from logfire_fleet_client._executor import Executor, _save, download_path, downloads_dir, read_state
+from logfire_fleet_client._files import REAL, Files, Journal
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client._streams import Streams
+from logfire_fleet_client._transport import Proxy, Transport
 
 ROOT = Path(__file__).resolve().parents[2]  # the repository
 OPAMP_TAP = ROOT / "target" / "release" / "opamp-tap"
@@ -983,7 +983,7 @@ def test_elsewhere_a_save_and_its_directory_are_flushed_with_fsync(tmp_path, mon
 # MOVEFILE_WRITE_THROUGH: it returns once the rename is on the disk). Played on any host with a
 # stand-in for MoveFileExW.
 def test_on_windows_a_saves_rename_is_written_through(tmp_path) -> None:
-    from pydantic_opamp_client import _windows
+    from logfire_fleet_client import _windows
 
     calls: list[tuple[str, str, int]] = []
 
@@ -999,7 +999,7 @@ def test_on_windows_a_saves_rename_is_written_through(tmp_path) -> None:
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows access-control lists")
 def test_on_windows_a_save_a_download_and_the_tap_allow_the_user_alone(tmp_path, monkeypatch) -> None:
-    from pydantic_opamp_client import _core, _windows
+    from logfire_fleet_client import _core, _windows
 
     user = _windows.user_sid()
     assert _windows.user_only() == f"D:P(A;;FA;;;{user})"

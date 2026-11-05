@@ -1,62 +1,62 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.15.0",
-  "commit": "76b1866e1f434fc2287c1c918272c788b05c7612",
+  "version": "0.16.0",
+  "commit": "f601cfc9fdeae4efbf8beb7b85208b7eaf079a63",
   "files": {
     "native-linux-arm64-libopamp_native.so": {
-      "sha256": "f0aad61c288e66dd09253218c332a866b855e9005d1b1226e588e257664fd7dd",
+      "sha256": "ace99e34dbb3e8d710d75281ead7d616d57b8742761b1488975371217a906eb2",
       "kind": "native",
       "target": "linux-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-arm64-libopamp_native.so": {
-      "sha256": "2086e502a83e33ce86a2388eb1b6e99a3ecff7877f2f458f93e9b1613a6f9752",
+      "sha256": "a0df3ffef7c723ec7444446b372a3cec974895bcac90aaae84a400705ae44a92",
       "kind": "native",
       "target": "linux-musl-arm64",
       "lib": "libopamp_native.so"
     },
     "native-linux-musl-x64-libopamp_native.so": {
-      "sha256": "5c4e962c48523023dafb26217446377a2efe21d7a60c44030d783f74e8eddcd5",
+      "sha256": "a581df883b63b9ff5f03359e130a51b471151de1c2fdbdad108a50168927a222",
       "kind": "native",
       "target": "linux-musl-x64",
       "lib": "libopamp_native.so"
     },
     "native-linux-x64-libopamp_native.so": {
-      "sha256": "255f8149156afcd34677f6f5fd0cf97e47775b99350cff82eba17f2e6d67898f",
+      "sha256": "4672bd43e566e30442268da067904ee23a777d356ccf67893cfba39240a10229",
       "kind": "native",
       "target": "linux-x64",
       "lib": "libopamp_native.so"
     },
     "native-osx-arm64-libopamp_native.dylib": {
-      "sha256": "b889800c808073b02b89af3d1c6c4340ca1413503ae3a77a343aa9bea2fd5930",
+      "sha256": "e5324db9f23f55b3db284081b1f94d3e81223ca15916e9c396a0f37761fb6855",
       "kind": "native",
       "target": "osx-arm64",
       "lib": "libopamp_native.dylib"
     },
     "native-osx-x64-libopamp_native.dylib": {
-      "sha256": "cce5831c6b95b91821322530af7a82f3c544dd3c362c394253d91a64110a4197",
+      "sha256": "1c72185cb7dd954cf8c6376fe3bb408ee8145a5abb6c2ccc3418c99418da15e4",
       "kind": "native",
       "target": "osx-x64",
       "lib": "libopamp_native.dylib"
     },
     "native-win-arm64-opamp_native.dll": {
-      "sha256": "ad4c69d93c28ae0db5f34938401a14e956b6fed0fdf3163f9b14a37baac642ec",
+      "sha256": "2f4b28d8520bbe5fd01786900bfad38786ebcee7f5f76e5d19cfe51d31beff4b",
       "kind": "native",
       "target": "win-arm64",
       "lib": "opamp_native.dll"
     },
     "native-win-x64-opamp_native.dll": {
-      "sha256": "71ce46bc7e36eef5d27c35073798b91f246a91204f41cc9ee958090b5cf6e385",
+      "sha256": "d3b8514396682dbe3aa8ba5a7beb36a86c6c206cc154461dc3737c558f203c6b",
       "kind": "native",
       "target": "win-x64",
       "lib": "opamp_native.dll"
     },
     "opamp-core-tree.tar.gz": {
-      "sha256": "eaaae6fecf513c772647024501af9c74286399171ec24658a29e8726d26cf695",
+      "sha256": "4733fa7139db135ee852f859b859409a635bb239a0143f7e8507f3bd48127fab",
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "4184fffe2556e67b691008383ebc0ba0d10bd797808515b905496059e9748795",
+      "sha256": "3aa0f5869e1d002d0c29905d2b18e5d9c86f4f2aeabeb76156d7c39f023329b9",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
@@ -64,11 +64,11 @@
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "525bbb055cc4668f3d20f329683e9fcceadb2ebbed5de27185c98db9702e1c0e",
+      "sha256": "4cda6260ee8c7fd4130109b09d28b1ed51cf7efbfff21170a54c731793ae6bfd",
       "kind": "wasm"
     },
     "tool-linux-x64-opamp-tap": {
-      "sha256": "faeed1ce88f9dbde85e28f88aa24cad76563307c250528f0ff5dd903ca72eed2",
+      "sha256": "f1baf887900d4d96913c18323c0e09e88aef401da5efa1cc2d4c938b3d6c18ce",
       "kind": "tool",
       "target": "linux-x64",
       "bin": "opamp-tap"
@@ -77,8 +77,8 @@
   "tree": {
     "licenses/core/LICENSE.txt": "aa264075f49f37f62eeb2509d0f4e48951251c2f3b8deca1f1775fb14236b455",
     "licenses/core/THIRD_PARTY_NOTICES.txt": "b255db006048db96330fe78e411bb52ade12d3f06d8840f207127ad393c70c72",
-    "proto/opamp/core/v1/core.proto": "30d389d93f06116f837a111b146514010f7f78d5a1465550e241bd42f8ad69b5",
-    "proto/opamp/sdk/v1/settings.proto": "1d62043f5c6210a2d32bab5861769824d278a30c1a522b205d35c683a54f9365",
+    "proto/opamp/core/v1/core.proto": "49db8fb1df26d2f72dc51545aef2348c56d5005495c4bdf52d8b3eba963e5098",
+    "proto/opamp/sdk/v1/settings.proto": "f997d274c0dcf722b1ad49447cc8b58d031f1d401eb9f6fa2c19977b3f1b5733",
     "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
     "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
     "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",

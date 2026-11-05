@@ -3,7 +3,7 @@
 """Fuzz target (Atheris): the Python client's own code around the core, fed by a server whose every
 answer is the fuzzer's and an application whose callback calls the client as the fuzzer says.
 
-One input is one run of a real Client on the native core (its C interface: pydantic_opamp_client._native),
+One input is one run of a real Client on the native core (its C interface: logfire_fleet_client._native),
 on a seeded event loop with a virtual clock (tests/_sched_loop.py), in either mode:
 
 - Platform mode: the executor's aiohttp path over a fake session (responses in pieces, resets,
@@ -58,23 +58,23 @@ except ImportError:  # the seeds' replay under pytest: no instrumentation
     atheris = None
 
 if atheris is not None and __name__ == "__main__":
-    with atheris.instrument_imports(include=["pydantic_opamp_client"]):
-        import pydantic_opamp_client._client  # noqa: F401
+    with atheris.instrument_imports(include=["logfire_fleet_client"]):
+        import logfire_fleet_client._client  # noqa: F401
 
 import aiohttp  # noqa: E402
 from aiohttp import WSMessage, WSMsgType  # noqa: E402
 import yarl  # noqa: E402
 from multidict import CIMultiDict  # noqa: E402
 
-import pydantic_opamp_client._client as _client_mod  # noqa: E402
-import pydantic_opamp_client._core as _core_mod  # noqa: E402
-import pydantic_opamp_client._executor as _executor_mod  # noqa: E402
+import logfire_fleet_client._client as _client_mod  # noqa: E402
+import logfire_fleet_client._core as _core_mod  # noqa: E402
+import logfire_fleet_client._executor as _executor_mod  # noqa: E402
 from _fuzzlib import CALLS, CAPABILITIES, CAPABILITY, Reader, Server, call, pieces  # noqa: E402
 from _sched_loop import Network, SeededLoop  # noqa: E402
 from _sched_world import FakeContent  # noqa: E402
-from pydantic_opamp_client import Client, Config, Notification, Proxy, Status, opamp_pb2 as pb  # noqa: E402
-from pydantic_opamp_client._executor import downloads_dir  # noqa: E402
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
+from logfire_fleet_client import Client, Config, Notification, Proxy, Status, opamp_pb2 as pb  # noqa: E402
+from logfire_fleet_client._executor import downloads_dir  # noqa: E402
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
 
 UNIX0 = 1_790_000_000_000
 STOP_S = 5.0

@@ -4,7 +4,7 @@
 // app.cjs as an ES module: `import` loads http without require, so its instrumentation needs the
 // loader hook the register installs. (The logs API and the package come through require:
 // NODE_PATH, where this example finds them, doesn't reach `import`. An application with the
-// package installed writes `import { appSettings } from "@pydantic/opamp-otel"`.)
+// package installed writes `import { appSettings } from "@pydantic/logfire-fleet-otel"`.)
 //
 // As app.cjs, it reads the feature flag `example.feature` the server sends (docs/app-settings.md):
 // /feature each round while it is `on`, /changed once per change it is told of.
@@ -15,7 +15,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { logs } = require("@opentelemetry/api-logs");
 // The whole package this time: the same module the register loaded, so the same appSettings.
-const { appSettings } = require("@pydantic/opamp-otel");
+const { appSettings } = require("@pydantic/logfire-fleet-otel");
 const log = logs.getLogger("app");
 
 const get = (url) => http.get(url, (res) => res.resume()).on("error", () => {});

@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import struct
 
-from pydantic_opamp_client import anyvalue_pb2, opamp_pb2 as pb
+from logfire_fleet_client import anyvalue_pb2, opamp_pb2 as pb
 
 
 class Reader:

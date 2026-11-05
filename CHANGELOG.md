@@ -68,8 +68,9 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.15.0, which the clients now pin. It
-  decides which exporters the SDK policy governs and how each is named (#109).
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.16.0, which the clients now pin. Core
+  0.15.0 decides which exporters the SDK policy governs and how each is named (#109); 0.16.0 names
+  the generated Java and .NET types after Logfire Fleet (#126).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
@@ -176,11 +177,30 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
-## SDKs 0.1.2 (2026-11-05)
+## SDKs 0.2.0 (2026-11-05)
 
-`sdk/v0.1.2`, on core 0.15.0, for Python, Node.js, Java and .NET.
+`sdk/v0.2.0`, on core 0.16.0, for Python, Node.js, Java and .NET.
 
-These entries in **Unreleased** above are in 0.1.2. They stay there because they also apply to
+### Breaking
+
+- Python, Node.js, Java, .NET: the packages take Logfire Fleet's names. The 0.1.x names get no new
+  versions; install the new ones and change the imports:
+
+  | Was (0.1.x) | Now |
+  | --- | --- |
+  | PyPI `pydantic-opamp-otel`, `pydantic-opamp-client`, `pydantic-opamp-core` | `logfire-fleet-otel`, `logfire-fleet-client`, `logfire-fleet-core` |
+  | `import pydantic_opamp_otel`, `pydantic_opamp_client` | `import logfire_fleet_otel`, `logfire_fleet_client` |
+  | npm `@pydantic/opamp-otel`, `@pydantic/opamp-client` | `@pydantic/logfire-fleet-otel`, `@pydantic/logfire-fleet-client` |
+  | Maven `dev.pydantic:opamp-client`, `dev.pydantic:opamp-javaagent-extension` | `dev.pydantic:logfire-fleet-client`, `dev.pydantic:logfire-fleet-javaagent-extension` |
+  | Java packages `dev.pydantic.opamp.*` | `dev.pydantic.logfire.fleet.*` |
+  | NuGet and namespaces `Pydantic.OpAmp.*` | `Logfire.Fleet.*` |
+  | .NET `AddPydanticOpAmp()` | `AddLogfireFleet()` |
+  | `OTEL_DOTNET_AUTO_PLUGINS="Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"` | `"Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation"` |
+
+  The Python entry points keep their names (`OTEL_PYTHON_DISTRO=opamp`,
+  `OTEL_PYTHON_CONFIGURATOR=opamp`), and the Go modules keep their paths.
+
+These entries in **Unreleased** above are in 0.2.0. They stay there because they also apply to
 Go or the Supervisor, which have not had a release with them:
 
 - The SDK policy governs every exporter the SDK exports through (**Breaking**). The first
@@ -190,7 +210,7 @@ Go or the Supervisor, which have not had a release with them:
   names each exporter and its warning, the same in every language (#109).
 - Java, .NET: an HTTP client of the application's no longer switches to platform mode silently
   (**Breaking**) (#109).
-- On core 0.15.0.
+- On core 0.16.0.
 
 ### Added
 
@@ -208,7 +228,7 @@ Go or the Supervisor, which have not had a release with them:
   become the global one: the server heard APPLIED while the application's spans went past every
   gate, and the instance was described as `unknown_service` (#114).
 - Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
-  install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
+  install logfire-fleet-otel`, `npm install @pydantic/logfire-fleet-otel`, Maven Central, `dotnet add
   package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
   docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
   tags (#124).

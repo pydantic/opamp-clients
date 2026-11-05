@@ -29,7 +29,7 @@ using System.Runtime.InteropServices;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
-using Pydantic.OpAmp;
+using Logfire.Fleet;
 
 using var stop = new CancellationTokenSource();
 using var term = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>

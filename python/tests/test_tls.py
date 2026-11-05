@@ -12,7 +12,7 @@ import pytest
 import trustme
 from _servers import MODES, OpampServer, run_client
 
-from pydantic_opamp_client import TLS, Client, Config, Status
+from logfire_fleet_client import TLS, Client, Config, Status
 
 TRANSPORTS = ["http", "ws"]
 

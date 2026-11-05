@@ -50,9 +50,9 @@ before are deleted at start. A file that was already there is never written over
 application, or deleted by a download that couldn't make its own.
 
 The clients: Go `go/opamp/transport.go` (`saveState`, `fetch`), Python
-`python/src/pydantic_opamp_client/_executor.py`, Node `node/opamp/src/executor.ts`, Java
-`java/opamp/src/main/java/dev/pydantic/opamp/StateFile.java`, .NET
-`dotnet/Pydantic.OpAmp.Client/StateFile.cs`.
+`python/src/logfire_fleet_client/_executor.py`, Node `node/opamp/src/executor.ts`, Java
+`java/opamp/src/main/java/dev/pydantic/logfire/fleet/StateFile.java`, .NET
+`dotnet/Logfire.Fleet.Client/StateFile.cs`.
 
 ## How it is checked
 

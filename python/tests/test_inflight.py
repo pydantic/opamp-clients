@@ -13,8 +13,8 @@ import time
 
 import pytest
 
-from pydantic_opamp_client._executor import InFlight
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client._executor import InFlight
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 IDS = range(1, 6)
 

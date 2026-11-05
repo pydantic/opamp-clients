@@ -13,7 +13,7 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
-import { create, ServerToAgentSchema, toBinary } from "@pydantic/opamp-client";
+import { create, ServerToAgentSchema, toBinary } from "@pydantic/logfire-fleet-client";
 
 const INDEX = new URL("../src/index.js", import.meta.url).href;
 const TABLES = fileURLToPath(new URL("../../../../tests/shell-tables/", import.meta.url));

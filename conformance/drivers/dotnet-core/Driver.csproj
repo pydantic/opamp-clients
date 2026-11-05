@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../../dotnet/Pydantic.OpAmp.Client/Pydantic.OpAmp.Client.csproj" />
+    <ProjectReference Include="../../../dotnet/Logfire.Fleet.Client/Logfire.Fleet.Client.csproj" />
   </ItemGroup>
 
 </Project>

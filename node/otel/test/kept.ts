@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { AgentRemoteConfigSchema, create, toBinary } from "@pydantic/opamp-client";
+import { AgentRemoteConfigSchema, create, toBinary } from "@pydantic/logfire-fleet-client";
 
 import { FILE } from "./policy.js";
 

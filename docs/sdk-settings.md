@@ -11,10 +11,10 @@ To put an SDK under a server without writing code, use a language's integration:
 | Language | Integration | How it plugs in |
 |---|---|---|
 | Java | the Java agent extension, [javaagent.md](javaagent.md) | `-Dotel.javaagent.extensions=...` on the upstream OpenTelemetry Java agent |
-| Python | `pydantic-opamp-otel`, [python-otel.md](python-otel.md) | installed next to `opentelemetry-instrument`: a distro, a configurator and the SDK's OpAMP hook |
-| Node.js | `@pydantic/opamp-otel`, [node-otel.md](node-otel.md) | `node --import @pydantic/opamp-otel/register`, in place of upstream's `register` |
+| Python | `logfire-fleet-otel`, [python-otel.md](python-otel.md) | installed next to `opentelemetry-instrument`: a distro, a configurator and the SDK's OpAMP hook |
+| Node.js | `@pydantic/logfire-fleet-otel`, [node-otel.md](node-otel.md) | `node --import @pydantic/logfire-fleet-otel/register`, in place of upstream's `register` |
 | Go | `github.com/pydantic/opamp-clients/go/opampotel`, [go-otel.md](go-otel.md) | `opampotel.Setup(ctx)` in place of the application's own SDK setup |
-| .NET | `Pydantic.OpAmp.AutoInstrumentation`, [dotnet-otel.md](dotnet-otel.md) | a plugin for upstream's automatic instrumentation (`OTEL_DOTNET_AUTO_PLUGINS`) |
+| .NET | `Logfire.Fleet.AutoInstrumentation`, [dotnet-otel.md](dotnet-otel.md) | a plugin for upstream's automatic instrumentation (`OTEL_DOTNET_AUTO_PLUGINS`) |
 
 To wire a client to an SDK by hand instead, see [sdks.md](sdks.md).
 
@@ -506,7 +506,7 @@ What else to know:
 - **Turned off means dropped at export.** Spans, metrics and logs are still made while a signal's
   export is off (a span is still sampled, so services downstream still trace it). They are only
   dropped at export. Cumulative metrics carry the counts made meanwhile into the next export.
-- **An SDK the application builds on its own isn't reached.** Python (`pydantic_opamp_otel.configure()`)
+- **An SDK the application builds on its own isn't reached.** Python (`logfire_fleet_otel.configure()`)
   and .NET (`WithOpAmp()`) let an application keep its own setup; in Node.js and Go the
   integration's setup has to be the application's whole SDK setup, and in Java the agent's SDK.
   Node.js and Go report a provider the application registers or sets as the global one as

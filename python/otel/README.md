@@ -1,4 +1,4 @@
-# pydantic-opamp-otel
+# logfire-fleet-otel
 
 OpenTelemetry auto-instrumentation for Python, under an OpAMP server.
 
@@ -8,7 +8,7 @@ Install it next to the instrumentations the application needs, then run the appl
 `opentelemetry-instrument` with the server's address and key:
 
 ```bash
-pip install pydantic-opamp-otel opentelemetry-instrumentation-flask
+pip install logfire-fleet-otel opentelemetry-instrumentation-flask
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
@@ -26,10 +26,10 @@ When it can't connect, it warns once, with what to check. The instance keeps its
 restarts with no configuration
 ([default-state-dir.md](https://github.com/pydantic/opamp-clients/blob/main/docs/default-state-dir.md)).
 
-An application on the Logfire SDK calls `pydantic_opamp_otel.configure_logfire()` in place of
-`logfire.configure()` (`pip install 'pydantic-opamp-otel[logfire]'`). One that sets its
-OpenTelemetry SDK up in code already keeps that setup and calls `pydantic_opamp_otel.manage()`
+An application on the Logfire SDK calls `logfire_fleet_otel.configure_logfire()` in place of
+`logfire.configure()` (`pip install 'logfire-fleet-otel[logfire]'`). One that sets its
+OpenTelemetry SDK up in code already keeps that setup and calls `logfire_fleet_otel.manage()`
 after it.
 
-Everything else, including setting the SDK up in code with `pydantic_opamp_otel.configure()`, is in
+Everything else, including setting the SDK up in code with `logfire_fleet_otel.configure()`, is in
 [docs/python-otel.md](https://github.com/pydantic/opamp-clients/blob/main/docs/python-otel.md).

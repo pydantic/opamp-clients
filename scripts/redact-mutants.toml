@@ -1,15 +1,15 @@
 # Redactions dropped, one at a time, for scripts/redact_mutants.py: each must fail the
 # noninterference test of its `test` (`python`: python/tests/test_redaction.py; `go`:
-# go/opamp/redact_test.go; `dotnet`: dotnet/Pydantic.OpAmp.Client.Tests/RedactionTests.cs). Each
+# go/opamp/redact_test.go; `dotnet`: dotnet/Logfire.Fleet.Client.Tests/RedactionTests.cs). Each
 # replaces `find`, which must match exactly once in `file`, with `replace`. `shows` says what the
 # dropped redaction lets out.
 
 # ---------------------------------------------------------------------------------------------
-# The Python SDK (python/src/pydantic_opamp_client).
+# The Python SDK (python/src/logfire_fleet_client).
 
 [[mutant]]
 name = "python-config-headers-shown"
-file = "python/src/pydantic_opamp_client/_client.py"
+file = "python/src/logfire_fleet_client/_client.py"
 test = "python"
 shows = "the headers sent to the server, in a Config's repr"
 find = """            if name == "headers":
@@ -19,7 +19,7 @@ replace = """            if name == "headers":
 
 [[mutant]]
 name = "python-proxy-headers-shown"
-file = "python/src/pydantic_opamp_client/_transport.py"
+file = "python/src/logfire_fleet_client/_transport.py"
 test = "python"
 shows = "a proxy's CONNECT headers (Proxy-Authorization), in a Proxy's repr"
 find = """headers={redacted_headers(self.headers)!r}"""
@@ -27,7 +27,7 @@ replace = """headers={dict(self.headers)!r}"""
 
 [[mutant]]
 name = "python-proxy-password-shown"
-file = "python/src/pydantic_opamp_client/_transport.py"
+file = "python/src/logfire_fleet_client/_transport.py"
 test = "python"
 shows = "a proxy URL's password, in a Proxy's and a Config's repr"
 find = """    return re.sub(r"(//[^/@:]*):[^/@]*@", r"\\1:***@", url)"""
@@ -35,7 +35,7 @@ replace = """    return url"""
 
 [[mutant]]
 name = "python-key-shown"
-file = "python/src/pydantic_opamp_client/_transport.py"
+file = "python/src/logfire_fleet_client/_transport.py"
 test = "python"
 shows = "a client certificate's private key and its password, in a TLS's repr"
 find = """    key_pem: str | bytes | None = field(default=None, repr=False)
@@ -97,11 +97,11 @@ find = """func (t TLS) LogValue() slog.Value { return slog.StringValue(t.String(
 replace = ""
 
 # ---------------------------------------------------------------------------------------------
-# The .NET SDK (dotnet/Pydantic.OpAmp.Client: Redacted.cs and the options records' PrintMembers).
+# The .NET SDK (dotnet/Logfire.Fleet.Client: Redacted.cs and the options records' PrintMembers).
 
 [[mutant]]
 name = "dotnet-headers-shown"
-file = "dotnet/Pydantic.OpAmp.Client/Redacted.cs"
+file = "dotnet/Logfire.Fleet.Client/Redacted.cs"
 test = "dotnet"
 shows = "the headers sent to the server, in OpAmpClientOptions' ToString"
 find = """headers.Keys.Select(k => $"{k} = {Hidden}")"""
@@ -109,7 +109,7 @@ replace = """headers.Keys.Select(k => $"{k} = {headers[k]}")"""
 
 [[mutant]]
 name = "dotnet-url-password-shown"
-file = "dotnet/Pydantic.OpAmp.Client/Redacted.cs"
+file = "dotnet/Logfire.Fleet.Client/Redacted.cs"
 test = "dotnet"
 shows = "a password in the endpoint's or the proxy's URL, in OpAmpClientOptions' ToString"
 find = """Password().Replace(uri.OriginalString, "$1:***@")"""
@@ -117,7 +117,7 @@ replace = """uri.OriginalString"""
 
 [[mutant]]
 name = "dotnet-proxy-shown"
-file = "dotnet/Pydantic.OpAmp.Client/OpAmpClient.cs"
+file = "dotnet/Logfire.Fleet.Client/OpAmpClient.cs"
 test = "dotnet"
 shows = "the proxy URL's password (Uri.ToString keeps it), in OpAmpClientOptions' ToString"
 find = """(nameof(this.Proxy), Redacted.Url(this.Proxy)),"""
@@ -125,7 +125,7 @@ replace = """(nameof(this.Proxy), this.Proxy),"""
 
 [[mutant]]
 name = "dotnet-key-shown"
-file = "dotnet/Pydantic.OpAmp.Client/ClientTransport.cs"
+file = "dotnet/Logfire.Fleet.Client/ClientTransport.cs"
 test = "dotnet"
 shows = "the client key, in OpAmpTlsOptions' (and OpAmpClientOptions') ToString"
 find = """(nameof(this.ClientKeyPem), Redacted.Secret(this.ClientKeyPem)),"""

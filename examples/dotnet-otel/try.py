@@ -80,7 +80,7 @@ NUGET = ["-v", f"{os.environ.get('OPAMP_EXAMPLES_NUGET_VOLUME') or 'opamp-client
 EDOT = "--edot" in sys.argv
 TARGET = target("dotnet-otel-edot" if EDOT else "dotnet-otel")
 #: Our plugin, after EDOT's with --edot.
-OURS = "Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation"
+OURS = "Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation"
 PLUGIN = ("Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation:" if EDOT
           else "") + OURS
 #: EDOT's instrument.sh sets OTEL_DOTNET_AUTO_PLUGINS to its plugin alone, so with --edot the

@@ -8,9 +8,9 @@ import asyncio
 
 import pytest
 
-from pydantic_opamp_client import Client, Config, Notification, Status
-from pydantic_opamp_client._core import Core
-from pydantic_opamp_client._proto.opamp.core.v1 import core_pb2 as corepb
+from logfire_fleet_client import Client, Config, Notification, Status
+from logfire_fleet_client._core import Core
+from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb
 
 
 def test_an_unknown_effect_stops_the_client(monkeypatch):
@@ -57,7 +57,7 @@ def test_a_callback_that_throws_stops_the_client_which_says_so_once():
 
 def test_a_stalled_save_is_told_as_the_core_says():
     # The core tells of a save that hangs, and of its end: the application hears both, as they are.
-    from pydantic_opamp_client._client import _notification
+    from logfire_fleet_client._client import _notification
 
     def told(stalled: bool, waited_ms: int) -> Notification | None:
         n = corepb.Notification(save_stalled=corepb.SaveStalled(stalled=stalled, waited_ms=waited_ms))

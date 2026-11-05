@@ -41,15 +41,15 @@ server.
 
 | Language | Integration |
 |---|---|
-| Python | `pydantic-opamp-otel`, under `opentelemetry-instrument` ([python-otel.md](python-otel.md)) |
+| Python | `logfire-fleet-otel`, under `opentelemetry-instrument` ([python-otel.md](python-otel.md)) |
 | Go | `opampotel.Setup` in place of the SDK's setup ([go-otel.md](go-otel.md)) |
-| Node.js | `node --import @pydantic/opamp-otel/register` ([node-otel.md](node-otel.md)) |
+| Node.js | `node --import @pydantic/logfire-fleet-otel/register` ([node-otel.md](node-otel.md)) |
 | Java | the extension jar beside the OpenTelemetry Java agent ([javaagent.md](javaagent.md)) |
 | .NET | the plugin for automatic instrumentation, or `WithOpAmp()` in code ([dotnet-otel.md](dotnet-otel.md)) |
 
-Each is on its language's registry: `pydantic-opamp-otel` on PyPI, `@pydantic/opamp-otel` on npm,
-`dev.pydantic:opamp-javaagent-extension` on Maven Central, `Pydantic.OpAmp.AutoInstrumentation`
-and `Pydantic.OpAmp.Extensions.Hosting` on NuGet, and Go's module
+Each is on its language's registry: `logfire-fleet-otel` on PyPI, `@pydantic/logfire-fleet-otel` on npm,
+`dev.pydantic:logfire-fleet-javaagent-extension` on Maven Central, `Logfire.Fleet.AutoInstrumentation`
+and `Logfire.Fleet.Extensions.Hosting` on NuGet, and Go's module
 `github.com/pydantic/opamp-clients/go/opampotel`.
 
 ### 3. Point it at the server

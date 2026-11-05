@@ -13,8 +13,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/opamp-client";
-import { type HostInit, SdkSettings } from "@pydantic/opamp-client/sdk";
+import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type RemoteConfigStatus, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { type HostInit, SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 
 import * as standalone from "../src/app-settings.js";
 import { keepApplied } from "./kept.js";
@@ -298,7 +298,7 @@ test("the snapshot is frozen, and no later change alters it", () => {
 test("appSettings is one per process, whichever path loads it, and the package's agent uses it", async () => {
   assert.equal(standalone.appSettings, appSettings);
   assert.equal(standalone.AppSettings, AppSettings);
-  assert.equal((globalThis as Record<symbol, unknown>)[Symbol.for("@pydantic/opamp-otel.appSettings")], appSettings);
+  assert.equal((globalThis as Record<symbol, unknown>)[Symbol.for("@pydantic/logfire-fleet-otel.appSettings")], appSettings);
   const { AGENT } = await import("../src/index.js");
   assert.equal(AGENT.controls.app, appSettings);
   // A CommonJS application's require() reaches the same one (require of an ES module, Node.js 22.12+).
@@ -360,7 +360,7 @@ test("through the agent: the same map again, sent another way, or another settin
 });
 
 test("a value that starts with U+FEFF reaches the application as it was sent, and at the next start", () => {
-  // @bufbuild/protobuf's default decoder drops a leading U+FEFF (@pydantic/opamp-client's src/utf8.ts).
+  // @bufbuild/protobuf's default decoder drops a leading U+FEFF (@pydantic/logfire-fleet-client's src/utf8.ts).
   // Keys are ASCII (docs/app-settings.md), so only a value can carry one.
   const BOM = "\uFEFF";
   const dir = stateDir();

@@ -1,6 +1,6 @@
 # OpenTelemetry .NET automatic instrumentation, under an OpAMP server
 
-`dotnet/Pydantic.OpAmp.AutoInstrumentation` is a plugin for upstream's
+`dotnet/Logfire.Fleet.AutoInstrumentation` is a plugin for upstream's
 [automatic instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation).
 With it, the SDK that automatic instrumentation sets up joins an OpAMP server's fleet and takes
 its settings from the server: sampling, what to send, which instrumentations run
@@ -23,11 +23,11 @@ Add the plugin to the application next to the automatic instrumentation package,
 
 ```bash
 dotnet add package OpenTelemetry.AutoInstrumentation --version 1.17.0
-dotnet add package Pydantic.OpAmp.AutoInstrumentation
+dotnet add package Logfire.Fleet.AutoInstrumentation
 ```
 
 ```bash
-OTEL_DOTNET_AUTO_PLUGINS="Pydantic.OpAmp.AutoInstrumentation.Plugin, Pydantic.OpAmp.AutoInstrumentation" \
+OTEL_DOTNET_AUTO_PLUGINS="Logfire.Fleet.AutoInstrumentation.Plugin, Logfire.Fleet.AutoInstrumentation" \
 OTEL_SERVICE_NAME=checkout \
 OTEL_OPAMP_ENDPOINT=https://opamp.example.com/v1/opamp \
 OTEL_OPAMP_HEADERS="Authorization=Bearer%20<key>" \
@@ -98,7 +98,7 @@ not conflict with the ones automatic instrumentation ships.
 - **Never holds the application up.** If the plugin can't start, it says why on standard error
   and the SDK runs unmanaged.
 
-The rules are the SDK settings layer's (`Pydantic.OpAmp.Client.Sdk`), the same in every
+The rules are the SDK settings layer's (`Logfire.Fleet.Client.Sdk`), the same in every
 language. The plugin only carries them out on the .NET SDK.
 
 ### What the policy governs, and what it reports ungoverned
@@ -330,7 +330,7 @@ No control either: once the SDK is built, the agent reports what it runs as its 
 components ([what the SDK integrations report](available-components.md#what-the-sdk-integrations-report)),
 and the server is sent their hash, and them in full when it asks. It lists:
 
-- `sdk`: the package (`Pydantic.OpAmp.AutoInstrumentation`, or `Pydantic.OpAmp.Extensions.Hosting`
+- `sdk`: the package (`Logfire.Fleet.AutoInstrumentation`, or `Logfire.Fleet.Extensions.Hosting`
   for `WithOpAmp()`) and its version, `telemetry.sdk.language` `dotnet`, and the OpenTelemetry
   SDK's version.
 - `instrumentations`: under the names that the `instrumentations` control takes, upstream's lowercase
@@ -359,14 +359,14 @@ provider under `WithOpAmp()`), with export health.
 ## In code: `WithOpAmp()`
 
 An application that sets its SDK up in code (`services.AddOpenTelemetry()`) gets the same with one
-call, from `dotnet/Pydantic.OpAmp.Extensions.Hosting`:
+call, from `dotnet/Logfire.Fleet.Extensions.Hosting`:
 
 ```csharp
 builder.Services.AddOpenTelemetry()
     .WithTracing(t => t.AddAspNetCoreInstrumentation().AddOtlpExporter())
     .WithMetrics(m => m.AddAspNetCoreInstrumentation().AddOtlpExporter())
     .WithOpAmp();
-// or: builder.AddPydanticOpAmp();
+// or: builder.AddLogfireFleet();
 ```
 
 The server comes from the configuration's `OpAmp` section (`OpAmp:Endpoint`,
@@ -402,7 +402,7 @@ adds to a built provider (`tracerProvider.AddProcessor`, `loggerProvider.AddProc
 reported at the next of those; the policy in force stays.
 A tracer or meter provider the application builds on its own (`Sdk.CreateTracerProviderBuilder()`)
 isn't under `WithOpAmp()`, and isn't seen.
-Tests: `dotnet/Pydantic.OpAmp.Extensions.Hosting.Tests`, a host against an OpAMP server and a
+Tests: `dotnet/Logfire.Fleet.Extensions.Hosting.Tests`, a host against an OpAMP server and a
 collector on loopback.
 
 ## The application's own settings
@@ -410,10 +410,10 @@ collector on loopback.
 The server may send the application settings of its own in the policy's `app_settings` control
 (a feature flag, a verbosity), which the plugin and `WithOpAmp()` hand on rather than read
 ([app-settings.md](app-settings.md)). The application reads them through `OpAmpAppSettings`
-(namespace `Pydantic.OpAmp`):
+(namespace `Logfire.Fleet`):
 
 ```csharp
-using Pydantic.OpAmp;
+using Logfire.Fleet;
 
 if (OpAmpAppSettings.Get("checkout.new_flow", "off") == "on")
 {
@@ -440,7 +440,7 @@ are still called and the config is still APPLIED. Disposing what `OnChange` retu
 disposing it again does nothing. Any thread may read, subscribe and unsubscribe at any time, and a
 reader sees the whole of one map or the whole of the next.
 
-`OpAmpAppSettings` lives in `Pydantic.OpAmp.Client`, the assembly the plugin and the hosting
+`OpAmpAppSettings` lives in `Logfire.Fleet.Client`, the assembly the plugin and the hosting
 package already both depend on, so it is one type whichever of them fills it, and an application
 that references either has it; it is a small static class with no dependency of its own, and with
 nothing attached it answers every read with its default and never calls a handler. Both declare
@@ -460,7 +460,7 @@ told of.
 
 ## How it is checked
 
-- Unit tests (`dotnet/Pydantic.OpAmp.AutoInstrumentation.Tests`):
+- Unit tests (`dotnet/Logfire.Fleet.AutoInstrumentation.Tests`):
   - the sampler and the gate, on the real SDK types;
   - the next-start settings become the instrumentation variables;
   - the answers, saving and reporting follow the layer;

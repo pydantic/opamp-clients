@@ -21,8 +21,8 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { type Client, RemoteConfigStatuses } from "@pydantic/opamp-client";
-import { SdkSettings } from "@pydantic/opamp-client/sdk";
+import { type Client, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 import { keepApplied } from "./kept.js";
 import { config as policyConfig, off, overridden, policy } from "./policy.js";
 
