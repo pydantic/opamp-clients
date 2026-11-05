@@ -622,7 +622,6 @@ internal sealed class SdkAgent
     {
         EffectiveConfig? report = null;
         AvailableComponents? listed = null;
-        ComponentHealth? health = null;
         OpAmpClient? c;
         lock (this.gate)
         {
@@ -631,7 +630,13 @@ internal sealed class SdkAgent
                 report = rehosted ? this.effective : null;
                 listed = this.unsent;
                 this.unsent = null;
-                health = this.HealthLocked();
+                if (this.HealthLocked() is { } health)
+                {
+                    // Under the gate, as SetHealth's: sent after it, this report could undo a newer
+                    // one SetHealth queued in between.
+                    this.HealthSent = health;
+                    this.client?.SetHealth(health);
+                }
             }
 
             c = this.client;
@@ -650,12 +655,6 @@ internal sealed class SdkAgent
         if (listed is not null)
         {
             c.SetAvailableComponents(listed);
-        }
-
-        if (health is not null)
-        {
-            this.HealthSent = health;
-            c.SetHealth(health);
         }
     }
 

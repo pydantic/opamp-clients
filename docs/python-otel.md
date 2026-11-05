@@ -12,13 +12,10 @@ It plugs in through upstream's extension points, including the SDK's OpAMP hook
 
 ## Use it
 
-Install it next to the instrumentations the application needs. Until it is published, install it
-from a checkout of this repository, after fetching the compiled core the checkout pins:
+Install it next to the instrumentations the application needs:
 
 ```bash
-git clone https://github.com/pydantic/opamp-clients && cd opamp-clients
-scripts/fetch_core.py fetch
-pip install ./python/core ./python ./python/otel opentelemetry-instrumentation-flask
+pip install pydantic-opamp-otel opentelemetry-instrumentation-flask
 ```
 
 Then run the application under `opentelemetry-instrument` as usual, with the server's address:
@@ -181,8 +178,7 @@ runs unmanaged.
 An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
-(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x). Until it is published, from a checkout
-as [above](#use-it): `pip install ./python/core ./python './python/otel[logfire]'`.
+(`pydantic-opamp-otel[logfire]`; `logfire` 5.1 to 5.x).
 
 ```python
 import logfire

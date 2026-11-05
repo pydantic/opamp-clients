@@ -72,14 +72,15 @@ class CompiledOnly(unittest.TestCase):
                  assembly: tuple[str, ...] = ("lib/net8.0/Pydantic.OpAmp.Client.dll", "lib/net10.0/Pydantic.OpAmp.Client.dll"),
                  hosting: tuple[str, ...] = (HOSTING_DLL, "lib/net8.0/Pydantic.OpAmp.Extensions.Hosting.xml", HOSTING_DLL_10,
                                              "lib/net10.0/Pydantic.OpAmp.Extensions.Hosting.xml"),
-                 hosting_depends: str = "Pydantic.OpAmp.Client") -> None:
+                 hosting_depends: str = "Pydantic.OpAmp.Client", hosting_readme: str = "") -> None:
         nuspec = f'<dependency id="Pydantic.OpAmp.Core.Native" version="{depends or f"[{nd.core_version()}]"}" />'
         with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Client.0.1.0.nupkg", "w") as z:
             z.writestr("Pydantic.OpAmp.Client.nuspec", nuspec)
             for m in (*assembly, *client_extra):
                 z.writestr(m, "")
         with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg", "w") as z:
-            z.writestr("Pydantic.OpAmp.Extensions.Hosting.nuspec", f'<dependency id="{hosting_depends}" version="0.1.0" />')
+            z.writestr("Pydantic.OpAmp.Extensions.Hosting.nuspec",
+                       f'{hosting_readme}<dependency id="{hosting_depends}" version="0.1.0" />')
             for m in hosting:
                 z.writestr(m, "")
         with zipfile.ZipFile(self.dist / "nuget" / "Pydantic.OpAmp.Core.Native.0.1.0.nupkg", "w") as z:
@@ -163,6 +164,17 @@ class CompiledOnly(unittest.TestCase):
         self.assertIn(f"{hosting}: lacks {HOSTING_DLL}", self.problems())
         self.packages(hosting_depends="Pydantic.OpAmp.Core.Native")
         self.assertIn(f"{hosting}: doesn't depend on Pydantic.OpAmp.Client", self.problems())
+
+    # NuGet's page shows the README the nuspec names: that one file, and no other, may ride along.
+    def test_the_hosting_package_may_carry_the_readme_its_nuspec_names(self) -> None:
+        self.core_wheel()
+        hosting = "Pydantic.OpAmp.Extensions.Hosting.0.1.0.nupkg"
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "README.md"), hosting_readme="<readme>README.md</readme>")
+        self.assertEqual(self.problems(), "")
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "README.md"))
+        self.assertIn(f"{hosting}: ships README.md", self.problems())
+        self.packages(hosting=(HOSTING_DLL, HOSTING_DLL_10, "NOTES.md"), hosting_readme="<readme>README.md</readme>")
+        self.assertIn(f"{hosting}: ships NOTES.md", self.problems())
 
     def test_a_binary_in_the_client_fails(self) -> None:
         self.archive(CLIENT, "pydantic_opamp_client/__init__.py", "pydantic_opamp_client/_native.abi3.so")

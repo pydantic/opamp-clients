@@ -47,8 +47,10 @@ server.
 | Java | the extension jar beside the OpenTelemetry Java agent ([javaagent.md](javaagent.md)) |
 | .NET | the plugin for automatic instrumentation, or `WithOpAmp()` in code ([dotnet-otel.md](dotnet-otel.md)) |
 
-Until the packages are on PyPI, npm, Maven Central and NuGet, each page says how to install from
-this repository.
+Each is on its language's registry: `pydantic-opamp-otel` on PyPI, `@pydantic/opamp-otel` on npm,
+`dev.pydantic:opamp-javaagent-extension` on Maven Central, `Pydantic.OpAmp.AutoInstrumentation`
+and `Pydantic.OpAmp.Extensions.Hosting` on NuGet, and Go's module
+`github.com/pydantic/opamp-clients/go/opampotel`.
 
 ### 3. Point it at the server
 

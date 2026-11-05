@@ -2,7 +2,8 @@
 
 What each release of this repository's packages changes for the people who run them. Every
 release is a tag: `go/opampsupervisor/vX.Y.Z` (the Supervisor and its installers),
-`go/<module>/vX.Y.Z` (the Go modules), and, once the SDKs are on their registries, `sdk/vX.Y.Z`.
+`go/<module>/vX.Y.Z` (the Go modules), and `sdk/vX.Y.Z` (the SDKs on PyPI, npm, Maven Central and
+NuGet).
 The core every package carries is a `core/vX.Y.Z` release of this repository, pinned in
 `opamp-core.lock.json`.
 
@@ -52,6 +53,11 @@ and date. Tests, CI and docs alone don't need a line.
   exporters; its sampler stays the application's, so the sampling controls, debug mode and the
   instrumentation switches are refused. In Node.js the Logfire SDK's logs (spans of
   `logfire.span_type` `log`) go through the log controls. Needs core 0.15.0.
+- Supervisor installers and container image: the Collector runs with
+  `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
+  receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
+  those metrics fails when a component is in more than one pipeline (packaging/README.md,
+  "Pipeline item counts") (#120).
 - .NET: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Extensions.Hosting` and the automatic
   instrumentation plugin ship for .NET 10 as well as .NET 8 (`net8.0` and `net10.0`), and their
   tests run on both. Building from source needs the .NET 10 SDK (#86).
@@ -77,6 +83,11 @@ and date. Tests, CI and docs alone don't need a line.
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
   (`http://localhost:4318/v1/traces`); the identity (`otlp@localhost:4318`) is unchanged. The
   warnings read the same in every SDK. On core 0.15.0 (#109).
+- Python, Node.js, Java, .NET: every package page and guide installs from its registry (`pip
+  install pydantic-opamp-otel`, `npm install @pydantic/opamp-otel`, Maven Central, `dotnet add
+  package`) in place of building from a checkout, and the READMEs PyPI and npm show link to the
+  docs on GitHub. The NuGet packages carry their README, Pydantic as author, the project URL and
+  tags (#124).
 - Supervisor installers: the Collector the packages ship (deb, rpm, `.pkg`, `.msi`, the release
   archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
   v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
@@ -89,6 +100,10 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
+  as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
+  replacing, and could have killed the new Collector. It now signals the process it was stopping
+  (#124).
 - Supervisor installers: an upgrade in place (apt, dnf, the `.pkg`, the `.msi`) keeps the host
   running. Before, the Linux packages stopped and disabled the Supervisor during an upgrade, and the
   `.msi` left it stopped and set to start on demand. After an upgrade the package runs the new
@@ -208,13 +223,15 @@ The first release of the SDKs on their registries, from the tag `sdk/v0.1.1`, on
 - Node.js on npm: `@pydantic/opamp-client` and `@pydantic/opamp-otel`, with provenance. The npm
   packages also have a 0.1.0. It has the same contents, was published by hand, and has no
   provenance. Use 0.1.1.
-- Java (Maven Central, `dev.pydantic`) and .NET (NuGet, `Pydantic.OpAmp.*`) are not on their
-  registries yet. A later `sdk/v*` release publishes them.
+- Java on Maven Central: `dev.pydantic:opamp-client` and `dev.pydantic:opamp-javaagent-extension`
+  (with its `app-settings` jar).
+- .NET on NuGet: `Pydantic.OpAmp.Client`, `Pydantic.OpAmp.Core.Native`,
+  `Pydantic.OpAmp.AutoInstrumentation` and `Pydantic.OpAmp.Extensions.Hosting`.
 
 This is the first release of these packages, so it lists no changes. Some entries in the
-**Unreleased** section above also apply to Python or Node.js. Version 0.1.1 already includes those
-changes. The entries stay in **Unreleased** because they also apply to Go, Java, .NET or the
-Supervisor, which have not had a release with them.
+**Unreleased** section above also apply to the SDKs. Version 0.1.1 already includes those
+changes. The entries stay in **Unreleased** because they also apply to Go or the Supervisor, which
+have not had a release with them.
 
 ## Supervisor 0.8.0 (2026-10-29)
 

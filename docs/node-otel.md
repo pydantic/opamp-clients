@@ -18,13 +18,11 @@ later.
 
 ## Use it
 
-Build it in a checkout of this repository (until it is published), and install it into the
-application:
+Install it into the application. It brings upstream's auto-instrumentations and OTLP exporters
+with it:
 
 ```bash
-OPAMP=/path/to/opamp   # this repository
-(cd $OPAMP/node/opamp && npm ci && npm run build) && (cd $OPAMP/node/otel && npm ci && npm run build)
-npm install $OPAMP/node/otel   # in the application's directory
+npm install @pydantic/opamp-otel
 ```
 
 Then start the application with it instead of upstream's `register`:

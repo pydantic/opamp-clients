@@ -82,7 +82,7 @@ against:
 
 ```xml
 <PackageReference Include="Elastic.OpenTelemetry.AutoInstrumentation" Version="1.6.1" />
-<ProjectReference Include="path/to/dotnet/Pydantic.OpAmp.AutoInstrumentation/Pydantic.OpAmp.AutoInstrumentation.csproj" />
+<PackageReference Include="Pydantic.OpAmp.AutoInstrumentation" Version="0.1.1" />
 ```
 
 List both plugins, EDOT's first, and start the application with `_instrument.sh`:
@@ -107,7 +107,7 @@ EDOT Python is a distro and a configurator, and so is this package. Only one of 
 choose this package's, and keep EDOT's instrumentations, sampler and resource detectors.
 
 ```bash
-pip install elastic-opentelemetry ./python ./python/otel
+pip install elastic-opentelemetry pydantic-opamp-otel
 edot-bootstrap --action=install     # the instrumentations for what the application uses
 
 OTEL_PYTHON_DISTRO=opamp \

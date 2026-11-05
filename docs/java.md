@@ -13,19 +13,12 @@ or later. Its [README](../java/opamp/README.md) has the full reference.
 <dependency>
   <groupId>dev.pydantic</groupId>
   <artifactId>opamp-client</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.1</version>
 </dependency>
 ```
 
-The artifact is not on Maven Central yet ([sdk-registries.md](sdk-registries.md)). Until it is,
-install it into your local Maven repository from a checkout, and depend on it as above:
-
-```bash
-cd java/opamp
-mvn install -DskipTests
-```
-
-Gradle finds it there with `mavenLocal()` in its repositories.
+Gradle: `implementation("dev.pydantic:opamp-client:0.1.1")`. The latest version is on
+[Maven Central](https://central.sonatype.com/artifact/dev.pydantic/opamp-client).
 
 ## Start and stop
 
