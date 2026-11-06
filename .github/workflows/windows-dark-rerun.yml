@@ -34,13 +34,15 @@ jobs:
         run: |
           set -euo pipefail
           jobs=$(gh api "repos/$REPO/actions/runs/$RUN/attempts/1/jobs?per_page=100" --paginate \
-            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | [.id, .name] | @tsv')
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | [.id, .name, .check_run_url] | @tsv')
           echo "Failed jobs:"; echo "$jobs"
           others=$(echo "$jobs" | cut -f2 | grep -v -x -e 'Windows installer, built, installed and enrolled' -e 'CI OK' || true)
           if [ -n "$others" ]; then echo "Other jobs failed too; leaving the run as it is."; exit 0; fi
-          windows=$(echo "$jobs" | awk -F'\t' '$2 == "Windows installer, built, installed and enrolled" { print $1 }')
+          windows=$(echo "$jobs" | awk -F'\t' '$2 == "Windows installer, built, installed and enrolled" { print $3 }')
           if [ -z "$windows" ]; then echo "The Windows installer job didn't fail."; exit 0; fi
-          if ! gh api "repos/$REPO/check-runs/$windows/annotations" --jq '.[].message' | grep -q 'exceeded the maximum execution time'; then
+          # The job's check run (its id isn't promised to be the job's); a failed lookup fails this job.
+          annotations=$(gh api "${windows#https://api.github.com/}/annotations" --jq '.[].message')
+          if ! grep -q 'exceeded the maximum execution time' <<<"$annotations"; then
             echo "The Windows installer job failed on its own (not at the job's time limit); leaving it red."; exit 0
           fi
           echo "The Windows installer job hit the job's time limit with the machine dark; re-running the failed jobs once."
