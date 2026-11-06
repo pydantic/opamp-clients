@@ -202,6 +202,21 @@ and date. Tests, CI and docs alone don't need a line.
   (Python), ip-address 10.7.4 (Node.js), jackson-databind 2.22.3 (Java tests). Every lockfile is
   now checked against OSV on every change and nightly (`scripts/deps_scan.py`).
 
+## SDKs 0.2.1 (2026-11-06)
+
+`sdk/v0.2.1`, on core 0.16.0, for Python, Node.js, Java and .NET. Only Python and Node.js change.
+
+### Added
+
+- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
+  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
+  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
+  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
+  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
+  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
+  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
+  client, and in Node.js the server is told of the exporters it has then (#127).
+
 ## SDKs 0.2.0 (2026-11-05)
 
 `sdk/v0.2.0`, on core 0.16.0, for Python, Node.js, Java and .NET.

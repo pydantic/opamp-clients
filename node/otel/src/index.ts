@@ -1861,7 +1861,14 @@ export class Agent {
     if (!this.layer || this.ownProviders.has(signal)) return;
     this.ownProviders.add(signal);
     this.#decide();
-    // Called from the application's code: what the client sends isn't the application's to trace.
+    this.#republish();
+  }
+
+  /**
+   * The inventory and export health, sent again for exporters that changed while it runs. Called
+   * from the application's code: what the client sends isn't the application's to trace.
+   */
+  #republish(): void {
     context.with(suppressTracing(context.active()), () => {
       if (this.#instrumentations) this.inventory = inventory(this.#instrumentations, this.exporters);
       const components = this.components();
@@ -1872,11 +1879,13 @@ export class Agent {
 
   /**
    * Once the SDK has started: the gates in front of every exporter on the providers it
-   * registered (`govern`), each one that can't be gated warned about once.
+   * registered (`govern`), each one that can't be gated warned about once. Called again once
+   * running (the Logfire SDK configured again), the exporters it now finds are listed to the server.
    */
   govern(providers: Partial<Record<ApiSignal, unknown>>): void {
     this.found = govern(this.controls, providers);
     this.#decide();
+    if (this.client) this.#republish();
   }
 
   /**

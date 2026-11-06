@@ -41,13 +41,15 @@ async function body(req: IncomingMessage): Promise<Uint8Array> {
   return new Uint8Array(Buffer.concat(chunks));
 }
 
-/** An OpAMP server that offers `offer` in its first answer: the statuses and instance UIDs it hears. */
+/** An OpAMP server that offers `offer` in its first answer: the statuses, instance UIDs and
+ * available components hashes it hears. */
 async function configServer(offer: string) {
-  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], uids: new Set<string>() };
+  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], uids: new Set<string>(), hashes: [] as string[] };
   const s = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     seen.polls++;
     seen.uids.add(Buffer.from(msg.instanceUid).toString("hex"));
+    if (msg.availableComponents) seen.hashes.push(Buffer.from(msg.availableComponents.hash).toString("hex"));
     if (msg.remoteConfigStatus) {
       seen.statuses.push({ status: msg.remoteConfigStatus.status, error: msg.remoteConfigStatus.errorMessage });
     }
@@ -69,13 +71,14 @@ async function configServer(offer: string) {
 /**
  * A program that sets the SDK up as the Logfire SDK does under fleet (its head sampler and resource
  * through the hook, its NodeSDK started by the hook), `times` times over, as configure() called
- * again; once `ready` it makes `spans` and exits. Its output.
+ * again; once `ready` it makes `spans` and exits. Its output. `otlp`: the last SDK also exports over OTLP.
  */
-async function app(endpoint: string, spans: string, ready: () => boolean, times = 1) {
+async function app(endpoint: string, spans: string, ready: () => boolean, times = 1, otlp = false) {
   const program = `
     import { createRequire } from "node:module";
     import { NodeSDK } from "@opentelemetry/sdk-node";
     import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+    import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
     import { resourceFromAttributes } from "@opentelemetry/resources";
     import { trace, metrics, context, propagation } from "@opentelemetry/api";
     import { logs } from "@opentelemetry/api-logs";
@@ -93,7 +96,8 @@ async function app(endpoint: string, spans: string, ready: () => boolean, times 
       const resource = resourceFromAttributes({ "service.name": "shop", "telemetry.sdk.name": "logfire",
         ...fleet.resourceAttributes });
       sdk = new NodeSDK({ resource, autoDetectResources: false, instrumentations: [], sampler: fleet.headSampler(undefined),
-        spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter())] });
+        spanProcessors: [new SimpleSpanProcessor(new ConsoleSpanExporter()),
+          ...(${otlp} && i === ${times} - 1 ? [new SimpleSpanProcessor(new OTLPTraceExporter({ url: "http://127.0.0.1:9/v1/traces" }))] : [])] });
       fleet.start(() => sdk.start(), resource);
       console.log("instance", fleet.resourceAttributes["service.instance.id"]);
     }
@@ -163,6 +167,29 @@ test("configure() again under fleet: the new SDK's exporters are governed, under
     assert.doesNotMatch(out, /secret/);
     assert.doesNotMatch(out, /of its own/, out);
     assert.equal(s.seen.uids.size, 1, out);
+  } finally {
+    s.close();
+  }
+});
+
+test("configure() again under fleet: the server is told of the exporters the new SDK has", async () => {
+  // The components the server hears of with both exporters from the start...
+  const once = await configServer(policy({}));
+  let expected: string | undefined;
+  try {
+    const { code, out } = await app(once.endpoint, "", once.applied, 1, true);
+    assert.equal(code, 0, out);
+    expected = once.seen.hashes.at(-1);
+    assert.ok(expected, out);
+  } finally {
+    once.close();
+  }
+  // ...are what it last hears of when the OTLP exporter came with configure() again.
+  const s = await configServer(policy({}));
+  try {
+    const { code, out } = await app(s.endpoint, "", () => s.applied() && s.seen.hashes.at(-1) === expected, 2, true);
+    assert.equal(code, 0, out);
+    assert.equal(s.seen.hashes.at(-1), expected, out);
   } finally {
     s.close();
   }
