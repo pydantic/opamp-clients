@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-# CI only: what the Windows runner looks like every 30 s, written to a check run of its own. When a
+# CI only: what the Windows runner looks like every 10 s, written to a check run of its own. When a
 # step stops the runner from answering, the job ends with no log at all; this process runs apart
 # from the runner, so its last report shows what the machine was doing then. Stops when -Stop
 # exists, or after -Minutes.
@@ -27,6 +27,8 @@ function Report {
         "memory free $([int]($os.FreePhysicalMemory / 1024)) MB of $([int]($os.TotalVisibleMemorySize / 1024)) MB; $($procs.Count) processes"
         (Get-PSDrive -PSProvider FileSystem | ForEach-Object { "drive $($_.Name): $([int]($_.Free / 1MB)) MB free" })
         "CPU load $((Get-CimInstance Win32_Processor | Measure-Object -Average LoadPercentage).Average)%"
+        (Get-Counter -ErrorAction SilentlyContinue -Counter '\PhysicalDisk(*)\Current Disk Queue Length', '\PhysicalDisk(*)\Disk Bytes/sec', '\PhysicalDisk(*)\Avg. Disk sec/Transfer', '\Memory\Pages/sec', '\Network Interface(*)\Bytes Total/sec').CounterSamples |
+            ForEach-Object { "$($_.Path): $([math]::Round($_.CookedValue, 3))" }
         ''
         '## Ours, msiexec, PowerShell, the runner'
         ($procs | Where-Object { $_.Name -match 'opamp|otelcol|msiexec|install\.test|powershell|pwsh|Runner|bash|conhost' } |
@@ -77,7 +79,7 @@ $script:id = $null
 $deadline = (Get-Date).AddMinutes($Minutes)
 while ((Get-Date) -lt $deadline -and -not (Test-Path -LiteralPath $Stop)) {
     Post 'in_progress' "alive at $((Get-Date).ToUniversalTime().ToString('HH:mm:ss')) UTC" (Report) ''
-    Start-Sleep -Seconds 30
+    Start-Sleep -Seconds 10
 }
 $finished = Test-Path -LiteralPath $Stop
 Post 'completed' $(if ($finished) { 'the job finished' } else { "the job didn't finish in $Minutes minutes" }) (Report) $(if ($finished) { 'success' } else { 'failure' })

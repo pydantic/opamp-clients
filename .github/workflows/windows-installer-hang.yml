@@ -7,10 +7,9 @@ name: Windows installer hang
 # what took the runner down. It runs only on pull requests in this repository (it needs to write
 # check runs, which a caller of ci.yml doesn't grant). Remove it once the cause is fixed.
 #
-# Seen so far: the runner and the heartbeat both stop reaching GitHub about a minute after the .msi is
-# built, whatever step is running then (even `touch`); with tee or without. Half the runs here keep
-# Defender off the built and installed files, to see whether its scan of the bundled Collector is
-# what cuts the machine off.
+# Seen so far (five of nine runs hung): the runner and the heartbeat both stop reaching GitHub a few
+# seconds after the Supervisor service starts the Collector, during the install or the upgrade test;
+# with tee or without. The heartbeat now reports disk, paging and network counters every 10 s.
 on:
   pull_request:
     paths:
@@ -27,7 +26,7 @@ concurrency:
 
 jobs:
   installer:
-    name: Windows installer, run ${{ matrix.run }}${{ matrix.exclude && ' (Defender excluded)' || '' }}
+    name: Windows installer, run ${{ matrix.run }}
     if: github.repository == 'pydantic/opamp-clients'
     runs-on: windows-latest
     timeout-minutes: 30
@@ -35,7 +34,6 @@ jobs:
       fail-fast: false
       matrix:
         run: [1, 2, 3, 4]
-        exclude: [true, false]
     defaults:
       run:
         shell: bash
@@ -54,12 +52,6 @@ jobs:
         with:
           go-version: "1.26"
           cache-dependency-path: go/opampsupervisor/go.sum
-      - name: Defender kept off the built and installed files
-        if: matrix.exclude
-        shell: pwsh
-        run: |
-          Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP, "$env:ProgramFiles\pydantic-opamp", "$env:ProgramData\pydantic-opamp", (go env GOCACHE)
-          (Get-MpPreference).ExclusionPath
       - name: The packaging tests (the enroll script), as CI runs them
         working-directory: go/opampsupervisor/packaging
         run: |
@@ -75,7 +67,7 @@ jobs:
         env:
           HEARTBEAT_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha }}
-          RUN: ${{ matrix.run }}${{ matrix.exclude && ' (Defender excluded)' || '' }}
+          RUN: ${{ matrix.run }}
         run: |
           $script = "$PWD\go\opampsupervisor\packaging\windows\ci-heartbeat.ps1"
           # Start-Process joins ArgumentList with spaces and no quoting, so every value is quoted here.
