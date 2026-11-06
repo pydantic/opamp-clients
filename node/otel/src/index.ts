@@ -106,6 +106,7 @@ import {
   type ComponentHealth,
   ComponentHealthSchema,
   create,
+  fromBinary,
   type AnyValue,
   AnyValueSchema,
   KeyValueSchema,
@@ -114,6 +115,8 @@ import {
   type KeyValue,
   type Notification,
   type RemoteConfigStatus,
+  RemoteConfigStatusSchema,
+  RemoteConfigStatuses,
   saveState,
   SETUP_LOCK_FILE,
   SETUP_UID_FILE,
@@ -129,11 +132,15 @@ import {
   startSetup,
 } from "@pydantic/logfire-fleet-client";
 import {
+  type AgentLog,
+  AgentLog_Level,
+  type AgentOutput,
+  type AgentState,
+  AgentStateSchema,
+  type AgentStepInit,
   type FoundExporterInit,
-  type HealthReport,
   type HostInit,
   type InventoryInit,
-  type Loaded,
   type SamplingRule,
   type ScopeLevel,
   SdkSettings,
@@ -227,72 +234,6 @@ function text(u: Uint8Array): string {
 
 function uuidBytes(u: string): Uint8Array {
   return Uint8Array.from(Buffer.from(u.replaceAll("-", ""), "hex"));
-}
-
-/** An endpoint as it is safe to log (no user info, query or fragment): the core's rule. */
-export function shownEndpoint(endpoint: string): string {
-  try {
-    return startSetup(create(SetupStartSchema, { code: { endpoint } })).shownEndpoint;
-  } catch {
-    return "the endpoint";
-  }
-}
-
-/** What to check when the server can't be reached, by what went wrong (the core's hints). */
-function hint(hints: SetupHints | undefined, status: number | undefined): string {
-  if (status === 401 || status === 403) return hints?.refused ?? "";
-  if (status === 404) return hints?.notFound ?? "";
-  if (status === undefined) return hints?.unreachable ?? "";
-  return hints?.error ?? "";
-}
-
-/**
- * Says when the client connects, when it can't (once a run of failures, with what to check), and
- * when it's back: setup that works or doesn't is never silent.
- */
-export class Reachability {
-  /** The configured endpoint, as it is safe to log. */
-  readonly endpoint: string;
-  /** The endpoint the client uses now, as the client gives it (unset, or undefined from it: the
-   * configured one): after the server moved the agent, the one it moved it to. */
-  inUse: (() => string | undefined) | undefined;
-  #ever = false;
-  #failing = false;
-
-  /** `endpoint`: as it is safe to log; `hints`: the core's, naming what gave the endpoint and
-   * the headers. */
-  constructor(endpoint: string, readonly service = "", readonly uid = "", readonly hints?: SetupHints) {
-    this.endpoint = endpoint;
-  }
-
-  /** The endpoint the client uses now, as it is safe to log. */
-  at(): string {
-    const e = this.inUse?.();
-    return e ? shownEndpoint(e) : this.endpoint;
-  }
-
-  notified(n: Notification): void {
-    const endpoint = this.at();
-    if (n.kind === "connected") {
-      if (!this.#ever) {
-        const who = this.service ? ` as ${this.service}` : "";
-        say.notice(`OpAMP: connected to ${endpoint}; this SDK is managed${who}, instance ${this.uid}`);
-      } else if (this.#failing) {
-        diag.info(`OpAMP: connected to ${endpoint} again`);
-      }
-      this.#ever = true;
-      this.#failing = false;
-    } else if (n.kind === "connectFailed") {
-      if (!this.#failing) {
-        const why = n.detail || `HTTP ${n.status}`;
-        say.warn(`OpAMP: can't reach ${endpoint} (${why}): ${hint(this.hints, n.status)}. Retrying in the background; `
-          + "the SDK keeps its current settings meanwhile");
-      } else {
-        diag.debug(`OpAMP: still can't reach ${endpoint}: ${n.detail}`);
-      }
-      this.#failing = true;
-    }
-  }
 }
 
 /** The program, as a name: the script run, without its extension; `node` when there is none. */
@@ -1671,10 +1612,12 @@ function write(path: string, content: string | Uint8Array): void {
   saveState(path, typeof content === "string" ? new TextEncoder().encode(content) : content);
 }
 
-/** How often export health is looked at (the layer sends it at once on a change, else at most every 60 s). */
-export const HEALTH_EVERY_MS = 30_000;
-
-/** The package's state: one per process. `app`: where the application reads its own settings. */
+/**
+ * The package's state: one per process. `app`: where the application reads its own settings.
+ *
+ * What it does around the settings is the layer's agent flow (docs/sdk-settings.md, "The agent
+ * flow"): it tells the flow what happened and carries out what the flow says, in order.
+ */
 export class Agent {
   readonly controls: Controls;
 
@@ -1684,13 +1627,10 @@ export class Agent {
 
   setup: Setup | undefined;
   layer: SdkSettings | undefined;
-  loaded: Loaded | undefined;
   host: HostInit = {};
-  current: Uint8Array = new TextEncoder().encode("{}");
   effective: EffectiveConfig | undefined;
   uid: string | undefined;
   client: Client | undefined;
-  reachability: Reachability | undefined;
   #stopping: Promise<void> | undefined;
   /** Each prepare: a stop that ends after a later prepare leaves that one's slot alone. */
   #run = 0;
@@ -1703,16 +1643,23 @@ export class Agent {
     set: (fn, ms) => setTimeout(fn, ms).unref(),
     clear: (handle) => clearTimeout(handle as NodeJS.Timeout),
   };
-  /** When the layer said to call Refresh (wall clock, ms; 0: never), and that, monotonic. */
-  #refreshAt = 0;
-  #refreshDue = 0;
+  /** The flow's state, as the layer last gave it. */
+  flow: Uint8Array = new Uint8Array();
+  /** The flow's state, decoded: when it asks the layer again, and the export health it last built. */
+  get state(): AgentState {
+    return fromBinary(AgentStateSchema, this.flow);
+  }
+
+  /** When the flow asks the layer again (the end of debug mode; wall clock, ms; 0: never). */
+  get refreshAt(): number {
+    return Number(this.state.refreshAtUnixMs ?? 0n);
+  }
+
+  /** The monotonic clock's reading at prepare: the flow's clock counts from it. */
+  #base = 0;
   #timer: unknown;
   /** Each arming of the timer: a timer armed before the latest arming does nothing. */
   #generation = 0;
-  /** When export health is next due (monotonic, ms; 0: not before the client starts). */
-  #healthDue = 0;
-  /** The layer's last answer on export health. */
-  health: HealthReport | undefined;
   /** What the instance runs, once the SDK is built (`instrument`): reported as its available components. */
   inventory: InventoryInit | undefined;
   /** The signals the application registered a global provider of its own for (watchProviders). */
@@ -1734,7 +1681,7 @@ export class Agent {
     return this.setup !== undefined;
   }
 
-  /** Before the SDK is built: load the saved settings, put them in force, name the instance. */
+  /** Before the SDK is built: name the instance, start the flow, put its settings in force. */
   prepare(env: NodeJS.ProcessEnv = process.env, options: Options = {}): void {
     // A register after an earlier one's shutdown: that run's client stopped, this one's starts.
     this.#stopping = undefined;
@@ -1748,157 +1695,150 @@ export class Agent {
     this.found = [];
     this.#env = env;
     this.host = hostFromEnv();
-    let saved: Uint8Array | undefined;
     let coreState: Uint8Array | undefined;
     const dir = this.setup.stateDir;
     if (dir) {
       try {
         mkdirSync(dir, { recursive: true });
         // The settings to start with are the last config applied, which the client keeps in its
-        // state (opamp-state); sdk-settings.json is what this package kept itself before, read
-        // only while the client's state holds no config applied.
+        // state (opamp-state).
         const state = join(dir, "opamp-state");
         if (existsSync(state)) coreState = readFileSync(state);
-        const path = join(dir, "sdk-settings.json");
-        if (existsSync(path)) saved = readFileSync(path);
       } catch (e) {
-        say.warn(`OpAMP: saved SDK settings unreadable, using the SDK's own: ${String(e)}`);
+        say.warn(`OpAMP: the client's saved state unreadable, using the SDK's own settings: ${String(e)}`);
       }
     }
-    this.#saved = saved;
-    this.#coreState = coreState;
-    this.#load();
     this.uid = this.#identity(env);
+    this.#base = this.elapsed();
+    const h = this.setup.hints;
+    this.#carryOut(this.layer.start({
+      host: this.host,
+      stateDir: dir !== undefined,
+      ...(coreState ? { coreState } : {}),
+      endpoint: this.setup.endpoint,
+      instanceUid: uuidBytes(this.uid),
+      hints: { refused: h?.refused ?? "", notFound: h?.notFound ?? "", unreachable: h?.unreachable ?? "", error: h?.error ?? "" },
+      nowUnixMs: BigInt(this.now()),
+      nowMonoMs: 0n,
+    }));
   }
 
-  /** The settings kept from the last run (prepare), to load again under a narrower host. */
-  #saved: Uint8Array | undefined;
-  #coreState: Uint8Array | undefined;
+  /** The flow's clock: the monotonic one, in milliseconds since prepare. */
+  #mono(): bigint {
+    return BigInt(Math.max(0, Math.floor(this.elapsed() - this.#base)));
+  }
 
-  /** The saved settings loaded under the host, and put in force. */
-  #load(): void {
-    if (!this.layer) return;
-    this.loaded = this.layer.load(this.#saved, this.host, BigInt(this.now()), this.#coreState);
-    if (this.loaded.warning) say.warn(`OpAMP: ${this.loaded.warning}`);
-    this.current = this.loaded.current;
-    this.effective = this.loaded.effective;
-    this.controls.apply(this.loaded.settings);
-    this.#refreshAfter(this.loaded.refreshAtUnixMs);
+  /**
+   * Tell the flow what happened (one AgentStep input), and carry out what it says: the remote
+   * config status and the health it gave, if any.
+   */
+  step(input: AgentStepInit["input"]): { status?: RemoteConfigStatus; health?: ComponentHealth } {
+    if (!this.layer) return {};
+    let out;
+    try {
+      out = this.layer.step({ agent: this.flow, nowUnixMs: BigInt(this.now()), nowMonoMs: this.#mono(), input });
+    } catch (e) {
+      say.warn(`OpAMP: the settings layer failed: ${String(e)}`);
+      return {};
+    }
+    return this.#carryOut(out);
+  }
+
+  /** The flow's effects, in order, and its timer for the next wake. */
+  #carryOut(out: AgentOutput): { status?: RemoteConfigStatus; health?: ComponentHealth } {
+    this.flow = out.agent;
+    this.effective = out.effective;
+    const answered: { status?: RemoteConfigStatus; health?: ComponentHealth } = {};
+    for (const { effect } of out.effects) {
+      switch (effect.case) {
+        case "apply":
+          this.controls.apply(effect.value);
+          this.#unloaded();
+          break;
+        case "effective":
+          this.client?.setEffectiveConfig(effect.value);
+          break;
+        case "status":
+          answered.status = effect.value;
+          this.client?.setRemoteConfigStatus(effect.value);
+          break;
+        case "health":
+          answered.health = effect.value;
+          this.client?.setHealth(effect.value);
+          break;
+        case "saveUid":
+          this.#saveUid(effect.value);
+          break;
+        case "log":
+          sayLine(effect.value);
+          break;
+      }
+    }
+    this.#arm(Number(out.wakeAtMonoMs));
+    return answered;
+  }
+
+  /** The UID the server assigned: the client uses it from now on, the next start in the telemetry too. */
+  #saveUid(uid: string): void {
+    this.uid = uid;
+    const dir = this.setup?.stateDir;
+    if (!dir) return;
+    try {
+      write(join(dir, SETUP_UID_FILE), uid);
+    } catch (e) {
+      this.step({ case: "uidNotSaved", value: String(e) });
+    }
   }
 
   /**
    * Before the client starts: this process carries out less than prepare declared (manage(): the
-   * sampler is the application's, and it loads no instrumentation). The settings loaded at start
-   * are loaded again under the narrower host, so an override of one it no longer declares is set
-   * aside, and a policy that overrides one is refused.
+   * sampler is the application's, and it loads no instrumentation). The flow decides again under
+   * the narrower host, so an override of one it no longer declares is set aside, and a policy that
+   * overrides one is refused.
    */
   narrow(host: HostInit): void {
     if (!this.layer) return;
     this.host = host;
-    this.#load();
+    this.step({ case: "host", value: host });
   }
 
-  /** When the layer said to call Refresh next (wall clock, ms since the epoch; 0: never). */
-  get refreshAt(): number {
-    return this.#refreshAt;
-  }
-
-  /**
-   * The layer's refresh_at_unix_ms: the one timer armed for it, in place of any earlier one. The
-   * time left is taken from the wall clock once, then waited for on a monotonic clock, so the wall
-   * clock moving meanwhile doesn't move it.
-   */
-  #refreshAfter(at: bigint): void {
-    this.#refreshAt = Number(at);
-    this.#refreshDue = this.#refreshAt ? this.elapsed() + Math.max(0, this.#refreshAt - this.now()) : 0;
-    this.arm();
-  }
-
-  /** (Re)arm the agent's one timer, for the next thing it waits for; none: no timer. */
-  arm(): void {
+  /** The agent's one timer, for the flow's next wake (monotonic ms since prepare; 0: none). */
+  #arm(wakeMs: number): void {
     if (this.#timer !== undefined) this.timers.clear(this.#timer);
     this.#timer = undefined;
     const generation = ++this.#generation;
-    const due = this.#due();
-    if (due === undefined || this.#stopping) return;
+    if (!wakeMs || this.#stopping) return;
     // At most setTimeout's longest wait: a timer that fires early finds nothing due, and re-arms.
-    const wait = Math.min(Math.max(0, due - this.elapsed()), 0x7fffffff);
+    const wait = Math.min(Math.max(0, wakeMs - Number(this.#mono())), 0x7fffffff);
     this.#timer = this.timers.set(() => this.#tick(generation), wait);
   }
 
-  /** The monotonic time the timer is next due at. */
-  #due(): number | undefined {
-    const due = [this.#refreshAt ? this.#refreshDue : 0, this.#healthDue].filter((t) => t > 0);
-    return due.length ? Math.min(...due) : undefined;
-  }
-
   #tick(generation: number): void {
-    // Armed before a later decision, which armed its own: nothing to do.
+    // Armed before a later step, which armed its own: nothing to do.
     if (generation !== this.#generation) return;
     this.#timer = undefined;
     context.with(suppressTracing(context.active()), () => {
-      if (this.#refreshAt && this.elapsed() >= this.#refreshDue) {
-        // Due by the monotonic clock: at least the time it was due at, whatever the wall clock says.
-        this.refresh(Math.max(this.now(), this.#refreshAt));
-      }
-      if (this.#healthDue && this.elapsed() >= this.#healthDue) {
-        this.#healthDue = this.elapsed() + HEALTH_EVERY_MS;
-        this.reportHealth();
-      }
-      this.arm();
+      this.step({ case: "timer", value: this.#counts() });
     });
   }
 
-  /** From now on, export health every 30 s, on the same timer as the end of debug mode. */
-  watchHealth(): void {
-    this.#healthDue = this.elapsed() + HEALTH_EVERY_MS;
-    this.arm();
-  }
-
-  /**
-   * Export health, from what the gates counted: the layer says whether to send it, and builds the
-   * `exporters` entry of the agent's health. The top-level `healthy` stays the application's, which
-   * this package doesn't judge: true. Returns the agent's health, as sent or held.
-   */
-  reportHealth(): ComponentHealth {
+  #counts() {
     const c = this.controls.counts;
-    const previous = this.health;
-    this.health = this.layer!.health(
-      { traces: c.traces.message, metrics: c.metrics.message, logs: c.logs.message },
-      previous,
-      BigInt(this.now()),
-      this.controls.settings,
-      this.exporters,
-    );
-    const health = create(ComponentHealthSchema, {
-      healthy: true,
-      ...(this.health.exporters ? { componentHealthMap: { exporters: this.health.exporters } } : {}),
-    });
-    if (this.health.send) {
-      const e = this.health.exporters;
-      if (e && e.status !== previous?.exporters?.status) {
-        diag.info(`OpAMP: export health: ${e.status}${e.lastError ? ` (${e.lastError})` : ""}`);
-      }
-      this.client?.setHealth(health);
-    }
-    return health;
+    return { traces: c.traces.message, metrics: c.metrics.message, logs: c.logs.message };
   }
 
   /**
-   * The time the layer said to ask again has come (the end of debug mode): what is in force now,
-   * put in force and reported, with or without the server.
+   * The SDK is built (start): the flow is told, with the exporters; the first health, which the
+   * client's first message carries.
    */
-  refresh(now = this.now()): void {
-    const layer = this.layer;
-    if (!layer) return;
-    const r = layer.refresh(this.current, this.loaded?.current ?? new Uint8Array(), BigInt(now), this.host);
-    if (r.warning) say.warn(`OpAMP: ${r.warning}`);
-    this.controls.apply(r.settings);
-    const before = this.#refreshAt;
-    this.effective = r.effective;
-    if (this.effective) this.client?.setEffectiveConfig(this.effective);
-    this.#refreshAfter(r.refreshAtUnixMs);
-    if (before && !this.#refreshAt) diag.info("OpAMP: debug mode is over: the settings sent before it are in force");
+  built(service: string): ComponentHealth {
+    this.step({ case: "built", value: { service, exporters: this.exporters } });
+    return this.exportersNow().health ?? create(ComponentHealthSchema, { healthy: true });
+  }
+
+  /** The exporters listed and the gates' counts now, told to the flow: export health at once. */
+  exportersNow(): { status?: RemoteConfigStatus; health?: ComponentHealth } {
+    return this.step({ case: "exporters", value: { exporters: this.exporters, counts: this.#counts() } });
   }
 
   /**
@@ -1916,7 +1856,7 @@ export class Agent {
       if (this.#instrumentations) this.inventory = inventory(this.#instrumentations, this.exporters);
       const components = this.components();
       if (components) this.client?.setAvailableComponents(components);
-      if (this.client) this.reportHealth();
+      if (this.client) this.exportersNow();
     });
   }
 
@@ -2038,10 +1978,9 @@ export class Agent {
     // Stopped first (a SIGTERM while the resource was being detected): don't start at all.
     if (!s || !layer || !uid || this.#stopping) return;
     const heartbeat = s.heartbeatMs;
-    this.reachability = new Reachability(s.shown, String(resource.attributes["service.name"] ?? ""), uid, s.hints);
-    this.reachability.inUse = () => this.client?.endpoint;
     try {
       const availableComponents = this.components();
+      const health = this.built(String(resource.attributes["service.name"] ?? ""));
       // The client's own requests aren't the application's: everything it starts (its timers,
       // its requests) runs in this context, so no instrumentation traces them.
       this.client = context.with(suppressTracing(context.active()), () => Client.start(
@@ -2070,13 +2009,12 @@ export class Agent {
         },
         {
           description: layer.describe(attributes(resource), this.host, BigInt(this.now())),
-          health: this.reportHealth(),
+          health,
           ...(this.effective ? { effectiveConfig: this.effective } : {}),
           ...(availableComponents ? { availableComponents } : {}),
         },
         (n) => this.#notified(n),
       ));
-      this.watchHealth();
     } catch (e) {
       say.error(`OpAMP: the client did not start; the SDK runs unmanaged: ${String(e)}`);
     }
@@ -2120,73 +2058,62 @@ export class Agent {
   }
 
   #notified(n: Notification): void {
-    this.reachability?.notified(n);
-    if (n.kind === "remoteConfig" && this.client) {
-      const answer = this.remoteConfig(n.remoteConfig);
-      if (this.effective) this.client.setEffectiveConfig(this.effective);
-      this.client.setRemoteConfigStatus(answer);
-    } else if (n.kind === "instanceUidChanged") {
-      this.instanceUidChanged(n.instanceUid);
-    } else if (n.kind === "stateFromNewerVersion") {
-      say.warn(`OpAMP: the saved state was written by a newer version of this SDK (state format ${n.version}), `
-        + "which this one can't read: it is kept as it is, and this run saves nothing");
-    } else if (n.kind === "stopped" && n.error !== undefined) {
-      say.error(`OpAMP: the client stopped; the SDK runs unmanaged: ${String(n.error)}`);
+    this.tell(n, this.client?.endpoint);
+  }
+
+  /** Tell the flow of a notification; `inUse`: the endpoint the client uses now (unset: the configured one). */
+  tell(n: Notification, inUse?: string): void {
+    const endpoint = inUse ?? "";
+    switch (n.kind) {
+      case "remoteConfig":
+        this.remoteConfig(n.remoteConfig);
+        return;
+      case "connected":
+        this.step({ case: "connected", value: { endpoint } });
+        return;
+      case "connectFailed":
+        this.step({ case: "connectFailed", value: { endpoint, status: n.status ?? 0, detail: n.detail ?? "" } });
+        return;
+      case "instanceUidChanged":
+        this.step({ case: "instanceUidChanged", value: n.instanceUid });
+        return;
+      case "stateFromNewerVersion":
+        this.step({ case: "stateFromNewerVersion", value: n.version });
+        return;
+      case "stopped":
+        this.step({ case: "stopped", value: { error: n.error === undefined ? "" : String(n.error) } });
+        return;
     }
   }
 
-  /**
-   * The server assigned the instance another UID: the next start uses it, as the OpAMP instance
-   * UID and as service.instance.id (this run's resource is already the SDK's).
-   */
-  instanceUidChanged(bytes: Uint8Array): void {
-    const uid = text(bytes);
-    if (uid === this.uid) return;
-    this.uid = uid;
-    const dir = this.setup?.stateDir;
-    if (!dir) return;
-    try {
-      write(join(dir, SETUP_UID_FILE), uid);
-      diag.info(`OpAMP: the server named this instance ${uid}; service.instance.id follows at the next start`);
-    } catch (e) {
-      say.warn(`OpAMP: can't save the instance UID the server assigned: ${String(e)}`);
-    }
-  }
-
-  /** Carry out the layer's decision on a remote config; the answer for the server. */
+  /** Tell the flow of a remote config; the answer for the server, which goes to the client too. */
   remoteConfig(config: AgentRemoteConfig): RemoteConfigStatus {
-    const s = this.setup!;
-    const now = this.now();
-    const d = this.layer!.decide(
-      config,
-      this.current,
-      this.loaded?.current ?? new Uint8Array(),
-      this.host,
-      BigInt(now),
-      // With a state directory the client keeps the config this applies, in its own state, and
-      // tells the server APPLIED once that is saved: nothing for this package to save. Without
-      // one, nothing is kept, and a next-start change is refused.
-      s.stateDir === undefined ? undefined : () => {},
-    );
-    if (d.apply) {
-      this.controls.apply(d.apply);
-      this.#unloaded();
-    }
-    if (d.pendingRestart.length > 0) {
-      diag.info(`OpAMP: ${d.pendingRestart.join(", ")} changed; in force when the application restarts`);
-    }
-    this.current = d.current;
-    this.effective = d.effective;
-    if (!d.apply && this.#refreshAt && now >= this.#refreshAt) {
-      // FAILED, so nothing changes, but what is reported is now's: once the wall clock has passed
-      // the end of debug mode (a machine that slept, before the timer went off), it ends here, as
-      // the report says.
-      this.refresh(now);
-    } else {
-      // Applied or not, when to call Refresh next: a refused config leaves the window as it was.
-      this.#refreshAfter(d.refreshAtUnixMs);
-    }
-    return d.status!;
+    return this.step({ case: "remoteConfig", value: config }).status ?? create(RemoteConfigStatusSchema, {
+      lastRemoteConfigHash: config.configHash,
+      status: RemoteConfigStatuses.RemoteConfigStatuses_FAILED,
+      errorMessage: "the settings layer gave no answer",
+    });
+  }
+}
+
+/** A line of the flow's, said as the package's own. */
+function sayLine(line: AgentLog): void {
+  const text = `OpAMP: ${line.text}`;
+  switch (line.level) {
+    case AgentLog_Level.DEBUG:
+      diag.debug(text);
+      break;
+    case AgentLog_Level.INFO:
+      diag.info(text);
+      break;
+    case AgentLog_Level.NOTICE:
+      say.notice(text);
+      break;
+    case AgentLog_Level.WARN:
+      say.warn(text);
+      break;
+    default:
+      say.error(text);
   }
 }
 

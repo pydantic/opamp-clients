@@ -30,8 +30,8 @@ import { type AgentRemoteConfig, type RemoteConfigStatus, RemoteConfigStatuses }
 import { SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 import { keepApplied } from "./kept.js";
-import { config as policyConfig, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
-import { Agent, Controls, glob, HEALTH_EVERY_MS, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
+import { config as policyConfig, decide, FILE, off, overridden, type Overrides, policy, reported } from "./policy.js";
+import { Agent, Controls, glob, hostFromEnv, MASK, Redaction, SEVERITY_OFF } from "../src/index.js";
 import { Scrubbing } from "../src/scrub.js";
 
 const LAYER = new SdkSettings();
@@ -56,7 +56,7 @@ const config = (doc: string | object) => policyConfig(document(doc), document(do
  * package declares them with every exporter its own (hostFromEnv), at `now` (0: no clock).
  */
 function settings(doc: string | object, now = 0): Settings {
-  const d = LAYER.decide(config(doc), EMPTY, EMPTY, hostFromEnv(), BigInt(now));
+  const d = decide(LAYER, config(doc), hostFromEnv(), BigInt(now));
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
   return d.apply!;
 }
@@ -165,7 +165,7 @@ test("send_logs false overrides every scope's level; a scope level on a host tha
   // A host that doesn't declare the scope levels refuses them (the layer's rule; this package
   // declares them always, test/inventory.test.ts).
   const host = { live: hostFromEnv().live!.filter((k) => k !== "send_logs_level_by_scope") };
-  const d = LAYER.decide(config({ log_levels: { scopes: { a: "off" } } }), EMPTY, EMPTY, host, BigInt(NOW));
+  const d = decide(LAYER, config({ log_levels: { scopes: { a: "off" } } }), host, BigInt(NOW));
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.equal(d.status?.errorMessage, "log_levels: scopes: this SDK cannot apply the requested override");
   assert.equal(d.apply, undefined);
@@ -249,7 +249,7 @@ test("the log cap, live: a new n starts a full bucket, the same n keeps it, left
   assert.equal(c.logsCap, undefined);
   assert.equal(send(5000), 5000);
   // A cap the layer refuses changes nothing: 0 is "turn the logs off".
-  const d = LAYER.decide(config({ log_rate_limit: { records_per_second: 0 } }), EMPTY, EMPTY, hostFromEnv(), 0n);
+  const d = decide(LAYER, config({ log_rate_limit: { records_per_second: 0 } }), hostFromEnv(), 0n);
   assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_FAILED);
   assert.equal(d.status!.errorMessage, "log_rate_limit: records_per_second must be a number more than 0, at most 1000000");
 });
@@ -458,7 +458,7 @@ test("redaction: a key both lists match is dropped; drop doesn't change dropped_
 test("redaction is declared, and a host that doesn't declare it refuses it", () => {
   assert.ok(hostFromEnv().live!.includes("drop_attributes") && hostFromEnv().live!.includes("mask_attributes"));
   const host = { live: hostFromEnv().live!.filter((k) => k !== "drop_attributes" && k !== "mask_attributes") };
-  const d = LAYER.decide(config({ attribute_redaction: { mask: ["user.email"] } }), EMPTY, EMPTY, host, 0n);
+  const d = decide(LAYER, config({ attribute_redaction: { mask: ["user.email"] } }), host, 0n);
   assert.equal(d.status?.errorMessage, "attribute_redaction: mask: this SDK cannot apply the requested override");
   assert.equal(d.apply, undefined);
 });
@@ -657,7 +657,7 @@ test("scrubbing is declared where redaction is", () => {
   const live = hostFromEnv().live!;
   assert.ok(live.includes("scrub_defaults") && live.includes("scrub_patterns"));
   const host = { live: live.filter((k) => !k.startsWith("scrub_")) };
-  const d = LAYER.decide(config({ scrubbing: { defaults: true } }), EMPTY, EMPTY, host, 0n);
+  const d = decide(LAYER, config({ scrubbing: { defaults: true } }), host, 0n);
   assert.match(d.status?.errorMessage ?? "", /^scrubbing: /);
   assert.equal(d.apply, undefined);
 });
@@ -814,14 +814,14 @@ test("a caller's decision is followed whatever the rules: sampled under rate 0, 
 
 test("rules written another way are the same rules, and report the same effective config", () => {
   const host = hostFromEnv();
-  const a = LAYER.decide(config({ sampling_rules: { rules: [{ rate: 0, path: "/health*" }] } }), EMPTY, EMPTY, host, 0n);
+  const a = decide(LAYER, config({ sampling_rules: { rules: [{ rate: 0, path: "/health*" }] } }), host, 0n);
   const other = policy({ sampling_rules: { rules: [{ path: "/health*", rate: 0 }] } }).replace('"rate":0}', '"rate":0.0}');
-  const b = LAYER.decide(config(other), EMPTY, EMPTY, host, 0n);
+  const b = decide(LAYER, config(other), host, 0n);
   assert.deepEqual(a.apply?.samplingRules.map((r) => [r.rate, r.path]), [[0, "/health*"]]);
   assert.deepEqual(b.apply?.samplingRules.map((r) => [r.rate, r.path]), [[0, "/health*"]]);
   assert.equal(reported(a.effective), reported(b.effective));
   // A bad rule: FAILED, naming it, and the rules in force stay.
-  const bad = LAYER.decide(config({ sampling_rules: { rules: [{ rate: 0 }, { rate: 7 }] } }), EMPTY, EMPTY, host, 0n);
+  const bad = decide(LAYER, config({ sampling_rules: { rules: [{ rate: 0 }, { rate: 7 }] } }), host, 0n);
   assert.equal(bad.status?.errorMessage, "sampling_rules: rules[1].rate: 7 is not between 0 and 1");
 });
 
@@ -884,7 +884,7 @@ test("the trace cap on a real SDK: whole traces, a local child never refused; re
 class TestAgent extends Agent {
   wall = NOW;
   mono = 0;
-  armed: { fn: () => void; ms: number; cleared: boolean }[] = [];
+  armed: { fn: () => void; ms: number; at: number; cleared: boolean }[] = [];
   reported: object[] = [];
 
   constructor(dir: string | undefined, env: NodeJS.ProcessEnv = {}, wall = NOW) {
@@ -895,7 +895,7 @@ class TestAgent extends Agent {
     this.timers = {
       set: (fn, ms) => {
         // Fired, it is spent: the agent arms another if it waits for more.
-        const t = { fn: () => ((t.cleared = true), fn()), ms, cleared: false };
+        const t = { fn: () => ((t.cleared = true), fn()), ms, at: this.mono + ms, cleared: false };
         this.armed.push(t);
         return t;
       },
@@ -905,6 +905,7 @@ class TestAgent extends Agent {
     // A client that keeps what it is handed: the effective config, and (below) health.
     this.client = {
       setEffectiveConfig: (e: never) => this.reported.push(overridden(e)),
+      setRemoteConfigStatus: () => {},
       setHealth: () => {},
     } as never;
   }
@@ -928,10 +929,16 @@ class TestAgent extends Agent {
     return t && !t.cleared ? t : undefined;
   }
 
-  /** Both clocks forward by `ms`, and the timer fired if it is due by then. */
+  /** Both clocks forward by `ms`. */
   pass(ms: number): void {
     this.wall += ms;
     this.mono += ms;
+  }
+
+  /** The timer fired, if it is due by now, as setTimeout would. */
+  fireDue(): void {
+    const t = this.timer;
+    if (t && t.at <= this.mono) t.fn();
   }
 
   /** The controls the effective config reports overridden. */
@@ -963,6 +970,8 @@ test("vectors: debug.json and saving.json, step by step through the agent: decid
   const all = [...vectors<DebugCase>("debug"), ...vectors<DebugCase>("saving")]
     .filter((k) => !k.steps.some((s) => s.save === "failed"));
   assert.ok(all.length >= 13);
+  // A host that gives no time is another SDK's case: this one always has a clock.
+  all.splice(0, all.length, ...all.filter((k) => !k.steps.some((s) => s.now_unix_ms === 0)));
   // A next-start change is another SDK's case: this one carries every setting out at once, the
   // instrumentation switches too, so nothing it applies waits for a restart.
   const cases = all.filter((k) => !k.steps.some((s) => s.document?.includes('"instrumentations":{"mode":"override"')));
@@ -977,12 +986,14 @@ test("vectors: debug.json and saving.json, step by step through the agent: decid
       if (step.call === "load") {
         agent = new TestAgent(dir, {}, step.now_unix_ms);
       } else {
-        agent.wall = step.now_unix_ms;
+        // The clocks move together, and the timer goes off if it is due by then.
+        agent.pass(step.now_unix_ms - agent.wall);
+        agent.fireDue();
         if (step.call === "decide") {
           const s = agent.remoteConfig(config(step.document!));
           status = s.status;
           error = s.errorMessage;
-        } else agent.refresh();
+        }
       }
       const w = step.want;
       if (w.status !== undefined) {
@@ -993,10 +1004,8 @@ test("vectors: debug.json and saving.json, step by step through the agent: decid
       if (w.sampling_rate !== undefined) assert.equal(agent.controls.sampler.samplingRate, w.sampling_rate ?? undefined, what);
       if (w.refresh_at_unix_ms !== undefined) {
         assert.equal(agent.refreshAt, w.refresh_at_unix_ms, what);
-        // The one timer, armed for the time left, or none.
-        const timer = agent.timer;
-        if (w.refresh_at_unix_ms === 0) assert.equal(timer, undefined, what);
-        else assert.equal(timer?.ms, w.refresh_at_unix_ms - step.now_unix_ms, what);
+        // The one timer, armed for no later than the end.
+        if (w.refresh_at_unix_ms !== 0) assert.ok(agent.timer!.ms <= w.refresh_at_unix_ms - step.now_unix_ms, what);
       }
       if (w.effective !== undefined) assert.equal(reported(agent.effective), w.effective, what);
     }
@@ -1031,7 +1040,7 @@ test("debug mode: the timer ends it with no server, puts the earlier settings ba
   assert.deepEqual(agent.controls.sampler.explain(ROOT_CONTEXT, "GET", SpanKind.SERVER, {}), { how: "rate", rate: 0, rule: 0 });
   logs.export(batch, () => {});
   assert.deepEqual(out.got.at(-1)!.map((r) => `${r.instrumentationScope.name}:${r.severityNumber}`), ["app:13"]);
-  assert.equal(agent.timer, undefined);
+  assert.equal(agent.timer?.ms, 25_000); // export health's, 30 s from the start
   assert.equal(agent.refreshAt, 0);
   assert.ok(!("debug" in agent.settingsInForce));
 });
@@ -1040,10 +1049,10 @@ test("debug mode: the end reported to the server; the same document again doesn'
   const agent = new TestAgent(undefined);
   const doc = policy({ head_sampling: { ratio: 0.25 }, debug: { until: new Date(NOW + 60_000).toISOString() } });
   agent.remoteConfig(config(doc));
-  assert.equal(agent.timer?.ms, 60_000);
+  assert.equal(agent.refreshAt, NOW + 60_000);
   agent.pass(30_000);
   agent.remoteConfig(config(doc)); // a reconnect: the same window, 30 s left
-  assert.equal(agent.timer?.ms, 30_000);
+  assert.equal(agent.refreshAt, NOW + 60_000);
   agent.pass(30_000);
   agent.timer!.fn();
   assert.deepEqual(agent.reported.at(-1), { head_sampling: { ratio: 0.25 } });
@@ -1063,7 +1072,7 @@ test("debug mode: a timer armed before a newer decision does nothing; a new end 
   // A config with debug local ends debug mode at once, and the timer with it.
   agent.remoteConfig(config({ signal_exports: { logs: { enabled: true } } }));
   assert.equal(agent.controls.sampler.samplingRate, undefined);
-  assert.equal(agent.timer, undefined);
+  assert.equal(agent.refreshAt, 0);
 });
 
 test("debug mode ends on the monotonic clock: the wall clock moving back doesn't extend it", () => {
@@ -1073,7 +1082,7 @@ test("debug mode ends on the monotonic clock: the wall clock moving back doesn't
   agent.wall -= 3_600_000; // the wall clock set back an hour meanwhile
   agent.timer!.fn();
   assert.equal(agent.controls.sampler.samplingRate, 0);
-  assert.equal(agent.timer, undefined);
+  assert.equal(agent.refreshAt, 0);
 });
 
 test("debug mode: a refused config after the wall clock passed its end ends it, as reported", () => {
@@ -1088,7 +1097,6 @@ test("debug mode: a refused config after the wall clock passed its end ends it, 
   assert.deepEqual(agent.settingsInForce, { head_sampling: { ratio: 0.1 } });
   assert.equal(agent.controls.sampler.samplingRate, 0.1);
   assert.equal(agent.refreshAt, 0);
-  assert.equal(agent.timer, undefined);
   assert.deepEqual(agent.reported.at(-1), { head_sampling: { ratio: 0.1 } });
 });
 
@@ -1100,7 +1108,7 @@ test("debug mode: refused more than 24 h ahead, and an end already past is appli
   const past = agent.remoteConfig(config({ head_sampling: { ratio: 0.5 }, debug: { until: new Date(NOW - 1000).toISOString() } }));
   assert.equal(past.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
   assert.equal(agent.controls.sampler.samplingRate, 0.5);
-  assert.equal(agent.timer, undefined);
+  assert.equal(agent.refreshAt, 0);
   assert.deepEqual(agent.settingsInForce, { head_sampling: { ratio: 0.5 } });
 });
 
@@ -1124,11 +1132,14 @@ test("a stopped agent arms no timer", async () => {
   const t = agent.timer!;
   await agent.stop();
   assert.ok(t.cleared);
-  agent.arm();
+  agent.remoteConfig(config({ debug: { until: new Date(NOW + 2000).toISOString() } }));
   assert.equal(agent.timer, undefined);
 });
 
 // --- export health -------------------------------------------------------------------------------
+
+/** How often the flow builds export health. */
+const HEALTH_EVERY_MS = 30_000;
 
 type Signal = "traces" | "metrics" | "logs";
 
@@ -1168,12 +1179,16 @@ test("vectors: health.json, call after call through the agent: its gates' counts
   const cases = vectors<HealthCase>("health");
   assert.ok(cases.length >= 14);
   for (const k of cases) {
+    // A wall clock set back is the layer's case: the agent's flow never steps back in time.
+    if (k.steps.some((st, i) => i > 0 && st.now_unix_ms < k.steps[i - 1]!.now_unix_ms)) continue;
     const agent = new TestAgent(undefined, {}, k.steps[0]!.now_unix_ms);
-    const sent: { componentHealthMap: Record<string, unknown> }[] = [];
-    agent.client = { setHealth: (h: never) => sent.push(h), setEffectiveConfig: () => {} } as never;
+    const sent: { healthy: boolean; componentHealthMap: Record<string, unknown> }[] = [];
+    agent.client = { setHealth: (h: never) => sent.push(h), setEffectiveConfig: () => {}, setRemoteConfigStatus: () => {} } as never;
     for (const [i, step] of k.steps.entries()) {
       const what = `${k.name}, step ${i + 1}`;
-      agent.wall = step.now_unix_ms;
+      // The settings in force sent first, then the exporters and their counts; then the timer due
+      // goes off and the exporters are told: health is built at once.
+      agent.pass(step.now_unix_ms - agent.wall);
       agent.remoteConfig(config(step.settings ?? {}));
       agent.exporters = (step.exporters ?? []).map((e) => ({ destination: "", gated: false, ...e }));
       for (const signal of ["traces", "metrics", "logs"] as const) {
@@ -1184,12 +1199,16 @@ test("vectors: health.json, call after call through the agent: its gates' counts
         });
       }
       const before = sent.length;
-      const health = agent.reportHealth();
+      agent.fireDue();
+      agent.built("");
+      const report = agent.state.health!;
+      const health = { healthy: true, componentHealthMap: { exporters: report.exporters } };
+      if (sent.length > before) assert.equal(sent.at(-1)!.healthy, true, what);
       const w = step.want;
       // The top level stays the application's; export health is under exporters.
       assert.equal(health.healthy, true, what);
       if (w.send !== undefined) assert.equal(sent.length > before, w.send, what);
-      if (w.sent_unix_ms !== undefined) assert.equal(agent.health!.sentUnixMs, BigInt(w.sent_unix_ms), what);
+      if (w.sent_unix_ms !== undefined) assert.equal(report.sentUnixMs, BigInt(w.sent_unix_ms), what);
       const exporters = health.componentHealthMap.exporters;
       checkHealth(exporters, w, what);
       for (const [signal, sw] of Object.entries(w.signals ?? {})) {
@@ -1258,12 +1277,11 @@ test("the gates count each export's result, and what they drop on purpose", () =
 
 test("export health on the agent's timer: at start, a failure at once, a recovery, nothing while nothing changes", () => {
   const agent = new TestAgent(undefined);
-  const health = agent.reportHealth(); // what the client starts with
+  const health = agent.built(""); // what the client starts with
   assert.equal(health.componentHealthMap.exporters?.status, "ok");
   const sent: { componentHealthMap: { exporters?: { status: string; lastError: string } } }[] = [];
-  agent.client = { setHealth: (h: never) => sent.push(h), setEffectiveConfig: () => {} } as never;
+  agent.client = { setHealth: (h: never) => sent.push(h), setEffectiveConfig: () => {}, setRemoteConfigStatus: () => {} } as never;
   const exporters = () => sent.at(-1)!.componentHealthMap.exporters!;
-  agent.watchHealth(); // as start() does once the client runs
   const tick = () => {
     assert.equal(agent.timer?.ms, HEALTH_EVERY_MS);
     agent.pass(HEALTH_EVERY_MS);

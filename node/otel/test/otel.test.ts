@@ -21,10 +21,10 @@ import {
   SimpleSpanProcessor,
   TraceIdRatioBasedSampler,
 } from "@opentelemetry/sdk-trace-base";
-import { type Client, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
+import { type Client, type Notification, RemoteConfigStatuses } from "@pydantic/logfire-fleet-client";
 import { SdkSettings } from "@pydantic/logfire-fleet-client/sdk";
 import { keepApplied } from "./kept.js";
-import { config as policyConfig, off, overridden, policy } from "./policy.js";
+import { config as policyConfig, decide, off, overridden, policy } from "./policy.js";
 
 import {
   Agent,
@@ -39,11 +39,9 @@ import {
   metricReaderOptions,
   preparing,
   programName,
-  Reachability,
   release,
   say,
   samplerFromEnv,
-  shownEndpoint,
   setupFromEnv,
   type Options,
   type Setup,
@@ -74,7 +72,7 @@ beforeEach(() => {
 
 const LAYER = new SdkSettings();
 const text = (s: string) => new TextEncoder().encode(s);
-const settings = (doc: string) => LAYER.load(text(doc), hostFromEnv()).settings;
+const settings = (doc: string) => decide(LAYER, config(doc), hostFromEnv()).apply;
 // Every setting (docs/sdk-settings.md).
 const SETTINGS = ["debug_sampling_rate", "debug_send_logs_level", "debug_until", "deactivate_all_instrumentations",
   "deactivate_instrumentations", "drop_attributes", "mask_attributes", "sampling_rate",
@@ -99,6 +97,26 @@ function said(fn: () => void): [string, string][] {
     diag.disable();
   }
   return out;
+}
+
+/**
+ * An agent for an endpoint, built with a service name, without a client: what it says of the
+ * notifications it is told. `inUse`: the endpoint the client would say it uses now.
+ */
+class Told {
+  readonly agent = new Agent();
+  readonly uid: string;
+  inUse: string | undefined;
+
+  constructor(url: string, service = "", env: Record<string, string> = {}, options: Options = {}) {
+    this.agent.prepare({ OTEL_OPAMP_ENDPOINT: url, OTEL_OPAMP_STATE_DIR: "none", ...env }, options);
+    this.agent.built(service);
+    this.uid = this.agent.uid!;
+  }
+
+  notified(n: Notification): void {
+    this.agent.tell(n, this.inUse);
+  }
 }
 
 function prepared(dir: string, extra: Record<string, string> = {}): { agent: Agent; env: NodeJS.ProcessEnv } {
@@ -430,13 +448,13 @@ test("a UID the server assigns is the one the next start uses", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const { agent } = prepared(dir);
   const assigned = "0192f3a4-5b6c-7d8e-9f01-23456789abcd";
-  agent.instanceUidChanged(Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")));
+  agent.tell({ kind: "instanceUidChanged", instanceUid: Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")) });
   assert.equal(readFileSync(join(dir, "instance-uid"), "utf8"), assigned);
   assert.equal(prepared(dir).agent.uid, assigned);
   // Without a state directory there is nowhere to keep it, and nothing fails.
   const bare = new Agent();
   bare.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp" });
-  bare.instanceUidChanged(Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")));
+  bare.tell({ kind: "instanceUidChanged", instanceUid: Uint8Array.from(Buffer.from(assigned.replaceAll("-", ""), "hex")) });
 });
 
 test("a service.instance.id it can't decode never stops the application: a UID of its own", () => {
@@ -569,21 +587,19 @@ test("OTEL_SDK_DISABLED: the package stays out of the way too", () => {
   assert.throws(() => readFileSync(join(dir, "instance-uid")));
 });
 
-test("the settings to start with are the config the client kept applied, else the file kept before", () => {
+test("the settings to start with are the config the client kept applied", () => {
   const dir = mkdtempSync(join(tmpdir(), "opamp-otel-"));
   const rate = () => prepared(dir).agent.controls.sampler.samplingRate;
-  // Kept before the client kept the config applied (an earlier release): it carries over.
-  writeFileSync(join(dir, "sdk-settings.json"), policy({ head_sampling: { ratio: 0.25 } }));
-  assert.equal(rate(), 0.25);
-  // Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+  // Nothing kept: the SDK's own.
+  assert.equal(rate(), undefined);
   keepApplied(dir, policy({ head_sampling: { ratio: 0.5 } }));
   assert.equal(rate(), 0.5);
-  // A config applied with no policy: every setting the SDK's own, not the old file's.
+  // A config applied with no policy: every setting the SDK's own.
   keepApplied(dir, undefined);
   assert.equal(rate(), undefined);
-  // A client state that doesn't read: the old file again.
+  // A client state that doesn't read: the SDK's own too.
   writeFileSync(join(dir, "opamp-state"), new Uint8Array([0xff, 0xff]));
-  assert.equal(rate(), 0.25);
+  assert.equal(rate(), undefined);
 });
 
 /** The process that held the default state directory ends. */
@@ -892,10 +908,10 @@ test("a lock left by a process that is gone is taken over; a running one's isn't
 });
 
 test("connecting, failing and recovering are each said once", () => {
-  const uid = "00000000-0000-0000-0000-000000000007";
+  let uid = "";
   const lines = said(() => {
-    const s = shownFor("https://user:secret@opamp.example.com/v1/opamp?token=x");
-    const r = new Reachability(s.shown, "checkout", uid, s.hints);
+    const r = new Told("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout");
+    uid = r.uid;
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connectFailed", status: 401, detail: "HTTP 401" });
     r.notified({ kind: "connected" });
@@ -917,12 +933,10 @@ test("connecting, failing and recovering are each said once", () => {
 });
 
 test("after the server moved the agent, what is said names the endpoint the client uses now", () => {
-  let inUse: string | undefined; // none yet: the configured one
   const lines = said(() => {
-    const r = new Reachability(shownFor("https://a.example.com/v1/opamp").shown);
-    r.inUse = () => inUse;
+    const r = new Told("https://a.example.com/v1/opamp");
     r.notified({ kind: "connected" });
-    inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
+    r.inUse = "https://user:secret@b.example.com/v1/opamp?token=x";
     r.notified({ kind: "connectFailed", detail: "connection refused" });
     r.notified({ kind: "connected" });
   }).filter(([level]) => level !== "debug");
@@ -945,9 +959,8 @@ test("the warning names what gave the server: the option given in code, else the
     [{ headers: {} }, "OTEL_OPAMP_ENDPOINT", "the headers given to register()"],
   ];
   for (const [options, endpointFrom, headersFrom] of cases) {
-    const s = setupFromEnv(env, options)!;
     const lines = said(() => {
-      const r = new Reachability(s.shown, "", "u", s.hints);
+      const r = new Told(env.OTEL_OPAMP_ENDPOINT, "", env, options);
       for (const status of [401, 404, undefined]) {
         r.notified({ kind: "connectFailed", status, detail: "" });
         r.notified({ kind: "connected" });
@@ -1015,11 +1028,11 @@ test("an endpoint without a scheme is refused: off, with a warning", () => {
 });
 
 test("the endpoint is logged without its secrets, whatever it is", () => {
-  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f"),
+  assert.equal(shownFor("https://user:secret@opamp.example.com:4320/v1/opamp?token=x#f").shown,
     "https://opamp.example.com:4320/v1/opamp");
-  assert.equal(shownEndpoint("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x"),
+  assert.equal(shownFor("https://user:secret@opamp.example.com:notaport/v1/opamp?token=x").shown,
     "https://opamp.example.com:notaport/v1/opamp");
-  assert.equal(shownEndpoint("https://user:secret@[::1/v1/opamp?k=v"), "https://[::1/v1/opamp");
+  assert.equal(shownFor("https://user:secret@[::1/v1/opamp?k=v").shown, "https://[::1/v1/opamp");
 });
 
 test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to the console; other info stays on diag", (t) => {
@@ -1028,11 +1041,12 @@ test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to th
   const before = say.console;
   say.console = true;
   const lines: string[] = [];
+  let uid = "";
   diag.setLogger({ error: () => {}, warn: () => {}, info: (m) => void lines.push(m), debug: () => {}, verbose: () => {} },
     DiagLogLevel.ALL);
   try {
-    const s = shownFor("http://opamp.example.com/v1/opamp");
-    const r = new Reachability(s.shown, "", "u", s.hints);
+    const r = new Told("http://opamp.example.com/v1/opamp");
+    uid = r.uid;
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
     r.notified({ kind: "connected" });
     r.notified({ kind: "connectFailed", status: 404, detail: "" });
@@ -1047,7 +1061,7 @@ test("without OTEL_LOG_LEVEL, warnings, errors and the first connection go to th
     + "current settings meanwhile";
   assert.deepEqual(warned.mock.calls.map((c) => c.arguments), [
     [notFound],
-    ["OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance u"],
+    [`OpAMP: connected to http://opamp.example.com/v1/opamp; this SDK is managed, instance ${uid}`],
     [notFound],
   ]);
   assert.deepEqual(errored.mock.calls.map((c) => c.arguments), [["OpAMP: x"]]);

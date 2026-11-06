@@ -42,6 +42,7 @@ function agent() {
   a.client = {
     setEffectiveConfig: (e: EffectiveConfig) => void got.effective.push(overridden(e)),
     setAvailableComponents: (c: AvailableComponents) => got.components.push(c),
+    setRemoteConfigStatus: () => {},
     setHealth: () => {},
   } as never;
   say.warn = (m: string) => void got.warned.push(m);
@@ -82,7 +83,6 @@ test("a provider of the application's own, registered once the SDK has started, 
   a.instrument([]);
   const status = a.remoteConfig(config(POLICY));
   assert.equal(status.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);
-  a.client!.setEffectiveConfig(a.effective!);
   const all = {
     head_sampling: { ratio: 1 }, signal_exports: off("traces", "metrics", "logs"), log_levels: { level: "warn" },
     attribute_redaction: { drop: ["x"] }, instrumentations: { all_disabled: true },
@@ -103,7 +103,7 @@ test("a provider of the application's own, registered once the SDK has started, 
   assert.equal(own.getFinishedSpans().length, 1);
   // Reported at once as an ungoverned traces exporter, in the components and export health.
   assert.deepEqual(exportersListed(got.components.at(-1)).traces, { InMemorySpanExporter: true, [APP_PROVIDER]: false });
-  const traces = a.health!.exporters!.componentHealthMap.traces!;
+  const traces = a.state.health!.exporters!.componentHealthMap.traces!;
   assert.deepEqual(Object.fromEntries(Object.entries(traces.componentHealthMap).map(([k, c]) => [k, [c.status, c.healthy]])),
     { InMemorySpanExporter: ["governed", true], [APP_PROVIDER]: ["ungoverned", true] });
   // Nothing set aside: every override stays in force on what the SDK exports.
@@ -149,7 +149,6 @@ test("a provider of the application's own, registered before the SDK starts, is 
   a.instrument([]);
   const status = a.remoteConfig(config(POLICY));
   assert.equal(status.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, status.errorMessage);
-  a.client!.setEffectiveConfig(a.effective!);
   assert.equal((inForce(got)?.signal_exports as Record<string, unknown>).logs !== undefined, true);
   assert.equal(exportersListed(a.components()).traces?.[APP_PROVIDER], false);
   await s.shutdown();

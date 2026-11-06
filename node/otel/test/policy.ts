@@ -3,7 +3,15 @@
 
 // Logfire SDK policies for the tests, as a server sends them (docs/sdk-settings.md).
 
-import { type AgentRemoteConfig, AgentRemoteConfigSchema, create, type EffectiveConfig } from "@pydantic/logfire-fleet-client";
+import {
+  type AgentRemoteConfig,
+  AgentRemoteConfigSchema,
+  create,
+  fromBinary,
+  type EffectiveConfig,
+  type RemoteConfigStatus,
+} from "@pydantic/logfire-fleet-client";
+import { AgentStateSchema, type HostInit, type SdkSettings, type Settings } from "@pydantic/logfire-fleet-client/sdk";
 
 export const FILE = "logfire-sdk-policy.json";
 export const V1 = "logfire-sdk-policy/v1";
@@ -104,4 +112,23 @@ export function overridden(e: EffectiveConfig | undefined): Record<string, unkno
     }
   }
   return out;
+}
+
+/**
+ * What the layer's agent flow answers to `c` under `host` at `now` (on both clocks), from a fresh
+ * start with no policy kept: the status, the settings handed over (if any), the effective config
+ * after, and when it asks the layer again (0: never).
+ */
+export function decide(layer: SdkSettings, c: AgentRemoteConfig, host: HostInit, now = 0n, stateDir = true) {
+  const started = layer.start({ host, stateDir, endpoint: "http://127.0.0.1:1", instanceUid: new Uint8Array(16),
+    nowUnixMs: now, nowMonoMs: now });
+  const out = layer.step({ agent: started.agent, nowUnixMs: now, nowMonoMs: now, input: { case: "remoteConfig", value: c } });
+  let status: RemoteConfigStatus | undefined;
+  let apply: Settings | undefined;
+  for (const { effect } of out.effects) {
+    if (effect.case === "status") status = effect.value;
+    if (effect.case === "apply") apply = effect.value;
+  }
+  const state = fromBinary(AgentStateSchema, out.agent);
+  return { status: status!, apply, effective: out.effective, refreshAtUnixMs: state.refreshAtUnixMs };
 }

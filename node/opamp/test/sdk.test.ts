@@ -7,24 +7,39 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { create } from "@bufbuild/protobuf";
+import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
 
 import {
   AgentConfigObjectSchema,
   type AgentDescription,
+  type AgentRemoteConfig,
   AgentRemoteConfigSchema,
   type AvailableComponents,
   type ComponentDetails,
+  type ComponentHealth,
   KeyValueSchema,
+  type RemoteConfigStatus,
   RemoteConfigStatuses,
 } from "../src/index.js";
-import { type FoundExporterInit, type HostInit, type InventoryInit, SdkSettings, SpanKind } from "../src/sdk.js";
+import {
+  type AgentEffect,
+  AgentLog_Level,
+  type AgentOutput,
+  type AgentState,
+  AgentStateSchema,
+  type AgentStepInit,
+  type FoundExporterInit,
+  type HostInit,
+  type InventoryInit,
+  SdkSettings,
+  type Settings,
+  SpanKind,
+} from "../src/sdk.js";
 import { config, full, off, overridden, policy, reported, V1 } from "./policy.js";
 
 const text = (s: string) => new TextEncoder().encode(s);
 const APPLIED = RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
 const FAILED = RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
-const none = new Uint8Array();
 
 // A host that declares every setting: each live one at once, each next-start one at the next start.
 const declaring = {
@@ -52,32 +67,110 @@ const declaring = {
 };
 const now = 1_791_979_200_000n; // 2026-10-14T12:00:00Z
 
-test("loads, decides and describes", () => {
-  const layer = new SdkSettings();
-  const logsOff = policy({ signal_exports: off("logs") });
-  const loaded = layer.load(text(logsOff), declaring);
-  assert.equal(loaded.settings?.sendLogs, false);
-  assert.equal(reported(loaded.effective), full(logsOff));
+type Effect = NonNullable<AgentEffect["effect"]>;
 
-  const kept: Uint8Array[] = [];
+/** The layer's agent flow, stepped by a test, on clocks that move together from `now`. */
+class Flow {
+  readonly layer = new SdkSettings();
+  out: AgentOutput;
+  readonly now: bigint;
+
+  constructor(host?: HostInit, o: { stateDir?: boolean; coreState?: Uint8Array; now?: bigint } = {}) {
+    this.now = o.now ?? now;
+    this.out = this.layer.start({
+      ...(host ? { host } : {}),
+      stateDir: o.stateDir ?? true,
+      ...(o.coreState ? { coreState: o.coreState } : {}),
+      endpoint: "http://127.0.0.1:1",
+      instanceUid: new Uint8Array(16),
+      nowUnixMs: this.now,
+      nowMonoMs: this.now,
+    });
+  }
+
+  step(ms: number, input: AgentStepInit["input"]): this {
+    const at = this.now + BigInt(ms);
+    this.out = this.layer.step({ agent: this.out.agent, nowUnixMs: at, nowMonoMs: at, input });
+    return this;
+  }
+
+  decide(c: AgentRemoteConfig, ms = 1): this {
+    return this.step(ms, { case: "remoteConfig", value: c });
+  }
+
+  /** The last effect of a kind in the last output. */
+  #effect(kind: Effect["case"]): unknown {
+    let found: unknown;
+    for (const e of this.out.effects) if (e.effect.case === kind) found = e.effect.value;
+    return found;
+  }
+
+  get status(): RemoteConfigStatus | undefined {
+    return this.#effect("status") as RemoteConfigStatus | undefined;
+  }
+
+  get apply(): Settings | undefined {
+    return this.#effect("apply") as Settings | undefined;
+  }
+
+  get health(): ComponentHealth | undefined {
+    return this.#effect("health") as ComponentHealth | undefined;
+  }
+
+  get effective() {
+    return this.out.effective;
+  }
+
+  get warned(): boolean {
+    return this.out.effects.some((e) => e.effect.case === "log" && e.effect.value.level >= AgentLog_Level.WARN);
+  }
+
+  get state(): AgentState {
+    return fromBinary(AgentStateSchema, this.out.agent);
+  }
+}
+
+const url = (name: string) => new URL(`../../../../testdata/sdk-settings/${name}`, import.meta.url);
+type StartCase = { name: string; core_state?: string; want: string; warns: boolean };
+const START = (JSON.parse(readFileSync(url("start.json"), "utf8")) as { cases: StartCase[] }).cases;
+
+/**
+ * The client's saved state with a config applied whose only policy file is `doc`: a state saved
+ * before the client kept the config applied (start.json), with the config applied added (its field
+ * 16, a message, which protobuf takes from the end of the encoding).
+ */
+function keptApplied(doc: string | Uint8Array): Uint8Array {
+  const base = START.find((c) => c.name.startsWith("a core state saved before the core kept the config applied"))!;
+  const applied = toBinary(AgentRemoteConfigSchema, config(doc));
+  const size: number[] = [];
+  let n = applied.length;
+  do {
+    size.push((n & 0x7f) | (n > 0x7f ? 0x80 : 0));
+    n >>= 7;
+  } while (n);
+  return Uint8Array.from([...Buffer.from(base.core_state!, "hex"), (16 << 3) | 2, 1, ...size, ...applied]);
+}
+
+test("starts, decides and describes", () => {
+  const f = new Flow(declaring);
+  assert.ok(f.apply);
+  assert.equal(reported(f.effective), full(policy()));
   const quarter = policy({ head_sampling: { ratio: 0.25 } });
-  const d = layer.decide(config(quarter), loaded.current, loaded.current, declaring, 0n, (doc) => {
-    kept.push(doc);
-  });
-  assert.equal(d.status?.status, APPLIED);
-  assert.deepEqual(d.status?.lastRemoteConfigHash, text("h"));
-  assert.equal(d.apply?.samplingRate, 0.25);
-  assert.deepEqual(kept, [text(quarter)]);
-  assert.equal(reported(d.effective), full(quarter));
+  f.decide(config(quarter));
+  assert.equal(f.status?.status, APPLIED);
+  assert.deepEqual(f.status?.lastRemoteConfigHash, text("h"));
+  assert.equal(f.apply?.samplingRate, 0.25);
+  assert.equal(reported(f.effective), full(quarter));
+  f.decide(config(policy({ head_sampling: { ratio: "x" } })), 2);
+  assert.equal(f.status?.status, FAILED);
+  assert.match(f.status?.errorMessage ?? "", /^head_sampling:/);
+  assert.equal(f.apply, undefined);
+  assert.equal(reported(f.effective), full(quarter));
+  // A step without an input, or on a state that isn't one, is an error.
+  assert.throws(() => f.layer.step({ agent: f.out.agent }));
+  assert.throws(() => f.layer.step({ agent: Uint8Array.of(0xff), input: { case: "timer", value: {} } }));
 
-  const bad = layer.decide(config(policy({ head_sampling: { ratio: "x" } })), d.current, loaded.current, declaring, 0n, () => {});
-  assert.equal(bad.status?.status, FAILED);
-  assert.match(bad.status?.errorMessage ?? "", /^head_sampling:/);
-  assert.equal(bad.apply, undefined);
-  assert.deepEqual(bad.current, d.current);
-  assert.equal(kept.length, 1); // refused: nothing to keep
-
-  const desc = layer.describe([
+  const desc = f.layer.describe([
     create(KeyValueSchema, { key: "service.name", value: { value: { case: "stringValue", value: "checkout" } } }),
     create(KeyValueSchema, { key: "host.name", value: { value: { case: "stringValue", value: "h" } } }),
   ], declaring, now);
@@ -112,58 +205,62 @@ test("the description names the policy format and the controls the host carries 
 });
 
 test("a host says what it carries out", () => {
-  const layer = new SdkSettings();
   const host = { live: ["deactivate_instrumentations"] };
   const sw = policy({ instrumentations: { disabled: ["http"] } });
-  const d = layer.decide(config(sw), none, none, host);
-  assert.equal(d.status?.status, APPLIED);
-  assert.deepEqual(d.apply?.deactivateInstrumentations?.names, ["http"]); // live: in force now, no state needed
-  assert.deepEqual(overridden(d.effective), { instrumentations: { disabled: ["http"] } });
+  const f = new Flow(host, { stateDir: false }).decide(config(sw));
+  assert.equal(f.status?.status, APPLIED);
+  assert.deepEqual(f.apply?.deactivateInstrumentations?.names, ["http"]); // live: in force now, no state needed
+  assert.deepEqual(overridden(f.effective), { instrumentations: { disabled: ["http"] } });
   // An override the host does not carry out refuses the whole policy, and what was in force stays.
-  const tracesOff = policy({ signal_exports: off("traces") });
-  const refused = layer.decide(config(tracesOff), d.current, none, host);
-  assert.equal(refused.status?.status, FAILED);
-  assert.equal(refused.status?.errorMessage, "signal_exports.traces: this SDK cannot apply the requested override");
-  assert.equal(refused.apply, undefined);
-  assert.deepEqual(refused.current, d.current);
-  assert.deepEqual(overridden(refused.effective), { instrumentations: { disabled: ["http"] } });
+  f.decide(config(policy({ signal_exports: off("traces") })), 2);
+  assert.equal(f.status?.status, FAILED);
+  assert.equal(f.status?.errorMessage, "signal_exports.traces: this SDK cannot apply the requested override");
+  assert.equal(f.apply, undefined);
+  assert.deepEqual(overridden(f.effective), { instrumentations: { disabled: ["http"] } });
   // A control past the first two names the field too.
-  const rules = layer.decide(config(policy({ sampling_rules: { rules: [{ rate: 0 }] } })), d.current, none, host);
-  assert.equal(rules.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
+  f.decide(config(policy({ sampling_rules: { rules: [{ rate: 0 }] } })), 3);
+  assert.equal(f.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
   // A field nothing here knows refuses it too.
   const unknown = JSON.stringify({ ...JSON.parse(sw), x: "1" });
-  assert.equal(layer.decide(config(unknown), d.current, none, host).status?.errorMessage, 'policy: unknown field "x"');
-  // Saved under another host, a setting this one does not carry out is not in force.
-  assert.equal(layer.load(text(tracesOff), host).settings?.sendTraces, undefined);
+  assert.equal(f.decide(config(unknown), 4).status?.errorMessage, 'policy: unknown field "x"');
   // Declared nothing, nothing is carried out: every override is refused.
-  const nothing = layer.decide(config(policy({ head_sampling: { ratio: 0.5 } })), none, none, undefined, 0n, () => {});
+  const nothing = new Flow().decide(config(policy({ head_sampling: { ratio: 0.5 } })));
   assert.equal(nothing.status?.errorMessage, "head_sampling: this SDK cannot apply the requested override");
   // A host naming what is no setting has a bug: an error, saying which.
-  assert.throws(() => layer.load(undefined, { live: ["send_metric"] }), /send_metric/);
+  assert.throws(() => new Flow({ live: ["send_metric"] }), /send_metric/);
 });
 
 test("a policy is the config's only file", () => {
-  const layer = new SdkSettings();
   const beside = config(policy());
   beside.config!.configMap["other.json"] = create(AgentConfigObjectSchema, { body: text("{}"), contentType: "application/json" });
-  const d = layer.decide(beside, none, none, declaring);
-  assert.equal(d.status?.status, FAILED);
-  assert.match(d.status?.errorMessage ?? "", /^config_map:/);
+  const f = new Flow(declaring).decide(beside);
+  assert.equal(f.status?.status, FAILED);
+  assert.match(f.status?.errorMessage ?? "", /^config_map:/);
   const empty = create(AgentRemoteConfigSchema, { configHash: text("h"), config: { configMap: {} } });
-  assert.match(layer.decide(empty, none, none, declaring).status?.errorMessage ?? "", /^config_map:/);
+  assert.match(f.decide(empty, 2).status?.errorMessage ?? "", /^config_map:/);
+});
+
+test("a next-start change needs somewhere to keep state", () => {
+  const quarter = policy({ head_sampling: { ratio: 0.25 } });
+  assert.equal(new Flow(declaring, { stateDir: false }).decide(config(quarter)).status?.status, APPLIED); // live
+  const redis = policy({ instrumentations: { disabled: ["redis"] } });
+  assert.equal(
+    new Flow(declaring, { stateDir: false }).decide(config(redis)).status?.errorMessage,
+    "instrumentations: takes effect at the next start, which needs somewhere to keep state",
+  );
+  assert.equal(new Flow(declaring).decide(config(redis)).status?.status, APPLIED);
 });
 
 test("a log level arrives as the lowest severity number to export", () => {
-  const layer = new SdkSettings();
-  const d = layer.decide(config(policy({ log_levels: { level: "Warning" } })), none, none, declaring);
-  assert.equal(d.status?.status, APPLIED);
-  assert.equal(d.apply?.sendLogsMinSeverity, 13);
-  assert.deepEqual(overridden(d.effective), { log_levels: { level: "warn" } });
-  assert.equal(layer.load(text(policy()), declaring).settings?.sendLogsMinSeverity, undefined); // unset: every severity
+  const f = new Flow(declaring);
+  assert.equal(f.apply?.sendLogsMinSeverity, undefined); // unset: every severity
+  f.decide(config(policy({ log_levels: { level: "Warning" } })));
+  assert.equal(f.status?.status, APPLIED);
+  assert.equal(f.apply?.sendLogsMinSeverity, 13);
+  assert.deepEqual(overridden(f.effective), { log_levels: { level: "warn" } });
 });
 
 test("the settings that match telemetry arrive typed, where the host declares them", () => {
-  const layer = new SdkSettings();
   const doc = policy({
     sampling_rules: { rules: [{ rate: 0, kind: "server", path: "/health*" }] },
     log_levels: { scopes: { "com.acme.db*": "debug" } },
@@ -171,7 +268,7 @@ test("the settings that match telemetry arrive typed, where the host declares th
     trace_rate_limit: { traces_per_second: 50 },
     log_rate_limit: { records_per_second: 0.5 },
   });
-  const d = layer.decide(config(doc), none, none, declaring, now);
+  const d = new Flow(declaring).decide(config(doc));
   assert.equal(d.status?.status, APPLIED);
   const s = d.apply!;
   assert.equal(s.samplingRules.length, 1);
@@ -183,46 +280,39 @@ test("the settings that match telemetry arrive typed, where the host declares th
   assert.deepEqual([s.dropAttributes, s.maskAttributes], [["*token*"], ["user.email"]]);
   assert.deepEqual([s.samplingTracesPerSecond, s.sendLogsPerSecond], [50, 0.5]);
   // Undeclared: refused, never in force.
-  const plain = layer.decide(config(doc), none, none, { live: ["sampling_rate"] });
+  const plain = new Flow({ live: ["sampling_rate"] }).decide(config(doc));
   assert.equal(plain.status?.status, FAILED);
   assert.equal(plain.apply, undefined);
   assert.equal(plain.status?.errorMessage, "sampling_rules: rules: this SDK cannot apply the requested override");
 });
 
-test("debug mode arrives folded in, and a refresh at its end ends it", () => {
-  const layer = new SdkSettings();
+test("debug mode arrives folded in, and the timer at its end ends it", () => {
   const doc = policy({ head_sampling: { ratio: 0.1 }, debug: { until: "2026-10-14T12:30:00Z", log_level: "info" } });
-  const d = layer.decide(config(doc), none, none, declaring, now, () => {});
-  assert.equal(d.apply?.samplingRate, 1);
-  assert.equal(d.apply?.sendLogsMinSeverity, 9);
-  const end = now + 30n * 60_000n;
-  assert.equal(d.refreshAtUnixMs, end);
-  const before = layer.refresh(d.current, none, end - 1n, declaring);
-  assert.equal(before.settings?.samplingRate, 1);
-  const after = layer.refresh(d.current, none, end, declaring);
-  assert.equal(after.settings?.samplingRate, 0.1);
-  assert.equal(after.refreshAtUnixMs, 0n);
-  assert.deepEqual(overridden(after.effective), { head_sampling: { ratio: 0.1 } });
-  assert.equal(layer.load(d.current, declaring, now).refreshAtUnixMs, end);
+  const f = new Flow(declaring).decide(config(doc), 0);
+  assert.equal(f.apply?.samplingRate, 1);
+  assert.equal(f.apply?.sendLogsMinSeverity, 9);
+  const end = 30 * 60_000;
+  assert.equal(f.state.refreshAtUnixMs, now + BigInt(end));
+  assert.ok(f.out.wakeAtMonoMs > 0n && f.out.wakeAtMonoMs <= now + BigInt(end));
+  f.step(end, { case: "timer", value: {} });
+  assert.equal(f.apply?.samplingRate, 0.1);
+  assert.equal(f.state.refreshAtUnixMs ?? 0n, 0n);
+  assert.deepEqual(overridden(f.effective), { head_sampling: { ratio: 0.1 } });
 });
 
-test("export health: sent at the first call and on a failure, held while nothing changes", () => {
-  const layer = new SdkSettings();
-  const first = layer.health({}, undefined, now);
-  assert.equal(first.send, true);
-  assert.deepEqual(Object.keys(first.exporters!.componentHealthMap).sort(), ["logs", "metrics", "traces"]);
-  assert.equal(first.exporters!.status, "ok");
-  assert.equal(layer.health({}, first, now + 30_000n).send, false);
-  const failed = layer.health(
-    { traces: { exportsFailed: 1n, itemsFailed: 512n, lastFailed: true, lastError: "connection refused" } },
-    first,
-    now + 30_000n,
-    { sendLogs: false },
-  );
-  assert.equal(failed.send, true);
-  assert.equal(failed.exporters!.healthy, false);
-  assert.equal(failed.exporters!.componentHealthMap.traces?.lastError, "connection refused");
-  assert.equal(failed.exporters!.componentHealthMap.logs?.status, "off");
+test("export health: sent when built and on a failure, held while nothing changes", () => {
+  const f = new Flow(declaring);
+  const exporters = (counts = {}) => ({ case: "exporters" as const, value: { exporters: [], counts } });
+  f.step(0, { case: "built", value: { service: "checkout" } });
+  f.step(0, exporters());
+  const first = f.health!.componentHealthMap.exporters!;
+  assert.deepEqual(Object.keys(first.componentHealthMap).sort(), ["logs", "metrics", "traces"]);
+  assert.equal(first.status, "ok");
+  assert.equal(f.step(30_000, exporters()).health, undefined);
+  f.step(30_000, exporters({ traces: { exportsFailed: 1n, itemsFailed: 512n, lastFailed: true, lastError: "connection refused" } }));
+  const sent = f.health!.componentHealthMap.exporters!;
+  assert.equal(sent.healthy, false);
+  assert.equal(sent.componentHealthMap.traces?.lastError, "connection refused");
 });
 
 interface CustomCase {
@@ -237,14 +327,11 @@ interface CustomCase {
 const hostOf = (h: { live?: string[]; next_start?: string[] } | undefined) =>
   h === undefined ? declaring : { live: h.live ?? [], nextStart: h.next_start ?? [] };
 
-test("vectors: custom.json, the application's own settings, through Decide, Load and Refresh", () => {
-  const url = new URL("../../../../testdata/sdk-settings/custom.json", import.meta.url);
-  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: CustomCase[] }).cases;
+test("vectors: custom.json, the application's own settings, through the flow", () => {
+  const cases = (JSON.parse(readFileSync(url("custom.json"), "utf8")) as { cases: CustomCase[] }).cases;
   assert.ok(cases.length >= 15);
-  const layer = new SdkSettings();
   for (const c of cases) {
-    const host = hostOf(c.host);
-    const d = layer.decide(config(c.document), none, none, host, now, () => {});
+    const d = new Flow(hostOf(c.host)).decide(config(c.document));
     if (c.refused !== undefined) {
       assert.equal(d.status?.status, FAILED, c.name);
       assert.equal(d.status?.errorMessage, c.refused, c.name);
@@ -254,11 +341,6 @@ test("vectors: custom.json, the application's own settings, through Decide, Load
     assert.equal(d.status?.status, APPLIED, `${c.name}: ${d.status?.errorMessage}`);
     assert.deepEqual({ ...d.apply!.custom }, c.custom, c.name);
     assert.equal(reported(d.effective), c.effective, c.name);
-    // The same map at the next start (Load of what Decide saved) and at the timer's Refresh.
-    const loaded = layer.load(d.current, host, now);
-    assert.deepEqual({ ...loaded.settings!.custom }, c.custom, `${c.name} (load)`);
-    const r = layer.refresh(d.current, d.current, now, host);
-    assert.deepEqual({ ...r.settings!.custom }, c.custom, `${c.name} (refresh)`);
   }
 });
 
@@ -272,15 +354,15 @@ interface SettingsCase {
   refresh_at_unix_ms?: number;
 }
 
-test("vectors: settings.json, how the layer reads a policy, through Decide", () => {
-  const url = new URL("../../../../testdata/sdk-settings/settings.json", import.meta.url);
-  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: SettingsCase[] }).cases;
+test("vectors: settings.json, how the layer reads a policy, through the flow", () => {
+  const cases = (JSON.parse(readFileSync(url("settings.json"), "utf8")) as { cases: SettingsCase[] }).cases;
   assert.ok(cases.length > 100);
-  const layer = new SdkSettings();
   for (const c of cases) {
-    // The policy is also the one in force at start, so a next-start setting is in force at once.
-    const doc = text(c.document);
-    const d = layer.decide(config(doc), none, doc, hostOf(c.host), BigInt(c.now_unix_ms ?? 0), () => {});
+    // A host that gives no time is another SDK's case: this one always has a clock.
+    if (c.now_unix_ms === undefined && c.document.includes('"debug":{"mode":"override"')) continue;
+    // The policy kept applied too, so a next-start setting is in force at once.
+    const d = new Flow(hostOf(c.host), { coreState: keptApplied(c.document), now: BigInt(c.now_unix_ms ?? now) })
+      .decide(config(c.document), 0);
     if (c.refused !== undefined) {
       assert.equal(d.status?.errorMessage, c.refused, c.name);
       assert.equal(d.status?.status, FAILED, c.name);
@@ -288,66 +370,28 @@ test("vectors: settings.json, how the layer reads a policy, through Decide", () 
     }
     assert.equal(d.status?.status, APPLIED, `${c.name}: ${d.status?.errorMessage}`);
     assert.equal(reported(d.effective), c.effective, c.name);
-    if (c.refresh_at_unix_ms !== undefined) assert.equal(d.refreshAtUnixMs, BigInt(c.refresh_at_unix_ms), c.name);
+    if (c.refresh_at_unix_ms !== undefined) assert.equal(d.state.refreshAtUnixMs ?? 0n, BigInt(c.refresh_at_unix_ms), c.name);
   }
-});
-
-test("the save the layer asks for decides the answer (#215: decide, then commit)", () => {
-  const layer = new SdkSettings();
-  const current = text(policy({ head_sampling: { ratio: 0.5 } }));
-  const quarter = config(policy({ head_sampling: { ratio: 0.25 } }));
-  const failed = layer.decide(quarter, current, current, declaring, 0n, () => {
-    throw new Error("ENOSPC: no space left on device");
-  });
-  assert.equal(failed.status?.status, FAILED);
-  assert.equal(failed.status?.errorMessage, "can't save the settings: ENOSPC: no space left on device");
-  assert.equal(failed.apply, undefined);
-  assert.deepEqual(failed.current, current);
-  assert.deepEqual(overridden(failed.effective), { head_sampling: { ratio: 0.5 } });
-  // Whatever is thrown refuses the config.
-  const odd = layer.decide(quarter, current, current, declaring, 0n, () => {
-    throw "a string";
-  });
-  assert.equal(odd.status?.errorMessage, "can't save the settings: a string");
-  // Nowhere to keep state: a live change is applied, a next-start one refused.
-  const live = layer.decide(quarter, current, current, declaring);
-  assert.equal(live.status?.status, APPLIED);
-  const redis = policy({ instrumentations: { disabled: ["redis"] } });
-  const later = layer.decide(config(redis), current, current, declaring);
-  assert.equal(
-    later.status?.errorMessage,
-    "instrumentations: takes effect at the next start, which needs somewhere to keep state",
-  );
-  const kept: Uint8Array[] = [];
-  const saved = layer.decide(config(redis), current, current, declaring, 0n, (doc) => {
-    kept.push(doc);
-  });
-  assert.equal(saved.status?.status, APPLIED);
-  assert.deepEqual(saved.pendingRestart, ["deactivate_instrumentations"]);
-  assert.deepEqual(kept, [text(redis)]);
 });
 
 test("a string that starts with U+FEFF comes back from the layer as it was sent", () => {
   // @bufbuild/protobuf's default decoder drops a leading U+FEFF (src/utf8.ts): the patterns the
   // matchers run on would differ from every other language's.
-  const layer = new SdkSettings();
-  const d = layer.decide(
-    config(policy({
-      sampling_rules: { rules: [{ rate: 1, name: "﻿GET", attributes: { "﻿k": "﻿*" } }] },
-      log_levels: { scopes: { "﻿app*": "error" } },
-      attribute_redaction: { drop: ["﻿secret"], mask: ["﻿﻿pass*"] },
-    })),
-    new Uint8Array(),
-    new Uint8Array(),
+  const d = new Flow(
     { live: ["sampling_rules", "send_logs_level", "send_logs_level_by_scope", "drop_attributes", "mask_attributes"] },
-  );
-  assert.equal(d.status?.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status?.errorMessage);
+    { stateDir: false },
+  ).decide(config(policy({
+    sampling_rules: { rules: [{ rate: 1, name: "\uFEFFGET", attributes: { "\uFEFFk": "\uFEFF*" } }] },
+    log_levels: { scopes: { "\uFEFFapp*": "error" } },
+    attribute_redaction: { drop: ["\uFEFFsecret"], mask: ["\uFEFF\uFEFFpass*"] },
+  })));
+  assert.equal(d.status?.status, APPLIED, d.status?.errorMessage);
   const rule = d.apply!.samplingRules[0]!;
-  assert.equal(rule.name, "﻿GET");
-  assert.deepEqual(rule.attributes, { "﻿k": "﻿*" });
-  assert.equal(d.apply!.sendLogsScopeLevels[0]!.pattern, "﻿app*");
-  assert.deepEqual(d.apply!.dropAttributes, ["﻿secret"]);
-  assert.deepEqual(d.apply!.maskAttributes, ["﻿﻿pass*"]);
+  assert.equal(rule.name, "\uFEFFGET");
+  assert.deepEqual(rule.attributes, { "\uFEFFk": "\uFEFF*" });
+  assert.equal(d.apply!.sendLogsScopeLevels[0]!.pattern, "\uFEFFapp*");
+  assert.deepEqual(d.apply!.dropAttributes, ["\uFEFFsecret"]);
+  assert.deepEqual(d.apply!.maskAttributes, ["\uFEFF\uFEFFpass*"]);
 });
 
 interface ComponentsCase {
@@ -395,10 +439,9 @@ function shown(c: AvailableComponents): Record<string, unknown> {
 }
 
 test("vectors: exporters.json, each case through Exporters", () => {
-  const url = new URL("../../../../testdata/sdk-settings/exporters.json", import.meta.url);
-  type Found = { signal: string; kind?: string; gated?: boolean; endpoint?: string; from_env?: boolean };
+    type Found = { signal: string; kind?: string; gated?: boolean; endpoint?: string; from_env?: boolean };
   type Case = { name: string; found: Found[]; env?: Record<string, string>; default_protocol?: string; want: unknown };
-  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: Case[] }).cases;
+  const cases = (JSON.parse(readFileSync(url("exporters.json"), "utf8")) as { cases: Case[] }).cases;
   assert.ok(cases.length > 10);
   const layer = new SdkSettings();
   for (const c of cases) {
@@ -412,8 +455,7 @@ test("vectors: exporters.json, each case through Exporters", () => {
 });
 
 test("vectors: components.json, each inventory through Components", () => {
-  const url = new URL("../../../../testdata/sdk-settings/components.json", import.meta.url);
-  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: ComponentsCase[] }).cases;
+    const cases = (JSON.parse(readFileSync(url("components.json"), "utf8")) as { cases: ComponentsCase[] }).cases;
   assert.ok(cases.length > 10);
   const layer = new SdkSettings();
   for (const c of cases) {
@@ -438,17 +480,11 @@ test("vectors: components.json, each inventory through Components", () => {
   }
 });
 
-type StartCase = { name: string; core_state?: string; saved?: string; want: string; warns: boolean };
-
 test("vectors: start.json, the settings to start with from the core's saved state", () => {
-  const url = new URL("../../../../testdata/sdk-settings/start.json", import.meta.url);
-  const cases = (JSON.parse(readFileSync(url, "utf8")) as { cases: StartCase[] }).cases;
-  const layer = new SdkSettings();
-  for (const c of cases) {
+  for (const c of START) {
     const coreState = c.core_state === undefined ? undefined : new Uint8Array(Buffer.from(c.core_state, "hex"));
-    const saved = c.saved === undefined ? undefined : new TextEncoder().encode(c.saved);
-    const loaded = layer.load(saved, declaring, 0n, coreState);
-    assert.equal(new TextDecoder().decode(loaded.current), c.want, c.name);
-    assert.equal(loaded.warning !== "", c.warns, `${c.name}: ${loaded.warning}`);
+    const f = new Flow(declaring, coreState ? { coreState } : {});
+    assert.equal(new TextDecoder().decode(f.state.current), c.want, c.name);
+    assert.equal(f.warned, c.warns, c.name);
   }
 });
