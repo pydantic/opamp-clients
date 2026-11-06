@@ -21,7 +21,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
-	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 // seedAppliedRemoteConfig leaves rc in the OpAMP client's state file in dir as the config the
@@ -50,10 +49,10 @@ func seedAppliedRemoteConfig(t *testing.T, dir string, rc *protobufs.AgentRemote
 		_, _ = w.Write(out)
 	}))
 	defer srv.Close()
-	c, err := collector.Start(t.Context(), opamp.Config{
+	c, err := opamp.Start(t.Context(), opamp.Config{
 		Endpoint: srv.URL, StateFile: filepath.Join(dir, "opamp-state"), HeartbeatInterval: 50 * time.Millisecond,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig | protobufs.AgentCapabilities_AgentCapabilities_ReportsRemoteConfig),
-	}, collector.Status{}, func(c *collector.Client, n collector.Notification) {
+	}, opamp.Status{}, func(c *opamp.Client, n opamp.Notification) {
 		if n.Kind == opamp.RemoteConfig {
 			c.SetRemoteConfigStatus(&protobufs.RemoteConfigStatus{
 				LastRemoteConfigHash: n.RemoteConfig.GetConfigHash(), Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED,
