@@ -318,7 +318,7 @@ func handedOf(n Notification) (handed, bool) {
 	case RemoteConfig:
 		return handed{RemoteConfig, string(n.RemoteConfig.GetConfigHash())}, true
 	case CustomMessage:
-		return handed{CustomMessage, string(n.CustomMessage.GetData())}, true
+		return handed{CustomMessage, string(n.x().CustomMessage.GetData())}, true
 	case HeartbeatInterval:
 		return handed{HeartbeatInterval, n.HeartbeatInterval.String()}, true
 	}
@@ -377,8 +377,8 @@ func (m *mClient) notify(n Notification) {
 	}
 	var action func(*Client)
 	if n.Kind == CustomMessage {
-		action = m.armed[string(n.CustomMessage.GetData())]
-		delete(m.armed, string(n.CustomMessage.GetData()))
+		action = m.armed[string(n.x().CustomMessage.GetData())]
+		delete(m.armed, string(n.x().CustomMessage.GetData()))
 	}
 	panicNow := m.panicAt == k && n.Kind != Stopped
 	m.mu.Unlock()
@@ -554,8 +554,7 @@ func (r *modelRun) session(s mSession) error {
 		}
 	}
 	m := &mClient{armed: map[string]func(*Client){}, stopInside: make(chan error, 1)}
-	c, err := Start(context.Background(), cfg, Status{Description: modelDesc(mOutside, 0),
-		CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{modelCapability}}},
+	c, err := startWith(&protobufs.CustomCapabilities{Capabilities: []string{modelCapability}})(context.Background(), cfg, Status{Description: modelDesc(mOutside, 0)},
 		func(_ *Client, n Notification) { m.notify(n) })
 	if err != nil {
 		return fmt.Errorf("start: %w", err)

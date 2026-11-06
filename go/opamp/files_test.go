@@ -37,6 +37,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // tapRec is one record of a core tap.
@@ -201,15 +202,15 @@ func TestTheTapJournalsSavesAndDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	installed := make(chan string, 1)
-	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StateFile: state,
-		AcceptPackages: true}, Status{}, func(c *Client, n Notification) {
+	c, err := startFull(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour, StateFile: state,
+		plumbed: plumb.Options{AcceptPackages: true}}, Status{}, func(c *Client, n Notification) {
 		if n.Kind == InstallPackage {
-			got, err := os.ReadFile(n.Path)
+			got, err := os.ReadFile(n.x().Path)
 			if err == nil && sha256.Sum256(got) != sum {
 				err = errors.New("the file handed over isn't the package")
 			}
-			c.PackageInstalled(n.PackageName, n.Package.Hash, err)
-			installed <- n.Path
+			c.PackageInstalled(n.x().PackageName, n.x().Package.Hash, err)
+			installed <- n.x().Path
 		}
 	})
 	if err != nil {
@@ -575,7 +576,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 	aTap := filepath.Join(dir, "a.tap")
 	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
 		Capabilities: uint64(protobufs.AgentCapabilities_AgentCapabilities_AcceptsRemoteConfig), tapFile: aTap, fs: fsys}
-	a, err := Start(context.Background(), cfg, Status{}, nil)
+	a, err := startFull(context.Background(), cfg, Status{}, nil)
 	if err != nil {
 		return err
 	}
@@ -679,7 +680,7 @@ func saveFaultRun(t *testing.T, seed uint64) error {
 	defer tsB.Close()
 	bTap := filepath.Join(dir, "b.tap")
 	cfg.Endpoint, cfg.tapFile, cfg.fs = tsB.URL, bTap, nil
-	b, err := Start(context.Background(), cfg, Status{}, nil)
+	b, err := startFull(context.Background(), cfg, Status{}, nil)
 	if err != nil {
 		return err
 	}
@@ -834,7 +835,7 @@ func TestAPartialDownloadIsNeverReused(t *testing.T) {
 	if err := os.WriteFile(left, []byte("partial"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", StateFile: state, AcceptPackages: true}, Status{}, nil)
+	c, err := startFull(context.Background(), Config{Mode: ModePlatform, Endpoint: "http://127.0.0.1:1", StateFile: state, plumbed: plumb.Options{AcceptPackages: true}}, Status{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -892,18 +893,18 @@ func downloadFaultRun(t *testing.T, seed uint64) error {
 	installs := make(chan string, 4)
 	notify := func(c *Client, n Notification) {
 		if n.Kind == InstallPackage {
-			got, err := os.ReadFile(n.Path)
+			got, err := os.ReadFile(n.x().Path)
 			if err == nil && sha256.Sum256(got) != sum {
 				err = errors.New("the file handed over isn't the package")
 			}
-			c.PackageInstalled(n.PackageName, n.Package.Hash, err)
-			installs <- n.Path
+			c.PackageInstalled(n.x().PackageName, n.x().Package.Hash, err)
+			installs <- n.x().Path
 		}
 	}
 	const stopTimeout = time.Second
 	cfg := Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: 100 * time.Millisecond, StopTimeout: stopTimeout, StateFile: state,
-		AcceptPackages: true, tapFile: filepath.Join(dir, "a.tap"), fs: fsys}
-	a, err := Start(context.Background(), cfg, Status{}, notify)
+		plumbed: plumb.Options{AcceptPackages: true}, tapFile: filepath.Join(dir, "a.tap"), fs: fsys}
+	a, err := startFull(context.Background(), cfg, Status{}, notify)
 	if err != nil {
 		return err
 	}
@@ -955,7 +956,7 @@ func downloadFaultRun(t *testing.T, seed uint64) error {
 
 	// The next client, on a disk that works.
 	cfg.fs, cfg.tapFile = nil, filepath.Join(dir, "b.tap")
-	b, err := Start(context.Background(), cfg, Status{}, notify)
+	b, err := startFull(context.Background(), cfg, Status{}, notify)
 	if err != nil {
 		return err
 	}

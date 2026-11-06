@@ -632,7 +632,7 @@ func runAdversary(srv *advServer, host string, wasm []byte, dir string, seed uin
 		cfg.TLS = TLS{CAPEM: certs.ca}
 	}
 	cfg.Endpoint = fmt.Sprintf("http://%s/opamp?seed=%d%s", host, seed, query)
-	c, err := Start(context.Background(), cfg, Status{}, h.notify)
+	c, err := startFull(context.Background(), cfg, Status{}, h.notify)
 	if err != nil {
 		res.fails = append(res.fails, fmt.Sprintf("start: %v", err))
 		return res

@@ -90,7 +90,7 @@ in full.
 | What | Option | More |
 |---|---|---|
 | Endpoint | `Config.Endpoint`: `http(s)://` polls, `ws(s)://` keeps one connection open | |
-| Headers | `Config.Header`, sent with every request and WebSocket upgrade; `Config.AuthHeader`, a function asked for headers about every second (a token it renews) | [sdks.md](sdks.md#credentials-and-state) |
+| Headers | `Config.Header`, sent with every request and WebSocket upgrade | [sdks.md](sdks.md#credentials-and-state) |
 | TLS | `Config.TLS`: `CAPEM`, `IncludeSystemCAs`, `CertPEM` and `KeyPEM`, `MinVersion`, `MaxVersion`, and a `*tls.Config` to start from | package documentation, "TLS and proxies" |
 | Proxy | `Config.Proxy`: `URL`, `ConnectHeader`, `ResolveLocally`, or `Direct` for none. Without one, the environment's | package documentation, "TLS and proxies" |
 | Who speaks HTTP | `Config.Mode`: `opamp.ModeCore` (the default) or `opamp.ModePlatform` (net/http and gorilla/websocket; advanced); `Config.HTTPClient` needs platform mode named | [sdks.md](sdks.md#core-mode-and-platform-mode) |
@@ -104,8 +104,7 @@ in full.
 | Connection settings | `Config.AcceptConnectionSettings` (needs a state file), `Config.VerifyTimeout` | [connection-settings.md](connection-settings.md) |
 | Telemetry settings | `ReportsOwnTraces`, `ReportsOwnMetrics`, `ReportsOwnLogs`; answer `ConnectionSettings` with `SetConnectionSettingsStatus` | [telemetry-settings.md](telemetry-settings.md) |
 | Available components | `Status.AvailableComponents`, `SetAvailableComponents` | [available-components.md](available-components.md) |
-| Packages | `Config.AcceptPackages` (needs a state file), `MaxPackageBytes`, `DownloadTimeout`; answer with `PackageInstalled`, `PackageRemoved` | [packages.md](packages.md) |
-| Custom messages | `Status.CustomCapabilities`, `SetCustomCapabilities`, `SendCustomMessage` | [custom-messages.md](custom-messages.md) |
+| Packages, custom messages, commands, renewed auth headers | Not in this package: they are the Collector's, in `go/opamp/collector` (below) | [packages.md](packages.md), [custom-messages.md](custom-messages.md) |
 | Limits | `RequestTimeout`, `ConnectTimeout`, `StopTimeout`, `MaxSendBytes`, `MaxReceiveBytes` | [how-it-works.md](how-it-works.md#effects-end) |
 
 Options that can't work (PEM that doesn't parse, a key that doesn't match its certificate, a proxy
@@ -120,12 +119,25 @@ The callback gets a `Notification`; `Kind` says which, and the fields that go wi
 | `Connected`, `ConnectFailed` | `Status`, `Detail` | |
 | `RemoteConfig` | `RemoteConfig` | `SetRemoteConfigStatus` |
 | `ConnectionSettings` | `ConnectionSettings` | `SetConnectionSettingsStatus` |
-| `InstallPackage`, `RemovePackage` | `PackageName`, `Package`, `Path` | `PackageInstalled`, `PackageRemoved` |
-| `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `CustomMessage`, `CustomCapabilities`, `Detail` | |
-| `InstanceUIDChanged`, `HeartbeatInterval`, `Command` | `InstanceUID`, `HeartbeatInterval`, `Command` | |
+| `InstanceUIDChanged`, `HeartbeatInterval` | `InstanceUID`, `HeartbeatInterval` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `ErrorType`, `Message`, `Detail`, `Field`, `FieldName`, `Bytes`, `Stalled`, `Waited` | |
 | `StateFromNewerVersion` | `StateVersion`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `Err`: why it stopped on its own, or nil after `Stop` | |
+
+## The Collector's client
+
+`go/opamp/collector` is the client the Go Supervisor and the Collector's extension use: package
+`opamp`'s client with what only they need on top. An SDK uses package `opamp`.
+
+| What | Option |
+|---|---|
+| Renewed auth headers | `collector.Config.AuthHeader`, a function asked for headers about every second (a token it renews) |
+| Packages | `collector.Config.AcceptPackages` (needs a state file), `MaxPackageBytes`, `DownloadTimeout`, `NoSpliceDownloads` (core mode); kinds `InstallPackage`, `RemovePackage` (`PackageName`, `Package`, `Path`); answer `PackageInstalled`, `PackageRemoved`, an error wrapped by `collector.FailedForNow` or `collector.FailedLeavingUnknown` saying how it failed |
+| Custom messages | `collector.Status.CustomCapabilities`, `SetCustomCapabilities`, `SendCustomMessage`; kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
+| Commands | kind `Command` (`Command`) |
+
+`collector.Config` embeds `opamp.Config`, `collector.Notification` embeds `opamp.Notification`, and
+`collector.Client` embeds `*opamp.Client`: everything above works the same on it.
 
 ## Goroutines and stop
 

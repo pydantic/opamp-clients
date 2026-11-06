@@ -138,7 +138,7 @@ named.
 
 | Language | Platform mode, by name | An HTTP client of the application's | Refused at start |
 |---|---|---|---|
-| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
+| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` (package collector) in platform mode; a `TLS.Config` with a `ServerName` in core mode |
 | Node.js | `mode: "platform"` | takes none | nothing |
 | Python | `Config(mode="platform")` | takes none | nothing |
 | Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally` and a proxy that isn't `http://` |
@@ -179,8 +179,8 @@ lists the option in each language). The examples leave this out; a comment in ea
 bootstrap `Authorization` header goes.
 
 The core checks every header list it sends against one rule, whether the headers were configured,
-offered by the server, or added by an authentication extension. Go's `Config.AuthHeader`, which
-the Supervisor's auth extensions use, hands the core a token it renews. The core sets the token
+offered by the server, or added by an authentication extension. Go's `collector.Config.AuthHeader`
+(`go/opamp/collector`), which the Supervisor's auth extensions use, hands the core a token it renews. The core sets the token
 over the header of the same name on each later request and connection, and never saves it. A list
 the rule refuses fails that attempt, and nothing is sent.
 

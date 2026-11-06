@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 // coreClientStateFile is the client's state file in the storage directory: the instance UID,
@@ -56,12 +57,12 @@ type coreClient struct {
 
 	mu sync.Mutex
 	// opened is the client once opened (Open, or Start), and settings what it was opened with.
-	opened   *opamp.Opened
+	opened   *collector.Opened
 	settings types.StartSettings
-	client   *opamp.Client
+	client   *collector.Client
 	stopped  bool
 	caps     protobufs.AgentCapabilities
-	status   opamp.Status
+	status   collector.Status
 	// callbacks are the Supervisor's, from Start.
 	callbacks types.Callbacks
 	// uid is the instance UID the Supervisor has: the one the client started with, or the last
@@ -128,26 +129,28 @@ func (c *coreClient) Open(ctx context.Context, settings types.StartSettings) err
 		c.caps = settings.Capabilities
 	}
 	caps := c.caps
-	cfg := opamp.Config{
-		Endpoint:     settings.OpAMPServerURL,
-		InstanceUID:  [16]byte(settings.InstanceUid),
-		Capabilities: uint64(caps),
-		Header:       header,
-		// Platform mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
-		// environment's proxies, as opamp-go had.
-		Mode:        opamp.ModePlatform,
-		HTTPClient:  &http.Client{Transport: transport},
-		AuthHeader:  auth,
-		StateFile:   c.stateFile,
-		StateSealer: c.sealer,
-		// The capability is the switch: the core declares it, and the status bit, itself.
-		AcceptConnectionSettings: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings != 0,
-		AcceptPackages:           caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages != 0 && c.installPackage != nil,
+	cfg := collector.Config{
+		Config: opamp.Config{
+			Endpoint:     settings.OpAMPServerURL,
+			InstanceUID:  [16]byte(settings.InstanceUid),
+			Capabilities: uint64(caps),
+			Header:       header,
+			// Platform mode: net/http and gorilla/websocket, with the Supervisor's TLS settings and the
+			// environment's proxies, as opamp-go had.
+			Mode:        opamp.ModePlatform,
+			HTTPClient:  &http.Client{Transport: transport},
+			StateFile:   c.stateFile,
+			StateSealer: c.sealer,
+			// The capability is the switch: the core declares it, and the status bit, itself.
+			AcceptConnectionSettings: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsOpAMPConnectionSettings != 0,
+		},
+		AuthHeader:     auth,
+		AcceptPackages: caps&protobufs.AgentCapabilities_AgentCapabilities_AcceptsPackages != 0 && c.installPackage != nil,
 	}
 	if settings.HeartbeatInterval != nil {
-		cfg.HeartbeatInterval = *settings.HeartbeatInterval
+		cfg.Config.HeartbeatInterval = *settings.HeartbeatInterval
 	}
-	opened, err := opamp.Open(ctx, cfg)
+	opened, err := collector.Open(ctx, cfg)
 	if err != nil {
 		return err
 	}
@@ -250,7 +253,7 @@ func (c *coreClient) Stop(ctx context.Context) error {
 
 // onNotification turns what the core says into the Supervisor's callbacks. It runs on the
 // client's goroutine, one at a time, as opamp-go's callbacks run on its receiver's.
-func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
+func (c *coreClient) onNotification(cl *collector.Client, n collector.Notification) {
 	ctx := context.Background()
 	cb := c.callbacks
 	message := func(m *types.MessageData) {
@@ -296,9 +299,9 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 				Status:                     protobufs.ConnectionSettingsStatuses_ConnectionSettingsStatuses_APPLIED,
 			})
 		}
-	case opamp.CustomMessage:
+	case collector.CustomMessage:
 		message(&types.MessageData{CustomMessage: n.CustomMessage})
-	case opamp.ServerCustomCapabilities:
+	case collector.ServerCustomCapabilities:
 		message(&types.MessageData{CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: n.CustomCapabilities}})
 	case opamp.InstanceUIDChanged:
 		uid := n.InstanceUID
@@ -310,13 +313,13 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 		c.uid = uid
 		c.report.instanceUID(c.logger, uid)
 		message(&types.MessageData{AgentIdentification: &protobufs.AgentIdentification{NewInstanceUid: uid[:]}})
-	case opamp.Command:
+	case collector.Command:
 		if cb.OnCommand != nil {
 			if err := cb.OnCommand(ctx, n.Command); err != nil {
 				c.logger.Error("Failed to carry out the OpAMP server's command", zap.Error(err))
 			}
 		}
-	case opamp.InstallPackage:
+	case collector.InstallPackage:
 		name, hash := n.PackageName, n.Package.GetHash()
 		// Installing stops and starts the collector: not on the client's goroutine, which
 		// would hold up everything else the server says meanwhile.
@@ -330,7 +333,7 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			}
 			cl.PackageInstalled(name, hash, err)
 		}})
-	case opamp.RemovePackage:
+	case collector.RemovePackage:
 		// The collector the server stops offering is removed, and the configured one runs again;
 		// the Supervisor installs no other package.
 		name := n.PackageName
@@ -353,7 +356,7 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 			}
 			cl.PackageRemoved(name, err)
 		}})
-	case opamp.CustomMessageNotSent:
+	case collector.CustomMessageNotSent:
 		c.logger.Warn("A custom message to the OpAMP server was not sent",
 			zap.String("capability", n.CustomMessage.GetCapability()), zap.String("reason", n.Detail))
 	case opamp.StatusTooLarge:
@@ -383,7 +386,7 @@ func (c *coreClient) onNotification(cl *opamp.Client, n opamp.Notification) {
 }
 
 // running is the started client, or nil; with c.mu held.
-func (c *coreClient) running() *opamp.Client { return c.client }
+func (c *coreClient) running() *collector.Client { return c.client }
 
 // has says whether the capability is declared; with c.mu held.
 func (c *coreClient) has(capability protobufs.AgentCapabilities) bool { return c.caps&capability != 0 }

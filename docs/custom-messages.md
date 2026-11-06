@@ -43,7 +43,7 @@ connection, with their own types and data.
 
 | Client | Declare | Send | Hear |
 |---|---|---|---|
-| Go | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
+| Go (`go/opamp/collector`, the Supervisor's and the extension's) | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 
 ## How it is checked
 

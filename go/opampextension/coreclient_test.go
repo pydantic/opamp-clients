@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 // The UID the core makes (or kept) reaches the extension as upstream's AgentIdentification, the
@@ -25,7 +26,7 @@ func TestTheClientsUIDReachesTheExtension(t *testing.T) {
 	placeholder, made := [16]byte{1}, [16]byte{2}
 	c.uid = placeholder
 
-	c.onNotification(nil, opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: made})
-	c.onNotification(nil, opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: made})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: made}})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.InstanceUIDChanged, InstanceUID: made}})
 	assert.Equal(t, [][]byte{made[:]}, got)
 }

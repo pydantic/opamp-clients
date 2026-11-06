@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 )
 
 // A Supervisor that can't reach its server says so once a run of failures, as an error naming what
@@ -30,7 +31,7 @@ func TestConnectFailuresAreSaidOnceARunWithWhatToCheck(t *testing.T) {
 	c.reach = newReachability(c.logger, "wss://user:secret@opamp.example.com/v1/opamp?token=x")
 
 	for range 3 {
-		c.onNotification(nil, opamp.Notification{Kind: opamp.ConnectFailed, Detail: "dial tcp: lookup opamp.example.com: no such host"})
+		c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.ConnectFailed, Detail: "dial tcp: lookup opamp.example.com: no such host"}})
 	}
 	require.Len(t, failed, 1, "one error for the run of failures")
 	msg := failed[0].Error()
@@ -40,14 +41,14 @@ func TestConnectFailuresAreSaidOnceARunWithWhatToCheck(t *testing.T) {
 	assert.NotContains(t, msg, "token=x")
 	assert.Equal(t, 2, logs.FilterMessage("Still can't reach the OpAMP server").Len(), "the repeats at debug")
 
-	c.onNotification(nil, opamp.Notification{Kind: opamp.Connected})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.Connected}})
 	assert.Equal(t, 1, logs.FilterMessage("Connected to the OpAMP server again").Len())
-	c.onNotification(nil, opamp.Notification{Kind: opamp.Connected})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.Connected}})
 	assert.Equal(t, 1, logs.FilterMessage("Connected to the OpAMP server again").Len(), "said once")
 
 	// A new run of failures after a connect is said again; the server was reachable, so the hint
 	// says so.
-	c.onNotification(nil, opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection reset"})
+	c.onNotification(nil, collector.Notification{Notification: opamp.Notification{Kind: opamp.ConnectFailed, Detail: "connection reset"}})
 	require.Len(t, failed, 2)
 	assert.Contains(t, failed[1].Error(), "reachable before")
 }

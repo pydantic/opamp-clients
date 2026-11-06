@@ -21,6 +21,16 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Python, Node.js, Java, .NET: the clients do only what every SDK uses. The server's packages
+  and downloads, custom messages, server commands and renewed auth headers are gone from them;
+  platform mode and connection settings stay (#129).
+- Go: `go/opamp` is the SDK client and does the same. What only the Supervisor and the Collector's
+  extension use moved to the new package `go/opamp/collector`: `AuthHeader`, `AcceptPackages`,
+  `MaxPackageBytes`, `DownloadTimeout`, `NoSpliceDownloads`, `Status.CustomCapabilities`,
+  `SetCustomCapabilities`, `SendCustomMessage`, `PackageInstalled`, `PackageRemoved`,
+  `FailedForNow`, `FailedLeavingUnknown`, and the kinds `Command`, `CustomMessage`,
+  `ServerCustomCapabilities`, `CustomMessageNotSent`, `InstallPackage`, `RemovePackage`. Its types
+  embed package `opamp`'s, so code that used them switches the import and the type names (#129).
 - Go, Python, Node.js, Java, .NET: the SDK settings an earlier release kept itself
   (`sdk-settings.json` in the state directory) are no longer read at start. The settings to start
   with are the config the client kept applied; a state directory with only the old file starts
