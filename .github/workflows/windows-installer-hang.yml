@@ -61,10 +61,11 @@ jobs:
           RUN: ${{ matrix.run }}
         run: |
           $script = "$PWD\go\opampsupervisor\packaging\windows\ci-heartbeat.ps1"
-          Start-Process -WindowStyle Hidden -FilePath powershell.exe -ArgumentList @('-NoProfile', '-NonInteractive',
-            '-ExecutionPolicy', 'Bypass', '-File', $script, '-Repo', $env:GITHUB_REPOSITORY, '-Sha', $env:SHA,
-            '-Name', "Windows installer heartbeat, run $env:RUN", '-Log', "$env:RUNNER_TEMP\install-test.log",
-            '-Stop', "$env:RUNNER_TEMP\heartbeat.stop")
+          # Start-Process joins ArgumentList with spaces and no quoting, so every value is quoted here.
+          $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', "`"$script`"",
+            '-Repo', $env:GITHUB_REPOSITORY, '-Sha', $env:SHA, '-Name', "`"Windows installer heartbeat, run $env:RUN`"",
+            '-Log', "`"$env:RUNNER_TEMP\install-test.log`"", '-Stop', "`"$env:RUNNER_TEMP\heartbeat.stop`"")
+          Start-Process -WindowStyle Hidden -FilePath powershell.exe -ArgumentList ($arguments -join ' ')
       - name: The .msi installed, enrolled with a server that issues a token, and restarted
         working-directory: go/opampsupervisor/packaging
         run: |
