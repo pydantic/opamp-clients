@@ -608,7 +608,7 @@ public class HostingTests
         var listed = agent.Agent!.Components!.Components["exporters"].SubComponentMap.SelectMany(s => s.Value.SubComponentMap.Select(e =>
             (Key: $"{s.Key}/{e.Key.Split('@')[0]}", Gated: e.Value.Metadata.Single(m => m.Key == "gated").Value.BoolValue))).ToList();
         Assert.Equal(ungoverned.Order(), listed.Where(e => !e.Gated).Select(e => e.Key).Distinct().Order());
-        var health = agent.Agent.LastHealth!.Exporters.ComponentHealthMap;
+        var health = agent.Agent.ExportHealth!.ComponentHealthMap;
         Assert.All(ungoverned, u => Assert.Contains(health[u.Split('/')[0]].ComponentHealthMap,
             c => c.Key.Split('@')[0] == u.Split('/')[1] && c.Value.Status == "ungoverned" && c.Value.Healthy));
 
@@ -732,7 +732,7 @@ public class HostingTests
         agent.Agent.Recheck();
         Assert.True(Listed("logs"));
         Assert.False(agent.Controls.Sends(Signal.Logs));
-        Assert.Equal("ungoverned", agent.Agent.LastHealth!.Exporters.ComponentHealthMap["logs"].ComponentHealthMap["Kept"].Status);
+        Assert.Equal("ungoverned", agent.Agent.ExportHealth!.ComponentHealthMap["logs"].ComponentHealthMap["Kept"].Status);
         await Kit.Until(() => server.Messages.Any(m => m.Health?.ComponentHealthMap.TryGetValue("exporters", out var x) == true &&
                                                        x.ComponentHealthMap["logs"].ComponentHealthMap.ContainsKey("Kept")), "export health with it sent");
         await host.StopAsync(Cancel);
@@ -952,7 +952,7 @@ public class HostingTests
     {
         await using var server = new OpAmpServer();
         var dir = Kit.TempDir();
-        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), "not a settings document");
+        Directory.CreateDirectory(Path.Combine(dir, "opamp-state")); // a saved state that can't be read
         var said = new Said();
         var b = Builder(new() { ["OpAmp:Endpoint"] = server.Endpoint, ["OpAmp:StateDirectory"] = dir });
         b.Logging.AddProvider(said);

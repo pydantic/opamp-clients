@@ -68,8 +68,7 @@ public class AgentTests
         Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
         Assert.False(agent.Controls.SendLogs);
         Assert.Empty(p.Set); // the instrumentations were read already: nothing changes until the restart
-        // The client keeps the config applied, in its own state: nothing of the plugin's own.
-        Assert.False(File.Exists(Path.Combine(p.Env["OTEL_OPAMP_STATE_DIR"]!, "sdk-settings.json")));
+        // The client keeps the config applied, in its own state.
         Kept.KeepApplied(p.Env["OTEL_OPAMP_STATE_DIR"]!, policy);
 
         agent.Stop(TimeSpan.Zero); // the process exits
@@ -83,7 +82,7 @@ public class AgentTests
     }
 
     [Fact]
-    public void TheSettingsToStartWithAreTheConfigTheClientKeptAppliedElseTheFileKeptBefore()
+    public void TheSettingsToStartWithAreTheConfigTheClientKeptApplied()
     {
         var dir = TempDir();
         double? Rate()
@@ -99,18 +98,18 @@ public class AgentTests
             }
         }
 
-        // Kept before the client kept the config applied (an earlier release): it carries over.
-        File.WriteAllText(Path.Combine(dir, "sdk-settings.json"), Policy.HeadSampling(0.25));
-        Assert.Equal(0.25, Rate());
-        // Once the client keeps a config applied, that is where a start begins: the old file is not read.
+        // Nothing kept: the SDK's own settings.
+        Assert.Null(Rate());
         Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         Assert.Equal(0.5, Rate());
-        // A config applied with every control local: every setting the SDK's own, not the old file's.
+        // A config applied with every control local: every setting the SDK's own.
+        Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         Kept.KeepApplied(dir, Policy.Local);
         Assert.Null(Rate());
-        // A client state that doesn't read: the old file again.
+        // A client state that doesn't read: the SDK's own settings again.
+        Kept.KeepApplied(dir, Policy.HeadSampling(0.5));
         File.WriteAllBytes(Path.Combine(dir, "opamp-state"), [0xff, 0xff]);
-        Assert.Equal(0.25, Rate());
+        Assert.Null(Rate());
     }
 
     [Fact]
@@ -281,7 +280,6 @@ public class AgentTests
             await serving;
         }
 
-        Assert.False(File.Exists(Path.Combine(dir, "sdk-settings.json")));
         var next = new Process { Env = { ["OTEL_OPAMP_STATE_DIR"] = dir } }.Prepare()!;
         try
         {

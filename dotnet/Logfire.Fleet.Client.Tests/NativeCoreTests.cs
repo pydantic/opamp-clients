@@ -57,7 +57,7 @@ public class NativeCoreTests
             requests.Add(Bytes(rng, 60));
         }
 
-        requests.Add(new Request { Load = new Load() }.ToByteArray());
+        requests.Add(new Request { AgentStart = new AgentStart { InstanceUid = ByteString.CopyFrom(new byte[16]) } }.ToByteArray());
         foreach (var r in requests)
         {
             Assert.Equal(Convert.ToHexString(wasm.Call(r)), Convert.ToHexString(Native.SdkSettingsCall(r)));

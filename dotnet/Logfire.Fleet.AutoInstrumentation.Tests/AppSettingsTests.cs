@@ -435,7 +435,7 @@ public class AppSettingsTests
                 host.Live.Add("custom");
             }
 
-            var d = layer.Decide(config, ByteString.Empty, ByteString.Empty, host, Vectors.Now);
+            var d = Vectors.Decide(layer, config, host, Vectors.Now);
             if (c.TryGetProperty("refused", out var refused))
             {
                 if (d.Status.Status != RemoteConfigStatuses.Failed || d.Status.ErrorMessage != refused.GetString())
@@ -461,7 +461,7 @@ public class AppSettingsTests
                 var told = new Told();
                 using (controls.App.OnChange(told.Handler))
                 {
-                    controls.Apply(d.Apply);
+                    controls.Apply(d.Apply!);
                 }
 
                 if (Canon(want) != Canon(controls.App.Snapshot()))
@@ -474,7 +474,7 @@ public class AppSettingsTests
                     failed.Add($"{name}: told {told.All.Count} times");
                 }
 
-                var body = Policy.Text(d.Effective);
+                var body = Policy.Text(d.Effective!);
                 if (body != c.GetProperty("effective").GetString())
                 {
                     failed.Add($"{name}: effective {body}");
@@ -700,6 +700,7 @@ public class AppSettingsTests
     {
         var app = new AppSettingsStore();
         var wall = Vectors.Now;
+        var nanos = 0L;
         var agent = Agent.Prepare(
             n => n switch
             {
@@ -708,7 +709,7 @@ public class AppSettingsTests
                 _ => null,
             },
             (_, _) => { },
-            new Clock(() => wall, () => 0, (_, _) => new Dummy()),
+            new Clock(() => wall, () => nanos, (_, _) => new Dummy()),
             app)!;
         try
         {
@@ -719,8 +720,10 @@ public class AppSettingsTests
                 ("debug", """{"until":"2026-10-14T12:10:00Z"}"""),
                 ("app_settings", """{"values":{"a":"1"}}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
-            agent.Sdk.Refresh(Vectors.Now + 300_000); // while debug mode lasts
-            agent.Sdk.Refresh(Vectors.Now + 600_000); // and at its end
+            (wall, nanos) = (Vectors.Now + 300_000, 300_000_000_000); // while debug mode lasts
+            agent.Sdk.TickForTest();
+            (wall, nanos) = (Vectors.Now + 600_000, 600_000_000_000); // and at its end
+            agent.Sdk.TickForTest();
             Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
             Assert.Equal(0UL, agent.Sdk.RefreshAt);
             told.Want((M(("a", "1")), new[] { "a" }));

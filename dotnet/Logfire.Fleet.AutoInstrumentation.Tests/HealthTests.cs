@@ -187,7 +187,7 @@ public class HealthTests
     // Every case of testdata/health.json through the agent: its counts reached through the tally's
     // own calls, its settings as a remote config, its exporters as the inventory lists them; the
     // first step the agent's start (export health goes with the first message), each next the
-    // timer going off 30 s after the last.
+    // timer going off at the step's time (the clocks moving together).
     [Fact]
     public void EveryHealthVectorThroughTheAgentsTimer()
     {
@@ -198,7 +198,13 @@ public class HealthTests
             this.timers.Clear();
             this.nanos = 0;
             var steps = c.GetProperty("steps").EnumerateArray().ToList();
-            this.wall = steps[0].GetProperty("now_unix_ms").GetUInt64();
+            var walls = steps.Select(s => s.GetProperty("now_unix_ms").GetUInt64()).ToList();
+            if (walls.Zip(walls.Skip(1)).Any(w => w.Second < w.First))
+            {
+                continue; // the clocks here move together: a wall clock going back is the layer's tests
+            }
+
+            this.wall = walls[0];
             // A state directory: the first step's settings, decided before the start (and kept applied
             // as the client keeps them), are what it loads.
             var dir = Path.Combine(Path.GetTempPath(), "opamp-health-" + Guid.NewGuid());
@@ -211,11 +217,8 @@ public class HealthTests
                 {
                     var step = steps[i];
                     var where = $"{name}: step {i}";
-                    this.wall = step.GetProperty("now_unix_ms").GetUInt64();
-                    if (i > 0)
-                    {
-                        this.nanos += 30 * Second;
-                    }
+                    this.wall = walls[i];
+                    this.nanos = (long)(walls[i] - walls[0]) * 1_000_000;
 
                     var settings = step.TryGetProperty("settings", out var doc) ? doc.GetRawText() : Policy.Local;
                     Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(settings)).Status);
@@ -250,16 +253,24 @@ public class HealthTests
                         this.Fire();
                     }
 
-                    var report = agent.Sdk.LastHealth!;
-                    Check(step.GetProperty("want"), report, where, failed);
+                    // What went out this step; the flow keeps the report it last made, so what a step
+                    // that sends nothing says is only that.
                     var sent = !ReferenceEquals(before, agent.Sdk.HealthSent) &&
                                agent.Sdk.HealthSent!.ComponentHealthMap.ContainsKey("exporters");
-                    if (sent != report.Send)
+                    var wanted = step.GetProperty("want");
+                    if (!sent)
                     {
-                        failed.Add($"{where}: sent {sent}, the report said {report.Send}");
+                        if (wanted.TryGetProperty("send", out var w) && w.GetBoolean())
+                        {
+                            failed.Add($"{where}: nothing sent");
+                        }
+
+                        continue;
                     }
 
-                    if (report.Send && (agent.Sdk.HealthSent!.ComponentHealthMap["exporters"] != report.Exporters || !agent.Sdk.HealthSent.Healthy))
+                    var report = agent.Sdk.State.Health;
+                    Check(wanted, report, where, failed);
+                    if ((!agent.Sdk.HealthSent!.ComponentHealthMap["exporters"].Equals(report.Exporters) || !agent.Sdk.HealthSent.Healthy))
                     {
                         failed.Add($"{where}: the health sent isn't the application's with the report's exporters entry");
                     }
@@ -271,7 +282,7 @@ public class HealthTests
             }
         }
 
-        Assert.Empty(failed);
+        Assert.True(failed.Count == 0, string.Join("\n", failed));
     }
 
     // The hosting package's health check publisher can report before the agent starts, or while
