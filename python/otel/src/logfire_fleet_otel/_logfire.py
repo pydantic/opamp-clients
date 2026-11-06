@@ -139,7 +139,7 @@ def _head(sampling) -> Any:
 
 
 def configure_logfire(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
-                      state_dir: str | os.PathLike | None = None,
+                      state_dir: str | os.PathLike[str] | None = None,
                       heartbeat_interval: timedelta | float | str | None = None, **kwargs) -> logfire.Logfire:
     """``logfire.configure`` under the OpAMP server: call it in its place, with the same keyword
     arguments. The server is ``endpoint``, ``headers``, ``state_dir`` and ``heartbeat_interval``,
@@ -271,7 +271,7 @@ class LogfireFleet:
 
 
 def logfire_fleet(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
-                  state_dir: str | os.PathLike | None = None,
+                  state_dir: str | os.PathLike[str] | None = None,
                   heartbeat_interval: timedelta | float | str | None = None) -> LogfireFleet | None:
     """For ``logfire.configure(fleet=...)``: the server is ``endpoint``, ``headers``, ``state_dir``
     and ``heartbeat_interval``, else the OTEL_OPAMP_* variables, as for ``configure()``. None, with
