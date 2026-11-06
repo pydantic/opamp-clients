@@ -134,6 +134,28 @@ can't register its providers.
 Call it once, after the SDK has started. With no SDK started it warns and the application runs
 unmanaged.
 
+### The Logfire SDK's own `fleet` option
+
+A Logfire SDK that has the `fleet` option (`@pydantic/logfire-node`, with this package installed
+beside it as its optional peer dependency) joins the fleet from `logfire.configure()` itself, and
+nothing is refused:
+
+```js
+import * as logfire from "@pydantic/logfire-node";
+
+logfire.configure({ serviceName: "checkout", fleet: true });  // or LOGFIRE_FLEET=true
+```
+
+`fleet: true` takes the server from the `OTEL_OPAMP_*` variables; `fleet: { endpoint, headers,
+stateDir, heartbeatIntervalMs }` gives it in code. The Logfire SDK calls `logfireFleet()` and the
+`LogfireFleet` it returns: the live sampler as its head sampler (so the sampling controls and debug
+mode are carried out), the instance UID as `service.instance.id`, and its NodeSDK started by
+`start`, so the providers it registers are the SDK's and every exporter on them gets the gates.
+Its instrumentations are its own, so `instrumentations` is refused. The contract is versioned
+(`LOGFIRE_FLEET_CONTRACT`): a Logfire SDK that doesn't know the installed version warns and runs
+unmanaged, as it does without this package or without an endpoint. A later `logfire.configure()`
+is governed under the same client and instance, and `logfire.shutdown()` says goodbye first.
+
 ## What it does
 
 - **Joins the fleet** with one instance UID: the OpAMP instance UID, and `service.instance.id` in

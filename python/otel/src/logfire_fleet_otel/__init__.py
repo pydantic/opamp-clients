@@ -65,8 +65,8 @@ from . import app_settings
 from ._match import Bucket, Redactor, Scrubber, attribute_text, glob, level_keeps, rebucket, threshold
 from .app_settings import AppSettings
 
-__all__ = ["Configurator", "Distro", "GatedMetricExporter", "app_settings", "configure", "configure_logfire", "govern",
-           "manage", "start"]
+__all__ = ["LOGFIRE_FLEET_CONTRACT", "Configurator", "Distro", "GatedMetricExporter", "LogfireFleet", "app_settings", "configure",
+           "configure_logfire", "govern", "logfire_fleet", "manage", "start"]
 
 _log = logging.getLogger(__name__)
 
@@ -1362,14 +1362,16 @@ class Agent:
         client = self.client
         return client.endpoint if client is not None else None
 
-    def start(self, resource: Resource) -> None:
-        """Once the SDK is built: join the fleet, on a thread of the client's own."""
+    def start(self, resource: Resource, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
+        """Once the SDK is built: join the fleet, on a thread of the client's own. The providers
+        are the SDK's (the global ones where not given)."""
         if self.setup is None or self.layer is None or self.uid is None or self._loop is not None:
             return
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can
         # carry out of it. The settings loaded at start are loaded again, under the host as built.
-        found = govern(self.controls, log_spans=self.logfire, layer=self.layer, listed_as=self._listed_as)
+        found = govern(self.controls, tracer_provider, meter_provider, logger_provider, log_spans=self.logfire,
+                       layer=self.layer, listed_as=self._listed_as)
         self.found, self.exporters = found.found, found.exporters
         self._warn(found.warnings)
         built = sdk_host(configured=self.configured, auto_instrumented=self._auto_instrumented,
@@ -1455,6 +1457,20 @@ class Agent:
             if warning not in self._warned:
                 self._warned.add(warning)
                 _log.warning("OpAMP: %s", warning)
+
+    def rebuilt(self, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
+        """The SDK was built again once the client had started (``logfire.configure()`` called a
+        second time): the new providers' exporters get the gates and replace the old ones in the
+        inventory. The client and its settings stay as they are."""
+        with self._lock:
+            found = govern(self.controls, tracer_provider, meter_provider, logger_provider, log_spans=self.logfire,
+                           layer=self.layer, listed_as=self._listed_as)
+            self.found, self.exporters = found.found, found.exporters
+            self._warn(found.warnings)
+            if self.client is not None:
+                components = self._components()
+                if components is not None:
+                    self.client.set_available_components(components)
 
     def processor_added(self, processor, signal: str) -> None:
         """The application is adding a span (`signal` "traces") or log record ("logs") processor
@@ -2025,4 +2041,4 @@ def manage(*, endpoint: str | None = None, headers: Mapping[str, str] | None = N
     AGENT.start(getattr(provider, "resource", None) or Resource.create({}))
 
 
-from ._logfire import configure_logfire  # noqa: E402 - it reads the package's AGENT
+from ._logfire import LOGFIRE_FLEET_CONTRACT, LogfireFleet, configure_logfire, logfire_fleet  # noqa: E402 - they read the package's AGENT

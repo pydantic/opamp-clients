@@ -203,3 +203,90 @@ def _resource(instance) -> Resource:
         provider = trace.get_tracer_provider()
     provider = getattr(provider, "provider", provider)
     return getattr(provider, "resource", None) or Resource.create({})
+
+
+#: The version of the contract between ``logfire.configure(fleet=...)`` and this package: what
+#: ``logfire_fleet`` takes and what a ``LogfireFleet`` offers. The Logfire SDK checks it and runs
+#: unmanaged, with a warning, on one it doesn't know.
+LOGFIRE_FLEET_CONTRACT = 1
+
+
+class LogfireFleet:
+    """What ``logfire.configure(fleet=...)`` calls, in this order, as it builds its SDK:
+
+    1. ``head_sampler(sampler)`` with the head sampler it built (None: every trace), before its
+       tracer provider: the live sampler that takes the server's sampling over it.
+    2. ``resource_attributes`` merged into its resource: the instance UID as ``service.instance.id``.
+    3. For each export to Logfire, as it builds the exporter chain: ``redacting_spans`` around the
+       sender (under its retries, so a span the retries make is redacted too), ``spans`` around the
+       retrying exporter (above them, so a span is decided and counted once), ``logs`` and
+       ``metrics`` around its log and metric exporters.
+    4. ``start(resource, tracer_provider=..., meter_provider=..., logger_provider=...)`` once its
+       providers are built: every other exporter on them (its console, ``additional_span_processors``,
+       ``OTEL_EXPORTER_OTLP_*``) gets the gates, what can't be gated is reported to the server as
+       ungoverned, and the client starts. Called again for a later ``configure()``, it governs the
+       new providers under the same client.
+
+    None of it raises for the server's settings, and none of it waits for the server: until the
+    server answers, the settings in force are the last ones saved in the state directory, else
+    the SDK's own.
+    """
+
+    contract = LOGFIRE_FLEET_CONTRACT
+
+    def __init__(self, agent) -> None:
+        self._agent = agent
+
+    def head_sampler(self, sampler: Any) -> Any:
+        return self._agent.controls.sampler.wrap(sampler)
+
+    @property
+    def resource_attributes(self) -> dict[str, str]:
+        from . import _INSTANCE_ID  # noqa: PLC0415
+
+        return {_INSTANCE_ID: str(self._agent.uid)}
+
+    def redacting_spans(self, exporter: Any) -> Any:
+        return self._agent.controls.redacting(exporter)
+
+    def spans(self, exporter: Any) -> Any:
+        # The Logfire SDK's logs are spans: they go through the log controls.
+        return self._agent.controls.spans(exporter, log_spans=True, redact=False)
+
+    def logs(self, exporter: Any) -> Any:
+        return self._agent.controls.logs(exporter)
+
+    def metrics(self, exporter: Any) -> Any:
+        from . import GatedMetricExporter  # noqa: PLC0415
+
+        return GatedMetricExporter(exporter)
+
+    def start(self, resource: Resource, *, tracer_provider: Any = None, meter_provider: Any = None,
+              logger_provider: Any = None) -> None:
+        agent = self._agent
+        if agent.client is not None or agent._loop is not None:  # noqa: SLF001 - its own package
+            agent.rebuilt(tracer_provider, meter_provider, logger_provider)
+            return
+        agent.start(resource, tracer_provider, meter_provider, logger_provider)
+
+
+def logfire_fleet(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
+                  state_dir: str | os.PathLike | None = None,
+                  heartbeat_interval: timedelta | float | str | None = None) -> LogfireFleet | None:
+    """For ``logfire.configure(fleet=...)``: the server is ``endpoint``, ``headers``, ``state_dir``
+    and ``heartbeat_interval``, else the OTEL_OPAMP_* variables, as for ``configure()``. None, with
+    the reason logged, where there is no server to join (no endpoint, ``OTEL_OPAMP_DISABLED``, or a
+    core that can't load on this platform): the Logfire SDK then runs unmanaged. It never raises."""
+    from . import AGENT  # noqa: PLC0415
+
+    if AGENT.setup is None or AGENT._loop is None:  # noqa: SLF001 - its own package
+        # A copy: the package's variables for opentelemetry-instrument aren't the Logfire SDK's.
+        env = {**os.environ, "OTEL_METRICS_EXPORTER": "otlp"}
+        AGENT.prepare(env, auto_instrumented=False, endpoint=endpoint, headers=headers, state_dir=state_dir,
+                      heartbeat_interval=heartbeat_interval)
+        if not AGENT.on:
+            return None
+        # The sampler is the package's, and the Logfire SDK's logs are spans.
+        AGENT.configured = True
+        AGENT.logfire = True
+    return LogfireFleet(AGENT)

@@ -3,6 +3,7 @@
 """configure_logfire: the Logfire SDK under the server (docs/python-otel.md, "The Logfire SDK")."""
 
 import gzip
+import inspect
 import json
 import subprocess
 import sys
@@ -11,6 +12,7 @@ import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import logfire
 import pytest
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 from logfire_fleet_client import opamp_pb2
@@ -75,9 +77,31 @@ class _Ingest:
 _AFTER = 'with logfire.span("after", **{"user.email": "a@example.com"}):\n    pass'
 
 
+#: Whether the installed Logfire SDK takes ``fleet=``: it calls this package's LogfireFleet itself.
+_LOGFIRE_FLEET = "fleet" in inspect.signature(logfire.configure).parameters
+
+
+@pytest.fixture(params=["configure_logfire", "fleet"])
+def how(request) -> str:
+    """How the child sets the Logfire SDK up under the server: with configure_logfire, or with
+    ``logfire.configure(fleet=...)`` where the installed Logfire SDK has it."""
+    if request.param == "fleet" and not _LOGFIRE_FLEET:
+        pytest.skip("the installed Logfire SDK has no fleet option")
+    return request.param
+
+
+def _setup(how: str, endpoint: str, args: str) -> str:
+    """The child's line that sets the Logfire SDK up under the server at `endpoint`."""
+    if how == "fleet":
+        # Imported here: a Logfire SDK without the fleet option has no logfire.fleet.
+        return (f"logfire.configure(fleet=__import__('logfire.fleet').fleet.FleetOptions(endpoint={endpoint!r}, "
+                f"heartbeat_interval=0.1), {args})")
+    return f"logfire_fleet_otel.configure_logfire(endpoint={endpoint!r}, heartbeat_interval=0.1, {args})"
+
+
 def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool = False, extra: str = "",
-         env: dict | None = None, where: str | None = None, after: str = _AFTER):
-    """A child that sets the Logfire SDK up with configure_logfire, sends a span "before", waits for
+         env: dict | None = None, where: str | None = None, after: str = _AFTER, how: str = "configure_logfire"):
+    """A child that sets the Logfire SDK up under the server (`how`), sends a span "before", waits for
     the server's answer to `offer`, then runs `after` (by default a span "after", with a
     `user.email` attribute). `where` is the token and base URL arguments: by default a token, with
     `ingest` as the base URL."""
@@ -94,10 +118,8 @@ def _run(server: _Server, ingest: _Ingest, tmp_path, offer: str, console: bool =
     server._reply = reply
     child = textwrap.dedent(f"""
         import pathlib, time, logfire, logfire_fleet_otel
-        logfire_fleet_otel.configure_logfire(
-            endpoint={server.endpoint!r}, heartbeat_interval=0.1, {where},
-            service_name="rocket", console={None if console else False!r}, metrics=False, send_to_logfire=True,
-            inspect_arguments=False{extra})
+        {_setup(how, server.endpoint, f"{where}, service_name='rocket', console={None if console else False!r}, "
+                                      f"metrics=False, send_to_logfire=True, inspect_arguments=False{extra}")}
         agent = logfire_fleet_otel.AGENT
         with logfire.span("before"):
             pass
@@ -132,12 +154,12 @@ def servers():
     ingest.close()
 
 
-def test_the_logfire_sdk_takes_the_servers_settings(tmp_path, servers):
+def test_the_logfire_sdk_takes_the_servers_settings(tmp_path, servers, how):
     """The Logfire SDK set up with configure_logfire joins the fleet and sends to Logfire through
     the package's gates: a policy that masks an attribute is carried out on what reaches Logfire,
     with the instance UID as service.instance.id and the token as the Logfire SDK sends it."""
     server, ingest = servers
-    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}))
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     uid = uuid.UUID(run.stdout.split("uid ")[-1].split()[0])
     assert {m.instance_uid for m in server.got} == {uid.bytes}
@@ -158,15 +180,15 @@ def test_the_logfire_sdk_takes_the_servers_settings(tmp_path, servers):
         assert setting in run.stdout.split("live ")[-1]
 
 
-def test_a_logfire_sdk_stops_sending_traces_when_the_server_says(tmp_path, servers):
+def test_a_logfire_sdk_stops_sending_traces_when_the_server_says(tmp_path, servers, how):
     server, ingest = servers
-    run = _run(server, ingest, tmp_path, policy(signal_exports={"traces": {"enabled": False}}))
+    run = _run(server, ingest, tmp_path, policy(signal_exports={"traces": {"enabled": False}}), how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == ["before"]
 
 
-def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers):
+def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers, how):
     """Regression: logfire.info() and the Logfire SDK's logging handler make spans, which the log
     controls passed untouched while the policy was answered as applied."""
     server, ingest = servers
@@ -180,19 +202,19 @@ def test_the_log_controls_apply_to_the_logfire_sdks_logs(tmp_path, servers):
         with logfire.span("request"):
             pass
     """)
-    run = _run(server, ingest, tmp_path, policy(log_levels={"level": "warn"}), after=after)
+    run = _run(server, ingest, tmp_path, policy(log_levels={"level": "warn"}), after=after, how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert sorted(ingest.names()) == ["before", "loud stdlib", "loud warning", "request"], run.stderr
 
 
-def test_the_logfire_sdks_console_is_governed_like_its_export_to_logfire(tmp_path, servers):
+def test_the_logfire_sdks_console_is_governed_like_its_export_to_logfire(tmp_path, servers, how):
     """The Logfire SDK's console gets the gates once it is built: a policy that turns the traces
     off is APPLIED and in force on the console as on what reaches Logfire."""
     server, ingest = servers
     after = _AFTER + '\nprint("exporters", sorted((e.signal, e.name, e.gated) for e in agent.exporters))'
     run = _run(server, ingest, tmp_path, policy(signal_exports={"traces": {"enabled": False}}), console=True,
-               after=after)
+               after=after, how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert not any(m.remote_config_status.status == FAILED for m in server.got)
@@ -214,28 +236,28 @@ def test_without_an_endpoint_it_is_logfire_configure():
     assert run.returncode == 0, run.stderr
 
 
-def test_a_logfire_sdk_samples_as_the_server_says(tmp_path, servers):
+def test_a_logfire_sdk_samples_as_the_server_says(tmp_path, servers, how):
     """The live sampler is the Logfire SDK's head sampler: a ratio of 0 starts no more traces."""
     server, ingest = servers
-    run = _run(server, ingest, tmp_path, policy(head_sampling={"ratio": 0.0}))
+    run = _run(server, ingest, tmp_path, policy(head_sampling={"ratio": 0.0}), how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == ["before"]
 
 
-def test_the_logfire_sdks_own_settings_still_hold_where_the_server_sets_none(tmp_path, servers):
+def test_the_logfire_sdks_own_settings_still_hold_where_the_server_sets_none(tmp_path, servers, how):
     """What the Logfire SDK reads from its variables when the arguments leave them out still holds
     under the server: its sample rate (here 0, so no trace starts at all until the server says
     otherwise) and its resource attributes, beside the instance UID."""
     server, ingest = servers
     run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
-               env={"LOGFIRE_TRACE_SAMPLE_RATE": "0", "LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"})
+               env={"LOGFIRE_TRACE_SAMPLE_RATE": "0", "LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"}, how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == []
     (tmp_path / "again").mkdir()
     run = _run(server, ingest, tmp_path / "again", policy(attribute_redaction={"mask": ["user.email"]}),
-               env={"LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"})
+               env={"LOGFIRE_RESOURCE_ATTRIBUTES": "team=rocketeers"}, how=how)
     assert run.returncode == 0, run.stderr
     uid = run.stdout.split("uid ")[-1].split()[0]
     (after,) = [a for n, a in ingest.spans if n == "after"]
@@ -266,14 +288,14 @@ def _credentials(data_dir, token: str, url: str) -> None:
         {"token": token, "project_name": "rocket", "project_url": "https://example.com/rocket", "logfire_api_url": url}))
 
 
-def test_the_logfire_sdks_credentials_file_says_where_it_sends(tmp_path, servers):
+def test_the_logfire_sdks_credentials_file_says_where_it_sends(tmp_path, servers, how):
     """As for the Logfire SDK, its credentials file gives the token and base URL it isn't given:
     what is sent goes there, through the gates, with or without a token argument."""
     server, ingest = servers
     data_dir = tmp_path / "logfire"
     _credentials(data_dir, "pylf_v1_us_file", ingest.url)
     run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
-               where=f"data_dir={str(data_dir)!r}")
+               where=f"data_dir={str(data_dir)!r}", how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert any(m.remote_config_status.status == APPLIED for m in server.got)
     assert ingest.names() == ["before", "after"], run.stderr
@@ -283,13 +305,13 @@ def test_the_logfire_sdks_credentials_file_says_where_it_sends(tmp_path, servers
 
     (tmp_path / "again").mkdir()
     run = _run(server, ingest, tmp_path / "again", policy(attribute_redaction={"mask": ["user.email"]}),
-               where=f'token="pylf_v1_us_arg", data_dir={str(data_dir)!r}')
+               where=f'token="pylf_v1_us_arg", data_dir={str(data_dir)!r}', how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert ingest.names() == ["before", "after"] * 2, run.stderr
     assert "pylf_v1_us_arg" in ingest.auth
 
 
-def test_zstd_is_sent_as_the_logfire_sdk_sends_it(tmp_path, servers):
+def test_zstd_is_sent_as_the_logfire_sdk_sends_it(tmp_path, servers, how):
     import logfire  # noqa: PLC0415
 
     if not hasattr(logfire.AdvancedOptions(), "compression"):
@@ -297,7 +319,7 @@ def test_zstd_is_sent_as_the_logfire_sdk_sends_it(tmp_path, servers):
     server, ingest = servers
     run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}),
                where=f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r}, '
-                     f'compression="zstd")')
+                     f'compression="zstd")', how=how)
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
     assert ingest.names() == ["before", "after"], run.stderr
     assert ingest.encodings == {"zstd"}
@@ -335,3 +357,62 @@ def test_advanced_options_as_a_mapping_keep_their_log_record_processors(servers)
     """)
     run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=_child_env())
     assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+
+
+def test_the_policy_sits_where_configure_logfire_puts_it_in_the_logfire_sdks_export(servers, how):
+    """The export to Logfire, built by either: one gate, above the Logfire SDK's retries (each span
+    decided and counted once), and redaction under them (a span the retries make is redacted too)."""
+    server, ingest = servers
+    child = textwrap.dedent(f"""
+        import logfire, logfire_fleet_otel
+        from opentelemetry import trace
+        from logfire_fleet_otel import _chain, _sdk_provider
+        {_setup(how, server.endpoint, f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions(base_url={ingest.url!r}), '
+                                      'console=False, metrics=False, send_to_logfire=True')}
+        provider = _sdk_provider(trace.get_tracer_provider())
+        def processors(p, depth=0):
+            yield p
+            for child in getattr(p, "_span_processors", ()) or ():
+                yield from processors(child, depth + 1)
+            inner = getattr(p, "processor", None)
+            if inner is not None and depth < 16:
+                yield from processors(inner, depth + 1)
+        seen = set()
+        for p in processors(provider._active_span_processor):
+            exporter = getattr(getattr(p, "_batch_processor", None), "_exporter", None)
+            if exporter is not None and id(exporter) not in seen:
+                seen.add(id(exporter))
+                print("chain", [type(e).__name__ for e in _chain(exporter)])
+    """)
+    run = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=60, env=_child_env())
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    (chain,) = [line for line in run.stdout.splitlines() if line.startswith("chain")]
+    names = eval(chain.removeprefix("chain "))  # noqa: S307 - our own child's output
+    assert names.count("_GatedSpanExporter") == 1, names
+    gate, retry, redact = (names.index(n) for n in ("_GatedSpanExporter", "RetryFewerSpansSpanExporter",
+                                                   "_RedactingSpanExporter"))
+    assert gate < retry < redact, names
+
+
+def test_logfire_configured_again_keeps_its_new_exporters_under_the_policy(tmp_path, servers):
+    """A second ``logfire.configure(fleet=...)`` builds new providers: they are governed under the
+    same client and instance, so the policy still holds on what reaches Logfire and on an exporter
+    only the second one has."""
+    if not _LOGFIRE_FLEET:
+        pytest.skip("the installed Logfire SDK has no fleet option")
+    server, ingest = servers
+    again = _setup("fleet", server.endpoint, f'token="pylf_v1_us_test", advanced=logfire.AdvancedOptions('
+                                             f'base_url={ingest.url!r}), service_name="rocket", console=False, '
+                                             f'metrics=False, send_to_logfire=True, inspect_arguments=False, '
+                                             f'additional_span_processors=[SimpleSpanProcessor(ConsoleSpanExporter())]')
+    run = _run(server, ingest, tmp_path, policy(attribute_redaction={"mask": ["user.email"]}), how="fleet",
+               after="from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor\n"
+                     + again + "\n" + _AFTER)
+    assert run.returncode == 0 and "Traceback" not in run.stderr, run.stderr
+    uid = uuid.UUID(run.stdout.split("uid ")[-1].split()[0])
+    assert {m.instance_uid for m in server.got} == {uid.bytes}
+    assert ingest.names() == ["before", "after"], run.stderr
+    (after,) = [a for n, a in ingest.spans if n == "after"]
+    assert after["user.email"] != "a@example.com"
+    assert after["resource"]["service.instance.id"] == str(uid)
+    assert '"after"' in run.stdout and "a@example.com" not in run.stdout, run.stdout

@@ -173,9 +173,39 @@ configurator, or `logfire.configure()` (whose logs then go through the log contr
 Call it once, after the application sets its tracer provider. With none set it warns and the SDK
 runs unmanaged.
 
+## The Logfire SDK: `logfire.configure(fleet=True)`
+
+A Logfire SDK that has the `fleet` option joins the fleet from `logfire.configure()` itself.
+Install it with its `fleet` extra, which installs this package:
+
+```bash
+pip install 'logfire[fleet]'
+```
+
+```python
+import logfire
+
+logfire.configure(service_name="checkout", fleet=True)  # or LOGFIRE_FLEET=true
+logfire.instrument_fastapi(app)
+```
+
+`fleet=True` takes the server from the `OTEL_OPAMP_*` variables above;
+`logfire.fleet.FleetOptions(endpoint=..., headers=..., state_dir=..., heartbeat_interval=...)`
+gives it in code. It does what `configure_logfire()` below does (the live sampler as the head
+sampler, the gates on the export to Logfire, above its retries with redaction under them, the
+gates on every other exporter, the instance UID as `service.instance.id`), but the Logfire SDK
+builds its exporters itself and calls this package at each of those points, through
+`logfire_fleet_otel.logfire_fleet()` and the `LogfireFleet` it returns. That contract is
+versioned (`LOGFIRE_FLEET_CONTRACT`): a Logfire SDK that doesn't know the installed version warns
+and runs unmanaged. So does one without the extra, or without an endpoint. It never blocks:
+until the server answers, the settings in force are the last ones saved in the state directory,
+else the Logfire SDK's own. A later `logfire.configure(fleet=...)` builds new providers, which are
+governed under the same client and instance.
+
 ## The Logfire SDK: `configure_logfire()`
 
-An application on the [Logfire SDK](https://logfire.pydantic.dev/docs/) calls
+For a Logfire SDK without the `fleet` option. An application on the
+[Logfire SDK](https://logfire.pydantic.dev/docs/) calls
 `configure_logfire()` in place of `logfire.configure()`, with the same keyword arguments, and its
 SDK joins the fleet and takes the server's settings. Install the package with its `logfire` extra
 (`logfire-fleet-otel[logfire]`; `logfire` 5.1 to 5.x).

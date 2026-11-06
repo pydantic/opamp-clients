@@ -1911,7 +1911,14 @@ export class Agent {
     if (!this.layer || this.ownProviders.has(signal)) return;
     this.ownProviders.add(signal);
     this.#decide();
-    // Called from the application's code: what the client sends isn't the application's to trace.
+    this.#republish();
+  }
+
+  /**
+   * The inventory and export health, sent again for exporters that changed while it runs. Called
+   * from the application's code: what the client sends isn't the application's to trace.
+   */
+  #republish(): void {
     context.with(suppressTracing(context.active()), () => {
       if (this.#instrumentations) this.inventory = inventory(this.#instrumentations, this.exporters);
       const components = this.components();
@@ -1922,11 +1929,13 @@ export class Agent {
 
   /**
    * Once the SDK has started: the gates in front of every exporter on the providers it
-   * registered (`govern`), each one that can't be gated warned about once.
+   * registered (`govern`), each one that can't be gated warned about once. Called again once
+   * running (the Logfire SDK configured again), the exporters it now finds are listed to the server.
    */
   govern(providers: Partial<Record<ApiSignal, unknown>>): void {
     this.found = govern(this.controls, providers);
     this.#decide();
+    if (this.client) this.#republish();
   }
 
   /**
@@ -2379,5 +2388,85 @@ function registered(env: NodeJS.ProcessEnv, logLevel: string | undefined): { sdk
       await AGENT.stop();
       await sdk.shutdown();
     },
+  };
+}
+
+/**
+ * The version of the contract between the Logfire SDK's `configure({ fleet })` and this package:
+ * what `logfireFleet` takes and what a `LogfireFleet` offers. The Logfire SDK checks it and runs
+ * unmanaged, with a warning, on one it doesn't know.
+ */
+export const LOGFIRE_FLEET_CONTRACT = 1;
+
+/**
+ * What the Logfire SDK's `configure({ fleet })` calls, in this order, as it builds its NodeSDK:
+ *
+ * 1. `resourceAttributes`, merged into its resource: the instance UID as `service.instance.id`.
+ * 2. `headSampler(sampler)` with the head sampler it built (undefined: every trace), for its
+ *    NodeSDK: the live sampler that takes the server's sampling over it.
+ * 3. `start(startSdk, resource)` with what starts its NodeSDK: the providers that registers are
+ *    the SDK's, every exporter on them (its export to Logfire, its console, its additional
+ *    processors and readers) gets the gates, what can't be gated is reported to the server as
+ *    ungoverned, and the client starts. Called again for a later `configure()`, it governs the
+ *    new providers under the same client.
+ * 4. `shutdown()` from its own `shutdown()`, before the SDK's: goodbye to the server.
+ *
+ * None of it throws for the server's settings, and none of it waits for the server: until the
+ * server answers, the settings in force are the last ones saved in the state directory, else the
+ * SDK's own. The Logfire SDK's instrumentations are its own, so the instrumentation switches
+ * aren't carried out.
+ */
+export interface LogfireFleet {
+  readonly contract: number;
+  readonly resourceAttributes: Readonly<Record<string, string>>;
+  headSampler(sampler: Sampler | undefined): Sampler;
+  start(startSdk: () => void, resource: Resource): void;
+  shutdown(): Promise<void>;
+}
+
+let logfireStarted = false;
+
+/**
+ * For the Logfire SDK's `configure({ fleet })`: the server is `options`, then OTEL_OPAMP_*, as for
+ * `register`. Undefined, with the reason said, where there is no server to join (no endpoint,
+ * OTEL_OPAMP_DISABLED, or a core that can't load): the Logfire SDK then runs unmanaged. Never throws.
+ */
+export function logfireFleet(options: Options = {}, env: NodeJS.ProcessEnv = process.env): LogfireFleet | undefined {
+  try {
+    if (!logfireStarted) {
+      say.console = str(env, "OTEL_LOG_LEVEL") === undefined;
+      preparing(AGENT, appSettings, env, () => undefined, options);
+    }
+    if (!AGENT.on) return undefined;
+  } catch (e) {
+    say.error(`OpAMP: the Logfire SDK runs unmanaged: ${String(e)}`);
+    return undefined;
+  }
+  // The Logfire SDK's logs are spans: they go through the log controls.
+  AGENT.controls.logSpans = true;
+  return {
+    contract: LOGFIRE_FLEET_CONTRACT,
+    resourceAttributes: AGENT.uid ? { [INSTANCE_ID]: AGENT.uid } : {},
+    headSampler: (sampler) => AGENT.controls.sampler.wrap(sampler ?? new ParentBasedSampler({ root: new AlwaysOnSampler() })),
+    start(startSdk, resource) {
+      // The providers the Logfire SDK's NodeSDK registers are the SDK's; one registered later, in
+      // their place, is the application's own (reported ungoverned).
+      watchProviders(AGENT, startSdk);
+      // A provider the watch didn't see (the Logfire SDK registers through its own copy of the
+      // OpenTelemetry API, where npm didn't dedupe it) is read from the globals, which every copy shares.
+      registry.sdk = {
+        traces: registry.sdk.traces ?? delegate(trace.getTracerProvider()),
+        metrics: registry.sdk.metrics ?? delegate(metrics.getMeterProvider()),
+        logs: registry.sdk.logs ?? delegate(logs.getLoggerProvider()),
+      };
+      AGENT.govern(registry.sdk);
+      if (logfireStarted) return;
+      logfireStarted = true;
+      const dropped = new Set(INSTRUMENTATION_SETTINGS);
+      AGENT.narrow({ live: (hostFromEnv().live ?? []).filter((k) => !dropped.has(k)) });
+      AGENT.instrument([]);
+      AGENT.start(resource);
+    },
+    shutdown: () => AGENT.stop(),
   };
 }
