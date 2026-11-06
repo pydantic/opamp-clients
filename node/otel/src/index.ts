@@ -1626,11 +1626,55 @@ function published(): { name: string; version: string } {
   }
 }
 
+/** A module an instrumentation patches, or a file of one, as @opentelemetry/instrumentation holds it. */
+type Patching = { patch?: (...args: unknown[]) => unknown; moduleExports?: unknown; files?: Patching[] };
+
+/**
+ * Calls `applied` once `i` applies: the first time it patches a module the application loaded
+ * (its library, at a version it supports), or a file of one. @opentelemetry/instrumentation patches
+ * on the module's require or import, reading each of its module definitions' `patch` then (those it
+ * holds, `_modules`: getModuleDefinitions makes new ones), so the definition's own is wrapped. One
+ * that patched before (its `moduleExports` set) applies at once, and so does one that patches no
+ * module (undici's, on Node.js's diagnostics channels) or doesn't say which it patches. Never
+ * throws into the application's require.
+ */
+export function whenApplied(i: Instrumentation, applied: () => void): void {
+  const held = (i as { _modules?: unknown })._modules;
+  const defs = Array.isArray(held) ? (held as Patching[]) : [];
+  if (defs.length === 0) {
+    applied();
+    return;
+  }
+  let done = false;
+  const once = () => {
+    if (done) return;
+    done = true;
+    try {
+      applied();
+    } catch {
+      // Reporting only.
+    }
+  };
+  const watch = (d: Patching) => {
+    if (d.moduleExports !== undefined) once();
+    const patch = d.patch;
+    if (typeof patch !== "function") return;
+    d.patch = function (this: unknown, ...args: unknown[]) {
+      once();
+      return patch.apply(this, args);
+    };
+  };
+  for (const d of defs) {
+    watch(d);
+    for (const f of d.files ?? []) watch(f);
+  }
+}
+
 /**
  * What this instance runs, for the layer's `components` (docs/node-otel.md#inventory): this
- * package and the SDK; each instrumentation it loaded (`instrumentations`, switched off or not)
- * under the name deactivate_instrumentations takes, with its version; and `exporters`, as
- * `govern` found them (and a global provider of the application's own, ungoverned).
+ * package and the SDK; each instrumentation given (`instrumentations`: those that apply, switched
+ * off or not) under the name deactivate_instrumentations takes, with its version; and
+ * `exporters`, as `govern` found them (and a global provider of the application's own, ungoverned).
  */
 export function inventory(instrumentations: readonly Instrumentation[], exporters: readonly Exporter[] = []): InventoryInit {
   const own = published();
@@ -1775,8 +1819,12 @@ export class Agent {
   readonly #warned = new Set<string>();
   /** Each exporter as the layer last listed it, by what was found: should a call fail, it keeps its name. */
   readonly #listedAs = new Map<string, Exporter>();
-  /** The instrumentations the SDK loaded (`instrument`), which the inventory lists. */
+  /** The instrumentations the SDK loaded (`instrument`). */
   #instrumentations: Instrumentation[] | undefined;
+  /** Those that apply (whenApplied), which the inventory lists. */
+  readonly #applied = new Set<Instrumentation>();
+  /** Whether the inventory is to be listed again, once the require that applied one returns. */
+  #relist = false;
 
   get on(): boolean {
     return this.setup !== undefined;
@@ -1963,7 +2011,7 @@ export class Agent {
     this.#decide();
     // Called from the application's code: what the client sends isn't the application's to trace.
     context.with(suppressTracing(context.active()), () => {
-      if (this.#instrumentations) this.inventory = inventory(this.#instrumentations, this.exporters);
+      if (this.#instrumentations) this.inventory = inventory(this.#applying(), this.exporters);
       const components = this.components();
       if (components) this.client?.setAvailableComponents(components);
       if (this.client) this.reportHealth();
@@ -2013,16 +2061,46 @@ export class Agent {
    * settings in force say; and the inventory, of them and the exporters `govern` found.
    */
   instrument(instrumentations: Instrumentation[]): void {
-    this.#instrumentations = instrumentations;
+    this.#instrumentations = undefined;
+    this.#applied.clear();
     this.controls.instrument(instrumentations);
-    this.inventory = inventory(instrumentations, this.exporters);
+    // Listed once it applies: its library loaded. One that applies later is listed then.
+    for (const i of instrumentations) whenApplied(i, () => this.#apply(i));
+    this.#instrumentations = instrumentations;
+    this.inventory = inventory(this.#applying(), this.exporters);
     this.#unloaded();
+  }
+
+  /** The instrumentations that apply, in the order the SDK loaded them. */
+  #applying(): Instrumentation[] {
+    return (this.#instrumentations ?? []).filter((i) => this.#applied.has(i));
+  }
+
+  /**
+   * `i` applies: listed, and the inventory sent again, once the require or import that applied it
+   * has returned (off the application's path, as one).
+   */
+  #apply(i: Instrumentation): void {
+    if (this.#applied.has(i)) return;
+    this.#applied.add(i);
+    if (!this.#instrumentations || this.#relist) return;
+    this.#relist = true;
+    setImmediate(() => {
+      this.#relist = false;
+      if (!this.#instrumentations || !this.layer) return;
+      // The client's request isn't the application's to trace.
+      context.with(suppressTracing(context.active()), () => {
+        this.inventory = inventory(this.#applying(), this.exporters);
+        const components = this.components();
+        if (components) this.client?.setAvailableComponents(components);
+      });
+    });
   }
 
   /**
    * What the instance runs, as its available components (the hash left to the client), on the
-   * host and clock the settings are decided on. Nothing it lists changes while it runs: the
-   * instrumentations and exporters are the SDK's from its start, the host is read once.
+   * host and clock the settings are decided on. The exporters are the SDK's from its start, the
+   * host is read once; an instrumentation is added once it applies.
    */
   components(): AvailableComponents | undefined {
     if (!this.layer || !this.inventory) return undefined;

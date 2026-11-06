@@ -115,16 +115,22 @@ test("a typical setup: the package, the SDK, each instrumentation by its short n
   assert.equal(c.settings.debug_until, "at once");
 });
 
-test("every instrumentation getNodeAutoInstrumentations loads is listed, with its version, and switched off by that name", () => {
+test("of the instrumentations getNodeAutoInstrumentations loads, those that apply are listed, each switched off by its name", () => {
   const all = getNodeAutoInstrumentations();
   for (const i of all) i.disable();
   const agent = built({}, all);
   const listed = shown(agent.components()).instrumentations;
-  assert.equal(Object.keys(listed).length, all.length);
+  // Not every one bundled: one whose library this process hasn't loaded isn't listed.
   assert.ok(all.length > 30);
+  assert.ok(Object.keys(listed).length < all.length, JSON.stringify(listed));
+  assert.equal("mongodb" in listed, false); // not installed here
+  // Each, listed under its name, with its version (inventory lists every one it is given).
+  const named = inventory(all).instrumentations!;
+  assert.equal(named.length, all.length);
   for (const i of all) {
-    const [name, version] = Object.entries(listed).find(([n]) => `@opentelemetry/instrumentation-${n}` === i.instrumentationName)!;
+    const { name, version } = named.find((n) => n.scope === i.instrumentationName)!;
     assert.equal(version, i.instrumentationVersion, name);
+    if (name! in listed) assert.equal(listed[name!], i.instrumentationVersion, name);
     // The name listed is the one the server switches it by.
     const s = agent.remoteConfig(config(policy({ instrumentations: { disabled: [name] } })));
     assert.equal(s.status, RemoteConfigStatuses.RemoteConfigStatuses_APPLIED);

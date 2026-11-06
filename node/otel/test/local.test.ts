@@ -11,9 +11,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { createRequire } from "node:module";
+
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import type { Instrumentation } from "@opentelemetry/instrumentation";
 
-import { Agent, decimal, inventory, localFromEnv, managedHost, samplerFromEnv, samplingRateFromEnv } from "../src/index.js";
+import {
+  Agent, decimal, inventory, localFromEnv, managedHost, samplerFromEnv, samplingRateFromEnv, whenApplied,
+} from "../src/index.js";
 
 test("the sampling rate is the ratio of the sampler OTEL_TRACES_SAMPLER names", () => {
   const cases: [Record<string, string>, number, RegExp][] = [
@@ -83,4 +88,61 @@ test("each instrumentation is listed with its scope: the name its tracer is unde
     { name: "http", version: "0.222.0", scope: "@opentelemetry/instrumentation-http" },
     { name: "fs", version: "", scope: "@opentelemetry/instrumentation-fs" },
   ]);
+});
+
+/** An instrumentation with module definitions, as @opentelemetry/instrumentation holds them. */
+function patching(name: string, defs: Record<string, unknown>[]) {
+  return {
+    instrumentationName: name,
+    instrumentationVersion: "1.0.0",
+    setTracerProvider() {},
+    _modules: defs,
+  } as unknown as Instrumentation;
+}
+
+test("an instrumentation applies once it patches a module the application loaded, or one of its files", () => {
+  const seen: string[] = [];
+  const main = { name: "pg", patch: (e: unknown) => e, files: [{ name: "pg/lib/client.js", patch: (e: unknown) => e }] };
+  whenApplied(patching("@opentelemetry/instrumentation-pg", [main]), () => seen.push("pg"));
+  assert.deepEqual(seen, []); // its library isn't loaded
+  // The require hook calls the definition's patch, as it reads it then: once only.
+  const exports = {};
+  assert.equal(main.patch(exports), exports);
+  main.patch(exports);
+  main.files[0]!.patch(exports);
+  assert.deepEqual(seen, ["pg"]);
+  // Patched already (before it was watched), or patching no module at all: at once.
+  const before: string[] = [];
+  whenApplied(patching("a", [{ name: "a", patch: (e: unknown) => e, moduleExports: {} }]), () => before.push("a"));
+  whenApplied(patching("@opentelemetry/instrumentation-undici", []), () => before.push("undici"));
+  assert.deepEqual(before, ["a", "undici"]);
+});
+
+test("a real instrumentation applies once the application requires its module", () => {
+  const all = getNodeAutoInstrumentations({ "@opentelemetry/instrumentation-fs": { enabled: false } });
+  const applied: string[] = [];
+  for (const i of all) whenApplied(i, () => applied.push(i.instrumentationName));
+  assert.equal(applied.includes("@opentelemetry/instrumentation-mongodb"), false); // not installed here
+  const http = createRequire(import.meta.url)("node:http");
+  assert.ok(http);
+  assert.ok(applied.includes("@opentelemetry/instrumentation-http"), applied.join(", "));
+  for (const i of all) i.disable();
+});
+
+test("the inventory lists the instrumentations that apply, and one that applies later once it does", async () => {
+  const agent = new Agent();
+  agent.prepare({ OTEL_OPAMP_ENDPOINT: "http://server/v1/opamp", OTEL_OPAMP_STATE_DIR: mkdtempSync(join(tmpdir(), "opamp-otel-")) });
+  const pg = { name: "pg", patch: (e: unknown) => e };
+  agent.instrument([
+    patching("@opentelemetry/instrumentation-http", [{ name: "http", patch: (e: unknown) => e, moduleExports: {} }]),
+    patching("@opentelemetry/instrumentation-pg", [pg]),
+    patching("@opentelemetry/instrumentation-undici", []),
+  ]);
+  const names = () => (agent.inventory?.instrumentations ?? []).map((i) => i.name);
+  assert.deepEqual(names(), ["http", "undici"]);
+  pg.patch({}); // the application loads pg
+  assert.deepEqual(names(), ["http", "undici"]); // listed once the require has returned
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(names(), ["http", "pg", "undici"]);
+  agent.abandon();
 });

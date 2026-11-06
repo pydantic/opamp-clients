@@ -48,12 +48,14 @@ async function body(req: IncomingMessage): Promise<Uint8Array> {
 }
 
 /** An OpAMP server that answers every poll: how many it had, whether one said goodbye, and the
- * available components each sent (`askComponents`: asked for in full in the first answer). */
+ * available components each sent (`askComponents`: asked for in full whenever a hash comes that it
+ * hasn't had in full, as a server that doesn't know them asks). */
 async function server(askComponents = false) {
   const seen = {
     polls: 0, goodbye: false, authorization: [] as (string | undefined)[], components: [] as (AvailableComponents | undefined)[],
     capabilities: [] as bigint[],
   };
+  const known = new Set<string>();
   const s = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     seen.polls++;
@@ -61,7 +63,11 @@ async function server(askComponents = false) {
     seen.components.push(msg.availableComponents);
     seen.capabilities.push(msg.capabilities);
     if (msg.agentDisconnect) seen.goodbye = true;
-    const flags = askComponents && seen.polls === 1 ? BigInt(ServerToAgentFlags.ServerToAgentFlags_ReportAvailableComponents) : 0n;
+    const c = msg.availableComponents;
+    const hash = c ? Buffer.from(c.hash).toString("hex") : "";
+    if (c && Object.keys(c.components).length > 0) known.add(hash);
+    const ask = askComponents && c !== undefined && c.hash.length > 0 && !known.has(hash);
+    const flags = ask ? BigInt(ServerToAgentFlags.ServerToAgentFlags_ReportAvailableComponents) : 0n;
     res.setHeader("Content-Type", "application/x-protobuf");
     res.end(toBinary(ServerToAgentSchema, create(ServerToAgentSchema, { instanceUid: msg.instanceUid, flags })));
   });
@@ -143,24 +149,31 @@ test("SIGTERM with the application's own listener: the application decides", asy
 test("the inventory reaches the server: its hash at once, in full when asked, then left out while unchanged", async () => {
   const s = await server(true);
   try {
-    const r = await run("setTimeout(() => {}, 1500);", s.endpoint, undefined, undefined, {
+    // The program loads http (express isn't installed here): http applies, express doesn't.
+    const r = await run("import 'node:http'; setTimeout(() => {}, 1500);", s.endpoint, undefined, undefined, {
       OTEL_NODE_ENABLED_INSTRUMENTATIONS: "http,express",
       OTEL_TRACES_EXPORTER: "zipkin", // NodeSDK builds it; the gate goes in front of it at start
     });
     assert.deepEqual([r.code, r.signal], [0, null], r.out);
-    const [first, full] = s.seen.components;
-    assert.ok(first && full, r.out);
+    const sent = s.seen.components;
+    const first = sent[0];
+    assert.ok(first, r.out);
     assert.ok(first.hash.length > 0, "the hash, computed by the client"); // the core's, of what was set
     assert.deepEqual(first.components, {});
-    assert.deepEqual(full.hash, first.hash);
+    // In full when asked, for the hash just sent; again once an instrumentation applies (a new hash).
+    const last = sent.findLastIndex((a) => a !== undefined && Object.keys(a.components).length > 0);
+    assert.ok(last > 0, r.out);
+    const full = sent[last]!;
+    assert.deepEqual(full.hash, sent[last - 1]!.hash);
     const c = full.components;
     assert.deepEqual(Object.keys(c).sort(), ["exporters", "instrumentations", "sdk", "settings"]);
     const meta = Object.fromEntries(c.sdk!.metadata.map((kv) => [kv.key, kv.value?.value.value]));
     assert.equal(meta["integration.name"], "@pydantic/opamp-otel");
     assert.equal(meta["telemetry.sdk.language"], "nodejs");
     assert.match(String(meta["telemetry.sdk.version"]), /^\d+\.\d+\.\d+/);
-    // The instrumentations the variables load, under the names deactivate_instrumentations takes.
-    assert.deepEqual(Object.keys(c.instrumentations!.subComponentMap).sort(), ["express", "http"]);
+    // Of the instrumentations the variables load, those that apply, under the names
+    // deactivate_instrumentations takes.
+    assert.deepEqual(Object.keys(c.instrumentations!.subComponentMap).sort(), ["http"]);
     for (const i of Object.values(c.instrumentations!.subComponentMap)) {
       assert.match(String(i.metadata.find((kv) => kv.key === "version")?.value?.value.value), /^\d+\.\d+\.\d+/);
     }
@@ -169,8 +182,8 @@ test("the inventory reaches the server: its hash at once, in full when asked, th
     assert.deepEqual(gated, { traces: { "zipkin@localhost:9411": true } }); // metrics and logs: none
     assert.ok(c.settings!.subComponentMap.send_traces);
     assert.ok(c.settings!.subComponentMap.send_logs);
-    // Sent in full once, as asked; unchanged after that, so left out. The capability on every message.
-    assert.ok(s.seen.components.length > 2 && s.seen.components.slice(2).every((a) => a === undefined), r.out);
+    // Unchanged after that, so left out. The capability on every message.
+    assert.ok(sent.length > last + 1 && sent.slice(last + 1).every((a) => a === undefined), r.out);
     const reports = BigInt(AgentCapabilities.AgentCapabilities_ReportsAvailableComponents);
     assert.ok(s.seen.capabilities.every((c) => (c & reports) === reports));
   } finally {
