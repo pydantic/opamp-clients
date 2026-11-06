@@ -272,6 +272,9 @@ internal sealed class SdkAgent
     // The exporters last listed, governed or not: one child each in export health.
     private List<Exporter> exporters = [];
 
+    // The instrumentations last listed: one that applies since (its library loaded) is listed again.
+    private List<Instrumentation> instrumentations = [];
+
     // The exporters as last found and decided (Exporters), and the layer's warnings said.
     private readonly object decisions = new();
     private List<FoundExporter> found = [];
@@ -439,6 +442,7 @@ internal sealed class SdkAgent
             this.inventory = inventory;
             var listed = inventory();
             this.exporters = [.. listed.Exporters];
+            this.instrumentations = [.. listed.Instrumentations];
             this.components = this.layer.Components(listed, this.host, now);
             described = this.host;
             describedAt = now;
@@ -659,8 +663,8 @@ internal sealed class SdkAgent
     }
 
     /// <summary>
-    /// The host and the exporters now, if started: when the exporters differ they are listed
-    /// again; when the host differs (it can only lose the sampler's settings), the settings in
+    /// The host and the exporters now, if started: when the exporters or the instrumentations
+    /// differ they are listed again; when the host differs (it can only lose the sampler's settings), the settings in
     /// force are what the layer decides under it (<paramref name="rehosted"/>). Whether either changed.
     /// </summary>
     private bool RelistLocked(ulong nowUnixMs, out bool rehosted)
@@ -673,7 +677,7 @@ internal sealed class SdkAgent
 
         var now = this.hostNow(true);
         var listed = listing();
-        var relisted = !listed.Exporters.SequenceEqual(this.exporters);
+        var relisted = !listed.Exporters.SequenceEqual(this.exporters) || !listed.Instrumentations.SequenceEqual(this.instrumentations);
         if (now.Equals(this.host) && !relisted)
         {
             return false;
@@ -694,6 +698,7 @@ internal sealed class SdkAgent
         }
 
         this.exporters = [.. listed.Exporters];
+        this.instrumentations = [.. listed.Instrumentations];
         this.unsent = this.components = this.layer.Components(listed, now, nowUnixMs);
         return true;
     }

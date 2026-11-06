@@ -91,7 +91,9 @@ public class LocalTests
     [Fact]
     public void EachInstrumentationIsListedWithItsScopeWhereItIsKnown()
     {
-        var scopes = Prepared([]).Inventory().Instrumentations.ToDictionary(i => i.Name, i => i.Scope);
+        var agent = Prepared([]);
+        agent.loadedAssemblies = InventoryTests.EveryLibrary;
+        var scopes = agent.Inventory().Instrumentations.ToDictionary(i => i.Name, i => i.Scope);
         Assert.Equal("System.Net.Http", scopes["httpclient"]);
         Assert.Equal("Microsoft.AspNetCore", scopes["aspnetcore"]);
         Assert.Equal("OpenTelemetry.Instrumentation.Runtime", scopes["netruntime"]); // metrics only: its meter

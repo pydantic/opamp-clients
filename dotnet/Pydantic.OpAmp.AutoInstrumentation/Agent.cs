@@ -232,9 +232,10 @@ internal sealed class Agent
     }
 
     /// <summary>
-    /// What it runs (docs/available-components.md): every instrumentation automatic instrumentation
-    /// has on .NET, switched off or not, under the name <c>deactivate_instrumentations</c> takes,
-    /// at automatic instrumentation's version (they ship together; none when it isn't loaded); and
+    /// What it runs (docs/available-components.md): each instrumentation automatic instrumentation
+    /// has on .NET whose library the application has loaded, switched off or not, under the name
+    /// <c>deactivate_instrumentations</c> takes, at automatic instrumentation's version (they ship
+    /// together; none when it isn't loaded); and
     /// each signal's exporters as <c>OTEL_*_EXPORTER</c> names them, the OTLP one gated where the
     /// plugin gates it, each sending where its variables say. Then what the built providers export through
     /// beside those (another plugin's processor, or the file's exporters under file-based
@@ -245,7 +246,10 @@ internal sealed class Agent
     internal Inventory Inventory(string? autoVersion = null)
     {
         autoVersion ??= AutoInstrumentationVersion();
-        var instrumentations = Env.Runnable.Select(name => Inventories.Scoped(name, autoVersion));
+        // Those whose library the application has loaded: one loaded later is listed then (the
+        // agent asks again before each decision and on its health timer).
+        var loaded = this.loadedAssemblies();
+        var instrumentations = Env.Runnable.Where(name => Env.Applies(name, loaded)).Select(name => Inventories.Scoped(name, autoVersion));
         var configured = new List<Exporters.Built>();
         foreach (var signal in Enum.GetValues<Signal>())
         {
@@ -298,6 +302,12 @@ internal sealed class Agent
         var exporters = this.agent.Exporters(configured.Distinct().Concat(beside.Distinct()), "http/protobuf");
         return Inventories.Of(typeof(Agent).Assembly, instrumentations, exporters);
     }
+
+    /// <summary>The names of the assemblies the application has loaded; a test's own in tests.</summary>
+    internal Func<IReadOnlySet<string>> loadedAssemblies = LoadedAssemblies;
+
+    private static IReadOnlySet<string> LoadedAssemblies() =>
+        AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name).OfType<string>().ToHashSet(StringComparer.Ordinal);
 
     /// <summary>Automatic instrumentation's version, from its assembly if the process has it loaded; else unknown (empty).</summary>
     private static string AutoInstrumentationVersion() =>

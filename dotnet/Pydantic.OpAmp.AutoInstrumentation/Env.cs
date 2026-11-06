@@ -38,6 +38,52 @@ internal static class Env
     };
 
     /// <summary>
+    /// The assemblies of the library each instrumentation instruments, by the name
+    /// <c>deactivate_instrumentations</c> takes: it applies once the application has loaded one of
+    /// them. None: the runtime's own (its metrics and the process's), which always apply.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, string[]> Libraries = new Dictionary<string, string[]>
+    {
+        ["adonet"] = ["System.Data.Common"],
+        ["aspnetcore"] = ["Microsoft.AspNetCore.Hosting", "Microsoft.AspNetCore.Http"],
+        ["azure"] = ["Azure.Core"],
+        ["elasticsearch"] = ["Elastic.Clients.Elasticsearch"],
+        ["elastictransport"] = ["Elastic.Transport"],
+        ["entityframeworkcore"] = ["Microsoft.EntityFrameworkCore"],
+        ["graphql"] = ["GraphQL"],
+        ["grpcnetclient"] = ["Grpc.Net.Client"],
+        ["httpclient"] = ["System.Net.Http"],
+        ["ilogger"] = ["Microsoft.Extensions.Logging"],
+        ["kafka"] = ["Confluent.Kafka"],
+        ["log4net"] = ["log4net"],
+        ["masstransit"] = ["MassTransit"],
+        ["mongodb"] = ["MongoDB.Driver", "MongoDB.Driver.Core"],
+        ["mysqlconnector"] = ["MySqlConnector"],
+        ["mysqldata"] = ["MySql.Data"],
+        ["netruntime"] = [],
+        ["nlog"] = ["NLog"],
+        ["npgsql"] = ["Npgsql"],
+        ["nservicebus"] = ["NServiceBus.Core"],
+        ["oraclemda"] = ["Oracle.ManagedDataAccess"],
+        ["process"] = [],
+        ["quartz"] = ["Quartz"],
+        ["rabbitmq"] = ["RabbitMQ.Client"],
+        ["sqlclient"] = ["Microsoft.Data.SqlClient", "System.Data.SqlClient"],
+        ["sqlite"] = ["Microsoft.Data.Sqlite", "System.Data.SQLite"],
+        ["stackexchangeredis"] = ["StackExchange.Redis"],
+        ["wcfclient"] = ["System.ServiceModel.Primitives", "System.ServiceModel.Http"],
+        ["wcfcore"] = ["CoreWCF.Primitives"],
+    };
+
+    /// <summary>
+    /// Whether the instrumentation <paramref name="name"/> applies, with these assemblies
+    /// <paramref name="loaded"/> (by name): its library is loaded. One the table hasn't is listed, as
+    /// it can't be told.
+    /// </summary>
+    public static bool Applies(string name, IReadOnlySet<string> loaded) =>
+        !Libraries.TryGetValue(name, out var assemblies) || assemblies.Length == 0 || assemblies.Any(loaded.Contains);
+
+    /// <summary>
     /// The instrumentations it can run, as <c>deactivate_instrumentations</c> names them: each
     /// one's name in its variable, lowercase, once for every signal it has. ASP.NET and WCF
     /// services are .NET Framework's alone, which the plugin doesn't run on.

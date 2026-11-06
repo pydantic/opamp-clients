@@ -20,6 +20,9 @@ public class InventoryTests
         return Agent.Prepare(n => env.GetValueOrDefault(n), (_, _) => { })!;
     }
 
+    /// <summary>Every library automatic instrumentation instruments, as if the application had loaded them all.</summary>
+    internal static IReadOnlySet<string> EveryLibrary() => Env.Libraries.Values.SelectMany(a => a).ToHashSet();
+
     /// <summary>Each signal's exporters, by name: whether gated.</summary>
     private static Dictionary<string, Dictionary<string, bool>> Exporters(Inventory inventory) =>
         inventory.Exporters.GroupBy(e => e.Signal).ToDictionary(g => g.Key, g => g.GroupBy(e => e.Name).ToDictionary(e => e.Key, e => e.All(x => x.Gated)));
@@ -28,6 +31,8 @@ public class InventoryTests
     public void ATypicalSetupListsItselfTheSdkEachInstrumentationAndEachExporter()
     {
         var agent = Prepared(new() { ["OTEL_METRICS_EXPORTER"] = "otlp,prometheus" });
+        // An ASP.NET Core application that logs and makes HTTP requests: no database client loaded.
+        agent.loadedAssemblies = () => new HashSet<string> { "Microsoft.AspNetCore.Hosting", "Microsoft.Extensions.Logging", "System.Net.Http" };
         var inventory = agent.Inventory("1.17.0");
         Assert.Equal("Pydantic.OpAmp.AutoInstrumentation", inventory.Integration);
         Assert.Equal("0.1.0", inventory.IntegrationVersion);
@@ -44,6 +49,8 @@ public class InventoryTests
         Assert.Contains("ilogger", names); // logs only
         Assert.DoesNotContain("aspnet", names); // .NET Framework's
         Assert.DoesNotContain("wcfservice", names);
+        Assert.DoesNotContain("npgsql", names); // its library isn't loaded
+        Assert.Equal(["aspnetcore", "httpclient", "ilogger", "netruntime", "process"], names);
         Assert.Equal(names.Distinct().Count(), names.Count); // httpclient is traces' and metrics': once
         Assert.All(inventory.Instrumentations, i => Assert.Equal("1.17.0", i.Version));
 
@@ -62,7 +69,9 @@ public class InventoryTests
     [Fact]
     public void EachInstrumentationIsListedByTheNameThatSwitchesItOff()
     {
-        var listed = Prepared([]).Inventory().Instrumentations.Select(i => i.Name).ToList();
+        var every = Prepared([]);
+        every.loadedAssemblies = EveryLibrary;
+        var listed = every.Inventory().Instrumentations.Select(i => i.Name).ToList();
         foreach (var name in listed)
         {
             var vars = Env.Switches(new Settings { DeactivateInstrumentations = new Names { Names_ = { name } } });
@@ -227,6 +236,47 @@ public class InventoryTests
         {
             agent.Stop(TimeSpan.FromSeconds(10));
         }
+    }
+
+    // A library the application loads once it runs: its instrumentation is listed then, and the
+    // inventory sent again (the agent asks again on its health timer and before each decision).
+    [Fact]
+    public async Task AnInstrumentationIsListedOnceItsLibraryIsLoaded()
+    {
+        await using var server = new Server();
+        var agent = Prepared(new() { ["OTEL_OPAMP_ENDPOINT"] = server.Endpoint, ["OTEL_OPAMP_HEARTBEAT_INTERVAL"] = "100ms" });
+        var loaded = new HashSet<string> { "System.Net.Http" };
+        agent.loadedAssemblies = () => loaded;
+        try
+        {
+            agent.Start([new("service.name", "inventory-test")]);
+            Assert.Equal(["httpclient", "netruntime", "process"],
+                agent.Sdk.Components!.Components["instrumentations"].SubComponentMap.Keys.Order(StringComparer.Ordinal));
+            await Until(() => server.Messages.Any(m => m.AvailableComponents is { Hash.IsEmpty: false }), "the components' hash");
+            var first = server.Messages.First(m => m.AvailableComponents is { Hash.IsEmpty: false }).AvailableComponents.Hash;
+            loaded = new HashSet<string> { "System.Net.Http", "Npgsql" };
+            agent.Sdk.Recheck();
+            Assert.Contains("npgsql", agent.Sdk.Components!.Components["instrumentations"].SubComponentMap.Keys);
+            await Until(() => server.Messages.Any(m => m.AvailableComponents is { Hash.IsEmpty: false } c && c.Hash != first), "the new hash");
+        }
+        finally
+        {
+            agent.Stop(TimeSpan.FromSeconds(10));
+        }
+    }
+
+    [Fact]
+    public void AnInstrumentationAppliesOnceOneOfItsLibrarysAssembliesIsLoaded()
+    {
+        var none = new HashSet<string>();
+        Assert.True(Env.Applies("netruntime", none)); // the runtime's own
+        Assert.True(Env.Applies("process", none));
+        Assert.False(Env.Applies("sqlclient", none));
+        Assert.True(Env.Applies("sqlclient", new HashSet<string> { "System.Data.SqlClient" }));
+        Assert.True(Env.Applies("sqlclient", new HashSet<string> { "Microsoft.Data.SqlClient" }));
+        Assert.True(Env.Applies("unknowninstrumentation", none)); // one the table hasn't: listed
+        // Every instrumentation it can run has its library named.
+        Assert.All(Env.Runnable, name => Assert.True(Env.Libraries.ContainsKey(name), name));
     }
 
     private static async Task Until(Func<bool> done, string what)
