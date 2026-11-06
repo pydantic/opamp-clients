@@ -30,7 +30,7 @@ function Report {
         ''
         '## Ours, msiexec, PowerShell, the runner'
         ($procs | Where-Object { $_.Name -match 'opamp|otelcol|msiexec|install\.test|powershell|pwsh|Runner|bash|conhost' } |
-            Sort-Object ProcessId | ForEach-Object { "$($_.ProcessId) <- $($_.ParentProcessId) $($_.Name) $([int]($_.WorkingSetSize / 1MB)) MB: $($_.CommandLine)" })
+            Sort-Object ProcessId | ForEach-Object { "$($_.ProcessId) <- $($_.ParentProcessId) $($_.Name) $([int]($_.WorkingSetSize / 1MB)) MB, CPU $([int](($_.KernelModeTime + $_.UserModeTime) / 1e7)) s: $($_.CommandLine)" })
         ''
         '## Most memory'
         ($procs | Sort-Object WorkingSetSize -Descending | Select-Object -First 10 |
@@ -38,6 +38,10 @@ function Report {
         ''
         '## Services'
         (Get-Service pydantic-opamp-supervisor, msiserver -ErrorAction SilentlyContinue | ForEach-Object { "$($_.Name) $($_.Status)" })
+        ''
+        '## The Supervisor, last 15 events'
+        (Get-WinEvent -FilterHashtable @{LogName = 'Application'; ProviderName = 'pydantic-opamp-supervisor'} -MaxEvents 15 -ErrorAction SilentlyContinue |
+            Sort-Object TimeCreated | ForEach-Object { "$($_.TimeCreated.ToUniversalTime().ToString('HH:mm:ss')) $($_.Message)" })
         ''
         '## The test, last 80 lines'
         (Get-Content -Tail 80 -LiteralPath $Log -ErrorAction SilentlyContinue)
