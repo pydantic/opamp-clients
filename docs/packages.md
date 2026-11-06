@@ -89,7 +89,6 @@ reporting each package's status, resuming after a crash); the application instal
 | Client | Turn on | Install | Remove |
 |---|---|---|---|
 | Go | `Config.StateFile`, `Config.AcceptPackages` | kind `InstallPackage`: `PackageName`, `Package`, `Path`; answer `PackageInstalled` (an error wrapped by `FailedForNow` or `FailedLeavingUnknown` says how it failed) | kind `RemovePackage`; answer `PackageRemoved` (the same) |
-| Node.js | `stateFile`, `acceptPackages` | `installPackage`: `name`, `package`, `path`; answer `packageInstalled` | `removePackage`; answer `packageRemoved` |
 | Java | `stateFile`, `acceptPackages` | `Notification.InstallPackage`: `name`, `pkg`, `path`; answer `packageInstalled` | `Notification.RemovePackage`; answer `packageRemoved` |
 | .NET | `StateFile`, `AcceptPackages` | `OpAmpNotification.InstallPackage`: `Name`, `Package`, `Path`; answer `PackageInstalled` | `OpAmpNotification.RemovePackage`; answer `PackageRemoved` |
 

@@ -1,11 +1,9 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// A disk that fails (fast-check): a client in either mode saves remote configs (and downloads a
-// package) while one operation of one of its saves fails (EIO), writes half and then fails
-// (ENOSPC), is slow (0.5 to 2 s), or lands and then reports failure (a rename, a directory sync);
-// or its downloads' directory can't be made, or a discard can't delete its file. Whatever the
-// fault:
+// A disk that fails (fast-check): a client in either mode saves remote configs while one
+// operation of one of its saves fails (EIO), writes half and then fails (ENOSPC), is slow (0.5 to
+// 2 s), or lands and then reports failure (a rename, a directory sync). Whatever the fault:
 // - the client survives: it never stops on its own, and keeps heartbeating while a save is slow;
 // - every save gets exactly one answer, stored or store_failed (the tap says);
 // - stop returns within its bound (the stop timeout plus the save in progress);
@@ -27,19 +25,20 @@ import { fromBinary } from "@bufbuild/protobuf";
 import fc from "fast-check";
 
 import { TEST_CORE_TAP } from "../src/core.js";
-import { downloadsDir } from "../src/executor.js";
 import { settled, TEST_FILE_OPS } from "../src/files.js";
 import { ConfigSchema } from "../src/gen/opamp/core/v1/core_pb.js";
 import { AgentCapabilities, Client, type Config, type Notification } from "../src/index.js";
 import { checkTap, type Fault, faulty, type OpName, opampServer, readTap, sleep, storeAnswers, stores, until } from "./disk.js";
 
-/** Where the fault goes: the `nth` time a save does `op`, or every time a download's directory is
- * made or a discard deletes a file. */
-type Where = { on: "save"; op: OpName; nth: number; fault: Fault } | { on: "mkdir" } | { on: "discard" };
+/** Where the fault goes: the `nth` time a save does `op`. */
+interface Where {
+  op: OpName;
+  nth: number;
+  fault: Fault;
+}
 
 interface Case {
   mode: "platform" | "core";
-  pkg: boolean;
   where: Where;
 }
 
@@ -53,19 +52,14 @@ const faultFor = (op: OpName): fc.Arbitrary<Fault> =>
     fc.constant<Fault>(op === "rename" || op === "syncDir" ? { kind: "lands" } : { kind: "error" }),
   );
 
-const where: fc.Arbitrary<Where> = fc.oneof(
-  { weight: 6, arbitrary: fc
-    .tuple(fc.constantFrom(...SAVE_OPS), fc.integer({ min: 1, max: 3 }))
-    .chain(([op, nth]) => faultFor(op).map((fault): Where => ({ on: "save", op, nth, fault }))) },
-  { weight: 1, arbitrary: fc.constant<Where>({ on: "mkdir" }) },
-  { weight: 1, arbitrary: fc.constant<Where>({ on: "discard" }) },
-);
+const where: fc.Arbitrary<Where> = fc
+  .tuple(fc.constantFrom(...SAVE_OPS), fc.integer({ min: 1, max: 3 }))
+  .chain(([op, nth]) => faultFor(op).map((fault): Where => ({ op, nth, fault })));
 
 const cases: fc.Arbitrary<Case> = fc.record({
   mode: fc.constantFrom<"platform" | "core">("platform", "core"),
-  pkg: fc.boolean(),
   where,
-}).map((c) => (c.where.on === "save" ? c : { ...c, pkg: true }));
+});
 
 const hex = (b: Uint8Array | undefined) => (b === undefined ? "none" : Buffer.from(b).toString("hex"));
 /** stop's bound: the stop timeout (5 s), the slowest save (2 s), and a margin. */
@@ -80,43 +74,38 @@ async function run(c: Case, log: (m: string) => void): Promise<void> {
   const seen = new Map<OpName, number>();
   const disk = faulty((op, path) => {
     const w = c.where;
-    if (w.on === "mkdir") return op === "mkdir" && path === downloadsDir(state) ? { kind: "error", code: "EACCES" } : undefined;
-    if (w.on === "discard") return op === "remove" && path.startsWith(downloadsDir(state)) ? { kind: "error" } : undefined;
     const ofSave = op === "syncDir" || path === tmp;
     if (!ofSave || op !== w.op) return undefined;
     const n = (seen.get(op) ?? 0) + 1;
     seen.set(op, n);
     return n === w.nth ? w.fault : undefined;
   });
-  const server = await opampServer({ configs: 3, every: 5, ...(c.pkg ? { pkg: Buffer.from("the package ".repeat(1000)) } : {}) });
+  const server = await opampServer({ configs: 3, every: 5 });
   const errors: unknown[] = [];
   const base = {
     stateFile: state,
     capabilities: BigInt(AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig),
     heartbeatIntervalMs: 50,
     requestTimeoutMs: 3000,
-    acceptPackages: c.pkg,
     mode: c.mode,
     proxy: false,
   };
   let a: Client | undefined;
   const notify = (n: Notification) => {
     if (n.kind === "stopped" && n.error !== undefined) errors.push(n.error);
-    if (n.kind === "installPackage") a?.packageInstalled(n.packageName, n.package.hash);
   };
   a = Client.start({ ...base, endpoint: server.url, [TEST_FILE_OPS]: disk.ops, [TEST_CORE_TAP]: tapA } as Config, {}, notify);
   try {
-    // The configs are in (the last at the 15th message), every save asked for is answered, and the
-    // package is done with. (A save fault may not strike: the core asks for fewer saves when one is
-    // slow, taking in what comes meanwhile at once.)
+    // The configs are in (the last at the 15th message) and every save asked for is answered. (A
+    // save fault may not strike: the core asks for fewer saves when one is slow, taking in what
+    // comes meanwhile at once.)
     const progress = () => {
       const recs = readTap(tapA);
-      const done = !c.pkg || c.where.on === "mkdir" || disk.calls.some((k) => k.op === "remove" && k.path.startsWith(downloadsDir(state)));
-      return { msgs: server.msgs.length, asked: stores(recs).length, answered: storeAnswers(recs).length, done };
+      return { msgs: server.msgs.length, asked: stores(recs).length, answered: storeAnswers(recs).length };
     };
     const ready = () => {
       const p = progress();
-      return p.msgs >= 20 && p.asked >= 2 && p.answered >= p.asked && p.done;
+      return p.msgs >= 20 && p.asked >= 2 && p.answered >= p.asked;
     };
     await until("the saves answered", ready, 15_000).catch((e: Error) => {
       throw new Error(`${e.message}: ${JSON.stringify(progress())}`);
@@ -157,7 +146,7 @@ async function run(c: Case, log: (m: string) => void): Promise<void> {
   // A crashed save's temporary file, left behind: the next save makes its own.
   writeFileSync(tmp, "LEFT BY A CRASH", { mode: 0o644 });
   const next = await opampServer({ configs: 1, first: 50 });
-  const b = Client.start({ ...base, acceptPackages: false, endpoint: next.url, [TEST_CORE_TAP]: tapB } as Config, {});
+  const b = Client.start({ ...base, endpoint: next.url, [TEST_CORE_TAP]: tapB } as Config, {});
   try {
     await until("the next client's save", () => storeAnswers(readTap(tapB)).length > 0, 15_000);
   } finally {

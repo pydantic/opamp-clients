@@ -139,7 +139,7 @@ named.
 | Language | Platform mode, by name | An HTTP client of the application's | Refused at start |
 |---|---|---|---|
 | Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
-| Node.js | `mode: "platform"` | takes none | `spliceDownloads: false` in platform mode |
+| Node.js | `mode: "platform"` | takes none | nothing |
 | Python | `Config(mode="platform")` | takes none | nothing |
 | Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
 | .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |

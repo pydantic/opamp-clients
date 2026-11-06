@@ -44,7 +44,6 @@ connection, with their own types and data.
 | Client | Declare | Send | Hear |
 |---|---|---|---|
 | Go | `Status.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | kinds `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
-| Node.js | `status.customCapabilities`, `setCustomCapabilities` | `sendCustomMessage` | `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` |
 | Java | `OpampClient.Status` (the sixth component), `setCustomCapabilities` | `sendCustomMessage` | `Notification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 | .NET | `OpAmpStatus.CustomCapabilities`, `SetCustomCapabilities` | `SendCustomMessage` | `OpAmpNotification.CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` |
 

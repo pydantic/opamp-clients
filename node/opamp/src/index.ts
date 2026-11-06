@@ -19,8 +19,7 @@ import { create } from "@bufbuild/protobuf";
 
 import { Core, TEST_CORE_MODULE, TEST_CORE_TAP } from "./core.js";
 import { busyOn, type FileOps, journal, REAL, settled, TEST_FILE_OPS } from "./files.js";
-import { CustomMessageSchema, PackageAvailableSchema } from "./gen/opamp/v1/opamp_pb.js";
-import { Executor, TEST_PLATFORM, type TestPlatform, downloadPath, downloadsDir } from "./executor.js";
+import { Executor, TEST_PLATFORM, type TestPlatform } from "./executor.js";
 import { Streams } from "./streams.js";
 import { Transport, type ProxyOptions, type TlsOptions } from "./transport.js";
 import {
@@ -35,15 +34,11 @@ import type {
   AgentDescription,
   AgentRemoteConfig,
   AvailableComponents,
-  CustomCapabilities,
-  CustomMessage,
   ComponentHealth,
   ConnectionSettingsOffers,
   ConnectionSettingsStatus,
   EffectiveConfig,
-  PackageAvailable,
   RemoteConfigStatus,
-  ServerToAgentCommand,
 } from "./gen/opamp/v1/opamp_pb.js";
 
 export * from "./gen/opamp/v1/opamp_pb.js";
@@ -118,10 +113,6 @@ export interface Config {
   acceptConnectionSettings?: boolean;
   /** How long offered settings have to prove themselves; default 60 s. */
   verifyTimeoutMs?: number;
-  /** Take packages from the server (docs/packages.md): the client downloads them to
-   * `${stateFile}.downloads` and the application installs them (installPackage, removePackage).
-   * Only with a stateFile: a restart would forget what the agent has. */
-  acceptPackages?: boolean;
   /** Ask the server to assign the instance UID (the RequestInstanceUid flag,
    * docs/instance-uid.md). The UID the client starts with (made up, or instanceUid) is the
    * temporary value until the server assigns one. With a stateFile the assigned UID is kept, and
@@ -129,16 +120,12 @@ export interface Config {
    * UID each time: the agent is a new agent after every restart.
    * covers: OPAMP-UID-04 */
   requestInstanceUid?: boolean;
-  /** The largest package file downloaded; default 1 GiB. */
-  maxPackageBytes?: number;
-  /** How long a download may take; default 10 minutes. */
-  downloadTimeoutMs?: number;
-  /** TLS for https:// and wss:// endpoints and package downloads, in both modes: the CAs to
+  /** TLS for https:// and wss:// endpoints, in both modes: the CAs to
    * trust, a client certificate to present, the versions to use. Default: Node's CAs, no client
    * certificate, TLS 1.2 or later.
    * covers: RULE-TLS-01, RULE-TLS-02 */
   tls?: TlsOptions;
-  /** A proxy for every connection to the server and every download (HTTP, HTTPS or SOCKS5).
+  /** A proxy for every connection to the server (HTTP, HTTPS or SOCKS5).
    * `false`: none. Omitted (or without `url`): the proxies in the environment (HTTP_PROXY,
    * HTTPS_PROXY, ALL_PROXY, NO_PROXY), by the rule every SDK's core mode shares, never under CGI
    * (REQUEST_METHOD set: httpoxy). In platform mode: Node's default instead, the environment's
@@ -152,10 +139,6 @@ export interface Config {
    * picks the proxy. "node": undici's fetch and the ws package, for an application that needs
    * Node's own stack (its convention for the environment's proxies, say). */
   mode?: "core" | "platform";
-  /** Core mode: package files go from the socket to the file without passing through the core
-   * (where the response says how long the body is). Default true. It is core mode's: `false`
-   * in platform mode throws. */
-  spliceDownloads?: boolean;
 }
 
 /** Whether `config` runs in core mode: yes, unless it asks for platform mode by name. What the mode
@@ -164,11 +147,6 @@ function runsInCoreMode(config: Config): boolean {
   const mode: unknown = config.mode;
   if (mode !== undefined && mode !== "core" && mode !== "platform") {
     throw new TypeError(`mode is "core" or "platform", not ${JSON.stringify(mode)}`);
-  }
-  if (mode === "platform" && config.spliceDownloads === false) {
-    throw new TypeError(
-      'spliceDownloads in platform mode: it is core mode\'s (undici writes package files itself); leave it out, or leave mode out (or "core")',
-    );
   }
   return mode !== "platform";
 }
@@ -182,9 +160,6 @@ export interface Status {
   /** The components the agent has (leave `hash` empty: the core computes it). The server gets the
    * hash, and the components in full when it asks. */
   availableComponents?: AvailableComponents;
-  /** The custom capabilities the agent supports: custom messages for them reach the application,
-   * and it may send them. */
-  customCapabilities?: CustomCapabilities;
 }
 
 /** A status field. */
@@ -206,18 +181,6 @@ export type Notification =
   | { kind: "remoteConfig"; remoteConfig: AgentRemoteConfig }
   /** Own telemetry and other connection settings, all of them; answer with setConnectionSettingsStatus. */
   | { kind: "connectionSettings"; connectionSettings: ConnectionSettingsOffers }
-  /** A custom message from the server, for a custom capability the agent declared. */
-  | { kind: "customMessage"; customMessage: CustomMessage }
-  /** The custom capabilities the server supports changed. */
-  | { kind: "serverCustomCapabilities"; customCapabilities: string[] }
-  /** A custom message the application sent won't be, and why. */
-  | { kind: "customMessageNotSent"; customMessage: CustomMessage; detail: string }
-  /** Install a package from the file at `path` (checking its signature is the application's job);
-   * answer with packageInstalled. The client deletes the file after the answer. */
-  | { kind: "installPackage"; packageName: string; package: PackageAvailable; path: string }
-  /** Remove a package no longer offered; answer with packageRemoved. */
-  | { kind: "removePackage"; packageName: string }
-  | { kind: "command"; command: ServerToAgentCommand }
   | { kind: "instanceUidChanged"; instanceUid: Uint8Array }
   | { kind: "heartbeatInterval"; heartbeatIntervalMs: number }
   | { kind: "statusTooLarge"; field: StatusField; bytes: number }
@@ -228,7 +191,7 @@ export type Notification =
   | { kind: "saveStalled"; stalled: boolean; waitedMs: number }
   /** The saved state is a newer core's, in a format (`version`) this one can't read: the client
    * starts from its configuration, as on first use, and saves nothing (no offered connection
-   * settings, no packages), leaving that state as it is. Worth a warning: an older release was
+   * settings), leaving that state as it is. Worth a warning: an older release was
    * started on a newer one's state file. */
   | { kind: "stateFromNewerVersion"; version: number }
   /** The client has stopped: after stop(), or on its own because of `error` (which stop() throws too). */
@@ -245,7 +208,7 @@ const FIELDS: Record<CoreStatusField, StatusField> = {
   [CoreStatusField.PACKAGE_STATUSES]: "packageStatuses",
 };
 
-function fromCore(n: CoreNotification, stateFile: string | undefined): Notification | undefined {
+function fromCore(n: CoreNotification): Notification | undefined {
   const k = n.kind;
   switch (k.case) {
     case "connected":
@@ -258,27 +221,6 @@ function fromCore(n: CoreNotification, stateFile: string | undefined): Notificat
       return { kind: "remoteConfig", remoteConfig: k.value };
     case "connectionSettings":
       return { kind: "connectionSettings", connectionSettings: k.value };
-    case "customMessage":
-      return { kind: "customMessage", customMessage: k.value };
-    case "serverCustomCapabilities":
-      return { kind: "serverCustomCapabilities", customCapabilities: k.value.capabilities };
-    case "customMessageNotSent":
-      return {
-        kind: "customMessageNotSent",
-        customMessage: k.value.message ?? create(CustomMessageSchema),
-        detail: k.value.reason,
-      };
-    case "installPackage":
-      return {
-        kind: "installPackage",
-        packageName: k.value.name,
-        package: k.value.package ?? create(PackageAvailableSchema),
-        path: downloadPath(stateFile ?? "", k.value.download),
-      };
-    case "removePackage":
-      return { kind: "removePackage", packageName: k.value.name };
-    case "command":
-      return { kind: "command", command: k.value };
     case "instanceUidChanged":
       return { kind: "instanceUidChanged", instanceUid: k.value };
     case "heartbeatIntervalMs":
@@ -302,15 +244,8 @@ const EMPTY = create(EmptySchema);
 
 /** The longest delay a Node timer takes (setTimeout takes a longer one as 1 ms). */
 const MAX_DELAY_MS = 2 ** 31 - 1;
-/** Once the core has stopped, at least this for what it gave up on to unwind (a download's file
- * deleted once the write in flight is over), however much of the stop timeout the core took: stop
- * returns within the stop timeout and this. 250 ms was too little on a loaded machine: a core that
- * took all of its stop timeout and then stopped with a file being written left the file to be
- * deleted after stop had returned (measured: up to 1.1 s on one CPU shared with 28 processes). */
-const STOP_GRACE_MS = 1000;
-
-/** Effects that open something new: a connection, a download, a stream. */
-const STARTS = new Set(["wsOpen", "download", "streamOpen"]);
+/** Effects that open something new: a connection, a stream. */
+const STARTS = new Set(["wsOpen", "streamOpen"]);
 
 /** Milliseconds or bytes for the core. A negative one reaches it as its two's complement, which the
  * core refuses at start, naming the field and the number meant. */
@@ -322,7 +257,7 @@ export class Client {
    * file was still under way: then once that is over). */
   #core: Core | undefined;
   #x: Executor | undefined;
-  /** Core mode's sockets and files; undefined otherwise. */
+  /** Core mode's sockets; undefined otherwise. */
   #streams: Streams | undefined;
   readonly #notify: (n: Notification) => void;
   readonly #stateFile: string | undefined;
@@ -337,15 +272,8 @@ export class Client {
   #done: Promise<void>;
   #finish!: (err?: unknown) => void;
   #finished = false;
-  /** When stop() was first called (the client's clock). */
-  #stopAt: number | undefined;
   /** What keeps Node.js running from stop() until the client has stopped. */
   #stopHold: NodeJS.Timeout | undefined;
-  /** How long all of stop may take: the core's stop_timeout_ms, as given or by default (its
-   * start reports it), from stop(). Once the core has stopped, what is left of it bounds the wait
-   * for what it started to unwind (RULE-SHELL-07); a file write that hangs is let go rather than
-   * holding stop up. 0 until the core has started. */
-  #stopMs = 0;
   #saidStopped = false;
 
   /** Start a client. `notify` is called for every notification, never before `start` returns (a
@@ -372,7 +300,7 @@ export class Client {
     this.#done.catch(() => {});
     if (config.stateFile !== undefined && busyOn(config.stateFile)) {
       // A client before this one on the state file left work under way there (a save still
-      // writing, a cancelled download deleting its file): this one starts once it is over, from
+      // writing): this one starts once it is over, from
       // what it left. What the application asks meanwhile waits for it.
       const file = config.stateFile;
       void settled(file).then(() => {
@@ -396,9 +324,6 @@ export class Client {
     if (status.availableComponents) {
       this.#feed(input({ case: "setAvailableComponents", value: status.availableComponents }));
     }
-    if (status.customCapabilities) {
-      this.#feed(input({ case: "setCustomCapabilities", value: status.customCapabilities }));
-    }
     this.#feed(input({ case: "start", value: EMPTY }));
     // Deliver what came while starting once the caller has the client.
     queueMicrotask(() => {
@@ -413,7 +338,7 @@ export class Client {
     });
   }
 
-  /** Read the state file, start the core, and clear the downloads of before. */
+  /** Read the state file and start the core. */
   #boot(config: Config, transport: Transport): void {
     const coreMode = runsInCoreMode(config);
     const tests = config as {
@@ -425,7 +350,7 @@ export class Client {
     const core = new Core(
       // The core takes the transport from the endpoint, makes the instance UID if none is given
       // (from the entropy and the wall clock), keeps every effect's time (this client carries out
-      // its cancels) and decides what a download's response means. It makes the backoff's jitter
+      // its cancels). It makes the backoff's jitter
       // seed from the entropy too (seed left 0: two clients started in the same tick don't retry
       // in step).
       create(ConfigSchema, {
@@ -443,21 +368,16 @@ export class Client {
         savedState: config.stateFile === undefined ? undefined : readState(config.stateFile),
         acceptConnectionSettings: config.acceptConnectionSettings ?? false,
         verifyTimeoutMs: ms(config.verifyTimeoutMs),
-        acceptPackages: config.acceptPackages ?? false,
         requestInstanceUid: config.requestInstanceUid ?? false,
-        maxPackageBytes: ms(config.maxPackageBytes),
-        downloadTimeoutMs: ms(config.downloadTimeoutMs),
         streams: coreMode,
         entropy: new Uint8Array(randomBytes(32)),
         unixMs: BigInt(Date.now()),
-        spliceDownloads: coreMode && (config.spliceDownloads ?? true),
         proxy: coreMode ? transport.coreProxyChoice() : undefined,
       }),
       tests[TEST_CORE_MODULE],
       tests[TEST_CORE_TAP],
     );
     this.#core = core;
-    this.#stopMs = Number(core.limits?.stopTimeoutMs ?? 0n);
     let ops = tests[TEST_FILE_OPS] ?? REAL;
     if (config.stateFile !== undefined) {
       if (core.tapped) {
@@ -465,13 +385,11 @@ export class Client {
         core.file({ op: "state", path: basename(resolve(config.stateFile)) });
         ops = journal(ops, config.stateFile, (r) => core.file(r));
       }
-      // Files downloaded before a restart: the core downloads again what it still needs.
-      ops.clear(downloadsDir(config.stateFile));
     }
     const platform = tests[TEST_PLATFORM];
     this.#x = new Executor((input) => this.#feed(input), config.stateFile, transport, ops, platform?.executor);
     this.#streams = coreMode
-      ? new Streams((input) => this.#feed(input), transport, config.stateFile, ops, platform?.streams)
+      ? new Streams((input) => this.#feed(input), transport, platform?.streams)
       : undefined;
   }
 
@@ -490,18 +408,6 @@ export class Client {
     this.#feed(input({ case: "setEffectiveConfig", value }));
   }
 
-  /** Change the custom capabilities the agent supports. */
-  setCustomCapabilities(value: CustomCapabilities): void {
-    this.#feed(input({ case: "setCustomCapabilities", value }));
-  }
-
-  /** Send a custom message, for one of the agent's custom capabilities. It goes with the next
-   * message the server takes, and again if that message is lost; if it can't be sent at all, a
-   * customMessageNotSent notification says why. */
-  sendCustomMessage(value: CustomMessage): void {
-    this.#feed(input({ case: "sendCustomMessage", value }));
-  }
-
   /** Change the components the agent has (leave `hash` empty: the core computes it). */
   setAvailableComponents(value: AvailableComponents): void {
     this.#feed(input({ case: "setAvailableComponents", value }));
@@ -515,18 +421,6 @@ export class Client {
   /** Report on telemetry settings (the answer to a connectionSettings notification). */
   setConnectionSettingsStatus(value: ConnectionSettingsStatus): void {
     this.#feed(input({ case: "setConnectionSettingsStatus", value }));
-  }
-
-  /** Answer an installPackage notification: the package at `hash` is installed, or (`error`) why
-   * it isn't. */
-  packageInstalled(name: string, hash: Uint8Array, error?: string): void {
-    this.#feed(input({ case: "packageInstalled", value: { name, hash, ok: error === undefined, detail: error ?? "" } } as never));
-  }
-
-  /** Answer a removePackage notification: the package is removed, or (`error`) why it isn't. One
-   * that isn't is reported failed, and not removed again until it is offered and dropped again. */
-  packageRemoved(name: string, error?: string): void {
-    this.#feed(input({ case: "packageRemoved", value: { name, failed: error !== undefined, detail: error ?? "" } } as never));
   }
 
   /** The instance UID in use: the one given, the one the core made, or one the server assigned
@@ -551,7 +445,6 @@ export class Client {
    * running, so a program that ends by awaiting stop() says its goodbye first. (The client's own
    * timers and connections never do.) */
   stop(): Promise<void> {
-    this.#stopAt ??= this.#now();
     if (this.#stopHold === undefined && !this.#finished) {
       const hold = setInterval(() => {}, MAX_DELAY_MS);
       this.#stopHold = hold;
@@ -597,14 +490,14 @@ export class Client {
           // A newer module than this client: fail loudly rather than skip what the core asked for.
           if (e.kind.case === undefined) throw new Error("the core asked for an effect this client doesn't know: the client is older than its core");
           if (e.kind.case === "notify") {
-            const n = fromCore(e.kind.value, this.#stateFile);
+            const n = fromCore(e.kind.value);
             if (n?.kind === "stopped") stopped = n;
             else if (n) this.#tell(n);
           } else if (out.stopped && STARTS.has(e.kind.case)) {
             // An output that says stopped starts nothing new (RULE-SHELL-07): what it would start
             // could only be given up on.
           } else if (!this.#streams?.do(e) || e.kind.case === "cancel") {
-            // (A cancel names a download, Streams', or a save, the Executor's.)
+            // (A cancel names a request, a connection or a save: the Executor's.)
             x.do(e);
           }
         }
@@ -674,17 +567,10 @@ export class Client {
     clearTimeout(this.#timer);
     const x = this.#x;
     const core = this.#core;
-    // All of stop takes one stop timeout from stop() (RULE-SHELL-07).
-    const begun = this.#stopAt ?? this.#now();
-    // One deadline for all of it: the grace is given once, not to each part.
-    const releasedBy = Math.max(begun + this.#stopMs, this.#now() + STOP_GRACE_MS);
-    const left = () => Math.max(0, releasedBy - this.#now());
     void (async () => {
-      // Whatever is still under way (the client stopped on its own) is given up on; downloads
-      // given up on have deleted what they wrote, or the bound has passed.
-      await x?.shutdown(left());
-      // Core mode: files still being written are deleted once their write in flight is over.
-      await this.#streams?.shutdown(left());
+      // Whatever is still under way (the client stopped on its own) is given up on.
+      await x?.shutdown();
+      this.#streams?.shutdown();
       this.#finish(err);
       // A save still writing ends whole (stop doesn't wait for it, a client started next on the
       // state file does): the tap records it, then closes.

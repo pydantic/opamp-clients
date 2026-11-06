@@ -60,7 +60,7 @@ run = ["{bin}/driver-go-core"]
 # in platform mode (fetch and ws; the driver asks for it by name, OPAMP_NODE_MODE=platform: the
 # SDK's default is core mode).
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "node/opamp", cmd = ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"] }
 run = ["env", "OPAMP_NODE_MODE=platform", "node", "{conf}/drivers/node/driver.mjs"]
@@ -68,10 +68,10 @@ run = ["env", "OPAMP_NODE_MODE=platform", "node", "{conf}/drivers/node/driver.mj
 [node-core]
 # Ours: node/opamp in core mode (the SDK's default; the driver asks for it by name): the core
 # speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
-# over Node's TCP and TLS sockets (the core's shell), and decides download redirects: it keeps
+# over Node's TCP and TLS sockets (the core's shell): it keeps
 # every time, and closes every stream by stop's end.
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "node/opamp", cmd = ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"] }
 run = ["node", "{conf}/drivers/node/driver.mjs"]

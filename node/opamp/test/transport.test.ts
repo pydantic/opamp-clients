@@ -593,8 +593,7 @@ test("core mode: the client certificate only on a stream to the server's origin"
   });
   const port = await listen(server);
   const got: Input[] = [];
-  const state = join(mkdtempSync(join(tmpdir(), "opamp-tls-")), "state");
-  const s = new Streams((i) => got.push(i), new Transport({ tls: { ca: CA, ...CLIENT }, proxy: false }), state);
+  const s = new Streams((i) => got.push(i), new Transport({ tls: { ca: CA, ...CLIENT }, proxy: false }));
   const kind = (id: bigint) => got.find((i) => (i.kind.value as { id?: bigint }).id === id)?.kind.case;
   try {
     for (const [id, serverOrigin] of [
@@ -613,7 +612,7 @@ test("core mode: the client certificate only on a stream to the server's origin"
       got.length = 0;
     }
   } finally {
-    await s.shutdown();
+    s.shutdown();
     server.close();
   }
 });
@@ -701,9 +700,6 @@ test("with no mode named the client runs in core mode; \"platform\" is platform 
   const start = (config: Partial<Config>) =>
     void Client.start({ endpoint: "http://localhost:1/v1/opamp", instanceUid: UID, proxy: false, ...config }, {}).stop();
   assert.throws(() => start({ mode: "python" as never }), /mode is "core" or "platform", not "python"/);
-  assert.throws(() => start({ mode: "platform", spliceDownloads: false }), /spliceDownloads in platform mode/);
-  assert.doesNotThrow(() => start({ mode: "platform", spliceDownloads: true }));
-  assert.doesNotThrow(() => start({ spliceDownloads: false }));
 });
 
 // covers: RULE-PROXY-01
