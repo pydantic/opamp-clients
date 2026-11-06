@@ -43,6 +43,9 @@ The truth-* checks run check_truth (examples/integrations.py) with main.go in a 
 of its own as the global one, exporting to a second sink. Nothing is set aside: the agent reports
 that signal's ungoverned app_provider, its settings stay in force, and every other setting must
 change the telemetry at the first sink.
+
+check_upgrade (examples/integrations.py) runs main.go built on the last release (previous/go.mod,
+opampotel from the module proxy; examples/previous-release.json), then on this checkout.
 """
 from __future__ import annotations
 
@@ -52,7 +55,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, check_rotation, check_outage, key_in_code,  # noqa: E402
+from integrations import (MARGIN, DRIFT, SIGNALS, check, check_app_settings, check_setup, check_rotation, check_outage,  # noqa: E402
+                          check_slots, check_upgrade, key_in_code,
                           check_signals, check_truth, ended, main, offer, pings, run, signal, spans, statuses, stop_group, target, opamp_url)
 import json  # noqa: E402
 import shutil  # noqa: E402
@@ -62,9 +66,20 @@ from datetime import datetime, timedelta, timezone  # noqa: E402
 HERE = Path(__file__).resolve().parent
 TARGET = target("go-otel")
 APP = TARGET / "app"
+#: check_upgrade's build of the same program on the last release (previous/go.mod).
+PREVIOUS_APP = TARGET / "app-previous"
 
 
-def launcher(in_code: bool, target_: Path):
+def build() -> None:
+    subprocess.run(["go", "build", "-o", str(APP), "."], cwd=HERE, check=True)
+    src = TARGET / "previous"
+    src.mkdir(exist_ok=True)
+    for f in ["previous/go.mod", "previous/go.sum", "main.go", "setups.go"]:
+        shutil.copy(HERE / f, src)
+    subprocess.run(["go", "build", "-mod=readonly", "-o", str(PREVIOUS_APP), "."], cwd=src, check=True)
+
+
+def launcher(in_code: bool, target_: Path, app_: Path = APP):
     def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
         endpoint = opamp_url(port)
         telemetry = f"http://127.0.0.1:{telemetry_port}"
@@ -84,7 +99,7 @@ def launcher(in_code: bool, target_: Path):
                        OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
                        OTEL_OPAMP_STATE_DIR=str(state),
                        OTEL_OPAMP_HEARTBEAT_INTERVAL="1s")
-        app = subprocess.Popen([str(APP), *args, f"{telemetry}/ping"], env=env | extra, start_new_session=True,
+        app = subprocess.Popen([str(app_), *args, f"{telemetry}/ping"], env=env | extra, start_new_session=True,
                                stdout=subprocess.DEVNULL, stderr=open(target_ / f"{name}.stderr", "w"))
 
         return lambda: stop_group(app)
@@ -247,6 +262,8 @@ CHECKS = {
     "setup": lambda: check_setup(FROM_ENV, TARGET),
     "rotation": lambda: check_rotation(FROM_ENV, TARGET),
     "outage": lambda: check_outage(FROM_ENV, TARGET),
+    "upgrade": lambda: check_upgrade(launcher(False, TARGET, PREVIOUS_APP), FROM_ENV, TARGET),
+    "slots": lambda: check_slots(FROM_ENV, TARGET),
     "settings": lambda: check_settings(FROM_ENV, TARGET),
     "app": lambda: check_app_settings(FROM_ENV, TARGET),
     "truth-global-tracer": lambda: check_truth(FROM_ENV, TARGET, "global-tracer", set(), switch_at_once=True,
@@ -263,4 +280,4 @@ CHECKS = {
 }
 
 if __name__ == "__main__":
-    sys.exit(main(CHECKS, lambda: subprocess.run(["go", "build", "-o", str(APP), "."], cwd=HERE, check=True)))
+    sys.exit(main(CHECKS, build))

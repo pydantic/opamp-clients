@@ -2404,6 +2404,10 @@ export function logfireFleet(options: Options = {}, env: NodeJS.ProcessEnv = pro
       AGENT.instrument([]);
       AGENT.start(resource);
     },
-    shutdown: () => AGENT.stop(),
+    shutdown: () => {
+      // A configure({ fleet }) after this starts the client again.
+      logfireStarted = false;
+      return AGENT.stop();
+    },
   };
 }

@@ -273,7 +273,7 @@ func (st *Status) Print(w io.Writer, now time.Time) {
 	}
 	switch rc := st.RemoteConfig; {
 	case rc == nil:
-		line("Remote config", "none received")
+		line("Remote config", "none received yet")
 	case rc.Error != "":
 		line("Remote config", "%s since %s (hash %s): %s", rc.Status, ago(rc.Since), short(rc.Hash), rc.Error)
 	default:

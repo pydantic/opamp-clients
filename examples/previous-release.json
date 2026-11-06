@@ -1,0 +1,7 @@
+{
+  "python": "logfire-fleet-otel==0.2.0",
+  "node": "@pydantic/logfire-fleet-otel@0.2.0",
+  "java": "dev.pydantic:logfire-fleet-javaagent-extension:0.2.0",
+  "dotnet": "Logfire.Fleet.AutoInstrumentation 0.2.0",
+  "go": "github.com/pydantic/opamp-clients/go/opampotel v0.2.0"
+}

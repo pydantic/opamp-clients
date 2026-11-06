@@ -46,3 +46,8 @@ packages = ["src/logfire_fleet_otel"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.uv]
+# A build of this directory is cached until one of these changes (uv's default is pyproject.toml
+# alone): without the sources, a uv run --with of the directory keeps an older build.
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }]

@@ -115,6 +115,13 @@ none. The next start, with the same state directory and nothing at the endpoint:
 starts, makes its requests, and its spans have no URL from the first (the policy it saved), until
 server C comes up there and hears it with the same UID and that policy in force.
 
+check_upgrade starts the application on the integration's last release (PREVIOUS: the packages
+as published), then on this checkout, with the same state directory: what the release saved must
+carry over. The release, against server A, applies a policy dropping the URL; once spans arrive
+without one, it stops. This checkout then starts with nothing at the endpoint: its spans have no
+URL from the first (the policy the release saved), until server C comes up there and hears it with
+the release's UID and the drop in force (judge_offline_start).
+
 check_truth runs one more, under a setup (EXAMPLE_SETUP) that adds telemetry paths of its own:
 the server offers TRUTH's documents, one setting each beside sampling_rate 1, and each is either
 carried out (the sink shows it) or named as set aside in the effective config, never APPLIED and
@@ -1046,8 +1053,9 @@ def judge_own_key(again: list[dict]) -> list[tuple[str, bool]]:
 
 def check(launch: Launch, instrumentation: str, target_: Path, service: str = "checkout",
           listen: str = "127.0.0.1:0", seconds: tuple[float, float] = (150, 30), switch_at_once: bool = False,
-          switches: bool = True, versioned: bool = True) -> bool:
-    """Both runs, and every check printed; True when all pass. `target_`: the runner's own
+          switches: bool = True, versioned: bool = True, env: dict[str, str] | None = None) -> bool:
+    """Both runs, and every check printed; True when all pass. `env`: the application's own
+    variables, in both runs. `target_`: the runner's own
     directory (target()). `seconds`: the most each run waits for what it needs to see.
     switch_at_once: the integration switches instrumentations off while the application runs,
     not at the next start. switches=False: it can't switch them off at all (the application
@@ -1069,7 +1077,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
     try:
         # Until the fifth offer is answered, then long enough to see what the last one did.
         one = run(launch, scenario(instrumentation), state, "run1", seconds[0], listen, target_,
-                  until=lambda events: len(statuses(events)) >= 5, settle=10)
+                  until=lambda events: len(statuses(events)) >= 5, settle=10, env=env)
         print(f"run 1: remote config statuses {[s for _, s, _ in statuses(one)]}")
         expect(judge_first(one, service, switch_at_once, switches))
         expect(judge_transport(one))
@@ -1078,7 +1086,7 @@ def check(launch: Launch, instrumentation: str, target_: Path, service: str = "c
         # Until the application has made its requests with the agent connected, then long enough
         # for any span of theirs to have been exported.
         two = run(launch, {"server": {}}, state, "run2", seconds[1], listen, target_,
-                  until=connected, settle=2 * MARGIN)
+                  until=connected, settle=2 * MARGIN, env=env)
         print(f"run 2: {sum(e['event'] == 'a2s' for e in two)} messages, {len(pings(two))} application requests, "
               f"{len(spans(two))} span exports")
         expect(judge_second(one, two, switches))
@@ -1635,10 +1643,11 @@ def judge_outage(sink: list[dict], a: list[dict], b: list[dict], down: float, up
 
 def judge_offline_start(sink: list[dict], c: list[dict], started: float, up: float,
                         uid: str | None) -> list[tuple[str, bool]]:
-    """check_outage's next start, `started` with no server at the OpAMP endpoint, until server C
-    comes up there at `up`: the application runs on the policy it saved (the drop) from its first
-    span, with no word from a server; server C then hears it with the same UID and the drop in
-    force. Every time is the wall clock's (on_wall)."""
+    """A start (check_outage's next start, check_upgrade's on this checkout), `started` with no
+    server at the OpAMP endpoint, until server C comes up there at `up`: the application runs on
+    the policy it saved (the drop) from its first span, with no word from a server; server C then
+    hears it with the same UID (`uid`, the run before's) and the drop in force. Every time is the
+    wall clock's (on_wall)."""
     made = pings(sink, started, up)
     names = ending(sink, started, up)
     named = [n for n in names if "://" in n or n == "[REDACTED]"]
@@ -1739,6 +1748,201 @@ def check_outage(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", sec
             expect(judge_transport(c))
     finally:
         shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+#: The integrations' last release, as published, for check_upgrade: the next start after it is this
+#: checkout's. Moved on at each release, once its packages are on the registries.
+PREVIOUS = json.loads((Path(__file__).resolve().parent / "previous-release.json").read_text())
+
+
+def check_upgrade(previous: Launch, launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 120,
+                  env: dict[str, str] | None = None, name: str = "upgrade") -> bool:
+    """The application on the last release (`previous`), then on this checkout (`launch`), with
+    one state directory; every check printed, True when all pass. The release, against server A,
+    applies the drop (OUTAGE_DROP); this checkout then starts with no server at the endpoint until
+    it has made its requests, then server C, which offers nothing (judge_offline_start). The
+    telemetry goes to a sink of its own throughout. `name` names its logs and state."""
+    target_.mkdir(parents=True, exist_ok=True)
+    state = Path(tempfile.mkdtemp(prefix=f"state-{name}-", dir=target_))
+    state.chmod(0o777)
+    env = env or {}
+    host = listen.rsplit(":", 1)[0]
+    at = f"{host}:{free_port(host)}"
+    port = at.rsplit(":", 1)[1]
+    ok = True
+
+    def expect(results: list[tuple[str, bool]]) -> None:
+        nonlocal ok
+        for what, cond in results:
+            ok &= cond
+            print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+
+    origin = time.time()
+
+    def wall(log: Path) -> list[dict]:
+        return on_wall(read_log(log), origin)
+
+    try:
+        with serving({"server": {}}, f"{name}-sink", listen, target_) as (_, telemetry, sink_log):
+            stop = once(previous(port, telemetry, state, f"{name}-release", env))
+            try:
+                with serving({"server": {"faults": [offer(1, OUTAGE_DROP)]}}, f"{name}-a", at, target_) as (_, _, a_log):
+                    def dropped() -> bool:
+                        st = [t for t, s, _ in statuses(wall(a_log)) if s == "APPLIED"]
+                        return bool(st) and len(ending(wall(sink_log), st[0] + DRIFT, 1e9)) > REQUESTS
+                    wait_for(dropped, seconds, MARGIN)
+                    stop()
+                    time.sleep(0.5)
+            finally:
+                stop()
+            a = wall(a_log)
+            st = statuses(a)
+            applied = next((t for t, s, _ in st if s == "APPLIED"), None)
+            after = ending(wall(sink_log), applied + DRIFT, 1e9) if applied is not None else []
+            named = [n for n in after if "://" in n]
+            uid = next((e["uid"] for e in a if e["event"] == "a2s"), None)
+            print(f"the release: server A statuses {[s for _, s, _ in st]}, {len(after)} spans after it")
+            expect([
+                (f"the release: the drop APPLIED ({[s for _, s, _ in st]})", applied is not None),
+                (f"and carried out: spans without a URL ({len(after)}, {named[:2]})", len(after) > REQUESTS and not named),
+            ])
+            expect(judge_transport(a))
+
+            started = time.time() - origin
+            stop = once(launch(port, telemetry, state, name, env))
+            try:
+                wait_for(lambda: len(pings(wall(sink_log), started)) > 3 * REQUESTS
+                         and len(ending(wall(sink_log), started, 1e9)) > REQUESTS, seconds, 2)
+                up = time.time() - origin
+                with serving({"server": {}}, f"{name}-c", at, target_) as (_, _, c_log):
+                    wait_for(lambda: bool(effective_configs(wall(c_log))), seconds, MARGIN)
+                    stop()
+                    time.sleep(0.5)
+            finally:
+                stop()
+            c = wall(c_log)
+            print(f"this checkout: {len(pings(wall(sink_log), started, up))} requests before a server came up, "
+                  f"server C {sum(e['event'] == 'a2s' for e in c)} messages")
+            expect(judge_offline_start(wall(sink_log), c, started, up, uid))
+            expect(judge_transport(c))
+    finally:
+        shutil.rmtree(state, ignore_errors=True)
+    return ok
+
+
+def uids_heard(events: list[dict], after: float = -1) -> list[str]:
+    """The UIDs of the agents heard after `after`, in the order first heard."""
+    return list(dict.fromkeys(e["uid"] for e in events if e["event"] == "a2s" and e["t"] > after))
+
+
+def files_under(base: Path) -> list[str]:
+    """Every file under `base`, as a path relative to it with / between its parts."""
+    return sorted(p.relative_to(base).as_posix() for p in base.rglob("*") if p.is_file())
+
+
+def files_in_container(image: str) -> Callable[[Path], list[str]]:
+    """files_under(), read in a container of `image` as root, with `base` mounted: what an
+    application in a container made there is readable by its user alone."""
+    def files(base: Path) -> list[str]:
+        out = subprocess.run(["docker", "run", "--rm", "-v", f"{base}:/base:ro", image, "find", "/base", "-type", "f"],
+                             capture_output=True, text=True, check=True).stdout
+        return sorted(line.removeprefix("/base/") for line in out.splitlines() if line.startswith("/base/"))
+    return files
+
+
+def judge_slots(events: list[dict], files: list[str], starts: list[float], heard: list[str | None]) -> list[tuple[str, bool]]:
+    """check_slots' four starts (`starts`, on the wall clock (on_wall)): the UID each was heard with
+    first (`heard`), and the files under the default state directory's base (XDG_STATE_HOME) at
+    the end (files_under())."""
+    u1, u2, u3, u4 = heard
+    parts = [f.split("/") for f in files if f.startswith("opamp/")]
+    service = sorted({p[1] for p in parts if len(p) > 2})
+    slots = sorted({p[2] for p in parts if len(p) > 3}) if len(service) == 1 else []
+    kept = all(any(p[2] == slot and p[3] != "lock" for p in parts if len(p) == 4) for slot in slots)
+    # The drop, as each restart's effective config: the state its slot kept, not a fresh start. (The
+    # server's answers carry no UID: the offers looked for are those until the next start, when the
+    # agent that runs on has long had the drop.)
+    ends = [*starts[3:], 1e9]
+    restarted = [(reported([e for e in events if t < e["t"] < end and e.get("uid") == u], OUTAGE_DROP),
+                  any(e["event"] == "s2a" and e.get("offer_config") and t < e["t"] < end for e in events))
+                 for t, end, u in zip(starts[2:], ends, heard[2:])]
+    return [
+        (f"two processes at once, each its own instance: two UIDs ({u1}, {u2})", None not in (u1, u2) and u1 != u2),
+        (f"in the user's state directory: opamp/ holds one directory for the service ({service})",
+         len(service) == 1 and re.fullmatch(r"checkout-[0-9a-f]{8}", service[0]) is not None),
+        (f"with a slot for each process, each holding its state ({slots})", slots == ["1", "2"] and kept),
+        (f"the second restarted while the first runs takes its slot back: the same UID ({u3})", u3 == u2),
+        (f"with both gone, the next start takes the first slot: the first's UID ({u4})", u4 == u1),
+        ("each restart starts on the policy its slot kept (the drop, as its effective config, with no offer)",
+         all(kept and not offered for kept, offered in restarted)),
+    ]
+
+
+def check_slots(launch: Launch, target_: Path, listen: str = "127.0.0.1:0", seconds: float = 90,
+                env: dict[str, str] | None = None, name: str = "slots",
+                list_files: Callable[[Path], list[str]] = files_under) -> bool:
+    """The default state directory (docs/default-state-dir.md), with several processes of one
+    program; every check printed, True when all pass. No state directory is named
+    (OTEL_OPAMP_STATE_DIR set but empty, which is unset) and the user's state directory is one of
+    the check's own (XDG_STATE_HOME). The server offers the drop (OUTAGE_DROP) to each new agent.
+    Two processes start, one after the other; the second stops and starts again while the first
+    runs; then both stop, and one starts (judge_slots). `launch` is given that directory as the
+    state directory too, for a container to mount: the variables naming it are rewritten there.
+    `list_files` lists what is under it at the end: files_under(), or for an application in a
+    container, which makes them as another user, readable by it alone, a listing from in one."""
+    target_.mkdir(parents=True, exist_ok=True)
+    base = Path(tempfile.mkdtemp(prefix=f"xdg-{name}-", dir=target_))
+    base.chmod(0o777)
+    env = (env or {}) | {"XDG_STATE_HOME": str(base), "OTEL_OPAMP_STATE_DIR": ""}
+    origin = time.time()
+    ok = True
+    try:
+        with serving({"server": {"faults": [offer(1, OUTAGE_DROP)]}}, name, listen, target_) as (port, telemetry, log):
+            def events() -> list[dict]:
+                return on_wall(read_log(log), origin)
+
+            starts: list[float] = []
+            heard: list[str | None] = []
+
+            def start(n: int, running: tuple[str | None, ...] = ()) -> Callable[[], None]:
+                """Start `n`, while the agents with the UIDs `running` go on: the UID it is heard
+                with is the first other one that messages after it starts."""
+                t = time.time() - origin
+                stop = once(launch(port, telemetry, base, f"{name}-{n}", env))
+                starts.append(t)
+
+                def new() -> list[str]:
+                    return [u for u in uids_heard(events(), t) if u not in running]
+                wait_for(lambda: bool(new()), seconds, 0)
+                heard.append(next(iter(new()), None))
+                applied = lambda: any(e["event"] == "a2s" and e.get("uid") == heard[-1] and e["t"] > t
+                                      and (e.get("remote_config_status") or {}).get("status", "").endswith("APPLIED")
+                                      for e in events())
+                wait_for(lambda: applied() or reported([e for e in events() if e.get("uid") == heard[-1]], OUTAGE_DROP),
+                         seconds, MARGIN)
+                return stop
+
+            first = start(1)
+            try:
+                second = start(2, (heard[0],))
+                try:
+                    second()
+                    time.sleep(1)
+                    third = start(3, (heard[0],))
+                    third()
+                finally:
+                    second()
+            finally:
+                first()
+            time.sleep(1)
+            start(4)()
+            print(f"UIDs heard at each start {heard}")
+            for what, cond in [*judge_slots(events(), list_files(base), starts, heard), *judge_transport(events())]:
+                ok &= cond
+                print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+    finally:
+        shutil.rmtree(base, ignore_errors=True)
     return ok
 
 

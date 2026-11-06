@@ -67,4 +67,6 @@ at INFO.
 ## How it is checked
 
 Each integration's unit tests: the same UID after a restart, another slot (and UID) for a second
-process at once, another UID for another service, and each case above that turns it off.
+process at once, another UID for another service, and each case above that turns it off. End to end,
+each integration's `slots` check ([examples/README.md](../examples/README.md)) runs two processes of
+its example application on it, restarts each, and holds the slots and UIDs to these rules.

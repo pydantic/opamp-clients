@@ -339,10 +339,10 @@ if (-not $edited) {
     Write-Atomically (Join-Path $root 'supervisor.yaml.sha256') (Get-Sha256 $configPath)
     Write-Atomically (Join-Path $root 'enroll.options') ($options | ConvertTo-Json)
 }
-$done = if ($Refresh) { 'refreshed' } else { 'enrolled' }
+$done = if ($Refresh) { 'Refreshed' } else { 'Enrolled' }
 
 if ($NoStart) {
-    Write-Output "$done with $Endpoint; start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
+    Write-Output "$done with $Endpoint. Start the Supervisor with: Set-Service $service -StartupType Automatic; Start-Service $service"
 } else {
     $started = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
     Restart-Supervisor
@@ -355,5 +355,5 @@ if ($NoStart) {
         Write-Error "enrolled, but the Supervisor can't connect to $Endpoint yet; it keeps retrying. Fix what is above, then check with: & '$supervisor' status --storage '$storage'"
         exit 1
     }
-    Write-Output "$done with $Endpoint; the Supervisor is running and connected ($service)"
+    Write-Output "$done with $Endpoint. The Supervisor is running and connected ($service)."
 }

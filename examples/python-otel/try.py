@@ -33,7 +33,11 @@ and off (docs/app-settings.md).
 check_outage (examples/integrations.py) runs for app.py, and twice for logfire_app.py, the same
 requests from an application on the Logfire SDK, its spans sent where the Logfire SDK sends them
 (LOGFIRE_TOKEN, and its base URL the sink): set up with configure_logfire() (outage-logfire), and
-with logfire.configure() left as it is and manage() called after it (outage-manage).
+with logfire.configure() left as it is and manage() called after it (outage-manage). check_upgrade
+runs for app.py and logfire_app.py: first on the last release (examples/previous-release.json, from
+PyPI), then on this checkout. check_slots runs app.py on the default state directory, two
+processes at once. check_workers runs workers.py, a parent that forks two workers as gunicorn
+does: the policy the parent is given after the fork reaches them.
 """
 from __future__ import annotations
 
@@ -42,13 +46,15 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from integrations import (DRIFT, MARGIN, ROOT, check, check_app_settings, check_setup, check_rotation, check_outage,  # noqa: E402
-                          key_in_code, offer,
+from integrations import (DRIFT, MARGIN, PREVIOUS, ROOT, check, check_app_settings, check_setup, check_rotation,  # noqa: E402
+                          check_outage, check_slots, check_upgrade,
+                          key_in_code, offer, OUTAGE_DROP, judge_transport, read_log, serving, wait_for,
                           check_signals, check_truth, main, pings, run, signal as exports, spans, statuses, stop_group, target, opamp_url)
 
 HERE = Path(__file__).resolve().parent
@@ -56,24 +62,31 @@ EDOT = "--edot" in sys.argv
 #: Elastic's distribution, with --edot.
 EDOT_VERSION = "1.18.0"
 TARGET = target("python-otel-edot" if EDOT else "python-otel")
+#: The instrumentations and Elastic's distribution, beside the package.
+WITH = [  # aiohttp-client too: the OpAMP client is aiohttp, and its own requests must not be traced.
+    "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client",
+    *(["--with", f"elastic-opentelemetry=={EDOT_VERSION}"] if EDOT else [])]
 UV = ["uv", "run", "--quiet", "--no-project", "--python", "3.13",
       "--with", str(ROOT / "python"), "--with", str(ROOT / "python/otel"),
-      # aiohttp-client too: the OpAMP client is aiohttp, and its own requests must not be traced.
-      "--with", "opentelemetry-instrumentation-urllib", "--with", "opentelemetry-instrumentation-aiohttp-client",
       # logfire_app.py's: the Logfire SDK, at the versions configure_logfire is checked with.
-      "--with", f"{ROOT / 'python/otel'}[logfire]",
-      *(["--with", f"elastic-opentelemetry=={EDOT_VERSION}"] if EDOT else [])]
+      "--with", f"{ROOT / 'python/otel'}[logfire]", *WITH]
+#: The last release's (check_upgrade), as published: its package and the client it requires.
+PREVIOUS_UV = ["uv", "run", "--quiet", "--no-project", "--python", "3.13", "--with",
+               PREVIOUS["python"].replace("==", "[logfire]=="), *WITH]
 #: With --edot: this package's distro and configurator, EDOT's sampler and resource detectors.
 EDOT_ENV = {"OTEL_PYTHON_DISTRO": "opamp", "OTEL_PYTHON_CONFIGURATOR": "opamp",
             "OTEL_TRACES_SAMPLER": "experimental_composite_parentbased_traceidratio",
             "OTEL_EXPERIMENTAL_RESOURCE_DETECTORS": "process_runtime,os,telemetry_distro,otel"} if EDOT else {}
 APPS = {"app.py": ["opentelemetry-instrument", "python", str(HERE / "app.py")],
         "in_code.py": ["python", str(HERE / "in_code.py")],
-        "logfire_app.py": ["python", str(HERE / "logfire_app.py")]}
+        "logfire_app.py": ["python", str(HERE / "logfire_app.py")],
+        "workers.py": ["opentelemetry-instrument", "python", str(HERE / "workers.py")]}
 APP = "app.py"
+#: The directory of the check running (of()).
+DIRECTORY = TARGET / "app-py"
 
 
-def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str]):
+def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[str, str], uv: list[str] = UV):
     telemetry = f"http://127.0.0.1:{telemetry_port}"
     env = {k: v for k, v in os.environ.items() if not k.startswith("OTEL_OPAMP_")}
     env.update(OTEL_EXPORTER_OTLP_ENDPOINT=telemetry,
@@ -89,7 +102,7 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                    OTEL_OPAMP_STATE_DIR=str(state),
                    OTEL_OPAMP_HEARTBEAT_INTERVAL="1s",
                    LOGFIRE_TOKEN="pylf_v1_us_test", LOGFIRE_BASE_URL=telemetry, LOGFIRE_SEND_TO_LOGFIRE="true")
-    elif APP == "app.py":
+    elif APP in ("app.py", "workers.py"):
         env.update(OTEL_SERVICE_NAME="checkout",
                    OTEL_OPAMP_ENDPOINT=opamp_url(port),
                    OTEL_OPAMP_HEADERS="Authorization=Bearer%20example",
@@ -100,8 +113,8 @@ def launch(port: str, telemetry_port: str, state: Path, name: str, extra: dict[s
                    CHECKOUT_OPAMP_KEY="example",
                    CHECKOUT_STATE_DIR=str(state),
                    CHECKOUT_OPAMP_HEARTBEAT="1s")
-    stderr = open(TARGET / APP.replace(".", "-") / f"{name}.stderr", "w")
-    app = subprocess.Popen([*UV, *APPS[APP], f"{telemetry}/ping"], env=env | extra, start_new_session=True,
+    stderr = open(DIRECTORY / f"{name}.stderr", "w")
+    app = subprocess.Popen([*uv, *APPS[APP], f"{telemetry}/ping"], env=env | extra, start_new_session=True,
                            stdout=subprocess.DEVNULL, stderr=stderr)
 
     return lambda: stop_group(app, signal.SIGINT)  # as Ctrl-C would: atexit runs
@@ -212,18 +225,66 @@ def check_next(launch, target_: Path, seconds: float = 200) -> bool:
     return ok
 
 
+#: check_workers' offer: at the parent's sixth message, seconds after it forked its workers.
+WORKERS_OFFER = 6
+
+
+def check_workers(launch, target_: Path, seconds: float = 90) -> bool:
+    """workers.py: a parent forks two workers once the SDK is built, and only they make requests.
+    The server offers the drop (OUTAGE_DROP) at the parent's sixth message, after the fork: the
+    workers carry it out, through the parent, within a second of its APPLIED."""
+    with serving({"server": {"faults": [offer(WORKERS_OFFER, OUTAGE_DROP)]}}, "workers", "127.0.0.1:0", target_) as (
+            port, telemetry, log):
+        state = Path(tempfile.mkdtemp(prefix="state-workers-", dir=target_))
+        stop = launch(port, telemetry, state, "workers", {})
+        try:
+            def done() -> bool:
+                st = [t for t, s, _ in statuses(read_log(log)) if s == "APPLIED"]
+                return bool(st) and len(ending(read_log(log), st[0] + WORKERS_SETTLE, 1e9)) > 10
+            wait_for(done, seconds, MARGIN)
+        finally:
+            stop()
+        events = read_log(log)
+    st = statuses(events)
+    applied = next((t for t, s, _ in st if s == "APPLIED"), None)
+    uids = {e["uid"] for e in events if e["event"] == "a2s"}
+    offered = min((e["t"] for e in events if e["event"] == "s2a" and e.get("offer_config")), default=0)
+    # Arrived before the offer: redaction is at export, so a span that ended just before it may not show its URL.
+    before = [n for e in spans(events) if e["t"] < offered for n in e.get("spans") or []]
+    after = ending(events, applied + WORKERS_SETTLE, 1e9) if applied is not None else []
+    named = [n for n in after if "://" in n]
+    results = [
+        (f"the server hears one instance, the parent ({len(uids)} UIDs)", len(uids) == 1),
+        (f"the workers' requests traced before the policy, with their URL ({len(before)} spans)",
+         len(before) > 5 and all("://" in n for n in before)),
+        (f"the drop APPLIED ({[s for _, s, _ in st]})", applied is not None),
+        (f"and carried out in the workers within {WORKERS_SETTLE:.0f} s: spans without a URL ({len(after)}, {named[:2]})",
+         len(after) > 10 and not named),
+        *judge_transport(events),
+    ]
+    for what, cond in results:
+        print(f"  {'ok  ' if cond else 'FAIL'} {what}")
+    return all(cond for _, cond in results)
+
+
+#: How long a forked worker takes to follow its parent's settings: it reads them within a second,
+#: and a span ending then was started before.
+WORKERS_SETTLE = DRIFT + 1.5
+
+
 #: What the processors the application adds once the SDK is built (setups.py) export through past
 #: the gates: the span exporter its own kind of processor holds, reported ungoverned. The batch
 #: processors beside it are gated, so nothing is set aside.
 LATE_PROCESSOR = frozenset({"traces"})
 
 
-def of(app: str, run_check: Callable[[Path], bool]) -> Callable[[], bool]:
-    """A check of `app` (APPS), in a directory of its own: run_check(directory)."""
+def of(app: str, run_check: Callable[[Path], bool], setup: str = "") -> Callable[[], bool]:
+    """A check of `app` (APPS), in a directory of its own (and of `setup`'s, when it names one, for
+    checks whose runs' files are named alike): run_check(directory)."""
     def run_() -> bool:
-        global APP
+        global APP, DIRECTORY
         APP = app
-        directory = TARGET / app.replace(".", "-")
+        directory = DIRECTORY = TARGET / (app.replace(".", "-") + (f"-{setup}" if setup else ""))
         directory.mkdir(exist_ok=True)
         return run_check(directory)
     return run_
@@ -242,10 +303,18 @@ CHECKS = {
     "outage": of("app.py", lambda d: check_outage(launch, d)),
     "outage-logfire": of("logfire_app.py", lambda d: check_outage(launch, d, name="outage-logfire")),
     "outage-manage": of("logfire_app.py", lambda d: check_outage(launch, d, env={"EXAMPLE_SETUP": "manage"}, name="outage-manage")),
+    "upgrade": of("app.py", lambda d: check_upgrade(lambda *a: launch(*a, uv=PREVIOUS_UV), launch, d)),
+    "upgrade-logfire": of("logfire_app.py", lambda d: check_upgrade(lambda *a: launch(*a, uv=PREVIOUS_UV), launch, d,
+                                                                    name="upgrade-logfire")),
+    "slots": of("app.py", lambda d: check_slots(launch, d)),
+    "workers": of("workers.py", lambda d: check_workers(launch, d)),
     "next": of("app.py", lambda d: check_next(launch, d)),
     "app": of("app.py", lambda d: check_app_settings(launch, d)),
     "truth-late-processor": of("app.py", lambda d: check_truth(launch, d, "late-processor", set(),
                                                                          ungoverned=LATE_PROCESSOR)),
+    "first-logfire": of("logfire_app.py", lambda d: check(launch, "urllib", d, switches=False)),
+    "setup-logfire": of("logfire_app.py", lambda d: check_setup(launch, d)),
+    "rotation-logfire": of("logfire_app.py", lambda d: check_rotation(launch, d)),
     "first-in-code": of("in_code.py", lambda d: check(launch, "urllib", d, switches=False)),
     "setup-in-code": of("in_code.py", lambda d: check_setup(
         launch, d, env={"OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED": "false"},
@@ -254,5 +323,6 @@ CHECKS = {
 
 if __name__ == "__main__":
     # Resolve the environment once, so the runs don't spend their time installing.
-    sys.exit(main(CHECKS, lambda: subprocess.run([*UV, "python", "-c", "import logfire_fleet_otel"], check=True),
+    sys.exit(main(CHECKS, lambda: [subprocess.run([*uv, "python", "-c", "import logfire_fleet_otel"], check=True)
+                                   for uv in (UV, PREVIOUS_UV)],
                  options=("--edot",)))

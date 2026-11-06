@@ -105,6 +105,9 @@ and date. Tests, CI and docs alone don't need a line.
   archives and the container image) is upstream's OpenTelemetry Collector Contrib (`otelcol-contrib`
   v0.164.0) as released, pinned by SHA-256, in place of our own build of about 20 components. A
   config the server sends can use any contrib component. The packages are about 100 MB larger.
+- Supervisor: `pydantic-opamp-enroll` ends with a full sentence (`Enrolled with ... The Supervisor is
+  running and connected (...)`), and `status` says `Remote config  none received yet`, so a host that
+  just connected and is about to get its config doesn't read as broken (#113).
 - Python, Node.js, .NET: the first connection's line (`OpAMP: connected to ...; this SDK is managed
   as ..., instance ...`) shows with the default log settings, so a working SDK doesn't look like one
   that isn't loaded. Python writes it to stderr unless the application has logging handlers of its
@@ -113,6 +116,8 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
+  client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
   as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
   replacing, and could have killed the new Collector. It now signals the process it was stopping
