@@ -1,23 +1,77 @@
 {
   "source": "pydantic/opamp-clients",
-  "version": "0.16.0",
-  "commit": "771f684beae646314daaad6a7666b253c4fd03ca",
+  "version": "0.17.0-dev.1",
+  "commit": "c1c0e53b0586489ea4496aadfa337307d898c2cd",
   "files": {
+    "native-linux-arm64-libopamp_native.so": {
+      "sha256": "4e96a2da5e5720a69b4372014c08771f022babe27f36233e42cbac5415a58fa9",
+      "kind": "native",
+      "target": "linux-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-arm64-libopamp_native.so": {
+      "sha256": "e7f39641e3836a3c80e1c1084b43dcad1b1bb3a26cb3477f8acd105fd8ea1c53",
+      "kind": "native",
+      "target": "linux-musl-arm64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-musl-x64-libopamp_native.so": {
+      "sha256": "2f3322f2f20b1247e0c7168323dabebd29ea594c8b5ffdc2dd585ef3e8ea8a80",
+      "kind": "native",
+      "target": "linux-musl-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-linux-x64-libopamp_native.so": {
+      "sha256": "bed70e9b3d2a1f5f26b09fd2a0b029dc7e35d6b293b06c3db4c921736956bbc5",
+      "kind": "native",
+      "target": "linux-x64",
+      "lib": "libopamp_native.so"
+    },
+    "native-osx-arm64-libopamp_native.dylib": {
+      "sha256": "c4b5b3476918b2e5e81ad142ea7f0135aff12a6e98214f19f94db601dc34528d",
+      "kind": "native",
+      "target": "osx-arm64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-osx-x64-libopamp_native.dylib": {
+      "sha256": "77f2d0185b54f29882bc3c4f64f18345ccad7e8b4a85f9f13e93930d1d08a046",
+      "kind": "native",
+      "target": "osx-x64",
+      "lib": "libopamp_native.dylib"
+    },
+    "native-win-arm64-opamp_native.dll": {
+      "sha256": "68cab664d34fe9924ff037644269494f9294d75a86dccc2c2609f94b44d946dc",
+      "kind": "native",
+      "target": "win-arm64",
+      "lib": "opamp_native.dll"
+    },
+    "native-win-x64-opamp_native.dll": {
+      "sha256": "914b23246e0654bbaa7f4c0220efe4c5c0abfc2dbb4189e05affabd71a4e53bb",
+      "kind": "native",
+      "target": "win-x64",
+      "lib": "opamp_native.dll"
+    },
     "opamp-core-tree.tar.gz": {
-      "sha256": "f386632a337ca2380ce4b030fde9ca34e15a9c15a8dc0aad3bb0b92755eed247",
+      "sha256": "7dd1ae0d16afff2d02e2c3aa3d7fad218741f1df3ea43ab00195ae84469cdcfa",
       "kind": "tree"
     },
     "opamp_core.wasm": {
-      "sha256": "3aa0f5869e1d002d0c29905d2b18e5d9c86f4f2aeabeb76156d7c39f023329b9",
+      "sha256": "2fe593ec37f6e71e52cde0d52e45f30c085eea0fabcd8f9fc1d2b0b395080e0e",
       "kind": "wasm"
     },
     "opamp_core_adversary.wasm": {
-      "sha256": "c87c44c0115166424a4462cb7ce14d2caea905c2bd2de718f08b82d9352fc75a",
+      "sha256": "c3f62c7dc01f66cb512af3350da1d83cffcb0cf649f936b39c96654ecb581355",
       "kind": "wasm"
     },
     "opamp_sdk_settings.wasm": {
-      "sha256": "8987403685953529a294f7f277ac4214355301b594ce152387f368b0d43d90b8",
+      "sha256": "00657695f76c3267982a2b5df1aaf091a73ff58bcd64bf199b7f43feef24cbce",
       "kind": "wasm"
+    },
+    "tool-linux-x64-opamp-tap": {
+      "sha256": "fc2a0f9441829549f6a8f1603c55e63e0f1d86cd05b4211e6d4be59cd97a4775",
+      "kind": "tool",
+      "target": "linux-x64",
+      "bin": "opamp-tap"
     }
   },
   "tree": {
@@ -28,7 +82,7 @@
     "spec/proto/LICENSE": "c95bae1d1ce0235ecccd3560b772ec1efb97f348a79f0fbe0a634f0c2ccefe2c",
     "spec/proto/opamp/v1/anyvalue.proto": "f0326211aed50272a221e75ada27f31db55266ea65dcd7b7b3d8a0a58934e128",
     "spec/proto/opamp/v1/opamp.proto": "b972f1486c480752f4981309f94628aed12b0231c4d0a18a3554647d1884c488",
-    "spec/shell-contract.md": "5f1f605056cdd43f5edd7d92751a6f32f0506e529867de501fd75c27d1c619c4",
+    "spec/shell-contract.md": "76a6eb86ce54cd366ea4b3a43f44c64a3bb48a6707cd6b7aa4139d65041bc284",
     "testdata/sdk-settings/caps.json": "efad6282f0ee7612ad9477ed195277a25860db80393c9699ef5d209f634e6038",
     "testdata/sdk-settings/components.json": "44ee163dfbb98932b235950ffbd014bf48035be728c6fc4a4682b74c4f5dd17b",
     "testdata/sdk-settings/custom.json": "df84d97eaf718336cb81a61b78e7b36068cbfe9fdf31796cde4806fa2487581d",
