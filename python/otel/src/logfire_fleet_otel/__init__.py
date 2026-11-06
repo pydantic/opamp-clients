@@ -264,7 +264,7 @@ class Setup:
 
     @staticmethod
     def from_env(env=os.environ, *, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
-                 state_dir: str | os.PathLike | None = None,
+                 state_dir: str | os.PathLike[str] | None = None,
                  heartbeat_interval: timedelta | float | str | None = None) -> Setup | None:
         """The keyword arguments are what the application gave in code: each one given wins over
         its variable, and a blank one is not given. One it can't use is warned about and is the
@@ -1947,7 +1947,7 @@ def start(resource: Resource) -> None:
 
 
 def configure(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
-              state_dir: str | os.PathLike | None = None, heartbeat_interval: timedelta | float | str | None = None,
+              state_dir: str | os.PathLike[str] | None = None, heartbeat_interval: timedelta | float | str | None = None,
               **kwargs) -> None:
     """Set the SDK up in code as ``opentelemetry-instrument`` would, under the OpAMP server: the
     tracer, meter and logger providers the OTEL_* variables describe (OTLP by default), set as the
@@ -1999,7 +1999,7 @@ def _own_sdk():
 
 
 def manage(*, endpoint: str | None = None, headers: Mapping[str, str] | None = None,
-           state_dir: str | os.PathLike | None = None,
+           state_dir: str | os.PathLike[str] | None = None,
            heartbeat_interval: timedelta | float | str | None = None) -> None:
     """Put the SDK the application has already set up under the OpAMP server, as it is: built in
     code (a ``TracerProvider`` with its processors), by another distro, or by ``logfire.configure()``.
