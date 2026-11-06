@@ -6,7 +6,6 @@ package dev.pydantic.logfire.fleet.sdk;
 import com.dylibso.chicory.runtime.ExportFunction;
 import com.dylibso.chicory.runtime.Instance;
 import com.dylibso.chicory.runtime.Memory;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +17,8 @@ import opamp.proto.v1.Opamp;
  * What an OpenTelemetry SDK does with the settings an OpAMP server sends it, decided the same way
  * in every language: the SDK settings layer (src/main/wasm/opamp_sdk_settings.wasm),
  * compiled to JVM classes when this jar is built and run with
- * Chicory. It keeps nothing between calls; the caller keeps the settings documents it is handed
- * ({@code current}, and the one it saves) and passes them back.
+ * Chicory. It keeps nothing between calls; the caller keeps the agent flow's state it is handed
+ * and passes it back with the next step.
  * See docs/sdk-settings.md. Thread-safe.
  */
 public final class SdkSettings {
@@ -57,123 +56,20 @@ public final class SdkSettings {
   }
 
   /**
-   * At start, before the SDK is built: the settings to start with, from the document saved at the
-   * last change ({@code null}: nothing saved). Put all of them in force, next-start ones too. With
-   * no host, none is carried out: see {@link #load(byte[], SettingsProto.Host, long)}.
+   * The agent flow's start, before the SDK is built: the agent to keep and pass to the next {@link
+   * #step}, and what to do first (the settings to start with, from the last config applied in the
+   * core's saved state). A host naming what is no setting throws {@link IllegalArgumentException}.
    */
-  public SettingsProto.Loaded load(byte[] saved) {
-    return load(saved, null, 0);
+  public SettingsProto.AgentOutput start(SettingsProto.AgentStart start) {
+    return call(SettingsProto.Request.newBuilder().setAgentStart(start).build()).getAgentOutput();
   }
 
   /**
-   * As {@link #load(byte[])}, for {@code host}: the settings the SDK carries out, at once or at the
-   * next start ({@code null}: none carried out; see docs/sdk-settings.md#the-host). At {@code
-   * nowUnixMs}, the wall clock in milliseconds since the Unix epoch, which debug mode is decided by
-   * (0: none, and the SDK does not carry out debug mode). A host naming what is no setting throws
-   * {@link IllegalArgumentException}.
+   * One input to the agent flow (a remote config, a connection, the timer, the exporters built...):
+   * the agent to keep, the effects to carry out in order, and when to step the timer next.
    */
-  public SettingsProto.Loaded load(byte[] saved, SettingsProto.Host host, long nowUnixMs) {
-    return loadFrom(null, saved, host, nowUnixMs);
-  }
-
-  /**
-   * As {@link #load(byte[], SettingsProto.Host, long)}, with {@code coreState}: the OpAMP core's
-   * saved state (what it asked the host to store; {@code null}: none). The settings then come from
-   * the last config applied in it, and {@code saved} is read only when it holds none (a document
-   * kept before the core kept the config applied).
-   */
-  public SettingsProto.Loaded loadFrom(byte[] coreState, byte[] saved, SettingsProto.Host host, long nowUnixMs) {
-    SettingsProto.Load.Builder l = SettingsProto.Load.newBuilder().setNowUnixMs(nowUnixMs);
-    if (saved != null) {
-      l.setSaved(ByteString.copyFrom(saved));
-    }
-    if (coreState != null) {
-      l.setCoreState(ByteString.copyFrom(coreState));
-    }
-    if (host != null) {
-      l.setHost(host);
-    }
-    return call(SettingsProto.Request.newBuilder().setLoad(l).build()).getLoaded();
-  }
-
-  /** Keeps the document the layer asks to keep for the next start: whole or not at all. */
-  @FunctionalInterface
-  public interface Saver {
-    /** Save {@code doc} where {@link #load} reads it at the next start; throws if it can't. */
-    void save(byte[] doc) throws Exception;
-  }
-
-  /**
-   * How to answer a remote config, for a host that carries out nothing and keeps no state: see
-   * {@link #decide(Opamp.AgentRemoteConfig, ByteString, ByteString, SettingsProto.Host, long, Saver)}.
-   */
-  public SettingsProto.Decision decide(Opamp.AgentRemoteConfig config, ByteString current, ByteString atStart) {
-    return decide(config, current, atStart, null, 0, null);
-  }
-
-  /**
-   * How to answer a remote config. {@code current} is the document in force (from the last {@link
-   * #load} or decision), {@code atStart} the one loaded at start, the host and the time as for load.
-   *
-   * <p>The layer decides what to keep for the next start; {@code save} keeps it, and throws if it
-   * can't; the layer then answers from how that went: a config whose save failed is refused, saying
-   * why. {@code null}: the SDK keeps no state across restarts, so a config that changes a next-start
-   * setting is refused. A policy that overrides a control the host does not carry out is refused too.
-   */
-  public SettingsProto.Decision decide(Opamp.AgentRemoteConfig config, ByteString current, ByteString atStart,
-      SettingsProto.Host host, long nowUnixMs, Saver save) {
-    SettingsProto.Decide.Builder d = SettingsProto.Decide.newBuilder().setConfig(config).setCurrent(current)
-        .setAtStart(atStart).setNowUnixMs(nowUnixMs);
-    if (host != null) {
-      d.setHost(host);
-    }
-    SettingsProto.Decide decide = d.build();
-    SettingsProto.Plan plan = call(SettingsProto.Request.newBuilder().setDecide(decide).build()).getPlan();
-    SettingsProto.Commit.Builder commit = SettingsProto.Commit.newBuilder().setDecide(decide);
-    if (plan.hasSave() && save != null) {
-      try {
-        save.save(plan.getSave().toByteArray());
-        commit.setSaved(SettingsProto.Commit.Saved.SAVED_DONE);
-      } catch (Exception e) {
-        // Whatever stopped the save, the config is refused for it.
-        commit.setSaved(SettingsProto.Commit.Saved.SAVED_FAILED)
-            .setError(e.getMessage() != null ? e.getMessage() : e.toString());
-      }
-    }
-    return call(SettingsProto.Request.newBuilder().setCommit(commit).build()).getDecision();
-  }
-
-  /**
-   * What is in force at {@code nowUnixMs}, at the time a load, decision or refresh said to ask again
-   * ({@code refreshAtUnixMs}): the end of debug mode. {@code current} and {@code atStart} as for decide.
-   */
-  public SettingsProto.Refreshed refresh(ByteString current, ByteString atStart, SettingsProto.Host host,
-      long nowUnixMs) {
-    SettingsProto.Refresh.Builder r = SettingsProto.Refresh.newBuilder().setCurrent(current).setAtStart(atStart)
-        .setNowUnixMs(nowUnixMs);
-    if (host != null) {
-      r.setHost(host);
-    }
-    return call(SettingsProto.Request.newBuilder().setRefresh(r).build()).getRefreshed();
-  }
-
-  /**
-   * Export health, from the gates' counts since start: whether to send it now, and the entry for the
-   * agent health's {@code component_health_map["exporters"]}. {@code previous}: what the last call
-   * answered ({@code null} at the first); {@code settings}: those in force ({@code null}: none);
-   * {@code exporters}: each as the inventory lists it, reported governed or ungoverned under its signal.
-   */
-  public SettingsProto.HealthReport health(SettingsProto.ExportCounts counts, SettingsProto.HealthReport previous,
-      long nowUnixMs, SettingsProto.Settings settings, List<SettingsProto.Exporter> exporters) {
-    SettingsProto.Health.Builder h = SettingsProto.Health.newBuilder().setCounts(counts).setNowUnixMs(nowUnixMs)
-        .addAllExporters(exporters);
-    if (previous != null) {
-      h.setPrevious(previous);
-    }
-    if (settings != null) {
-      h.setSettings(settings);
-    }
-    return call(SettingsProto.Request.newBuilder().setHealth(h).build()).getHealthReport();
+  public SettingsProto.AgentOutput step(SettingsProto.AgentStep step) {
+    return call(SettingsProto.Request.newBuilder().setAgentStep(step).build()).getAgentOutput();
   }
 
   /**

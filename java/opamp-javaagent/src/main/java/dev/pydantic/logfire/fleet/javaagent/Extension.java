@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import opamp.proto.v1.Anyvalue;
@@ -151,32 +150,39 @@ final class Extension {
   private SettingsProto.Host declared = HOST;
   /** Whether the SDK samples with a sampler other than the extension's. */
   private boolean samplerOutside;
-  /** The settings loaded at start: the next-start ones in force until the next restart. */
-  private SettingsProto.Loaded loaded;
-  private volatile ByteString current;
-  /** The live settings in force: the last the layer handed over. */
-  private volatile SettingsProto.Settings inForce = SettingsProto.Settings.getDefaultInstance();
   /**
-   * The one timer for the layer's {@code refresh_at_unix_ms} (the end of debug mode), and the
-   * generation it was armed in: a decision after it arms its own, and the older one does nothing.
+   * The agent flow's state, as the layer handed it over (null before {@link #properties}): kept
+   * here, passed back with each step. The flow decides what is in force, what to answer and report,
+   * what to say, and when to step its timer.
+   */
+  private ByteString flow;
+  /** The client's saved state read at start: the flow starts again from it once the UID is known. */
+  private byte[] coreState;
+  /** The settings in force at start, next-start ones included. */
+  private SettingsProto.Settings startSettings = SettingsProto.Settings.getDefaultInstance();
+  /** The live settings in force: the last the flow handed over. */
+  private volatile SettingsProto.Settings inForce = SettingsProto.Settings.getDefaultInstance();
+  /** The monotonic clock, in milliseconds: what the flow's timer is measured on. */
+  java.util.function.LongSupplier monoClock = () -> System.nanoTime() / 1_000_000;
+  /** The monotonic clock's reading when the flow started: the flow's clock counts from it. */
+  private long base;
+  /**
+   * The one timer, for the flow's next wake, and the generation it was armed in: a step after it
+   * arms its own, and the older one does nothing.
    */
   private java.util.concurrent.ScheduledExecutorService timer;
   private java.util.concurrent.ScheduledFuture<?> armed;
-
   /** For tests on their own clock: the timer is armed but never scheduled (see clockForTest). */
   private boolean timerHeld;
   private long generation;
-  private long refreshAt;
-  /** Export health: the layer's last report, and the agent health last sent with it. */
-  private SettingsProto.HealthReport healthReport;
+  /** When the timer is armed for, on the flow's clock (0: not). */
+  private long wakeAt;
+  /** The agent health last sent. */
   private volatile Opamp.ComponentHealth health = Opamp.ComponentHealth.newBuilder().setHealthy(true).build();
-  /** How often the layer is asked whether export health is to be sent. */
-  static final Duration HEALTH_EVERY = Duration.ofSeconds(30);
   private volatile Opamp.EffectiveConfig effective;
   private UUID uid;
   private Resource resource;
   private final CompletableFuture<OpampClient> client = new CompletableFuture<>();
-  private volatile Reachability reachability;
 
   /**
    * Where the server is, from otel.opamp.*, as the core's Setup decides it; null when the extension
@@ -433,76 +439,6 @@ final class Extension {
     }
   }
 
-  /** What to check when the server can't be reached, by what went wrong, as the core words it. */
-  static String hint(CoreProto.SetupHints hints, Integer status) {
-    if (status == null) {
-      return hints.getUnreachable();
-    }
-    if (status == 401 || status == 403) {
-      return hints.getRefused();
-    }
-    if (status == 404) {
-      return hints.getNotFound();
-    }
-    return hints.getError();
-  }
-
-  /**
-   * Says when the client connects, when it can't (once a run of failures, with what to check), and
-   * when it's back: setup that works or doesn't is never silent. On the client's thread.
-   */
-  static final class Reachability {
-    /** The configured endpoint, as it is safe to log. */
-    private final String endpoint;
-    /**
-     * The endpoint the client uses now, as the client gives it (null, or null from it: the
-     * configured one): after the server moved the agent, the one it moved it to.
-     */
-    volatile Supplier<String> inUse;
-    private final String service;
-    private final UUID uid;
-    private final CoreProto.SetupHints hints;
-    private boolean ever;
-    private boolean failing;
-
-    Reachability(String shown, String service, UUID uid, CoreProto.SetupHints hints) {
-      this.endpoint = shown;
-      this.service = service;
-      this.uid = uid;
-      this.hints = hints;
-    }
-
-    /** The endpoint the client uses now, as it is safe to log. */
-    String at() {
-      Supplier<String> f = inUse;
-      String e = f == null ? null : f.get();
-      return e == null || e.isEmpty() ? endpoint : shown(e, endpoint);
-    }
-
-    synchronized void notified(Notification n) {
-      String endpoint = at();
-      if (n instanceof Notification.Connected) {
-        if (!ever) {
-          String who = service == null || service.isEmpty() ? "" : " as " + service;
-          LOG.info("OpAMP: connected to " + endpoint + "; this SDK is managed" + who + ", instance " + uid);
-        } else if (failing) {
-          LOG.info("OpAMP: connected to " + endpoint + " again");
-        }
-        ever = true;
-        failing = false;
-      } else if (n instanceof Notification.ConnectFailed f) {
-        if (!failing) {
-          String why = f.detail() != null && !f.detail().isEmpty() ? f.detail() : "HTTP " + f.status();
-          LOG.warning("OpAMP: can't reach " + endpoint + " (" + why + "): " + hint(hints, f.status())
-              + ". Retrying in the background; the SDK keeps its current settings meanwhile");
-        } else {
-          LOG.fine("OpAMP: still can't reach " + endpoint + ": " + f.detail());
-        }
-        failing = true;
-      }
-    }
-  }
-
   /**
    * Whether the core can be loaded, by {@code unavailable} (why it can't, or null); when it can't,
    * said once, and the agent runs unmanaged.
@@ -554,32 +490,27 @@ final class Extension {
       setup = null;
       return Map.of();
     }
-    byte[] saved = null;
     byte[] coreState = null;
     canSave = writable(setup.stateDir());
     if (setup.stateDir() != null) {
       try {
         // The settings to start with are the last config applied, which the client keeps in its
-        // state (opamp-state); sdk-settings.json is what this agent kept itself before, read only
-        // while the client's state holds no config applied.
+        // state (opamp-state).
         Path state = setup.stateDir().resolve("opamp-state");
         if (Files.exists(state)) {
           coreState = Files.readAllBytes(state);
         }
-        Path file = setup.stateDir().resolve("sdk-settings.json");
-        if (Files.exists(file)) {
-          saved = Files.readAllBytes(file);
-        }
       } catch (IOException e) {
-        LOG.log(Level.WARNING, "OpAMP: saved SDK settings unreadable, using the agent's own", e);
+        LOG.log(Level.WARNING, "OpAMP: the client's saved state unreadable, using the agent's own settings", e);
       }
     }
     if (controls.app == null) {
       controls.app = appSettings.get();
     }
     appBefore = controls.app == null ? null : controls.app.current();
-    start(coreState, saved);
-    return Controls.startProperties(loaded.getSettings());
+    this.coreState = coreState;
+    begin();
+    return Controls.startProperties(startSettings);
   }
 
   /**
@@ -616,35 +547,57 @@ final class Extension {
   }
 
   /**
-   * Declare only what the agent still carries out, and load the settings again under that host.
-   * The live settings it declares no more, in order (none: nothing changed).
+   * Declare only what the agent still carries out: the flow decides again under that host. The
+   * live settings it declares no more, in order (none: nothing changed).
    */
   private List<String> narrow() {
     SettingsProto.Host narrowed = host(samplerOutside);
-    if (narrowed.equals(declared) || loaded == null) {
+    if (narrowed.equals(declared) || flow == null) {
       return List.of();
     }
     List<String> lost = declared.getLiveList().stream().filter(k -> !narrowed.getLiveList().contains(k)).toList();
     declared = narrowed;
-    start(null, loaded.getCurrent().toByteArray());
+    step(SettingsProto.AgentStep.newBuilder().setHost(host()));
     return lost;
   }
 
-  private void start(byte[] coreState, byte[] saved) {
-    loaded = layer().loadFrom(coreState, saved, host(), wallClock.getAsLong());
-    if (!loaded.getWarning().isEmpty()) {
-      LOG.warning("OpAMP: " + loaded.getWarning());
-    }
-    current = loaded.getCurrent();
-    effective = loaded.getEffective();
-    controls.apply(loaded.getSettings());
-    inForce = loaded.getSettings();
-    arm(loaded.getRefreshAtUnixMs());
+  /** The flow's start: the settings to start with put in force, and its timer armed. */
+  private void begin() {
+    carryOut(layer().start(agentStart()));
+    startSettings = inForce;
   }
 
-  /** The settings loaded at start, next-start ones included. */
+  private SettingsProto.AgentStart agentStart() {
+    base = monoClock.getAsLong();
+    CoreProto.SetupHints h = setup.hints() == null ? CoreProto.SetupHints.getDefaultInstance() : setup.hints();
+    SettingsProto.AgentStart.Builder start = SettingsProto.AgentStart.newBuilder()
+        .setHost(host())
+        .setStateDir(setup.stateDir() != null)
+        .setEndpoint(setup.endpoint())
+        .setInstanceUid(ByteString.copyFrom(uid == null ? new byte[16] : bytes(uid)))
+        .setHints(SettingsProto.AgentHints.newBuilder().setRefused(h.getRefused()).setNotFound(h.getNotFound())
+            .setUnreachable(h.getUnreachable()).setError(h.getError()))
+        .setNowUnixMs(wallClock.getAsLong())
+        .setNowMonoMs(0);
+    if (coreState != null) {
+      start.setCoreState(ByteString.copyFrom(coreState));
+    }
+    return start.build();
+  }
+
+  /**
+   * The UID is known (after the settings were put in force: the agent reads the properties first):
+   * the same start again, naming the instance. Only the flow is kept: what it said to do was done.
+   */
+  private void named() {
+    if (flow != null) {
+      flow = layer().start(agentStart()).getAgent();
+    }
+  }
+
+  /** The settings in force at start, next-start ones included. */
   synchronized SettingsProto.Settings startSettings() {
-    return loaded.getSettings();
+    return startSettings;
   }
 
   /**
@@ -718,6 +671,7 @@ final class Extension {
       return r;
     }
     uid = identity(r.getAttribute(INSTANCE_ID));
+    named();
     resource = r.merge(Resource.create(Attributes.of(INSTANCE_ID, uid.toString())));
     return resource;
   }
@@ -732,6 +686,7 @@ final class Extension {
       return given;
     }
     uid = identity(given);
+    named();
     return uid.toString();
   }
 
@@ -843,13 +798,13 @@ final class Extension {
     // Platform mode, asked for by name (an HTTP client selects it too): the client's requests go
     // through the JDK's HTTP client, one of the agent's own that isn't traced.
     b.mode(OpampClient.Mode.PLATFORM).httpClient(untracedHttpClient());
-    reachability = new Reachability(s.shown(), resource.getAttribute(SERVICE_NAME), uid, s.hints());
-    reachability.inUse = () -> {
-      OpampClient c = client.getNow(null);
-      return c == null ? null : c.endpoint();
-    };
-    // Export health from the first message: the layer always sends its first report.
-    health(controls.counts(), inForce, wallClock.getAsLong());
+    // The flow is told the SDK is built: export health from the first message.
+    synchronized (this) {
+      String service = resource.getAttribute(SERVICE_NAME);
+      step(SettingsProto.AgentStep.newBuilder().setBuilt(SettingsProto.AgentBuilt.newBuilder()
+          .setService(service == null ? "" : service).addAllExporters(inventory.listed())));
+      step(exporters());
+    }
     // The inventory, once: the agent builds its SDK and instrumentations once, and the settings it
     // carries out (its host, the application's own among them once they're read) don't change
     // while it runs.
@@ -867,8 +822,6 @@ final class Extension {
       LOG.log(Level.SEVERE, "OpAMP: the client did not start; the agent runs unmanaged", e);
       return;
     }
-    long every = HEALTH_EVERY.toMillis();
-    timer().scheduleAtFixedRate(this::healthTick, every, every, java.util.concurrent.TimeUnit.MILLISECONDS);
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       try {
         // The server hears the agent go (agent_disconnect). The SDK's own shutdown hook flushes
@@ -903,92 +856,160 @@ final class Extension {
   }
 
   /**
-   * On the client's thread: keep it quick; the first may come before start returns. (The client
-   * tells a UID at start too, if it resumes one the server assigned before.)
+   * On the client's thread: keep it quick; the first may come before start returns, so what the
+   * flow says to send waits for the client. (The client tells a UID at start too, if it resumes one
+   * the server assigned before.)
    */
   void notified(Notification n) {
-    Reachability r = reachability;
-    if (r != null) {
-      r.notified(n);
+    OpampClient c = client.getNow(null);
+    Out out = tell(n, c == null ? null : c.endpoint());
+    if (out != null && !out.sends().isEmpty()) {
+      out.send(client.join());
     }
+  }
+
+  /** Tell the flow of a notification; {@code inUse}: the endpoint the client uses now (null: the configured one). */
+  private Out tell(Notification n, String endpoint) {
+    String inUse = endpoint == null ? "" : endpoint;
+    SettingsProto.AgentStep.Builder in = SettingsProto.AgentStep.newBuilder();
     if (n instanceof Notification.RemoteConfig rc) {
-      Opamp.RemoteConfigStatus answer = remoteConfig(rc.config());
-      OpampClient c = client.join();
-      c.setEffectiveConfig(effective);
-      c.setRemoteConfigStatus(answer);
-    } else if (n instanceof Notification.Stopped st && st.error() != null) {
-      LOG.log(Level.SEVERE, "OpAMP: the client stopped; the agent runs unmanaged", st.error());
+      in.setRemoteConfig(rc.config());
+    } else if (n instanceof Notification.Connected) {
+      in.setConnected(SettingsProto.AgentConnected.newBuilder().setEndpoint(inUse));
+    } else if (n instanceof Notification.ConnectFailed f) {
+      in.setConnectFailed(SettingsProto.AgentConnectFailed.newBuilder().setEndpoint(inUse)
+          .setStatus(f.status() == null ? 0 : f.status()).setDetail(f.detail() == null ? "" : f.detail()));
     } else if (n instanceof Notification.InstanceUidChanged changed) {
-      uidChanged(changed.instanceUid());
+      in.setInstanceUidChanged(ByteString.copyFrom(changed.instanceUid()));
     } else if (n instanceof Notification.StateFromNewerVersion newer) {
-      LOG.warning("OpAMP: the saved state was written by a newer version of this agent (state format "
-          + newer.version() + "), which this one can't read: it is kept as it is, and this run saves nothing");
+      in.setStateFromNewerVersion((int) Math.min(newer.version(), 0xffffffffL));
+    } else if (n instanceof Notification.Stopped st) {
+      in.setStopped(SettingsProto.AgentStopped.newBuilder()
+          .setError(st.error() == null ? "" : String.valueOf(st.error())));
+    } else {
+      return null;
+    }
+    synchronized (this) {
+      return step(in);
     }
   }
 
   /**
-   * The server named this instance anew. The client keeps the UID in its own state; kept here too,
-   * it is service.instance.id from the next start (the resource is built once).
+   * What a step said: the answer and health it gave, if any, and what to send (sent at once while
+   * the client runs; else left to the caller).
    */
-  private synchronized void uidChanged(byte[] raw) {
-    if (raw.length != 16) {
-      return;
+  record Out(Opamp.RemoteConfigStatus status, Opamp.ComponentHealth health,
+      List<java.util.function.Consumer<OpampClient>> sends) {
+    void send(OpampClient c) {
+      if (c != null) {
+        sends.forEach(s -> s.accept(c));
+      }
     }
-    ByteBuffer buf = ByteBuffer.wrap(raw);
-    UUID named = new UUID(buf.getLong(), buf.getLong());
-    if (named.equals(uid)) {
-      return;
+  }
+
+  /** Tell the flow what happened (one input), and carry out what it says. */
+  private synchronized Out step(SettingsProto.AgentStep.Builder input) {
+    if (flow == null) {
+      return new Out(null, null, List.of());
     }
-    if (!canSave) {
-      LOG.info("OpAMP: the server named this instance " + named + "; service.instance.id stays " + uid);
+    SettingsProto.AgentOutput out;
+    try {
+      out = layer().step(input.setAgent(flow).setNowUnixMs(wallClock.getAsLong()).setNowMonoMs(mono()).build());
+    } catch (RuntimeException e) {
+      LOG.log(Level.WARNING, "OpAMP: the settings layer failed", e);
+      return new Out(null, null, List.of());
+    }
+    return carryOut(out);
+  }
+
+  /** The flow's clock: the monotonic one, in milliseconds since it started. */
+  private long mono() {
+    return Math.max(0, monoClock.getAsLong() - base);
+  }
+
+  /** The flow's effects, in order, and its timer for the next wake. */
+  private synchronized Out carryOut(SettingsProto.AgentOutput out) {
+    flow = out.getAgent();
+    effective = out.getEffective();
+    Opamp.RemoteConfigStatus status = null;
+    Opamp.ComponentHealth sent = null;
+    List<java.util.function.Consumer<OpampClient>> sends = new ArrayList<>();
+    for (SettingsProto.AgentEffect e : out.getEffectsList()) {
+      switch (e.getEffectCase()) {
+        case APPLY -> {
+          controls.apply(e.getApply());
+          inForce = e.getApply();
+        }
+        case EFFECTIVE -> {
+          Opamp.EffectiveConfig c = e.getEffective();
+          sends.add(client -> client.setEffectiveConfig(c));
+        }
+        case STATUS -> {
+          Opamp.RemoteConfigStatus st = e.getStatus();
+          status = st;
+          sends.add(client -> client.setRemoteConfigStatus(st));
+        }
+        case HEALTH -> {
+          Opamp.ComponentHealth h = e.getHealth();
+          sent = h;
+          health = h;
+          sends.add(client -> client.setHealth(h));
+        }
+        case SAVE_UID -> saveUid(e.getSaveUid());
+        case LOG -> say(e.getLog());
+        default -> { }
+      }
+    }
+    arm(out.getWakeAtMonoMs());
+    return new Out(status, sent, sends);
+  }
+
+  /** The UID the server assigned, kept: service.instance.id from the next start. */
+  private void saveUid(String named) {
+    if (setup == null || setup.stateDir() == null) {
       return;
     }
     try {
-      write(setup.stateDir().resolve(dev.pydantic.logfire.fleet.Setup.UID_FILE), named.toString().getBytes(StandardCharsets.UTF_8));
-      LOG.info("OpAMP: the server named this instance " + named + "; service.instance.id stays " + uid
-          + " until the next start");
+      write(setup.stateDir().resolve(dev.pydantic.logfire.fleet.Setup.UID_FILE), named.getBytes(StandardCharsets.UTF_8));
     } catch (IOException e) {
-      LOG.log(Level.WARNING, "OpAMP: can't save the instance UID the server assigned", e);
+      step(SettingsProto.AgentStep.newBuilder().setUidNotSaved(String.valueOf(e.getMessage())));
     }
   }
 
-  /** Carry out the layer's decision on a remote config; the answer for the server. */
+  /** A line of the flow's, said as the agent's own. */
+  private static void say(SettingsProto.AgentLog line) {
+    Level level = switch (line.getLevel()) {
+      case DEBUG -> Level.FINE;
+      case WARN -> Level.WARNING;
+      case ERROR -> Level.SEVERE;
+      default -> Level.INFO;
+    };
+    LOG.log(level, "OpAMP: " + line.getText());
+  }
+
+  /** The exporters listed and the gates' counts now, as the flow takes them. */
+  private SettingsProto.AgentStep.Builder exporters() {
+    return SettingsProto.AgentStep.newBuilder().setExporters(SettingsProto.AgentExporters.newBuilder()
+        .addAllExporters(inventory.listed()).setCounts(controls.counts()));
+  }
+
+  /** Answer a remote config as the flow decides; the answer for the server (sent too, while the client runs). */
   synchronized Opamp.RemoteConfigStatus remoteConfig(Opamp.AgentRemoteConfig config) {
-    // With a state directory the client keeps the config this applies, in its own state, and tells
-    // the server APPLIED once that is saved: nothing for the agent to save. Without one, nothing is
-    // kept, and a next-start change is refused.
-    long now = wallClock.getAsLong();
-    SettingsProto.Decision d = layer().decide(config, current, loaded.getCurrent(), host(), now,
-        setup.stateDir() == null ? null : doc -> { });
-    if (d.hasApply()) {
-      controls.apply(d.getApply());
-      inForce = d.getApply();
-    }
-    if (d.getPendingRestartCount() > 0) {
-      LOG.info("OpAMP: " + String.join(", ", d.getPendingRestartList())
-          + " changed; in force when the application restarts");
-    }
-    current = d.getCurrent();
-    effective = d.getEffective();
-    if (!d.hasApply() && refreshAt != 0 && now >= refreshAt) {
-      // FAILED, so nothing changes, but what is reported is now's: once the wall clock has passed
-      // the end of debug mode (a machine that slept, before the timer went off), it ends here, as
-      // the report says.
-      refresh(now);
-    } else {
-      arm(d.getRefreshAtUnixMs());
-    }
-    return d.getStatus();
+    Out out = step(SettingsProto.AgentStep.newBuilder().setRemoteConfig(config));
+    out.send(client.getNow(null));
+    return out.status() != null ? out.status() : Opamp.RemoteConfigStatus.newBuilder()
+        .setLastRemoteConfigHash(config.getConfigHash())
+        .setStatus(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED)
+        .setErrorMessage("the settings layer gave no answer").build();
   }
 
   /**
-   * Arm the one timer for {@code at} (ms since the Unix epoch; 0: none), in place of any earlier
-   * one. The time left is measured now and waited on the executor's monotonic clock, so the wall
-   * clock moving meanwhile doesn't move the end.
+   * Arm the one timer for {@code at} (the flow's clock; 0: none), in place of any earlier one. It
+   * waits on the executor's monotonic clock, so the wall clock moving meanwhile doesn't move it.
    */
   private synchronized void arm(long at) {
     generation++;
-    refreshAt = at;
+    wakeAt = at;
     if (armed != null) {
       armed.cancel(false);
       armed = null;
@@ -997,8 +1018,7 @@ final class Extension {
       return;
     }
     long gen = generation;
-    armed = timer().schedule(() -> fire(gen, at), Math.max(0, at - wallClock.getAsLong()),
-        java.util.concurrent.TimeUnit.MILLISECONDS);
+    armed = timer().schedule(() -> fire(gen, at), Math.max(0, at - mono()), java.util.concurrent.TimeUnit.MILLISECONDS);
   }
 
   private synchronized java.util.concurrent.ScheduledExecutorService timer() {
@@ -1013,74 +1033,24 @@ final class Extension {
   }
 
   /**
-   * The timer armed in {@code gen} for {@code at} went off: what is in force now. A decision since
-   * armed its own, so this one does nothing. The time waited is the timer's: the layer is asked at
-   * {@code at} at least, however the wall clock moved.
+   * The timer armed in {@code gen} (for {@code at}) went off: the flow is told, with the gates'
+   * counts. A step since armed its own, so this one does nothing.
    */
   void fire(long gen, long at) {
-    Opamp.EffectiveConfig report;
+    Out out;
     synchronized (this) {
       if (gen != generation) {
         return;
       }
-      report = refresh(Math.max(wallClock.getAsLong(), at));
-    }
-    OpampClient c = client.getNow(null);
-    if (c != null) {
-      c.setEffectiveConfig(report);
-    }
-  }
-
-  /** Ask the layer what is in force at {@code nowUnixMs}, put it in force, and arm the next timer. */
-  synchronized Opamp.EffectiveConfig refresh(long nowUnixMs) {
-    SettingsProto.Refreshed r = layer().refresh(current, loaded.getCurrent(), host(), nowUnixMs);
-    if (!r.getWarning().isEmpty()) {
-      LOG.warning("OpAMP: " + r.getWarning());
-    }
-    controls.apply(r.getSettings());
-    inForce = r.getSettings();
-    effective = r.getEffective();
-    if (refreshAt != 0 && r.getRefreshAtUnixMs() == 0) {
-      LOG.info("OpAMP: debug mode is over; the settings sent before it are in force again");
-    }
-    arm(r.getRefreshAtUnixMs());
-    return effective;
-  }
-
-  /**
-   * Export health, every {@link #HEALTH_EVERY}: what the gates counted, through the layer, which
-   * says whether to send it (at once on a change of health or status, at most every 60 s for the
-   * counters alone, never while nothing changes).
-   */
-  void healthTick() {
-    try {
-      Opamp.ComponentHealth h = health(controls.counts(), inForce, wallClock.getAsLong());
-      OpampClient c = client.getNow(null);
-      if (h != null && c != null) {
-        c.setHealth(h);
+      armed = null;
+      try {
+        out = step(SettingsProto.AgentStep.newBuilder().setTimer(controls.counts()));
+      } catch (RuntimeException e) {
+        LOG.log(Level.WARNING, "OpAMP: the settings timer", e);
+        return;
       }
-    } catch (RuntimeException e) {
-      // A periodic task that throws is never run again.
-      LOG.log(Level.WARNING, "OpAMP: export health", e);
     }
-  }
-
-  /**
-   * The agent health to send for these counts and settings at {@code nowUnixMs}, or null when the
-   * layer says not to send. The top level stays healthy (the application's); export health is its
-   * {@code component_health_map["exporters"]}, with a child for each exporter the inventory lists.
-   */
-  synchronized Opamp.ComponentHealth health(SettingsProto.ExportCounts counts, SettingsProto.Settings settings,
-      long nowUnixMs) {
-    SettingsProto.HealthReport r = layer().health(counts, healthReport, nowUnixMs, settings,
-        inventory.listed());
-    healthReport = r;
-    if (!r.getSend()) {
-      return null;
-    }
-    health = Opamp.ComponentHealth.newBuilder().setHealthy(true)
-        .putComponentHealthMap("exporters", r.getExporters()).build();
-    return health;
+    out.send(client.getNow(null));
   }
 
   /** The agent health last sent. */
@@ -1099,13 +1069,85 @@ final class Extension {
    * armed a moment before a test's deadline would otherwise go off on its own, mid-test).
    */
   synchronized void clockForTest(java.util.function.LongSupplier clock) {
-    wallClock = clock;
-    timerHeld = true;
+    clockForTest(clock, clock);
   }
 
-  /** When the timer is armed for (0: not), and in which generation. */
+  /**
+   * For tests: the wall clock from {@code wall}, the monotonic one from {@code mono}. A flow already
+   * started starts again on them (a flow never steps back in time, and the test's clock is earlier).
+   */
+  synchronized void clockForTest(java.util.function.LongSupplier wall, java.util.function.LongSupplier mono) {
+    wallClock = wall;
+    monoClock = mono;
+    timerHeld = true;
+    if (armed != null) {
+      armed.cancel(false);
+      armed = null;
+    }
+    if (flow != null) {
+      begin();
+    }
+  }
+
+  /** For tests: the instance named {@code id}, as resource() names it. */
+  synchronized void namedForTest(UUID id) {
+    uid = id;
+    named();
+  }
+
+  /** For tests: tell the flow of {@code n}, the client using {@code inUse} (null: the configured endpoint). */
+  void tellForTest(Notification n, String inUse) {
+    tell(n, inUse);
+  }
+
+  /**
+   * For tests: the SDK built (as start tells the flow), with the exporters listed and {@code counts};
+   * the timer fired first if due, with them. The agent health sent meanwhile (null: none).
+   */
+  synchronized Opamp.ComponentHealth builtForTest(String service, SettingsProto.ExportCounts counts) {
+    Opamp.ComponentHealth before = health;
+    long[] a = armedForTest();
+    if (a[1] != 0 && a[1] <= mono()) {
+      step(SettingsProto.AgentStep.newBuilder().setTimer(counts));
+    }
+    step(SettingsProto.AgentStep.newBuilder().setBuilt(SettingsProto.AgentBuilt.newBuilder().setService(service)
+        .addAllExporters(inventory.listed())));
+    step(SettingsProto.AgentStep.newBuilder().setExporters(SettingsProto.AgentExporters.newBuilder()
+        .addAllExporters(inventory.listed()).setCounts(counts)));
+    return health == before ? null : health;
+  }
+
+  /** When the timer is armed for on the flow's clock (0: not), and in which generation. */
   synchronized long[] armedForTest() {
-    return new long[] {generation, refreshAt};
+    return new long[] {generation, wakeAt};
+  }
+
+  /** For tests: fire the timer if it is due by the test clock's now. */
+  void fireDueForTest() {
+    long[] a = armedForTest();
+    if (a[1] != 0 && a[1] <= mono()) {
+      fire(a[0], a[1]);
+    }
+  }
+
+  /** For tests: when the flow asks the layer again (the end of debug mode; wall clock, ms; 0: never). */
+  synchronized long refreshAtForTest() {
+    return state().getRefreshAtUnixMs();
+  }
+
+  /** For tests: the exporters and counts now, told to the flow; the agent health last sent. */
+  Opamp.ComponentHealth exportersNowForTest() {
+    step(exporters());
+    return health;
+  }
+
+  /** The flow's state, decoded. */
+  synchronized SettingsProto.AgentState state() {
+    try {
+      return SettingsProto.AgentState.parseFrom(flow);
+    } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   /** The available components sent at start (null before). */
@@ -1179,7 +1221,10 @@ final class Extension {
 
   /** For tests: the endpoint what the agent says of reaching its server names now. */
   String endpointSaidForTest() {
-    return reachability.at();
+    OpampClient c = client.getNow(null);
+    String inUse = c == null ? null : c.endpoint();
+    String configured = state().getEndpoint();
+    return inUse == null || inUse.isEmpty() ? configured : shown(inUse, configured);
   }
 
   /** For tests: stop the client, as the shutdown hook does (the server hears the agent go). */
@@ -1199,9 +1244,10 @@ final class Extension {
     e.appSettings = () -> null;
     e.setup = setup;
     e.canSave = setup != null && setup.stateDir() != null;
-    e.loaded = SettingsProto.Loaded.getDefaultInstance();
-    e.current = ByteString.copyFromUtf8("{}");
     e.effective = Opamp.EffectiveConfig.getDefaultInstance();
+    if (setup != null) {
+      e.begin();
+    }
     return e;
   }
 }

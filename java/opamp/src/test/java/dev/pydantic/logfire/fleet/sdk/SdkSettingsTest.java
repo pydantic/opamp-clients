@@ -9,6 +9,8 @@ import static dev.pydantic.logfire.fleet.sdk.Policy.override;
 import static dev.pydantic.logfire.fleet.sdk.Policy.v1;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -50,31 +52,107 @@ class SdkSettingsTest {
   static final Opamp.RemoteConfigStatuses APPLIED = Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED;
   static final Opamp.RemoteConfigStatuses FAILED = Opamp.RemoteConfigStatuses.RemoteConfigStatuses_FAILED;
 
+  /** The layer's agent flow, stepped by a test, on clocks that move together from {@link #NOW}. */
+  static final class Flow {
+    final SdkSettings layer = new SdkSettings();
+    SettingsProto.AgentOutput out;
+
+    Flow(SettingsProto.Host host) {
+      this(host, true, null);
+    }
+
+    Flow(SettingsProto.Host host, boolean stateDir, byte[] coreState) {
+      SettingsProto.AgentStart.Builder start = SettingsProto.AgentStart.newBuilder().setStateDir(stateDir)
+          .setEndpoint("http://127.0.0.1:1").setInstanceUid(ByteString.copyFrom(new byte[16]))
+          .setNowUnixMs(NOW).setNowMonoMs(NOW);
+      if (host != null) {
+        start.setHost(host);
+      }
+      if (coreState != null) {
+        start.setCoreState(ByteString.copyFrom(coreState));
+      }
+      out = layer.start(start.build());
+    }
+
+    Flow step(long ms, SettingsProto.AgentStep.Builder input) {
+      out = layer.step(input.setAgent(out.getAgent()).setNowUnixMs(NOW + ms).setNowMonoMs(NOW + ms).build());
+      return this;
+    }
+
+    Flow decide(Opamp.AgentRemoteConfig c, long ms) {
+      return step(ms, SettingsProto.AgentStep.newBuilder().setRemoteConfig(c));
+    }
+
+    Flow decide(Opamp.AgentRemoteConfig c) {
+      return decide(c, 1);
+    }
+
+    private SettingsProto.AgentEffect last(SettingsProto.AgentEffect.EffectCase kind) {
+      SettingsProto.AgentEffect found = null;
+      for (SettingsProto.AgentEffect e : out.getEffectsList()) {
+        if (e.getEffectCase() == kind) {
+          found = e;
+        }
+      }
+      return found;
+    }
+
+    Opamp.RemoteConfigStatus status() {
+      SettingsProto.AgentEffect e = last(SettingsProto.AgentEffect.EffectCase.STATUS);
+      return e == null ? Opamp.RemoteConfigStatus.getDefaultInstance() : e.getStatus();
+    }
+
+    /** The settings to put in force, or null for none. */
+    SettingsProto.Settings apply() {
+      SettingsProto.AgentEffect e = last(SettingsProto.AgentEffect.EffectCase.APPLY);
+      return e == null ? null : e.getApply();
+    }
+
+    Opamp.ComponentHealth health() {
+      SettingsProto.AgentEffect e = last(SettingsProto.AgentEffect.EffectCase.HEALTH);
+      return e == null ? null : e.getHealth();
+    }
+
+    Opamp.EffectiveConfig effective() {
+      return out.getEffective();
+    }
+
+    boolean warned() {
+      return out.getEffectsList().stream().anyMatch(e -> e.hasLog()
+          && e.getLog().getLevelValue() >= SettingsProto.AgentLog.Level.WARN_VALUE);
+    }
+
+    SettingsProto.AgentState state() {
+      try {
+        return SettingsProto.AgentState.parseFrom(out.getAgent());
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw new AssertionError(e);
+      }
+    }
+  }
+
   @Test
-  void loadsDecidesAndDescribes() {
-    String saved = v1("signal_exports", exports("", "", "off"));
-    SettingsProto.Loaded l = layer.load(saved.getBytes(StandardCharsets.UTF_8), DECLARING, 0);
-    assertTrue(l.getSettings().hasSendLogs());
-    assertFalse(l.getSettings().getSendLogs());
-    assertEquals(Policy.full(saved), effective(l.getEffective()));
-
-    List<String> kept = new ArrayList<>();
+  void startsDecidesAndDescribes() {
+    Flow f = new Flow(DECLARING);
+    assertEquals(Policy.full(v1()), effective(f.effective()));
     String quarter = v1("head_sampling", override("\"ratio\":0.25"));
-    SettingsProto.Decision d = layer.decide(config(quarter), l.getCurrent(), l.getCurrent(),
-        DECLARING, 0, doc -> kept.add(new String(doc, StandardCharsets.UTF_8)));
-    assertEquals(APPLIED, d.getStatus().getStatus());
-    assertEquals(ByteString.copyFromUtf8("h"), d.getStatus().getLastRemoteConfigHash());
-    assertEquals(0.25, d.getApply().getSamplingRate());
-    assertEquals(List.of(quarter), kept);
-    assertEquals(Policy.full(quarter), effective(d.getEffective()));
+    f.decide(config(quarter));
+    assertEquals(APPLIED, f.status().getStatus());
+    assertEquals(ByteString.copyFromUtf8("h"), f.status().getLastRemoteConfigHash());
+    assertEquals(0.25, f.apply().getSamplingRate());
+    assertEquals(Policy.full(quarter), effective(f.effective()));
 
-    SettingsProto.Decision bad = layer.decide(config(v1("head_sampling", override("\"ratio\":\"x\""))), d.getCurrent(),
-        l.getCurrent(), DECLARING, 0, doc -> kept.add("again"));
-    assertEquals(FAILED, bad.getStatus().getStatus());
-    assertTrue(bad.getStatus().getErrorMessage().startsWith("head_sampling:"));
-    assertFalse(bad.hasApply());
-    assertEquals(d.getCurrent(), bad.getCurrent());
-    assertEquals(1, kept.size()); // refused: nothing to keep
+    f.decide(config(v1("head_sampling", override("\"ratio\":\"x\""))), 2);
+    assertEquals(FAILED, f.status().getStatus());
+    assertTrue(f.status().getErrorMessage().startsWith("head_sampling:"));
+    assertNull(f.apply());
+    assertEquals(Policy.full(quarter), effective(f.effective()));
+    // A step without an input, or on a state that isn't one, is an error.
+    assertThrows(IllegalArgumentException.class,
+        () -> f.layer.step(SettingsProto.AgentStep.newBuilder().setAgent(f.out.getAgent()).build()));
+    assertThrows(IllegalArgumentException.class, () -> f.layer.step(SettingsProto.AgentStep.newBuilder()
+        .setAgent(ByteString.copyFrom(new byte[] {(byte) 0xff})).setTimer(SettingsProto.ExportCounts.getDefaultInstance())
+        .build()));
 
     // The policy is the remote config's only file: another beside it, or none, is refused.
     Opamp.AgentConfigObject other = Opamp.AgentConfigObject.newBuilder().setBody(ByteString.copyFromUtf8("{}"))
@@ -84,49 +162,21 @@ class SdkSettingsTest {
     Opamp.AgentRemoteConfig none = config(quarter).toBuilder()
         .setConfig(Opamp.AgentConfigMap.newBuilder().putConfigMap("other.json", other)).build();
     for (Opamp.AgentRemoteConfig c : List.of(beside, none)) {
-      SettingsProto.Decision r = layer.decide(c, d.getCurrent(), l.getCurrent(), DECLARING, 0, KEEP);
-      assertEquals(FAILED, r.getStatus().getStatus());
-      assertTrue(r.getStatus().getErrorMessage().startsWith("config_map:"), r.getStatus().getErrorMessage());
+      f.decide(c, 3);
+      assertEquals(FAILED, f.status().getStatus());
+      assertTrue(f.status().getErrorMessage().startsWith("config_map:"), f.status().getErrorMessage());
     }
   }
 
-  /** A save that keeps nothing, for a host that has somewhere to keep state. */
-  static final SdkSettings.Saver KEEP = doc -> { };
-
-  /**
-   * Decide, then commit (#215): the integration saves what the layer asks it to keep, and the layer
-   * answers from how that went, the same in every language.
-   */
   @Test
-  void theSaveTheLayerAsksForDecidesTheAnswer() {
-    String half = v1("head_sampling", override("\"ratio\":0.5"));
+  void aNextStartChangeNeedsSomewhereToKeepState() {
     String quarter = v1("head_sampling", override("\"ratio\":0.25"));
-    ByteString current = ByteString.copyFromUtf8(half);
-    SettingsProto.Decision failed = layer.decide(config(quarter), current, current, DECLARING,
-        0, doc -> {
-          throw new java.io.IOException("No space left on device");
-        });
-    assertEquals(FAILED, failed.getStatus().getStatus());
-    assertEquals("can't save the settings: No space left on device", failed.getStatus().getErrorMessage());
-    assertFalse(failed.hasApply());
-    assertEquals(current, failed.getCurrent());
-    assertEquals(Policy.full(half), effective(failed.getEffective()));
-    // Whatever stops the save refuses the config.
-    SettingsProto.Decision odd = layer.decide(config(quarter), current, current, DECLARING, 0,
-        doc -> {
-          throw new IllegalStateException();
-        });
-    assertEquals("can't save the settings: java.lang.IllegalStateException", odd.getStatus().getErrorMessage());
     // Nowhere to keep state: a live change is applied, a next-start one refused.
-    SettingsProto.Decision live = layer.decide(config(quarter), current, current, DECLARING, 0, null);
-    assertEquals(APPLIED, live.getStatus().getStatus());
+    assertEquals(APPLIED, new Flow(DECLARING, false, null).decide(config(quarter)).status().getStatus());
     String redis = every("instrumentations", override("\"disabled\":[\"redis\"]"));
-    SettingsProto.Decision later = layer.decide(config(redis), current, current, DECLARING, 0, null);
     assertEquals("instrumentations: takes effect at the next start, which needs somewhere to keep state",
-        later.getStatus().getErrorMessage());
-    SettingsProto.Decision saved = layer.decide(config(redis), current, current, DECLARING, 0, KEEP);
-    assertEquals(APPLIED, saved.getStatus().getStatus());
-    assertEquals(List.of("deactivate_instrumentations"), saved.getPendingRestartList());
+        new Flow(DECLARING, false, null).decide(config(redis)).status().getErrorMessage());
+    assertEquals(APPLIED, new Flow(DECLARING).decide(config(redis)).status().getStatus());
   }
 
   /** A non-identifying attribute of the description: a string as itself, an array joined by commas. */
@@ -175,15 +225,14 @@ class SdkSettingsTest {
 
   @Test
   void aLogLevelArrivesAsTheLowestSeverityNumberToExport() {
+    Flow f = new Flow(DECLARING);
+    assertFalse(f.apply().hasSendLogsMinSeverity()); // local: every severity
     String doc = every("log_levels", override("\"level\":\"warn\""));
-    SettingsProto.Decision d = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY, DECLARING, 0, null);
-    assertEquals(APPLIED, d.getStatus().getStatus());
-    assertTrue(d.getApply().hasSendLogsMinSeverity());
-    assertEquals(13, d.getApply().getSendLogsMinSeverity());
-    assertEquals(Policy.sorted(doc), effective(d.getEffective()));
-    // Local: every severity.
-    assertFalse(layer.load(every().getBytes(StandardCharsets.UTF_8), DECLARING, 0).getSettings()
-        .hasSendLogsMinSeverity());
+    f.decide(config(doc));
+    assertEquals(APPLIED, f.status().getStatus());
+    assertTrue(f.apply().hasSendLogsMinSeverity());
+    assertEquals(13, f.apply().getSendLogsMinSeverity());
+    assertEquals(Policy.sorted(doc), effective(f.effective()));
   }
 
   /** A host that declares every setting: each live one at once, each next-start one at the next start. */
@@ -204,9 +253,9 @@ class SdkSettingsTest {
         "attribute_redaction", override("\"mask\":[\"User.Email\"],\"drop\":[\"*token*\"]"),
         "trace_rate_limit", override("\"traces_per_second\":50"),
         "log_rate_limit", override("\"records_per_second\":0.5"));
-    SettingsProto.Decision d = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY, DECLARING, NOW, null);
-    assertEquals(APPLIED, d.getStatus().getStatus());
-    SettingsProto.Settings s = d.getApply();
+    Flow d = new Flow(DECLARING).decide(config(doc));
+    assertEquals(APPLIED, d.status().getStatus());
+    SettingsProto.Settings s = d.apply();
     assertEquals(1, s.getSamplingRulesCount());
     SettingsProto.SamplingRule rule = s.getSamplingRules(0);
     assertEquals(0.0, rule.getRate());
@@ -219,73 +268,78 @@ class SdkSettingsTest {
     assertEquals(50.0, s.getSamplingTracesPerSecond());
     assertEquals(0.5, s.getSendLogsPerSecond());
     // Undeclared: refused, and nothing is in force.
-    SettingsProto.Decision plain = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY,
-        SettingsProto.Host.newBuilder().addLive("sampling_rate").build(), NOW, null);
-    assertEquals(FAILED, plain.getStatus().getStatus());
-    assertFalse(plain.hasApply());
-    assertTrue(plain.getStatus().getErrorMessage().endsWith(": this SDK cannot apply the requested override"),
-        plain.getStatus().getErrorMessage());
+    Flow plain = new Flow(SettingsProto.Host.newBuilder().addLive("sampling_rate").build()).decide(config(doc));
+    assertEquals(FAILED, plain.status().getStatus());
+    assertNull(plain.apply());
+    assertTrue(plain.status().getErrorMessage().endsWith(": this SDK cannot apply the requested override"),
+        plain.status().getErrorMessage());
   }
 
   @Test
   void anOverrideTheHostDoesNotCarryOutIsRefused() {
     SettingsProto.Host host = SettingsProto.Host.newBuilder().addLive("sampling_rate").build();
     String in = v1("head_sampling", override("\"ratio\":0.5"));
-    SettingsProto.Decision d = layer.decide(config(in), ByteString.EMPTY, ByteString.EMPTY, host, NOW, null);
-    assertEquals(APPLIED, d.getStatus().getStatus());
+    Flow f = new Flow(host).decide(config(in));
+    assertEquals(APPLIED, f.status().getStatus());
     // A refusal names the control, or the control and its field.
-    SettingsProto.Decision v1 = layer.decide(config(v1("head_sampling", override("\"ratio\":0.5"),
-        "signal_exports", exports("", "", "off"))), d.getCurrent(), ByteString.EMPTY, host, NOW, null);
-    assertEquals(FAILED, v1.getStatus().getStatus());
-    assertEquals("signal_exports.logs: this SDK cannot apply the requested override", v1.getStatus().getErrorMessage());
-    assertFalse(v1.hasApply());
-    assertEquals(d.getCurrent(), v1.getCurrent());
-    assertEquals(Policy.full(in), effective(v1.getEffective()));
-    SettingsProto.Decision field = layer.decide(config(every("instrumentations", override("\"disabled\":[\"otelhttp\"]"))),
-        d.getCurrent(), ByteString.EMPTY, host, NOW, KEEP);
-    assertEquals(FAILED, field.getStatus().getStatus());
+    f.decide(config(v1("head_sampling", override("\"ratio\":0.5"), "signal_exports", exports("", "", "off"))), 2);
+    assertEquals(FAILED, f.status().getStatus());
+    assertEquals("signal_exports.logs: this SDK cannot apply the requested override", f.status().getErrorMessage());
+    assertNull(f.apply());
+    assertEquals(Policy.full(in), effective(f.effective()));
+    f.decide(config(every("instrumentations", override("\"disabled\":[\"otelhttp\"]"))), 3);
+    assertEquals(FAILED, f.status().getStatus());
     assertEquals("instrumentations: disabled: this SDK cannot apply the requested override",
-        field.getStatus().getErrorMessage());
+        f.status().getErrorMessage());
+    // A host naming what is no setting has a bug: an error, saying which.
+    IllegalArgumentException bad = assertThrows(IllegalArgumentException.class,
+        () -> new Flow(SettingsProto.Host.newBuilder().addLive("send_metric").build()));
+    assertTrue(bad.getMessage().contains("send_metric"), bad.getMessage());
   }
 
   @Test
-  void debugModeArrivesFoldedInAndARefreshAtItsEndEndsIt() {
+  void debugModeArrivesFoldedInAndTheTimerAtItsEndEndsIt() {
     String doc = every("head_sampling", override("\"ratio\":0.1"),
         "debug", override("\"until\":\"2026-10-14T12:30:00Z\",\"log_level\":\"info\""));
-    SettingsProto.Decision d = layer.decide(config(doc), ByteString.EMPTY, ByteString.EMPTY, DECLARING, NOW, KEEP);
-    assertEquals(1.0, d.getApply().getSamplingRate());
-    assertEquals(9, d.getApply().getSendLogsMinSeverity());
-    long end = NOW + 30 * 60_000;
-    assertEquals(end, d.getRefreshAtUnixMs());
-    SettingsProto.Refreshed r = layer.refresh(d.getCurrent(), ByteString.EMPTY, DECLARING, end);
-    assertEquals(0.1, r.getSettings().getSamplingRate());
-    assertFalse(r.getSettings().hasSendLogsMinSeverity());
-    assertEquals(0, r.getRefreshAtUnixMs());
-    assertEquals(Policy.sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(r.getEffective()));
-    assertEquals(end, layer.load(d.getCurrent().toByteArray(), DECLARING, NOW).getRefreshAtUnixMs());
+    Flow f = new Flow(DECLARING).decide(config(doc), 0);
+    assertEquals(1.0, f.apply().getSamplingRate());
+    assertEquals(9, f.apply().getSendLogsMinSeverity());
+    long end = 30 * 60_000;
+    assertEquals(NOW + end, f.state().getRefreshAtUnixMs());
+    assertTrue(f.out.getWakeAtMonoMs() > 0 && f.out.getWakeAtMonoMs() <= NOW + end);
+    f.step(end, SettingsProto.AgentStep.newBuilder().setTimer(SettingsProto.ExportCounts.getDefaultInstance()));
+    assertEquals(0.1, f.apply().getSamplingRate());
+    assertFalse(f.apply().hasSendLogsMinSeverity());
+    assertEquals(0, f.state().getRefreshAtUnixMs());
+    assertEquals(Policy.sorted(every("head_sampling", override("\"ratio\":0.1"))), effective(f.effective()));
   }
 
   @Test
-  void exportHealthIsSentAtTheFirstCallAndOnAFailureAndHeldWhileNothingChanges() {
-    SettingsProto.HealthReport first = layer.health(SettingsProto.ExportCounts.getDefaultInstance(), null, NOW, null, List.of());
-    assertTrue(first.getSend());
-    assertEquals(3, first.getExporters().getComponentHealthMapCount());
-    assertEquals("ok", first.getExporters().getStatus());
-    assertFalse(layer.health(SettingsProto.ExportCounts.getDefaultInstance(), first, NOW + 30_000, null, List.of()).getSend());
-    SettingsProto.HealthReport failed = layer.health(SettingsProto.ExportCounts.newBuilder()
-        .setTraces(SettingsProto.SignalCounts.newBuilder().setExportsFailed(1).setItemsFailed(512).setLastFailed(true)
-            .setLastError("connection refused")).build(),
-        first, NOW + 30_000, SettingsProto.Settings.newBuilder().setSendLogs(false).build(),
-        List.of(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("zipkin").build()));
-    assertTrue(failed.getSend());
+  void exportHealthIsSentWhenBuiltAndOnAFailureAndHeldWhileNothingChanges() {
+    Flow f = new Flow(DECLARING);
+    f.step(0, SettingsProto.AgentStep.newBuilder().setBuilt(SettingsProto.AgentBuilt.newBuilder().setService("checkout")));
+    f.step(0, exporters(SettingsProto.ExportCounts.getDefaultInstance()));
+    Opamp.ComponentHealth first = f.health().getComponentHealthMapMap().get("exporters");
+    assertEquals(3, first.getComponentHealthMapCount());
+    assertEquals("ok", first.getStatus());
+    assertNull(f.step(30_000, exporters(SettingsProto.ExportCounts.getDefaultInstance())).health());
+    f.step(60_000, SettingsProto.AgentStep.newBuilder().setExporters(SettingsProto.AgentExporters.newBuilder()
+        .setCounts(SettingsProto.ExportCounts.newBuilder()
+            .setTraces(SettingsProto.SignalCounts.newBuilder().setExportsFailed(1).setItemsFailed(512)
+                .setLastFailed(true).setLastError("connection refused")))
+        .addExporters(SettingsProto.Exporter.newBuilder().setSignal("traces").setName("zipkin"))));
+    Opamp.ComponentHealth failed = f.health().getComponentHealthMapMap().get("exporters");
     // Each exporter is a child of its signal: one the gates don't reach is ungoverned, healthy all the same.
-    Opamp.ComponentHealth zipkin = failed.getExporters().getComponentHealthMapMap().get("traces")
+    Opamp.ComponentHealth zipkin = failed.getComponentHealthMapMap().get("traces")
         .getComponentHealthMapMap().get("zipkin");
     assertEquals("ungoverned", zipkin.getStatus());
     assertTrue(zipkin.getHealthy());
-    assertFalse(failed.getExporters().getHealthy());
-    assertEquals("connection refused", failed.getExporters().getComponentHealthMapMap().get("traces").getLastError());
-    assertEquals("off", failed.getExporters().getComponentHealthMapMap().get("logs").getStatus());
+    assertFalse(failed.getHealthy());
+    assertEquals("connection refused", failed.getComponentHealthMapMap().get("traces").getLastError());
+  }
+
+  private static SettingsProto.AgentStep.Builder exporters(SettingsProto.ExportCounts counts) {
+    return SettingsProto.AgentStep.newBuilder().setExporters(SettingsProto.AgentExporters.newBuilder().setCounts(counts));
   }
 
   static final ObjectMapper JSON = new ObjectMapper();
@@ -343,7 +397,7 @@ class SdkSettingsTest {
 
   /**
    * testdata/start.json: the policy to start with comes from the last config applied in the core's
-   * saved state, else from the policy kept before. A config applied without a policy starts from the
+   * saved state, else the SDK's own. A config applied without a policy starts from the
    * SDK's own settings, with a warning.
    */
   @TestFactory
@@ -352,10 +406,9 @@ class SdkSettingsTest {
     for (JsonNode c : JSON.readTree(testdata().resolve("start.json").toFile()).get("cases")) {
       tests.add(DynamicTest.dynamicTest(c.get("name").asText(), () -> {
         byte[] coreState = c.has("core_state") ? HexFormat.of().parseHex(c.get("core_state").asText()) : null;
-        byte[] saved = c.has("saved") ? c.get("saved").asText().getBytes(StandardCharsets.UTF_8) : null;
-        SettingsProto.Loaded loaded = layer.loadFrom(coreState, saved, EVERY, 0);
-        assertEquals(c.get("want").asText(), loaded.getCurrent().toStringUtf8());
-        assertEquals(c.get("warns").asBoolean(), !loaded.getWarning().isEmpty(), loaded.getWarning());
+        Flow f = new Flow(EVERY, true, coreState);
+        assertEquals(c.get("want").asText(), f.state().getCurrent().toStringUtf8());
+        assertEquals(c.get("warns").asBoolean(), f.warned());
       }));
     }
     return tests.stream();
