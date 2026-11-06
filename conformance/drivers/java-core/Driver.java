@@ -71,9 +71,6 @@ public class Driver {
     return Anyvalue.KeyValue.newBuilder().setKey(k).setValue(Anyvalue.AnyValue.newBuilder().setStringValue(v)).build();
   }
 
-  /** The custom capability DRIVERS.md names: ping is answered with pong. */
-  static final String ECHO = "io.opentelemetry.echo";
-
   /** The components DRIVERS.md names: an OTLP receiver (with its version) and a debug exporter. */
   static Opamp.AvailableComponents components() {
     Opamp.ComponentDetails otlp = Opamp.ComponentDetails.newBuilder().addMetadata(kv("version", "1.0.0")).build();
@@ -149,8 +146,6 @@ public class Driver {
       }
       builder.tls(tls.build());
     }
-    // Package files come the same way as messages: the same TLS (DRIVER_CA_FILE) and proxy, and no
-    // redirect followed (the core decides).
     // An HTTP proxy. Its credentials go through CONNECT tunnels only because clients.toml runs
     // the JVM with -Djdk.http.auth.tunneling.disabledSchemes= (java/opamp/README.md). In core mode
     // the core speaks to the proxy itself: http://, https://, socks5:// or socks5h://, with
@@ -160,7 +155,6 @@ public class Driver {
       builder.proxy(proxy);
     }
     builder.acceptConnectionSettings("1".equals(System.getenv("DRIVER_ACCEPT_CONNECTION_SETTINGS")));
-    builder.acceptPackages("1".equals(System.getenv("DRIVER_PACKAGES")));
     builder.requestInstanceUid("1".equals(System.getenv("DRIVER_REQUEST_UID")));
     OpampClient.Config config = builder.build();
     // DRIVER_THROW_ON_CONFIG: the callback itself throws on the first remote config (RULE-SHELL-02).
@@ -178,10 +172,7 @@ public class Driver {
             .build(),
         Opamp.EffectiveConfig.newBuilder().setConfigMap(Opamp.AgentConfigMap.getDefaultInstance()).build(),
         null,
-        "1".equals(System.getenv("DRIVER_COMPONENTS")) ? components() : null,
-        "1".equals(System.getenv("DRIVER_CUSTOM"))
-            ? Opamp.CustomCapabilities.newBuilder().addCapabilities(ECHO).build()
-            : null);
+        "1".equals(System.getenv("DRIVER_COMPONENTS")) ? components() : null);
     try {
       client.complete(OpampClient.start(config, status, n -> {
         switch (n) {
@@ -216,34 +207,6 @@ public class Driver {
                 .setStatus(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED)
                 .build());
           }
-          case Notification.CustomMessage cm -> {
-            Opamp.CustomMessage m = cm.message();
-            emit("custom_message", "capability", m.getCapability(), "type", m.getType(),
-                "data", HexFormat.of().formatHex(m.getData().toByteArray()));
-            if (m.getType().equals("ping")) {
-              client.join().sendCustomMessage(
-                  Opamp.CustomMessage.newBuilder().setCapability(ECHO).setType("pong").setData(m.getData()).build());
-            }
-          }
-          case Notification.CustomMessageNotSent ns -> emit("custom_message_not_sent", "reason", ns.reason());
-          case Notification.InstallPackage ip -> {
-            String sha = null;
-            String error = null;
-            try {
-              sha = HexFormat.of().formatHex(
-                  java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(ip.path())));
-            } catch (java.io.IOException | java.security.NoSuchAlgorithmException e) {
-              error = String.valueOf(e);
-            }
-            emit("install_package", "name", ip.name(), "version", ip.pkg().getVersion(), "sha256", sha, "error", error);
-            client.join().packageInstalled(ip.name(), ip.pkg().getHash().toByteArray(), error);
-          }
-          case Notification.RemovePackage rp -> {
-            emit("remove_package", "name", rp.name());
-            client.join().packageRemoved(rp.name());
-          }
-          case Notification.ServerCustomCapabilities sc ->
-              emit("server_custom_capabilities", "capabilities", String.join(",", sc.capabilities()));
           case Notification.ConnectionSettings s -> {
             Opamp.ConnectionSettingsOffers offers = s.settings();
             emit("telemetry_settings", "hash", HexFormat.of().formatHex(offers.getHash().toByteArray()),

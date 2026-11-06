@@ -19,7 +19,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
 import logfire_fleet_otel
-from _policy import FILE, config_map, off, overrides, policy
+from _policy import FILE, config_map, layer_decide, off, overrides, policy
 from kept import keep_applied
 from logfire_fleet_otel import Agent, Controls
 
@@ -83,7 +83,7 @@ LOCAL = policy().encode()
 
 def typed(settings, now: int = NOW, host: settings_pb2.Host = HOST) -> settings_pb2.Settings:
     """The settings as the layer hands them to this package, for a server's policy."""
-    d = LAYER.decide(config(settings), LOCAL, LOCAL, host, now)
+    d = layer_decide(LAYER, config(settings), host, now)
     assert d.status.status == APPLIED, d.status.error_message
     return d.apply
 
@@ -205,7 +205,7 @@ def test_scope_levels_are_declared_only_where_the_package_built_the_sdk(tmp_path
     # Another configurator's SDK: not this package's gates, so refused, never in force.
     other = logfire_fleet_otel.sdk_host(configured=False, governed=False)
     assert "send_logs_level_by_scope" not in other.live
-    d = LAYER.decide(config(doc), LOCAL, LOCAL, other, NOW)
+    d = layer_decide(LAYER, config(doc), other, NOW)
     assert d.status.status == FAILED and not d.HasField("apply")
     assert d.status.error_message == "log_levels: scopes: this SDK cannot apply the requested override"
 
@@ -334,7 +334,7 @@ def test_send_logs_false_drops_before_the_cap_takes_anything():
 
 def test_a_bad_cap_is_failed():
     for bad in (0, -1, 1000001, "x"):
-        d = LAYER.decide(config({"log_rate_limit": {"records_per_second": bad}}), LOCAL, LOCAL, HOST, NOW)
+        d = layer_decide(LAYER, config({"log_rate_limit": {"records_per_second": bad}}), HOST, NOW)
         assert d.status.status == FAILED, bad
         assert d.status.error_message == ("log_rate_limit: records_per_second must be a number more than 0, "
                                           "at most 1000000"), bad
@@ -892,7 +892,7 @@ def test_bad_rules_are_failed_naming_the_rule():
                        ([{"rate": 1}, {"rate": 1, "route": "/x"}], "sampling_rules: rules[1].route"),
                        ([{"rate": 1, "kind": "sideways"}], "sampling_rules: rules[0].kind"),
                        ([{"name": "x"}], "sampling_rules: rules[0].rate: missing")):
-        d = LAYER.decide(config({"sampling_rules": {"rules": rules}}), LOCAL, LOCAL, HOST, NOW)
+        d = layer_decide(LAYER, config({"sampling_rules": {"rules": rules}}), HOST, NOW)
         assert d.status.status == FAILED and why in d.status.error_message, (rules, d.status.error_message)
 
 
@@ -931,6 +931,16 @@ def agent_at(clocks: Clocks, state, **env) -> Agent:
     return agent
 
 
+def refresh_at(agent: Agent) -> int:
+    """When the agent's flow asks the layer again (debug mode's end), in Unix milliseconds (0: never)."""
+    return settings_pb2.AgentState.FromString(agent._flow).refresh_at_unix_ms
+
+
+def flow_health(agent: Agent) -> settings_pb2.HealthReport:
+    """The export health the agent's flow last built."""
+    return settings_pb2.AgentState.FromString(agent._flow).health
+
+
 def eff(agent: Agent) -> dict:
     """The controls the agent's effective config reports overridden."""
     return overrides(agent.effective)
@@ -950,12 +960,17 @@ DEBUG = vectors("debug") + [c for c in vectors("saving") if all(s.get("save") !=
 
 @pytest.mark.parametrize("case", DEBUG, ids=ids(DEBUG))
 def test_debug_mode_and_saving_over_time_are_what_the_shared_vectors_say_through_the_agent(case, tmp_path):
+    if any(step["now_unix_ms"] == 0 for step in case["steps"]):
+        pytest.skip("a host that gives no time is another SDK's case: this one always has a clock")
     clocks = Clocks()
     nowhere = any(step.get("save") == "nowhere" for step in case["steps"])
     state = "none" if nowhere else tmp_path
     agent = agent_at(clocks, state)
     for step in case["steps"]:
-        clocks.wall = step["now_unix_ms"]
+        # The clocks move together, and whatever is due then goes off, as on the timer's thread.
+        clocks.advance(step["now_unix_ms"] - clocks.wall)
+        with agent._lock:
+            agent._tick()
         if step["call"] == "decide":
             status = agent.remote_config(config(step["document"].encode()))
             want_status = {"applied": APPLIED, "failed": FAILED}[step["want"].get("status", "applied")]
@@ -965,13 +980,11 @@ def test_debug_mode_and_saving_over_time_are_what_the_shared_vectors_say_through
                 keep_applied(tmp_path, step["document"].encode())  # as the client does, before APPLIED goes out
         elif step["call"] == "load":
             agent = agent_at(clocks, state)  # a restart
-        else:
-            agent._refresh(step["now_unix_ms"])
         want = step["want"]
         if "sampling_rate" in want:
             assert agent.controls.sampler._rate == want["sampling_rate"]
         if "refresh_at_unix_ms" in want:
-            assert agent._refresh_at == want["refresh_at_unix_ms"]
+            assert refresh_at(agent) == want["refresh_at_unix_ms"]
         if "effective" in want:
             assert reported_text(agent) == want["effective"]
 
@@ -979,23 +992,25 @@ def test_debug_mode_and_saving_over_time_are_what_the_shared_vectors_say_through
 def test_the_timer_ends_debug_mode_at_its_deadline_and_reports_it(tmp_path):
     clocks = Clocks()
     agent = agent_at(clocks, tmp_path)
-    reported = []
-    agent.client = type("Client", (), {"set_effective_config": lambda self, e: reported.append(e)})()
+    agent.client = client = FakeClient()
     agent.remote_config(config({"head_sampling": {"ratio": 0.1}, "log_levels": {"level": "error", "scopes": {"noisy": "off"}},
                                 "sampling_rules": {"rules": [{"rate": 0}]},
                                 "debug": {"until": "2026-10-14T12:10:00Z", "log_level": "info"}}))
     c = agent.controls
     assert (c.sampler._rate, c.logs_min_severity, c.logs_scope_levels, c.sampler._rules) == (1, 9, (), ())
-    assert agent._tick() == pytest.approx(600)
+    assert refresh_at(agent) == NOW + 600_000
     clocks.advance(599_999)
-    assert agent._tick() == pytest.approx(0.001) and c.sampler._rate == 1  # still in debug: half-open
+    agent._wake_at = clocks.mono  # the timer goes off: still in debug, half-open
+    agent._tick()
+    assert c.sampler._rate == 1
     clocks.advance(1)
-    assert agent._tick() is None  # due: refreshed, nothing more to wait for
+    agent._tick()  # due: debug mode ends
+    assert refresh_at(agent) == 0
     assert (c.sampler._rate, c.logs_min_severity, c.logs_scope_levels) == (0.1, 17, (("noisy", 0xFFFF),))
     assert len(c.sampler._rules) == 1
     assert eff(agent) == {"head_sampling": {"ratio": 0.1}, "log_levels": {"level": "error", "scopes": {"noisy": "off"}},
                           "sampling_rules": {"rules": [{"rate": 0}]}}
-    assert reported and reported[-1] is agent.effective
+    assert client.effective and client.effective[-1] == agent.effective
 
 
 def test_a_wall_clock_set_back_doesnt_hold_debug_mode_open(tmp_path):
@@ -1005,7 +1020,7 @@ def test_a_wall_clock_set_back_doesnt_hold_debug_mode_open(tmp_path):
     clocks.mono += 600  # ten minutes pass...
     clocks.wall -= 3_600_000  # ...while the wall clock is set back an hour
     agent._tick()
-    assert agent.controls.sampler._rate == 0.1 and agent._refresh_at == 0
+    assert agent.controls.sampler._rate == 0.1 and refresh_at(agent) == 0
 
 
 def test_a_failed_config_after_the_wall_clock_passed_debug_until_ends_debug_mode(tmp_path):
@@ -1020,7 +1035,7 @@ def test_a_failed_config_after_the_wall_clock_passed_debug_until_ends_debug_mode
     assert s.status == FAILED
     # What is in force is what is reported: debug mode is over.
     assert eff(agent) == {"head_sampling": {"ratio": 0.1}}
-    assert agent.controls.sampler._rate == 0.1 and agent._refresh_at == 0
+    assert agent.controls.sampler._rate == 0.1 and refresh_at(agent) == 0
 
 
 def test_a_newer_decision_replaces_the_timer_so_the_old_one_does_nothing(tmp_path):
@@ -1031,9 +1046,9 @@ def test_a_newer_decision_replaces_the_timer_so_the_old_one_does_nothing(tmp_pat
     agent.remote_config(config({"head_sampling": {"ratio": 0.2}, "debug": {"until": "2026-10-14T12:30:00Z"}}))
     clocks.advance(540_000)  # the first window's end: nothing happens
     agent._tick()
-    assert agent.controls.sampler._rate == 1 and agent._refresh_at == NOW + 30 * 60_000
+    assert agent.controls.sampler._rate == 1 and refresh_at(agent) == NOW + 30 * 60_000
     agent.remote_config(config({"head_sampling": {"ratio": 0.2}}))  # debug local: debug ends at once
-    assert agent._refresh_deadline is None and agent._tick() is None
+    assert refresh_at(agent) == 0
     assert agent.controls.sampler._rate == 0.2
 
 
@@ -1049,7 +1064,7 @@ def test_caps_redaction_and_send_switches_stay_in_debug_mode(tmp_path):
 
 def test_debug_mode_is_refused_where_the_package_didnt_build_the_sdk():
     other = logfire_fleet_otel.sdk_host(configured=False, governed=False)
-    d = LAYER.decide(config({"debug": {"until": "2026-10-14T12:10:00Z"}}), LOCAL, LOCAL, other, NOW)
+    d = layer_decide(LAYER, config({"debug": {"until": "2026-10-14T12:10:00Z"}}), other, NOW)
     assert d.status.status == FAILED and not d.HasField("apply") and not d.refresh_at_unix_ms
     assert d.status.error_message == "debug: until: this SDK cannot apply the requested override"
 
@@ -1078,7 +1093,7 @@ def test_the_timer_thread_ends_debug_mode_on_its_own():
         deadline = time.monotonic() + 5
         while agent.controls.sampler._rate != 0.1 and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert agent.controls.sampler._rate == 0.1 and agent._refresh_at == 0
+        assert agent.controls.sampler._rate == 0.1 and refresh_at(agent) == 0
     finally:
         agent.stop()
         timer.join(5)
@@ -1104,7 +1119,7 @@ def test_a_saved_debug_window_ends_when_the_client_cant_start(tmp_path, caplog):
         deadline = time.monotonic() + 5
         while agent.controls.sampler._rate != 0.1 and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert agent.controls.sampler._rate == 0.1 and agent._refresh_at == 0
+        assert agent.controls.sampler._rate == 0.1 and refresh_at(agent) == 0
     finally:
         agent.stop()
 
@@ -1127,15 +1142,26 @@ def attributes_of(health) -> dict:
 
 @pytest.mark.parametrize("case", HEALTH, ids=ids(HEALTH))
 def test_export_health_is_what_the_shared_vectors_say_through_the_agent(case, tmp_path):
-    clocks = Clocks()
+    # A wall clock set back is the layer's case: the agent's flow never steps back in time.
+    times = [step["now_unix_ms"] for step in case["steps"]]
+    if times != sorted(times):
+        pytest.skip("the wall clock goes back")
+    clocks = Clocks(times[0])
     agent = agent_at(clocks, tmp_path)
+    agent.client = client = FakeClient()
     for step in case["steps"]:
-        clocks.wall = step["now_unix_ms"]
-        agent._put_in_force(typed(step.get("settings", {}), step["now_unix_ms"]))
+        # The settings in force sent first, then the exporters and their counts; then the timer
+        # due goes off and the exporters are told: health is built at once.
+        clocks.advance(step["now_unix_ms"] - clocks.wall)
+        agent.remote_config(config(step.get("settings", {})))
         agent.exporters = exporters_of(step.get("exporters", []))
         counted(agent.controls, step.get("counts", {}))
+        sent = len(client.health)
         with agent._lock:
-            report = agent._export_health()
+            agent._tick()
+            agent._built("")
+        report = flow_health(agent)
+        report.send = len(client.health) > sent
         want = step["want"]
         if "send" in want:
             assert report.send == want["send"]
@@ -1168,12 +1194,20 @@ class FakeClient:
     def __init__(self) -> None:
         self.health: list = []
         self.effective: list = []
+        self.status: list = []
+        self.components: list = []
 
     def set_health(self, h) -> None:
         self.health.append(h)
 
     def set_effective_config(self, e) -> None:
         self.effective.append(e)
+
+    def set_remote_config_status(self, s) -> None:
+        self.status.append(s)
+
+    def set_available_components(self, c) -> None:
+        self.components.append(c)
 
 
 def test_the_gates_count_exports_failures_and_what_they_drop_on_purpose():
@@ -1237,11 +1271,11 @@ def test_the_timer_sends_export_health_on_a_failure_and_holds_it_while_nothing_c
     agent.client = client = FakeClient()
     agent._ticking = True  # as start() does, before its thread runs _tick
     with agent._lock:
-        first = agent._export_health()  # what start() sends with the first message
-    message = agent._health_message(first)
+        message = agent._built("")  # what start() sends with the first message
     assert message.healthy and message.component_health_map["exporters"].status == "ok"
+    client.health.clear()
     clocks.advance(30_000)
-    assert agent._tick() == pytest.approx(30)
+    agent._tick()
     assert client.health == []  # nothing changed
     agent.controls.spans(Recording(SpanExportResult.FAILURE)).export(["s"])
     clocks.advance(30_000)
@@ -1289,7 +1323,7 @@ def test_the_package_declares_every_setting_it_carries_out():
     # No SDK of the global providers' to govern: only the application's own settings.
     assert list(logfire_fleet_otel.sdk_host(configured=False, governed=False).live) == ["custom"]
     # Every declared name is a setting: the layer refuses a host naming one that isn't.
-    LAYER.load(LOCAL, every)
+    layer_decide(LAYER, config({}), every)
 
 
 # --- the native matchers against the layer's reference ones (Evaluate), on generated inputs --------

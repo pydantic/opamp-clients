@@ -46,10 +46,12 @@ Each also uses its SDK's OTLP/HTTP trace exporter: `otlptracehttp`,
 | Remote config | the application applies it | Parse it, change the SDK, then answer with `RemoteConfigStatus`, APPLIED or FAILED, and the config's hash. The client hands each config over once and one at a time, and with a state file hands the last one over again at start ([remote-config.md](remote-config.md)). |
 | Telemetry settings | the SDK's exporters | Declare `ReportsOwnMetrics`, `ReportsOwnTraces` and `ReportsOwnLogs` for the signals you export. On `ConnectionSettings`, point each exporter at `own_metrics`, `own_traces` or `own_logs`: `destination_endpoint` is the full OTLP/HTTP URL (`.../v1/metrics`), with its `headers`; an empty one switches that signal off. Rebuild the exporter and swap it in, then answer with `ConnectionSettingsStatus`, APPLIED or FAILED, and the settings' hash. You get all the settings every time, not only what changed, and with a state file again at start ([telemetry-settings.md](telemetry-settings.md)). |
 | Available components | what the application can run: its instrumentations, say | Give them at start (`available_components`), with no hash: the client computes it, sends it, and sends the full list when the server asks ([available-components.md](available-components.md)). |
-| Custom messages | what the application and its server agree on | Declare the custom capabilities (`custom_capabilities`); messages for them arrive as `CustomMessage`, and `send_custom_message` sends one back, at least once ([custom-messages.md](custom-messages.md)). |
-| Packages | extensions the application loads | With a state file and `accept_packages`, install each `InstallPackage` from the file it names (checking its signature is yours), then answer; remove each `RemovePackage`. Both must be safe to do twice: after a crash the client asks again ([packages.md](packages.md)). |
 | Health | the application's own view | `healthy: true` at start; report changes with `setHealth`. |
 | Stop | before the SDK shuts down | Stop the OpAMP client first, so the server hears the agent go (`agent_disconnect`), then shut the SDK down so it flushes. |
+
+The SDK clients take no packages, custom messages or server commands, and have no auth-header
+refresh: those are the Go Supervisor's and the Collector extension's
+([packages.md](packages.md), [custom-messages.md](custom-messages.md)).
 
 The capabilities to declare are `AcceptsRemoteConfig`. The client adds `ReportsStatus` and
 `ReportsHeartbeat` itself, and the `Reports*` bit for each status field you set.
@@ -136,11 +138,11 @@ named.
 
 | Language | Platform mode, by name | An HTTP client of the application's | Refused at start |
 |---|---|---|---|
-| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` in platform mode; a `TLS.Config` with a `ServerName` in core mode |
-| Node.js | `mode: "platform"` | takes none | `spliceDownloads: false` in platform mode |
-| Python | `Config(mode="platform")` | takes none | `splice_downloads=False` in platform mode |
-| Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally`, `spliceDownloads(false)` and a proxy that isn't `http://` |
-| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` and `SpliceDownloads = false` |
+| Go | `Mode: opamp.ModePlatform` | `Config.HTTPClient`, with platform mode named | an `HTTPClient` without `ModePlatform`; `NoSpliceDownloads` (package collector) in platform mode; a `TLS.Config` with a `ServerName` in core mode |
+| Node.js | `mode: "platform"` | takes none | nothing |
+| Python | `Config(mode="platform")` | takes none | nothing |
+| Java | `mode(OpampClient.Mode.PLATFORM)` | `httpClient(...)`, with platform mode named | an `httpClient` without `Mode.PLATFORM`; in platform mode `proxyResolveLocally` and a proxy that isn't `http://` |
+| .NET | `Mode = OpAmpMode.Platform` | `HttpClient`, with platform mode named | an `HttpClient` without `OpAmpMode.Platform`; in platform mode `ProxyResolveLocally` |
 
 The examples name no mode, so they run in core mode. The integrations of
 [sdk-settings.md](sdk-settings.md) ask for platform mode by name: keeping the client's own
@@ -177,8 +179,8 @@ lists the option in each language). The examples leave this out; a comment in ea
 bootstrap `Authorization` header goes.
 
 The core checks every header list it sends against one rule, whether the headers were configured,
-offered by the server, or added by an authentication extension. Go's `Config.AuthHeader`, which
-the Supervisor's auth extensions use, hands the core a token it renews. The core sets the token
+offered by the server, or added by an authentication extension. Go's `collector.Config.AuthHeader`
+(`go/opamp/collector`), which the Supervisor's auth extensions use, hands the core a token it renews. The core sets the token
 over the header of the same name on each later request and connection, and never saves it. A list
 the rule refuses fails that attempt, and nothing is sent.
 

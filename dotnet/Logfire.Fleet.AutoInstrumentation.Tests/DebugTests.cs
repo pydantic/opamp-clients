@@ -10,7 +10,7 @@ using Xunit;
 
 namespace Logfire.Fleet.AutoInstrumentation.Tests;
 
-/// <summary>Debug mode: the layer's Load, Decide and Refresh through the agent, on its clocks, and the one timer that ends it.</summary>
+/// <summary>Debug mode through the agent's flow, on its clocks, and the timer that ends it.</summary>
 public class DebugTests
 {
     private const ulong Noon = Vectors.Now; // 2026-10-14T12:00:00Z
@@ -30,7 +30,11 @@ public class DebugTests
         return handle;
     });
 
-    /// <summary>The timer armed last, if it is still armed.</summary>
+    /// <summary>When the flow asks the layer again, on its clock (milliseconds since the start); null: never.</summary>
+    private static ulong? RefreshDue(Agent agent) =>
+        agent.Sdk.State.HasRefreshDueMonoMs ? agent.Sdk.State.RefreshDueMonoMs : null;
+
+    /// <summary>The timer armed last, if it is still armed (the next of export health's tick and the refresh).</summary>
     private (TimeSpan Delay, Action Fire)? Armed =>
         this.timers.Count > 0 && !this.timers[^1].Handle.Disposed ? (this.timers[^1].Delay, this.timers[^1].Fire) : null;
 
@@ -55,7 +59,7 @@ public class DebugTests
     // Every case of testdata/debug.json and saving.json, each step through the agent the plugin
     // runs: a decide is a remote config (kept applied as the client keeps it, where there is a state
     // directory), a load a restart (a new agent on the same state directory), a refresh the timer's
-    // call, each at the step's time on the agent's clock. saving.json's cases whose save fails are
+    // call, each at the step's time on the agent's clocks (moving together). saving.json's cases whose save fails are
     // the layer's: here the client keeps the config applied, and its save failing holds APPLIED back
     // rather than refusing the config (the client's tests).
     [Fact]
@@ -68,16 +72,24 @@ public class DebugTests
         {
             var name = c.GetProperty("name").GetString()!;
             var steps = c.GetProperty("steps").EnumerateArray().ToList();
+            var walls = steps.Select(s => s.GetProperty("now_unix_ms").GetUInt64()).ToList();
+            if (walls.Contains(0UL) || walls.Zip(walls.Skip(1)).Any(w => w.Second < w.First))
+            {
+                continue; // the clocks here move together: a host without a wall clock, or one going back, is the layer's tests
+            }
+
             var canSave = steps.All(s => !s.TryGetProperty("save", out var v) || v.GetString() != "nowhere");
             var dir = canSave ? Path.Combine(Path.GetTempPath(), "opamp-debug-" + Guid.NewGuid()) : null;
-            this.wall = steps[0].GetProperty("now_unix_ms").GetUInt64();
+            this.wall = walls[0];
+            this.nanos = 0;
             var agent = this.Start(dir);
             try
             {
                 for (var i = 0; i < steps.Count; i++)
                 {
                     var step = steps[i];
-                    this.wall = step.GetProperty("now_unix_ms").GetUInt64();
+                    this.wall = walls[i];
+                    this.nanos = (long)(walls[i] - walls[0]) * 1_000_000;
                     RemoteConfigStatus? status = null;
                     switch (step.GetProperty("call").GetString())
                     {
@@ -95,7 +107,7 @@ public class DebugTests
                             agent = this.Start(dir);
                             break;
                         default:
-                            agent.Sdk.Refresh(this.wall);
+                            agent.Sdk.TickForTest();
                             break;
                     }
 
@@ -141,7 +153,7 @@ public class DebugTests
             }
         }
 
-        Assert.Empty(failed);
+        Assert.True(failed.Count == 0, string.Join("\n", failed));
     }
 
     [Fact]
@@ -150,15 +162,15 @@ public class DebugTests
         var agent = this.Start(null);
         try
         {
-            Assert.Null(this.Armed); // no window, no timer
+            Assert.Null(RefreshDue(agent)); // no window, nothing to ask again
             var status = agent.RemoteConfig(Vectors.Config(Policy.Of(
                 ("head_sampling", """{"ratio":0.1}"""),
                 ("debug", """{"until":"2026-10-14T12:10:00Z","sampling_ratio":1}"""))));
             Assert.Equal(RemoteConfigStatuses.Applied, status.Status);
             Assert.Equal(1, agent.Controls.Sampler.Policy.Rate);
             Assert.Contains("\"debug\"", Effective(agent.Effective));
-            var (delay, fire) = this.Armed!.Value;
-            Assert.Equal(TimeSpan.FromMinutes(10), delay);
+            Assert.Equal(10 * Minute, RefreshDue(agent));
+            var (_, fire) = this.Armed!.Value;
 
             // The wall clock jumps back an hour; the process's own clock reaches the deadline.
             this.wall = Noon - (60 * Minute);
@@ -166,7 +178,7 @@ public class DebugTests
             fire();
             Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
             Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Effective(agent.Effective));
-            Assert.Null(this.Armed);
+            Assert.Null(RefreshDue(agent));
         }
         finally
         {
@@ -186,7 +198,7 @@ public class DebugTests
             this.nanos = (long)TimeSpan.FromMinutes(5).TotalMilliseconds * 1_000_000;
             fire(); // early, by the process's clock
             Assert.Equal(1, agent.Controls.Sampler.Policy.Rate); // the debug rate (1 by default)
-            Assert.Equal(TimeSpan.FromMinutes(5), this.Armed!.Value.Delay); // armed again for the rest
+            Assert.Equal(10 * Minute, RefreshDue(agent)); // still due at the window's end
         }
         finally
         {
@@ -210,7 +222,7 @@ public class DebugTests
             Assert.Equal(RemoteConfigStatuses.Failed, status.Status);
             Assert.Equal("""{"head_sampling":{"ratio":0.1}}""", Effective(agent.Effective));
             Assert.Equal(0.1, agent.Controls.Sampler.Policy.Rate);
-            Assert.Null(this.Armed);
+            Assert.Null(RefreshDue(agent));
         }
         finally
         {
@@ -227,7 +239,7 @@ public class DebugTests
             agent.RemoteConfig(Vectors.Config(Policy.Of(("debug", """{"until":"2026-10-14T12:10:00Z","sampling_ratio":0.5}"""))));
             var (_, stale) = this.Armed!.Value;
             agent.RemoteConfig(Vectors.Config(Policy.Of(("debug", """{"until":"2026-10-14T12:20:00Z","sampling_ratio":0.5}"""))));
-            Assert.Equal(TimeSpan.FromMinutes(20), this.Armed!.Value.Delay);
+            Assert.Equal(20 * Minute, RefreshDue(agent));
             this.nanos = (long)TimeSpan.FromMinutes(10).TotalMilliseconds * 1_000_000;
             this.wall = Noon + (10 * Minute);
             stale(); // the first window's timer, already running when the second came
@@ -237,7 +249,7 @@ public class DebugTests
             // A policy with debug local ends it at once, and the timer with it.
             agent.RemoteConfig(Vectors.Config(Policy.Of(("signal_exports.logs", """{"enabled":true}"""))));
             Assert.Null(agent.Controls.Sampler.Policy.Rate);
-            Assert.Null(this.Armed);
+            Assert.Null(RefreshDue(agent));
         }
         finally
         {

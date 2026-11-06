@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
+using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -16,19 +17,19 @@ namespace Logfire.Fleet.Client.Tests;
 /// Properties of the client around the core, over random plans (FsCheck): the application's calls,
 /// each made from one of up to four threads at once (with pauses of 0-2 ms), or from inside the
 /// notification callback (so it reaches the client while it is still carrying out the step that
-/// called back), over either transport. Order is only defined per caller. Whatever the plan: every
-/// custom message reaches the server once, each caller's in the order it sent them; the server ends
-/// with the description set last; sequence numbers run without a gap; the goodbye is the last
-/// message; nothing is reported as an error. Runs: OPAMP_PROP_RUNS (default 25).
+/// called back), over either transport. Order is only defined per caller. Whatever the plan: the
+/// healths reach the server in the order each caller set them (a health set over another before it
+/// went is never sent: only the latest counts), and the server ends with the health and the
+/// description set last; sequence numbers run without a gap; the goodbye is the last message;
+/// nothing is reported as an error. Runs: OPAMP_PROP_RUNS (default 25).
 /// </summary>
 public class PropertyTests
 {
-    private const string Capability = "io.example.tick";
     private const int FromCallback = 0;
     private static readonly byte[] Uid = Enumerable.Repeat((byte)0x42, 16).ToArray();
 
     [Fact]
-    public void CallsFromAnyThreadArriveOnceAndInOrder()
+    public void CallsFromAnyThreadArriveInOrder()
     {
         var runs = int.TryParse(Environment.GetEnvironmentVariable("OPAMP_PROP_RUNS"), out var n) ? n : 25;
         var plans =
@@ -70,9 +71,11 @@ public class PropertyTests
                 got.Add(msg);
             }
 
-            // Every answer carries a custom message, so the application is called back often.
-            var tick = new CustomMessage { Capability = Capability, Type = "tick" };
-            return new ServerToAgent { InstanceUid = msg.InstanceUid, CustomMessage = tick }.ToByteArray();
+            // Every answer carries a new remote config, so the application is called back often (the
+            // callback answers each, so the core hands over the next).
+            var hash = ByteString.CopyFromUtf8($"config-{got.Count}");
+            var config = new AgentRemoteConfig { ConfigHash = hash, Config = new AgentConfigMap() };
+            return new ServerToAgent { InstanceUid = msg.InstanceUid, RemoteConfig = config }.ToByteArray();
         }
 
         var (loopback, port) = LoopbackListener.Start();
@@ -129,8 +132,9 @@ public class PropertyTests
         }
 
         var sent = Enumerable.Range(0, plan.Threads + 1).Select(_ => new List<int>()).ToArray();
-        var order = new object(); // descriptions are set under it, so the last one set is known
+        var order = new object(); // descriptions and healths are set under it, so the last one set is known
         var lastDescription = 0;
+        var lastHealth = 0;
         var errors = new List<string>();
         var burstsDone = 0;
         OpAmpClient? client = null;
@@ -153,10 +157,11 @@ public class PropertyTests
                     sent[s.Caller].Add(s.Id);
                 }
 
-                c.SendCustomMessage(new CustomMessage
+                lock (order)
                 {
-                    Capability = Capability, Type = "t", Data = ByteString.CopyFromUtf8(s.Id.ToString()),
-                });
+                    lastHealth = s.Id;
+                    c.SetHealth(new ComponentHealth { Healthy = true, Status = s.Id.ToString(CultureInfo.InvariantCulture) });
+                }
             }
         }
 
@@ -169,9 +174,13 @@ public class PropertyTests
                     errors.Add(e.ToString());
                 }
 
-                if (n is OpAmpNotification.CustomMessageNotSent x)
+                // Answered, so the core hands over the next remote config (and calls back again).
+                if (n is OpAmpNotification.RemoteConfig rc && Volatile.Read(ref client) is { } h)
                 {
-                    errors.Add($"not sent: {x.Reason}");
+                    h.SetRemoteConfigStatus(new RemoteConfigStatus
+                    {
+                        LastRemoteConfigHash = rc.Config.ConfigHash, Status = RemoteConfigStatuses.Applied,
+                    });
                 }
             }
 
@@ -200,11 +209,11 @@ public class PropertyTests
                 Endpoint = new Uri($"{(plan.Ws ? "ws" : "http")}://127.0.0.1:{port}/v1/opamp"),
                 InstanceUid = Uid,
                 HeartbeatInterval = TimeSpan.FromMilliseconds(20),
+                Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig | AgentCapabilities.ReportsHealth),
             },
             new OpAmpStatus
             {
                 Description = Description(0),
-                CustomCapabilities = new CustomCapabilities { Capabilities = { Capability } },
             },
             Notify);
         Volatile.Write(ref client, started);
@@ -274,13 +283,13 @@ public class PropertyTests
             }
         }
 
-        int[] Delivered() => Got().Where(m => m.CustomMessage?.Type == "t")
-            .Select(m => int.Parse(m.CustomMessage.Data.ToStringUtf8())).ToArray();
+        int[] Delivered() => Got().Where(m => m.Health is { Status: var st } && st.Length > 0 && char.IsAsciiDigit(st[0]))
+            .Select(m => int.Parse(m.Health.Status, CultureInfo.InvariantCulture)).ToArray();
         long[] Descriptions() => Got().Where(m => m.AgentDescription is not null)
             .Select(m => m.AgentDescription.NonIdentifyingAttributes[0].Value.IntValue).ToArray();
         for (var i = 0; i < 1000; i++)
         {
-            if ((Delivered().Order().SequenceEqual(Sent()) && Descriptions().LastOrDefault(-1) == lastDescription)
+            if ((Delivered().LastOrDefault(0) == Volatile.Read(ref lastHealth) && Descriptions().LastOrDefault(-1) == lastDescription)
                 || Errors().Length > 0)
             {
                 break;
@@ -303,11 +312,13 @@ public class PropertyTests
 
         Assert.Empty(Errors());
         var delivered = Delivered();
-        Assert.Equal(Sent(), delivered.Order().ToArray()); // each once
+        Assert.Equal(lastHealth, delivered.LastOrDefault(0)); // the last set goes
+        Assert.Subset(Sent().ToHashSet(), delivered.ToHashSet()); // only what was set
         for (var c = 0; c <= plan.Threads; c++)
         {
             var mine = steps.Where(s => s.Caller == c).Select(s => s.Id).ToHashSet();
-            Assert.Equal(sent[c], delivered.Where(mine.Contains).ToArray()); // each caller's in its order
+            var theirs = delivered.Where(mine.Contains).ToArray();
+            Assert.Equal(theirs.Order(), theirs); // each caller's in its order
         }
 
         Assert.Equal(lastDescription, Descriptions().Last());
@@ -353,11 +364,11 @@ public class PropertyTests
         }
     }
 
-    /// <summary>A step: a new description or a custom message, by caller 1..threads or from the callback (0).</summary>
+    /// <summary>A step: a new description or a new health, by caller 1..threads or from the callback (0).</summary>
     private sealed record Step(bool Describe, int Caller, int PauseMs)
     {
         public override string ToString() =>
-            $"{(this.Describe ? "describe" : "send")}@{(this.Caller == FromCallback ? "callback" : $"t{this.Caller}")}"
+            $"{(this.Describe ? "describe" : "health")}@{(this.Caller == FromCallback ? "callback" : $"t{this.Caller}")}"
             + (this.PauseMs > 0 ? $"+{this.PauseMs}ms" : string.Empty);
     }
 

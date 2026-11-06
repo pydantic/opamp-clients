@@ -21,6 +21,20 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Breaking
 
+- Python, Node.js, Java, .NET: the clients do only what every SDK uses. The server's packages
+  and downloads, custom messages, server commands and renewed auth headers are gone from them;
+  platform mode and connection settings stay (#129).
+- Go: `go/opamp` is the SDK client and does the same. What only the Supervisor and the Collector's
+  extension use moved to the new package `go/opamp/collector`: `AuthHeader`, `AcceptPackages`,
+  `MaxPackageBytes`, `DownloadTimeout`, `NoSpliceDownloads`, `Status.CustomCapabilities`,
+  `SetCustomCapabilities`, `SendCustomMessage`, `PackageInstalled`, `PackageRemoved`,
+  `FailedForNow`, `FailedLeavingUnknown`, and the kinds `Command`, `CustomMessage`,
+  `ServerCustomCapabilities`, `CustomMessageNotSent`, `InstallPackage`, `RemovePackage`. Its types
+  embed package `opamp`'s, so code that used them switches the import and the type names (#129).
+- Go, Python, Node.js, Java, .NET: the SDK settings an earlier release kept itself
+  (`sdk-settings.json` in the state directory) are no longer read at start. The settings to start
+  with are the config the client kept applied; a state directory with only the old file starts
+  with the SDK's own settings until the server sends a config (#129).
 - Go, Java, .NET: an HTTP client of the application's no longer switches the client to platform
   mode silently. Platform mode is an advanced option and must be named (`Mode: opamp.ModePlatform`,
   `mode(OpampClient.Mode.PLATFORM)`, `Mode = OpAmpMode.Platform`); an HTTP client without it is
@@ -47,6 +61,14 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Added
 
+- Python, Node.js: `logfire_fleet()` / `logfireFleet()` and `LogfireFleet`, what the Logfire
+  SDK's own `fleet` option calls (`logfire.configure(fleet=True)` with `logfire[fleet]`;
+  `configure({ fleet: true })` in `@pydantic/logfire-node` with this package beside it). The
+  Logfire SDK builds its own SDK and hands this package its head sampler, its resource and (in
+  Python) its export to Logfire at the points `configure_logfire()` uses, so nothing reads the
+  Logfire SDK's private modules and, unlike `manage()`, the sampling controls are carried out. A
+  versioned contract (`LOGFIRE_FLEET_CONTRACT`); a second `configure()` is governed under the same
+  client.
 - Supervisor installers and container image: the Collector runs with
   `--feature-gates=telemetry.newPipelineTelemetry`, so its own metrics count the items every
   receiver, processor (`batch` too) and exporter takes in and passes on. A Prometheus reader of
@@ -68,9 +90,13 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Changed
 
-- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.16.0, which the clients now pin. Core
-  0.15.0 decides which exporters the SDK policy governs and how each is named (#109); 0.16.0 names
-  the generated Java and .NET types after Logfire Fleet (#126).
+- Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
+  SDK does around a policy is the same in each language: when debug mode ends, when export health
+  is sent, and the lines it logs about reaching the server (#129).
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.17.0 (its prerelease 0.17.0-dev.1 until
+  it is released), which the clients now pin. Core 0.15.0 decides which exporters the SDK policy
+  governs and how each is named (#109); 0.16.0 names the generated Java and .NET types after
+  Logfire Fleet (#126); 0.17.0 carries only what every SDK uses (#129).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP

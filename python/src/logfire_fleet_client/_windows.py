@@ -3,10 +3,9 @@
 """Windows' side of the client's files, through the Win32 API (ctypes): what os.open's mode and
 os.replace don't do there.
 
-- The user's only. A mode of 0600 or 0700 means nothing on Windows: a new state file, download,
-  downloads directory or core tap is made with an access-control list that allows the user the
-  process runs as everything and nobody else anything, inheriting nothing (a directory's is
-  inherited by what is made in it), as the .NET and Java clients make them.
+- The user's only. A mode of 0600 means nothing on Windows: a new state file or core tap is made
+  with an access-control list that allows the user the process runs as everything and nobody else
+  anything, inheriting nothing, as the .NET and Java clients make them.
 - A rename that reaches the disk. A directory can't be flushed on Windows; MoveFileEx with
   MOVEFILE_WRITE_THROUGH returns only once the rename has been written out."""
 
@@ -33,7 +32,6 @@ _FILE_ATTRIBUTE_NORMAL = 0x80
 _INVALID_HANDLE = ctypes.c_void_p(-1).value
 _TOKEN_QUERY = 0x8
 _TOKEN_USER = 1
-_ERROR_ALREADY_EXISTS = 183
 _SDDL_REVISION_1 = 1
 _DACL_SECURITY_INFORMATION = 0x4
 
@@ -111,18 +109,18 @@ def user_sid() -> str:
     return _user
 
 
-def user_only(directory: bool = False) -> str:
+def user_only() -> str:
     """The access-control list, as SDDL: the user may do anything, nobody else anything, nothing
-    inherited (protected); a directory's is inherited by its files and directories."""
-    return f"D:P(A;{'OICI' if directory else ''};FA;;;{user_sid()})"
+    inherited (protected)."""
+    return f"D:P(A;;FA;;;{user_sid()})"
 
 
 class _Attributes(ctypes.Structure):
     _fields_ = [("nLength", ctypes.c_ulong), ("lpSecurityDescriptor", ctypes.c_void_p), ("bInheritHandle", ctypes.c_int)]
 
 
-def _with_list(directory: bool, make: Callable[[ctypes.c_void_p], Any]) -> Any:
-    return _with_sd(user_only(directory), lambda sd: make(ctypes.byref(_Attributes(ctypes.sizeof(_Attributes), sd.value, 0))))
+def _with_list(make: Callable[[ctypes.c_void_p], Any]) -> Any:
+    return _with_sd(user_only(), lambda sd: make(ctypes.byref(_Attributes(ctypes.sizeof(_Attributes), sd.value, 0))))
 
 
 def create_private(path: str, append: bool = False) -> int:
@@ -138,7 +136,7 @@ def create_private(path: str, append: bool = False) -> int:
     def make(attrs: Any) -> Any:
         return k32.CreateFileW(path, access, _FILE_SHARE_READ | _FILE_SHARE_WRITE, attrs, disposition, _FILE_ATTRIBUTE_NORMAL, None)
 
-    handle = _with_list(False, make)
+    handle = _with_list(make)
     if handle is None or handle == _INVALID_HANDLE:
         raise _fail("CreateFileW", path)
     try:
@@ -146,21 +144,6 @@ def create_private(path: str, append: bool = False) -> int:
     except BaseException:
         k32.CloseHandle(handle)
         raise
-
-
-def make_private_dir(path: str) -> bool:
-    """Make directory `path` (its parents as need be), the user's only, unless it is there: whether
-    it was made."""
-    if os.path.isdir(path):
-        return False
-    parent = os.path.dirname(os.path.abspath(path))
-    os.makedirs(parent, exist_ok=True)
-    k32, _ = _dlls()
-    if _with_list(True, lambda attrs: k32.CreateDirectoryW(path, attrs)):
-        return True
-    if ctypes.get_last_error() == _ERROR_ALREADY_EXISTS and os.path.isdir(path):
-        return False
-    raise _fail("CreateDirectoryW", path)
 
 
 def replace(src: str, dst: str, move: Callable[[str, str, int], bool] | None = None) -> None:

@@ -242,8 +242,7 @@ settings it carries out. For example, with otelhttp, a log bridge and a Promethe
   reader, so a Prometheus reader, or any reader while `OTEL_METRICS_PRODUCERS` is set, is
   `gated: false`. A global provider set in place of `Setup`'s adds an `app_provider`,
   `gated: false`, and the inventory is sent again ([above](#where-the-server-cant-reach)).
-- **Settings** are those of the host the layer is given at `Load` and `Decide`, with the same
-  clock: every one.
+- **Settings** are those of the host the agent flow is given, with the same clock: every one.
 
 ## The settings that match telemetry
 
@@ -368,16 +367,15 @@ there is no cap from the next export.
  "debug": {"mode": "override", "until": "2026-10-14T15:30:00Z", "sampling_ratio": 1, "log_level": "debug"}}
 ```
 
-The layer decides everything; the package passes it the time (`LoadAt`, `DecideAt`, with
-`time.Now()`) and runs one timer (`time.AfterFunc`). Until `until`, the settings the layer
+The layer's agent flow decides everything; the package passes it the time (`time.Now()`, wall
+and monotonic) and runs one timer (`time.AfterFunc`). Until `until`, the settings the flow
 hands over have the debug ratio and level folded in. The rules and the levels per scope wait
-until the end. Redaction, the caps and the signal exports stay as sent. Each answer says when to ask
-again (`refresh_at_unix_ms`); the timer is armed for it, in place of any earlier one, next to the
-decision and under the same lock, and a timer a newer decision replaced does nothing. When it
-goes off the package calls `Refresh`, puts what it returns in force, and reports the effective
-config, in which `debug` is local again: the server sees debug mode end, but is not needed for
-it. The wait is on Go's monotonic clock, so a wall clock moved back while it runs doesn't make
-it longer. A restart before the end, with the saved document, is still in debug mode until the
+until the end. Redaction, the caps and the signal exports stay as sent. Each output says when to
+wake it; the timer is armed for that, in place of any earlier one, under the same lock as the
+step, and a timer a newer step replaced does nothing. When it goes off the package steps the
+flow, which puts the settings without debug in force and reports the effective config, in which
+`debug` is local again: the server sees debug mode end, but is not needed for it. The wait is on
+Go's monotonic clock, so a wall clock moved back while it runs doesn't make it longer. A restart before the end, with the saved document, is still in debug mode until the
 same time; without a state directory the server sends the config again, and the window, being
 a time, is the same.
 
@@ -387,7 +385,7 @@ No setting: always on. Each gate counts, after the exporter's own retries, the e
 succeeded and failed (with the exporter's error), the spans, metric data points or log records
 in failed ones, and the items it dropped on purpose (a signal's exports off, a switched-off
 instrumentation, a level, a cap). The agent's health at start, and then every 30 s on the same
-timer as debug mode, carries what the layer's `Health` call makes of them, under
+timer as debug mode, carries what the agent flow makes of them, under
 `component_health_map["exporters"]`, with one child each for `traces`, `metrics` and `logs`:
 
 ```json
@@ -483,7 +481,7 @@ told of.
   - the application's own settings (`appsettings_test.go`): reads before any config, without a
     server and once a key is left out; the typed reads against `custom.json`'s `typed` vectors and
     their edges; every `custom.json` case through the layer and `Controls`; a function told once
-    per change and never for the same map (sent again, another way, by a Refresh at the end of
+    per change and never for the same map (sent again, another way, at the end of
     debug mode), in order, one at a time, each with its own copy; a panic recovered and logged;
     unsubscribing, also from inside a function; readers and subscribers on other goroutines; a bad
     map FAILED with nothing changed; restarts with and without a state directory, through `Setup`

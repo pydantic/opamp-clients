@@ -385,8 +385,9 @@ internal sealed class Trace(bool coreMode = false)
             case Effect.KindOneofCase.WsOpen:
                 Add(CallKind.Connect, e.WsOpen.Id);
                 break;
-            case Effect.KindOneofCase.Download:
-                Add(CallKind.Get, e.Download.Id);
+            case Effect.KindOneofCase.Download or Effect.KindOneofCase.DownloadDone or Effect.KindOneofCase.StreamSplice or Effect.KindOneofCase.Discard
+                or Effect.KindOneofCase.DownloadData:
+                this.Violation($"{Describe(e)}: this client takes no downloads (RULE-SHELL-04)");
                 break;
             case Effect.KindOneofCase.Store:
                 Add(null, e.Store.Id);
@@ -405,12 +406,6 @@ internal sealed class Trace(bool coreMode = false)
             case Effect.KindOneofCase.Cancel when coreMode:
                 this.discarded.Add(e.Cancel.Id_); // a download whose file hadn't begun, or its done not asked
                 break;
-            case Effect.KindOneofCase.Discard when coreMode:
-                this.discarded.Add(e.Discard.Id_);
-                break;
-            case Effect.KindOneofCase.DownloadDone:
-                Add(null, e.DownloadDone.Id_);
-                break;
             case Effect.KindOneofCase.ProxyQuery:
                 this.streams[e.ProxyQuery.Id] = "asking";
                 this.Tally("proxy asked");
@@ -425,10 +420,6 @@ internal sealed class Trace(bool coreMode = false)
             case Effect.KindOneofCase.StreamStartTls when this.streams.GetValueOrDefault(e.StreamStartTls.Id) == "open":
                 this.streams[e.StreamStartTls.Id] = "tls";
                 this.Tally("stream TLS");
-                break;
-            case Effect.KindOneofCase.StreamSplice:
-                this.splices[e.StreamSplice.Id] = this.splices.GetValueOrDefault(e.StreamSplice.Id) + 1;
-                this.Tally("stream spliced");
                 break;
             case Effect.KindOneofCase.StreamClose:
                 if (this.streams.TryGetValue(e.StreamClose.Id, out var was) && was is not ("failed" or "closed"))
@@ -1233,14 +1224,11 @@ internal sealed class Rig
                 Mode = this.CoreMode ? OpAmpMode.Core : OpAmpMode.Platform,
                 DirectConnection = this.CoreMode,
                 StateFile = this.stateful ? this.StateFile : null,
-                AcceptPackages = this.stateful,
                 Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig
-                    | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig | AgentCapabilities.AcceptsPackages
-                    | AgentCapabilities.ReportsPackageStatuses),
+                    | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig),
                 HeartbeatInterval = TimeSpan.FromSeconds(30),
                 RequestTimeout = TimeSpan.FromSeconds(10),
                 ConnectTimeout = TimeSpan.FromSeconds(10),
-                DownloadTimeout = TimeSpan.FromSeconds(60),
                 StopTimeout = StopTimeout,
                 TimeProvider = this.Time,
             },

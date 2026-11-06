@@ -349,13 +349,34 @@ internal static class Vectors
     /// <summary>A remote config whose only file is the policy <paramref name="document"/>.</summary>
     public static AgentRemoteConfig Config(string document) => Logfire.Fleet.Tests.Policy.Config(document);
 
+    /// <summary>What the layer decides of <paramref name="config"/>: the status, the settings it hands over and the effective config it reports (null: none).</summary>
+    public sealed record Decided(RemoteConfigStatus Status, Settings? Apply, EffectiveConfig? Effective);
+
+    /// <summary>
+    /// A remote config to an agent just started on <paramref name="host"/> at <paramref name="now"/>
+    /// (no state directory): the status the flow sends and the settings it applies.
+    /// </summary>
+    public static Decided Decide(SdkSettings layer, AgentRemoteConfig config, Host host, ulong now)
+    {
+        var started = layer.Start(new AgentStart
+        {
+            Host = host,
+            InstanceUid = ByteString.CopyFrom(new byte[16]),
+            NowUnixMs = now,
+        });
+        var output = layer.Step(new AgentStep { Agent = started.Agent, NowUnixMs = now, RemoteConfig = config });
+        return new(output.Effects.Single(e => e.EffectCase == AgentEffect.EffectOneofCase.Status).Status,
+            output.Effects.FirstOrDefault(e => e.EffectCase == AgentEffect.EffectOneofCase.Apply)?.Apply,
+            output.Effects.FirstOrDefault(e => e.EffectCase == AgentEffect.EffectOneofCase.Effective)?.Effective);
+    }
+
     /// <summary>The settings a policy puts in force, as the layer decides them at <paramref name="now"/>.</summary>
     public static Settings Settings(string document, ulong now = Now)
     {
         using var layer = new SdkSettings();
-        var d = layer.Decide(Config(document), ByteString.Empty, ByteString.Empty, Declaring(), now);
+        var d = Decide(layer, Config(document), Declaring(), now);
         Assert.True(d.Status.Status == RemoteConfigStatuses.Applied, $"{document}: {d.Status.ErrorMessage}");
-        return d.Apply;
+        return d.Apply!;
     }
 
     /// <summary>A vector's policy, as the layer decides it.</summary>

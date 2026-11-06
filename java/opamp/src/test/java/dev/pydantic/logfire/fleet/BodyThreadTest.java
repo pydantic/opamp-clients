@@ -126,26 +126,6 @@ class BodyThreadTest {
     x.close().get(10, TimeUnit.SECONDS);
   }
 
-  @Test
-  void aDownloadsBodyIsNotReadOnTheClientsThread(@TempDir Path dir) throws Exception {
-    Stalled body = new Stalled();
-    FakeHttp http = new FakeHttp();
-    http.atSend = r -> r.future.complete(new Response(r.request, 200, body));
-    LinkedBlockingQueue<CoreProto.Input> got = new LinkedBlockingQueue<>();
-    Executor x = new Executor(Transport.of(http), got::add, dir.resolve("state"));
-    runsAtOnce(x, CoreProto.Effect.newBuilder().setDownload(CoreProto.Download.newBuilder()
-        .setId(2).setUrl("http://fake/p").setTimeoutMs(30_000).setMaxBytes(1 << 20)).build());
-    String reader = body.readers.poll(5, TimeUnit.SECONDS);
-    assertNotNull(reader, "the body is read");
-    assertFalse(reader.equals("opamp-client"), "the body is read on " + reader);
-    x.run(CoreProto.Effect.newBuilder().setCancel(CoreProto.Id.newBuilder().setId(2)).build());
-    assertTrue(body.closed.await(5, TimeUnit.SECONDS), "the cancel closes the body");
-    CoreProto.Input in = got.poll(5, TimeUnit.SECONDS);
-    assertNotNull(in, "the download ends");
-    assertTrue(in.hasDownloadFailed(), "it failed: " + in);
-    x.close().get(10, TimeUnit.SECONDS);
-  }
-
   /**
    * The whole client: its first poll's response is complete before the shell reads it, and its
    * body stalls. The loop goes on all the same: the core's request timeout fires and its cancel

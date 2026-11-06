@@ -6430,175 +6430,172 @@ java.lang.String defaultValue) {
     }
   }
 
-  public interface LoadOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Load)
+  public interface AgentStartOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentStart)
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     * @return Whether the saved field is set.
-     */
-    boolean hasSaved();
-    /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     * @return The saved.
-     */
-    com.google.protobuf.ByteString getSaved();
-
-    /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      * @return Whether the host field is set.
      */
     boolean hasHost();
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      * @return The host.
      */
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost();
 
     /**
      * <pre>
-     * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-     * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+     * the host keeps state across restarts
      * </pre>
      *
-     * <code>uint64 now_unix_ms = 3;</code>
+     * <code>bool state_dir = 2;</code>
+     * @return The stateDir.
+     */
+    boolean getStateDir();
+
+    /**
+     * <pre>
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 3;</code>
+     * @return Whether the coreState field is set.
+     */
+    boolean hasCoreState();
+    /**
+     * <pre>
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
+     * </pre>
+     *
+     * <code>optional bytes core_state = 3;</code>
+     * @return The coreState.
+     */
+    com.google.protobuf.ByteString getCoreState();
+
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 7;</code>
+     * @return The instanceUid.
+     */
+    com.google.protobuf.ByteString getInstanceUid();
+
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     * @return Whether the hints field is set.
+     */
+    boolean hasHints();
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     * @return The hints.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints();
+
+    /**
+     * <pre>
+     * the wall clock, in milliseconds since the Unix epoch
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 9;</code>
      * @return The nowUnixMs.
      */
     long getNowUnixMs();
 
     /**
      * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
+     * a monotonic clock, in milliseconds
      * </pre>
      *
-     * <code>optional bytes core_state = 4;</code>
-     * @return Whether the coreState field is set.
+     * <code>uint64 now_mono_ms = 10;</code>
+     * @return The nowMonoMs.
      */
-    boolean hasCoreState();
-    /**
-     * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes core_state = 4;</code>
-     * @return The coreState.
-     */
-    com.google.protobuf.ByteString getCoreState();
+    long getNowMonoMs();
   }
   /**
    * <pre>
-   * At start, before the SDK is built: the settings of the last config applied.
+   * The agent flow: the layer's decisions over time, as a step machine shaped like the client core.
+   * AgentStart once, before the SDK is built; then AgentStep for each thing that happens (a remote
+   * config, a client notification, the timer). Each answers an AgentOutput: carry out its effects in
+   * order, keep one timer for wake_at_mono_ms (replacing any earlier one), and pass `agent` back with
+   * the next step, as it came. The host keeps no settings document, no timer of its own and no
+   * wording: put Apply in force on the SDK, hand Effective, Status and Health to the client, write
+   * SaveUid's file, and say each Log line. Steps for one agent are made one at a time, in order.
    * </pre>
    *
-   * Protobuf type {@code opamp.sdk.v1.Load}
+   * Protobuf type {@code opamp.sdk.v1.AgentStart}
    */
-  public  static final class Load extends
+  public  static final class AgentStart extends
       com.google.protobuf.GeneratedMessageLite<
-          Load, Load.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Load)
-      LoadOrBuilder {
-    private Load() {
-      saved_ = com.google.protobuf.ByteString.EMPTY;
+          AgentStart, AgentStart.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentStart)
+      AgentStartOrBuilder {
+    private AgentStart() {
       coreState_ = com.google.protobuf.ByteString.EMPTY;
+      endpoint_ = "";
+      instanceUid_ = com.google.protobuf.ByteString.EMPTY;
     }
     private int bitField0_;
-    public static final int SAVED_FIELD_NUMBER = 1;
-    private com.google.protobuf.ByteString saved_;
-    /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     * @return Whether the saved field is set.
-     */
-    @java.lang.Override
-    public boolean hasSaved() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     * @return The saved.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getSaved() {
-      return saved_;
-    }
-    /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     * @param value The saved to set.
-     */
-    private void setSaved(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  bitField0_ |= 0x00000001;
-      saved_ = value;
-    }
-    /**
-     * <pre>
-     * The document this host kept itself (sdk-settings.json, before the core kept the last config
-     * applied): read only when core_state holds no config applied. Unset: none.
-     * </pre>
-     *
-     * <code>optional bytes saved = 1;</code>
-     */
-    private void clearSaved() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      saved_ = getDefaultInstance().getSaved();
-    }
-
-    public static final int HOST_FIELD_NUMBER = 2;
+    public static final int HOST_FIELD_NUMBER = 1;
     private dev.pydantic.logfire.fleet.sdk.SettingsProto.Host host_;
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.Override
     public boolean hasHost() {
-      return ((bitField0_ & 0x00000002) != 0);
+      return ((bitField0_ & 0x00000001) != 0);
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.Override
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
       return host_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance() : host_;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
       value.getClass();  // minimal bytecode null check
       host_ = value;
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
     private void mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
@@ -6610,81 +6607,76 @@ java.lang.String defaultValue) {
       } else {
         host_ = value;
       }
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 2;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     private void clearHost() {
       host_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
+      bitField0_ = (bitField0_ & ~0x00000001);
     }
 
-    public static final int NOW_UNIX_MS_FIELD_NUMBER = 3;
-    private long nowUnixMs_;
+    public static final int STATE_DIR_FIELD_NUMBER = 2;
+    private boolean stateDir_;
     /**
      * <pre>
-     * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-     * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+     * the host keeps state across restarts
      * </pre>
      *
-     * <code>uint64 now_unix_ms = 3;</code>
-     * @return The nowUnixMs.
+     * <code>bool state_dir = 2;</code>
+     * @return The stateDir.
      */
     @java.lang.Override
-    public long getNowUnixMs() {
-      return nowUnixMs_;
+    public boolean getStateDir() {
+      return stateDir_;
     }
     /**
      * <pre>
-     * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-     * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+     * the host keeps state across restarts
      * </pre>
      *
-     * <code>uint64 now_unix_ms = 3;</code>
-     * @param value The nowUnixMs to set.
+     * <code>bool state_dir = 2;</code>
+     * @param value The stateDir to set.
      */
-    private void setNowUnixMs(long value) {
+    private void setStateDir(boolean value) {
       
-      nowUnixMs_ = value;
+      stateDir_ = value;
     }
     /**
      * <pre>
-     * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-     * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+     * the host keeps state across restarts
      * </pre>
      *
-     * <code>uint64 now_unix_ms = 3;</code>
+     * <code>bool state_dir = 2;</code>
      */
-    private void clearNowUnixMs() {
+    private void clearStateDir() {
 
-      nowUnixMs_ = 0L;
+      stateDir_ = false;
     }
 
-    public static final int CORE_STATE_FIELD_NUMBER = 4;
+    public static final int CORE_STATE_FIELD_NUMBER = 3;
     private com.google.protobuf.ByteString coreState_;
     /**
      * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
      * </pre>
      *
-     * <code>optional bytes core_state = 4;</code>
+     * <code>optional bytes core_state = 3;</code>
      * @return Whether the coreState field is set.
      */
     @java.lang.Override
     public boolean hasCoreState() {
-      return ((bitField0_ & 0x00000004) != 0);
+      return ((bitField0_ & 0x00000002) != 0);
     }
     /**
      * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
      * </pre>
      *
-     * <code>optional bytes core_state = 4;</code>
+     * <code>optional bytes core_state = 3;</code>
      * @return The coreState.
      */
     @java.lang.Override
@@ -6693,77 +6685,326 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
      * </pre>
      *
-     * <code>optional bytes core_state = 4;</code>
+     * <code>optional bytes core_state = 3;</code>
      * @param value The coreState to set.
      */
     private void setCoreState(com.google.protobuf.ByteString value) {
       java.lang.Class<?> valueClass = value.getClass();
-  bitField0_ |= 0x00000004;
+  bitField0_ |= 0x00000002;
       coreState_ = value;
     }
     /**
      * <pre>
-     * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-     * settings come from the last config applied in it, read with the core's own decoding, even
-     * after an endpoint change. Unset: none.
+     * The client's saved state, as the host keeps it: the policy to start with is the last config
+     * applied in it, read with the core's own decoding. Unset: none.
      * </pre>
      *
-     * <code>optional bytes core_state = 4;</code>
+     * <code>optional bytes core_state = 3;</code>
      */
     private void clearCoreState() {
-      bitField0_ = (bitField0_ & ~0x00000004);
+      bitField0_ = (bitField0_ & ~0x00000002);
       coreState_ = getDefaultInstance().getCoreState();
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static final int ENDPOINT_FIELD_NUMBER = 5;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * as configured: the lines name it as it is safe to log
+     * </pre>
+     *
+     * <code>string endpoint = 5;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int INSTANCE_UID_FIELD_NUMBER = 7;
+    private com.google.protobuf.ByteString instanceUid_;
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 7;</code>
+     * @return The instanceUid.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getInstanceUid() {
+      return instanceUid_;
+    }
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 7;</code>
+     * @param value The instanceUid to set.
+     */
+    private void setInstanceUid(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      instanceUid_ = value;
+    }
+    /**
+     * <pre>
+     * 16 bytes
+     * </pre>
+     *
+     * <code>bytes instance_uid = 7;</code>
+     */
+    private void clearInstanceUid() {
+
+      instanceUid_ = getDefaultInstance().getInstanceUid();
+    }
+
+    public static final int HINTS_FIELD_NUMBER = 8;
+    private dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints hints_;
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     */
+    @java.lang.Override
+    public boolean hasHints() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints() {
+      return hints_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.getDefaultInstance() : hints_;
+    }
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+      value.getClass();  // minimal bytecode null check
+      hints_ = value;
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+      value.getClass();  // minimal bytecode null check
+      if (hints_ != null &&
+          hints_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.getDefaultInstance()) {
+        hints_ =
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.newBuilder(hints_).mergeFrom(value).buildPartial();
+      } else {
+        hints_ = value;
+      }
+      bitField0_ |= 0x00000004;
+    }
+    /**
+     * <pre>
+     * SetupStarted.hints
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+     */
+    private void clearHints() {
+      hints_ = null;
+      bitField0_ = (bitField0_ & ~0x00000004);
+    }
+
+    public static final int NOW_UNIX_MS_FIELD_NUMBER = 9;
+    private long nowUnixMs_;
+    /**
+     * <pre>
+     * the wall clock, in milliseconds since the Unix epoch
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 9;</code>
+     * @return The nowUnixMs.
+     */
+    @java.lang.Override
+    public long getNowUnixMs() {
+      return nowUnixMs_;
+    }
+    /**
+     * <pre>
+     * the wall clock, in milliseconds since the Unix epoch
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 9;</code>
+     * @param value The nowUnixMs to set.
+     */
+    private void setNowUnixMs(long value) {
+      
+      nowUnixMs_ = value;
+    }
+    /**
+     * <pre>
+     * the wall clock, in milliseconds since the Unix epoch
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 9;</code>
+     */
+    private void clearNowUnixMs() {
+
+      nowUnixMs_ = 0L;
+    }
+
+    public static final int NOW_MONO_MS_FIELD_NUMBER = 10;
+    private long nowMonoMs_;
+    /**
+     * <pre>
+     * a monotonic clock, in milliseconds
+     * </pre>
+     *
+     * <code>uint64 now_mono_ms = 10;</code>
+     * @return The nowMonoMs.
+     */
+    @java.lang.Override
+    public long getNowMonoMs() {
+      return nowMonoMs_;
+    }
+    /**
+     * <pre>
+     * a monotonic clock, in milliseconds
+     * </pre>
+     *
+     * <code>uint64 now_mono_ms = 10;</code>
+     * @param value The nowMonoMs to set.
+     */
+    private void setNowMonoMs(long value) {
+      
+      nowMonoMs_ = value;
+    }
+    /**
+     * <pre>
+     * a monotonic clock, in milliseconds
+     * </pre>
+     *
+     * <code>uint64 now_mono_ms = 10;</code>
+     */
+    private void clearNowMonoMs() {
+
+      nowMonoMs_ = 0L;
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         java.nio.ByteBuffer data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(byte[] data)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(java.io.InputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -6771,24 +7012,24 @@ java.lang.String defaultValue) {
           DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseDelimitedFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseDelimitedFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -6799,100 +7040,50 @@ java.lang.String defaultValue) {
     public static Builder newBuilder() {
       return (Builder) DEFAULT_INSTANCE.createBuilder();
     }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Load prototype) {
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart prototype) {
       return DEFAULT_INSTANCE.createBuilder(prototype);
     }
 
     /**
      * <pre>
-     * At start, before the SDK is built: the settings of the last config applied.
+     * The agent flow: the layer's decisions over time, as a step machine shaped like the client core.
+     * AgentStart once, before the SDK is built; then AgentStep for each thing that happens (a remote
+     * config, a client notification, the timer). Each answers an AgentOutput: carry out its effects in
+     * order, keep one timer for wake_at_mono_ms (replacing any earlier one), and pass `agent` back with
+     * the next step, as it came. The host keeps no settings document, no timer of its own and no
+     * wording: put Apply in force on the SDK, hand Effective, Status and Health to the client, write
+     * SaveUid's file, and say each Log line. Steps for one agent are made one at a time, in order.
      * </pre>
      *
-     * Protobuf type {@code opamp.sdk.v1.Load}
+     * Protobuf type {@code opamp.sdk.v1.AgentStart}
      */
     public static final class Builder extends
         com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Load, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Load)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.LoadOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.newBuilder()
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentStart)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStartOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.newBuilder()
       private Builder() {
         super(DEFAULT_INSTANCE);
       }
 
 
       /**
-       * <pre>
-       * The document this host kept itself (sdk-settings.json, before the core kept the last config
-       * applied): read only when core_state holds no config applied. Unset: none.
-       * </pre>
-       *
-       * <code>optional bytes saved = 1;</code>
-       * @return Whether the saved field is set.
-       */
-      @java.lang.Override
-      public boolean hasSaved() {
-        return instance.hasSaved();
-      }
-      /**
-       * <pre>
-       * The document this host kept itself (sdk-settings.json, before the core kept the last config
-       * applied): read only when core_state holds no config applied. Unset: none.
-       * </pre>
-       *
-       * <code>optional bytes saved = 1;</code>
-       * @return The saved.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getSaved() {
-        return instance.getSaved();
-      }
-      /**
-       * <pre>
-       * The document this host kept itself (sdk-settings.json, before the core kept the last config
-       * applied): read only when core_state holds no config applied. Unset: none.
-       * </pre>
-       *
-       * <code>optional bytes saved = 1;</code>
-       * @param value The saved to set.
-       * @return This builder for chaining.
-       */
-      public Builder setSaved(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setSaved(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * The document this host kept itself (sdk-settings.json, before the core kept the last config
-       * applied): read only when core_state holds no config applied. Unset: none.
-       * </pre>
-       *
-       * <code>optional bytes saved = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearSaved() {
-        copyOnWrite();
-        instance.clearSaved();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       @java.lang.Override
       public boolean hasHost() {
         return instance.hasHost();
       }
       /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       @java.lang.Override
       public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
         return instance.getHost();
       }
       /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       public Builder setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
         copyOnWrite();
@@ -6900,7 +7091,7 @@ java.lang.String defaultValue) {
         return this;
         }
       /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       public Builder setHost(
           dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.Builder builderForValue) {
@@ -6909,7 +7100,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       public Builder mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
         copyOnWrite();
@@ -6917,7 +7108,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <code>.opamp.sdk.v1.Host host = 2;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       public Builder clearHost() {  copyOnWrite();
         instance.clearHost();
@@ -6926,55 +7117,51 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-       * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+       * the host keeps state across restarts
        * </pre>
        *
-       * <code>uint64 now_unix_ms = 3;</code>
-       * @return The nowUnixMs.
+       * <code>bool state_dir = 2;</code>
+       * @return The stateDir.
        */
       @java.lang.Override
-      public long getNowUnixMs() {
-        return instance.getNowUnixMs();
+      public boolean getStateDir() {
+        return instance.getStateDir();
       }
       /**
        * <pre>
-       * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-       * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+       * the host keeps state across restarts
        * </pre>
        *
-       * <code>uint64 now_unix_ms = 3;</code>
-       * @param value The nowUnixMs to set.
+       * <code>bool state_dir = 2;</code>
+       * @param value The stateDir to set.
        * @return This builder for chaining.
        */
-      public Builder setNowUnixMs(long value) {
+      public Builder setStateDir(boolean value) {
         copyOnWrite();
-        instance.setNowUnixMs(value);
+        instance.setStateDir(value);
         return this;
       }
       /**
        * <pre>
-       * The wall clock, in milliseconds since the Unix epoch. Debug mode (debug_until) is decided
-       * against it; 0 (a host built before it) makes the debug settings ones the host can't carry out.
+       * the host keeps state across restarts
        * </pre>
        *
-       * <code>uint64 now_unix_ms = 3;</code>
+       * <code>bool state_dir = 2;</code>
        * @return This builder for chaining.
        */
-      public Builder clearNowUnixMs() {
+      public Builder clearStateDir() {
         copyOnWrite();
-        instance.clearNowUnixMs();
+        instance.clearStateDir();
         return this;
       }
 
       /**
        * <pre>
-       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-       * settings come from the last config applied in it, read with the core's own decoding, even
-       * after an endpoint change. Unset: none.
+       * The client's saved state, as the host keeps it: the policy to start with is the last config
+       * applied in it, read with the core's own decoding. Unset: none.
        * </pre>
        *
-       * <code>optional bytes core_state = 4;</code>
+       * <code>optional bytes core_state = 3;</code>
        * @return Whether the coreState field is set.
        */
       @java.lang.Override
@@ -6983,12 +7170,11 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-       * settings come from the last config applied in it, read with the core's own decoding, even
-       * after an endpoint change. Unset: none.
+       * The client's saved state, as the host keeps it: the policy to start with is the last config
+       * applied in it, read with the core's own decoding. Unset: none.
        * </pre>
        *
-       * <code>optional bytes core_state = 4;</code>
+       * <code>optional bytes core_state = 3;</code>
        * @return The coreState.
        */
       @java.lang.Override
@@ -6997,12 +7183,11 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-       * settings come from the last config applied in it, read with the core's own decoding, even
-       * after an endpoint change. Unset: none.
+       * The client's saved state, as the host keeps it: the policy to start with is the last config
+       * applied in it, read with the core's own decoding. Unset: none.
        * </pre>
        *
-       * <code>optional bytes core_state = 4;</code>
+       * <code>optional bytes core_state = 3;</code>
        * @param value The coreState to set.
        * @return This builder for chaining.
        */
@@ -7013,12 +7198,11 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * The OpAMP core's saved state, as the host keeps it (what the core asked it to store): the
-       * settings come from the last config applied in it, read with the core's own decoding, even
-       * after an endpoint change. Unset: none.
+       * The client's saved state, as the host keeps it: the policy to start with is the last config
+       * applied in it, read with the core's own decoding. Unset: none.
        * </pre>
        *
-       * <code>optional bytes core_state = 4;</code>
+       * <code>optional bytes core_state = 3;</code>
        * @return This builder for chaining.
        */
       public Builder clearCoreState() {
@@ -7027,7 +7211,267 @@ java.lang.String defaultValue) {
         return this;
       }
 
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Load)
+      /**
+       * <pre>
+       * as configured: the lines name it as it is safe to log
+       * </pre>
+       *
+       * <code>string endpoint = 5;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * as configured: the lines name it as it is safe to log
+       * </pre>
+       *
+       * <code>string endpoint = 5;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * as configured: the lines name it as it is safe to log
+       * </pre>
+       *
+       * <code>string endpoint = 5;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as configured: the lines name it as it is safe to log
+       * </pre>
+       *
+       * <code>string endpoint = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * as configured: the lines name it as it is safe to log
+       * </pre>
+       *
+       * <code>string endpoint = 5;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 7;</code>
+       * @return The instanceUid.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getInstanceUid() {
+        return instance.getInstanceUid();
+      }
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 7;</code>
+       * @param value The instanceUid to set.
+       * @return This builder for chaining.
+       */
+      public Builder setInstanceUid(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setInstanceUid(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * 16 bytes
+       * </pre>
+       *
+       * <code>bytes instance_uid = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearInstanceUid() {
+        copyOnWrite();
+        instance.clearInstanceUid();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      @java.lang.Override
+      public boolean hasHints() {
+        return instance.hasHints();
+      }
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints() {
+        return instance.getHints();
+      }
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      public Builder setHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+        copyOnWrite();
+        instance.setHints(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      public Builder setHints(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHints(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      public Builder mergeHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+        copyOnWrite();
+        instance.mergeHints(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * SetupStarted.hints
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentHints hints = 8;</code>
+       */
+      public Builder clearHints() {  copyOnWrite();
+        instance.clearHints();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the wall clock, in milliseconds since the Unix epoch
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 9;</code>
+       * @return The nowUnixMs.
+       */
+      @java.lang.Override
+      public long getNowUnixMs() {
+        return instance.getNowUnixMs();
+      }
+      /**
+       * <pre>
+       * the wall clock, in milliseconds since the Unix epoch
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 9;</code>
+       * @param value The nowUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNowUnixMs(long value) {
+        copyOnWrite();
+        instance.setNowUnixMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the wall clock, in milliseconds since the Unix epoch
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 9;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNowUnixMs() {
+        copyOnWrite();
+        instance.clearNowUnixMs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * a monotonic clock, in milliseconds
+       * </pre>
+       *
+       * <code>uint64 now_mono_ms = 10;</code>
+       * @return The nowMonoMs.
+       */
+      @java.lang.Override
+      public long getNowMonoMs() {
+        return instance.getNowMonoMs();
+      }
+      /**
+       * <pre>
+       * a monotonic clock, in milliseconds
+       * </pre>
+       *
+       * <code>uint64 now_mono_ms = 10;</code>
+       * @param value The nowMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNowMonoMs(long value) {
+        copyOnWrite();
+        instance.setNowMonoMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * a monotonic clock, in milliseconds
+       * </pre>
+       *
+       * <code>uint64 now_mono_ms = 10;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNowMonoMs() {
+        copyOnWrite();
+        instance.clearNowMonoMs();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentStart)
     }
     @java.lang.Override
     @java.lang.SuppressWarnings({"ThrowNull"})
@@ -7036,7 +7480,7 @@ java.lang.String defaultValue) {
         java.lang.Object arg0, java.lang.Object arg1) {
       switch (method) {
         case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Load();
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart();
         }
         case NEW_BUILDER: {
           return new Builder();
@@ -7044,27 +7488,31 @@ java.lang.String defaultValue) {
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
               "bitField0_",
-              "saved_",
               "host_",
-              "nowUnixMs_",
+              "stateDir_",
               "coreState_",
+              "endpoint_",
+              "instanceUid_",
+              "hints_",
+              "nowUnixMs_",
+              "nowMonoMs_",
             };
             java.lang.String info =
-                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u100a\u0000\u0002" +
-                "\u1009\u0001\u0003\u0003\u0004\u100a\u0002";
+                "\u0000\b\u0000\u0001\u0001\n\b\u0000\u0000\u0000\u0001\u1009\u0000\u0002\u0007\u0003" +
+                "\u100a\u0001\u0005\u0208\u0007\n\b\u1009\u0002\t\u0003\n\u0003";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
           return DEFAULT_INSTANCE;
         }
         case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Load> parser = PARSER;
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart> parser = PARSER;
           if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.class) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.class) {
               parser = PARSER;
               if (parser == null) {
                 parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Load>(
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart>(
                         DEFAULT_INSTANCE);
                 PARSER = parser;
               }
@@ -7084,250 +7532,5751 @@ java.lang.String defaultValue) {
     }
 
 
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Load)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Load DEFAULT_INSTANCE;
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentStart)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart DEFAULT_INSTANCE;
     static {
-      Load defaultInstance = new Load();
+      AgentStart defaultInstance = new AgentStart();
       // New instances are implicitly immutable so no need to make
       // immutable.
       DEFAULT_INSTANCE = defaultInstance;
       com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Load.class, defaultInstance);
+        AgentStart.class, defaultInstance);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Load getDefaultInstance() {
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart getDefaultInstance() {
       return DEFAULT_INSTANCE;
     }
 
-    private static volatile com.google.protobuf.Parser<Load> PARSER;
+    private static volatile com.google.protobuf.Parser<AgentStart> PARSER;
 
-    public static com.google.protobuf.Parser<Load> parser() {
+    public static com.google.protobuf.Parser<AgentStart> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
 
-  public interface LoadedOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Loaded)
+  public interface AgentHintsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentHints)
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * HTTP 401 or 403
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     * @return Whether the settings field is set.
+     * <code>string refused = 1;</code>
+     * @return The refused.
      */
-    boolean hasSettings();
+    java.lang.String getRefused();
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * HTTP 401 or 403
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     * @return The settings.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings();
-
-    /**
-     * <pre>
-     * keep it: the document in force now
-     * </pre>
-     *
-     * <code>bytes current = 2;</code>
-     * @return The current.
-     */
-    com.google.protobuf.ByteString getCurrent();
-
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
-     * @return Whether the effective field is set.
-     */
-    boolean hasEffective();
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
-     * @return The effective.
-     */
-    opamp.proto.v1.Opamp.EffectiveConfig getEffective();
-
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The warning.
-     */
-    java.lang.String getWarning();
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The bytes for warning.
+     * <code>string refused = 1;</code>
+     * @return The bytes for refused.
      */
     com.google.protobuf.ByteString
-        getWarningBytes();
+        getRefusedBytes();
 
     /**
      * <pre>
-     * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-     * any earlier one. 0: nothing to wait for. See Refresh.
+     * HTTP 404
      * </pre>
      *
-     * <code>uint64 refresh_at_unix_ms = 5;</code>
-     * @return The refreshAtUnixMs.
+     * <code>string not_found = 2;</code>
+     * @return The notFound.
      */
-    long getRefreshAtUnixMs();
-  }
-  /**
-   * Protobuf type {@code opamp.sdk.v1.Loaded}
-   */
-  public  static final class Loaded extends
-      com.google.protobuf.GeneratedMessageLite<
-          Loaded, Loaded.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Loaded)
-      LoadedOrBuilder {
-    private Loaded() {
-      current_ = com.google.protobuf.ByteString.EMPTY;
-      warning_ = "";
-    }
-    private int bitField0_;
-    public static final int SETTINGS_FIELD_NUMBER = 1;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings settings_;
+    java.lang.String getNotFound();
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * HTTP 404
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+     * <code>string not_found = 2;</code>
+     * @return The bytes for notFound.
+     */
+    com.google.protobuf.ByteString
+        getNotFoundBytes();
+
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The unreachable.
+     */
+    java.lang.String getUnreachable();
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The bytes for unreachable.
+     */
+    com.google.protobuf.ByteString
+        getUnreachableBytes();
+
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The error.
+     */
+    java.lang.String getError();
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The bytes for error.
+     */
+    com.google.protobuf.ByteString
+        getErrorBytes();
+  }
+  /**
+   * <pre>
+   * What to check when the server can't be reached, as the core's Setup words it.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.sdk.v1.AgentHints}
+   */
+  public  static final class AgentHints extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentHints, AgentHints.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentHints)
+      AgentHintsOrBuilder {
+    private AgentHints() {
+      refused_ = "";
+      notFound_ = "";
+      unreachable_ = "";
+      error_ = "";
+    }
+    public static final int REFUSED_FIELD_NUMBER = 1;
+    private java.lang.String refused_;
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The refused.
      */
     @java.lang.Override
-    public boolean hasSettings() {
+    public java.lang.String getRefused() {
+      return refused_;
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @return The bytes for refused.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getRefusedBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(refused_);
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @param value The refused to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setRefused(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      refused_ = value;
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     */
+    private void clearRefused() {
+
+      refused_ = getDefaultInstance().getRefused();
+    }
+    /**
+     * <pre>
+     * HTTP 401 or 403
+     * </pre>
+     *
+     * <code>string refused = 1;</code>
+     * @param value The bytes for refused to set.
+     */
+    private void setRefusedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      refused_ = value.toStringUtf8();
+
+    }
+
+    public static final int NOT_FOUND_FIELD_NUMBER = 2;
+    private java.lang.String notFound_;
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The notFound.
+     */
+    @java.lang.Override
+    public java.lang.String getNotFound() {
+      return notFound_;
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @return The bytes for notFound.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getNotFoundBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(notFound_);
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @param value The notFound to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setNotFound(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      notFound_ = value;
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     */
+    private void clearNotFound() {
+
+      notFound_ = getDefaultInstance().getNotFound();
+    }
+    /**
+     * <pre>
+     * HTTP 404
+     * </pre>
+     *
+     * <code>string not_found = 2;</code>
+     * @param value The bytes for notFound to set.
+     */
+    private void setNotFoundBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      notFound_ = value.toStringUtf8();
+
+    }
+
+    public static final int UNREACHABLE_FIELD_NUMBER = 3;
+    private java.lang.String unreachable_;
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The unreachable.
+     */
+    @java.lang.Override
+    public java.lang.String getUnreachable() {
+      return unreachable_;
+    }
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @return The bytes for unreachable.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUnreachableBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(unreachable_);
+    }
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @param value The unreachable to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUnreachable(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      unreachable_ = value;
+    }
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     */
+    private void clearUnreachable() {
+
+      unreachable_ = getDefaultInstance().getUnreachable();
+    }
+    /**
+     * <pre>
+     * no response
+     * </pre>
+     *
+     * <code>string unreachable = 3;</code>
+     * @param value The bytes for unreachable to set.
+     */
+    private void setUnreachableBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      unreachable_ = value.toStringUtf8();
+
+    }
+
+    public static final int ERROR_FIELD_NUMBER = 4;
+    private java.lang.String error_;
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The error.
+     */
+    @java.lang.Override
+    public java.lang.String getError() {
+      return error_;
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @return The bytes for error.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getErrorBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(error_);
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @param value The error to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setError(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      error_ = value;
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     */
+    private void clearError() {
+
+      error_ = getDefaultInstance().getError();
+    }
+    /**
+     * <pre>
+     * any other status
+     * </pre>
+     *
+     * <code>string error = 4;</code>
+     * @param value The bytes for error to set.
+     */
+    private void setErrorBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      error_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * <pre>
+     * What to check when the server can't be reached, as the core's Setup words it.
+     * </pre>
+     *
+     * Protobuf type {@code opamp.sdk.v1.AgentHints}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentHints)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHintsOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return The refused.
+       */
+      @java.lang.Override
+      public java.lang.String getRefused() {
+        return instance.getRefused();
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return The bytes for refused.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getRefusedBytes() {
+        return instance.getRefusedBytes();
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @param value The refused to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefused(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setRefused(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRefused() {
+        copyOnWrite();
+        instance.clearRefused();
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 401 or 403
+       * </pre>
+       *
+       * <code>string refused = 1;</code>
+       * @param value The bytes for refused to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefusedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setRefusedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return The notFound.
+       */
+      @java.lang.Override
+      public java.lang.String getNotFound() {
+        return instance.getNotFound();
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return The bytes for notFound.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getNotFoundBytes() {
+        return instance.getNotFoundBytes();
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @param value The notFound to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNotFound(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setNotFound(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNotFound() {
+        copyOnWrite();
+        instance.clearNotFound();
+        return this;
+      }
+      /**
+       * <pre>
+       * HTTP 404
+       * </pre>
+       *
+       * <code>string not_found = 2;</code>
+       * @param value The bytes for notFound to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNotFoundBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setNotFoundBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * no response
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return The unreachable.
+       */
+      @java.lang.Override
+      public java.lang.String getUnreachable() {
+        return instance.getUnreachable();
+      }
+      /**
+       * <pre>
+       * no response
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return The bytes for unreachable.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUnreachableBytes() {
+        return instance.getUnreachableBytes();
+      }
+      /**
+       * <pre>
+       * no response
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @param value The unreachable to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnreachable(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setUnreachable(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * no response
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUnreachable() {
+        copyOnWrite();
+        instance.clearUnreachable();
+        return this;
+      }
+      /**
+       * <pre>
+       * no response
+       * </pre>
+       *
+       * <code>string unreachable = 3;</code>
+       * @param value The bytes for unreachable to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUnreachableBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUnreachableBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return The error.
+       */
+      @java.lang.Override
+      public java.lang.String getError() {
+        return instance.getError();
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return The bytes for error.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getErrorBytes() {
+        return instance.getErrorBytes();
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @param value The error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setError(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setError(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearError() {
+        copyOnWrite();
+        instance.clearError();
+        return this;
+      }
+      /**
+       * <pre>
+       * any other status
+       * </pre>
+       *
+       * <code>string error = 4;</code>
+       * @param value The bytes for error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrorBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setErrorBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentHints)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "refused_",
+              "notFound_",
+              "unreachable_",
+              "error_",
+            };
+            java.lang.String info =
+                "\u0000\u0004\u0000\u0000\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u0208\u0002\u0208" +
+                "\u0003\u0208\u0004\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentHints)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints DEFAULT_INSTANCE;
+    static {
+      AgentHints defaultInstance = new AgentHints();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentHints.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentHints> PARSER;
+
+    public static com.google.protobuf.Parser<AgentHints> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentStepOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentStep)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * the last AgentOutput.agent, as it came
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     * @return The agent.
+     */
+    com.google.protobuf.ByteString getAgent();
+
+    /**
+     * <pre>
+     * as AgentStart's
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 2;</code>
+     * @return The nowUnixMs.
+     */
+    long getNowUnixMs();
+
+    /**
+     * <code>uint64 now_mono_ms = 3;</code>
+     * @return The nowMonoMs.
+     */
+    long getNowMonoMs();
+
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     * @return Whether the remoteConfig field is set.
+     */
+    boolean hasRemoteConfig();
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     * @return The remoteConfig.
+     */
+    opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     * @return Whether the connected field is set.
+     */
+    boolean hasConnected();
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     * @return The connected.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected getConnected();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     * @return Whether the connectFailed field is set.
+     */
+    boolean hasConnectFailed();
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     * @return The connectFailed.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed getConnectFailed();
+
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     * @return Whether the instanceUidChanged field is set.
+     */
+    boolean hasInstanceUidChanged();
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     * @return The instanceUidChanged.
+     */
+    com.google.protobuf.ByteString getInstanceUidChanged();
+
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return Whether the uidNotSaved field is set.
+     */
+    boolean hasUidNotSaved();
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return The uidNotSaved.
+     */
+    java.lang.String getUidNotSaved();
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return The bytes for uidNotSaved.
+     */
+    com.google.protobuf.ByteString
+        getUidNotSavedBytes();
+
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     * @return Whether the stateFromNewerVersion field is set.
+     */
+    boolean hasStateFromNewerVersion();
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     * @return The stateFromNewerVersion.
+     */
+    int getStateFromNewerVersion();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     * @return Whether the stopped field is set.
+     */
+    boolean hasStopped();
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     * @return The stopped.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped getStopped();
+
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     * @return Whether the timer field is set.
+     */
+    boolean hasTimer();
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     * @return The timer.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getTimer();
+
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     * @return Whether the exporters field is set.
+     */
+    boolean hasExporters();
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     * @return The exporters.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters getExporters();
+
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     * @return Whether the host field is set.
+     */
+    boolean hasHost();
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     * @return The host.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost();
+
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     * @return Whether the built field is set.
+     */
+    boolean hasBuilt();
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     * @return The built.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt getBuilt();
+
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.InputCase getInputCase();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentStep}
+   */
+  public  static final class AgentStep extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentStep, AgentStep.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentStep)
+      AgentStepOrBuilder {
+    private AgentStep() {
+      agent_ = com.google.protobuf.ByteString.EMPTY;
+    }
+    private int inputCase_ = 0;
+    private java.lang.Object input_;
+    public enum InputCase
+        implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
+      REMOTE_CONFIG(4),
+      CONNECTED(5),
+      CONNECT_FAILED(6),
+      INSTANCE_UID_CHANGED(7),
+      UID_NOT_SAVED(8),
+      STATE_FROM_NEWER_VERSION(9),
+      STOPPED(10),
+      TIMER(11),
+      EXPORTERS(12),
+      HOST(13),
+      BUILT(14),
+      INPUT_NOT_SET(0);
+      private final int value;
+      private InputCase(int value) {
+        this.value = value;
+      }
+      /**
+       * @deprecated Use {@link #forNumber(int)} instead.
+       */
+      @java.lang.Deprecated
+      public static InputCase valueOf(int value) {
+        return forNumber(value);
+      }
+
+      public static InputCase forNumber(int value) {
+        switch (value) {
+          case 4: return REMOTE_CONFIG;
+          case 5: return CONNECTED;
+          case 6: return CONNECT_FAILED;
+          case 7: return INSTANCE_UID_CHANGED;
+          case 8: return UID_NOT_SAVED;
+          case 9: return STATE_FROM_NEWER_VERSION;
+          case 10: return STOPPED;
+          case 11: return TIMER;
+          case 12: return EXPORTERS;
+          case 13: return HOST;
+          case 14: return BUILT;
+          case 0: return INPUT_NOT_SET;
+          default: return null;
+        }
+      }
+      @java.lang.Override public int getNumber() {
+        return this.value;
+      }
+    };
+
+    @java.lang.Override
+    public InputCase
+    getInputCase() {
+      return InputCase.forNumber(
+          inputCase_);
+    }
+
+    private void clearInput() {
+      inputCase_ = 0;
+      input_ = null;
+    }
+
+    public static final int AGENT_FIELD_NUMBER = 1;
+    private com.google.protobuf.ByteString agent_;
+    /**
+     * <pre>
+     * the last AgentOutput.agent, as it came
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     * @return The agent.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getAgent() {
+      return agent_;
+    }
+    /**
+     * <pre>
+     * the last AgentOutput.agent, as it came
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     * @param value The agent to set.
+     */
+    private void setAgent(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      agent_ = value;
+    }
+    /**
+     * <pre>
+     * the last AgentOutput.agent, as it came
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     */
+    private void clearAgent() {
+
+      agent_ = getDefaultInstance().getAgent();
+    }
+
+    public static final int NOW_UNIX_MS_FIELD_NUMBER = 2;
+    private long nowUnixMs_;
+    /**
+     * <pre>
+     * as AgentStart's
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 2;</code>
+     * @return The nowUnixMs.
+     */
+    @java.lang.Override
+    public long getNowUnixMs() {
+      return nowUnixMs_;
+    }
+    /**
+     * <pre>
+     * as AgentStart's
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 2;</code>
+     * @param value The nowUnixMs to set.
+     */
+    private void setNowUnixMs(long value) {
+      
+      nowUnixMs_ = value;
+    }
+    /**
+     * <pre>
+     * as AgentStart's
+     * </pre>
+     *
+     * <code>uint64 now_unix_ms = 2;</code>
+     */
+    private void clearNowUnixMs() {
+
+      nowUnixMs_ = 0L;
+    }
+
+    public static final int NOW_MONO_MS_FIELD_NUMBER = 3;
+    private long nowMonoMs_;
+    /**
+     * <code>uint64 now_mono_ms = 3;</code>
+     * @return The nowMonoMs.
+     */
+    @java.lang.Override
+    public long getNowMonoMs() {
+      return nowMonoMs_;
+    }
+    /**
+     * <code>uint64 now_mono_ms = 3;</code>
+     * @param value The nowMonoMs to set.
+     */
+    private void setNowMonoMs(long value) {
+      
+      nowMonoMs_ = value;
+    }
+    /**
+     * <code>uint64 now_mono_ms = 3;</code>
+     */
+    private void clearNowMonoMs() {
+
+      nowMonoMs_ = 0L;
+    }
+
+    public static final int REMOTE_CONFIG_FIELD_NUMBER = 4;
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     */
+    @java.lang.Override
+    public boolean hasRemoteConfig() {
+      return inputCase_ == 4;
+    }
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig() {
+      if (inputCase_ == 4) {
+         return (opamp.proto.v1.Opamp.AgentRemoteConfig) input_;
+      }
+      return opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 4;
+    }
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 4 &&
+          input_ != opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance()) {
+        input_ = opamp.proto.v1.Opamp.AgentRemoteConfig.newBuilder((opamp.proto.v1.Opamp.AgentRemoteConfig) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 4;
+    }
+    /**
+     * <pre>
+     * the client's remote config notification
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+     */
+    private void clearRemoteConfig() {
+      if (inputCase_ == 4) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int CONNECTED_FIELD_NUMBER = 5;
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     */
+    @java.lang.Override
+    public boolean hasConnected() {
+      return inputCase_ == 5;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected getConnected() {
+      if (inputCase_ == 5) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setConnected(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 5;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeConnected(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 5 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 5;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+     */
+    private void clearConnected() {
+      if (inputCase_ == 5) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int CONNECT_FAILED_FIELD_NUMBER = 6;
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     */
+    @java.lang.Override
+    public boolean hasConnectFailed() {
+      return inputCase_ == 6;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed getConnectFailed() {
+      if (inputCase_ == 6) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setConnectFailed(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 6;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeConnectFailed(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 6 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 6;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+     */
+    private void clearConnectFailed() {
+      if (inputCase_ == 6) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int INSTANCE_UID_CHANGED_FIELD_NUMBER = 7;
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     * @return Whether the instanceUidChanged field is set.
+     */
+    @java.lang.Override
+    public boolean hasInstanceUidChanged() {
+      return inputCase_ == 7;
+    }
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     * @return The instanceUidChanged.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString getInstanceUidChanged() {
+      if (inputCase_ == 7) {
+        return (com.google.protobuf.ByteString) input_;
+      }
+      return com.google.protobuf.ByteString.EMPTY;
+    }
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     * @param value The instanceUidChanged to set.
+     */
+    private void setInstanceUidChanged(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  inputCase_ = 7;
+      input_ = value;
+    }
+    /**
+     * <pre>
+     * 16 bytes: the server named the instance anew
+     * </pre>
+     *
+     * <code>bytes instance_uid_changed = 7;</code>
+     */
+    private void clearInstanceUidChanged() {
+      if (inputCase_ == 7) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int UID_NOT_SAVED_FIELD_NUMBER = 8;
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return Whether the uidNotSaved field is set.
+     */
+    @java.lang.Override
+    public boolean hasUidNotSaved() {
+      return inputCase_ == 8;
+    }
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return The uidNotSaved.
+     */
+    @java.lang.Override
+    public java.lang.String getUidNotSaved() {
+      java.lang.String ref = "";
+      if (inputCase_ == 8) {
+        ref = (java.lang.String) input_;
+      }
+      return ref;
+    }
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @return The bytes for uidNotSaved.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUidNotSavedBytes() {
+      java.lang.String ref = "";
+      if (inputCase_ == 8) {
+        ref = (java.lang.String) input_;
+      }
+      return com.google.protobuf.ByteString.copyFromUtf8(ref);
+    }
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @param value The uidNotSaved to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUidNotSaved(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      inputCase_ = 8;
+      input_ = value;
+    }
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     */
+    private void clearUidNotSaved() {
+      if (inputCase_ == 8) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+    /**
+     * <pre>
+     * SaveUid failed, and why
+     * </pre>
+     *
+     * <code>string uid_not_saved = 8;</code>
+     * @param value The bytes for uidNotSaved to set.
+     */
+    private void setUidNotSavedBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      input_ = value.toStringUtf8();
+      inputCase_ = 8;
+    }
+
+    public static final int STATE_FROM_NEWER_VERSION_FIELD_NUMBER = 9;
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     * @return Whether the stateFromNewerVersion field is set.
+     */
+    @java.lang.Override
+    public boolean hasStateFromNewerVersion() {
+      return inputCase_ == 9;
+    }
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     * @return The stateFromNewerVersion.
+     */
+    @java.lang.Override
+    public int getStateFromNewerVersion() {
+      if (inputCase_ == 9) {
+        return (java.lang.Integer) input_;
+      }
+      return 0;
+    }
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     * @param value The stateFromNewerVersion to set.
+     */
+    private void setStateFromNewerVersion(int value) {
+      inputCase_ = 9;
+      input_ = value;
+    }
+    /**
+     * <pre>
+     * the notification's state format
+     * </pre>
+     *
+     * <code>uint32 state_from_newer_version = 9;</code>
+     */
+    private void clearStateFromNewerVersion() {
+      if (inputCase_ == 9) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int STOPPED_FIELD_NUMBER = 10;
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     */
+    @java.lang.Override
+    public boolean hasStopped() {
+      return inputCase_ == 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped getStopped() {
+      if (inputCase_ == 10) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStopped(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeStopped(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 10 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+     */
+    private void clearStopped() {
+      if (inputCase_ == 10) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int TIMER_FIELD_NUMBER = 11;
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     */
+    @java.lang.Override
+    public boolean hasTimer() {
+      return inputCase_ == 11;
+    }
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getTimer() {
+      if (inputCase_ == 11) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setTimer(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 11;
+    }
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeTimer(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 11 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 11;
+    }
+    /**
+     * <pre>
+     * wake_at_mono_ms came: what the gates counted since start
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+     */
+    private void clearTimer() {
+      if (inputCase_ == 11) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int EXPORTERS_FIELD_NUMBER = 12;
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     */
+    @java.lang.Override
+    public boolean hasExporters() {
+      return inputCase_ == 12;
+    }
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters getExporters() {
+      if (inputCase_ == 12) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 12;
+    }
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 12 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 12;
+    }
+    /**
+     * <pre>
+     * the inventory's exporters changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+     */
+    private void clearExporters() {
+      if (inputCase_ == 12) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int HOST_FIELD_NUMBER = 13;
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     */
+    @java.lang.Override
+    public boolean hasHost() {
+      return inputCase_ == 13;
+    }
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
+      if (inputCase_ == 13) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Host) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 13;
+    }
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 13 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Host) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 13;
+    }
+    /**
+     * <pre>
+     * what the host carries out changed
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Host host = 13;</code>
+     */
+    private void clearHost() {
+      if (inputCase_ == 13) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static final int BUILT_FIELD_NUMBER = 14;
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     */
+    @java.lang.Override
+    public boolean hasBuilt() {
+      return inputCase_ == 14;
+    }
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt getBuilt() {
+      if (inputCase_ == 14) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt) input_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setBuilt(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt value) {
+      value.getClass();  // minimal bytecode null check
+      input_ = value;
+      inputCase_ = 14;
+    }
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeBuilt(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt value) {
+      value.getClass();  // minimal bytecode null check
+      if (inputCase_ == 14 &&
+          input_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.getDefaultInstance()) {
+        input_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt) input_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        input_ = value;
+      }
+      inputCase_ = 14;
+    }
+    /**
+     * <pre>
+     * the SDK is built, before the client starts
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+     */
+    private void clearBuilt() {
+      if (inputCase_ == 14) {
+        inputCase_ = 0;
+        input_ = null;
+      }
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentStep}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentStep)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStepOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+      @java.lang.Override
+      public InputCase
+          getInputCase() {
+        return instance.getInputCase();
+      }
+
+      public Builder clearInput() {
+        copyOnWrite();
+        instance.clearInput();
+        return this;
+      }
+
+
+      /**
+       * <pre>
+       * the last AgentOutput.agent, as it came
+       * </pre>
+       *
+       * <code>bytes agent = 1;</code>
+       * @return The agent.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getAgent() {
+        return instance.getAgent();
+      }
+      /**
+       * <pre>
+       * the last AgentOutput.agent, as it came
+       * </pre>
+       *
+       * <code>bytes agent = 1;</code>
+       * @param value The agent to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAgent(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setAgent(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the last AgentOutput.agent, as it came
+       * </pre>
+       *
+       * <code>bytes agent = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAgent() {
+        copyOnWrite();
+        instance.clearAgent();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as AgentStart's
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 2;</code>
+       * @return The nowUnixMs.
+       */
+      @java.lang.Override
+      public long getNowUnixMs() {
+        return instance.getNowUnixMs();
+      }
+      /**
+       * <pre>
+       * as AgentStart's
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 2;</code>
+       * @param value The nowUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNowUnixMs(long value) {
+        copyOnWrite();
+        instance.setNowUnixMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as AgentStart's
+       * </pre>
+       *
+       * <code>uint64 now_unix_ms = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNowUnixMs() {
+        copyOnWrite();
+        instance.clearNowUnixMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 now_mono_ms = 3;</code>
+       * @return The nowMonoMs.
+       */
+      @java.lang.Override
+      public long getNowMonoMs() {
+        return instance.getNowMonoMs();
+      }
+      /**
+       * <code>uint64 now_mono_ms = 3;</code>
+       * @param value The nowMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNowMonoMs(long value) {
+        copyOnWrite();
+        instance.setNowMonoMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 now_mono_ms = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNowMonoMs() {
+        copyOnWrite();
+        instance.clearNowMonoMs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      @java.lang.Override
+      public boolean hasRemoteConfig() {
+        return instance.hasRemoteConfig();
+      }
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.AgentRemoteConfig getRemoteConfig() {
+        return instance.getRemoteConfig();
+      }
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      public Builder setRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.setRemoteConfig(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      public Builder setRemoteConfig(
+          opamp.proto.v1.Opamp.AgentRemoteConfig.Builder builderForValue) {
+        copyOnWrite();
+        instance.setRemoteConfig(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      public Builder mergeRemoteConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
+        copyOnWrite();
+        instance.mergeRemoteConfig(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the client's remote config notification
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.AgentRemoteConfig remote_config = 4;</code>
+       */
+      public Builder clearRemoteConfig() {
+        copyOnWrite();
+        instance.clearRemoteConfig();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      @java.lang.Override
+      public boolean hasConnected() {
+        return instance.hasConnected();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected getConnected() {
+        return instance.getConnected();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      public Builder setConnected(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected value) {
+        copyOnWrite();
+        instance.setConnected(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      public Builder setConnected(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.Builder builderForValue) {
+        copyOnWrite();
+        instance.setConnected(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      public Builder mergeConnected(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected value) {
+        copyOnWrite();
+        instance.mergeConnected(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnected connected = 5;</code>
+       */
+      public Builder clearConnected() {
+        copyOnWrite();
+        instance.clearConnected();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      @java.lang.Override
+      public boolean hasConnectFailed() {
+        return instance.hasConnectFailed();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed getConnectFailed() {
+        return instance.getConnectFailed();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      public Builder setConnectFailed(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed value) {
+        copyOnWrite();
+        instance.setConnectFailed(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      public Builder setConnectFailed(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.Builder builderForValue) {
+        copyOnWrite();
+        instance.setConnectFailed(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      public Builder mergeConnectFailed(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed value) {
+        copyOnWrite();
+        instance.mergeConnectFailed(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentConnectFailed connect_failed = 6;</code>
+       */
+      public Builder clearConnectFailed() {
+        copyOnWrite();
+        instance.clearConnectFailed();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * 16 bytes: the server named the instance anew
+       * </pre>
+       *
+       * <code>bytes instance_uid_changed = 7;</code>
+       * @return Whether the instanceUidChanged field is set.
+       */
+      @java.lang.Override
+      public boolean hasInstanceUidChanged() {
+        return instance.hasInstanceUidChanged();
+      }
+      /**
+       * <pre>
+       * 16 bytes: the server named the instance anew
+       * </pre>
+       *
+       * <code>bytes instance_uid_changed = 7;</code>
+       * @return The instanceUidChanged.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getInstanceUidChanged() {
+        return instance.getInstanceUidChanged();
+      }
+      /**
+       * <pre>
+       * 16 bytes: the server named the instance anew
+       * </pre>
+       *
+       * <code>bytes instance_uid_changed = 7;</code>
+       * @param value The instanceUidChanged to set.
+       * @return This builder for chaining.
+       */
+      public Builder setInstanceUidChanged(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setInstanceUidChanged(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * 16 bytes: the server named the instance anew
+       * </pre>
+       *
+       * <code>bytes instance_uid_changed = 7;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearInstanceUidChanged() {
+        copyOnWrite();
+        instance.clearInstanceUidChanged();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @return Whether the uidNotSaved field is set.
+       */
+      @java.lang.Override
+      public boolean hasUidNotSaved() {
+        return instance.hasUidNotSaved();
+      }
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @return The uidNotSaved.
+       */
+      @java.lang.Override
+      public java.lang.String getUidNotSaved() {
+        return instance.getUidNotSaved();
+      }
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @return The bytes for uidNotSaved.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUidNotSavedBytes() {
+        return instance.getUidNotSavedBytes();
+      }
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @param value The uidNotSaved to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUidNotSaved(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setUidNotSaved(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUidNotSaved() {
+        copyOnWrite();
+        instance.clearUidNotSaved();
+        return this;
+      }
+      /**
+       * <pre>
+       * SaveUid failed, and why
+       * </pre>
+       *
+       * <code>string uid_not_saved = 8;</code>
+       * @param value The bytes for uidNotSaved to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUidNotSavedBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUidNotSavedBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the notification's state format
+       * </pre>
+       *
+       * <code>uint32 state_from_newer_version = 9;</code>
+       * @return Whether the stateFromNewerVersion field is set.
+       */
+      @java.lang.Override
+      public boolean hasStateFromNewerVersion() {
+        return instance.hasStateFromNewerVersion();
+      }
+      /**
+       * <pre>
+       * the notification's state format
+       * </pre>
+       *
+       * <code>uint32 state_from_newer_version = 9;</code>
+       * @return The stateFromNewerVersion.
+       */
+      @java.lang.Override
+      public int getStateFromNewerVersion() {
+        return instance.getStateFromNewerVersion();
+      }
+      /**
+       * <pre>
+       * the notification's state format
+       * </pre>
+       *
+       * <code>uint32 state_from_newer_version = 9;</code>
+       * @param value The stateFromNewerVersion to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStateFromNewerVersion(int value) {
+        copyOnWrite();
+        instance.setStateFromNewerVersion(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the notification's state format
+       * </pre>
+       *
+       * <code>uint32 state_from_newer_version = 9;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStateFromNewerVersion() {
+        copyOnWrite();
+        instance.clearStateFromNewerVersion();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      @java.lang.Override
+      public boolean hasStopped() {
+        return instance.hasStopped();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped getStopped() {
+        return instance.getStopped();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      public Builder setStopped(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped value) {
+        copyOnWrite();
+        instance.setStopped(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      public Builder setStopped(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.Builder builderForValue) {
+        copyOnWrite();
+        instance.setStopped(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      public Builder mergeStopped(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped value) {
+        copyOnWrite();
+        instance.mergeStopped(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStopped stopped = 10;</code>
+       */
+      public Builder clearStopped() {
+        copyOnWrite();
+        instance.clearStopped();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      @java.lang.Override
+      public boolean hasTimer() {
+        return instance.hasTimer();
+      }
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getTimer() {
+        return instance.getTimer();
+      }
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      public Builder setTimer(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+        copyOnWrite();
+        instance.setTimer(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      public Builder setTimer(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.Builder builderForValue) {
+        copyOnWrite();
+        instance.setTimer(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      public Builder mergeTimer(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+        copyOnWrite();
+        instance.mergeTimer(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * wake_at_mono_ms came: what the gates counted since start
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts timer = 11;</code>
+       */
+      public Builder clearTimer() {
+        copyOnWrite();
+        instance.clearTimer();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      @java.lang.Override
+      public boolean hasExporters() {
+        return instance.hasExporters();
+      }
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters getExporters() {
+        return instance.getExporters();
+      }
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      public Builder setExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters value) {
+        copyOnWrite();
+        instance.setExporters(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      public Builder setExporters(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      public Builder mergeExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters value) {
+        copyOnWrite();
+        instance.mergeExporters(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the inventory's exporters changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentExporters exporters = 12;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      @java.lang.Override
+      public boolean hasHost() {
+        return instance.hasHost();
+      }
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
+        return instance.getHost();
+      }
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      public Builder setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
+        copyOnWrite();
+        instance.setHost(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      public Builder setHost(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHost(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      public Builder mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
+        copyOnWrite();
+        instance.mergeHost(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * what the host carries out changed
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Host host = 13;</code>
+       */
+      public Builder clearHost() {
+        copyOnWrite();
+        instance.clearHost();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      @java.lang.Override
+      public boolean hasBuilt() {
+        return instance.hasBuilt();
+      }
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt getBuilt() {
+        return instance.getBuilt();
+      }
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      public Builder setBuilt(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt value) {
+        copyOnWrite();
+        instance.setBuilt(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      public Builder setBuilt(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.Builder builderForValue) {
+        copyOnWrite();
+        instance.setBuilt(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      public Builder mergeBuilt(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt value) {
+        copyOnWrite();
+        instance.mergeBuilt(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the SDK is built, before the client starts
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentBuilt built = 14;</code>
+       */
+      public Builder clearBuilt() {
+        copyOnWrite();
+        instance.clearBuilt();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentStep)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "input_",
+              "inputCase_",
+              "agent_",
+              "nowUnixMs_",
+              "nowMonoMs_",
+              opamp.proto.v1.Opamp.AgentRemoteConfig.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.class,
+            };
+            java.lang.String info =
+                "\u0000\u000e\u0001\u0000\u0001\u000e\u000e\u0000\u0000\u0000\u0001\n\u0002\u0003" +
+                "\u0003\u0003\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007=\u0000\b\u023b\u0000\t" +
+                ">\u0000\n<\u0000\u000b<\u0000\f<\u0000\r<\u0000\u000e<\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentStep)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep DEFAULT_INSTANCE;
+    static {
+      AgentStep defaultInstance = new AgentStep();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentStep.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentStep> PARSER;
+
+    public static com.google.protobuf.Parser<AgentStep> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentBuiltOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentBuilt)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @return The service.
+     */
+    java.lang.String getService();
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @return The bytes for service.
+     */
+    com.google.protobuf.ByteString
+        getServiceBytes();
+
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> 
+        getExportersList();
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index);
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    int getExportersCount();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentBuilt}
+   */
+  public  static final class AgentBuilt extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentBuilt, AgentBuilt.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentBuilt)
+      AgentBuiltOrBuilder {
+    private AgentBuilt() {
+      service_ = "";
+      exporters_ = emptyProtobufList();
+    }
+    public static final int SERVICE_FIELD_NUMBER = 1;
+    private java.lang.String service_;
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @return The service.
+     */
+    @java.lang.Override
+    public java.lang.String getService() {
+      return service_;
+    }
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @return The bytes for service.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getServiceBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(service_);
+    }
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @param value The service to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setService(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      service_ = value;
+    }
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     */
+    private void clearService() {
+
+      service_ = getDefaultInstance().getService();
+    }
+    /**
+     * <pre>
+     * the resource's service.name; empty: none
+     * </pre>
+     *
+     * <code>string service = 1;</code>
+     * @param value The bytes for service to set.
+     */
+    private void setServiceBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      service_ = value.toStringUtf8();
+
+    }
+
+    public static final int EXPORTERS_FIELD_NUMBER = 2;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> exporters_;
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    public java.util.List<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder> 
+        getExportersOrBuilderList() {
+      return exporters_;
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.Override
+    public int getExportersCount() {
+      return exporters_.size();
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
+      return exporters_.get(index);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder getExportersOrBuilder(
+        int index) {
+      return exporters_.get(index);
+    }
+    private void ensureExportersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> tmp = exporters_;
+      if (!tmp.isModifiable()) {
+        exporters_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.set(index, value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(index, value);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    private void addAllExporters(
+        java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
+      ensureExportersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, exporters_);
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    private void clearExporters() {
+      exporters_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * as the inventory lists them (Exporters' answer)
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+     */
+    private void removeExporters(int index) {
+      ensureExportersIsMutable();
+      exporters_.remove(index);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentBuilt}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentBuilt)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuiltOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * the resource's service.name; empty: none
+       * </pre>
+       *
+       * <code>string service = 1;</code>
+       * @return The service.
+       */
+      @java.lang.Override
+      public java.lang.String getService() {
+        return instance.getService();
+      }
+      /**
+       * <pre>
+       * the resource's service.name; empty: none
+       * </pre>
+       *
+       * <code>string service = 1;</code>
+       * @return The bytes for service.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getServiceBytes() {
+        return instance.getServiceBytes();
+      }
+      /**
+       * <pre>
+       * the resource's service.name; empty: none
+       * </pre>
+       *
+       * <code>string service = 1;</code>
+       * @param value The service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setService(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setService(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the resource's service.name; empty: none
+       * </pre>
+       *
+       * <code>string service = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearService() {
+        copyOnWrite();
+        instance.clearService();
+        return this;
+      }
+      /**
+       * <pre>
+       * the resource's service.name; empty: none
+       * </pre>
+       *
+       * <code>string service = 1;</code>
+       * @param value The bytes for service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setServiceBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setServiceBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getExportersList());
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      @java.lang.Override
+      public int getExportersCount() {
+        return instance.getExportersCount();
+      }/**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
+        return instance.getExporters(index);
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.setExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder addExporters(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder addAllExporters(
+          java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
+        copyOnWrite();
+        instance.addAllExporters(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+      /**
+       * <pre>
+       * as the inventory lists them (Exporters' answer)
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 2;</code>
+       */
+      public Builder removeExporters(int index) {
+        copyOnWrite();
+        instance.removeExporters(index);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentBuilt)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "service_",
+              "exporters_",
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.class,
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0001\u0000\u0001\u0208\u0002\u001b" +
+                "";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentBuilt)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt DEFAULT_INSTANCE;
+    static {
+      AgentBuilt defaultInstance = new AgentBuilt();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentBuilt.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentBuilt getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentBuilt> PARSER;
+
+    public static com.google.protobuf.Parser<AgentBuilt> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentConnectedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentConnected)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentConnected}
+   */
+  public  static final class AgentConnected extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentConnected, AgentConnected.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentConnected)
+      AgentConnectedOrBuilder {
+    private AgentConnected() {
+      endpoint_ = "";
+    }
+    public static final int ENDPOINT_FIELD_NUMBER = 1;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * the one the client uses now; empty: the configured one
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentConnected}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentConnected)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectedOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * the one the client uses now; empty: the configured one
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * the one the client uses now; empty: the configured one
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * the one the client uses now; empty: the configured one
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the one the client uses now; empty: the configured one
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * the one the client uses now; empty: the configured one
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentConnected)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "endpoint_",
+            };
+            java.lang.String info =
+                "\u0000\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0000\u0000\u0001\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentConnected)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected DEFAULT_INSTANCE;
+    static {
+      AgentConnected defaultInstance = new AgentConnected();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentConnected.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnected getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentConnected> PARSER;
+
+    public static com.google.protobuf.Parser<AgentConnected> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentConnectFailedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentConnectFailed)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <pre>
+     * the HTTP status; 0: no response
+     * </pre>
+     *
+     * <code>uint32 status = 2;</code>
+     * @return The status.
+     */
+    int getStatus();
+
+    /**
+     * <code>string detail = 3;</code>
+     * @return The detail.
+     */
+    java.lang.String getDetail();
+    /**
+     * <code>string detail = 3;</code>
+     * @return The bytes for detail.
+     */
+    com.google.protobuf.ByteString
+        getDetailBytes();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentConnectFailed}
+   */
+  public  static final class AgentConnectFailed extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentConnectFailed, AgentConnectFailed.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentConnectFailed)
+      AgentConnectFailedOrBuilder {
+    private AgentConnectFailed() {
+      endpoint_ = "";
+      detail_ = "";
+    }
+    public static final int ENDPOINT_FIELD_NUMBER = 1;
+    private java.lang.String endpoint_;
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <pre>
+     * as AgentConnected's
+     * </pre>
+     *
+     * <code>string endpoint = 1;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int STATUS_FIELD_NUMBER = 2;
+    private int status_;
+    /**
+     * <pre>
+     * the HTTP status; 0: no response
+     * </pre>
+     *
+     * <code>uint32 status = 2;</code>
+     * @return The status.
+     */
+    @java.lang.Override
+    public int getStatus() {
+      return status_;
+    }
+    /**
+     * <pre>
+     * the HTTP status; 0: no response
+     * </pre>
+     *
+     * <code>uint32 status = 2;</code>
+     * @param value The status to set.
+     */
+    private void setStatus(int value) {
+      
+      status_ = value;
+    }
+    /**
+     * <pre>
+     * the HTTP status; 0: no response
+     * </pre>
+     *
+     * <code>uint32 status = 2;</code>
+     */
+    private void clearStatus() {
+
+      status_ = 0;
+    }
+
+    public static final int DETAIL_FIELD_NUMBER = 3;
+    private java.lang.String detail_;
+    /**
+     * <code>string detail = 3;</code>
+     * @return The detail.
+     */
+    @java.lang.Override
+    public java.lang.String getDetail() {
+      return detail_;
+    }
+    /**
+     * <code>string detail = 3;</code>
+     * @return The bytes for detail.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getDetailBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(detail_);
+    }
+    /**
+     * <code>string detail = 3;</code>
+     * @param value The detail to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setDetail(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      detail_ = value;
+    }
+    /**
+     * <code>string detail = 3;</code>
+     */
+    private void clearDetail() {
+
+      detail_ = getDefaultInstance().getDetail();
+    }
+    /**
+     * <code>string detail = 3;</code>
+     * @param value The bytes for detail to set.
+     */
+    private void setDetailBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      detail_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentConnectFailed}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentConnectFailed)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailedOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * as AgentConnected's
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <pre>
+       * as AgentConnected's
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <pre>
+       * as AgentConnected's
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as AgentConnected's
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <pre>
+       * as AgentConnected's
+       * </pre>
+       *
+       * <code>string endpoint = 1;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * the HTTP status; 0: no response
+       * </pre>
+       *
+       * <code>uint32 status = 2;</code>
+       * @return The status.
+       */
+      @java.lang.Override
+      public int getStatus() {
+        return instance.getStatus();
+      }
+      /**
+       * <pre>
+       * the HTTP status; 0: no response
+       * </pre>
+       *
+       * <code>uint32 status = 2;</code>
+       * @param value The status to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStatus(int value) {
+        copyOnWrite();
+        instance.setStatus(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * the HTTP status; 0: no response
+       * </pre>
+       *
+       * <code>uint32 status = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStatus() {
+        copyOnWrite();
+        instance.clearStatus();
+        return this;
+      }
+
+      /**
+       * <code>string detail = 3;</code>
+       * @return The detail.
+       */
+      @java.lang.Override
+      public java.lang.String getDetail() {
+        return instance.getDetail();
+      }
+      /**
+       * <code>string detail = 3;</code>
+       * @return The bytes for detail.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getDetailBytes() {
+        return instance.getDetailBytes();
+      }
+      /**
+       * <code>string detail = 3;</code>
+       * @param value The detail to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDetail(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setDetail(value);
+        return this;
+      }
+      /**
+       * <code>string detail = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDetail() {
+        copyOnWrite();
+        instance.clearDetail();
+        return this;
+      }
+      /**
+       * <code>string detail = 3;</code>
+       * @param value The bytes for detail to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDetailBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setDetailBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentConnectFailed)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "endpoint_",
+              "status_",
+              "detail_",
+            };
+            java.lang.String info =
+                "\u0000\u0003\u0000\u0000\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u0208\u0002\u000b" +
+                "\u0003\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentConnectFailed)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed DEFAULT_INSTANCE;
+    static {
+      AgentConnectFailed defaultInstance = new AgentConnectFailed();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentConnectFailed.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentConnectFailed getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentConnectFailed> PARSER;
+
+    public static com.google.protobuf.Parser<AgentConnectFailed> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentStoppedOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentStopped)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @return The error.
+     */
+    java.lang.String getError();
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @return The bytes for error.
+     */
+    com.google.protobuf.ByteString
+        getErrorBytes();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentStopped}
+   */
+  public  static final class AgentStopped extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentStopped, AgentStopped.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentStopped)
+      AgentStoppedOrBuilder {
+    private AgentStopped() {
+      error_ = "";
+    }
+    public static final int ERROR_FIELD_NUMBER = 1;
+    private java.lang.String error_;
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @return The error.
+     */
+    @java.lang.Override
+    public java.lang.String getError() {
+      return error_;
+    }
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @return The bytes for error.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getErrorBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(error_);
+    }
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @param value The error to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setError(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      error_ = value;
+    }
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     */
+    private void clearError() {
+
+      error_ = getDefaultInstance().getError();
+    }
+    /**
+     * <pre>
+     * why it stopped on its own; empty: it was asked to
+     * </pre>
+     *
+     * <code>string error = 1;</code>
+     * @param value The bytes for error to set.
+     */
+    private void setErrorBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      error_ = value.toStringUtf8();
+
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentStopped}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentStopped)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStoppedOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <pre>
+       * why it stopped on its own; empty: it was asked to
+       * </pre>
+       *
+       * <code>string error = 1;</code>
+       * @return The error.
+       */
+      @java.lang.Override
+      public java.lang.String getError() {
+        return instance.getError();
+      }
+      /**
+       * <pre>
+       * why it stopped on its own; empty: it was asked to
+       * </pre>
+       *
+       * <code>string error = 1;</code>
+       * @return The bytes for error.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getErrorBytes() {
+        return instance.getErrorBytes();
+      }
+      /**
+       * <pre>
+       * why it stopped on its own; empty: it was asked to
+       * </pre>
+       *
+       * <code>string error = 1;</code>
+       * @param value The error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setError(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setError(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * why it stopped on its own; empty: it was asked to
+       * </pre>
+       *
+       * <code>string error = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearError() {
+        copyOnWrite();
+        instance.clearError();
+        return this;
+      }
+      /**
+       * <pre>
+       * why it stopped on its own; empty: it was asked to
+       * </pre>
+       *
+       * <code>string error = 1;</code>
+       * @param value The bytes for error to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrorBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setErrorBytes(value);
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentStopped)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "error_",
+            };
+            java.lang.String info =
+                "\u0000\u0001\u0000\u0000\u0001\u0001\u0001\u0000\u0000\u0000\u0001\u0208";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentStopped)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped DEFAULT_INSTANCE;
+    static {
+      AgentStopped defaultInstance = new AgentStopped();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentStopped.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStopped getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentStopped> PARSER;
+
+    public static com.google.protobuf.Parser<AgentStopped> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentExportersOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentExporters)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> 
+        getExportersList();
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index);
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    int getExportersCount();
+
+    /**
+     * <pre>
+     * as timer's
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+     * @return Whether the counts field is set.
+     */
+    boolean hasCounts();
+    /**
+     * <pre>
+     * as timer's
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+     * @return The counts.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts();
+  }
+  /**
+   * <pre>
+   * Export health is asked again at once, from `counts`.
+   * </pre>
+   *
+   * Protobuf type {@code opamp.sdk.v1.AgentExporters}
+   */
+  public  static final class AgentExporters extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentExporters, AgentExporters.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentExporters)
+      AgentExportersOrBuilder {
+    private AgentExporters() {
+      exporters_ = emptyProtobufList();
+    }
+    private int bitField0_;
+    public static final int EXPORTERS_FIELD_NUMBER = 1;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> exporters_;
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
+      return exporters_;
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    public java.util.List<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder> 
+        getExportersOrBuilderList() {
+      return exporters_;
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public int getExportersCount() {
+      return exporters_.size();
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
+      return exporters_.get(index);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder getExportersOrBuilder(
+        int index) {
+      return exporters_.get(index);
+    }
+    private void ensureExportersIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> tmp = exporters_;
+      if (!tmp.isModifiable()) {
+        exporters_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setExporters(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.set(index, value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addExporters(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+      value.getClass();  // minimal bytecode null check
+      ensureExportersIsMutable();
+      exporters_.add(index, value);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void addAllExporters(
+        java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
+      ensureExportersIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, exporters_);
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void clearExporters() {
+      exporters_ = emptyProtobufList();
+    }
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+     */
+    private void removeExporters(int index) {
+      ensureExportersIsMutable();
+      exporters_.remove(index);
+    }
+
+    public static final int COUNTS_FIELD_NUMBER = 2;
+    private dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts counts_;
+    /**
+     * <pre>
+     * as timer's
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasCounts() {
       return ((bitField0_ & 0x00000001) != 0);
     }
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * as timer's
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
      */
     @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-      return settings_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance() : settings_;
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts() {
+      return counts_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance() : counts_;
     }
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * as timer's
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+    private void setCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
       value.getClass();  // minimal bytecode null check
-      settings_ = value;
+      counts_ = value;
       bitField0_ |= 0x00000001;
     }
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * as timer's
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
      */
     @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+    private void mergeCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
       value.getClass();  // minimal bytecode null check
-      if (settings_ != null &&
-          settings_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance()) {
-        settings_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.newBuilder(settings_).mergeFrom(value).buildPartial();
+      if (counts_ != null &&
+          counts_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance()) {
+        counts_ =
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.newBuilder(counts_).mergeFrom(value).buildPartial();
       } else {
-        settings_ = value;
+        counts_ = value;
       }
       bitField0_ |= 0x00000001;
     }
     /**
      * <pre>
-     * put all of it in force, next-start ones too
+     * as timer's
      * </pre>
      *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+     * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
      */
-    private void clearSettings() {
-      settings_ = null;
+    private void clearCounts() {
+      counts_ = null;
       bitField0_ = (bitField0_ & ~0x00000001);
     }
 
-    public static final int CURRENT_FIELD_NUMBER = 2;
-    private com.google.protobuf.ByteString current_;
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
     /**
      * <pre>
-     * keep it: the document in force now
+     * Export health is asked again at once, from `counts`.
      * </pre>
      *
-     * <code>bytes current = 2;</code>
-     * @return The current.
+     * Protobuf type {@code opamp.sdk.v1.AgentExporters}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentExporters)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExportersOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getExportersList());
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public int getExportersCount() {
+        return instance.getExportersCount();
+      }/**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
+        return instance.getExporters(index);
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.setExporters(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder setExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.setExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
+        copyOnWrite();
+        instance.addExporters(index, value);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addExporters(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
+        copyOnWrite();
+        instance.addExporters(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder addAllExporters(
+          java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
+        copyOnWrite();
+        instance.addAllExporters(values);
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder clearExporters() {
+        copyOnWrite();
+        instance.clearExporters();
+        return this;
+      }
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 1;</code>
+       */
+      public Builder removeExporters(int index) {
+        copyOnWrite();
+        instance.removeExporters(index);
+        return this;
+      }
+
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasCounts() {
+        return instance.hasCounts();
+      }
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts() {
+        return instance.getCounts();
+      }
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      public Builder setCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+        copyOnWrite();
+        instance.setCounts(value);
+        return this;
+        }
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      public Builder setCounts(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.Builder builderForValue) {
+        copyOnWrite();
+        instance.setCounts(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      public Builder mergeCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+        copyOnWrite();
+        instance.mergeCounts(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * as timer's
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.ExportCounts counts = 2;</code>
+       */
+      public Builder clearCounts() {  copyOnWrite();
+        instance.clearCounts();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentExporters)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "exporters_",
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.class,
+              "counts_",
+            };
+            java.lang.String info =
+                "\u0000\u0002\u0000\u0001\u0001\u0002\u0002\u0000\u0001\u0000\u0001\u001b\u0002\u1009" +
+                "\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentExporters)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters DEFAULT_INSTANCE;
+    static {
+      AgentExporters defaultInstance = new AgentExporters();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentExporters.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentExporters getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentExporters> PARSER;
+
+    public static com.google.protobuf.Parser<AgentExporters> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentOutputOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentOutput)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * keep it and pass it back; never read it
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     * @return The agent.
+     */
+    com.google.protobuf.ByteString getAgent();
+
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> 
+        getEffectsList();
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect getEffects(int index);
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    int getEffectsCount();
+
+    /**
+     * <pre>
+     * step with timer then; 0: only on an input
+     * </pre>
+     *
+     * <code>uint64 wake_at_mono_ms = 3;</code>
+     * @return The wakeAtMonoMs.
+     */
+    long getWakeAtMonoMs();
+
+    /**
+     * <pre>
+     * in force now (the client's first status takes it)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
+     * @return Whether the effective field is set.
+     */
+    boolean hasEffective();
+    /**
+     * <pre>
+     * in force now (the client's first status takes it)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
+     * @return The effective.
+     */
+    opamp.proto.v1.Opamp.EffectiveConfig getEffective();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentOutput}
+   */
+  public  static final class AgentOutput extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentOutput, AgentOutput.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentOutput)
+      AgentOutputOrBuilder {
+    private AgentOutput() {
+      agent_ = com.google.protobuf.ByteString.EMPTY;
+      effects_ = emptyProtobufList();
+    }
+    private int bitField0_;
+    public static final int AGENT_FIELD_NUMBER = 1;
+    private com.google.protobuf.ByteString agent_;
+    /**
+     * <pre>
+     * keep it and pass it back; never read it
+     * </pre>
+     *
+     * <code>bytes agent = 1;</code>
+     * @return The agent.
      */
     @java.lang.Override
-    public com.google.protobuf.ByteString getCurrent() {
-      return current_;
+    public com.google.protobuf.ByteString getAgent() {
+      return agent_;
     }
     /**
      * <pre>
-     * keep it: the document in force now
+     * keep it and pass it back; never read it
      * </pre>
      *
-     * <code>bytes current = 2;</code>
-     * @param value The current to set.
+     * <code>bytes agent = 1;</code>
+     * @param value The agent to set.
      */
-    private void setCurrent(com.google.protobuf.ByteString value) {
+    private void setAgent(com.google.protobuf.ByteString value) {
       java.lang.Class<?> valueClass = value.getClass();
   
-      current_ = value;
+      agent_ = value;
     }
     /**
      * <pre>
-     * keep it: the document in force now
+     * keep it and pass it back; never read it
      * </pre>
      *
-     * <code>bytes current = 2;</code>
+     * <code>bytes agent = 1;</code>
      */
-    private void clearCurrent() {
+    private void clearAgent() {
 
-      current_ = getDefaultInstance().getCurrent();
+      agent_ = getDefaultInstance().getAgent();
     }
 
-    public static final int EFFECTIVE_FIELD_NUMBER = 3;
+    public static final int EFFECTS_FIELD_NUMBER = 2;
+    private com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> effects_;
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.Override
+    public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> getEffectsList() {
+      return effects_;
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    public java.util.List<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffectOrBuilder> 
+        getEffectsOrBuilderList() {
+      return effects_;
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.Override
+    public int getEffectsCount() {
+      return effects_.size();
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect getEffects(int index) {
+      return effects_.get(index);
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffectOrBuilder getEffectsOrBuilder(
+        int index) {
+      return effects_.get(index);
+    }
+    private void ensureEffectsIsMutable() {
+      com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> tmp = effects_;
+      if (!tmp.isModifiable()) {
+        effects_ =
+            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
+       }
+    }
+
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEffects(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEffectsIsMutable();
+      effects_.set(index, value);
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEffects(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEffectsIsMutable();
+      effects_.add(value);
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void addEffects(
+        int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
+      value.getClass();  // minimal bytecode null check
+      ensureEffectsIsMutable();
+      effects_.add(index, value);
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    private void addAllEffects(
+        java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> values) {
+      ensureEffectsIsMutable();
+      com.google.protobuf.AbstractMessageLite.addAll(
+          values, effects_);
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    private void clearEffects() {
+      effects_ = emptyProtobufList();
+    }
+    /**
+     * <pre>
+     * carry them out in order
+     * </pre>
+     *
+     * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+     */
+    private void removeEffects(int index) {
+      ensureEffectsIsMutable();
+      effects_.remove(index);
+    }
+
+    public static final int WAKE_AT_MONO_MS_FIELD_NUMBER = 3;
+    private long wakeAtMonoMs_;
+    /**
+     * <pre>
+     * step with timer then; 0: only on an input
+     * </pre>
+     *
+     * <code>uint64 wake_at_mono_ms = 3;</code>
+     * @return The wakeAtMonoMs.
+     */
+    @java.lang.Override
+    public long getWakeAtMonoMs() {
+      return wakeAtMonoMs_;
+    }
+    /**
+     * <pre>
+     * step with timer then; 0: only on an input
+     * </pre>
+     *
+     * <code>uint64 wake_at_mono_ms = 3;</code>
+     * @param value The wakeAtMonoMs to set.
+     */
+    private void setWakeAtMonoMs(long value) {
+      
+      wakeAtMonoMs_ = value;
+    }
+    /**
+     * <pre>
+     * step with timer then; 0: only on an input
+     * </pre>
+     *
+     * <code>uint64 wake_at_mono_ms = 3;</code>
+     */
+    private void clearWakeAtMonoMs() {
+
+      wakeAtMonoMs_ = 0L;
+    }
+
+    public static final int EFFECTIVE_FIELD_NUMBER = 4;
     private opamp.proto.v1.Opamp.EffectiveConfig effective_;
     /**
      * <pre>
-     * report it
+     * in force now (the client's first status takes it)
      * </pre>
      *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
      */
     @java.lang.Override
     public boolean hasEffective() {
-      return ((bitField0_ & 0x00000002) != 0);
+      return ((bitField0_ & 0x00000001) != 0);
     }
     /**
      * <pre>
-     * report it
+     * in force now (the client's first status takes it)
      * </pre>
      *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
      */
     @java.lang.Override
     public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
@@ -7335,23 +13284,23 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * report it
+     * in force now (the client's first status takes it)
      * </pre>
      *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
       value.getClass();  // minimal bytecode null check
       effective_ = value;
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
     }
     /**
      * <pre>
-     * report it
+     * in force now (the client's first status takes it)
      * </pre>
      *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
      */
     @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
     private void mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
@@ -7363,173 +13312,64 @@ java.lang.String defaultValue) {
       } else {
         effective_ = value;
       }
-      bitField0_ |= 0x00000002;
+      bitField0_ |= 0x00000001;
     }
     /**
      * <pre>
-     * report it
+     * in force now (the client's first status takes it)
      * </pre>
      *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
      */
     private void clearEffective() {
       effective_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
+      bitField0_ = (bitField0_ & ~0x00000001);
     }
 
-    public static final int WARNING_FIELD_NUMBER = 4;
-    private java.lang.String warning_;
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The warning.
-     */
-    @java.lang.Override
-    public java.lang.String getWarning() {
-      return warning_;
-    }
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The bytes for warning.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getWarningBytes() {
-      return com.google.protobuf.ByteString.copyFromUtf8(warning_);
-    }
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @param value The warning to set.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setWarning(
-        java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-
-      warning_ = value;
-    }
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     */
-    private void clearWarning() {
-
-      warning_ = getDefaultInstance().getWarning();
-    }
-    /**
-     * <pre>
-     * the saved settings were unreadable, and why
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @param value The bytes for warning to set.
-     */
-    private void setWarningBytes(
-        com.google.protobuf.ByteString value) {
-      checkByteStringIsUtf8(value);
-      warning_ = value.toStringUtf8();
-
-    }
-
-    public static final int REFRESH_AT_UNIX_MS_FIELD_NUMBER = 5;
-    private long refreshAtUnixMs_;
-    /**
-     * <pre>
-     * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-     * any earlier one. 0: nothing to wait for. See Refresh.
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 5;</code>
-     * @return The refreshAtUnixMs.
-     */
-    @java.lang.Override
-    public long getRefreshAtUnixMs() {
-      return refreshAtUnixMs_;
-    }
-    /**
-     * <pre>
-     * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-     * any earlier one. 0: nothing to wait for. See Refresh.
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 5;</code>
-     * @param value The refreshAtUnixMs to set.
-     */
-    private void setRefreshAtUnixMs(long value) {
-      
-      refreshAtUnixMs_ = value;
-    }
-    /**
-     * <pre>
-     * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-     * any earlier one. 0: nothing to wait for. See Refresh.
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 5;</code>
-     */
-    private void clearRefreshAtUnixMs() {
-
-      refreshAtUnixMs_ = 0L;
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         java.nio.ByteBuffer data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(byte[] data)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(java.io.InputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -7537,24 +13377,24 @@ java.lang.String defaultValue) {
           DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseDelimitedFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseDelimitedFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -7565,19 +13405,19 @@ java.lang.String defaultValue) {
     public static Builder newBuilder() {
       return (Builder) DEFAULT_INSTANCE.createBuilder();
     }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded prototype) {
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput prototype) {
       return DEFAULT_INSTANCE.createBuilder(prototype);
     }
 
     /**
-     * Protobuf type {@code opamp.sdk.v1.Loaded}
+     * Protobuf type {@code opamp.sdk.v1.AgentOutput}
      */
     public static final class Builder extends
         com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Loaded)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.LoadedOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.newBuilder()
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentOutput)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutputOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.newBuilder()
       private Builder() {
         super(DEFAULT_INSTANCE);
       }
@@ -7585,121 +13425,240 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * put all of it in force, next-start ones too
+       * keep it and pass it back; never read it
        * </pre>
        *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+       * <code>bytes agent = 1;</code>
+       * @return The agent.
        */
       @java.lang.Override
-      public boolean hasSettings() {
-        return instance.hasSettings();
+      public com.google.protobuf.ByteString getAgent() {
+        return instance.getAgent();
       }
       /**
        * <pre>
-       * put all of it in force, next-start ones too
+       * keep it and pass it back; never read it
        * </pre>
        *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+       * <code>bytes agent = 1;</code>
+       * @param value The agent to set.
+       * @return This builder for chaining.
        */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-        return instance.getSettings();
-      }
-      /**
-       * <pre>
-       * put all of it in force, next-start ones too
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      public Builder setAgent(com.google.protobuf.ByteString value) {
         copyOnWrite();
-        instance.setSettings(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * put all of it in force, next-start ones too
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder setSettings(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.Builder builderForValue) {
-        copyOnWrite();
-        instance.setSettings(builderForValue.build());
+        instance.setAgent(value);
         return this;
       }
       /**
        * <pre>
-       * put all of it in force, next-start ones too
+       * keep it and pass it back; never read it
        * </pre>
        *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
+       * <code>bytes agent = 1;</code>
+       * @return This builder for chaining.
        */
-      public Builder mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      public Builder clearAgent() {
         copyOnWrite();
-        instance.mergeSettings(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * put all of it in force, next-start ones too
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder clearSettings() {  copyOnWrite();
-        instance.clearSettings();
+        instance.clearAgent();
         return this;
       }
 
       /**
        * <pre>
-       * keep it: the document in force now
+       * carry them out in order
        * </pre>
        *
-       * <code>bytes current = 2;</code>
-       * @return The current.
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
        */
       @java.lang.Override
-      public com.google.protobuf.ByteString getCurrent() {
-        return instance.getCurrent();
+      public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> getEffectsList() {
+        return java.util.Collections.unmodifiableList(
+            instance.getEffectsList());
       }
       /**
        * <pre>
-       * keep it: the document in force now
+       * carry them out in order
        * </pre>
        *
-       * <code>bytes current = 2;</code>
-       * @param value The current to set.
-       * @return This builder for chaining.
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
        */
-      public Builder setCurrent(com.google.protobuf.ByteString value) {
+      @java.lang.Override
+      public int getEffectsCount() {
+        return instance.getEffectsCount();
+      }/**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect getEffects(int index) {
+        return instance.getEffects(index);
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder setEffects(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
         copyOnWrite();
-        instance.setCurrent(value);
+        instance.setEffects(index, value);
         return this;
       }
       /**
        * <pre>
-       * keep it: the document in force now
+       * carry them out in order
        * </pre>
        *
-       * <code>bytes current = 2;</code>
-       * @return This builder for chaining.
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
        */
-      public Builder clearCurrent() {
+      public Builder setEffects(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.Builder builderForValue) {
         copyOnWrite();
-        instance.clearCurrent();
+        instance.setEffects(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder addEffects(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
+        copyOnWrite();
+        instance.addEffects(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder addEffects(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect value) {
+        copyOnWrite();
+        instance.addEffects(index, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder addEffects(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEffects(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder addEffects(
+          int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.Builder builderForValue) {
+        copyOnWrite();
+        instance.addEffects(index,
+            builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder addAllEffects(
+          java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> values) {
+        copyOnWrite();
+        instance.addAllEffects(values);
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder clearEffects() {
+        copyOnWrite();
+        instance.clearEffects();
+        return this;
+      }
+      /**
+       * <pre>
+       * carry them out in order
+       * </pre>
+       *
+       * <code>repeated .opamp.sdk.v1.AgentEffect effects = 2;</code>
+       */
+      public Builder removeEffects(int index) {
+        copyOnWrite();
+        instance.removeEffects(index);
         return this;
       }
 
       /**
        * <pre>
-       * report it
+       * step with timer then; 0: only on an input
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>uint64 wake_at_mono_ms = 3;</code>
+       * @return The wakeAtMonoMs.
+       */
+      @java.lang.Override
+      public long getWakeAtMonoMs() {
+        return instance.getWakeAtMonoMs();
+      }
+      /**
+       * <pre>
+       * step with timer then; 0: only on an input
+       * </pre>
+       *
+       * <code>uint64 wake_at_mono_ms = 3;</code>
+       * @param value The wakeAtMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setWakeAtMonoMs(long value) {
+        copyOnWrite();
+        instance.setWakeAtMonoMs(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * step with timer then; 0: only on an input
+       * </pre>
+       *
+       * <code>uint64 wake_at_mono_ms = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearWakeAtMonoMs() {
+        copyOnWrite();
+        instance.clearWakeAtMonoMs();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * in force now (the client's first status takes it)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       @java.lang.Override
       public boolean hasEffective() {
@@ -7707,10 +13666,10 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * report it
+       * in force now (the client's first status takes it)
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       @java.lang.Override
       public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
@@ -7718,10 +13677,10 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * report it
+       * in force now (the client's first status takes it)
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       public Builder setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
         copyOnWrite();
@@ -7730,10 +13689,10 @@ java.lang.String defaultValue) {
         }
       /**
        * <pre>
-       * report it
+       * in force now (the client's first status takes it)
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       public Builder setEffective(
           opamp.proto.v1.Opamp.EffectiveConfig.Builder builderForValue) {
@@ -7743,10 +13702,10 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * report it
+       * in force now (the client's first status takes it)
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       public Builder mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
         copyOnWrite();
@@ -7755,129 +13714,1288 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * report it
+       * in force now (the client's first status takes it)
        * </pre>
        *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 3;</code>
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 4;</code>
        */
       public Builder clearEffective() {  copyOnWrite();
         instance.clearEffective();
         return this;
       }
 
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentOutput)
+    }
+    @java.lang.Override
+    @java.lang.SuppressWarnings({"ThrowNull"})
+    protected final java.lang.Object dynamicMethod(
+        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
+        java.lang.Object arg0, java.lang.Object arg1) {
+      switch (method) {
+        case NEW_MUTABLE_INSTANCE: {
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput();
+        }
+        case NEW_BUILDER: {
+          return new Builder();
+        }
+        case BUILD_MESSAGE_INFO: {
+            java.lang.Object[] objects = new java.lang.Object[] {
+              "bitField0_",
+              "agent_",
+              "effects_",
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.class,
+              "wakeAtMonoMs_",
+              "effective_",
+            };
+            java.lang.String info =
+                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0001\u0000\u0001\n\u0002\u001b" +
+                "\u0003\u0003\u0004\u1009\u0000";
+            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
+        }
+        case GET_DEFAULT_INSTANCE: {
+          return DEFAULT_INSTANCE;
+        }
+        case GET_PARSER: {
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput> parser = PARSER;
+          if (parser == null) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.class) {
+              parser = PARSER;
+              if (parser == null) {
+                parser =
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput>(
+                        DEFAULT_INSTANCE);
+                PARSER = parser;
+              }
+            }
+          }
+          return parser;
+        }
+        case GET_MEMOIZED_IS_INITIALIZED: {
+          return (byte) 1;
+        }
+        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
+        // So it can do anything. Combine with default case for smaller codegen.
+        case SET_MEMOIZED_IS_INITIALIZED:
+      }
+      // Should never happen. Generates tight code to throw an exception.
+      throw null;
+    }
+
+
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentOutput)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput DEFAULT_INSTANCE;
+    static {
+      AgentOutput defaultInstance = new AgentOutput();
+      // New instances are implicitly immutable so no need to make
+      // immutable.
+      DEFAULT_INSTANCE = defaultInstance;
+      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
+        AgentOutput.class, defaultInstance);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static volatile com.google.protobuf.Parser<AgentOutput> PARSER;
+
+    public static com.google.protobuf.Parser<AgentOutput> parser() {
+      return DEFAULT_INSTANCE.getParserForType();
+    }
+  }
+
+  public interface AgentEffectOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentEffect)
+      com.google.protobuf.MessageLiteOrBuilder {
+
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     * @return Whether the apply field is set.
+     */
+    boolean hasApply();
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     * @return The apply.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply();
+
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     * @return Whether the effective field is set.
+     */
+    boolean hasEffective();
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     * @return The effective.
+     */
+    opamp.proto.v1.Opamp.EffectiveConfig getEffective();
+
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     * @return Whether the status field is set.
+     */
+    boolean hasStatus();
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     * @return The status.
+     */
+    opamp.proto.v1.Opamp.RemoteConfigStatus getStatus();
+
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     * @return Whether the health field is set.
+     */
+    boolean hasHealth();
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     * @return The health.
+     */
+    opamp.proto.v1.Opamp.ComponentHealth getHealth();
+
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return Whether the saveUid field is set.
+     */
+    boolean hasSaveUid();
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return The saveUid.
+     */
+    java.lang.String getSaveUid();
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return The bytes for saveUid.
+     */
+    com.google.protobuf.ByteString
+        getSaveUidBytes();
+
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     * @return Whether the log field is set.
+     */
+    boolean hasLog();
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     * @return The log.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog getLog();
+
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.EffectCase getEffectCase();
+  }
+  /**
+   * Protobuf type {@code opamp.sdk.v1.AgentEffect}
+   */
+  public  static final class AgentEffect extends
+      com.google.protobuf.GeneratedMessageLite<
+          AgentEffect, AgentEffect.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentEffect)
+      AgentEffectOrBuilder {
+    private AgentEffect() {
+    }
+    private int effectCase_ = 0;
+    private java.lang.Object effect_;
+    public enum EffectCase
+        implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
+      APPLY(1),
+      EFFECTIVE(2),
+      STATUS(3),
+      HEALTH(4),
+      SAVE_UID(5),
+      LOG(6),
+      EFFECT_NOT_SET(0);
+      private final int value;
+      private EffectCase(int value) {
+        this.value = value;
+      }
+      /**
+       * @deprecated Use {@link #forNumber(int)} instead.
+       */
+      @java.lang.Deprecated
+      public static EffectCase valueOf(int value) {
+        return forNumber(value);
+      }
+
+      public static EffectCase forNumber(int value) {
+        switch (value) {
+          case 1: return APPLY;
+          case 2: return EFFECTIVE;
+          case 3: return STATUS;
+          case 4: return HEALTH;
+          case 5: return SAVE_UID;
+          case 6: return LOG;
+          case 0: return EFFECT_NOT_SET;
+          default: return null;
+        }
+      }
+      @java.lang.Override public int getNumber() {
+        return this.value;
+      }
+    };
+
+    @java.lang.Override
+    public EffectCase
+    getEffectCase() {
+      return EffectCase.forNumber(
+          effectCase_);
+    }
+
+    private void clearEffect() {
+      effectCase_ = 0;
+      effect_ = null;
+    }
+
+    public static final int APPLY_FIELD_NUMBER = 1;
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     */
+    @java.lang.Override
+    public boolean hasApply() {
+      return effectCase_ == 1;
+    }
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply() {
+      if (effectCase_ == 1) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings) effect_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      value.getClass();  // minimal bytecode null check
+      effect_ = value;
+      effectCase_ = 1;
+    }
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      value.getClass();  // minimal bytecode null check
+      if (effectCase_ == 1 &&
+          effect_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance()) {
+        effect_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings) effect_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        effect_ = value;
+      }
+      effectCase_ = 1;
+    }
+    /**
+     * <pre>
+     * put in force: live settings, next-start ones and custom
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+     */
+    private void clearApply() {
+      if (effectCase_ == 1) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+
+    public static final int EFFECTIVE_FIELD_NUMBER = 2;
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     */
+    @java.lang.Override
+    public boolean hasEffective() {
+      return effectCase_ == 2;
+    }
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
+      if (effectCase_ == 2) {
+         return (opamp.proto.v1.Opamp.EffectiveConfig) effect_;
+      }
+      return opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
+      value.getClass();  // minimal bytecode null check
+      effect_ = value;
+      effectCase_ = 2;
+    }
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
+      value.getClass();  // minimal bytecode null check
+      if (effectCase_ == 2 &&
+          effect_ != opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance()) {
+        effect_ = opamp.proto.v1.Opamp.EffectiveConfig.newBuilder((opamp.proto.v1.Opamp.EffectiveConfig) effect_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        effect_ = value;
+      }
+      effectCase_ = 2;
+    }
+    /**
+     * <pre>
+     * set_effective_config
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     */
+    private void clearEffective() {
+      if (effectCase_ == 2) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+
+    public static final int STATUS_FIELD_NUMBER = 3;
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     */
+    @java.lang.Override
+    public boolean hasStatus() {
+      return effectCase_ == 3;
+    }
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.RemoteConfigStatus getStatus() {
+      if (effectCase_ == 3) {
+         return (opamp.proto.v1.Opamp.RemoteConfigStatus) effect_;
+      }
+      return opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+      value.getClass();  // minimal bytecode null check
+      effect_ = value;
+      effectCase_ = 3;
+    }
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+      value.getClass();  // minimal bytecode null check
+      if (effectCase_ == 3 &&
+          effect_ != opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance()) {
+        effect_ = opamp.proto.v1.Opamp.RemoteConfigStatus.newBuilder((opamp.proto.v1.Opamp.RemoteConfigStatus) effect_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        effect_ = value;
+      }
+      effectCase_ = 3;
+    }
+    /**
+     * <pre>
+     * set_remote_config_status
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+     */
+    private void clearStatus() {
+      if (effectCase_ == 3) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+
+    public static final int HEALTH_FIELD_NUMBER = 4;
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     */
+    @java.lang.Override
+    public boolean hasHealth() {
+      return effectCase_ == 4;
+    }
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     */
+    @java.lang.Override
+    public opamp.proto.v1.Opamp.ComponentHealth getHealth() {
+      if (effectCase_ == 4) {
+         return (opamp.proto.v1.Opamp.ComponentHealth) effect_;
+      }
+      return opamp.proto.v1.Opamp.ComponentHealth.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHealth(opamp.proto.v1.Opamp.ComponentHealth value) {
+      value.getClass();  // minimal bytecode null check
+      effect_ = value;
+      effectCase_ = 4;
+    }
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeHealth(opamp.proto.v1.Opamp.ComponentHealth value) {
+      value.getClass();  // minimal bytecode null check
+      if (effectCase_ == 4 &&
+          effect_ != opamp.proto.v1.Opamp.ComponentHealth.getDefaultInstance()) {
+        effect_ = opamp.proto.v1.Opamp.ComponentHealth.newBuilder((opamp.proto.v1.Opamp.ComponentHealth) effect_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        effect_ = value;
+      }
+      effectCase_ = 4;
+    }
+    /**
+     * <pre>
+     * set_health (merge the application's own status in, if any)
+     * </pre>
+     *
+     * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+     */
+    private void clearHealth() {
+      if (effectCase_ == 4) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+
+    public static final int SAVE_UID_FIELD_NUMBER = 5;
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return Whether the saveUid field is set.
+     */
+    @java.lang.Override
+    public boolean hasSaveUid() {
+      return effectCase_ == 5;
+    }
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return The saveUid.
+     */
+    @java.lang.Override
+    public java.lang.String getSaveUid() {
+      java.lang.String ref = "";
+      if (effectCase_ == 5) {
+        ref = (java.lang.String) effect_;
+      }
+      return ref;
+    }
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @return The bytes for saveUid.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getSaveUidBytes() {
+      java.lang.String ref = "";
+      if (effectCase_ == 5) {
+        ref = (java.lang.String) effect_;
+      }
+      return com.google.protobuf.ByteString.copyFromUtf8(ref);
+    }
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @param value The saveUid to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setSaveUid(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+      effectCase_ = 5;
+      effect_ = value;
+    }
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     */
+    private void clearSaveUid() {
+      if (effectCase_ == 5) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+    /**
+     * <pre>
+     * write it to the state directory's instance-uid; on failure, uid_not_saved
+     * </pre>
+     *
+     * <code>string save_uid = 5;</code>
+     * @param value The bytes for saveUid to set.
+     */
+    private void setSaveUidBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      effect_ = value.toStringUtf8();
+      effectCase_ = 5;
+    }
+
+    public static final int LOG_FIELD_NUMBER = 6;
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     */
+    @java.lang.Override
+    public boolean hasLog() {
+      return effectCase_ == 6;
+    }
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog getLog() {
+      if (effectCase_ == 6) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog) effect_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.getDefaultInstance();
+    }
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setLog(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog value) {
+      value.getClass();  // minimal bytecode null check
+      effect_ = value;
+      effectCase_ = 6;
+    }
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeLog(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog value) {
+      value.getClass();  // minimal bytecode null check
+      if (effectCase_ == 6 &&
+          effect_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.getDefaultInstance()) {
+        effect_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog) effect_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        effect_ = value;
+      }
+      effectCase_ = 6;
+    }
+    /**
+     * <pre>
+     * say it, prefixed as the integration prefixes its lines
+     * </pre>
+     *
+     * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+     */
+    private void clearLog() {
+      if (effectCase_ == 6) {
+        effectCase_ = 0;
+        effect_ = null;
+      }
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, data, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input);
+    }
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageLite.parseFrom(
+          DEFAULT_INSTANCE, input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() {
+      return (Builder) DEFAULT_INSTANCE.createBuilder();
+    }
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect prototype) {
+      return DEFAULT_INSTANCE.createBuilder(prototype);
+    }
+
+    /**
+     * Protobuf type {@code opamp.sdk.v1.AgentEffect}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageLite.Builder<
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentEffect)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffectOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.newBuilder()
+      private Builder() {
+        super(DEFAULT_INSTANCE);
+      }
+
+      @java.lang.Override
+      public EffectCase
+          getEffectCase() {
+        return instance.getEffectCase();
+      }
+
+      public Builder clearEffect() {
+        copyOnWrite();
+        instance.clearEffect();
+        return this;
+      }
+
+
       /**
        * <pre>
-       * the saved settings were unreadable, and why
+       * put in force: live settings, next-start ones and custom
        * </pre>
        *
-       * <code>string warning = 4;</code>
-       * @return The warning.
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
        */
       @java.lang.Override
-      public java.lang.String getWarning() {
-        return instance.getWarning();
+      public boolean hasApply() {
+        return instance.hasApply();
       }
       /**
        * <pre>
-       * the saved settings were unreadable, and why
+       * put in force: live settings, next-start ones and custom
        * </pre>
        *
-       * <code>string warning = 4;</code>
-       * @return The bytes for warning.
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply() {
+        return instance.getApply();
+      }
+      /**
+       * <pre>
+       * put in force: live settings, next-start ones and custom
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+       */
+      public Builder setApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+        copyOnWrite();
+        instance.setApply(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * put in force: live settings, next-start ones and custom
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+       */
+      public Builder setApply(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.Builder builderForValue) {
+        copyOnWrite();
+        instance.setApply(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * put in force: live settings, next-start ones and custom
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+       */
+      public Builder mergeApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+        copyOnWrite();
+        instance.mergeApply(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * put in force: live settings, next-start ones and custom
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.Settings apply = 1;</code>
+       */
+      public Builder clearApply() {
+        copyOnWrite();
+        instance.clearApply();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      @java.lang.Override
+      public boolean hasEffective() {
+        return instance.hasEffective();
+      }
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
+        return instance.getEffective();
+      }
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      public Builder setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
+        copyOnWrite();
+        instance.setEffective(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      public Builder setEffective(
+          opamp.proto.v1.Opamp.EffectiveConfig.Builder builderForValue) {
+        copyOnWrite();
+        instance.setEffective(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      public Builder mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
+        copyOnWrite();
+        instance.mergeEffective(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_effective_config
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+       */
+      public Builder clearEffective() {
+        copyOnWrite();
+        instance.clearEffective();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      @java.lang.Override
+      public boolean hasStatus() {
+        return instance.hasStatus();
+      }
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.RemoteConfigStatus getStatus() {
+        return instance.getStatus();
+      }
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      public Builder setStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+        copyOnWrite();
+        instance.setStatus(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      public Builder setStatus(
+          opamp.proto.v1.Opamp.RemoteConfigStatus.Builder builderForValue) {
+        copyOnWrite();
+        instance.setStatus(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      public Builder mergeStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
+        copyOnWrite();
+        instance.mergeStatus(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_remote_config_status
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.RemoteConfigStatus status = 3;</code>
+       */
+      public Builder clearStatus() {
+        copyOnWrite();
+        instance.clearStatus();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      @java.lang.Override
+      public boolean hasHealth() {
+        return instance.hasHealth();
+      }
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      @java.lang.Override
+      public opamp.proto.v1.Opamp.ComponentHealth getHealth() {
+        return instance.getHealth();
+      }
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      public Builder setHealth(opamp.proto.v1.Opamp.ComponentHealth value) {
+        copyOnWrite();
+        instance.setHealth(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      public Builder setHealth(
+          opamp.proto.v1.Opamp.ComponentHealth.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHealth(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      public Builder mergeHealth(opamp.proto.v1.Opamp.ComponentHealth value) {
+        copyOnWrite();
+        instance.mergeHealth(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * set_health (merge the application's own status in, if any)
+       * </pre>
+       *
+       * <code>.opamp.proto.v1.ComponentHealth health = 4;</code>
+       */
+      public Builder clearHealth() {
+        copyOnWrite();
+        instance.clearHealth();
+        return this;
+      }
+
+      /**
+       * <pre>
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
+       * </pre>
+       *
+       * <code>string save_uid = 5;</code>
+       * @return Whether the saveUid field is set.
+       */
+      @java.lang.Override
+      public boolean hasSaveUid() {
+        return instance.hasSaveUid();
+      }
+      /**
+       * <pre>
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
+       * </pre>
+       *
+       * <code>string save_uid = 5;</code>
+       * @return The saveUid.
+       */
+      @java.lang.Override
+      public java.lang.String getSaveUid() {
+        return instance.getSaveUid();
+      }
+      /**
+       * <pre>
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
+       * </pre>
+       *
+       * <code>string save_uid = 5;</code>
+       * @return The bytes for saveUid.
        */
       @java.lang.Override
       public com.google.protobuf.ByteString
-          getWarningBytes() {
-        return instance.getWarningBytes();
+          getSaveUidBytes() {
+        return instance.getSaveUidBytes();
       }
       /**
        * <pre>
-       * the saved settings were unreadable, and why
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
        * </pre>
        *
-       * <code>string warning = 4;</code>
-       * @param value The warning to set.
+       * <code>string save_uid = 5;</code>
+       * @param value The saveUid to set.
        * @return This builder for chaining.
        */
-      public Builder setWarning(
+      public Builder setSaveUid(
           java.lang.String value) {
         copyOnWrite();
-        instance.setWarning(value);
+        instance.setSaveUid(value);
         return this;
       }
       /**
        * <pre>
-       * the saved settings were unreadable, and why
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
        * </pre>
        *
-       * <code>string warning = 4;</code>
+       * <code>string save_uid = 5;</code>
        * @return This builder for chaining.
        */
-      public Builder clearWarning() {
+      public Builder clearSaveUid() {
         copyOnWrite();
-        instance.clearWarning();
+        instance.clearSaveUid();
         return this;
       }
       /**
        * <pre>
-       * the saved settings were unreadable, and why
+       * write it to the state directory's instance-uid; on failure, uid_not_saved
        * </pre>
        *
-       * <code>string warning = 4;</code>
-       * @param value The bytes for warning to set.
+       * <code>string save_uid = 5;</code>
+       * @param value The bytes for saveUid to set.
        * @return This builder for chaining.
        */
-      public Builder setWarningBytes(
+      public Builder setSaveUidBytes(
           com.google.protobuf.ByteString value) {
         copyOnWrite();
-        instance.setWarningBytes(value);
+        instance.setSaveUidBytes(value);
         return this;
       }
 
       /**
        * <pre>
-       * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-       * any earlier one. 0: nothing to wait for. See Refresh.
+       * say it, prefixed as the integration prefixes its lines
        * </pre>
        *
-       * <code>uint64 refresh_at_unix_ms = 5;</code>
-       * @return The refreshAtUnixMs.
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
        */
       @java.lang.Override
-      public long getRefreshAtUnixMs() {
-        return instance.getRefreshAtUnixMs();
+      public boolean hasLog() {
+        return instance.hasLog();
       }
       /**
        * <pre>
-       * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-       * any earlier one. 0: nothing to wait for. See Refresh.
+       * say it, prefixed as the integration prefixes its lines
        * </pre>
        *
-       * <code>uint64 refresh_at_unix_ms = 5;</code>
-       * @param value The refreshAtUnixMs to set.
-       * @return This builder for chaining.
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
        */
-      public Builder setRefreshAtUnixMs(long value) {
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog getLog() {
+        return instance.getLog();
+      }
+      /**
+       * <pre>
+       * say it, prefixed as the integration prefixes its lines
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+       */
+      public Builder setLog(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog value) {
         copyOnWrite();
-        instance.setRefreshAtUnixMs(value);
+        instance.setLog(value);
         return this;
       }
       /**
        * <pre>
-       * When to call Refresh (milliseconds since the Unix epoch): arm one timer for it, in place of
-       * any earlier one. 0: nothing to wait for. See Refresh.
+       * say it, prefixed as the integration prefixes its lines
        * </pre>
        *
-       * <code>uint64 refresh_at_unix_ms = 5;</code>
-       * @return This builder for chaining.
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
        */
-      public Builder clearRefreshAtUnixMs() {
+      public Builder setLog(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Builder builderForValue) {
         copyOnWrite();
-        instance.clearRefreshAtUnixMs();
+        instance.setLog(builderForValue.build());
+        return this;
+      }
+      /**
+       * <pre>
+       * say it, prefixed as the integration prefixes its lines
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+       */
+      public Builder mergeLog(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog value) {
+        copyOnWrite();
+        instance.mergeLog(value);
+        return this;
+      }
+      /**
+       * <pre>
+       * say it, prefixed as the integration prefixes its lines
+       * </pre>
+       *
+       * <code>.opamp.sdk.v1.AgentLog log = 6;</code>
+       */
+      public Builder clearLog() {
+        copyOnWrite();
+        instance.clearLog();
         return this;
       }
 
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Loaded)
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentEffect)
     }
     @java.lang.Override
     @java.lang.SuppressWarnings({"ThrowNull"})
@@ -7886,36 +15004,37 @@ java.lang.String defaultValue) {
         java.lang.Object arg0, java.lang.Object arg1) {
       switch (method) {
         case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded();
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect();
         }
         case NEW_BUILDER: {
           return new Builder();
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "settings_",
-              "current_",
-              "effective_",
-              "warning_",
-              "refreshAtUnixMs_",
+              "effect_",
+              "effectCase_",
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.class,
+              opamp.proto.v1.Opamp.EffectiveConfig.class,
+              opamp.proto.v1.Opamp.RemoteConfigStatus.class,
+              opamp.proto.v1.Opamp.ComponentHealth.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.class,
             };
             java.lang.String info =
-                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
-                "\n\u0003\u1009\u0001\u0004\u0208\u0005\u0003";
+                "\u0000\u0006\u0001\u0000\u0001\u0006\u0006\u0000\u0000\u0000\u0001<\u0000\u0002<" +
+                "\u0000\u0003<\u0000\u0004<\u0000\u0005\u023b\u0000\u0006<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
           return DEFAULT_INSTANCE;
         }
         case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded> parser = PARSER;
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect> parser = PARSER;
           if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.class) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect.class) {
               parser = PARSER;
               if (parser == null) {
                 parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded>(
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect>(
                         DEFAULT_INSTANCE);
                 PARSER = parser;
               }
@@ -7935,1211 +15054,138 @@ java.lang.String defaultValue) {
     }
 
 
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Loaded)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded DEFAULT_INSTANCE;
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentEffect)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect DEFAULT_INSTANCE;
     static {
-      Loaded defaultInstance = new Loaded();
+      AgentEffect defaultInstance = new AgentEffect();
       // New instances are implicitly immutable so no need to make
       // immutable.
       DEFAULT_INSTANCE = defaultInstance;
       com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Loaded.class, defaultInstance);
+        AgentEffect.class, defaultInstance);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded getDefaultInstance() {
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentEffect getDefaultInstance() {
       return DEFAULT_INSTANCE;
     }
 
-    private static volatile com.google.protobuf.Parser<Loaded> PARSER;
+    private static volatile com.google.protobuf.Parser<AgentEffect> PARSER;
 
-    public static com.google.protobuf.Parser<Loaded> parser() {
+    public static com.google.protobuf.Parser<AgentEffect> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
 
-  public interface DecideOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Decide)
+  public interface AgentLogOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentLog)
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     * @return Whether the config field is set.
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @return The enum numeric value on the wire for level.
      */
-    boolean hasConfig();
+    int getLevelValue();
     /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     * @return The config.
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @return The level.
      */
-    opamp.proto.v1.Opamp.AgentRemoteConfig getConfig();
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level getLevel();
 
     /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 2;</code>
-     * @return The current.
+     * <code>string text = 2;</code>
+     * @return The text.
      */
-    com.google.protobuf.ByteString getCurrent();
-
+    java.lang.String getText();
     /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 3;</code>
-     * @return The atStart.
-     */
-    com.google.protobuf.ByteString getAtStart();
-
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     * @return Whether the host field is set.
-     */
-    boolean hasHost();
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     * @return The host.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost();
-
-    /**
-     * <pre>
-     * as Load's
-     * </pre>
-     *
-     * <code>uint64 now_unix_ms = 6;</code>
-     * @return The nowUnixMs.
-     */
-    long getNowUnixMs();
-  }
-  /**
-   * <pre>
-   * A remote config arrived. Answered in two steps: Decide says what to save for the next start
-   * (Plan); the host saves it, and Commit, with how that went, gives the answer (Decision). The
-   * layer decides; the host only says what became of the save.
-   * </pre>
-   *
-   * Protobuf type {@code opamp.sdk.v1.Decide}
-   */
-  public  static final class Decide extends
-      com.google.protobuf.GeneratedMessageLite<
-          Decide, Decide.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Decide)
-      DecideOrBuilder {
-    private Decide() {
-      current_ = com.google.protobuf.ByteString.EMPTY;
-      atStart_ = com.google.protobuf.ByteString.EMPTY;
-    }
-    private int bitField0_;
-    public static final int CONFIG_FIELD_NUMBER = 1;
-    private opamp.proto.v1.Opamp.AgentRemoteConfig config_;
-    /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     */
-    @java.lang.Override
-    public boolean hasConfig() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     */
-    @java.lang.Override
-    public opamp.proto.v1.Opamp.AgentRemoteConfig getConfig() {
-      return config_ == null ? opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance() : config_;
-    }
-    /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
-      value.getClass();  // minimal bytecode null check
-      config_ = value;
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
-      value.getClass();  // minimal bytecode null check
-      if (config_ != null &&
-          config_ != opamp.proto.v1.Opamp.AgentRemoteConfig.getDefaultInstance()) {
-        config_ =
-          opamp.proto.v1.Opamp.AgentRemoteConfig.newBuilder(config_).mergeFrom(value).buildPartial();
-      } else {
-        config_ = value;
-      }
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * required: without it the reply is an error
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-     */
-    private void clearConfig() {
-      config_ = null;
-      bitField0_ = (bitField0_ & ~0x00000001);
-    }
-
-    public static final int CURRENT_FIELD_NUMBER = 2;
-    private com.google.protobuf.ByteString current_;
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 2;</code>
-     * @return The current.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getCurrent() {
-      return current_;
-    }
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 2;</code>
-     * @param value The current to set.
-     */
-    private void setCurrent(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  
-      current_ = value;
-    }
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 2;</code>
-     */
-    private void clearCurrent() {
-
-      current_ = getDefaultInstance().getCurrent();
-    }
-
-    public static final int AT_START_FIELD_NUMBER = 3;
-    private com.google.protobuf.ByteString atStart_;
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 3;</code>
-     * @return The atStart.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getAtStart() {
-      return atStart_;
-    }
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 3;</code>
-     * @param value The atStart to set.
-     */
-    private void setAtStart(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  
-      atStart_ = value;
-    }
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 3;</code>
-     */
-    private void clearAtStart() {
-
-      atStart_ = getDefaultInstance().getAtStart();
-    }
-
-    public static final int HOST_FIELD_NUMBER = 5;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Host host_;
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     */
-    @java.lang.Override
-    public boolean hasHost() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
-      return host_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance() : host_;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-      value.getClass();  // minimal bytecode null check
-      host_ = value;
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-      value.getClass();  // minimal bytecode null check
-      if (host_ != null &&
-          host_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance()) {
-        host_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.newBuilder(host_).mergeFrom(value).buildPartial();
-      } else {
-        host_ = value;
-      }
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Host host = 5;</code>
-     */
-    private void clearHost() {
-      host_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
-    }
-
-    public static final int NOW_UNIX_MS_FIELD_NUMBER = 6;
-    private long nowUnixMs_;
-    /**
-     * <pre>
-     * as Load's
-     * </pre>
-     *
-     * <code>uint64 now_unix_ms = 6;</code>
-     * @return The nowUnixMs.
-     */
-    @java.lang.Override
-    public long getNowUnixMs() {
-      return nowUnixMs_;
-    }
-    /**
-     * <pre>
-     * as Load's
-     * </pre>
-     *
-     * <code>uint64 now_unix_ms = 6;</code>
-     * @param value The nowUnixMs to set.
-     */
-    private void setNowUnixMs(long value) {
-      
-      nowUnixMs_ = value;
-    }
-    /**
-     * <pre>
-     * as Load's
-     * </pre>
-     *
-     * <code>uint64 now_unix_ms = 6;</code>
-     */
-    private void clearNowUnixMs() {
-
-      nowUnixMs_ = 0L;
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide prototype) {
-      return DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
-    /**
-     * <pre>
-     * A remote config arrived. Answered in two steps: Decide says what to save for the next start
-     * (Plan); the host saves it, and Commit, with how that went, gives the answer (Decision). The
-     * layer decides; the host only says what became of the save.
-     * </pre>
-     *
-     * Protobuf type {@code opamp.sdk.v1.Decide}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Decide)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.DecideOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasConfig() {
-        return instance.hasConfig();
-      }
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      @java.lang.Override
-      public opamp.proto.v1.Opamp.AgentRemoteConfig getConfig() {
-        return instance.getConfig();
-      }
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      public Builder setConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
-        copyOnWrite();
-        instance.setConfig(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      public Builder setConfig(
-          opamp.proto.v1.Opamp.AgentRemoteConfig.Builder builderForValue) {
-        copyOnWrite();
-        instance.setConfig(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      public Builder mergeConfig(opamp.proto.v1.Opamp.AgentRemoteConfig value) {
-        copyOnWrite();
-        instance.mergeConfig(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * required: without it the reply is an error
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.AgentRemoteConfig config = 1;</code>
-       */
-      public Builder clearConfig() {  copyOnWrite();
-        instance.clearConfig();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 2;</code>
-       * @return The current.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getCurrent() {
-        return instance.getCurrent();
-      }
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 2;</code>
-       * @param value The current to set.
-       * @return This builder for chaining.
-       */
-      public Builder setCurrent(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setCurrent(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 2;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearCurrent() {
-        copyOnWrite();
-        instance.clearCurrent();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 3;</code>
-       * @return The atStart.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getAtStart() {
-        return instance.getAtStart();
-      }
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 3;</code>
-       * @param value The atStart to set.
-       * @return This builder for chaining.
-       */
-      public Builder setAtStart(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setAtStart(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 3;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearAtStart() {
-        copyOnWrite();
-        instance.clearAtStart();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      @java.lang.Override
-      public boolean hasHost() {
-        return instance.hasHost();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
-        return instance.getHost();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      public Builder setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-        copyOnWrite();
-        instance.setHost(value);
-        return this;
-        }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      public Builder setHost(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.Builder builderForValue) {
-        copyOnWrite();
-        instance.setHost(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      public Builder mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-        copyOnWrite();
-        instance.mergeHost(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 5;</code>
-       */
-      public Builder clearHost() {  copyOnWrite();
-        instance.clearHost();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * as Load's
-       * </pre>
-       *
-       * <code>uint64 now_unix_ms = 6;</code>
-       * @return The nowUnixMs.
-       */
-      @java.lang.Override
-      public long getNowUnixMs() {
-        return instance.getNowUnixMs();
-      }
-      /**
-       * <pre>
-       * as Load's
-       * </pre>
-       *
-       * <code>uint64 now_unix_ms = 6;</code>
-       * @param value The nowUnixMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setNowUnixMs(long value) {
-        copyOnWrite();
-        instance.setNowUnixMs(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * as Load's
-       * </pre>
-       *
-       * <code>uint64 now_unix_ms = 6;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearNowUnixMs() {
-        copyOnWrite();
-        instance.clearNowUnixMs();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Decide)
-    }
-    @java.lang.Override
-    @java.lang.SuppressWarnings({"ThrowNull"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "config_",
-              "current_",
-              "atStart_",
-              "host_",
-              "nowUnixMs_",
-            };
-            java.lang.String info =
-                "\u0000\u0005\u0000\u0001\u0001\u0006\u0005\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
-                "\n\u0003\n\u0005\u1009\u0001\u0006\u0003";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide> parser = PARSER;
-          if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
-        // So it can do anything. Combine with default case for smaller codegen.
-        case SET_MEMOIZED_IS_INITIALIZED:
-      }
-      // Should never happen. Generates tight code to throw an exception.
-      throw null;
-    }
-
-
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Decide)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide DEFAULT_INSTANCE;
-    static {
-      Decide defaultInstance = new Decide();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Decide.class, defaultInstance);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Decide> PARSER;
-
-    public static com.google.protobuf.Parser<Decide> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-  public interface PlanOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Plan)
-      com.google.protobuf.MessageLiteOrBuilder {
-
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     * @return Whether the save field is set.
-     */
-    boolean hasSave();
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     * @return The save.
-     */
-    com.google.protobuf.ByteString getSave();
-  }
-  /**
-   * Protobuf type {@code opamp.sdk.v1.Plan}
-   */
-  public  static final class Plan extends
-      com.google.protobuf.GeneratedMessageLite<
-          Plan, Plan.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Plan)
-      PlanOrBuilder {
-    private Plan() {
-      save_ = com.google.protobuf.ByteString.EMPTY;
-    }
-    private int bitField0_;
-    public static final int SAVE_FIELD_NUMBER = 1;
-    private com.google.protobuf.ByteString save_;
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     * @return Whether the save field is set.
-     */
-    @java.lang.Override
-    public boolean hasSave() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     * @return The save.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getSave() {
-      return save_;
-    }
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     * @param value The save to set.
-     */
-    private void setSave(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  bitField0_ |= 0x00000001;
-      save_ = value;
-    }
-    /**
-     * <pre>
-     * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-     * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-     * </pre>
-     *
-     * <code>optional bytes save = 1;</code>
-     */
-    private void clearSave() {
-      bitField0_ = (bitField0_ & ~0x00000001);
-      save_ = getDefaultInstance().getSave();
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan prototype) {
-      return DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
-    /**
-     * Protobuf type {@code opamp.sdk.v1.Plan}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Plan)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.PlanOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-
-      /**
-       * <pre>
-       * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-       * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-       * </pre>
-       *
-       * <code>optional bytes save = 1;</code>
-       * @return Whether the save field is set.
-       */
-      @java.lang.Override
-      public boolean hasSave() {
-        return instance.hasSave();
-      }
-      /**
-       * <pre>
-       * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-       * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-       * </pre>
-       *
-       * <code>optional bytes save = 1;</code>
-       * @return The save.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getSave() {
-        return instance.getSave();
-      }
-      /**
-       * <pre>
-       * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-       * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-       * </pre>
-       *
-       * <code>optional bytes save = 1;</code>
-       * @param value The save to set.
-       * @return This builder for chaining.
-       */
-      public Builder setSave(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setSave(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Save it where the host keeps state, whole or not at all (Load reads it at the next start),
-       * then Commit. Unset: the config is refused and there is nothing to save; Commit at once.
-       * </pre>
-       *
-       * <code>optional bytes save = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearSave() {
-        copyOnWrite();
-        instance.clearSave();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Plan)
-    }
-    @java.lang.Override
-    @java.lang.SuppressWarnings({"ThrowNull"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "save_",
-            };
-            java.lang.String info =
-                "\u0000\u0001\u0000\u0001\u0001\u0001\u0001\u0000\u0000\u0000\u0001\u100a\u0000";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan> parser = PARSER;
-          if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
-        // So it can do anything. Combine with default case for smaller codegen.
-        case SET_MEMOIZED_IS_INITIALIZED:
-      }
-      // Should never happen. Generates tight code to throw an exception.
-      throw null;
-    }
-
-
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Plan)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan DEFAULT_INSTANCE;
-    static {
-      Plan defaultInstance = new Plan();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Plan.class, defaultInstance);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Plan> PARSER;
-
-    public static com.google.protobuf.Parser<Plan> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-  public interface CommitOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Commit)
-      com.google.protobuf.MessageLiteOrBuilder {
-
-    /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-     * @return Whether the decide field is set.
-     */
-    boolean hasDecide();
-    /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-     * @return The decide.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide();
-
-    /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @return The enum numeric value on the wire for saved.
-     */
-    int getSavedValue();
-    /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @return The saved.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved getSaved();
-
-    /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @return The error.
-     */
-    java.lang.String getError();
-    /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @return The bytes for error.
+     * <code>string text = 2;</code>
+     * @return The bytes for text.
      */
     com.google.protobuf.ByteString
-        getErrorBytes();
+        getTextBytes();
   }
   /**
-   * <pre>
-   * The answer to a remote config, once the host has done what Plan asked.
-   * </pre>
-   *
-   * Protobuf type {@code opamp.sdk.v1.Commit}
+   * Protobuf type {@code opamp.sdk.v1.AgentLog}
    */
-  public  static final class Commit extends
+  public  static final class AgentLog extends
       com.google.protobuf.GeneratedMessageLite<
-          Commit, Commit.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Commit)
-      CommitOrBuilder {
-    private Commit() {
-      error_ = "";
+          AgentLog, AgentLog.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentLog)
+      AgentLogOrBuilder {
+    private AgentLog() {
+      text_ = "";
     }
     /**
-     * Protobuf enum {@code opamp.sdk.v1.Commit.Saved}
+     * Protobuf enum {@code opamp.sdk.v1.AgentLog.Level}
      */
-    public enum Saved
+    public enum Level
         implements com.google.protobuf.Internal.EnumLite {
       /**
        * <pre>
-       * Nothing saved: the host keeps no state across restarts (no state directory), or Plan asked
-       * for no save. A config that changes a next-start setting is then refused.
+       * only with the integration's debug output on
        * </pre>
        *
-       * <code>SAVED_NOWHERE = 0;</code>
+       * <code>DEBUG = 0;</code>
        */
-      SAVED_NOWHERE(0),
+      DEBUG(0),
+      /**
+       * <code>INFO = 1;</code>
+       */
+      INFO(1),
       /**
        * <pre>
-       * saved
+       * info said even where no logger is set up
        * </pre>
        *
-       * <code>SAVED_DONE = 1;</code>
+       * <code>NOTICE = 2;</code>
        */
-      SAVED_DONE(1),
+      NOTICE(2),
+      /**
+       * <code>WARN = 3;</code>
+       */
+      WARN(3),
       /**
        * <pre>
-       * the save failed: the config is refused
+       * the SDK is no longer managed
        * </pre>
        *
-       * <code>SAVED_FAILED = 2;</code>
+       * <code>ERROR = 4;</code>
        */
-      SAVED_FAILED(2),
+      ERROR(4),
       UNRECOGNIZED(-1),
       ;
 
       /**
        * <pre>
-       * Nothing saved: the host keeps no state across restarts (no state directory), or Plan asked
-       * for no save. A config that changes a next-start setting is then refused.
+       * only with the integration's debug output on
        * </pre>
        *
-       * <code>SAVED_NOWHERE = 0;</code>
+       * <code>DEBUG = 0;</code>
        */
-      public static final int SAVED_NOWHERE_VALUE = 0;
+      public static final int DEBUG_VALUE = 0;
+      /**
+       * <code>INFO = 1;</code>
+       */
+      public static final int INFO_VALUE = 1;
       /**
        * <pre>
-       * saved
+       * info said even where no logger is set up
        * </pre>
        *
-       * <code>SAVED_DONE = 1;</code>
+       * <code>NOTICE = 2;</code>
        */
-      public static final int SAVED_DONE_VALUE = 1;
+      public static final int NOTICE_VALUE = 2;
+      /**
+       * <code>WARN = 3;</code>
+       */
+      public static final int WARN_VALUE = 3;
       /**
        * <pre>
-       * the save failed: the config is refused
+       * the SDK is no longer managed
        * </pre>
        *
-       * <code>SAVED_FAILED = 2;</code>
+       * <code>ERROR = 4;</code>
        */
-      public static final int SAVED_FAILED_VALUE = 2;
+      public static final int ERROR_VALUE = 4;
 
 
       @java.lang.Override
@@ -9157,280 +15203,193 @@ java.lang.String defaultValue) {
        * @deprecated Use {@link #forNumber(int)} instead.
        */
       @java.lang.Deprecated
-      public static Saved valueOf(int value) {
+      public static Level valueOf(int value) {
         return forNumber(value);
       }
 
-      public static Saved forNumber(int value) {
+      public static Level forNumber(int value) {
         switch (value) {
-          case 0: return SAVED_NOWHERE;
-          case 1: return SAVED_DONE;
-          case 2: return SAVED_FAILED;
+          case 0: return DEBUG;
+          case 1: return INFO;
+          case 2: return NOTICE;
+          case 3: return WARN;
+          case 4: return ERROR;
           default: return null;
         }
       }
 
-      public static com.google.protobuf.Internal.EnumLiteMap<Saved>
+      public static com.google.protobuf.Internal.EnumLiteMap<Level>
           internalGetValueMap() {
         return internalValueMap;
       }
       private static final com.google.protobuf.Internal.EnumLiteMap<
-          Saved> internalValueMap =
-            new com.google.protobuf.Internal.EnumLiteMap<Saved>() {
+          Level> internalValueMap =
+            new com.google.protobuf.Internal.EnumLiteMap<Level>() {
               @java.lang.Override
-              public Saved findValueByNumber(int number) {
-                return Saved.forNumber(number);
+              public Level findValueByNumber(int number) {
+                return Level.forNumber(number);
               }
             };
 
       public static com.google.protobuf.Internal.EnumVerifier 
           internalGetVerifier() {
-        return SavedVerifier.INSTANCE;
+        return LevelVerifier.INSTANCE;
       }
 
-      private static final class SavedVerifier implements 
+      private static final class LevelVerifier implements 
            com.google.protobuf.Internal.EnumVerifier { 
               static final com.google.protobuf.Internal.EnumVerifier
-                  INSTANCE = new SavedVerifier();
+                  INSTANCE = new LevelVerifier();
               @java.lang.Override
               public boolean isInRange(int number) {
-                return Saved.forNumber(number) != null;
+                return Level.forNumber(number) != null;
               }
             };
 
       private final int value;
 
-      private Saved(int value) {
+      private Level(int value) {
         this.value = value;
       }
 
-      // @@protoc_insertion_point(enum_scope:opamp.sdk.v1.Commit.Saved)
+      // @@protoc_insertion_point(enum_scope:opamp.sdk.v1.AgentLog.Level)
     }
 
-    private int bitField0_;
-    public static final int DECIDE_FIELD_NUMBER = 1;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide decide_;
+    public static final int LEVEL_FIELD_NUMBER = 1;
+    private int level_;
     /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @return The enum numeric value on the wire for level.
      */
     @java.lang.Override
-    public boolean hasDecide() {
-      return ((bitField0_ & 0x00000001) != 0);
+    public int getLevelValue() {
+      return level_;
     }
     /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @return The level.
      */
     @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide() {
-      return decide_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.getDefaultInstance() : decide_;
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level getLevel() {
+      dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level result = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level.forNumber(level_);
+      return result == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level.UNRECOGNIZED : result;
     }
     /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-      value.getClass();  // minimal bytecode null check
-      decide_ = value;
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-      value.getClass();  // minimal bytecode null check
-      if (decide_ != null &&
-          decide_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.getDefaultInstance()) {
-        decide_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.newBuilder(decide_).mergeFrom(value).buildPartial();
-      } else {
-        decide_ = value;
-      }
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * required: the request Plan answered, as it was
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-     */
-    private void clearDecide() {
-      decide_ = null;
-      bitField0_ = (bitField0_ & ~0x00000001);
-    }
-
-    public static final int SAVED_FIELD_NUMBER = 2;
-    private int saved_;
-    /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @return The enum numeric value on the wire for saved.
-     */
-    @java.lang.Override
-    public int getSavedValue() {
-      return saved_;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @return The saved.
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved getSaved() {
-      dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved result = dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved.forNumber(saved_);
-      return result == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved.UNRECOGNIZED : result;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @param value The enum numeric value on the wire for saved to set.
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @param value The enum numeric value on the wire for level to set.
      * @throws IllegalArgumentException if UNRECOGNIZED is provided.
      */
-    private void setSavedValue(int value) {
-        saved_ = value;
+    private void setLevelValue(int value) {
+        level_ = value;
     }
     /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-     * @param value The saved to set.
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+     * @param value The level to set.
      */
-    private void setSaved(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved value) {
-      saved_ = value.getNumber();
+    private void setLevel(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level value) {
+      level_ = value.getNumber();
 
     }
     /**
-     * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
+     * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
      */
-    private void clearSaved() {
+    private void clearLevel() {
 
-      saved_ = 0;
+      level_ = 0;
     }
 
-    public static final int ERROR_FIELD_NUMBER = 3;
-    private java.lang.String error_;
+    public static final int TEXT_FIELD_NUMBER = 2;
+    private java.lang.String text_;
     /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @return The error.
+     * <code>string text = 2;</code>
+     * @return The text.
      */
     @java.lang.Override
-    public java.lang.String getError() {
-      return error_;
+    public java.lang.String getText() {
+      return text_;
     }
     /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @return The bytes for error.
+     * <code>string text = 2;</code>
+     * @return The bytes for text.
      */
     @java.lang.Override
     public com.google.protobuf.ByteString
-        getErrorBytes() {
-      return com.google.protobuf.ByteString.copyFromUtf8(error_);
+        getTextBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(text_);
     }
     /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @param value The error to set.
+     * <code>string text = 2;</code>
+     * @param value The text to set.
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setError(
+    private void setText(
         java.lang.String value) {
       value.getClass();  // minimal bytecode null check
 
-      error_ = value;
+      text_ = value;
     }
     /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
+     * <code>string text = 2;</code>
      */
-    private void clearError() {
+    private void clearText() {
 
-      error_ = getDefaultInstance().getError();
+      text_ = getDefaultInstance().getText();
     }
     /**
-     * <pre>
-     * SAVED_FAILED: why
-     * </pre>
-     *
-     * <code>string error = 3;</code>
-     * @param value The bytes for error to set.
+     * <code>string text = 2;</code>
+     * @param value The bytes for text to set.
      */
-    private void setErrorBytes(
+    private void setTextBytes(
         com.google.protobuf.ByteString value) {
       checkByteStringIsUtf8(value);
-      error_ = value.toStringUtf8();
+      text_ = value.toStringUtf8();
 
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         java.nio.ByteBuffer data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(byte[] data)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(java.io.InputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -9438,24 +15397,24 @@ java.lang.String defaultValue) {
           DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseDelimitedFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseDelimitedFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -9466,216 +15425,121 @@ java.lang.String defaultValue) {
     public static Builder newBuilder() {
       return (Builder) DEFAULT_INSTANCE.createBuilder();
     }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit prototype) {
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog prototype) {
       return DEFAULT_INSTANCE.createBuilder(prototype);
     }
 
     /**
-     * <pre>
-     * The answer to a remote config, once the host has done what Plan asked.
-     * </pre>
-     *
-     * Protobuf type {@code opamp.sdk.v1.Commit}
+     * Protobuf type {@code opamp.sdk.v1.AgentLog}
      */
     public static final class Builder extends
         com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Commit)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.CommitOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.newBuilder()
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentLog)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLogOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.newBuilder()
       private Builder() {
         super(DEFAULT_INSTANCE);
       }
 
 
       /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
+       * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+       * @return The enum numeric value on the wire for level.
        */
       @java.lang.Override
-      public boolean hasDecide() {
-        return instance.hasDecide();
+      public int getLevelValue() {
+        return instance.getLevelValue();
       }
       /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide() {
-        return instance.getDecide();
-      }
-      /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-       */
-      public Builder setDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-        copyOnWrite();
-        instance.setDecide(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-       */
-      public Builder setDecide(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.Builder builderForValue) {
-        copyOnWrite();
-        instance.setDecide(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-       */
-      public Builder mergeDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-        copyOnWrite();
-        instance.mergeDecide(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * required: the request Plan answered, as it was
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Decide decide = 1;</code>
-       */
-      public Builder clearDecide() {  copyOnWrite();
-        instance.clearDecide();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-       * @return The enum numeric value on the wire for saved.
-       */
-      @java.lang.Override
-      public int getSavedValue() {
-        return instance.getSavedValue();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-       * @param value The saved to set.
+       * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+       * @param value The level to set.
        * @return This builder for chaining.
        */
-      public Builder setSavedValue(int value) {
+      public Builder setLevelValue(int value) {
         copyOnWrite();
-        instance.setSavedValue(value);
+        instance.setLevelValue(value);
         return this;
       }
       /**
-       * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-       * @return The saved.
+       * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+       * @return The level.
        */
       @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved getSaved() {
-        return instance.getSaved();
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level getLevel() {
+        return instance.getLevel();
       }
       /**
-       * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
-       * @param value The enum numeric value on the wire for saved to set.
+       * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
+       * @param value The enum numeric value on the wire for level to set.
        * @throws IllegalArgumentException if UNRECOGNIZED is provided.
        * @return This builder for chaining.
        */
-      public Builder setSaved(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Saved value) {
+      public Builder setLevel(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.Level value) {
         copyOnWrite();
-        instance.setSaved(value);
+        instance.setLevel(value);
         return this;
       }
       /**
-       * <code>.opamp.sdk.v1.Commit.Saved saved = 2;</code>
+       * <code>.opamp.sdk.v1.AgentLog.Level level = 1;</code>
        * @return This builder for chaining.
        */
-      public Builder clearSaved() {
+      public Builder clearLevel() {
         copyOnWrite();
-        instance.clearSaved();
+        instance.clearLevel();
         return this;
       }
 
       /**
-       * <pre>
-       * SAVED_FAILED: why
-       * </pre>
-       *
-       * <code>string error = 3;</code>
-       * @return The error.
+       * <code>string text = 2;</code>
+       * @return The text.
        */
       @java.lang.Override
-      public java.lang.String getError() {
-        return instance.getError();
+      public java.lang.String getText() {
+        return instance.getText();
       }
       /**
-       * <pre>
-       * SAVED_FAILED: why
-       * </pre>
-       *
-       * <code>string error = 3;</code>
-       * @return The bytes for error.
+       * <code>string text = 2;</code>
+       * @return The bytes for text.
        */
       @java.lang.Override
       public com.google.protobuf.ByteString
-          getErrorBytes() {
-        return instance.getErrorBytes();
+          getTextBytes() {
+        return instance.getTextBytes();
       }
       /**
-       * <pre>
-       * SAVED_FAILED: why
-       * </pre>
-       *
-       * <code>string error = 3;</code>
-       * @param value The error to set.
+       * <code>string text = 2;</code>
+       * @param value The text to set.
        * @return This builder for chaining.
        */
-      public Builder setError(
+      public Builder setText(
           java.lang.String value) {
         copyOnWrite();
-        instance.setError(value);
+        instance.setText(value);
         return this;
       }
       /**
-       * <pre>
-       * SAVED_FAILED: why
-       * </pre>
-       *
-       * <code>string error = 3;</code>
+       * <code>string text = 2;</code>
        * @return This builder for chaining.
        */
-      public Builder clearError() {
+      public Builder clearText() {
         copyOnWrite();
-        instance.clearError();
+        instance.clearText();
         return this;
       }
       /**
-       * <pre>
-       * SAVED_FAILED: why
-       * </pre>
-       *
-       * <code>string error = 3;</code>
-       * @param value The bytes for error to set.
+       * <code>string text = 2;</code>
+       * @param value The bytes for text to set.
        * @return This builder for chaining.
        */
-      public Builder setErrorBytes(
+      public Builder setTextBytes(
           com.google.protobuf.ByteString value) {
         copyOnWrite();
-        instance.setErrorBytes(value);
+        instance.setTextBytes(value);
         return this;
       }
 
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Commit)
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentLog)
     }
     @java.lang.Override
     @java.lang.SuppressWarnings({"ThrowNull"})
@@ -9684,34 +15548,32 @@ java.lang.String defaultValue) {
         java.lang.Object arg0, java.lang.Object arg1) {
       switch (method) {
         case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit();
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog();
         }
         case NEW_BUILDER: {
           return new Builder();
         }
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "decide_",
-              "saved_",
-              "error_",
+              "level_",
+              "text_",
             };
             java.lang.String info =
-                "\u0000\u0003\u0000\u0001\u0001\u0003\u0003\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
-                "\f\u0003\u0208";
+                "\u0000\u0002\u0000\u0000\u0001\u0002\u0002\u0000\u0000\u0000\u0001\f\u0002\u0208" +
+                "";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
           return DEFAULT_INSTANCE;
         }
         case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit> parser = PARSER;
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog> parser = PARSER;
           if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.class) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog.class) {
               parser = PARSER;
               if (parser == null) {
                 parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit>(
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog>(
                         DEFAULT_INSTANCE);
                 PARSER = parser;
               }
@@ -9731,1331 +15593,244 @@ java.lang.String defaultValue) {
     }
 
 
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Commit)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit DEFAULT_INSTANCE;
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentLog)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog DEFAULT_INSTANCE;
     static {
-      Commit defaultInstance = new Commit();
+      AgentLog defaultInstance = new AgentLog();
       // New instances are implicitly immutable so no need to make
       // immutable.
       DEFAULT_INSTANCE = defaultInstance;
       com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Commit.class, defaultInstance);
+        AgentLog.class, defaultInstance);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit getDefaultInstance() {
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentLog getDefaultInstance() {
       return DEFAULT_INSTANCE;
     }
 
-    private static volatile com.google.protobuf.Parser<Commit> PARSER;
+    private static volatile com.google.protobuf.Parser<AgentLog> PARSER;
 
-    public static com.google.protobuf.Parser<Commit> parser() {
+    public static com.google.protobuf.Parser<AgentLog> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
 
-  public interface DecisionOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Decision)
+  public interface AgentStateOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.AgentState)
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     * @return Whether the status field is set.
-     */
-    boolean hasStatus();
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     * @return The status.
-     */
-    opamp.proto.v1.Opamp.RemoteConfigStatus getStatus();
-
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     * @return Whether the apply field is set.
-     */
-    boolean hasApply();
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     * @return The apply.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply();
-
-    /**
-     * <pre>
-     * keep it: the document in force now
-     * </pre>
-     *
-     * <code>bytes current = 3;</code>
-     * @return The current.
-     */
-    com.google.protobuf.ByteString getCurrent();
-
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     * @return Whether the effective field is set.
-     */
-    boolean hasEffective();
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     * @return The effective.
-     */
-    opamp.proto.v1.Opamp.EffectiveConfig getEffective();
-
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @return A list containing the pendingRestart.
-     */
-    java.util.List<java.lang.String>
-        getPendingRestartList();
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @return The count of pendingRestart.
-     */
-    int getPendingRestartCount();
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param index The index of the element to return.
-     * @return The pendingRestart at the given index.
-     */
-    java.lang.String getPendingRestart(int index);
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param index The index of the element to return.
-     * @return The pendingRestart at the given index.
-     */
-    com.google.protobuf.ByteString
-        getPendingRestartBytes(int index);
-
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 7;</code>
-     * @return The refreshAtUnixMs.
-     */
-    long getRefreshAtUnixMs();
-  }
-  /**
-   * Protobuf type {@code opamp.sdk.v1.Decision}
-   */
-  public  static final class Decision extends
-      com.google.protobuf.GeneratedMessageLite<
-          Decision, Decision.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Decision)
-      DecisionOrBuilder {
-    private Decision() {
-      current_ = com.google.protobuf.ByteString.EMPTY;
-      pendingRestart_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-    }
-    private int bitField0_;
-    public static final int STATUS_FIELD_NUMBER = 1;
-    private opamp.proto.v1.Opamp.RemoteConfigStatus status_;
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     */
-    @java.lang.Override
-    public boolean hasStatus() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     */
-    @java.lang.Override
-    public opamp.proto.v1.Opamp.RemoteConfigStatus getStatus() {
-      return status_ == null ? opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance() : status_;
-    }
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
-      value.getClass();  // minimal bytecode null check
-      status_ = value;
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
-      value.getClass();  // minimal bytecode null check
-      if (status_ != null &&
-          status_ != opamp.proto.v1.Opamp.RemoteConfigStatus.getDefaultInstance()) {
-        status_ =
-          opamp.proto.v1.Opamp.RemoteConfigStatus.newBuilder(status_).mergeFrom(value).buildPartial();
-      } else {
-        status_ = value;
-      }
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * APPLIED or FAILED, with the config's hash: report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-     */
-    private void clearStatus() {
-      status_ = null;
-      bitField0_ = (bitField0_ & ~0x00000001);
-    }
-
-    public static final int APPLY_FIELD_NUMBER = 2;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings apply_;
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     */
-    @java.lang.Override
-    public boolean hasApply() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply() {
-      return apply_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance() : apply_;
-    }
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      apply_ = value;
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      if (apply_ != null &&
-          apply_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance()) {
-        apply_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.newBuilder(apply_).mergeFrom(value).buildPartial();
-      } else {
-        apply_ = value;
-      }
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * APPLIED: put the live ones in force; unset when FAILED
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-     */
-    private void clearApply() {
-      apply_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
-    }
-
-    public static final int CURRENT_FIELD_NUMBER = 3;
-    private com.google.protobuf.ByteString current_;
-    /**
-     * <pre>
-     * keep it: the document in force now
-     * </pre>
-     *
-     * <code>bytes current = 3;</code>
-     * @return The current.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getCurrent() {
-      return current_;
-    }
-    /**
-     * <pre>
-     * keep it: the document in force now
-     * </pre>
-     *
-     * <code>bytes current = 3;</code>
-     * @param value The current to set.
-     */
-    private void setCurrent(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  
-      current_ = value;
-    }
-    /**
-     * <pre>
-     * keep it: the document in force now
-     * </pre>
-     *
-     * <code>bytes current = 3;</code>
-     */
-    private void clearCurrent() {
-
-      current_ = getDefaultInstance().getCurrent();
-    }
-
-    public static final int EFFECTIVE_FIELD_NUMBER = 5;
-    private opamp.proto.v1.Opamp.EffectiveConfig effective_;
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     */
-    @java.lang.Override
-    public boolean hasEffective() {
-      return ((bitField0_ & 0x00000004) != 0);
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     */
-    @java.lang.Override
-    public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
-      return effective_ == null ? opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance() : effective_;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-      value.getClass();  // minimal bytecode null check
-      effective_ = value;
-      bitField0_ |= 0x00000004;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-      value.getClass();  // minimal bytecode null check
-      if (effective_ != null &&
-          effective_ != opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance()) {
-        effective_ =
-          opamp.proto.v1.Opamp.EffectiveConfig.newBuilder(effective_).mergeFrom(value).buildPartial();
-      } else {
-        effective_ = value;
-      }
-      bitField0_ |= 0x00000004;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-     */
-    private void clearEffective() {
-      effective_ = null;
-      bitField0_ = (bitField0_ & ~0x00000004);
-    }
-
-    public static final int PENDING_RESTART_FIELD_NUMBER = 6;
-    private com.google.protobuf.Internal.ProtobufList<java.lang.String> pendingRestart_;
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @return A list containing the pendingRestart.
-     */
-    @java.lang.Override
-    public java.util.List<java.lang.String> getPendingRestartList() {
-      return pendingRestart_;
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @return The count of pendingRestart.
-     */
-    @java.lang.Override
-    public int getPendingRestartCount() {
-      return pendingRestart_.size();
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param index The index of the element to return.
-     * @return The pendingRestart at the given index.
-     */
-    @java.lang.Override
-    public java.lang.String getPendingRestart(int index) {
-      return pendingRestart_.get(index);
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param index The index of the value to return.
-     * @return The bytes of the pendingRestart at the given index.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getPendingRestartBytes(int index) {
-      return com.google.protobuf.ByteString.copyFromUtf8(
-          pendingRestart_.get(index));
-    }
-    private void ensurePendingRestartIsMutable() {
-      com.google.protobuf.Internal.ProtobufList<java.lang.String> tmp =
-          pendingRestart_;  if (!tmp.isModifiable()) {
-        pendingRestart_ =
-            com.google.protobuf.GeneratedMessageLite.mutableCopy(tmp);
-       }
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param index The index to set the value at.
-     * @param value The pendingRestart to set.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setPendingRestart(
-        int index, java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensurePendingRestartIsMutable();
-      pendingRestart_.set(index, value);
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param value The pendingRestart to add.
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void addPendingRestart(
-        java.lang.String value) {
-      value.getClass();  // minimal bytecode null check
-      ensurePendingRestartIsMutable();
-      pendingRestart_.add(value);
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param values The pendingRestart to add.
-     */
-    private void addAllPendingRestart(
-        java.lang.Iterable<java.lang.String> values) {
-      ensurePendingRestartIsMutable();
-      com.google.protobuf.AbstractMessageLite.addAll(
-          values, pendingRestart_);
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     */
-    private void clearPendingRestart() {
-      pendingRestart_ = com.google.protobuf.GeneratedMessageLite.emptyProtobufList();
-    }
-    /**
-     * <pre>
-     * next-start settings in force after a restart
-     * </pre>
-     *
-     * <code>repeated string pending_restart = 6;</code>
-     * @param value The bytes of the pendingRestart to add.
-     */
-    private void addPendingRestartBytes(
-        com.google.protobuf.ByteString value) {
-      checkByteStringIsUtf8(value);
-      ensurePendingRestartIsMutable();
-      pendingRestart_.add(value.toStringUtf8());
-    }
-
-    public static final int REFRESH_AT_UNIX_MS_FIELD_NUMBER = 7;
-    private long refreshAtUnixMs_;
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 7;</code>
-     * @return The refreshAtUnixMs.
-     */
-    @java.lang.Override
-    public long getRefreshAtUnixMs() {
-      return refreshAtUnixMs_;
-    }
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 7;</code>
-     * @param value The refreshAtUnixMs to set.
-     */
-    private void setRefreshAtUnixMs(long value) {
-      
-      refreshAtUnixMs_ = value;
-    }
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 7;</code>
-     */
-    private void clearRefreshAtUnixMs() {
-
-      refreshAtUnixMs_ = 0L;
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision prototype) {
-      return DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
-    /**
-     * Protobuf type {@code opamp.sdk.v1.Decision}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Decision)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.DecisionOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasStatus() {
-        return instance.hasStatus();
-      }
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      @java.lang.Override
-      public opamp.proto.v1.Opamp.RemoteConfigStatus getStatus() {
-        return instance.getStatus();
-      }
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      public Builder setStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
-        copyOnWrite();
-        instance.setStatus(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      public Builder setStatus(
-          opamp.proto.v1.Opamp.RemoteConfigStatus.Builder builderForValue) {
-        copyOnWrite();
-        instance.setStatus(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      public Builder mergeStatus(opamp.proto.v1.Opamp.RemoteConfigStatus value) {
-        copyOnWrite();
-        instance.mergeStatus(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * APPLIED or FAILED, with the config's hash: report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.RemoteConfigStatus status = 1;</code>
-       */
-      public Builder clearStatus() {  copyOnWrite();
-        instance.clearStatus();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      @java.lang.Override
-      public boolean hasApply() {
-        return instance.hasApply();
-      }
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getApply() {
-        return instance.getApply();
-      }
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      public Builder setApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-        copyOnWrite();
-        instance.setApply(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      public Builder setApply(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.Builder builderForValue) {
-        copyOnWrite();
-        instance.setApply(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      public Builder mergeApply(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-        copyOnWrite();
-        instance.mergeApply(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * APPLIED: put the live ones in force; unset when FAILED
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings apply = 2;</code>
-       */
-      public Builder clearApply() {  copyOnWrite();
-        instance.clearApply();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * keep it: the document in force now
-       * </pre>
-       *
-       * <code>bytes current = 3;</code>
-       * @return The current.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getCurrent() {
-        return instance.getCurrent();
-      }
-      /**
-       * <pre>
-       * keep it: the document in force now
-       * </pre>
-       *
-       * <code>bytes current = 3;</code>
-       * @param value The current to set.
-       * @return This builder for chaining.
-       */
-      public Builder setCurrent(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setCurrent(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * keep it: the document in force now
-       * </pre>
-       *
-       * <code>bytes current = 3;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearCurrent() {
-        copyOnWrite();
-        instance.clearCurrent();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      @java.lang.Override
-      public boolean hasEffective() {
-        return instance.hasEffective();
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      @java.lang.Override
-      public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
-        return instance.getEffective();
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      public Builder setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-        copyOnWrite();
-        instance.setEffective(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      public Builder setEffective(
-          opamp.proto.v1.Opamp.EffectiveConfig.Builder builderForValue) {
-        copyOnWrite();
-        instance.setEffective(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      public Builder mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-        copyOnWrite();
-        instance.mergeEffective(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 5;</code>
-       */
-      public Builder clearEffective() {  copyOnWrite();
-        instance.clearEffective();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @return A list containing the pendingRestart.
-       */
-      @java.lang.Override
-      public java.util.List<java.lang.String>
-          getPendingRestartList() {
-        return java.util.Collections.unmodifiableList(
-            instance.getPendingRestartList());
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @return The count of pendingRestart.
-       */
-      @java.lang.Override
-      public int getPendingRestartCount() {
-        return instance.getPendingRestartCount();
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param index The index of the element to return.
-       * @return The pendingRestart at the given index.
-       */
-      @java.lang.Override
-      public java.lang.String getPendingRestart(int index) {
-        return instance.getPendingRestart(index);
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param index The index of the value to return.
-       * @return The bytes of the pendingRestart at the given index.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getPendingRestartBytes(int index) {
-        return instance.getPendingRestartBytes(index);
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param index The index to set the value at.
-       * @param value The pendingRestart to set.
-       * @return This builder for chaining.
-       */
-      public Builder setPendingRestart(
-          int index, java.lang.String value) {
-        copyOnWrite();
-        instance.setPendingRestart(index, value);
-        return this;
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param value The pendingRestart to add.
-       * @return This builder for chaining.
-       */
-      public Builder addPendingRestart(
-          java.lang.String value) {
-        copyOnWrite();
-        instance.addPendingRestart(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param values The pendingRestart to add.
-       * @return This builder for chaining.
-       */
-      public Builder addAllPendingRestart(
-          java.lang.Iterable<java.lang.String> values) {
-        copyOnWrite();
-        instance.addAllPendingRestart(values);
-        return this;
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearPendingRestart() {
-        copyOnWrite();
-        instance.clearPendingRestart();
-        return this;
-      }
-      /**
-       * <pre>
-       * next-start settings in force after a restart
-       * </pre>
-       *
-       * <code>repeated string pending_restart = 6;</code>
-       * @param value The bytes of the pendingRestart to add.
-       * @return This builder for chaining.
-       */
-      public Builder addPendingRestartBytes(
-          com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.addPendingRestartBytes(value);
-        return this;
-      }
-
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 7;</code>
-       * @return The refreshAtUnixMs.
-       */
-      @java.lang.Override
-      public long getRefreshAtUnixMs() {
-        return instance.getRefreshAtUnixMs();
-      }
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 7;</code>
-       * @param value The refreshAtUnixMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setRefreshAtUnixMs(long value) {
-        copyOnWrite();
-        instance.setRefreshAtUnixMs(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 7;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearRefreshAtUnixMs() {
-        copyOnWrite();
-        instance.clearRefreshAtUnixMs();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Decision)
-    }
-    @java.lang.Override
-    @java.lang.SuppressWarnings({"ThrowNull"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "status_",
-              "apply_",
-              "current_",
-              "effective_",
-              "pendingRestart_",
-              "refreshAtUnixMs_",
-            };
-            java.lang.String info =
-                "\u0000\u0006\u0000\u0001\u0001\u0007\u0006\u0000\u0001\u0000\u0001\u1009\u0000\u0002" +
-                "\u1009\u0001\u0003\n\u0005\u1009\u0002\u0006\u021a\u0007\u0003";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision> parser = PARSER;
-          if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
-        // So it can do anything. Combine with default case for smaller codegen.
-        case SET_MEMOIZED_IS_INITIALIZED:
-      }
-      // Should never happen. Generates tight code to throw an exception.
-      throw null;
-    }
-
-
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Decision)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision DEFAULT_INSTANCE;
-    static {
-      Decision defaultInstance = new Decision();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Decision.class, defaultInstance);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Decision> PARSER;
-
-    public static com.google.protobuf.Parser<Decision> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-  public interface RefreshOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Refresh)
-      com.google.protobuf.MessageLiteOrBuilder {
-
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 1;</code>
-     * @return The current.
-     */
-    com.google.protobuf.ByteString getCurrent();
-
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 2;</code>
-     * @return The atStart.
-     */
-    com.google.protobuf.ByteString getAtStart();
-
-    /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      * @return Whether the host field is set.
      */
     boolean hasHost();
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      * @return The host.
      */
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost();
 
     /**
-     * <code>uint64 now_unix_ms = 4;</code>
-     * @return The nowUnixMs.
+     * <code>bool state_dir = 2;</code>
+     * @return The stateDir.
      */
-    long getNowUnixMs();
+    boolean getStateDir();
+
+    /**
+     * <code>bytes current = 3;</code>
+     * @return The current.
+     */
+    com.google.protobuf.ByteString getCurrent();
+
+    /**
+     * <code>bytes at_start = 4;</code>
+     * @return The atStart.
+     */
+    com.google.protobuf.ByteString getAtStart();
+
+    /**
+     * <code>string effective = 5;</code>
+     * @return The effective.
+     */
+    java.lang.String getEffective();
+    /**
+     * <code>string effective = 5;</code>
+     * @return The bytes for effective.
+     */
+    com.google.protobuf.ByteString
+        getEffectiveBytes();
+
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
+     */
+    java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> 
+        getExportersList();
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index);
+    /**
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
+     */
+    int getExportersCount();
+
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     * @return Whether the health field is set.
+     */
+    boolean hasHealth();
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     * @return The health.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealth();
+
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     * @return Whether the refreshAtUnixMs field is set.
+     */
+    boolean hasRefreshAtUnixMs();
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     * @return The refreshAtUnixMs.
+     */
+    long getRefreshAtUnixMs();
+
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     * @return Whether the refreshDueMonoMs field is set.
+     */
+    boolean hasRefreshDueMonoMs();
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     * @return The refreshDueMonoMs.
+     */
+    long getRefreshDueMonoMs();
+
+    /**
+     * <code>uint64 health_due_mono_ms = 10;</code>
+     * @return The healthDueMonoMs.
+     */
+    long getHealthDueMonoMs();
+
+    /**
+     * <code>uint64 started_unix_ms = 11;</code>
+     * @return The startedUnixMs.
+     */
+    long getStartedUnixMs();
+
+    /**
+     * <code>string endpoint = 12;</code>
+     * @return The endpoint.
+     */
+    java.lang.String getEndpoint();
+    /**
+     * <code>string endpoint = 12;</code>
+     * @return The bytes for endpoint.
+     */
+    com.google.protobuf.ByteString
+        getEndpointBytes();
+
+    /**
+     * <code>string service = 13;</code>
+     * @return The service.
+     */
+    java.lang.String getService();
+    /**
+     * <code>string service = 13;</code>
+     * @return The bytes for service.
+     */
+    com.google.protobuf.ByteString
+        getServiceBytes();
+
+    /**
+     * <code>string uid = 14;</code>
+     * @return The uid.
+     */
+    java.lang.String getUid();
+    /**
+     * <code>string uid = 14;</code>
+     * @return The bytes for uid.
+     */
+    com.google.protobuf.ByteString
+        getUidBytes();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     * @return Whether the hints field is set.
+     */
+    boolean hasHints();
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     * @return The hints.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints();
+
+    /**
+     * <code>bool ever = 16;</code>
+     * @return The ever.
+     */
+    boolean getEver();
+
+    /**
+     * <code>bool failing = 17;</code>
+     * @return The failing.
+     */
+    boolean getFailing();
+
+    /**
+     * <code>uint64 asked_unix_ms = 18;</code>
+     * @return The askedUnixMs.
+     */
+    long getAskedUnixMs();
+
+    /**
+     * <code>uint64 asked_mono_ms = 19;</code>
+     * @return The askedMonoMs.
+     */
+    long getAskedMonoMs();
   }
   /**
    * <pre>
-   * The timer from refresh_at_unix_ms went off: what is in force now. Debug mode ends here, with
-   * or without the server. Call it under the same lock as Decide and Commit, and drop a timer's call
-   * when a Commit came after the timer was armed (a generation counter): that Commit armed its own.
-   * Apply the settings and report the effective config, as after a Commit.
+   * AgentOutput.agent, decoded: the agent between steps. Hosts keep it as bytes and never read it.
+   * It lives only as long as the process, so its fields may change in any release.
    * </pre>
    *
-   * Protobuf type {@code opamp.sdk.v1.Refresh}
+   * Protobuf type {@code opamp.sdk.v1.AgentState}
    */
-  public  static final class Refresh extends
+  public  static final class AgentState extends
       com.google.protobuf.GeneratedMessageLite<
-          Refresh, Refresh.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Refresh)
-      RefreshOrBuilder {
-    private Refresh() {
+          AgentState, AgentState.Builder> implements
+      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.AgentState)
+      AgentStateOrBuilder {
+    private AgentState() {
       current_ = com.google.protobuf.ByteString.EMPTY;
       atStart_ = com.google.protobuf.ByteString.EMPTY;
+      effective_ = "";
+      exporters_ = emptyProtobufList();
+      endpoint_ = "";
+      service_ = "";
+      uid_ = "";
     }
     private int bitField0_;
-    public static final int CURRENT_FIELD_NUMBER = 1;
-    private com.google.protobuf.ByteString current_;
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 1;</code>
-     * @return The current.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getCurrent() {
-      return current_;
-    }
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 1;</code>
-     * @param value The current to set.
-     */
-    private void setCurrent(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  
-      current_ = value;
-    }
-    /**
-     * <pre>
-     * from the last Loaded or Decision
-     * </pre>
-     *
-     * <code>bytes current = 1;</code>
-     */
-    private void clearCurrent() {
-
-      current_ = getDefaultInstance().getCurrent();
-    }
-
-    public static final int AT_START_FIELD_NUMBER = 2;
-    private com.google.protobuf.ByteString atStart_;
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 2;</code>
-     * @return The atStart.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getAtStart() {
-      return atStart_;
-    }
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 2;</code>
-     * @param value The atStart to set.
-     */
-    private void setAtStart(com.google.protobuf.ByteString value) {
-      java.lang.Class<?> valueClass = value.getClass();
-  
-      atStart_ = value;
-    }
-    /**
-     * <pre>
-     * Loaded.current, as it was at start
-     * </pre>
-     *
-     * <code>bytes at_start = 2;</code>
-     */
-    private void clearAtStart() {
-
-      atStart_ = getDefaultInstance().getAtStart();
-    }
-
-    public static final int HOST_FIELD_NUMBER = 3;
+    public static final int HOST_FIELD_NUMBER = 1;
     private dev.pydantic.logfire.fleet.sdk.SettingsProto.Host host_;
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.Override
     public boolean hasHost() {
       return ((bitField0_ & 0x00000001) != 0);
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.Override
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
       return host_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.getDefaultInstance() : host_;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
@@ -11064,7 +15839,7 @@ java.lang.String defaultValue) {
       bitField0_ |= 0x00000001;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
     private void mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
@@ -11079,1524 +15854,173 @@ java.lang.String defaultValue) {
       bitField0_ |= 0x00000001;
     }
     /**
-     * <code>.opamp.sdk.v1.Host host = 3;</code>
+     * <code>.opamp.sdk.v1.Host host = 1;</code>
      */
     private void clearHost() {
       host_ = null;
       bitField0_ = (bitField0_ & ~0x00000001);
     }
 
-    public static final int NOW_UNIX_MS_FIELD_NUMBER = 4;
-    private long nowUnixMs_;
+    public static final int STATE_DIR_FIELD_NUMBER = 2;
+    private boolean stateDir_;
     /**
-     * <code>uint64 now_unix_ms = 4;</code>
-     * @return The nowUnixMs.
+     * <code>bool state_dir = 2;</code>
+     * @return The stateDir.
      */
     @java.lang.Override
-    public long getNowUnixMs() {
-      return nowUnixMs_;
+    public boolean getStateDir() {
+      return stateDir_;
     }
     /**
-     * <code>uint64 now_unix_ms = 4;</code>
-     * @param value The nowUnixMs to set.
+     * <code>bool state_dir = 2;</code>
+     * @param value The stateDir to set.
      */
-    private void setNowUnixMs(long value) {
+    private void setStateDir(boolean value) {
       
-      nowUnixMs_ = value;
+      stateDir_ = value;
     }
     /**
-     * <code>uint64 now_unix_ms = 4;</code>
+     * <code>bool state_dir = 2;</code>
      */
-    private void clearNowUnixMs() {
+    private void clearStateDir() {
 
-      nowUnixMs_ = 0L;
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
+      stateDir_ = false;
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh prototype) {
-      return DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
+    public static final int CURRENT_FIELD_NUMBER = 3;
+    private com.google.protobuf.ByteString current_;
     /**
-     * <pre>
-     * The timer from refresh_at_unix_ms went off: what is in force now. Debug mode ends here, with
-     * or without the server. Call it under the same lock as Decide and Commit, and drop a timer's call
-     * when a Commit came after the timer was armed (a generation counter): that Commit armed its own.
-     * Apply the settings and report the effective config, as after a Commit.
-     * </pre>
-     *
-     * Protobuf type {@code opamp.sdk.v1.Refresh}
+     * <code>bytes current = 3;</code>
+     * @return The current.
      */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Refresh)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.RefreshOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 1;</code>
-       * @return The current.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getCurrent() {
-        return instance.getCurrent();
-      }
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 1;</code>
-       * @param value The current to set.
-       * @return This builder for chaining.
-       */
-      public Builder setCurrent(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setCurrent(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * from the last Loaded or Decision
-       * </pre>
-       *
-       * <code>bytes current = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearCurrent() {
-        copyOnWrite();
-        instance.clearCurrent();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 2;</code>
-       * @return The atStart.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getAtStart() {
-        return instance.getAtStart();
-      }
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 2;</code>
-       * @param value The atStart to set.
-       * @return This builder for chaining.
-       */
-      public Builder setAtStart(com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setAtStart(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * Loaded.current, as it was at start
-       * </pre>
-       *
-       * <code>bytes at_start = 2;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearAtStart() {
-        copyOnWrite();
-        instance.clearAtStart();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      @java.lang.Override
-      public boolean hasHost() {
-        return instance.hasHost();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
-        return instance.getHost();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      public Builder setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-        copyOnWrite();
-        instance.setHost(value);
-        return this;
-        }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      public Builder setHost(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.Builder builderForValue) {
-        copyOnWrite();
-        instance.setHost(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      public Builder mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
-        copyOnWrite();
-        instance.mergeHost(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Host host = 3;</code>
-       */
-      public Builder clearHost() {  copyOnWrite();
-        instance.clearHost();
-        return this;
-      }
-
-      /**
-       * <code>uint64 now_unix_ms = 4;</code>
-       * @return The nowUnixMs.
-       */
-      @java.lang.Override
-      public long getNowUnixMs() {
-        return instance.getNowUnixMs();
-      }
-      /**
-       * <code>uint64 now_unix_ms = 4;</code>
-       * @param value The nowUnixMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setNowUnixMs(long value) {
-        copyOnWrite();
-        instance.setNowUnixMs(value);
-        return this;
-      }
-      /**
-       * <code>uint64 now_unix_ms = 4;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearNowUnixMs() {
-        copyOnWrite();
-        instance.clearNowUnixMs();
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Refresh)
-    }
     @java.lang.Override
-    @java.lang.SuppressWarnings({"ThrowNull"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "current_",
-              "atStart_",
-              "host_",
-              "nowUnixMs_",
-            };
-            java.lang.String info =
-                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\n\u0002\n\u0003" +
-                "\u1009\u0000\u0004\u0003";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh> parser = PARSER;
-          if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
-        // So it can do anything. Combine with default case for smaller codegen.
-        case SET_MEMOIZED_IS_INITIALIZED:
-      }
-      // Should never happen. Generates tight code to throw an exception.
-      throw null;
+    public com.google.protobuf.ByteString getCurrent() {
+      return current_;
     }
-
-
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Refresh)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh DEFAULT_INSTANCE;
-    static {
-      Refresh defaultInstance = new Refresh();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Refresh.class, defaultInstance);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Refresh> PARSER;
-
-    public static com.google.protobuf.Parser<Refresh> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-  public interface RefreshedOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Refreshed)
-      com.google.protobuf.MessageLiteOrBuilder {
-
     /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     * @return Whether the settings field is set.
+     * <code>bytes current = 3;</code>
+     * @param value The current to set.
      */
-    boolean hasSettings();
+    private void setCurrent(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      current_ = value;
+    }
     /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     * @return The settings.
+     * <code>bytes current = 3;</code>
      */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings();
+    private void clearCurrent() {
 
+      current_ = getDefaultInstance().getCurrent();
+    }
+
+    public static final int AT_START_FIELD_NUMBER = 4;
+    private com.google.protobuf.ByteString atStart_;
     /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     * @return Whether the effective field is set.
+     * <code>bytes at_start = 4;</code>
+     * @return The atStart.
      */
-    boolean hasEffective();
+    @java.lang.Override
+    public com.google.protobuf.ByteString getAtStart() {
+      return atStart_;
+    }
     /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
+     * <code>bytes at_start = 4;</code>
+     * @param value The atStart to set.
+     */
+    private void setAtStart(com.google.protobuf.ByteString value) {
+      java.lang.Class<?> valueClass = value.getClass();
+  
+      atStart_ = value;
+    }
+    /**
+     * <code>bytes at_start = 4;</code>
+     */
+    private void clearAtStart() {
+
+      atStart_ = getDefaultInstance().getAtStart();
+    }
+
+    public static final int EFFECTIVE_FIELD_NUMBER = 5;
+    private java.lang.String effective_;
+    /**
+     * <code>string effective = 5;</code>
      * @return The effective.
      */
-    opamp.proto.v1.Opamp.EffectiveConfig getEffective();
-
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 3;</code>
-     * @return The refreshAtUnixMs.
-     */
-    long getRefreshAtUnixMs();
-
-    /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The warning.
-     */
-    java.lang.String getWarning();
-    /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The bytes for warning.
-     */
-    com.google.protobuf.ByteString
-        getWarningBytes();
-  }
-  /**
-   * Protobuf type {@code opamp.sdk.v1.Refreshed}
-   */
-  public  static final class Refreshed extends
-      com.google.protobuf.GeneratedMessageLite<
-          Refreshed, Refreshed.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Refreshed)
-      RefreshedOrBuilder {
-    private Refreshed() {
-      warning_ = "";
-    }
-    private int bitField0_;
-    public static final int SETTINGS_FIELD_NUMBER = 1;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings settings_;
-    /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     */
     @java.lang.Override
-    public boolean hasSettings() {
-      return ((bitField0_ & 0x00000001) != 0);
+    public java.lang.String getEffective() {
+      return effective_;
     }
     /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-      return settings_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance() : settings_;
-    }
-    /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      settings_ = value;
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      if (settings_ != null &&
-          settings_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance()) {
-        settings_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.newBuilder(settings_).mergeFrom(value).buildPartial();
-      } else {
-        settings_ = value;
-      }
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * put the live ones in force
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-     */
-    private void clearSettings() {
-      settings_ = null;
-      bitField0_ = (bitField0_ & ~0x00000001);
-    }
-
-    public static final int EFFECTIVE_FIELD_NUMBER = 2;
-    private opamp.proto.v1.Opamp.EffectiveConfig effective_;
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     */
-    @java.lang.Override
-    public boolean hasEffective() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     */
-    @java.lang.Override
-    public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
-      return effective_ == null ? opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance() : effective_;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-      value.getClass();  // minimal bytecode null check
-      effective_ = value;
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-      value.getClass();  // minimal bytecode null check
-      if (effective_ != null &&
-          effective_ != opamp.proto.v1.Opamp.EffectiveConfig.getDefaultInstance()) {
-        effective_ =
-          opamp.proto.v1.Opamp.EffectiveConfig.newBuilder(effective_).mergeFrom(value).buildPartial();
-      } else {
-        effective_ = value;
-      }
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * report it
-     * </pre>
-     *
-     * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-     */
-    private void clearEffective() {
-      effective_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
-    }
-
-    public static final int REFRESH_AT_UNIX_MS_FIELD_NUMBER = 3;
-    private long refreshAtUnixMs_;
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 3;</code>
-     * @return The refreshAtUnixMs.
-     */
-    @java.lang.Override
-    public long getRefreshAtUnixMs() {
-      return refreshAtUnixMs_;
-    }
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 3;</code>
-     * @param value The refreshAtUnixMs to set.
-     */
-    private void setRefreshAtUnixMs(long value) {
-      
-      refreshAtUnixMs_ = value;
-    }
-    /**
-     * <pre>
-     * as Loaded's
-     * </pre>
-     *
-     * <code>uint64 refresh_at_unix_ms = 3;</code>
-     */
-    private void clearRefreshAtUnixMs() {
-
-      refreshAtUnixMs_ = 0L;
-    }
-
-    public static final int WARNING_FIELD_NUMBER = 4;
-    private java.lang.String warning_;
-    /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The warning.
-     */
-    @java.lang.Override
-    public java.lang.String getWarning() {
-      return warning_;
-    }
-    /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @return The bytes for warning.
+     * <code>string effective = 5;</code>
+     * @return The bytes for effective.
      */
     @java.lang.Override
     public com.google.protobuf.ByteString
-        getWarningBytes() {
-      return com.google.protobuf.ByteString.copyFromUtf8(warning_);
+        getEffectiveBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(effective_);
     }
     /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @param value The warning to set.
+     * <code>string effective = 5;</code>
+     * @param value The effective to set.
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setWarning(
+    private void setEffective(
         java.lang.String value) {
       value.getClass();  // minimal bytecode null check
 
-      warning_ = value;
+      effective_ = value;
     }
     /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
+     * <code>string effective = 5;</code>
      */
-    private void clearWarning() {
+    private void clearEffective() {
 
-      warning_ = getDefaultInstance().getWarning();
+      effective_ = getDefaultInstance().getEffective();
     }
     /**
-     * <pre>
-     * `current` no longer reads on this clock, and why: the SDK's own settings
-     * </pre>
-     *
-     * <code>string warning = 4;</code>
-     * @param value The bytes for warning to set.
+     * <code>string effective = 5;</code>
+     * @param value The bytes for effective to set.
      */
-    private void setWarningBytes(
+    private void setEffectiveBytes(
         com.google.protobuf.ByteString value) {
       checkByteStringIsUtf8(value);
-      warning_ = value.toStringUtf8();
+      effective_ = value.toStringUtf8();
 
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, data, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input);
-    }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageLite.parseFrom(
-          DEFAULT_INSTANCE, input, extensionRegistry);
-    }
-
-    public static Builder newBuilder() {
-      return (Builder) DEFAULT_INSTANCE.createBuilder();
-    }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed prototype) {
-      return DEFAULT_INSTANCE.createBuilder(prototype);
-    }
-
-    /**
-     * Protobuf type {@code opamp.sdk.v1.Refreshed}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Refreshed)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.RefreshedOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.newBuilder()
-      private Builder() {
-        super(DEFAULT_INSTANCE);
-      }
-
-
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasSettings() {
-        return instance.hasSettings();
-      }
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-        return instance.getSettings();
-      }
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-        copyOnWrite();
-        instance.setSettings(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder setSettings(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.Builder builderForValue) {
-        copyOnWrite();
-        instance.setSettings(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-        copyOnWrite();
-        instance.mergeSettings(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * put the live ones in force
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 1;</code>
-       */
-      public Builder clearSettings() {  copyOnWrite();
-        instance.clearSettings();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      @java.lang.Override
-      public boolean hasEffective() {
-        return instance.hasEffective();
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      @java.lang.Override
-      public opamp.proto.v1.Opamp.EffectiveConfig getEffective() {
-        return instance.getEffective();
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      public Builder setEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-        copyOnWrite();
-        instance.setEffective(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      public Builder setEffective(
-          opamp.proto.v1.Opamp.EffectiveConfig.Builder builderForValue) {
-        copyOnWrite();
-        instance.setEffective(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      public Builder mergeEffective(opamp.proto.v1.Opamp.EffectiveConfig value) {
-        copyOnWrite();
-        instance.mergeEffective(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * report it
-       * </pre>
-       *
-       * <code>.opamp.proto.v1.EffectiveConfig effective = 2;</code>
-       */
-      public Builder clearEffective() {  copyOnWrite();
-        instance.clearEffective();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 3;</code>
-       * @return The refreshAtUnixMs.
-       */
-      @java.lang.Override
-      public long getRefreshAtUnixMs() {
-        return instance.getRefreshAtUnixMs();
-      }
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 3;</code>
-       * @param value The refreshAtUnixMs to set.
-       * @return This builder for chaining.
-       */
-      public Builder setRefreshAtUnixMs(long value) {
-        copyOnWrite();
-        instance.setRefreshAtUnixMs(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * as Loaded's
-       * </pre>
-       *
-       * <code>uint64 refresh_at_unix_ms = 3;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearRefreshAtUnixMs() {
-        copyOnWrite();
-        instance.clearRefreshAtUnixMs();
-        return this;
-      }
-
-      /**
-       * <pre>
-       * `current` no longer reads on this clock, and why: the SDK's own settings
-       * </pre>
-       *
-       * <code>string warning = 4;</code>
-       * @return The warning.
-       */
-      @java.lang.Override
-      public java.lang.String getWarning() {
-        return instance.getWarning();
-      }
-      /**
-       * <pre>
-       * `current` no longer reads on this clock, and why: the SDK's own settings
-       * </pre>
-       *
-       * <code>string warning = 4;</code>
-       * @return The bytes for warning.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString
-          getWarningBytes() {
-        return instance.getWarningBytes();
-      }
-      /**
-       * <pre>
-       * `current` no longer reads on this clock, and why: the SDK's own settings
-       * </pre>
-       *
-       * <code>string warning = 4;</code>
-       * @param value The warning to set.
-       * @return This builder for chaining.
-       */
-      public Builder setWarning(
-          java.lang.String value) {
-        copyOnWrite();
-        instance.setWarning(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * `current` no longer reads on this clock, and why: the SDK's own settings
-       * </pre>
-       *
-       * <code>string warning = 4;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearWarning() {
-        copyOnWrite();
-        instance.clearWarning();
-        return this;
-      }
-      /**
-       * <pre>
-       * `current` no longer reads on this clock, and why: the SDK's own settings
-       * </pre>
-       *
-       * <code>string warning = 4;</code>
-       * @param value The bytes for warning to set.
-       * @return This builder for chaining.
-       */
-      public Builder setWarningBytes(
-          com.google.protobuf.ByteString value) {
-        copyOnWrite();
-        instance.setWarningBytes(value);
-        return this;
-      }
-
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Refreshed)
-    }
-    @java.lang.Override
-    @java.lang.SuppressWarnings({"ThrowNull"})
-    protected final java.lang.Object dynamicMethod(
-        com.google.protobuf.GeneratedMessageLite.MethodToInvoke method,
-        java.lang.Object arg0, java.lang.Object arg1) {
-      switch (method) {
-        case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed();
-        }
-        case NEW_BUILDER: {
-          return new Builder();
-        }
-        case BUILD_MESSAGE_INFO: {
-            java.lang.Object[] objects = new java.lang.Object[] {
-              "bitField0_",
-              "settings_",
-              "effective_",
-              "refreshAtUnixMs_",
-              "warning_",
-            };
-            java.lang.String info =
-                "\u0000\u0004\u0000\u0001\u0001\u0004\u0004\u0000\u0000\u0000\u0001\u1009\u0000\u0002" +
-                "\u1009\u0001\u0003\u0003\u0004\u0208";
-            return newMessageInfo(DEFAULT_INSTANCE, info, objects);
-        }
-        case GET_DEFAULT_INSTANCE: {
-          return DEFAULT_INSTANCE;
-        }
-        case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed> parser = PARSER;
-          if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.class) {
-              parser = PARSER;
-              if (parser == null) {
-                parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed>(
-                        DEFAULT_INSTANCE);
-                PARSER = parser;
-              }
-            }
-          }
-          return parser;
-        }
-        case GET_MEMOIZED_IS_INITIALIZED: {
-          return (byte) 1;
-        }
-        // SET_MEMOIZED_IS_INITIALIZED is never called for this message.
-        // So it can do anything. Combine with default case for smaller codegen.
-        case SET_MEMOIZED_IS_INITIALIZED:
-      }
-      // Should never happen. Generates tight code to throw an exception.
-      throw null;
-    }
-
-
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Refreshed)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed DEFAULT_INSTANCE;
-    static {
-      Refreshed defaultInstance = new Refreshed();
-      // New instances are implicitly immutable so no need to make
-      // immutable.
-      DEFAULT_INSTANCE = defaultInstance;
-      com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Refreshed.class, defaultInstance);
-    }
-
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static volatile com.google.protobuf.Parser<Refreshed> PARSER;
-
-    public static com.google.protobuf.Parser<Refreshed> parser() {
-      return DEFAULT_INSTANCE.getParserForType();
-    }
-  }
-
-  public interface HealthOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:opamp.sdk.v1.Health)
-      com.google.protobuf.MessageLiteOrBuilder {
-
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     * @return Whether the counts field is set.
-     */
-    boolean hasCounts();
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     * @return The counts.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts();
-
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     * @return Whether the previous field is set.
-     */
-    boolean hasPrevious();
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     * @return The previous.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getPrevious();
-
-    /**
-     * <code>uint64 now_unix_ms = 3;</code>
-     * @return The nowUnixMs.
-     */
-    long getNowUnixMs();
-
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     * @return Whether the settings field is set.
-     */
-    boolean hasSettings();
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     * @return The settings.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings();
-
-    /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
-     */
-    java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> 
-        getExportersList();
-    /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index);
-    /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
-     */
-    int getExportersCount();
-  }
-  /**
-   * <pre>
-   * Export health, from the counts the gates keep: call it from the same timer as Refresh, every
-   * 30 s, and pass back the report it answered last time. When `send`, put `exporters` under the
-   * agent's health `component_health_map["exporters"]` (the top-level `healthy` stays the
-   * application's) and call set_health; otherwise send nothing.
-   * </pre>
-   *
-   * Protobuf type {@code opamp.sdk.v1.Health}
-   */
-  public  static final class Health extends
-      com.google.protobuf.GeneratedMessageLite<
-          Health, Health.Builder> implements
-      // @@protoc_insertion_point(message_implements:opamp.sdk.v1.Health)
-      HealthOrBuilder {
-    private Health() {
-      exporters_ = emptyProtobufList();
-    }
-    private int bitField0_;
-    public static final int COUNTS_FIELD_NUMBER = 1;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts counts_;
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     */
-    @java.lang.Override
-    public boolean hasCounts() {
-      return ((bitField0_ & 0x00000001) != 0);
-    }
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts() {
-      return counts_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance() : counts_;
-    }
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
-      value.getClass();  // minimal bytecode null check
-      counts_ = value;
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
-      value.getClass();  // minimal bytecode null check
-      if (counts_ != null &&
-          counts_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.getDefaultInstance()) {
-        counts_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.newBuilder(counts_).mergeFrom(value).buildPartial();
-      } else {
-        counts_ = value;
-      }
-      bitField0_ |= 0x00000001;
-    }
-    /**
-     * <pre>
-     * cumulative since start
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
-     */
-    private void clearCounts() {
-      counts_ = null;
-      bitField0_ = (bitField0_ & ~0x00000001);
-    }
-
-    public static final int PREVIOUS_FIELD_NUMBER = 2;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport previous_;
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     */
-    @java.lang.Override
-    public boolean hasPrevious() {
-      return ((bitField0_ & 0x00000002) != 0);
-    }
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getPrevious() {
-      return previous_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance() : previous_;
-    }
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setPrevious(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-      value.getClass();  // minimal bytecode null check
-      previous_ = value;
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergePrevious(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-      value.getClass();  // minimal bytecode null check
-      if (previous_ != null &&
-          previous_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance()) {
-        previous_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.newBuilder(previous_).mergeFrom(value).buildPartial();
-      } else {
-        previous_ = value;
-      }
-      bitField0_ |= 0x00000002;
-    }
-    /**
-     * <pre>
-     * the last HealthReport answered; none at the first call
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-     */
-    private void clearPrevious() {
-      previous_ = null;
-      bitField0_ = (bitField0_ & ~0x00000002);
-    }
-
-    public static final int NOW_UNIX_MS_FIELD_NUMBER = 3;
-    private long nowUnixMs_;
-    /**
-     * <code>uint64 now_unix_ms = 3;</code>
-     * @return The nowUnixMs.
-     */
-    @java.lang.Override
-    public long getNowUnixMs() {
-      return nowUnixMs_;
-    }
-    /**
-     * <code>uint64 now_unix_ms = 3;</code>
-     * @param value The nowUnixMs to set.
-     */
-    private void setNowUnixMs(long value) {
-      
-      nowUnixMs_ = value;
-    }
-    /**
-     * <code>uint64 now_unix_ms = 3;</code>
-     */
-    private void clearNowUnixMs() {
-
-      nowUnixMs_ = 0L;
-    }
-
-    public static final int SETTINGS_FIELD_NUMBER = 4;
-    private dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings settings_;
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     */
-    @java.lang.Override
-    public boolean hasSettings() {
-      return ((bitField0_ & 0x00000004) != 0);
-    }
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-      return settings_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance() : settings_;
-    }
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      settings_ = value;
-      bitField0_ |= 0x00000004;
-    }
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     */
-    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
-    private void mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
-      value.getClass();  // minimal bytecode null check
-      if (settings_ != null &&
-          settings_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.getDefaultInstance()) {
-        settings_ =
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.newBuilder(settings_).mergeFrom(value).buildPartial();
-      } else {
-        settings_ = value;
-      }
-      bitField0_ |= 0x00000004;
-    }
-    /**
-     * <pre>
-     * in force: a send_* false reports that signal off
-     * </pre>
-     *
-     * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-     */
-    private void clearSettings() {
-      settings_ = null;
-      bitField0_ = (bitField0_ & ~0x00000004);
-    }
-
-    public static final int EXPORTERS_FIELD_NUMBER = 5;
+    public static final int EXPORTERS_FIELD_NUMBER = 6;
     private com.google.protobuf.Internal.ProtobufList<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> exporters_;
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.Override
     public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
       return exporters_;
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     public java.util.List<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder> 
         getExportersOrBuilderList() {
       return exporters_;
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.Override
     public int getExportersCount() {
       return exporters_.size();
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.Override
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
       return exporters_.get(index);
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExporterOrBuilder getExportersOrBuilder(
         int index) {
@@ -12611,11 +16035,7 @@ java.lang.String defaultValue) {
     }
 
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void setExporters(
@@ -12625,11 +16045,7 @@ java.lang.String defaultValue) {
       exporters_.set(index, value);
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
@@ -12638,11 +16054,7 @@ java.lang.String defaultValue) {
       exporters_.add(value);
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     @java.lang.SuppressWarnings("ReturnValueIgnored")
     private void addExporters(
@@ -12652,11 +16064,7 @@ java.lang.String defaultValue) {
       exporters_.add(index, value);
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     private void addAllExporters(
         java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
@@ -12665,71 +16073,527 @@ java.lang.String defaultValue) {
           values, exporters_);
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     private void clearExporters() {
       exporters_ = emptyProtobufList();
     }
     /**
-     * <pre>
-     * as the inventory lists them: one child each under its signal
-     * </pre>
-     *
-     * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+     * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
      */
     private void removeExporters(int index) {
       ensureExportersIsMutable();
       exporters_.remove(index);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static final int HEALTH_FIELD_NUMBER = 7;
+    private dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport health_;
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     */
+    @java.lang.Override
+    public boolean hasHealth() {
+      return ((bitField0_ & 0x00000002) != 0);
+    }
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealth() {
+      return health_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance() : health_;
+    }
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
+      value.getClass();  // minimal bytecode null check
+      health_ = value;
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
+      value.getClass();  // minimal bytecode null check
+      if (health_ != null &&
+          health_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance()) {
+        health_ =
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.newBuilder(health_).mergeFrom(value).buildPartial();
+      } else {
+        health_ = value;
+      }
+      bitField0_ |= 0x00000002;
+    }
+    /**
+     * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+     */
+    private void clearHealth() {
+      health_ = null;
+      bitField0_ = (bitField0_ & ~0x00000002);
+    }
+
+    public static final int REFRESH_AT_UNIX_MS_FIELD_NUMBER = 8;
+    private long refreshAtUnixMs_;
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     * @return Whether the refreshAtUnixMs field is set.
+     */
+    @java.lang.Override
+    public boolean hasRefreshAtUnixMs() {
+      return ((bitField0_ & 0x00000004) != 0);
+    }
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     * @return The refreshAtUnixMs.
+     */
+    @java.lang.Override
+    public long getRefreshAtUnixMs() {
+      return refreshAtUnixMs_;
+    }
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     * @param value The refreshAtUnixMs to set.
+     */
+    private void setRefreshAtUnixMs(long value) {
+      bitField0_ |= 0x00000004;
+      refreshAtUnixMs_ = value;
+    }
+    /**
+     * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+     */
+    private void clearRefreshAtUnixMs() {
+      bitField0_ = (bitField0_ & ~0x00000004);
+      refreshAtUnixMs_ = 0L;
+    }
+
+    public static final int REFRESH_DUE_MONO_MS_FIELD_NUMBER = 9;
+    private long refreshDueMonoMs_;
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     * @return Whether the refreshDueMonoMs field is set.
+     */
+    @java.lang.Override
+    public boolean hasRefreshDueMonoMs() {
+      return ((bitField0_ & 0x00000008) != 0);
+    }
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     * @return The refreshDueMonoMs.
+     */
+    @java.lang.Override
+    public long getRefreshDueMonoMs() {
+      return refreshDueMonoMs_;
+    }
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     * @param value The refreshDueMonoMs to set.
+     */
+    private void setRefreshDueMonoMs(long value) {
+      bitField0_ |= 0x00000008;
+      refreshDueMonoMs_ = value;
+    }
+    /**
+     * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+     */
+    private void clearRefreshDueMonoMs() {
+      bitField0_ = (bitField0_ & ~0x00000008);
+      refreshDueMonoMs_ = 0L;
+    }
+
+    public static final int HEALTH_DUE_MONO_MS_FIELD_NUMBER = 10;
+    private long healthDueMonoMs_;
+    /**
+     * <code>uint64 health_due_mono_ms = 10;</code>
+     * @return The healthDueMonoMs.
+     */
+    @java.lang.Override
+    public long getHealthDueMonoMs() {
+      return healthDueMonoMs_;
+    }
+    /**
+     * <code>uint64 health_due_mono_ms = 10;</code>
+     * @param value The healthDueMonoMs to set.
+     */
+    private void setHealthDueMonoMs(long value) {
+      
+      healthDueMonoMs_ = value;
+    }
+    /**
+     * <code>uint64 health_due_mono_ms = 10;</code>
+     */
+    private void clearHealthDueMonoMs() {
+
+      healthDueMonoMs_ = 0L;
+    }
+
+    public static final int STARTED_UNIX_MS_FIELD_NUMBER = 11;
+    private long startedUnixMs_;
+    /**
+     * <code>uint64 started_unix_ms = 11;</code>
+     * @return The startedUnixMs.
+     */
+    @java.lang.Override
+    public long getStartedUnixMs() {
+      return startedUnixMs_;
+    }
+    /**
+     * <code>uint64 started_unix_ms = 11;</code>
+     * @param value The startedUnixMs to set.
+     */
+    private void setStartedUnixMs(long value) {
+      
+      startedUnixMs_ = value;
+    }
+    /**
+     * <code>uint64 started_unix_ms = 11;</code>
+     */
+    private void clearStartedUnixMs() {
+
+      startedUnixMs_ = 0L;
+    }
+
+    public static final int ENDPOINT_FIELD_NUMBER = 12;
+    private java.lang.String endpoint_;
+    /**
+     * <code>string endpoint = 12;</code>
+     * @return The endpoint.
+     */
+    @java.lang.Override
+    public java.lang.String getEndpoint() {
+      return endpoint_;
+    }
+    /**
+     * <code>string endpoint = 12;</code>
+     * @return The bytes for endpoint.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getEndpointBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(endpoint_);
+    }
+    /**
+     * <code>string endpoint = 12;</code>
+     * @param value The endpoint to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setEndpoint(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      endpoint_ = value;
+    }
+    /**
+     * <code>string endpoint = 12;</code>
+     */
+    private void clearEndpoint() {
+
+      endpoint_ = getDefaultInstance().getEndpoint();
+    }
+    /**
+     * <code>string endpoint = 12;</code>
+     * @param value The bytes for endpoint to set.
+     */
+    private void setEndpointBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      endpoint_ = value.toStringUtf8();
+
+    }
+
+    public static final int SERVICE_FIELD_NUMBER = 13;
+    private java.lang.String service_;
+    /**
+     * <code>string service = 13;</code>
+     * @return The service.
+     */
+    @java.lang.Override
+    public java.lang.String getService() {
+      return service_;
+    }
+    /**
+     * <code>string service = 13;</code>
+     * @return The bytes for service.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getServiceBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(service_);
+    }
+    /**
+     * <code>string service = 13;</code>
+     * @param value The service to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setService(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      service_ = value;
+    }
+    /**
+     * <code>string service = 13;</code>
+     */
+    private void clearService() {
+
+      service_ = getDefaultInstance().getService();
+    }
+    /**
+     * <code>string service = 13;</code>
+     * @param value The bytes for service to set.
+     */
+    private void setServiceBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      service_ = value.toStringUtf8();
+
+    }
+
+    public static final int UID_FIELD_NUMBER = 14;
+    private java.lang.String uid_;
+    /**
+     * <code>string uid = 14;</code>
+     * @return The uid.
+     */
+    @java.lang.Override
+    public java.lang.String getUid() {
+      return uid_;
+    }
+    /**
+     * <code>string uid = 14;</code>
+     * @return The bytes for uid.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getUidBytes() {
+      return com.google.protobuf.ByteString.copyFromUtf8(uid_);
+    }
+    /**
+     * <code>string uid = 14;</code>
+     * @param value The uid to set.
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setUid(
+        java.lang.String value) {
+      value.getClass();  // minimal bytecode null check
+
+      uid_ = value;
+    }
+    /**
+     * <code>string uid = 14;</code>
+     */
+    private void clearUid() {
+
+      uid_ = getDefaultInstance().getUid();
+    }
+    /**
+     * <code>string uid = 14;</code>
+     * @param value The bytes for uid to set.
+     */
+    private void setUidBytes(
+        com.google.protobuf.ByteString value) {
+      checkByteStringIsUtf8(value);
+      uid_ = value.toStringUtf8();
+
+    }
+
+    public static final int HINTS_FIELD_NUMBER = 15;
+    private dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints hints_;
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     */
+    @java.lang.Override
+    public boolean hasHints() {
+      return ((bitField0_ & 0x00000010) != 0);
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints() {
+      return hints_ == null ? dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.getDefaultInstance() : hints_;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+      value.getClass();  // minimal bytecode null check
+      hints_ = value;
+      bitField0_ |= 0x00000010;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     */
+    @java.lang.SuppressWarnings({"ReferenceEquality", "ReturnValueIgnored"})
+    private void mergeHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+      value.getClass();  // minimal bytecode null check
+      if (hints_ != null &&
+          hints_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.getDefaultInstance()) {
+        hints_ =
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.newBuilder(hints_).mergeFrom(value).buildPartial();
+      } else {
+        hints_ = value;
+      }
+      bitField0_ |= 0x00000010;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+     */
+    private void clearHints() {
+      hints_ = null;
+      bitField0_ = (bitField0_ & ~0x00000010);
+    }
+
+    public static final int EVER_FIELD_NUMBER = 16;
+    private boolean ever_;
+    /**
+     * <code>bool ever = 16;</code>
+     * @return The ever.
+     */
+    @java.lang.Override
+    public boolean getEver() {
+      return ever_;
+    }
+    /**
+     * <code>bool ever = 16;</code>
+     * @param value The ever to set.
+     */
+    private void setEver(boolean value) {
+      
+      ever_ = value;
+    }
+    /**
+     * <code>bool ever = 16;</code>
+     */
+    private void clearEver() {
+
+      ever_ = false;
+    }
+
+    public static final int FAILING_FIELD_NUMBER = 17;
+    private boolean failing_;
+    /**
+     * <code>bool failing = 17;</code>
+     * @return The failing.
+     */
+    @java.lang.Override
+    public boolean getFailing() {
+      return failing_;
+    }
+    /**
+     * <code>bool failing = 17;</code>
+     * @param value The failing to set.
+     */
+    private void setFailing(boolean value) {
+      
+      failing_ = value;
+    }
+    /**
+     * <code>bool failing = 17;</code>
+     */
+    private void clearFailing() {
+
+      failing_ = false;
+    }
+
+    public static final int ASKED_UNIX_MS_FIELD_NUMBER = 18;
+    private long askedUnixMs_;
+    /**
+     * <code>uint64 asked_unix_ms = 18;</code>
+     * @return The askedUnixMs.
+     */
+    @java.lang.Override
+    public long getAskedUnixMs() {
+      return askedUnixMs_;
+    }
+    /**
+     * <code>uint64 asked_unix_ms = 18;</code>
+     * @param value The askedUnixMs to set.
+     */
+    private void setAskedUnixMs(long value) {
+      
+      askedUnixMs_ = value;
+    }
+    /**
+     * <code>uint64 asked_unix_ms = 18;</code>
+     */
+    private void clearAskedUnixMs() {
+
+      askedUnixMs_ = 0L;
+    }
+
+    public static final int ASKED_MONO_MS_FIELD_NUMBER = 19;
+    private long askedMonoMs_;
+    /**
+     * <code>uint64 asked_mono_ms = 19;</code>
+     * @return The askedMonoMs.
+     */
+    @java.lang.Override
+    public long getAskedMonoMs() {
+      return askedMonoMs_;
+    }
+    /**
+     * <code>uint64 asked_mono_ms = 19;</code>
+     * @param value The askedMonoMs to set.
+     */
+    private void setAskedMonoMs(long value) {
+      
+      askedMonoMs_ = value;
+    }
+    /**
+     * <code>uint64 asked_mono_ms = 19;</code>
+     */
+    private void clearAskedMonoMs() {
+
+      askedMonoMs_ = 0L;
+    }
+
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         java.nio.ByteBuffer data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         java.nio.ByteBuffer data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         com.google.protobuf.ByteString data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         com.google.protobuf.ByteString data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(byte[] data)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(byte[] data)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         byte[] data,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, data, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(java.io.InputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -12737,24 +16601,24 @@ java.lang.String defaultValue) {
           DEFAULT_INSTANCE, input, extensionRegistry);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseDelimitedFrom(java.io.InputStream input)
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseDelimitedFrom(java.io.InputStream input)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseDelimitedFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseDelimitedFrom(
         java.io.InputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
       return parseDelimitedFrom(DEFAULT_INSTANCE, input, extensionRegistry);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         com.google.protobuf.CodedInputStream input)
         throws java.io.IOException {
       return com.google.protobuf.GeneratedMessageLite.parseFrom(
           DEFAULT_INSTANCE, input);
     }
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health parseFrom(
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState parseFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
@@ -12765,278 +16629,211 @@ java.lang.String defaultValue) {
     public static Builder newBuilder() {
       return (Builder) DEFAULT_INSTANCE.createBuilder();
     }
-    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.Health prototype) {
+    public static Builder newBuilder(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState prototype) {
       return DEFAULT_INSTANCE.createBuilder(prototype);
     }
 
     /**
      * <pre>
-     * Export health, from the counts the gates keep: call it from the same timer as Refresh, every
-     * 30 s, and pass back the report it answered last time. When `send`, put `exporters` under the
-     * agent's health `component_health_map["exporters"]` (the top-level `healthy` stays the
-     * application's) and call set_health; otherwise send nothing.
+     * AgentOutput.agent, decoded: the agent between steps. Hosts keep it as bytes and never read it.
+     * It lives only as long as the process, so its fields may change in any release.
      * </pre>
      *
-     * Protobuf type {@code opamp.sdk.v1.Health}
+     * Protobuf type {@code opamp.sdk.v1.AgentState}
      */
     public static final class Builder extends
         com.google.protobuf.GeneratedMessageLite.Builder<
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Health, Builder> implements
-        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.Health)
-        dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthOrBuilder {
-      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.newBuilder()
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState, Builder> implements
+        // @@protoc_insertion_point(builder_implements:opamp.sdk.v1.AgentState)
+        dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStateOrBuilder {
+      // Construct using dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState.newBuilder()
       private Builder() {
         super(DEFAULT_INSTANCE);
       }
 
 
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       @java.lang.Override
-      public boolean hasCounts() {
-        return instance.hasCounts();
+      public boolean hasHost() {
+        return instance.hasHost();
       }
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
       @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts getCounts() {
-        return instance.getCounts();
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Host getHost() {
+        return instance.getHost();
       }
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
-      public Builder setCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+      public Builder setHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
         copyOnWrite();
-        instance.setCounts(value);
+        instance.setHost(value);
         return this;
         }
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
-      public Builder setCounts(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts.Builder builderForValue) {
+      public Builder setHost(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.Host.Builder builderForValue) {
         copyOnWrite();
-        instance.setCounts(builderForValue.build());
+        instance.setHost(builderForValue.build());
         return this;
       }
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
-      public Builder mergeCounts(dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportCounts value) {
+      public Builder mergeHost(dev.pydantic.logfire.fleet.sdk.SettingsProto.Host value) {
         copyOnWrite();
-        instance.mergeCounts(value);
+        instance.mergeHost(value);
         return this;
       }
       /**
-       * <pre>
-       * cumulative since start
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.ExportCounts counts = 1;</code>
+       * <code>.opamp.sdk.v1.Host host = 1;</code>
        */
-      public Builder clearCounts() {  copyOnWrite();
-        instance.clearCounts();
+      public Builder clearHost() {  copyOnWrite();
+        instance.clearHost();
         return this;
       }
 
       /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
+       * <code>bool state_dir = 2;</code>
+       * @return The stateDir.
        */
       @java.lang.Override
-      public boolean hasPrevious() {
-        return instance.hasPrevious();
+      public boolean getStateDir() {
+        return instance.getStateDir();
       }
       /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getPrevious() {
-        return instance.getPrevious();
-      }
-      /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-       */
-      public Builder setPrevious(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-        copyOnWrite();
-        instance.setPrevious(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-       */
-      public Builder setPrevious(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.Builder builderForValue) {
-        copyOnWrite();
-        instance.setPrevious(builderForValue.build());
-        return this;
-      }
-      /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-       */
-      public Builder mergePrevious(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-        copyOnWrite();
-        instance.mergePrevious(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * the last HealthReport answered; none at the first call
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.HealthReport previous = 2;</code>
-       */
-      public Builder clearPrevious() {  copyOnWrite();
-        instance.clearPrevious();
-        return this;
-      }
-
-      /**
-       * <code>uint64 now_unix_ms = 3;</code>
-       * @return The nowUnixMs.
-       */
-      @java.lang.Override
-      public long getNowUnixMs() {
-        return instance.getNowUnixMs();
-      }
-      /**
-       * <code>uint64 now_unix_ms = 3;</code>
-       * @param value The nowUnixMs to set.
+       * <code>bool state_dir = 2;</code>
+       * @param value The stateDir to set.
        * @return This builder for chaining.
        */
-      public Builder setNowUnixMs(long value) {
+      public Builder setStateDir(boolean value) {
         copyOnWrite();
-        instance.setNowUnixMs(value);
+        instance.setStateDir(value);
         return this;
       }
       /**
-       * <code>uint64 now_unix_ms = 3;</code>
+       * <code>bool state_dir = 2;</code>
        * @return This builder for chaining.
        */
-      public Builder clearNowUnixMs() {
+      public Builder clearStateDir() {
         copyOnWrite();
-        instance.clearNowUnixMs();
+        instance.clearStateDir();
         return this;
       }
 
       /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
+       * <code>bytes current = 3;</code>
+       * @return The current.
        */
       @java.lang.Override
-      public boolean hasSettings() {
-        return instance.hasSettings();
+      public com.google.protobuf.ByteString getCurrent() {
+        return instance.getCurrent();
       }
       /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
+       * <code>bytes current = 3;</code>
+       * @param value The current to set.
+       * @return This builder for chaining.
        */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings getSettings() {
-        return instance.getSettings();
-      }
-      /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-       */
-      public Builder setSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      public Builder setCurrent(com.google.protobuf.ByteString value) {
         copyOnWrite();
-        instance.setSettings(value);
-        return this;
-        }
-      /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-       */
-      public Builder setSettings(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings.Builder builderForValue) {
-        copyOnWrite();
-        instance.setSettings(builderForValue.build());
+        instance.setCurrent(value);
         return this;
       }
       /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
+       * <code>bytes current = 3;</code>
+       * @return This builder for chaining.
        */
-      public Builder mergeSettings(dev.pydantic.logfire.fleet.sdk.SettingsProto.Settings value) {
+      public Builder clearCurrent() {
         copyOnWrite();
-        instance.mergeSettings(value);
-        return this;
-      }
-      /**
-       * <pre>
-       * in force: a send_* false reports that signal off
-       * </pre>
-       *
-       * <code>.opamp.sdk.v1.Settings settings = 4;</code>
-       */
-      public Builder clearSettings() {  copyOnWrite();
-        instance.clearSettings();
+        instance.clearCurrent();
         return this;
       }
 
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>bytes at_start = 4;</code>
+       * @return The atStart.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString getAtStart() {
+        return instance.getAtStart();
+      }
+      /**
+       * <code>bytes at_start = 4;</code>
+       * @param value The atStart to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAtStart(com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setAtStart(value);
+        return this;
+      }
+      /**
+       * <code>bytes at_start = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAtStart() {
+        copyOnWrite();
+        instance.clearAtStart();
+        return this;
+      }
+
+      /**
+       * <code>string effective = 5;</code>
+       * @return The effective.
+       */
+      @java.lang.Override
+      public java.lang.String getEffective() {
+        return instance.getEffective();
+      }
+      /**
+       * <code>string effective = 5;</code>
+       * @return The bytes for effective.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEffectiveBytes() {
+        return instance.getEffectiveBytes();
+      }
+      /**
+       * <code>string effective = 5;</code>
+       * @param value The effective to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEffective(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEffective(value);
+        return this;
+      }
+      /**
+       * <code>string effective = 5;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEffective() {
+        copyOnWrite();
+        instance.clearEffective();
+        return this;
+      }
+      /**
+       * <code>string effective = 5;</code>
+       * @param value The bytes for effective to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEffectiveBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEffectiveBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       @java.lang.Override
       public java.util.List<dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> getExportersList() {
@@ -13044,32 +16841,20 @@ java.lang.String defaultValue) {
             instance.getExportersList());
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       @java.lang.Override
       public int getExportersCount() {
         return instance.getExportersCount();
       }/**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       @java.lang.Override
       public dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter getExporters(int index) {
         return instance.getExporters(index);
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder setExporters(
           int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
@@ -13078,11 +16863,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder setExporters(
           int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
@@ -13092,11 +16873,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder addExporters(dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
         copyOnWrite();
@@ -13104,11 +16881,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder addExporters(
           int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter value) {
@@ -13117,11 +16890,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder addExporters(
           dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
@@ -13130,11 +16899,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder addExporters(
           int index, dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.Builder builderForValue) {
@@ -13144,11 +16909,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder addAllExporters(
           java.lang.Iterable<? extends dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter> values) {
@@ -13157,11 +16918,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder clearExporters() {
         copyOnWrite();
@@ -13169,11 +16926,7 @@ java.lang.String defaultValue) {
         return this;
       }
       /**
-       * <pre>
-       * as the inventory lists them: one child each under its signal
-       * </pre>
-       *
-       * <code>repeated .opamp.sdk.v1.Exporter exporters = 5;</code>
+       * <code>repeated .opamp.sdk.v1.Exporter exporters = 6;</code>
        */
       public Builder removeExporters(int index) {
         copyOnWrite();
@@ -13181,7 +16934,488 @@ java.lang.String defaultValue) {
         return this;
       }
 
-      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Health)
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      @java.lang.Override
+      public boolean hasHealth() {
+        return instance.hasHealth();
+      }
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealth() {
+        return instance.getHealth();
+      }
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      public Builder setHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
+        copyOnWrite();
+        instance.setHealth(value);
+        return this;
+        }
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      public Builder setHealth(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHealth(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      public Builder mergeHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
+        copyOnWrite();
+        instance.mergeHealth(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.HealthReport health = 7;</code>
+       */
+      public Builder clearHealth() {  copyOnWrite();
+        instance.clearHealth();
+        return this;
+      }
+
+      /**
+       * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+       * @return Whether the refreshAtUnixMs field is set.
+       */
+      @java.lang.Override
+      public boolean hasRefreshAtUnixMs() {
+        return instance.hasRefreshAtUnixMs();
+      }
+      /**
+       * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+       * @return The refreshAtUnixMs.
+       */
+      @java.lang.Override
+      public long getRefreshAtUnixMs() {
+        return instance.getRefreshAtUnixMs();
+      }
+      /**
+       * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+       * @param value The refreshAtUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefreshAtUnixMs(long value) {
+        copyOnWrite();
+        instance.setRefreshAtUnixMs(value);
+        return this;
+      }
+      /**
+       * <code>optional uint64 refresh_at_unix_ms = 8;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRefreshAtUnixMs() {
+        copyOnWrite();
+        instance.clearRefreshAtUnixMs();
+        return this;
+      }
+
+      /**
+       * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+       * @return Whether the refreshDueMonoMs field is set.
+       */
+      @java.lang.Override
+      public boolean hasRefreshDueMonoMs() {
+        return instance.hasRefreshDueMonoMs();
+      }
+      /**
+       * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+       * @return The refreshDueMonoMs.
+       */
+      @java.lang.Override
+      public long getRefreshDueMonoMs() {
+        return instance.getRefreshDueMonoMs();
+      }
+      /**
+       * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+       * @param value The refreshDueMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setRefreshDueMonoMs(long value) {
+        copyOnWrite();
+        instance.setRefreshDueMonoMs(value);
+        return this;
+      }
+      /**
+       * <code>optional uint64 refresh_due_mono_ms = 9;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearRefreshDueMonoMs() {
+        copyOnWrite();
+        instance.clearRefreshDueMonoMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 health_due_mono_ms = 10;</code>
+       * @return The healthDueMonoMs.
+       */
+      @java.lang.Override
+      public long getHealthDueMonoMs() {
+        return instance.getHealthDueMonoMs();
+      }
+      /**
+       * <code>uint64 health_due_mono_ms = 10;</code>
+       * @param value The healthDueMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHealthDueMonoMs(long value) {
+        copyOnWrite();
+        instance.setHealthDueMonoMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 health_due_mono_ms = 10;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHealthDueMonoMs() {
+        copyOnWrite();
+        instance.clearHealthDueMonoMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 started_unix_ms = 11;</code>
+       * @return The startedUnixMs.
+       */
+      @java.lang.Override
+      public long getStartedUnixMs() {
+        return instance.getStartedUnixMs();
+      }
+      /**
+       * <code>uint64 started_unix_ms = 11;</code>
+       * @param value The startedUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStartedUnixMs(long value) {
+        copyOnWrite();
+        instance.setStartedUnixMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 started_unix_ms = 11;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStartedUnixMs() {
+        copyOnWrite();
+        instance.clearStartedUnixMs();
+        return this;
+      }
+
+      /**
+       * <code>string endpoint = 12;</code>
+       * @return The endpoint.
+       */
+      @java.lang.Override
+      public java.lang.String getEndpoint() {
+        return instance.getEndpoint();
+      }
+      /**
+       * <code>string endpoint = 12;</code>
+       * @return The bytes for endpoint.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getEndpointBytes() {
+        return instance.getEndpointBytes();
+      }
+      /**
+       * <code>string endpoint = 12;</code>
+       * @param value The endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpoint(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setEndpoint(value);
+        return this;
+      }
+      /**
+       * <code>string endpoint = 12;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEndpoint() {
+        copyOnWrite();
+        instance.clearEndpoint();
+        return this;
+      }
+      /**
+       * <code>string endpoint = 12;</code>
+       * @param value The bytes for endpoint to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEndpointBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setEndpointBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string service = 13;</code>
+       * @return The service.
+       */
+      @java.lang.Override
+      public java.lang.String getService() {
+        return instance.getService();
+      }
+      /**
+       * <code>string service = 13;</code>
+       * @return The bytes for service.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getServiceBytes() {
+        return instance.getServiceBytes();
+      }
+      /**
+       * <code>string service = 13;</code>
+       * @param value The service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setService(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setService(value);
+        return this;
+      }
+      /**
+       * <code>string service = 13;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearService() {
+        copyOnWrite();
+        instance.clearService();
+        return this;
+      }
+      /**
+       * <code>string service = 13;</code>
+       * @param value The bytes for service to set.
+       * @return This builder for chaining.
+       */
+      public Builder setServiceBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setServiceBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>string uid = 14;</code>
+       * @return The uid.
+       */
+      @java.lang.Override
+      public java.lang.String getUid() {
+        return instance.getUid();
+      }
+      /**
+       * <code>string uid = 14;</code>
+       * @return The bytes for uid.
+       */
+      @java.lang.Override
+      public com.google.protobuf.ByteString
+          getUidBytes() {
+        return instance.getUidBytes();
+      }
+      /**
+       * <code>string uid = 14;</code>
+       * @param value The uid to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUid(
+          java.lang.String value) {
+        copyOnWrite();
+        instance.setUid(value);
+        return this;
+      }
+      /**
+       * <code>string uid = 14;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearUid() {
+        copyOnWrite();
+        instance.clearUid();
+        return this;
+      }
+      /**
+       * <code>string uid = 14;</code>
+       * @param value The bytes for uid to set.
+       * @return This builder for chaining.
+       */
+      public Builder setUidBytes(
+          com.google.protobuf.ByteString value) {
+        copyOnWrite();
+        instance.setUidBytes(value);
+        return this;
+      }
+
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      @java.lang.Override
+      public boolean hasHints() {
+        return instance.hasHints();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints getHints() {
+        return instance.getHints();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      public Builder setHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+        copyOnWrite();
+        instance.setHints(value);
+        return this;
+        }
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      public Builder setHints(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints.Builder builderForValue) {
+        copyOnWrite();
+        instance.setHints(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      public Builder mergeHints(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentHints value) {
+        copyOnWrite();
+        instance.mergeHints(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentHints hints = 15;</code>
+       */
+      public Builder clearHints() {  copyOnWrite();
+        instance.clearHints();
+        return this;
+      }
+
+      /**
+       * <code>bool ever = 16;</code>
+       * @return The ever.
+       */
+      @java.lang.Override
+      public boolean getEver() {
+        return instance.getEver();
+      }
+      /**
+       * <code>bool ever = 16;</code>
+       * @param value The ever to set.
+       * @return This builder for chaining.
+       */
+      public Builder setEver(boolean value) {
+        copyOnWrite();
+        instance.setEver(value);
+        return this;
+      }
+      /**
+       * <code>bool ever = 16;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearEver() {
+        copyOnWrite();
+        instance.clearEver();
+        return this;
+      }
+
+      /**
+       * <code>bool failing = 17;</code>
+       * @return The failing.
+       */
+      @java.lang.Override
+      public boolean getFailing() {
+        return instance.getFailing();
+      }
+      /**
+       * <code>bool failing = 17;</code>
+       * @param value The failing to set.
+       * @return This builder for chaining.
+       */
+      public Builder setFailing(boolean value) {
+        copyOnWrite();
+        instance.setFailing(value);
+        return this;
+      }
+      /**
+       * <code>bool failing = 17;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearFailing() {
+        copyOnWrite();
+        instance.clearFailing();
+        return this;
+      }
+
+      /**
+       * <code>uint64 asked_unix_ms = 18;</code>
+       * @return The askedUnixMs.
+       */
+      @java.lang.Override
+      public long getAskedUnixMs() {
+        return instance.getAskedUnixMs();
+      }
+      /**
+       * <code>uint64 asked_unix_ms = 18;</code>
+       * @param value The askedUnixMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAskedUnixMs(long value) {
+        copyOnWrite();
+        instance.setAskedUnixMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 asked_unix_ms = 18;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAskedUnixMs() {
+        copyOnWrite();
+        instance.clearAskedUnixMs();
+        return this;
+      }
+
+      /**
+       * <code>uint64 asked_mono_ms = 19;</code>
+       * @return The askedMonoMs.
+       */
+      @java.lang.Override
+      public long getAskedMonoMs() {
+        return instance.getAskedMonoMs();
+      }
+      /**
+       * <code>uint64 asked_mono_ms = 19;</code>
+       * @param value The askedMonoMs to set.
+       * @return This builder for chaining.
+       */
+      public Builder setAskedMonoMs(long value) {
+        copyOnWrite();
+        instance.setAskedMonoMs(value);
+        return this;
+      }
+      /**
+       * <code>uint64 asked_mono_ms = 19;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearAskedMonoMs() {
+        copyOnWrite();
+        instance.clearAskedMonoMs();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.AgentState)
     }
     @java.lang.Override
     @java.lang.SuppressWarnings({"ThrowNull"})
@@ -13190,7 +17424,7 @@ java.lang.String defaultValue) {
         java.lang.Object arg0, java.lang.Object arg1) {
       switch (method) {
         case NEW_MUTABLE_INSTANCE: {
-          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.Health();
+          return new dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState();
         }
         case NEW_BUILDER: {
           return new Builder();
@@ -13198,29 +17432,45 @@ java.lang.String defaultValue) {
         case BUILD_MESSAGE_INFO: {
             java.lang.Object[] objects = new java.lang.Object[] {
               "bitField0_",
-              "counts_",
-              "previous_",
-              "nowUnixMs_",
-              "settings_",
+              "host_",
+              "stateDir_",
+              "current_",
+              "atStart_",
+              "effective_",
               "exporters_",
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporter.class,
+              "health_",
+              "refreshAtUnixMs_",
+              "refreshDueMonoMs_",
+              "healthDueMonoMs_",
+              "startedUnixMs_",
+              "endpoint_",
+              "service_",
+              "uid_",
+              "hints_",
+              "ever_",
+              "failing_",
+              "askedUnixMs_",
+              "askedMonoMs_",
             };
             java.lang.String info =
-                "\u0000\u0005\u0000\u0001\u0001\u0005\u0005\u0000\u0001\u0000\u0001\u1009\u0000\u0002" +
-                "\u1009\u0001\u0003\u0003\u0004\u1009\u0002\u0005\u001b";
+                "\u0000\u0013\u0000\u0001\u0001\u0013\u0013\u0000\u0001\u0000\u0001\u1009\u0000\u0002" +
+                "\u0007\u0003\n\u0004\n\u0005\u0208\u0006\u001b\u0007\u1009\u0001\b\u1003\u0002\t" +
+                "\u1003\u0003\n\u0003\u000b\u0003\f\u0208\r\u0208\u000e\u0208\u000f\u1009\u0004\u0010" +
+                "\u0007\u0011\u0007\u0012\u0003\u0013\u0003";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
           return DEFAULT_INSTANCE;
         }
         case GET_PARSER: {
-          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Health> parser = PARSER;
+          com.google.protobuf.Parser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState> parser = PARSER;
           if (parser == null) {
-            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.class) {
+            synchronized (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState.class) {
               parser = PARSER;
               if (parser == null) {
                 parser =
-                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.Health>(
+                    new DefaultInstanceBasedParser<dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState>(
                         DEFAULT_INSTANCE);
                 PARSER = parser;
               }
@@ -13240,24 +17490,24 @@ java.lang.String defaultValue) {
     }
 
 
-    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.Health)
-    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.Health DEFAULT_INSTANCE;
+    // @@protoc_insertion_point(class_scope:opamp.sdk.v1.AgentState)
+    private static final dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState DEFAULT_INSTANCE;
     static {
-      Health defaultInstance = new Health();
+      AgentState defaultInstance = new AgentState();
       // New instances are implicitly immutable so no need to make
       // immutable.
       DEFAULT_INSTANCE = defaultInstance;
       com.google.protobuf.GeneratedMessageLite.registerDefaultInstance(
-        Health.class, defaultInstance);
+        AgentState.class, defaultInstance);
     }
 
-    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.Health getDefaultInstance() {
+    public static dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentState getDefaultInstance() {
       return DEFAULT_INSTANCE;
     }
 
-    private static volatile com.google.protobuf.Parser<Health> PARSER;
+    private static volatile com.google.protobuf.Parser<AgentState> PARSER;
 
-    public static com.google.protobuf.Parser<Health> parser() {
+    public static com.google.protobuf.Parser<AgentState> parser() {
       return DEFAULT_INSTANCE.getParserForType();
     }
   }
@@ -15107,7 +19357,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15116,7 +19366,7 @@ java.lang.String defaultValue) {
     boolean hasHost();
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15126,7 +19376,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * as Load's: debug is listed only with a clock
+     * the wall clock: debug is listed only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15252,7 +19502,7 @@ java.lang.String defaultValue) {
     private dev.pydantic.logfire.fleet.sdk.SettingsProto.Host host_;
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15263,7 +19513,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15274,7 +19524,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15287,7 +19537,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15306,7 +19556,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's; unset, it lists no control
+     * as AgentStart's; unset, it lists no control
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15320,7 +19570,7 @@ java.lang.String defaultValue) {
     private long nowUnixMs_;
     /**
      * <pre>
-     * as Load's: debug is listed only with a clock
+     * the wall clock: debug is listed only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15332,7 +19582,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug is listed only with a clock
+     * the wall clock: debug is listed only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15344,7 +19594,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug is listed only with a clock
+     * the wall clock: debug is listed only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15560,7 +19810,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15571,7 +19821,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15582,7 +19832,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15594,7 +19844,7 @@ java.lang.String defaultValue) {
         }
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15607,7 +19857,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15619,7 +19869,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's; unset, it lists no control
+       * as AgentStart's; unset, it lists no control
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15631,7 +19881,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * as Load's: debug is listed only with a clock
+       * the wall clock: debug is listed only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -15643,7 +19893,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug is listed only with a clock
+       * the wall clock: debug is listed only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -15657,7 +19907,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug is listed only with a clock
+       * the wall clock: debug is listed only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -15765,7 +20015,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15774,7 +20024,7 @@ java.lang.String defaultValue) {
     boolean hasHost();
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15784,7 +20034,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * as Load's: debug mode is carried out only with a clock
+     * the wall clock: debug mode is carried out only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15863,7 +20113,7 @@ java.lang.String defaultValue) {
     private dev.pydantic.logfire.fleet.sdk.SettingsProto.Host host_;
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15874,7 +20124,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15885,7 +20135,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15898,7 +20148,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15917,7 +20167,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's
+     * as AgentStart's
      * </pre>
      *
      * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -15931,7 +20181,7 @@ java.lang.String defaultValue) {
     private long nowUnixMs_;
     /**
      * <pre>
-     * as Load's: debug mode is carried out only with a clock
+     * the wall clock: debug mode is carried out only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15943,7 +20193,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug mode is carried out only with a clock
+     * the wall clock: debug mode is carried out only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -15955,7 +20205,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug mode is carried out only with a clock
+     * the wall clock: debug mode is carried out only with one
      * </pre>
      *
      * <code>uint64 now_unix_ms = 3;</code>
@@ -16119,7 +20369,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16130,7 +20380,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16141,7 +20391,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16153,7 +20403,7 @@ java.lang.String defaultValue) {
         }
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16166,7 +20416,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16178,7 +20428,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's
+       * as AgentStart's
        * </pre>
        *
        * <code>.opamp.sdk.v1.Host host = 2;</code>
@@ -16190,7 +20440,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * as Load's: debug mode is carried out only with a clock
+       * the wall clock: debug mode is carried out only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -16202,7 +20452,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug mode is carried out only with a clock
+       * the wall clock: debug mode is carried out only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -16216,7 +20466,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug mode is carried out only with a clock
+       * the wall clock: debug mode is carried out only with one
        * </pre>
        *
        * <code>uint64 now_unix_ms = 3;</code>
@@ -22586,7 +26836,7 @@ java.lang.String defaultValue) {
 
     /**
      * <pre>
-     * as Load's: debug mode folded in
+     * the wall clock: debug mode folded in
      * </pre>
      *
      * <code>uint64 now_unix_ms = 7;</code>
@@ -22796,7 +27046,7 @@ java.lang.String defaultValue) {
     private long nowUnixMs_;
     /**
      * <pre>
-     * as Load's: debug mode folded in
+     * the wall clock: debug mode folded in
      * </pre>
      *
      * <code>uint64 now_unix_ms = 7;</code>
@@ -22808,7 +27058,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug mode folded in
+     * the wall clock: debug mode folded in
      * </pre>
      *
      * <code>uint64 now_unix_ms = 7;</code>
@@ -22820,7 +27070,7 @@ java.lang.String defaultValue) {
     }
     /**
      * <pre>
-     * as Load's: debug mode folded in
+     * the wall clock: debug mode folded in
      * </pre>
      *
      * <code>uint64 now_unix_ms = 7;</code>
@@ -23241,7 +27491,7 @@ java.lang.String defaultValue) {
 
       /**
        * <pre>
-       * as Load's: debug mode folded in
+       * the wall clock: debug mode folded in
        * </pre>
        *
        * <code>uint64 now_unix_ms = 7;</code>
@@ -23253,7 +27503,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug mode folded in
+       * the wall clock: debug mode folded in
        * </pre>
        *
        * <code>uint64 now_unix_ms = 7;</code>
@@ -23267,7 +27517,7 @@ java.lang.String defaultValue) {
       }
       /**
        * <pre>
-       * as Load's: debug mode folded in
+       * the wall clock: debug mode folded in
        * </pre>
        *
        * <code>uint64 now_unix_ms = 7;</code>
@@ -28643,28 +32893,6 @@ java.lang.String defaultValue) {
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     * @return Whether the load field is set.
-     */
-    boolean hasLoad();
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     * @return The load.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Load getLoad();
-
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     * @return Whether the decide field is set.
-     */
-    boolean hasDecide();
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     * @return The decide.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide();
-
-    /**
      * <code>.opamp.sdk.v1.Describe describe = 3;</code>
      * @return Whether the describe field is set.
      */
@@ -28687,28 +32915,6 @@ java.lang.String defaultValue) {
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Evaluate getEvaluate();
 
     /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     * @return Whether the refresh field is set.
-     */
-    boolean hasRefresh();
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     * @return The refresh.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh getRefresh();
-
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     * @return Whether the health field is set.
-     */
-    boolean hasHealth();
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     * @return The health.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Health getHealth();
-
-    /**
      * <code>.opamp.sdk.v1.Components components = 7;</code>
      * @return Whether the components field is set.
      */
@@ -28720,17 +32926,6 @@ java.lang.String defaultValue) {
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Components getComponents();
 
     /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     * @return Whether the commit field is set.
-     */
-    boolean hasCommit();
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     * @return The commit.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit getCommit();
-
-    /**
      * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
      * @return Whether the exporters field is set.
      */
@@ -28740,6 +32935,28 @@ java.lang.String defaultValue) {
      * @return The exporters.
      */
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporters getExporters();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     * @return Whether the agentStart field is set.
+     */
+    boolean hasAgentStart();
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     * @return The agentStart.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart getAgentStart();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     * @return Whether the agentStep field is set.
+     */
+    boolean hasAgentStep();
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     * @return The agentStep.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep getAgentStep();
 
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.Request.CallCase getCallCase();
   }
@@ -28757,15 +32974,12 @@ java.lang.String defaultValue) {
     private java.lang.Object call_;
     public enum CallCase
         implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
-      LOAD(1),
-      DECIDE(2),
       DESCRIBE(3),
       EVALUATE(4),
-      REFRESH(5),
-      HEALTH(6),
       COMPONENTS(7),
-      COMMIT(8),
       EXPORTERS(9),
+      AGENT_START(10),
+      AGENT_STEP(11),
       CALL_NOT_SET(0);
       private final int value;
       private CallCase(int value) {
@@ -28781,15 +32995,12 @@ java.lang.String defaultValue) {
 
       public static CallCase forNumber(int value) {
         switch (value) {
-          case 1: return LOAD;
-          case 2: return DECIDE;
           case 3: return DESCRIBE;
           case 4: return EVALUATE;
-          case 5: return REFRESH;
-          case 6: return HEALTH;
           case 7: return COMPONENTS;
-          case 8: return COMMIT;
           case 9: return EXPORTERS;
+          case 10: return AGENT_START;
+          case 11: return AGENT_STEP;
           case 0: return CALL_NOT_SET;
           default: return null;
         }
@@ -28809,110 +33020,6 @@ java.lang.String defaultValue) {
     private void clearCall() {
       callCase_ = 0;
       call_ = null;
-    }
-
-    public static final int LOAD_FIELD_NUMBER = 1;
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     */
-    @java.lang.Override
-    public boolean hasLoad() {
-      return callCase_ == 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Load getLoad() {
-      if (callCase_ == 1) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Load) call_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setLoad(dev.pydantic.logfire.fleet.sdk.SettingsProto.Load value) {
-      value.getClass();  // minimal bytecode null check
-      call_ = value;
-      callCase_ = 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeLoad(dev.pydantic.logfire.fleet.sdk.SettingsProto.Load value) {
-      value.getClass();  // minimal bytecode null check
-      if (callCase_ == 1 &&
-          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.getDefaultInstance()) {
-        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Load) call_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        call_ = value;
-      }
-      callCase_ = 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Load load = 1;</code>
-     */
-    private void clearLoad() {
-      if (callCase_ == 1) {
-        callCase_ = 0;
-        call_ = null;
-      }
-    }
-
-    public static final int DECIDE_FIELD_NUMBER = 2;
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     */
-    @java.lang.Override
-    public boolean hasDecide() {
-      return callCase_ == 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide() {
-      if (callCase_ == 2) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide) call_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-      value.getClass();  // minimal bytecode null check
-      call_ = value;
-      callCase_ = 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-      value.getClass();  // minimal bytecode null check
-      if (callCase_ == 2 &&
-          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.getDefaultInstance()) {
-        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide) call_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        call_ = value;
-      }
-      callCase_ = 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-     */
-    private void clearDecide() {
-      if (callCase_ == 2) {
-        callCase_ = 0;
-        call_ = null;
-      }
     }
 
     public static final int DESCRIBE_FIELD_NUMBER = 3;
@@ -29019,110 +33126,6 @@ java.lang.String defaultValue) {
       }
     }
 
-    public static final int REFRESH_FIELD_NUMBER = 5;
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     */
-    @java.lang.Override
-    public boolean hasRefresh() {
-      return callCase_ == 5;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh getRefresh() {
-      if (callCase_ == 5) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh) call_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setRefresh(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh value) {
-      value.getClass();  // minimal bytecode null check
-      call_ = value;
-      callCase_ = 5;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeRefresh(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh value) {
-      value.getClass();  // minimal bytecode null check
-      if (callCase_ == 5 &&
-          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.getDefaultInstance()) {
-        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh) call_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        call_ = value;
-      }
-      callCase_ = 5;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-     */
-    private void clearRefresh() {
-      if (callCase_ == 5) {
-        callCase_ = 0;
-        call_ = null;
-      }
-    }
-
-    public static final int HEALTH_FIELD_NUMBER = 6;
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     */
-    @java.lang.Override
-    public boolean hasHealth() {
-      return callCase_ == 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Health getHealth() {
-      if (callCase_ == 6) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Health) call_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.Health value) {
-      value.getClass();  // minimal bytecode null check
-      call_ = value;
-      callCase_ = 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.Health value) {
-      value.getClass();  // minimal bytecode null check
-      if (callCase_ == 6 &&
-          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.getDefaultInstance()) {
-        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Health) call_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        call_ = value;
-      }
-      callCase_ = 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Health health = 6;</code>
-     */
-    private void clearHealth() {
-      if (callCase_ == 6) {
-        callCase_ = 0;
-        call_ = null;
-      }
-    }
-
     public static final int COMPONENTS_FIELD_NUMBER = 7;
     /**
      * <code>.opamp.sdk.v1.Components components = 7;</code>
@@ -29175,58 +33178,6 @@ java.lang.String defaultValue) {
       }
     }
 
-    public static final int COMMIT_FIELD_NUMBER = 8;
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     */
-    @java.lang.Override
-    public boolean hasCommit() {
-      return callCase_ == 8;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit getCommit() {
-      if (callCase_ == 8) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit) call_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setCommit(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit value) {
-      value.getClass();  // minimal bytecode null check
-      call_ = value;
-      callCase_ = 8;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeCommit(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit value) {
-      value.getClass();  // minimal bytecode null check
-      if (callCase_ == 8 &&
-          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.getDefaultInstance()) {
-        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit) call_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        call_ = value;
-      }
-      callCase_ = 8;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-     */
-    private void clearCommit() {
-      if (callCase_ == 8) {
-        callCase_ = 0;
-        call_ = null;
-      }
-    }
-
     public static final int EXPORTERS_FIELD_NUMBER = 9;
     /**
      * <code>.opamp.sdk.v1.Exporters exporters = 9;</code>
@@ -29274,6 +33225,110 @@ java.lang.String defaultValue) {
      */
     private void clearExporters() {
       if (callCase_ == 9) {
+        callCase_ = 0;
+        call_ = null;
+      }
+    }
+
+    public static final int AGENT_START_FIELD_NUMBER = 10;
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     */
+    @java.lang.Override
+    public boolean hasAgentStart() {
+      return callCase_ == 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart getAgentStart() {
+      if (callCase_ == 10) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart) call_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAgentStart(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart value) {
+      value.getClass();  // minimal bytecode null check
+      call_ = value;
+      callCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeAgentStart(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart value) {
+      value.getClass();  // minimal bytecode null check
+      if (callCase_ == 10 &&
+          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.getDefaultInstance()) {
+        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart) call_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        call_ = value;
+      }
+      callCase_ = 10;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+     */
+    private void clearAgentStart() {
+      if (callCase_ == 10) {
+        callCase_ = 0;
+        call_ = null;
+      }
+    }
+
+    public static final int AGENT_STEP_FIELD_NUMBER = 11;
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     */
+    @java.lang.Override
+    public boolean hasAgentStep() {
+      return callCase_ == 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep getAgentStep() {
+      if (callCase_ == 11) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep) call_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAgentStep(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep value) {
+      value.getClass();  // minimal bytecode null check
+      call_ = value;
+      callCase_ = 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeAgentStep(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep value) {
+      value.getClass();  // minimal bytecode null check
+      if (callCase_ == 11 &&
+          call_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.getDefaultInstance()) {
+        call_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep) call_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        call_ = value;
+      }
+      callCase_ = 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+     */
+    private void clearAgentStep() {
+      if (callCase_ == 11) {
         callCase_ = 0;
         call_ = null;
       }
@@ -29389,102 +33444,6 @@ java.lang.String defaultValue) {
 
 
       /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasLoad() {
-        return instance.hasLoad();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Load getLoad() {
-        return instance.getLoad();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      public Builder setLoad(dev.pydantic.logfire.fleet.sdk.SettingsProto.Load value) {
-        copyOnWrite();
-        instance.setLoad(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      public Builder setLoad(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.Builder builderForValue) {
-        copyOnWrite();
-        instance.setLoad(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      public Builder mergeLoad(dev.pydantic.logfire.fleet.sdk.SettingsProto.Load value) {
-        copyOnWrite();
-        instance.mergeLoad(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Load load = 1;</code>
-       */
-      public Builder clearLoad() {
-        copyOnWrite();
-        instance.clearLoad();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      @java.lang.Override
-      public boolean hasDecide() {
-        return instance.hasDecide();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide getDecide() {
-        return instance.getDecide();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      public Builder setDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-        copyOnWrite();
-        instance.setDecide(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      public Builder setDecide(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.Builder builderForValue) {
-        copyOnWrite();
-        instance.setDecide(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      public Builder mergeDecide(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide value) {
-        copyOnWrite();
-        instance.mergeDecide(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decide decide = 2;</code>
-       */
-      public Builder clearDecide() {
-        copyOnWrite();
-        instance.clearDecide();
-        return this;
-      }
-
-      /**
        * <code>.opamp.sdk.v1.Describe describe = 3;</code>
        */
       @java.lang.Override
@@ -29581,102 +33540,6 @@ java.lang.String defaultValue) {
       }
 
       /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      @java.lang.Override
-      public boolean hasRefresh() {
-        return instance.hasRefresh();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh getRefresh() {
-        return instance.getRefresh();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      public Builder setRefresh(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh value) {
-        copyOnWrite();
-        instance.setRefresh(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      public Builder setRefresh(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.Builder builderForValue) {
-        copyOnWrite();
-        instance.setRefresh(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      public Builder mergeRefresh(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh value) {
-        copyOnWrite();
-        instance.mergeRefresh(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refresh refresh = 5;</code>
-       */
-      public Builder clearRefresh() {
-        copyOnWrite();
-        instance.clearRefresh();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      @java.lang.Override
-      public boolean hasHealth() {
-        return instance.hasHealth();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Health getHealth() {
-        return instance.getHealth();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      public Builder setHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.Health value) {
-        copyOnWrite();
-        instance.setHealth(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      public Builder setHealth(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.Builder builderForValue) {
-        copyOnWrite();
-        instance.setHealth(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      public Builder mergeHealth(dev.pydantic.logfire.fleet.sdk.SettingsProto.Health value) {
-        copyOnWrite();
-        instance.mergeHealth(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Health health = 6;</code>
-       */
-      public Builder clearHealth() {
-        copyOnWrite();
-        instance.clearHealth();
-        return this;
-      }
-
-      /**
        * <code>.opamp.sdk.v1.Components components = 7;</code>
        */
       @java.lang.Override
@@ -29721,54 +33584,6 @@ java.lang.String defaultValue) {
       public Builder clearComponents() {
         copyOnWrite();
         instance.clearComponents();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      @java.lang.Override
-      public boolean hasCommit() {
-        return instance.hasCommit();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit getCommit() {
-        return instance.getCommit();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      public Builder setCommit(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit value) {
-        copyOnWrite();
-        instance.setCommit(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      public Builder setCommit(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.Builder builderForValue) {
-        copyOnWrite();
-        instance.setCommit(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      public Builder mergeCommit(dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit value) {
-        copyOnWrite();
-        instance.mergeCommit(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Commit commit = 8;</code>
-       */
-      public Builder clearCommit() {
-        copyOnWrite();
-        instance.clearCommit();
         return this;
       }
 
@@ -29820,6 +33635,102 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      @java.lang.Override
+      public boolean hasAgentStart() {
+        return instance.hasAgentStart();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart getAgentStart() {
+        return instance.getAgentStart();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      public Builder setAgentStart(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart value) {
+        copyOnWrite();
+        instance.setAgentStart(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      public Builder setAgentStart(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.Builder builderForValue) {
+        copyOnWrite();
+        instance.setAgentStart(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      public Builder mergeAgentStart(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart value) {
+        copyOnWrite();
+        instance.mergeAgentStart(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStart agent_start = 10;</code>
+       */
+      public Builder clearAgentStart() {
+        copyOnWrite();
+        instance.clearAgentStart();
+        return this;
+      }
+
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      @java.lang.Override
+      public boolean hasAgentStep() {
+        return instance.hasAgentStep();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep getAgentStep() {
+        return instance.getAgentStep();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      public Builder setAgentStep(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep value) {
+        copyOnWrite();
+        instance.setAgentStep(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      public Builder setAgentStep(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.Builder builderForValue) {
+        copyOnWrite();
+        instance.setAgentStep(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      public Builder mergeAgentStep(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep value) {
+        copyOnWrite();
+        instance.mergeAgentStep(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentStep agent_step = 11;</code>
+       */
+      public Builder clearAgentStep() {
+        copyOnWrite();
+        instance.clearAgentStep();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Request)
     }
     @java.lang.Override
@@ -29838,19 +33749,16 @@ java.lang.String defaultValue) {
             java.lang.Object[] objects = new java.lang.Object[] {
               "call_",
               "callCase_",
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Load.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Decide.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Describe.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Evaluate.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Refresh.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Health.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Components.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Commit.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Exporters.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStart.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentStep.class,
             };
             java.lang.String info =
-                "\u0000\t\u0001\u0000\u0001\t\t\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
-                "<\u0000\u0004<\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000";
+                "\u0000\u0006\u0001\u0000\u0003\u000b\u0006\u0000\u0000\u0000\u0003<\u0000\u0004<" +
+                "\u0000\u0007<\u0000\t<\u0000\n<\u0000\u000b<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {
@@ -29910,28 +33818,6 @@ java.lang.String defaultValue) {
       com.google.protobuf.MessageLiteOrBuilder {
 
     /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     * @return Whether the loaded field is set.
-     */
-    boolean hasLoaded();
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     * @return The loaded.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded getLoaded();
-
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     * @return Whether the decision field is set.
-     */
-    boolean hasDecision();
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     * @return The decision.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision getDecision();
-
-    /**
      * <code>.opamp.proto.v1.AgentDescription description = 3;</code>
      * @return Whether the description field is set.
      */
@@ -29983,28 +33869,6 @@ java.lang.String defaultValue) {
     dev.pydantic.logfire.fleet.sdk.SettingsProto.Evaluated getEvaluated();
 
     /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     * @return Whether the refreshed field is set.
-     */
-    boolean hasRefreshed();
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     * @return The refreshed.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed getRefreshed();
-
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     * @return Whether the healthReport field is set.
-     */
-    boolean hasHealthReport();
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     * @return The healthReport.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealthReport();
-
-    /**
      * <code>.opamp.proto.v1.AvailableComponents available_components = 8;</code>
      * @return Whether the availableComponents field is set.
      */
@@ -30016,17 +33880,6 @@ java.lang.String defaultValue) {
     opamp.proto.v1.Opamp.AvailableComponents getAvailableComponents();
 
     /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     * @return Whether the plan field is set.
-     */
-    boolean hasPlan();
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     * @return The plan.
-     */
-    dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan getPlan();
-
-    /**
      * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
      * @return Whether the exportersDecided field is set.
      */
@@ -30036,6 +33889,17 @@ java.lang.String defaultValue) {
      * @return The exportersDecided.
      */
     dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportersDecided getExportersDecided();
+
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     * @return Whether the agentOutput field is set.
+     */
+    boolean hasAgentOutput();
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     * @return The agentOutput.
+     */
+    dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput getAgentOutput();
 
     public dev.pydantic.logfire.fleet.sdk.SettingsProto.Reply.ResultCase getResultCase();
   }
@@ -30053,16 +33917,12 @@ java.lang.String defaultValue) {
     private java.lang.Object result_;
     public enum ResultCase
         implements com.google.protobuf.AbstractMessageLite.InternalOneOfEnum {
-      LOADED(1),
-      DECISION(2),
       DESCRIPTION(3),
       ERROR(4),
       EVALUATED(5),
-      REFRESHED(6),
-      HEALTH_REPORT(7),
       AVAILABLE_COMPONENTS(8),
-      PLAN(9),
       EXPORTERS_DECIDED(10),
+      AGENT_OUTPUT(11),
       RESULT_NOT_SET(0);
       private final int value;
       private ResultCase(int value) {
@@ -30078,16 +33938,12 @@ java.lang.String defaultValue) {
 
       public static ResultCase forNumber(int value) {
         switch (value) {
-          case 1: return LOADED;
-          case 2: return DECISION;
           case 3: return DESCRIPTION;
           case 4: return ERROR;
           case 5: return EVALUATED;
-          case 6: return REFRESHED;
-          case 7: return HEALTH_REPORT;
           case 8: return AVAILABLE_COMPONENTS;
-          case 9: return PLAN;
           case 10: return EXPORTERS_DECIDED;
+          case 11: return AGENT_OUTPUT;
           case 0: return RESULT_NOT_SET;
           default: return null;
         }
@@ -30107,110 +33963,6 @@ java.lang.String defaultValue) {
     private void clearResult() {
       resultCase_ = 0;
       result_ = null;
-    }
-
-    public static final int LOADED_FIELD_NUMBER = 1;
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     */
-    @java.lang.Override
-    public boolean hasLoaded() {
-      return resultCase_ == 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded getLoaded() {
-      if (resultCase_ == 1) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded) result_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setLoaded(dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded value) {
-      value.getClass();  // minimal bytecode null check
-      result_ = value;
-      resultCase_ = 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeLoaded(dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded value) {
-      value.getClass();  // minimal bytecode null check
-      if (resultCase_ == 1 &&
-          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.getDefaultInstance()) {
-        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded) result_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        result_ = value;
-      }
-      resultCase_ = 1;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-     */
-    private void clearLoaded() {
-      if (resultCase_ == 1) {
-        resultCase_ = 0;
-        result_ = null;
-      }
-    }
-
-    public static final int DECISION_FIELD_NUMBER = 2;
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     */
-    @java.lang.Override
-    public boolean hasDecision() {
-      return resultCase_ == 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision getDecision() {
-      if (resultCase_ == 2) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision) result_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setDecision(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision value) {
-      value.getClass();  // minimal bytecode null check
-      result_ = value;
-      resultCase_ = 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeDecision(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision value) {
-      value.getClass();  // minimal bytecode null check
-      if (resultCase_ == 2 &&
-          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.getDefaultInstance()) {
-        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision) result_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        result_ = value;
-      }
-      resultCase_ = 2;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-     */
-    private void clearDecision() {
-      if (resultCase_ == 2) {
-        resultCase_ = 0;
-        result_ = null;
-      }
     }
 
     public static final int DESCRIPTION_FIELD_NUMBER = 3;
@@ -30406,110 +34158,6 @@ java.lang.String defaultValue) {
       }
     }
 
-    public static final int REFRESHED_FIELD_NUMBER = 6;
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     */
-    @java.lang.Override
-    public boolean hasRefreshed() {
-      return resultCase_ == 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed getRefreshed() {
-      if (resultCase_ == 6) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed) result_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setRefreshed(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed value) {
-      value.getClass();  // minimal bytecode null check
-      result_ = value;
-      resultCase_ = 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeRefreshed(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed value) {
-      value.getClass();  // minimal bytecode null check
-      if (resultCase_ == 6 &&
-          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.getDefaultInstance()) {
-        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed) result_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        result_ = value;
-      }
-      resultCase_ = 6;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-     */
-    private void clearRefreshed() {
-      if (resultCase_ == 6) {
-        resultCase_ = 0;
-        result_ = null;
-      }
-    }
-
-    public static final int HEALTH_REPORT_FIELD_NUMBER = 7;
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     */
-    @java.lang.Override
-    public boolean hasHealthReport() {
-      return resultCase_ == 7;
-    }
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealthReport() {
-      if (resultCase_ == 7) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport) result_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setHealthReport(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-      value.getClass();  // minimal bytecode null check
-      result_ = value;
-      resultCase_ = 7;
-    }
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergeHealthReport(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-      value.getClass();  // minimal bytecode null check
-      if (resultCase_ == 7 &&
-          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.getDefaultInstance()) {
-        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport) result_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        result_ = value;
-      }
-      resultCase_ = 7;
-    }
-    /**
-     * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-     */
-    private void clearHealthReport() {
-      if (resultCase_ == 7) {
-        resultCase_ = 0;
-        result_ = null;
-      }
-    }
-
     public static final int AVAILABLE_COMPONENTS_FIELD_NUMBER = 8;
     /**
      * <code>.opamp.proto.v1.AvailableComponents available_components = 8;</code>
@@ -30562,58 +34210,6 @@ java.lang.String defaultValue) {
       }
     }
 
-    public static final int PLAN_FIELD_NUMBER = 9;
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     */
-    @java.lang.Override
-    public boolean hasPlan() {
-      return resultCase_ == 9;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     */
-    @java.lang.Override
-    public dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan getPlan() {
-      if (resultCase_ == 9) {
-         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan) result_;
-      }
-      return dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.getDefaultInstance();
-    }
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void setPlan(dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan value) {
-      value.getClass();  // minimal bytecode null check
-      result_ = value;
-      resultCase_ = 9;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     */
-    @java.lang.SuppressWarnings("ReturnValueIgnored")
-    private void mergePlan(dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan value) {
-      value.getClass();  // minimal bytecode null check
-      if (resultCase_ == 9 &&
-          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.getDefaultInstance()) {
-        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan) result_)
-            .mergeFrom(value).buildPartial();
-      } else {
-        result_ = value;
-      }
-      resultCase_ = 9;
-    }
-    /**
-     * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-     */
-    private void clearPlan() {
-      if (resultCase_ == 9) {
-        resultCase_ = 0;
-        result_ = null;
-      }
-    }
-
     public static final int EXPORTERS_DECIDED_FIELD_NUMBER = 10;
     /**
      * <code>.opamp.sdk.v1.ExportersDecided exporters_decided = 10;</code>
@@ -30661,6 +34257,58 @@ java.lang.String defaultValue) {
      */
     private void clearExportersDecided() {
       if (resultCase_ == 10) {
+        resultCase_ = 0;
+        result_ = null;
+      }
+    }
+
+    public static final int AGENT_OUTPUT_FIELD_NUMBER = 11;
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     */
+    @java.lang.Override
+    public boolean hasAgentOutput() {
+      return resultCase_ == 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     */
+    @java.lang.Override
+    public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput getAgentOutput() {
+      if (resultCase_ == 11) {
+         return (dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput) result_;
+      }
+      return dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.getDefaultInstance();
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void setAgentOutput(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput value) {
+      value.getClass();  // minimal bytecode null check
+      result_ = value;
+      resultCase_ = 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     */
+    @java.lang.SuppressWarnings("ReturnValueIgnored")
+    private void mergeAgentOutput(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput value) {
+      value.getClass();  // minimal bytecode null check
+      if (resultCase_ == 11 &&
+          result_ != dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.getDefaultInstance()) {
+        result_ = dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.newBuilder((dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput) result_)
+            .mergeFrom(value).buildPartial();
+      } else {
+        result_ = value;
+      }
+      resultCase_ = 11;
+    }
+    /**
+     * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+     */
+    private void clearAgentOutput() {
+      if (resultCase_ == 11) {
         resultCase_ = 0;
         result_ = null;
       }
@@ -30774,102 +34422,6 @@ java.lang.String defaultValue) {
         return this;
       }
 
-
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      @java.lang.Override
-      public boolean hasLoaded() {
-        return instance.hasLoaded();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded getLoaded() {
-        return instance.getLoaded();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      public Builder setLoaded(dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded value) {
-        copyOnWrite();
-        instance.setLoaded(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      public Builder setLoaded(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.Builder builderForValue) {
-        copyOnWrite();
-        instance.setLoaded(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      public Builder mergeLoaded(dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded value) {
-        copyOnWrite();
-        instance.mergeLoaded(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Loaded loaded = 1;</code>
-       */
-      public Builder clearLoaded() {
-        copyOnWrite();
-        instance.clearLoaded();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      @java.lang.Override
-      public boolean hasDecision() {
-        return instance.hasDecision();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision getDecision() {
-        return instance.getDecision();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      public Builder setDecision(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision value) {
-        copyOnWrite();
-        instance.setDecision(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      public Builder setDecision(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.Builder builderForValue) {
-        copyOnWrite();
-        instance.setDecision(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      public Builder mergeDecision(dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision value) {
-        copyOnWrite();
-        instance.mergeDecision(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Decision decision = 2;</code>
-       */
-      public Builder clearDecision() {
-        copyOnWrite();
-        instance.clearDecision();
-        return this;
-      }
 
       /**
        * <code>.opamp.proto.v1.AgentDescription description = 3;</code>
@@ -31049,102 +34601,6 @@ java.lang.String defaultValue) {
       }
 
       /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      @java.lang.Override
-      public boolean hasRefreshed() {
-        return instance.hasRefreshed();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed getRefreshed() {
-        return instance.getRefreshed();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      public Builder setRefreshed(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed value) {
-        copyOnWrite();
-        instance.setRefreshed(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      public Builder setRefreshed(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.Builder builderForValue) {
-        copyOnWrite();
-        instance.setRefreshed(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      public Builder mergeRefreshed(dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed value) {
-        copyOnWrite();
-        instance.mergeRefreshed(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Refreshed refreshed = 6;</code>
-       */
-      public Builder clearRefreshed() {
-        copyOnWrite();
-        instance.clearRefreshed();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      @java.lang.Override
-      public boolean hasHealthReport() {
-        return instance.hasHealthReport();
-      }
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport getHealthReport() {
-        return instance.getHealthReport();
-      }
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      public Builder setHealthReport(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-        copyOnWrite();
-        instance.setHealthReport(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      public Builder setHealthReport(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.Builder builderForValue) {
-        copyOnWrite();
-        instance.setHealthReport(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      public Builder mergeHealthReport(dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport value) {
-        copyOnWrite();
-        instance.mergeHealthReport(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.HealthReport health_report = 7;</code>
-       */
-      public Builder clearHealthReport() {
-        copyOnWrite();
-        instance.clearHealthReport();
-        return this;
-      }
-
-      /**
        * <code>.opamp.proto.v1.AvailableComponents available_components = 8;</code>
        */
       @java.lang.Override
@@ -31189,54 +34645,6 @@ java.lang.String defaultValue) {
       public Builder clearAvailableComponents() {
         copyOnWrite();
         instance.clearAvailableComponents();
-        return this;
-      }
-
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      @java.lang.Override
-      public boolean hasPlan() {
-        return instance.hasPlan();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      @java.lang.Override
-      public dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan getPlan() {
-        return instance.getPlan();
-      }
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      public Builder setPlan(dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan value) {
-        copyOnWrite();
-        instance.setPlan(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      public Builder setPlan(
-          dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.Builder builderForValue) {
-        copyOnWrite();
-        instance.setPlan(builderForValue.build());
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      public Builder mergePlan(dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan value) {
-        copyOnWrite();
-        instance.mergePlan(value);
-        return this;
-      }
-      /**
-       * <code>.opamp.sdk.v1.Plan plan = 9;</code>
-       */
-      public Builder clearPlan() {
-        copyOnWrite();
-        instance.clearPlan();
         return this;
       }
 
@@ -31288,6 +34696,54 @@ java.lang.String defaultValue) {
         return this;
       }
 
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      @java.lang.Override
+      public boolean hasAgentOutput() {
+        return instance.hasAgentOutput();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      @java.lang.Override
+      public dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput getAgentOutput() {
+        return instance.getAgentOutput();
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      public Builder setAgentOutput(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput value) {
+        copyOnWrite();
+        instance.setAgentOutput(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      public Builder setAgentOutput(
+          dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.Builder builderForValue) {
+        copyOnWrite();
+        instance.setAgentOutput(builderForValue.build());
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      public Builder mergeAgentOutput(dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput value) {
+        copyOnWrite();
+        instance.mergeAgentOutput(value);
+        return this;
+      }
+      /**
+       * <code>.opamp.sdk.v1.AgentOutput agent_output = 11;</code>
+       */
+      public Builder clearAgentOutput() {
+        copyOnWrite();
+        instance.clearAgentOutput();
+        return this;
+      }
+
       // @@protoc_insertion_point(builder_scope:opamp.sdk.v1.Reply)
     }
     @java.lang.Override
@@ -31306,20 +34762,15 @@ java.lang.String defaultValue) {
             java.lang.Object[] objects = new java.lang.Object[] {
               "result_",
               "resultCase_",
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Loaded.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Decision.class,
               opamp.proto.v1.Opamp.AgentDescription.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.Evaluated.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Refreshed.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.HealthReport.class,
               opamp.proto.v1.Opamp.AvailableComponents.class,
-              dev.pydantic.logfire.fleet.sdk.SettingsProto.Plan.class,
               dev.pydantic.logfire.fleet.sdk.SettingsProto.ExportersDecided.class,
+              dev.pydantic.logfire.fleet.sdk.SettingsProto.AgentOutput.class,
             };
             java.lang.String info =
-                "\u0000\n\u0001\u0000\u0001\n\n\u0000\u0000\u0000\u0001<\u0000\u0002<\u0000\u0003" +
-                "<\u0000\u0004\u023b\u0000\u0005<\u0000\u0006<\u0000\u0007<\u0000\b<\u0000\t<\u0000" +
-                "\n<\u0000";
+                "\u0000\u0006\u0001\u0000\u0003\u000b\u0006\u0000\u0000\u0000\u0003<\u0000\u0004\u023b" +
+                "\u0000\u0005<\u0000\b<\u0000\n<\u0000\u000b<\u0000";
             return newMessageInfo(DEFAULT_INSTANCE, info, objects);
         }
         case GET_DEFAULT_INSTANCE: {

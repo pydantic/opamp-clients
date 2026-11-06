@@ -82,8 +82,6 @@ first message reports it in full.
 | Connection settings | `Config.accept_connection_settings` (needs a state file), `Config.verify_timeout_ms` | [connection-settings.md](connection-settings.md) |
 | Telemetry settings | `ReportsOwnTraces`, `ReportsOwnMetrics`, `ReportsOwnLogs`; answer `connection_settings` with `set_connection_settings_status` | [telemetry-settings.md](telemetry-settings.md) |
 | Available components | `Status.available_components`, `set_available_components` | [available-components.md](available-components.md) |
-| Packages | `Config.accept_packages` (needs a state file), `max_package_bytes`, `download_timeout_ms`; answer with `package_installed`, `package_removed` | [packages.md](packages.md) |
-| Custom messages | `Status.custom_capabilities`, `set_custom_capabilities`, `send_custom_message` | [custom-messages.md](custom-messages.md) |
 | Limits | `request_timeout_ms`, `connect_timeout_ms`, `stop_timeout_ms`, `max_send_bytes`, `max_receive_bytes` | [how-it-works.md](how-it-works.md#effects-end) |
 
 Settings that can't work (a missing file, a bad key, a proxy URL without a host) raise in
@@ -98,9 +96,7 @@ The callback gets a `Notification`; `kind` says which, and the fields that go wi
 | `connected`, `connect_failed` | `status`, `detail` | |
 | `remote_config` | `remote_config` | `set_remote_config_status` |
 | `connection_settings` | `connection_settings` | `set_connection_settings_status` |
-| `install_package`, `remove_package` | `package_name`, `package`, `path` | `package_installed`, `package_removed` |
-| `custom_message`, `server_custom_capabilities`, `custom_message_not_sent` | `custom_message`, `custom_capabilities`, `detail` | |
-| `instance_uid_changed`, `heartbeat_interval`, `command` | `instance_uid`, `heartbeat_interval_ms`, `command` | |
+| `instance_uid_changed`, `heartbeat_interval` | `instance_uid`, `heartbeat_interval_ms` | |
 | `error_response`, `bad_message`, `status_too_large`, `save_stalled` | `error_type`, `message`, `detail`, `field`, `bytes`, `stalled`, `waited_ms` | |
 | `state_from_newer_version` | `state_version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `stopped` | `error`: why it stopped on its own, or `None` after `stop()` | |

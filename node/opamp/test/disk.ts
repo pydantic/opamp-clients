@@ -3,7 +3,7 @@
 
 // Helpers for the tests of the client's file operations (files.test.ts, files.properties.test.ts):
 // a disk that fails or is slow (FileOps around the real one), the core tap decoded, the tap
-// checker run, and an OpAMP server that makes the client save and download.
+// checker run, and an OpAMP server that makes the client save.
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -23,7 +23,6 @@ import {
   AgentToServerSchema,
   create,
   fromBinary as decode,
-  PackageType,
   ServerToAgentSchema,
   toBinary,
 } from "../src/index.js";
@@ -43,7 +42,7 @@ export const sha256 = (b: Uint8Array): string => createHash("sha256").update(b).
 // --- A disk that fails ----------------------------------------------------------------------
 
 /** The operations FileOps carries out, by name. */
-export type OpName = "create" | "write" | "sync" | "close" | "rename" | "syncDir" | "remove" | "mkdir";
+export type OpName = "create" | "write" | "sync" | "close" | "rename" | "syncDir" | "remove";
 
 /** What happens to one operation: an error before it (EIO, or `code`); for a write, half of it
  * written and then ENOSPC; a delay; or (rename, syncDir) done, then reported failed. */
@@ -126,8 +125,6 @@ export function faulty(decide: (op: OpName, path: string) => Fault | undefined, 
     rename: (from, to) => run("rename", from, () => inner.rename(from, to), decide("rename", from)),
     syncDir: (dir) => run("syncDir", dir, () => inner.syncDir(dir), decide("syncDir", dir)),
     remove: (path) => run("remove", path, () => inner.remove(path), decide("remove", path)),
-    mkdir: (dir) => run("mkdir", dir, () => inner.mkdir(dir), decide("mkdir", dir)),
-    clear: (dir) => inner.clear(dir),
   };
   return { ops, calls, open };
 }
@@ -203,7 +200,7 @@ export function checkTap(tap: string): { code: number; out: string } | undefined
   return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
 }
 
-// --- A server that makes the client save and download -----------------------------------------
+// --- A server that makes the client save -----------------------------------------------------
 
 export interface ServerOptions {
   /** Offer remote configs 1..configs, one more every `every` messages (1), then the last again. */
@@ -211,34 +208,19 @@ export interface ServerOptions {
   every?: number;
   /** The first config's number (1 by default). */
   first?: number;
-  /** Offer one package, this file. */
-  pkg?: Buffer;
-  /** Hold the first GET of the file until release() (then send junk), or the GETs that this says to. */
-  hold?: (n: number) => boolean;
 }
 
 export interface TestServer {
   url: string;
   msgs: { at: number; msg: AgentToServer }[];
-  gets: number;
-  /** Requests for the file whose client went away before it was answered. */
-  abandoned: number;
-  release(): void;
   close(): void;
 }
 
 export async function opampServer(o: ServerOptions): Promise<TestServer> {
-  const held: http.ServerResponse[] = [];
   const s: TestServer = {
     url: "",
     msgs: [],
-    gets: 0,
-    abandoned: 0,
-    release() {
-      for (const res of held.splice(0)) res.end(Buffer.from("OLD".repeat(100)));
-    },
     close() {
-      s.release();
       for (const c of wss.clients) c.terminate();
       wss.close();
       server.closeAllConnections();
@@ -246,17 +228,6 @@ export async function opampServer(o: ServerOptions): Promise<TestServer> {
     },
   };
   const server = http.createServer((req, res) => {
-    if (req.method === "GET") {
-      const n = s.gets++;
-      if (o.hold?.(n)) {
-        held.push(res);
-        res.on("close", () => {
-          if (!res.writableEnded) s.abandoned++;
-        });
-        return;
-      }
-      return void res.end(o.pkg);
-    }
     const chunks: Buffer[] = [];
     req.on("data", (c: Buffer) => chunks.push(c));
     req.on("end", () => {
@@ -281,22 +252,6 @@ export async function opampServer(o: ServerOptions): Promise<TestServer> {
         ? { remoteConfig: { configHash: Buffer.from(`${n}`), config: { configMap: { "": { body: Buffer.from(`config ${n}`) } } } } }
         : {}),
     });
-    if (o.pkg) {
-      const { port } = server.address() as AddressInfo;
-      reply.packagesAvailable = create(ServerToAgentSchema, {
-        packagesAvailable: {
-          allPackagesHash: new Uint8Array([1]),
-          packages: {
-            pkg: {
-              type: PackageType.PackageType_TopLevel,
-              version: "1",
-              hash: new Uint8Array([2]),
-              file: { downloadUrl: `http://127.0.0.1:${port}/file`, contentHash: createHash("sha256").update(o.pkg).digest() },
-            },
-          },
-        },
-      }).packagesAvailable;
-    }
     return toBinary(ServerToAgentSchema, reply);
   }
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));

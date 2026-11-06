@@ -14,7 +14,7 @@ from _policy import config_map
 from logfire_fleet_client import opamp_pb2
 
 START = Path(__file__).resolve().parents[3] / "testdata" / "sdk-settings" / "start.json"
-BEFORE = "a core state saved before the core kept the config applied: the policy kept before carries over"
+BEFORE = "a core state saved before the core kept the config applied: the policy with every control local"
 
 
 def _varint(n: int) -> bytes:

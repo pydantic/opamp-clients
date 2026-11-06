@@ -35,13 +35,11 @@ import java.util.function.Consumer;
 /**
  * Where the client keeps the core's saved state: one file, replaced atomically, that only the
  * agent's user can open. It holds secrets: the credentials of connection settings the server
- * offered, and the private keys of telemetry settings' certificates. The package files downloaded
- * beside it are the user's only too.
+ * offered, and the private keys of telemetry settings' certificates.
  *
- * <p>On POSIX file systems the file is created with mode 0600 (downloads: a 0700 directory of 0600
- * files). On Windows (ACL file systems) it is created with an access-control list that allows the
+ * <p>On POSIX file systems the file is created with mode 0600. On Windows (ACL file systems) it is created with an access-control list that allows the
  * user alone, nothing inherited from its directory, and opened without sharing until that list is
- * set; the downloads directory gets the same list, which the files in it inherit. No entry for
+ * set. No entry for
  * SYSTEM or Administrators is added: the client needs none, and administrators can take ownership
  * of a file whatever its list says. (Java can't mark a list protected from inheritance, so an
  * administrator pushing a directory's permissions down to its files could add entries; the next
@@ -68,9 +66,8 @@ final class StateFile {
   static volatile Consumer<Path> beforeSave = p -> {};
 
   /**
-   * File work under way (saves, downloads), by state file. It can outlive the client that started
-   * it (a save already writing finishes whole; a cancelled download is still deleting its file),
-   * so a client started on the same state file waits for it first ({@link #settled}).
+   * Saves under way, by state file. One can outlive the client that started it (a save already
+   * writing finishes whole), so a client started on the same state file waits for it first ({@link #settled}).
    */
   private static final Map<Path, Integer> WORK = new HashMap<>();
 
@@ -146,7 +143,7 @@ final class StateFile {
     Path tmp = tmp(path);
     try {
       disk.remove(tmp);
-      try (Disk.Handle h = disk.create(tmp, false)) {
+      try (Disk.Handle h = disk.create(tmp)) {
         h.write(data, 0, data.length);
         h.sync();
       }
@@ -168,46 +165,12 @@ final class StateFile {
     return true;
   }
 
-  /**
-   * Make {@code dir} (and its parents) if it isn't there, the user's only (0700; on an ACL file
-   * system a list allowing the user alone, inherited by what is created in it): whether it was
-   * made.
-   */
-  static boolean makePrivateDirectory(Path dir) throws IOException {
-    FileSystem fs = dir.getFileSystem();
-    boolean there = Files.isDirectory(dir);
-    if (isPosix(fs)) {
-      if (!there) {
-        Files.createDirectories(dir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-      }
-    } else if (isAcl(fs)) {
-      List<AclEntry> acl = userOnly(currentUser(fs), true);
-      if (!there) {
-        Files.createDirectories(dir, aclAtCreation(fs, acl));
-      }
-      setAcl(dir, acl);
-    } else if (!there) {
-      Files.createDirectories(dir);
-    }
-    return !there;
-  }
-
-  /**
-   * A new file for a download at {@code path}, in a directory made by {@link
-   * #makePrivateDirectory}: the user's only (0600; with an ACL, it inherits the directory's). The
-   * file must not exist yet: no download writes over another's, or over a file left behind.
-   */
-  static FileChannel createInherited(Path path) throws IOException {
-    Set<OpenOption> opts = Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-    return FileChannel.open(path, opts, posixAttributes(path.getFileSystem(), "rw-------"));
-  }
-
   /** A new file at {@code path}, open for writing, that only the user can open. */
   static FileChannel createPrivate(Path path) throws IOException {
     FileSystem fs = path.getFileSystem();
     Set<OpenOption> opts = new HashSet<>(Set.of(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE));
     if (!isPosix(fs) && isAcl(fs)) {
-      List<AclEntry> acl = userOnly(currentUser(fs), false);
+      List<AclEntry> acl = userOnly(currentUser(fs));
       if (fs == FileSystems.getDefault()) {
         // Windows: nobody else opens it before its list is set (a list given at creation may
         // still take entries inherited from the directory).
@@ -226,17 +189,13 @@ final class StateFile {
     return FileChannel.open(path, opts, posixAttributes(fs, "rw-------"));
   }
 
-  /**
-   * An access-control list allowing {@code user} everything and nobody anything else; for a
-   * directory, inherited by what is created in it.
-   */
-  static List<AclEntry> userOnly(UserPrincipal user, boolean directory) {
+  /** An access-control list allowing {@code user} everything and nobody anything else. */
+  static List<AclEntry> userOnly(UserPrincipal user) {
     return List.of(AclEntry.newBuilder()
         .setType(AclEntryType.ALLOW)
         .setPrincipal(user)
         .setPermissions(EnumSet.allOf(AclEntryPermission.class))
-        .setFlags(directory ? EnumSet.of(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT)
-            : EnumSet.noneOf(AclEntryFlag.class))
+        .setFlags(EnumSet.noneOf(AclEntryFlag.class))
         .build());
   }
 

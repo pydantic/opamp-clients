@@ -49,17 +49,20 @@ operating system's randomness) and, with a state file, keeps it across restarts.
 `client.InstanceUid` says which UID is in use.
 
 The client keeps no time of its own. How long a request, a WebSocket connection being opened, a
-closing handshake, a download and stop may take is the core's (`RequestTimeout`,
-`ConnectTimeout`, `StopTimeout`, `DownloadTimeout`): when one runs out, the core cancels the effect
+closing handshake and stop may take is the core's (`RequestTimeout`, `ConnectTimeout`,
+`StopTimeout`): when one runs out, the core cancels the effect
 and the client aborts it at once, and reports nothing more about it. `StopAsync` ends when the
 core says it has stopped (within `StopTimeout`, 5 s by default, after waiting for the goodbye and
 the closing handshake); then everything still open is closed, and work the core cancelled is let
 finish within that time again. A save already writing at stop finishes, whole or not at all, and a
 client started on the same state file waits for it.
 
-Package downloads follow no redirect. Whatever the status, the body goes to the file, hashed,
-and the core is told the status and, for a redirect, the `Location` resolved with
-`new Uri(requested, location)` and its origin: the core decides whether to follow it.
+## What this client leaves out
+
+It is an SDK's client: it takes no packages, sends and hears no custom messages and runs no
+server commands. A server that offers any of them is refused, as the client never declared the
+capability. The Go Supervisor and the Collector extension are the clients for
+those.
 
 Set `OPAMP_CORE_TAP=<path>` to record every call into the core (for `opamp-tap`): the first
 core in the process writes `<path>`, each later one `<path>.<pid>.<n>`. A tap holds the headers
@@ -73,8 +76,7 @@ arm64 (`runtimes/<rid>/native`), about 2 MB each, with no assembly and no source
 ## TLS and proxies
 
 `Tls` sets the CAs to trust, a client certificate and the TLS versions. `Proxy` sets a proxy.
-Both apply to every connection the client makes, in both modes: requests, the WebSocket and
-package downloads.
+Both apply to every connection the client makes, in both modes: requests and the WebSocket.
 
 ```csharp
 var options = new OpAmpClientOptions
@@ -117,8 +119,6 @@ var options = new OpAmpClientOptions
   Windows and macOS, nor `HttpClient.DefaultProxy`: those are
   [platform mode](#core-mode-and-platform-mode)'s. Set `DirectConnection` to go direct instead. It can't
   be combined with `Proxy`.
-- Package downloads use the same settings. With `CaPem` set, a download from another server
-  (where a redirect points, say) needs that server's CA in `CaPem`, or `IncludeSystemCas`.
 - Bad settings throw `ArgumentException` from `Start`.
 
 .NET checks the server's certificate once the TLS handshake is done, not during it. A server
@@ -137,16 +137,14 @@ selects that mode, or the client refuses to start with an error that says what t
 
 Here platform mode is `Mode = OpAmpMode.Platform`, and setting `HttpClient` selects it too. `Start`
 throws for `Mode = OpAmpMode.Core` with an `HttpClient`, and in platform mode for
-`ProxyResolveLocally` and `SpliceDownloads = false`.
+`ProxyResolveLocally`.
 
 In core mode (`Mode = OpAmpMode.Core`, or no `Mode`) the shared core speaks HTTP/1.1, WebSocket,
 CONNECT and SOCKS5 itself (in the same native library). .NET then only
 opens TCP connections (`Socket`, TCP_NODELAY), starts TLS on them (`SslStream`, TLS inside TLS
-for an `https://` proxy), resolves names when asked to, answers which proxy to use, and writes
-package files; every byte on the wire is the core's.
+for an `https://` proxy), resolves names when asked to, and answers which proxy to use;
+every byte on the wire is the core's.
 
-- `SpliceDownloads` (default true): package bodies of 16 KiB or more go from the socket to the file
-  without passing through the core.
 - A connection the core closes keeps 2 s at most to flush what was written and hear the server
   end it; `StopAsync` resets whatever is still open, so it still ends within `StopTimeout`.
 
@@ -164,8 +162,8 @@ var options = new OpAmpClientOptions
 What differs there:
 
 - Without `Proxy` the client uses the system's proxy settings (`HttpClient.DefaultProxy`:
-  `HTTPS_PROXY` and the like, and on Windows and macOS the system's own), for requests, the
-  WebSocket and downloads alike. `DirectConnection` goes direct instead.
+  `HTTPS_PROXY` and the like, and on Windows and macOS the system's own), for requests and the
+  WebSocket alike. `DirectConnection` goes direct instead.
 - The environment's proxy URLs (`http_proxy`, `https_proxy`, `all_proxy`, in either case) are
   held to the same schemes, as is a `WebProxy` the application sets as `HttpClient.DefaultProxy`.
   One exception: .NET doesn't read `socks5h://` there (it would connect directly), so it is an
@@ -175,20 +173,19 @@ What differs there:
   everything else (`https://`, `ws://`, `wss://`).
 - `ProxyResolveLocally` is an error: .NET's SOCKS5 always sends the name, and an HTTP proxy is
   always given it.
-- You can pass your own `HttpClient`. It then carries everything, the WebSocket and downloads
+- You can pass your own `HttpClient`. It then carries everything, the WebSocket
   included, so set TLS and the proxy on its handler. It can't be combined with `Tls`, `Proxy` or
   `DirectConnection`.
 
 ## The state file
 
 With a state file (`StateFile`) the client keeps what it needs across restarts: accepted
-connection settings, the instance UID, the last remote config, telemetry settings and packages.
+connection settings, the instance UID, the last remote config and telemetry settings.
 It holds secrets: the credentials of connection settings the server offered (bearer tokens in
 `Authorization` headers) and the private keys of telemetry settings' client certificates.
 The client writes it for the agent's user alone: mode 0600 on Linux and macOS, and on Windows
 an access-control list that allows only that user, with nothing inherited from the directory.
-Package files downloaded beside it (`<state file>.downloads`, named for the client that
-downloads them) are protected the same way. Saves run beside the client's loop, one at a time.
+Saves run beside the client's loop, one at a time.
 Keep it on a local disk, in a directory only the agent's user can read: not on a shared or
 network path, and not in backups or images copied anywhere less protected.
 

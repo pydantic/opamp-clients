@@ -84,8 +84,6 @@ The first argument is a `Config`, the second a `Status`; both are interfaces in
 | Connection settings | `acceptConnectionSettings` (needs a state file), `verifyTimeoutMs` | [connection-settings.md](connection-settings.md) |
 | Telemetry settings | `ReportsOwnTraces`, `ReportsOwnMetrics`, `ReportsOwnLogs`; answer `connectionSettings` with `setConnectionSettingsStatus` | [telemetry-settings.md](telemetry-settings.md) |
 | Available components | `availableComponents`, `setAvailableComponents` | [available-components.md](available-components.md) |
-| Packages | `acceptPackages` (needs a state file), `maxPackageBytes`, `downloadTimeoutMs`; answer with `packageInstalled`, `packageRemoved` | [packages.md](packages.md) |
-| Custom messages | `customCapabilities`, `setCustomCapabilities`, `sendCustomMessage` | [custom-messages.md](custom-messages.md) |
 | Limits | `requestTimeoutMs`, `connectTimeoutMs`, `stopTimeoutMs`, `maxSendBytes`, `maxReceiveBytes` | [how-it-works.md](how-it-works.md#effects-end) |
 
 TLS and proxy settings the client can't use throw from `Client.start`, before anything is sent.
@@ -99,9 +97,7 @@ The callback gets a `Notification`, a union discriminated by `kind`.
 | `connected`, `connectFailed` | `status`, `detail` | |
 | `remoteConfig` | `remoteConfig` | `setRemoteConfigStatus` |
 | `connectionSettings` | `connectionSettings` | `setConnectionSettingsStatus` |
-| `installPackage`, `removePackage` | `packageName`, `package`, `path` | `packageInstalled`, `packageRemoved` |
-| `customMessage`, `serverCustomCapabilities`, `customMessageNotSent` | `customMessage`, `customCapabilities`, `detail` | |
-| `instanceUidChanged`, `heartbeatInterval`, `command` | `instanceUid`, `heartbeatIntervalMs`, `command` | |
+| `instanceUidChanged`, `heartbeatInterval` | `instanceUid`, `heartbeatIntervalMs` | |
 | `errorResponse`, `badMessage`, `statusTooLarge`, `saveStalled` | `errorType`, `message`, `detail`, `field`, `bytes`, `stalled`, `waitedMs` | |
 | `stateFromNewerVersion` | `version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `stopped` | `error`: why it stopped on its own, or `undefined` after `stop()` | |

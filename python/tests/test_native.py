@@ -151,7 +151,9 @@ def test_every_reply_is_the_modules_byte_for_byte(config: corepb.Config, run: li
 
 @settings(max_examples=EXAMPLES, deadline=None)
 @given(request=st.one_of(st.binary(max_size=60),
-                         st.just(settings_pb2.Request(load=settings_pb2.Load()).SerializeToString())))
+                         st.just(settings_pb2.Request(agent_start=settings_pb2.AgentStart(
+                             host=settings_pb2.Host(live=["sampling_rate"]), instance_uid=bytes(16),
+                             now_unix_ms=1_760_000_000_000)).SerializeToString())))
 def test_sdk_settings_replies_are_the_modules_byte_for_byte(request: bytes) -> None:
     assert _native.sdk_settings_call(request) == WasmSdkSettings().call(request)
 

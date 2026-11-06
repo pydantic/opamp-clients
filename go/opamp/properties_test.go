@@ -266,8 +266,7 @@ func checkPlan(plan []propStep, goroutines int, ws bool, mode Mode) error {
 		cfg.Endpoint = "ws" + strings.TrimPrefix(cfg.Endpoint, "http")
 	}
 	var err error
-	client, err = Start(context.Background(), cfg, Status{Description: propDescription(0),
-		CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{propCapability}}}, notify)
+	client, err = startWith(&protobufs.CustomCapabilities{Capabilities: []string{propCapability}})(context.Background(), cfg, Status{Description: propDescription(0)}, notify)
 	if err != nil {
 		return err
 	}

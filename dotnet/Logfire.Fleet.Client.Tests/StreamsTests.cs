@@ -257,40 +257,6 @@ public class StreamsTests
 
     // covers: RULE-SHELL-05
     [Fact]
-    public async Task ASlowFileStopsTheStreamThatFeedsIt()
-    {
-        using var hold = new ManualResetEventSlim();
-        using var r = new StreamsRig();
-        r.Files.HoldWrites = hold;
-        r.Net.OnDial = d => d.Accept();
-        r.Run(Fx.Open(1));
-        Assert.Equal(Input.KindOneofCase.StreamOpened, r.Next()!.KindCase);
-        const int size = 8 << 20;
-        r.Run(Fx.Splice(1, 7, size));
-        r.Ack();
-        var body = RandomNumberGenerator.GetBytes(size);
-        var server = r.Net.Dials[0].Server!;
-        var writing = server.WriteAsync(body).AsTask();
-
-        // The file's writes are held: the stream stops reading past the high-water mark, and the
-        // server's writes wait (its window full).
-        Assert.True(StreamsRig.Until(() => r.S.Unwritten > Streams.HighWater), "the file's writes never backed up");
-        await Task.Delay(300);
-        var waiting = r.S.Unwritten;
-        Assert.True(waiting <= Streams.HighWater + (64 << 10), $"{waiting} bytes waiting for the file: the stream read on");
-        Assert.False(writing.IsCompleted, "the server wrote everything: nothing held it");
-
-        hold.Set();
-        await writing.WaitAsync(TimeSpan.FromSeconds(20));
-        Assert.Equal(Input.KindOneofCase.StreamSpliced, r.Next(TimeSpan.FromSeconds(20))!.KindCase);
-        r.Run(Fx.DownloadDone(7));
-        var done = r.Next(TimeSpan.FromSeconds(20))!;
-        Assert.Equal(SHA256.HashData(body), done.Downloaded.Sha256.ToByteArray());
-        Assert.Equal(body, await File.ReadAllBytesAsync(r.X.DownloadPath(7)));
-    }
-
-    // covers: RULE-SHELL-05
-    [Fact]
     public async Task APeerThatDoesntReadStopsTheStreamAndThenFailsIt()
     {
         using var r = new StreamsRig();
@@ -327,151 +293,6 @@ public class StreamsTests
         Assert.Contains("has not taken", failed.StreamFailed.Detail, StringComparison.Ordinal);
         Assert.True(StreamsRig.Until(() => server.WasReset));
         Assert.Null(r.Next(Quiet));
-    }
-
-    // covers: RULE-SHELL-09
-    [Fact]
-    public async Task ASpliceGoesToTheFileAndWhatFollowsToTheCore()
-    {
-        using var r = new StreamsRig();
-        r.Net.OnDial = d => d.Accept();
-        r.Run(Fx.Open(1));
-        Assert.Equal(Input.KindOneofCase.StreamOpened, r.Next()!.KindCase);
-        r.Ack();
-        var server = r.Net.Dials[0].Server!;
-        await server.WriteAsync("HEAD+pre");
-        Assert.Equal("HEAD+pre", Encoding.ASCII.GetString(r.Data(1, 8)));
-
-        // In the step that read it: the body's first bytes as download_data, the rest spliced.
-        r.Run(Fx.DownloadData(9, "pre"));
-        r.Run(Fx.Splice(1, 9, 10));
-        r.Ack();
-        await server.WriteAsync("0123456789TAIL");
-        Assert.Equal(Input.KindOneofCase.StreamSpliced, r.Next()!.KindCase);
-        Assert.Equal("TAIL", Encoding.ASCII.GetString(r.Data(1, 4)));
-        r.Run(Fx.DownloadDone(9));
-        var done = r.Next()!.Downloaded;
-        var file = Encoding.ASCII.GetBytes("pre0123456789");
-        Assert.Equal(9u, done.Id);
-        Assert.Equal(SHA256.HashData(file), done.Sha256.ToByteArray());
-        Assert.Equal(file, await File.ReadAllBytesAsync(r.X.DownloadPath(9)));
-        var log = r.Files.Log;
-        Assert.True(Array.IndexOf(log, $"sync {Path.GetFileName(r.X.DownloadPath(9))}") >= 0, "never synced");
-    }
-
-    // A download's blocking file work (making its file, the flush to the disk, deleting it) runs
-    // on a thread of its own, as a save is written: on one of the pool's, for as long as the disk
-    // took, it kept a thread the loop, transport and timers need.
-    // covers: RULE-SHELL-07
-    [Fact]
-    public void ADownloadsFileWorkHoldsNoThreadOfThePool()
-    {
-        using var r = new StreamsRig();
-        r.Run(Fx.DownloadData(5, "whole"));
-        r.Run(Fx.DownloadDone(5));
-        Assert.True(StreamsRig.Until(() => r.Queue.Count > 0), "never answered");
-        r.Run(new Effect { Cancel = new Id { Id_ = 5 } }); // answered, the answer not yet taken: only its file is left, to delete
-        Assert.Null(r.Next(Quiet));
-        Assert.True(StreamsRig.Until(() => !File.Exists(r.X.DownloadPath(5))), "the cancelled download's file stayed");
-        r.Files.FailWrite = new IOException("the disk is full (injected)");
-        r.Run(Fx.DownloadData(6, "lost"));
-        r.Run(Fx.DownloadDone(6));
-        Assert.Equal(6u, r.Next()!.DownloadFailed.Id); // its file deleted
-        Assert.False(File.Exists(r.X.DownloadPath(6)));
-        var name = Path.GetFileName(r.X.DownloadPath(5));
-        Assert.Contains($"sync {name}", r.Files.Log);
-        Assert.Contains($"remove {name} True", r.Files.Log);
-        Assert.Contains($"remove {Path.GetFileName(r.X.DownloadPath(6))} True", r.Files.Log);
-        Assert.Empty(r.Files.OnPool);
-    }
-
-    // covers: RULE-SHELL-09
-    [Fact]
-    public async Task ADownloadsFileIsMadeNew()
-    {
-        using var r = new StreamsRig();
-        var stale = r.X.DownloadPath(3);
-        Directory.CreateDirectory(Path.GetDirectoryName(stale)!);
-        await File.WriteAllTextAsync(stale, "a crashed run's");
-        r.Run(Fx.DownloadData(3, "new"));
-        r.Run(Fx.DownloadDone(3));
-        Assert.Equal(3u, r.Next()!.DownloadFailed.Id);
-        Assert.Equal("a crashed run's", await File.ReadAllTextAsync(stale));
-    }
-
-    // covers: RULE-SHELL-06, RULE-SHELL-09
-    [Theory]
-    [InlineData("discard")]
-    [InlineData("cancel")]
-    public void ADiscardedOrCancelledFileGoesOnceItsWriteIsOverUntold(string how)
-    {
-        using var hold = new ManualResetEventSlim();
-        using var r = new StreamsRig();
-        r.Files.HoldWrites = hold;
-        r.Run(Fx.DownloadData(4, new byte[1024]));
-        var path = r.X.DownloadPath(4);
-        Assert.True(StreamsRig.Until(() => File.Exists(path)), "never made");
-        r.Run(how == "discard" ? new Effect { Discard = new Id { Id_ = 4 } } : new Effect { Cancel = new Id { Id_ = 4 } });
-        r.Run(Fx.DownloadData(4, new byte[1024])); // after it: nowhere
-        r.Run(Fx.DownloadDone(4));
-        hold.Set();
-        Assert.True(StreamsRig.Until(() => !File.Exists(path)), "the file stayed");
-        Assert.Null(r.Next(Quiet));
-    }
-
-    // covers: RULE-SHELL-06
-    [Fact]
-    public void ACancelAfterTheAnswerDropsItAndTheFile()
-    {
-        using var r = new StreamsRig();
-        r.Run(Fx.DownloadData(5, "whole"));
-        r.Run(Fx.DownloadDone(5));
-        Assert.True(StreamsRig.Until(() => r.Queue.Count > 0), "never answered");
-        r.Run(new Effect { Cancel = new Id { Id_ = 5 } });
-        Assert.Null(r.Next(Quiet));
-        Assert.True(StreamsRig.Until(() => !File.Exists(r.X.DownloadPath(5))), "the cancelled download's file stayed");
-    }
-
-    // covers: RULE-SHELL-09
-    [Fact]
-    public void AFailedWriteDeletesTheFileAndFailsTheDownload()
-    {
-        using var r = new StreamsRig();
-        r.Files.FailWrite = new IOException("the disk is full (injected)");
-        r.Run(Fx.DownloadData(6, "lost"));
-        r.Run(Fx.DownloadDone(6));
-        var failed = r.Next()!.DownloadFailed;
-        Assert.Contains("the disk is full", failed.Detail, StringComparison.Ordinal);
-        Assert.False(File.Exists(r.X.DownloadPath(6)));
-        Assert.Null(r.Next(Quiet));
-    }
-
-    // covers: RULE-SHELL-09
-    [Fact]
-    public void TheFilesOperationsAreJournaledAndDurableBeforeTheAnswer()
-    {
-        var dir = Directory.CreateTempSubdirectory("opamp-streams-journal-").FullName;
-        var state = Path.Combine(dir, "state");
-        var tapPath = Path.Combine(dir, "core.tap");
-        using (var tap = CoreTap.Open(tapPath)!)
-        {
-            using var r = new StreamsRig(files: new FileJournal(FileOps.Real, tap, state), state: state);
-            r.Run(Fx.DownloadData(8, "one"));
-            r.Run(Fx.DownloadData(8, "two"));
-            r.Run(Fx.DownloadDone(8));
-            Assert.Equal(8u, r.Next()!.Downloaded.Id);
-            r.Run(new Effect { Discard = new Id { Id_ = 8 } });
-            Assert.True(StreamsRig.Until(() => !File.Exists(r.X.DownloadPath(8))));
-        }
-
-        var ops = TapKit.Files(TapKit.Read(tapPath)).Select(f => f.Field("op")).ToList();
-        Assert.Equal("state", ops[0]);
-        Assert.Equal("mkdir", ops[1]);
-        Assert.Equal("create", ops[2]);
-        var sync = ops.IndexOf("sync");
-        Assert.True(sync > 2 && ops.Skip(3).Take(sync - 3).All(o => o == "write"), string.Join(", ", ops));
-        Assert.Equal("remove", ops[^1]);
-        Directory.Delete(dir, recursive: true);
     }
 
     // The proxy question (which the core asks only when it wasn't told which proxy to use) is
@@ -595,7 +416,6 @@ public class StreamsTests
         [
             (new() { Endpoint = endpoint }, true),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Core }, true),
-            (new() { Endpoint = endpoint, SpliceDownloads = false }, true),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform }, false),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app }, false),
         ];
@@ -632,8 +452,6 @@ public class StreamsTests
         using var app = new HttpClient();
         (OpAmpClientOptions Options, string Says)[] bad =
         [
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
-            (new() { Endpoint = endpoint, Mode = OpAmpMode.Platform, HttpClient = app, SpliceDownloads = false }, "SpliceDownloads is core mode's"),
             // Regression: an HttpClient alone switched to platform mode silently; the mode must be named.
             (new() { Endpoint = endpoint, HttpClient = app }, "HttpClient needs platform mode"),
             (new() { Endpoint = endpoint, Mode = OpAmpMode.Core, HttpClient = app }, "HttpClient can't be used in core mode"),
@@ -663,14 +481,6 @@ internal static class Fx
     public static Effect Write(ulong id, byte[] data) => new() { StreamWrite = new WsMessage { Id = id, Data = ByteString.CopyFrom(data) } };
 
     public static Effect Close(ulong id, bool abort) => new() { StreamClose = new StreamClose { Id = id, Abort = abort } };
-
-    public static Effect Splice(ulong id, ulong download, ulong bytes) => new() { StreamSplice = new StreamSplice { Id = id, Download = download, Bytes = bytes } };
-
-    public static Effect DownloadData(ulong id, string text) => DownloadData(id, Encoding.ASCII.GetBytes(text));
-
-    public static Effect DownloadData(ulong id, byte[] data) => new() { DownloadData = new WsMessage { Id = id, Data = ByteString.CopyFrom(data) } };
-
-    public static Effect DownloadDone(ulong id) => new() { DownloadDone = new Id { Id_ = id } };
 }
 
 /// <summary>
@@ -681,29 +491,21 @@ internal static class Fx
 /// </summary>
 internal sealed class StreamsRig : IDisposable
 {
-    private readonly string? dir;
     private Queued? last;
 
-    public StreamsRig(TimeProvider? time = null, Func<string, ProxyAnswer>? proxy = null, IFileOps? files = null, string? state = null, OpAmpTlsOptions? tls = null)
+    public StreamsRig(TimeProvider? time = null, Func<string, ProxyAnswer>? proxy = null, OpAmpTlsOptions? tls = null)
     {
-        this.dir = state is null ? Directory.CreateTempSubdirectory("opamp-streams-").FullName : null; // the test's own, if it gives one
-        this.State = state ?? Path.Combine(this.dir!, "state");
-        this.Files = new HeldFiles(files ?? FileOps.Real);
-        this.X = new Executor(new MemoryTransport(), this.Queue.Add, this.State, time, this.Files);
-        this.S = new Streams(this.X, this.Queue.Add, ClientTransport.SslOptions(tls ?? new OpAmpTlsOptions()), proxy ?? (_ => new ProxyAnswer()), this.Net, time);
+        this.X = new Executor(new MemoryTransport(), this.Queue.Add, time: time);
+        this.S = new Streams(this.Queue.Add, ClientTransport.SslOptions(tls ?? new OpAmpTlsOptions()), proxy ?? (_ => new ProxyAnswer()), this.Net, time);
     }
 
     public BlockingCollection<Queued> Queue { get; } = new();
 
     public MemNet Net { get; } = new();
 
-    public HeldFiles Files { get; }
-
     public Executor X { get; }
 
     public Streams S { get; }
-
-    public string State { get; }
 
     /// <summary>Wait (real time) until <paramref name="done"/>.</summary>
     public static bool Until(Func<bool> done, TimeSpan? within = null)
@@ -751,7 +553,6 @@ internal sealed class StreamsRig : IDisposable
             }
 
             this.last = q;
-            this.S.Stepping(q);
             return q.Input;
         }
     }
@@ -759,7 +560,6 @@ internal sealed class StreamsRig : IDisposable
     /// <summary>The step with the last input is over: the stream it came from reads on.</summary>
     public void Ack()
     {
-        this.S.Stepping(null);
         this.last?.Ack?.TrySetResult();
         this.last = null;
     }
@@ -784,15 +584,5 @@ internal sealed class StreamsRig : IDisposable
         this.Ack();
         _ = this.S.ShutdownAsync(TimeSpan.FromSeconds(2));
         _ = this.X.ReleaseAsync(TimeSpan.FromSeconds(2));
-        try
-        {
-            if (this.dir is not null)
-            {
-                Directory.Delete(this.dir, recursive: true);
-            }
-        }
-        catch (IOException)
-        {
-        }
     }
 }

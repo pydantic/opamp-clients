@@ -1,35 +1,29 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-// Carries out the core's HTTP and WebSocket effects, its saves and downloads, and reports what
+// Carries out the core's HTTP and WebSocket effects and its saves, and reports what
 // happened as inputs, each naming the effect it belongs to. It decides nothing about OpAMP and
 // keeps no time of its own: the core builds every request and reads every response, gives each
 // effect its deadline, and cancels what it gives up on (Effect.cancel), after which nothing more
 // about that effect is reported.
 
-import { createHash } from "node:crypto";
 import { closeSync, fsyncSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { create } from "@bufbuild/protobuf";
-import { type Dispatcher, fetch } from "undici";
+import { fetch } from "undici";
 import WebSocket from "ws";
 
 import {
-  type Download,
-  type DownloadResponse,
-  DownloadResponseSchema,
   type Effect,
   type Header,
   HeaderSchema,
   type HttpRequest,
   type Input,
   InputSchema,
-  type Origin,
-  OriginSchema,
   type WsOpen,
 } from "./gen/opamp/core/v1/core_pb.js";
-import { type FileOps, REAL, save, track, writeAll } from "./files.js";
+import { type FileOps, REAL, save, track } from "./files.js";
 import type { StreamsPlatform } from "./streams.js";
 import { Transport } from "./transport.js";
 
@@ -150,16 +144,6 @@ export interface TestPlatform {
   now?: () => number;
 }
 
-/** Where package files are downloaded, beside the state file. */
-export function downloadsDir(stateFile: string): string {
-  return `${stateFile}.downloads`;
-}
-
-/** The file of download `id`. */
-export function downloadPath(stateFile: string, id: bigint): string {
-  return join(downloadsDir(stateFile), id.toString());
-}
-
 /** One effect under way. */
 interface Entry {
   /** Give up on it at once: abort what is under way, drop its socket. */
@@ -178,9 +162,8 @@ interface Entry {
  * removal is atomic.
  *
  * - Every effect under way (a request, a connection being opened, an open or closing connection,
- *   a download, a save) has one entry.
- * - `cancel` removes the entry and aborts its work at once: a request or a download aborted (the
- *   download's file deleted), a connection dropped, a save not yet begun never begun.
+ *   a save) has one entry.
+ * - `cancel` removes the entry and aborts its work at once: a request aborted, a connection dropped, a save not yet begun never begun.
  * - Only `report` and `finish` deliver, and only while the entry is there; `finish` removes it, so
  *   an effect's last word is delivered once, and nothing about it after its cancel.
  * - A resource ready after its entry has gone (a connection that opens after its cancel, or after
@@ -240,16 +223,14 @@ export class InFlight {
 export class Executor {
   readonly #f: InFlight;
   readonly #stateFile: string | undefined;
-  /** TLS and proxy for every request, connection and download. */
+  /** TLS and proxy for every request and connection. */
   readonly #transport: Transport;
-  /** Downloads under way, and download files being deleted: shutdown waits for them. */
-  readonly #files = new Set<Promise<void>>();
   readonly #p: ExecutorPlatform;
-  /** The file system saves and downloads use (the journal's, with the tap on). */
+  /** The file system saves use (the journal's, with the tap on). */
   readonly #ops: FileOps;
   /** The last save asked for: the next waits for it (saves land one at a time, in order). */
   #lastSave: Promise<void> = Promise.resolve();
-  /** Saves, downloads and deletions under way. */
+  /** Saves under way. */
   readonly #work = new Set<Promise<void>>();
   /** The URL of the OpAMP request or connection whose outcome came last (undefined: none yet).
    * Set before the outcome reaches the core: a notification of it finds it in place. */
@@ -317,30 +298,13 @@ export class Executor {
         this.#store(k.value.id, k.value.data);
         break;
       case "cancel":
-        // A request, a connection being opened, open or closing, a download (its file deleted), a
-        // save (one writing lands whole, unreported; one not begun never begins).
+        // A request, a connection being opened, open or closing, a save (one writing lands whole,
+        // unreported; one not begun never begins).
         this.#f.cancel(k.value.id);
         break;
-      case "download":
-        this.#download(k.value);
-        break;
-      case "discard":
-        if (this.#stateFile !== undefined) {
-          // A file that can't be deleted stays until the next start clears the downloads.
-          this.#remove(downloadPath(this.#stateFile, k.value.id));
-        }
-        break;
       default:
-        break; // notifications are the client's
+        break; // notifications are the client's; downloads come only to a client that takes packages
     }
-  }
-
-  /** Delete a download's file, off the event loop; shutdown waits for it. */
-  #remove(path: string): void {
-    const removal = this.#ops.remove(path).then(() => {}, () => {});
-    this.#files.add(removal);
-    void removal.finally(() => this.#files.delete(removal));
-    this.#track(removal);
   }
 
   /** Save `data` off the event loop, after the saves asked for before it, and answer stored once
@@ -383,52 +347,16 @@ export class Executor {
     if (this.#stateFile !== undefined) track(this.#stateFile, w);
   }
 
-  /** Once every save, download and deletion under way has ended. */
+  /** Once every save under way has ended. */
   async settled(): Promise<void> {
     while (this.#work.size > 0) await Promise.allSettled([...this.#work]);
   }
 
-  /** GET a package file into its path, whatever the status, hashing it as it goes, and report the
-   * response; a redirect is not followed (the core decides). On failure, or once cancelled,
-   * nothing of it is left. */
-  #download(d: Download): void {
-    const abort = new AbortController();
-    if (!this.#f.start(d.id, () => abort.abort())) return;
-    const path = downloadPath(this.#stateFile ?? "", d.id);
-    const done = (async () => {
-      let answer: Input;
-      let made = false;
-      try {
-        // The server's client certificate only for a file at its own origin (the core says which).
-        const via = d.serverOrigin ? this.#transport.dispatcher : this.#transport.elsewhere;
-        const r = await fetchTo(this.#p, d, path, via, abort.signal, this.#ops, () => (made = true));
-        answer = input({ case: "downloadResponse", value: r });
-      } catch (e) {
-        // fetchTo deleted the file it made.
-        const detail = describe(e);
-        answer = input({ case: "downloadFailed", value: { $typeName: "opamp.core.v1.Failed", id: d.id, detail } });
-        made = false;
-      }
-      // Cancelled as it finished: its file goes all the same.
-      if (!this.#f.finish(d.id, answer) && made) await this.#ops.remove(path).catch(() => {});
-    })();
-    this.#files.add(done);
-    void done.finally(() => this.#files.delete(done));
-    this.#track(done);
-  }
-
   /** Give up on everything under way (the core has cancelled it all already when it
-   * stopped): once it is over, nothing of it is left (a download given up on has closed and
-   * deleted its file, and a discarded one is deleted: a client started next on the same state
-   * file may use the same ids), or `boundMs` has passed (a disk that has stopped answering holds
-   * no stop up: that write is let go). A save already writing lands whole, unreported. */
-  async shutdown(boundMs = Infinity): Promise<void> {
+   * stopped). A save already writing lands whole, unreported. */
+  async shutdown(): Promise<void> {
     this.#f.close();
     this.#transport.close();
-    const files = async () => {
-      while (this.#files.size > 0) await Promise.allSettled([...this.#files]);
-    };
-    await waitAtMost(files(), boundMs);
   }
 
   async #post(r: HttpRequest, signal: AbortSignal): Promise<Input> {
@@ -567,81 +495,5 @@ export class Executor {
   }
 }
 
-/** Where a redirect points: its Location `given` resolved against the URL `requested` by the
- * WHATWG URL parser, and that URL's origin (port 0 for the scheme's default). A Location that
- * doesn't resolve goes as given, with no origin: the core refuses it. */
-export function location(requested: string, given: string): { location: string; locationOrigin?: Origin } {
-  let u: URL;
-  try {
-    u = new URL(given, requested);
-  } catch {
-    return { location: given };
-  }
-  const scheme = u.protocol.replace(/:$/, "");
-  // WHATWG leaves a special scheme's default port out; another's is what the URL says.
-  const port = u.port === "" ? 0 : Number(u.port) === DEFAULT_PORTS[scheme] ? 0 : Number(u.port);
-  return {
-    location: u.href,
-    locationOrigin: create(OriginSchema, { scheme, host: u.hostname, port }),
-  };
-}
-
-/** The ports the url crate takes as a scheme's default (the core reports those as 0). */
-const DEFAULT_PORTS: Record<string, number> = { http: 80, https: 443, ws: 80, wss: 443, ftp: 21 };
-
 const pairs = (list: Header[]): [string, string][] =>
   Object.entries(headers(list)).flatMap(([n, vs]) => vs.map((v): [string, string] => [n, v]));
-
-/** Stream `d`'s response, whatever its status, to `path` (no redirect followed), up to its size
- * limit: the response, with its body's SHA-256 and a redirect's Location. `cancel` gives up on it.
- * The file is made new (never one left behind, which could be anyone's: then the download fails;
- * `made` says when it is), and deleted if the download fails or is cancelled after. */
-async function fetchTo(
-  p: ExecutorPlatform,
-  d: Download,
-  path: string,
-  dispatcher: Dispatcher,
-  cancel: AbortSignal,
-  ops: FileOps,
-  made: () => void,
-): Promise<DownloadResponse> {
-  const res = await p.fetch(d.url, { headers: pairs(d.headers), signal: cancel, redirect: "manual", dispatcher });
-  let file;
-  try {
-    await ops.mkdir(dirname(path));
-    // Given up on meanwhile: no file.
-    cancel.throwIfAborted();
-    file = await ops.create(path);
-    made();
-  } catch (e) {
-    await res.body?.cancel().catch(() => {});
-    throw e;
-  }
-  const hash = createHash("sha256");
-  let size = 0;
-  try {
-    if (res.body) {
-      for await (const chunk of res.body) {
-        size += chunk.length;
-        if (size > Number(d.maxBytes)) {
-          await res.body.cancel().catch(() => {});
-          throw new Error(`file over ${d.maxBytes} bytes`);
-        }
-        hash.update(chunk);
-        await writeAll(file, chunk);
-      }
-    }
-    // Given up on while it was written (a body without one too): the file goes.
-    cancel.throwIfAborted();
-    await file.sync();
-  } catch (e) {
-    await file.close().catch(() => {});
-    await ops.remove(path).catch(() => {});
-    throw e;
-  }
-  await file.close();
-  const r = create(DownloadResponseSchema, { id: d.id, status: res.status, sha256: new Uint8Array(hash.digest()) });
-  const given = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
-  if (given !== null) Object.assign(r, location(d.url, given));
-  return r;
-}

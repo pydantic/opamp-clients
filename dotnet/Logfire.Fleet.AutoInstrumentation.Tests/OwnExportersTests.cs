@@ -77,7 +77,7 @@ public class OwnExportersTests
             Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Config(policy)).Status);
             Assert.False(agent.Controls.SendTraces);
             Assert.Equal(Policy.Overrides(policy), InForce(agent));
-            var health = agent.Sdk.LastHealth!.Exporters.ComponentHealthMap["traces"].ComponentHealthMap;
+            var health = agent.Sdk.ExportHealth!.ComponentHealthMap["traces"].ComponentHealthMap;
             Assert.Contains(health.Values, h => h.Status == "ungoverned" && h.Healthy);
         }
         finally
@@ -134,7 +134,7 @@ public class OwnExportersTests
                 factory.CreateLogger("app").LogWarning("one");
                 await Until(() => Listed(agent).ContainsKey("logs/Own"), "the other plugin's exporter listed");
                 Assert.False(Listed(agent)["logs/Own"]);
-                Assert.Equal("ungoverned", agent.Sdk.LastHealth!.Exporters.ComponentHealthMap["logs"].ComponentHealthMap["Own"].Status);
+                Assert.Equal("ungoverned", agent.Sdk.ExportHealth!.ComponentHealthMap["logs"].ComponentHealthMap["Own"].Status);
                 Assert.False(agent.Controls.SendLogs);
                 Assert.Equal(Policy.Overrides(policy), InForce(agent));
                 var cap = Policy.Of(("log_rate_limit", """{"records_per_second":1}"""));

@@ -147,21 +147,18 @@ func TestScopeLevelsAreRefusedWhereTheLevelIs(t *testing.T) {
 	host := goHost()
 	host.Live = slices.DeleteFunc(host.Live, func(k string) bool { return k == "send_logs_level" })
 	doc := levelsPolicy("", "app=off")
-	d, err := testLayer(t).DecideAt(context.Background(), remote(doc), nil, nil, host, vectorNow, nil)
-	if err != nil {
-		t.Fatal(err)
+	status, apply, _ := decideAt(t, host, doc, vectorNow)
+	if status.GetStatus() != failed_ || apply != nil ||
+		status.GetErrorMessage() != "log_levels: scopes: this SDK cannot apply the requested override" {
+		t.Fatalf("decided %v %v", status, apply)
 	}
-	if d.GetStatus().GetStatus() != failed_ || d.GetApply() != nil ||
-		d.GetStatus().GetErrorMessage() != "log_levels: scopes: this SDK cannot apply the requested override" {
-		t.Fatalf("decided %v", d)
-	}
-	loaded, err := testLayer(t).LoadAt(context.Background(), []byte(doc), host, vectorNow)
-	effective := string(loaded.GetEffective().GetConfigMap().GetConfigMap()[policyFile].GetBody())
-	if err != nil || loaded.GetWarning() != "" || !strings.Contains(effective, `"log_levels":{"mode":"local"}`) {
-		t.Fatalf("loaded %v %v: a saved policy's levels this host cannot apply should be set aside", loaded, err)
+	loaded := startWith(t, host, []byte(doc), vectorNow)
+	effective := string(loaded.effective.GetConfigMap().GetConfigMap()[policyFile].GetBody())
+	if loaded.warning != "" || !strings.Contains(effective, `"log_levels":{"mode":"local"}`) {
+		t.Fatalf("loaded %v: a saved policy's levels this host cannot apply should be set aside", loaded)
 	}
 	c := NewControls()
-	c.Apply(loaded.GetSettings())
+	c.Apply(loaded.settings)
 	sink := &recordSink{}
 	emit(gatedLogs(c, sink), "app", log.SeverityInfo)
 	if len(sink.take()) != 1 {

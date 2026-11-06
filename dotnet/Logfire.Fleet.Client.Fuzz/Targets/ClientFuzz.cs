@@ -21,23 +21,21 @@ namespace Logfire.Fleet.Client.Fuzz;
 /// mode:
 /// <list type="bullet">
 /// <item>platform mode: the executor's HttpClient path over a transport of the fuzzer's (bodies in
-/// pieces, resets, error statuses with any headers, package downloads into the state file's
-/// directory; WebSocket upgrades taken or refused, messages in pieces, closes and drops);</item>
+/// pieces, resets, error statuses with any headers; WebSocket upgrades taken or refused, messages
+/// in pieces, closes and drops);</item>
 /// <item>core mode: the core's own HTTP and WebSocket over <see cref="Streams"/>, on
 /// <see cref="MemNet"/>, the server's bytes arriving in pieces (or any bytes at all, status line
-/// included), package files spliced or written by the streams' file writer.</item>
+/// included).</item>
 /// </list>
 /// The server answers each request with any bytes, a ServerToAgent built from the bytes (remote
-/// configs, packages with files it serves, connection settings, commands, custom messages, errors,
-/// a new instance UID) and perhaps damaged, an error status, or a reset. Each notification makes
-/// the callback call the client (statuses, remote config and package answers, custom messages,
-/// stop). Then the application stops the client. What must hold, whatever came: the client never
+/// configs, connection settings, errors, a new instance UID; and packages, commands and custom
+/// messages, which this client takes none of) and perhaps damaged, an error status, or a reset.
+/// Each notification makes the callback call the client (statuses, remote config answers, stop). Then the application stops the client. What must hold, whatever came: the client never
 /// stops on its own (the callback never throws, so an error is this shell's or the core's);
 /// callbacks one at a time, never after Stopped; Stopped once, last; stop completes within its
 /// bound without an error; every answer the server gave reaches the core unless the core gave up
-/// on it first (platform mode); InstallPackage names a file under the state file's downloads
-/// directory, there as the callback runs, whose SHA-256 is the offer's content hash when it has
-/// one; a heartbeat interval is never negative; no temporary state file is left; nothing is
+/// on it first (platform mode); the core asks for no download (the client takes no packages); a
+/// heartbeat interval is never negative; no temporary state file is left; nothing is
 /// started once stop has returned.
 /// <para>scripts/dotnet_fuzz.sh runs it under SharpFuzz; the tests' FuzzInputsTests run
 /// <see cref="Seeds"/> and every input under crashes/ClientFuzz/ with every <c>dotnet test</c>.</para>
@@ -141,15 +139,11 @@ internal static class ClientFuzz
                 HeartbeatInterval = TimeSpan.FromMilliseconds(new[] { 1, 5, 30_000, 0 }[(flags >> 2) & 3]),
                 RequestTimeout = TimeSpan.FromMilliseconds((flags & 16) != 0 ? 1000 : 0),
                 StateFile = this.state,
-                AcceptPackages = true,
                 AcceptConnectionSettings = (flags & 32) != 0,
                 RequestInstanceUid = (flags & 64) != 0,
-                DownloadTimeout = TimeSpan.FromSeconds(5),
-                MaxPackageBytes = (flags & 128) != 0 ? 1000UL : 0UL,
                 StopTimeout = TimeSpan.FromMilliseconds(StopMs),
                 Mode = this.coreMode ? OpAmpMode.Core : OpAmpMode.Platform,
                 DirectConnection = this.coreMode,
-                SpliceDownloads = !this.coreMode || (more & 1) != 0,
             };
             if (this.coreMode)
             {
@@ -181,7 +175,7 @@ internal static class ClientFuzz
         {
             var c = OpAmpClient.Start(
                 this.options,
-                new OpAmpStatus { Description = new AgentDescription(), CustomCapabilities = new CustomCapabilities { Capabilities = { FuzzInput.Capability } } },
+                new OpAmpStatus { Description = new AgentDescription() },
                 this.Notify,
                 new Seams { Transport = this.transport, Net = this.coreMode ? this.net : null, Environment = _ => null, Stepped = this.Stepped });
             this.client.SetResult(c);
@@ -278,9 +272,6 @@ internal static class ClientFuzz
                     case OpAmpNotification.HeartbeatInterval h when h.Interval < TimeSpan.Zero:
                         this.Problem($"heartbeat interval {h.Interval}");
                         break;
-                    case OpAmpNotification.InstallPackage ip:
-                        this.CheckPackage(ip);
-                        break;
                 }
 
                 if (n is OpAmpNotification.Stopped)
@@ -300,33 +291,6 @@ internal static class ClientFuzz
             finally
             {
                 Interlocked.Decrement(ref this.active);
-            }
-        }
-
-        private void CheckPackage(OpAmpNotification.InstallPackage ip)
-        {
-            var dir = Executor.DownloadsDir(this.state);
-            if (string.IsNullOrEmpty(ip.Path) || Path.GetDirectoryName(ip.Path) != dir)
-            {
-                this.Problem($"InstallPackage {ip.Name}: {ip.Path} is not in {dir}");
-                return;
-            }
-
-            byte[] got;
-            try
-            {
-                got = File.ReadAllBytes(ip.Path);
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                this.Problem($"InstallPackage {ip.Name}: its file can't be read: {e.Message}");
-                return;
-            }
-
-            var want = ip.Package.File?.ContentHash.ToByteArray() ?? [];
-            if (want.Length > 0 && !FuzzInput.Sha256(got).AsSpan().SequenceEqual(want))
-            {
-                this.Problem($"InstallPackage {ip.Name}: the file isn't the one offered ({got.Length} bytes)");
             }
         }
 
@@ -371,6 +335,10 @@ internal static class ClientFuzz
                             break;
                         case Effect.KindOneofCase.Cancel:
                             this.cancelled.Add(e.Cancel.Id_);
+                            break;
+                        case Effect.KindOneofCase.Download or Effect.KindOneofCase.DownloadDone
+                            or Effect.KindOneofCase.StreamSplice or Effect.KindOneofCase.Discard:
+                            this.Problem($"{e.KindCase} for a client that takes no packages");
                             break;
                     }
                 }

@@ -84,8 +84,6 @@ alone.) Give the agent's status to `Start`, so the first message reports it in f
 | Connection settings | `AcceptConnectionSettings` (needs a state file), `VerifyTimeout` | [connection-settings.md](connection-settings.md) |
 | Telemetry settings | `ReportsOwnTraces`, `ReportsOwnMetrics`, `ReportsOwnLogs`; answer `OpAmpNotification.ConnectionSettings` with `SetConnectionSettingsStatus` | [telemetry-settings.md](telemetry-settings.md) |
 | Available components | `OpAmpStatus.AvailableComponents`, `SetAvailableComponents` | [available-components.md](available-components.md) |
-| Packages | `AcceptPackages` (needs a state file), `MaxPackageBytes`, `DownloadTimeout`; answer with `PackageInstalled`, `PackageRemoved` | [packages.md](packages.md) |
-| Custom messages | `OpAmpStatus.CustomCapabilities`, `SetCustomCapabilities`, `SendCustomMessage` | [custom-messages.md](custom-messages.md) |
 | Limits | `RequestTimeout`, `ConnectTimeout`, `StopTimeout`, `MaxSendBytes`, `MaxReceiveBytes` | [how-it-works.md](how-it-works.md#effects-end) |
 
 Bad settings throw `ArgumentException` from `Start`, before anything is sent.
@@ -99,9 +97,7 @@ The callback gets an `OpAmpNotification`, a record with one nested record for ea
 | `Connected`, `ConnectFailed` | `Status`, `Detail` | |
 | `RemoteConfig` | `Config` | `SetRemoteConfigStatus` |
 | `ConnectionSettings` | `Settings` | `SetConnectionSettingsStatus` |
-| `InstallPackage`, `RemovePackage` | `Name`, `Package`, `Path` | `PackageInstalled`, `PackageRemoved` |
-| `CustomMessage`, `ServerCustomCapabilities`, `CustomMessageNotSent` | `Message`, `Capabilities`, `Reason` | |
-| `InstanceUidChanged`, `HeartbeatInterval`, `Command` | `InstanceUid`, `Interval`, `Value` | |
+| `InstanceUidChanged`, `HeartbeatInterval` | `InstanceUid`, `Interval` | |
 | `ErrorResponse`, `BadMessage`, `StatusTooLarge`, `SaveStalled` | `Type`, `Message`, `Detail`, `Field`, `Bytes`, `Stalled`, `Waited` | |
 | `StateFromNewerVersion` | `Version`: the format of a state a newer release saved, which is kept as it is; the client saves nothing this run | log it as a warning |
 | `Stopped` | `Error`: why it stopped on its own, or null after `StopAsync` | |

@@ -13,27 +13,20 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.LongFunction;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLException;
@@ -44,9 +37,8 @@ import javax.net.ssl.SSLException;
  * and a writer thread each), TLS on them (the JDK's {@link SSLEngine}, with the operator's CAs,
  * certificate and versions: layered, so TLS to an {@code https://} proxy carries TLS to the
  * server), name resolution (only for a SOCKS5 proxy with resolve-locally: otherwise the proxy
- * resolves), the proxy for a URL ({@link CoreProxy}), and the files of downloads. It decides
- * nothing: every byte it writes, the core wrote, and the core keeps every time (it closes a
- * stream it gives up on, and cancels a download's file). As node/opamp/src/streams.ts and
+ * resolves) and the proxy for a URL ({@link CoreProxy}). It decides nothing: every byte it
+ * writes, the core wrote, and the core keeps every time (it closes a stream it gives up on). As node/opamp/src/streams.ts and
  * python/src/logfire_fleet_client/_streams.py do.
  *
  * <p>Everything about a stream is decided on the client's thread (the loop): effects are carried
@@ -54,23 +46,12 @@ import javax.net.ssl.SSLException;
  * done, a failure) is posted there and reported only if its stream is still the core's. One
  * registry ({@link InFlight}, the shape of {@link dev.pydantic.logfire.fleet.InFlight} and of
  * Python's {@code _InFlight}) owns everything under way: each stream (its connection, and the
- * attempt connecting it), each name being resolved, each file's writes, each linger timer. A
+ * attempt connecting it), each name being resolved, each linger timer. A
  * close, from the core or at shutdown, ends what it names at once; a connection or a TLS
  * handshake that completes after its stream was closed is aborted as it arrives, and reported to
  * no one; nothing is reported after a stream's close, or after shutdown.
  *
- * <p>Download files are written by a thread of their own, one write at a time per file, in the
- * order the bytes came, made new (never one left behind), hashed as written, through the
- * client's {@link Disk} (journaled into the core tap). Each download ends here once, answering
- * the shell's download_done (synced, then downloaded; or download_failed if a write failed: what
- * came after is dropped, and the file deleted), or not at all when the core discards or cancels
- * it first: then the file goes once the write in flight is over, and nothing more is said.
- *
- * <p>Backpressure, both ways. Socket to file: once more than {@link #HIGH_WATER} bytes wait for a
- * file's writes, the stream that brought the last of them stops reading (its spliced bytes, or
- * the data the core turned into download_data just then) until they are down to {@link
- * #LOW_WATER}; nothing is dropped or reordered: the kernel's window stops the server. Core to
- * socket: while more than {@link #WRITE_HIGH} bytes written to a stream wait for the peer, the
+ * <p>Backpressure. Core to socket: while more than {@link #WRITE_HIGH} bytes written to a stream wait for the peer, the
  * stream reads nothing more (a peer that doesn't read hears nothing more to answer), until they
  * are down to {@link #WRITE_LOW}; and a write that finds more than {@link #MAX_UNSENT} still
  * waiting fails the stream (stream_failed: the core reconnects) rather than buffering without
@@ -80,17 +61,13 @@ import javax.net.ssl.SSLException;
 final class Streams {
   /** How long a closed stream has to flush what was written before it is aborted. */
   static final long LINGER_MS = 2_000;
-  /** Bytes waiting for a file's writes beyond which the stream they come from stops reading... */
-  static final int HIGH_WATER = 4 << 20;
-  /** ...until they are down to this. */
-  static final int LOW_WATER = 1 << 20;
   /** Bytes written to a stream and not yet taken by the peer beyond which it stops reading... */
   static final int WRITE_HIGH = 64 << 10;
   /** ...until they are down to this. */
   static final int WRITE_LOW = 16 << 10;
   /** Bytes written to a stream and not yet taken by the peer beyond which the next write fails it. */
   static final long MAX_UNSENT = 16 << 20;
-  /** The most bytes one read takes, and one file write. */
+  /** The most bytes one read takes. */
   static final int CHUNK = 64 << 10;
 
   /** A connection: a TCP socket's streams (the platform's, or a test's in memory). */
@@ -314,23 +291,7 @@ final class Streams {
   private final Platform platform;
   private final Engines tls;
   private final Function<String, CoreProto.ProxyAnswer.Builder> proxies;
-  private final Disk disk;
-  private final Path stateFile;
-  private final LongFunction<Path> downloadPath;
   final InFlight in = new InFlight();
-  /** Downloads' files not yet answered, by download id (the loop and their threads). */
-  private final Map<Long, DownloadFile> files = new ConcurrentHashMap<>();
-  /** The downloads whose file was made, answered and not yet deleted (a discard deletes it). */
-  private final Set<Long> answered = ConcurrentHashMap.newKeySet();
-  /**
-   * The downloads whose answer (downloaded, download_failed) is made and on its way to the loop:
-   * a cancel or a discard the loop carries out first takes it from here, and the answer is
-   * dropped (nothing about a file follows its cancel).
-   */
-  private final Set<Long> telling = ConcurrentHashMap.newKeySet();
-  /** The stream whose bytes the core is being given: the download_data it makes of them came from it. Loop only. */
-  private Stream reading;
-
   /**
    * Core mode's executor. {@code loop}: the client's thread, where effects are carried out and
    * where {@code deliver} feeds the core; {@code tls}: a client engine for a host, with the
@@ -338,24 +299,18 @@ final class Streams {
    * only); {@code proxies}: the answer to proxy_query for a URL.
    */
   Streams(ScheduledExecutorService loop, Consumer<CoreProto.Input> deliver, Platform platform,
-      Engines tls, Function<String, CoreProto.ProxyAnswer.Builder> proxies, Disk disk,
-      Path stateFile, LongFunction<Path> downloadPath) {
+      Engines tls, Function<String, CoreProto.ProxyAnswer.Builder> proxies) {
     this.loop = loop;
     this.deliver = deliver;
     this.platform = platform;
     this.tls = tls;
     this.proxies = proxies;
-    this.disk = disk;
-    this.stateFile = stateFile;
-    this.downloadPath = downloadPath;
     // The loop's scheduler runs the linger timers (cancelled at shutdown).
     in.timers = loop;
   }
 
   /**
-   * Carry out {@code e} if it is one of core mode's (on the loop): false if it isn't, or if
-   * another must carry it out too (a cancel names a save as well as a download's file; a discard
-   * of a download this didn't write is the platform executor's).
+   * Carry out {@code e} if it is one of core mode's (on the loop): false if it isn't.
    */
   boolean run(CoreProto.Effect e) {
     switch (e.getKindCase()) {
@@ -388,29 +343,6 @@ final class Streams {
           in.close(s, e.getStreamClose().getAbort());
         }
       }
-      case STREAM_SPLICE -> {
-        Stream s = in.streams.get(e.getStreamSplice().getId());
-        if (s != null) {
-          s.splice = new long[] {e.getStreamSplice().getDownload(), e.getStreamSplice().getBytes()};
-        }
-      }
-      case DOWNLOAD_DATA -> append(e.getDownloadData().getId(), e.getDownloadData().getData().toByteArray(), reading);
-      case DOWNLOAD_DONE -> {
-        DownloadFile f = file(e.getDownloadDone().getId());
-        synchronized (f) {
-          f.done = true;
-        }
-        pump(f);
-      }
-      // A download's file the core is done with, or gave up on (cancel: its stream is closed
-      // already). A save's cancel is the platform executor's too.
-      case DISCARD -> {
-        return forget(e.getDiscard().getId());
-      }
-      case CANCEL -> {
-        forget(e.getCancel().getId());
-        return false;
-      }
       default -> {
         return false;
       }
@@ -418,65 +350,13 @@ final class Streams {
     return true;
   }
 
-  /** Download {@code id}'s file goes (once the write in flight is over): whether it was this one's. */
-  private boolean forget(long id) {
-    DownloadFile f = files.get(id);
-    if (f != null) {
-      synchronized (f) {
-        f.gone = true;
-      }
-    }
-    // From here its thread answers nothing; an answer it made before, still on its way to the
-    // loop, is dropped.
-    boolean told = telling.remove(id);
-    if (f != null) {
-      // (If it was answered as this looked, the file it made is deleted with the rest.)
-      answered.remove(id);
-      pump(f);
-      return true;
-    }
-    if (answered.remove(id)) {
-      // Answered already: only its file is left.
-      if (stateFile != null && !in.closed) {
-        Path path = downloadPath.apply(id);
-        in.task(platform, "opamp-download-" + id + "-remove", () -> {
-          try {
-            disk.remove(path);
-          } catch (IOException ex) {
-            // it goes at the next start
-          }
-        });
-      }
-      return true;
-    }
-    return told;
-  }
-
   /**
-   * Drop every stream and resolution, and every file not complete (once its write in flight is
-   * over), on the loop. The future completes when the file work is over (the caller bounds the
-   * wait); nothing is reported from now on.
+   * Drop every stream and resolution, on the loop: nothing is reported from now on. The future is
+   * complete: nothing is left to wait for.
    */
   CompletableFuture<Void> shutdown() {
     in.stopAll();
-    for (DownloadFile f : files.values()) {
-      synchronized (f) {
-        f.gone = true;
-      }
-      pump(f);
-    }
-    return in.tasks();
-  }
-
-  /** Bytes waiting for files' writes, all of them (for tests). */
-  long unwritten() {
-    long n = 0;
-    for (DownloadFile f : files.values()) {
-      synchronized (f) {
-        n += f.unwritten;
-      }
-    }
-    return n;
+    return CompletableFuture.completedFuture(null);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -697,45 +577,10 @@ final class Streams {
     }
   }
 
-  /** Bytes read from {@code s}: its splice's to a file, the rest to the core. */
+  /** Bytes read from {@code s}, to the core. */
   private void data(Stream s, byte[] data) {
-    int off = 0;
-    // Body bytes: straight to the file, past the core. Hearing a splice done, the core may ask for
-    // the next in that step: what it asks in answer to a stream's input applies to the very next
-    // bytes, so what is left of this chunk is then that splice's, not the core's.
-    while (s.splice != null) {
-      long[] sp = s.splice;
-      int n = (int) Math.min(sp[1] < 0 ? Long.MAX_VALUE : sp[1], data.length - off);
-      append(sp[0], Arrays.copyOfRange(data, off, off + n), s);
-      sp[1] -= n;
-      off += n;
-      if (sp[1] == 0) {
-        s.splice = null;
-        from(s, id(s.id, CoreProto.Input.Builder::setStreamSpliced));
-      }
-      // (Hearing the splice done, the shell may have closed the stream: nothing more.)
-      if (off == data.length || !mine(s)) {
-        return;
-      }
-      if (n == 0) {
-        // A splice of no bytes (the real core asks for none) took none: the rest is the core's,
-        // whatever it asked on hearing that one done (a core that answers each with another
-        // doesn't hold the loop).
-        break;
-      }
-    }
-    from(s, CoreProto.Input.newBuilder().setStreamData(CoreProto.WsMessage.newBuilder()
-        .setId(s.id).setData(ByteString.copyFrom(data, off, data.length - off))).build());
-  }
-
-  /** Deliver {@code i}, what {@code s} read: the download_data the core makes of it came from {@code s}. */
-  private void from(Stream s, CoreProto.Input i) {
-    reading = s;
-    try {
-      deliver.accept(i);
-    } finally {
-      reading = null;
-    }
+    deliver.accept(CoreProto.Input.newBuilder().setStreamData(CoreProto.WsMessage.newBuilder()
+        .setId(s.id).setData(ByteString.copyFrom(data))).build());
   }
 
   /**
@@ -841,237 +686,6 @@ final class Streams {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Files.
-
-  private DownloadFile file(long id) {
-    return files.computeIfAbsent(id, k -> new DownloadFile(k, stateFile == null ? null : downloadPath.apply(k)));
-  }
-
-  /**
-   * Queue {@code data} for the end of download {@code id}'s file (made at the first); {@code src}:
-   * the stream it came from, held while too much waits.
-   */
-  private void append(long id, byte[] data, Stream src) {
-    DownloadFile f = file(id);
-    synchronized (f) {
-      // After a failure (or a discard), the bytes go nowhere.
-      if (f.error != null || f.gone || data.length == 0) {
-        return;
-      }
-      f.queue.add(data);
-      f.unwritten += data.length;
-      if (src != null && f.unwritten > HIGH_WATER && f.paused.add(src)) {
-        synchronized (src) {
-          src.hold();
-        }
-      }
-    }
-    pump(f);
-  }
-
-  /** Carry {@code f} forward on a thread of its own, unless that is under way. */
-  private void pump(DownloadFile f) {
-    synchronized (f) {
-      if (f.busy) {
-        return;
-      }
-      f.busy = true;
-    }
-    in.task(platform, "opamp-download-" + f.id, () -> run(f));
-  }
-
-  private enum Act { CREATE, WRITE, FINISH, REMOVE }
-
-  /**
-   * Write what is queued; then, if it is done, sync and answer; if it is gone or failed, delete
-   * it. Each decision under the file's lock, the I/O outside it; it stops (not busy) only when a
-   * decision finds nothing to do, so whatever comes meanwhile is seen.
-   */
-  private void run(DownloadFile f) {
-    while (true) {
-      Act act;
-      List<byte[]> batch = null;
-      synchronized (f) {
-        if (f.gone || f.error != null) {
-          act = Act.REMOVE;
-        } else if (!f.queue.isEmpty() || f.done) {
-          if (f.handle == null && !f.made) {
-            act = Act.CREATE;
-          } else if (!f.queue.isEmpty()) {
-            act = Act.WRITE;
-            batch = new ArrayList<>();
-            long n = 0;
-            while (!f.queue.isEmpty() && (batch.isEmpty() || n + f.queue.peek().length <= CHUNK * 4L)) {
-              byte[] b = f.queue.poll();
-              batch.add(b);
-              n += b.length;
-            }
-          } else {
-            act = Act.FINISH;
-          }
-        } else {
-          f.busy = false;
-          return;
-        }
-      }
-      try {
-        switch (act) {
-          case CREATE -> {
-            if (f.path == null) {
-              throw new IOException("no state file");
-            }
-            disk.mkdir(f.path.getParent());
-            Disk.Handle h = disk.create(f.path, true);
-            synchronized (f) {
-              f.handle = h;
-              f.made = true;
-            }
-          }
-          case WRITE -> {
-            long n = 0;
-            try {
-              for (byte[] b : batch) {
-                f.handle.write(b, 0, b.length);
-                f.hash.update(b);
-                n += b.length;
-              }
-            } finally {
-              List<Stream> unpause = List.of();
-              synchronized (f) {
-                f.unwritten -= sum(batch);
-                if (f.unwritten <= LOW_WATER) {
-                  unpause = new ArrayList<>(f.paused);
-                  f.paused.clear();
-                }
-              }
-              release(unpause);
-            }
-          }
-          case FINISH -> {
-            // Complete: durable before the core hears of it.
-            Disk.Handle h = f.handle;
-            try {
-              h.sync();
-            } finally {
-              synchronized (f) {
-                f.handle = null;
-              }
-              h.close();
-            }
-            byte[] sha;
-            synchronized (f) {
-              if (f.gone) {
-                continue; // deleted next, and nothing said
-              }
-              answered.add(f.id);
-              telling.add(f.id);
-              files.remove(f.id, f);
-              f.busy = false;
-              sha = f.hash.digest();
-            }
-            tell(f.id, CoreProto.Input.newBuilder().setDownloaded(
-                CoreProto.Downloaded.newBuilder().setId(f.id).setSha256(ByteString.copyFrom(sha))).build());
-            return;
-          }
-          case REMOVE -> {
-            if (remove(f)) {
-              return;
-            }
-          }
-        }
-      } catch (IOException | RuntimeException e) {
-        synchronized (f) {
-          if (f.error == null) {
-            f.error = "writing " + f.path + ": " + detail(e, "failed");
-          }
-        }
-      }
-    }
-  }
-
-  private static long sum(List<byte[]> bs) {
-    long n = 0;
-    for (byte[] b : bs) {
-      n += b.length;
-    }
-    return n;
-  }
-
-  private static void release(List<Stream> streams) {
-    for (Stream s : streams) {
-      synchronized (s) {
-        s.release();
-      }
-    }
-  }
-
-  /**
-   * Close and delete a file that failed or is gone, then answer download_done if it came: whether
-   * the file is over (false: it failed and download_done is still to come).
-   */
-  private boolean remove(DownloadFile f) {
-    List<Stream> unpause;
-    Disk.Handle h;
-    boolean made;
-    synchronized (f) {
-      // Nothing more is written: the streams it held read on (into nothing, until they end).
-      f.queue.clear();
-      f.unwritten = 0;
-      unpause = new ArrayList<>(f.paused);
-      f.paused.clear();
-      h = f.handle;
-      f.handle = null;
-      made = f.made;
-    }
-    release(unpause);
-    if (h != null) {
-      try {
-        h.close();
-      } catch (IOException e) {
-        // deleted next
-      }
-    }
-    if (made) {
-      try {
-        disk.remove(f.path);
-      } catch (IOException e) {
-        // it goes at the next start
-      }
-    }
-    String error;
-    synchronized (f) {
-      if (f.gone) {
-        files.remove(f.id, f);
-        f.busy = false;
-        return true;
-      }
-      if (!f.done) {
-        f.busy = false;
-        return true;
-      }
-      telling.add(f.id);
-      files.remove(f.id, f);
-      f.busy = false;
-      error = f.error;
-    }
-    tell(f.id, CoreProto.Input.newBuilder().setDownloadFailed(
-        CoreProto.Failed.newBuilder().setId(f.id).setDetail(error == null ? "" : error)).build());
-    return true;
-  }
-
-  /**
-   * Report {@code i}, the answer about download {@code id}'s file, from the loop: unless the core
-   * cancelled or discarded the file before the loop got to it, or this has shut down.
-   */
-  private void tell(long id, CoreProto.Input i) {
-    post(() -> {
-      if (telling.remove(id) && !in.closed) {
-        deliver.accept(i);
-      }
-    });
-  }
-
-  // ---------------------------------------------------------------------------------------------
   // State.
 
   /** A name being resolved. */
@@ -1082,9 +696,8 @@ final class Streams {
 
   /**
    * Everything under way, by owner: streams by id, names being resolved by stream id, streams
-   * given up whose failure the core has yet to hear, closed streams still flushing (each with its
-   * linger timer), and file work. The loop's alone, but
-   * for {@link #tasks}: {@code close} and {@link #stopAll} end what is here; nothing under way
+   * given up whose failure the core has yet to hear, and closed streams still flushing (each with
+   * its linger timer). The loop's alone: {@code close} and {@link #stopAll} end what is here; nothing under way
    * is anywhere else.
    */
   static final class InFlight {
@@ -1094,37 +707,9 @@ final class Streams {
     final Map<Long, Stream> failing = new HashMap<>();
     /** Streams closed with what was written still going ({@link #LINGER_MS} at most), and their timers. */
     final Map<Stream, ScheduledFuture<?>> lingering = new HashMap<>();
-    /** File work under way (and deletions): shutdown waits for it. */
-    private final Map<CompletableFuture<Void>, String> work = new ConcurrentHashMap<>();
     volatile boolean closed;
     /** Where linger timers run: the loop. */
     ScheduledExecutorService timers;
-
-    /** Run {@code r} on a thread of its own, as work shutdown waits for. */
-    void task(Platform platform, String name, Runnable r) {
-      CompletableFuture<Void> done = new CompletableFuture<>();
-      work.put(done, name);
-      try {
-        platform.start(name, () -> {
-          try {
-            r.run();
-          } finally {
-            // Gone from the registry before anyone waiting for it hears it is over.
-            work.remove(done);
-            done.complete(null);
-          }
-        });
-      } catch (RuntimeException e) {
-        work.remove(done);
-        done.complete(null);
-        throw e;
-      }
-    }
-
-    /** The file work under way now, over. */
-    CompletableFuture<Void> tasks() {
-      return CompletableFuture.allOf(work.keySet().toArray(new CompletableFuture[0]));
-    }
 
     /** What is under way, if anything: empty if nothing (tests). */
     String left() {
@@ -1141,11 +726,6 @@ final class Streams {
       if (!lingering.isEmpty()) {
         b.append("lingering ").append(lingering.keySet().stream().map(s -> s.id).toList()).append(' ');
       }
-      // (The map's contents, not its size: a size can lag a removal that is over.)
-      List<String> files = new ArrayList<>(work.values());
-      if (!files.isEmpty()) {
-        b.append("file work ").append(files);
-      }
       return b.toString().strip();
     }
 
@@ -1157,7 +737,6 @@ final class Streams {
       if (streams.get(s.id) == s) {
         streams.remove(s.id);
       }
-      s.splice = null;
       s.unsent.clear();
       if (s.conn == null || abort || s.pending) {
         // Given up on (or never ready: nothing written has anywhere to go).
@@ -1225,41 +804,6 @@ final class Streams {
     }
   }
 
-  /** A download's file. */
-  static final class DownloadFile {
-    final long id;
-    final Path path;
-    /** Bytes waiting for the next write, in order. */
-    final ArrayDeque<byte[]> queue = new ArrayDeque<>();
-    /** How many bytes are queued or being written. */
-    long unwritten;
-    /** Streams not reading until the bytes waiting are down to LOW_WATER. */
-    final Set<Stream> paused = new LinkedHashSet<>();
-    /** Of the bytes written (touched only by the write in flight). */
-    final MessageDigest hash;
-    /** A write is running: only it touches the handle and the hash. */
-    boolean busy;
-    /** The file was made (by this: only then is it this one's to delete). */
-    boolean made;
-    /** download_done came: sync, close and answer once everything queued is written. */
-    boolean done;
-    /** Discarded or cancelled (or shut down): delete it, say nothing. */
-    boolean gone;
-    /** A write failed: the file is deleted, and download_done is answered with this. */
-    String error;
-    Disk.Handle handle;
-
-    DownloadFile(long id, Path path) {
-      this.id = id;
-      this.path = path;
-      try {
-        this.hash = MessageDigest.getInstance("SHA-256");
-      } catch (NoSuchAlgorithmException e) {
-        throw new IllegalStateException(e);
-      }
-    }
-  }
-
   /** A TLS layer of a stream: an engine, and the bytes from below it not yet unwrapped. */
   static final class TlsLayer {
     final SSLEngine engine;
@@ -1292,8 +836,6 @@ final class Streams {
     boolean pending = true;
     /** Written while pending: sent once it is ready. */
     final List<byte[]> unsent = new ArrayList<>();
-    /** Its next bytes go to a download's file: which download, and how many are left. */
-    long[] splice;
     // Under its lock.
     /** Bytes for the socket, in order (the first being written). */
     final ArrayDeque<byte[]> out = new ArrayDeque<>();
@@ -1305,7 +847,7 @@ final class Streams {
     boolean writing = true;
     /** Closed: the FIN goes once {@link #out} is written. */
     boolean finishing;
-    /** Why it is not reading: how many files it waits for, and a full write buffer. */
+    /** Why it is not reading: how many reasons hold it (a full write buffer). */
     int holds;
     boolean blocked;
     /** A chunk read is with the loop: the next read waits for it. */

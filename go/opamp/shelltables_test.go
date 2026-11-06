@@ -224,7 +224,7 @@ func TestTheSharedURLTableCoreMode(t *testing.T) {
 			scheme = "ws"
 		}
 		before := srv.count()
-		c, err := Start(context.Background(), Config{Endpoint: scheme + "://" + base + e.Target, Mode: ModeCore,
+		c, err := startFull(context.Background(), Config{Endpoint: scheme + "://" + base + e.Target, Mode: ModeCore,
 			Proxy: Proxy{Direct: true}, InstanceUID: [16]byte{1}, HeartbeatInterval: time.Hour}, Status{}, nil)
 		if err != nil {
 			wrong = append(wrong, fmt.Sprintf("%s: start: %v", e.URL, err))
@@ -591,7 +591,7 @@ func TestTheSharedTLSTable(t *testing.T) {
 			}
 			// Core mode's TLS, from the same settings: Start takes them, or refuses them at once.
 			coreOK := false
-			if cl, err := Start(context.Background(), Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: opts,
+			if cl, err := startFull(context.Background(), Config{Endpoint: "http://127.0.0.1:9/", Mode: ModeCore, TLS: opts,
 				Proxy: Proxy{Direct: true}, HeartbeatInterval: time.Hour}, Status{}, nil); err == nil {
 				coreOK = true
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

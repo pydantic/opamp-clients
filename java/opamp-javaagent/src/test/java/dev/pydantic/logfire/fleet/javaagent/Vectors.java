@@ -70,13 +70,56 @@ final class Vectors {
         .setConfigHash(ByteString.copyFromUtf8(document)).build();
   }
 
+  /** What the layer's agent flow decides of a remote config: the answer, and the settings to put in force (null: none). */
+  record Decided(Opamp.RemoteConfigStatus status, SettingsProto.Settings apply) {}
+
+  /**
+   * A remote config of {@code document}, to the layer's agent flow just started for {@code host} at
+   * {@code nowUnixMs}, with somewhere to keep state.
+   */
+  static Decided decide(String document, SettingsProto.Host host, long nowUnixMs) {
+    SettingsProto.AgentOutput started = LAYER.start(SettingsProto.AgentStart.newBuilder().setHost(host)
+        .setStateDir(true).setInstanceUid(ByteString.copyFrom(new byte[16]))
+        .setNowUnixMs(nowUnixMs).setNowMonoMs(nowUnixMs).build());
+    SettingsProto.AgentOutput out = LAYER.step(SettingsProto.AgentStep.newBuilder().setAgent(started.getAgent())
+        .setNowUnixMs(nowUnixMs).setNowMonoMs(nowUnixMs).setRemoteConfig(config(document)).build());
+    Opamp.RemoteConfigStatus status = Opamp.RemoteConfigStatus.getDefaultInstance();
+    SettingsProto.Settings apply = null;
+    for (SettingsProto.AgentEffect e : out.getEffectsList()) {
+      if (e.hasStatus()) {
+        status = e.getStatus();
+      } else if (e.hasApply()) {
+        apply = e.getApply();
+      }
+    }
+    return new Decided(status, apply);
+  }
+
+  /**
+   * The settings in force at a start from the config the client kept applied, a policy of {@code
+   * document} (next-start ones included), for {@code host} at {@code nowUnixMs}; and whether the
+   * start warned.
+   */
+  static SettingsProto.Settings started(String document, SettingsProto.Host host, long nowUnixMs) {
+    SettingsProto.AgentOutput out = LAYER.start(SettingsProto.AgentStart.newBuilder().setHost(host)
+        .setStateDir(true).setInstanceUid(ByteString.copyFrom(new byte[16]))
+        .setCoreState(ByteString.copyFrom(Kept.coreState(document)))
+        .setNowUnixMs(nowUnixMs).setNowMonoMs(nowUnixMs).build());
+    for (SettingsProto.AgentEffect e : out.getEffectsList()) {
+      if (e.hasLog() && e.getLog().getLevelValue() >= SettingsProto.AgentLog.Level.WARN_VALUE) {
+        throw new AssertionError(document + ": " + e.getLog().getText());
+      }
+    }
+    return out.getEffectsList().stream().filter(SettingsProto.AgentEffect::hasApply).reduce((a, b) -> b)
+        .orElseThrow().getApply();
+  }
+
   /** The settings a policy puts in force, every setting declared, at {@code nowUnixMs}. */
   static SettingsProto.Settings settings(String document, long nowUnixMs) {
-    SettingsProto.Decision d = LAYER.decide(config(document), ByteString.EMPTY, ByteString.EMPTY, ALL,
-        nowUnixMs, null);
-    assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.getStatus().getStatus(),
-        document + ": " + d.getStatus().getErrorMessage());
-    return d.getApply();
+    Decided d = decide(document, ALL, nowUnixMs);
+    assertEquals(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED, d.status().getStatus(),
+        document + ": " + d.status().getErrorMessage());
+    return d.apply();
   }
 
   /** A case's settings, at its clock. */

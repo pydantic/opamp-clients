@@ -183,7 +183,7 @@ class OutsideTest {
       assertEquals(Map.of("console", true, "InMemoryLogRecordExporter", false), listed.get("logs"));
       assertEquals(Map.of("console", true, "InMemoryMetricReader", false), listed.get("metrics"));
       // And so does export health: a child each, the ungoverned one healthy all the same.
-      Opamp.ComponentHealth traces = e.health(e.controls.counts(), e.inForce(), Vectors.NOW)
+      Opamp.ComponentHealth traces = e.exportersNowForTest()
           .getComponentHealthMapMap().get("exporters").getComponentHealthMapMap().get("traces");
       assertEquals("ungoverned", traces.getComponentHealthMapMap().get("InMemorySpanExporter").getStatus());
       assertTrue(traces.getComponentHealthMapMap().get("InMemorySpanExporter").getHealthy());

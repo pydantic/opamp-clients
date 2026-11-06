@@ -26,8 +26,7 @@ public sealed record OpAmpClientOptions
 
     /// <summary>
     /// Capabilities the agent supports (AgentCapabilities bits), fixed for the run. ReportsStatus is
-    /// always added, and the core adds the bits of what it does itself (packages, connection
-    /// settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
+    /// always added, and the core adds the bits of what it does itself (connection settings). Declare ReportsHeartbeat for heartbeats, and the Reports* bit of each status you
     /// set: a status whose bit isn't declared isn't sent.
     /// </summary>
     public ulong Capabilities { get; init; }
@@ -69,13 +68,13 @@ public sealed record OpAmpClientOptions
     public long MaxReceiveBytes { get; init; }
 
     /// <summary>
-    /// TLS for https:// and wss:// endpoints and package downloads: the CAs to trust, a client
+    /// TLS for https:// and wss:// endpoints: the CAs to trust, a client
     /// certificate, the TLS versions. Default: the system's CAs, TLS 1.2 or 1.3, no client certificate.
     /// </summary>
     public OpAmpTlsOptions? Tls { get; init; }
 
     /// <summary>
-    /// A proxy for every connection (requests, the WebSocket, package downloads):
+    /// A proxy for every connection (requests, the WebSocket):
     /// <c>http://</c>, <c>https://</c>, <c>socks5://</c> or <c>socks5h://</c>, with credentials as
     /// <c>user:password@</c>. With <c>socks5://</c> and <c>socks5h://</c> alike the proxy resolves
     /// the server's host name (unlike curl, where <c>socks5://</c> resolves it locally), unless
@@ -110,8 +109,8 @@ public sealed record OpAmpClientOptions
     /// Your own HttpClient, instead of <see cref="Tls"/>, <see cref="Proxy"/> and
     /// <see cref="DirectConnection"/> (setting any of them with it is an error). Only
     /// <see cref="OpAmpMode.Platform"/> (advanced) can use it, and it must be named: without
-    /// <see cref="Mode"/> set to <see cref="OpAmpMode.Platform"/> it is an error. It carries everything: requests, the WebSocket
-    /// upgrade and package downloads. Build it on a handler that doesn't follow redirects or
+    /// <see cref="Mode"/> set to <see cref="OpAmpMode.Platform"/> it is an error. It carries everything: requests and the WebSocket
+    /// upgrade. Build it on a handler that doesn't follow redirects or
     /// decompress (<c>AllowAutoRedirect = false</c>, the default decompression): a 3xx goes to the
     /// core as it is, which decides what it means, and the core asks for no compression. The
     /// client doesn't dispose it.
@@ -136,14 +135,6 @@ public sealed record OpAmpClientOptions
     public TimeSpan VerifyTimeout { get; init; }
 
     /// <summary>
-    /// Take packages from the server (docs/packages.md): the client downloads them beside the
-    /// <see cref="StateFile"/> (its path and <c>.downloads</c>) and the application installs them
-    /// (<see cref="OpAmpNotification.InstallPackage"/>, <see cref="OpAmpNotification.RemovePackage"/>).
-    /// Only with a <see cref="StateFile"/>: a restart would forget what the agent has.
-    /// </summary>
-    public bool AcceptPackages { get; init; }
-
-    /// <summary>
     /// Ask the server to assign the instance UID (the RequestInstanceUid flag,
     /// docs/instance-uid.md). The UID the client starts with (made up, or <see cref="InstanceUid"/>)
     /// is the temporary value until the server assigns one. With a <see cref="StateFile"/> the
@@ -152,15 +143,6 @@ public sealed record OpAmpClientOptions
     /// covers: OPAMP-UID-04
     /// </summary>
     public bool RequestInstanceUid { get; init; }
-
-    /// <summary>The largest package file downloaded; default 1 GiB.</summary>
-    public ulong MaxPackageBytes { get; init; }
-
-    /// <summary>
-    /// How long a download may take; default 10 minutes. The core keeps this time and cancels a
-    /// download that passes it.
-    /// </summary>
-    public TimeSpan DownloadTimeout { get; init; }
 
     /// <summary>
     /// The clock and timers the client keeps its time with (the core's timer, the core's clock,
@@ -172,20 +154,13 @@ public sealed record OpAmpClientOptions
     /// <summary>
     /// Who speaks HTTP and WebSocket. <see cref="OpAmpMode.Core"/>: the shared core itself
     /// (HTTP/1.1, WebSocket, CONNECT and SOCKS5), over the client's own TCP connections and
-    /// SslStream with <see cref="Tls"/>; .NET only opens connections, starts TLS, answers which
-    /// proxy to use and writes package files. <see cref="OpAmpMode.Platform"/>: .NET's HttpClient
+    /// SslStream with <see cref="Tls"/>; .NET only opens connections, starts TLS and answers which
+    /// proxy to use. <see cref="OpAmpMode.Platform"/>: .NET's HttpClient
     /// and ClientWebSocket (advanced). Default (null): core mode. Nothing switches modes silently:
     /// an option only one mode honours (<see cref="HttpClient"/> is platform mode's) makes
     /// <c>Start</c> throw with what to set instead, unless that mode is named.
     /// </summary>
     public OpAmpMode? Mode { get; init; }
-
-    /// <summary>
-    /// Core mode: package files go from the socket to the file without passing through the core,
-    /// where the response says how long the body is. Default true. It is core mode's: false in
-    /// <see cref="OpAmpMode.Platform"/> is an error.
-    /// </summary>
-    public bool SpliceDownloads { get; init; } = true;
 
     /// <summary>
     /// What ToString prints: every member, but not the headers' values or a password in
@@ -211,13 +186,9 @@ public sealed record OpAmpClientOptions
         (nameof(this.StateFile), this.StateFile),
         (nameof(this.AcceptConnectionSettings), this.AcceptConnectionSettings),
         (nameof(this.VerifyTimeout), this.VerifyTimeout),
-        (nameof(this.AcceptPackages), this.AcceptPackages),
         (nameof(this.RequestInstanceUid), this.RequestInstanceUid),
-        (nameof(this.MaxPackageBytes), this.MaxPackageBytes),
-        (nameof(this.DownloadTimeout), this.DownloadTimeout),
         (nameof(this.TimeProvider), this.TimeProvider),
-        (nameof(this.Mode), this.Mode),
-        (nameof(this.SpliceDownloads), this.SpliceDownloads));
+        (nameof(this.Mode), this.Mode));
 }
 
 /// <summary>Who speaks HTTP and WebSocket: <see cref="OpAmpClientOptions.Mode"/>.</summary>
@@ -254,12 +225,6 @@ public sealed record OpAmpStatus
     /// the hash, and the components in full when it asks.
     /// </summary>
     public AvailableComponents? AvailableComponents { get; init; }
-
-    /// <summary>
-    /// The custom capabilities the agent supports: custom messages for them reach the application,
-    /// and it may send them.
-    /// </summary>
-    public CustomCapabilities? CustomCapabilities { get; init; }
 }
 
 /// <summary>What the application is told.</summary>
@@ -292,45 +257,11 @@ public abstract record OpAmpNotification
             Redacted.Print(builder, (nameof(this.Settings), Redacted.Message(this.Settings)));
     }
 
-    /// <summary>A custom message from the server, for a custom capability the agent declared.</summary>
-    public sealed record CustomMessage(global::OpAmp.Proto.V1.CustomMessage Message) : OpAmpNotification;
-
-    /// <summary>The custom capabilities the server supports changed.</summary>
-    public sealed record ServerCustomCapabilities(IReadOnlyList<string> Capabilities) : OpAmpNotification;
-
-    /// <summary>A custom message the application sent won't be, and why.</summary>
-    public sealed record CustomMessageNotSent(global::OpAmp.Proto.V1.CustomMessage Message, string Reason) : OpAmpNotification;
-
-    /// <summary>A command from the server.</summary>
-    public sealed record Command(ServerToAgentCommand Value) : OpAmpNotification;
-
     /// <summary>The server assigned a new instance UID; persist it if you persist the UID.</summary>
     public sealed record InstanceUidChanged(byte[] InstanceUid) : OpAmpNotification;
 
     /// <summary>The heartbeat or polling interval changed (zero: heartbeats off).</summary>
     public sealed record HeartbeatInterval(TimeSpan Interval) : OpAmpNotification;
-
-    /// <summary>
-    /// Install package <paramref name="Name"/> (<paramref name="Package"/>: version, hash, type, the
-    /// file's signature) from the file at <paramref name="Path"/>; checking the signature is the
-    /// application's job. Answer with <see cref="OpAmpClient.PackageInstalled"/>; the client
-    /// deletes the file after the answer.
-    /// </summary>
-    public sealed record InstallPackage(string Name, PackageAvailable Package, string Path) : OpAmpNotification
-    {
-        /// <summary>What ToString prints: every member, but the download's headers without their values and its URL without a password.</summary>
-        protected override bool PrintMembers(StringBuilder builder) => Redacted.Print(
-            builder,
-            (nameof(this.Name), this.Name),
-            (nameof(this.Package), Redacted.Message(this.Package)),
-            (nameof(this.Path), this.Path));
-    }
-
-    /// <summary>
-    /// Remove package <paramref name="Name"/>, no longer offered; answer with
-    /// <see cref="OpAmpClient.PackageRemoved"/>.
-    /// </summary>
-    public sealed record RemovePackage(string Name) : OpAmpNotification;
 
     /// <summary>
     /// A status field was left out of a message because it was too large: <paramref name="Field"/>
@@ -352,7 +283,7 @@ public abstract record OpAmpNotification
     /// <summary>
     /// The saved state is a newer core's, in a format (<paramref name="Version"/>) this one can't
     /// read: the client starts from its configuration, as on first use, and saves nothing (no
-    /// offered connection settings, no packages), leaving that state as it is. Worth a warning: an
+    /// offered connection settings), leaving that state as it is. Worth a warning: an
     /// older release was started on a newer one's state file.
     /// </summary>
     public sealed record StateFromNewerVersion(uint Version) : OpAmpNotification;
@@ -383,10 +314,8 @@ public abstract record OpAmpNotification
 /// </remarks>
 public sealed class OpAmpClient
 {
-    // Once the core has stopped, at least this for the work it cancelled to unwind (a download's
-    // file deleted once the write in flight is over), however much of the stop timeout the core
-    // took: as every SDK. 250 ms was too little on a loaded runner (Java's, the nightly of
-    // 2026-10-23: a download's file deleted after stop had returned).
+    // Once the core has stopped, at least this for the work it cancelled to unwind (a request
+    // aborted, a stream reset), however much of the stop timeout the core took: as every SDK.
     private static readonly TimeSpan StopGrace = TimeSpan.FromSeconds(1);
 
     // stopCalled before StopAsync.
@@ -432,12 +361,6 @@ public sealed class OpAmpClient
             OpAmpMode.Core => true,
             _ => throw new ArgumentException($"Mode is Core or Platform, not {options.Mode}", nameof(options)),
         };
-        if (!coreMode && !options.SpliceDownloads)
-        {
-            // Nothing one mode alone honours is ignored.
-            throw new ArgumentException("SpliceDownloads is core mode's (HttpClient writes package files itself): leave it true, or run in core mode (no HttpClient, and Mode unset or Core)", nameof(options));
-        }
-
         // First: bad TLS or proxy settings throw here. In core mode the platform's transport
         // carries only what a core that isn't the real one hands over (the real core asks for
         // streams).
@@ -467,12 +390,8 @@ public sealed class OpAmpClient
             MaxReceiveBytes = Bytes(options.MaxReceiveBytes),
             AcceptConnectionSettings = options.AcceptConnectionSettings,
             VerifyTimeoutMs = Ms(options.VerifyTimeout),
-            AcceptPackages = options.AcceptPackages,
             RequestInstanceUid = options.RequestInstanceUid,
-            MaxPackageBytes = options.MaxPackageBytes,
-            DownloadTimeoutMs = Ms(options.DownloadTimeout),
             Streams = coreMode,
-            SpliceDownloads = coreMode && options.SpliceDownloads,
             // Core mode: the core picks each connection's proxy from this.
             Proxy = coreMode ? CoreProxyChoice(options, seams?.Environment ?? Environment.GetEnvironmentVariable) : null,
         };
@@ -487,16 +406,9 @@ public sealed class OpAmpClient
         config.Headers.AddRange(options.Headers.Select(h => new Header { Name = h.Key, Value = h.Value }));
         Func<string, string?>? getenv = seams?.Tap is { } tap ? name => name == CoreTap.Variable ? tap : null : null;
         this.core = new CoreInstance(config, getenv, seams?.Core);
-        if (options.StateFile is { } downloadsOf)
-        {
-            // Files downloaded before a restart: the core downloads again what it still needs.
-            // (Once the core has taken the config: not for one it refuses.)
-            Executor.DeleteDownloads(downloadsOf, files);
-        }
-
         if (this.core.Tap is { } t && options.StateFile is { } state)
         {
-            // Tapped: the file operations of its saves and downloads are recorded too.
+            // Tapped: the file operations of its saves are recorded too.
             files = new FileJournal(files, t, state);
         }
 
@@ -506,7 +418,7 @@ public sealed class OpAmpClient
         if (coreMode)
         {
             this.streams = new Streams(
-                this.executor, this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), _ => ProxyAnswerFor(options), seams?.Net, this.time);
+                this.Enqueue, ClientTransport.SslOptions(options.Tls ?? new OpAmpTlsOptions()), _ => ProxyAnswerFor(options), seams?.Net, this.time);
         }
 
         // All of stop takes the core's stop timeout, as given or by default: its start reports it.
@@ -573,11 +485,6 @@ public sealed class OpAmpClient
             c.Post(new Input { SetAvailableComponents = a });
         }
 
-        if (status.CustomCapabilities is { } cc)
-        {
-            c.Post(new Input { SetCustomCapabilities = cc });
-        }
-
         c.Post(new Input { Start = new Empty() });
         _ = Task.Run(c.RunAsync);
         c.started.SetResult(); // the loop steps, and notifies, from now on
@@ -615,7 +522,7 @@ public sealed class OpAmpClient
     /// <summary>Inputs queued for the loop, not yet stepped: for tests, to wait until it is idle.</summary>
     internal int Queued => Volatile.Read(ref this.queued);
 
-    /// <summary>Effects' work still running (requests, connections, downloads, saves): for tests.</summary>
+    /// <summary>Effects' work still running (requests, connections, saves): for tests.</summary>
     internal int Working => this.executor.InFlight.Working + (this.streams?.In.Working ?? 0);
 
     /// <summary>Core mode's streams open, connecting or lingering: for tests.</summary>
@@ -633,16 +540,6 @@ public sealed class OpAmpClient
     /// <summary>Change the effective config.</summary>
     public void SetEffectiveConfig(EffectiveConfig value) => this.Call(new Input { SetEffectiveConfig = value });
 
-    /// <summary>Change the custom capabilities the agent supports.</summary>
-    public void SetCustomCapabilities(CustomCapabilities value) => this.Call(new Input { SetCustomCapabilities = value });
-
-    /// <summary>
-    /// Send a custom message, for one of the agent's custom capabilities. It goes with the next
-    /// message the server takes, and again if that message is lost; if it can't be sent at all, a
-    /// <see cref="OpAmpNotification.CustomMessageNotSent"/> says why.
-    /// </summary>
-    public void SendCustomMessage(global::OpAmp.Proto.V1.CustomMessage value) => this.Call(new Input { SendCustomMessage = value });
-
     /// <summary>Change the components the agent has (leave the hash empty: the core computes it).</summary>
     public void SetAvailableComponents(AvailableComponents value) => this.Call(new Input { SetAvailableComponents = value });
 
@@ -652,33 +549,6 @@ public sealed class OpAmpClient
     /// <summary>Report on telemetry settings (the answer to a <see cref="OpAmpNotification.ConnectionSettings"/>).</summary>
     public void SetConnectionSettingsStatus(ConnectionSettingsStatus value) =>
         this.Call(new Input { SetConnectionSettingsStatus = value });
-
-    /// <summary>
-    /// Answer <see cref="OpAmpNotification.InstallPackage"/>: the package at <paramref name="hash"/>
-    /// is installed (<paramref name="error"/> null), or why it isn't.
-    /// </summary>
-    public void PackageInstalled(string name, byte[] hash, string? error = null) =>
-        this.Call(new Input
-        {
-            PackageInstalled = new Core.PackageInstalled
-            {
-                Name = name, Hash = ByteString.CopyFrom(hash), Ok = error is null, Detail = error ?? string.Empty,
-            },
-        });
-
-    /// <summary>
-    /// Answer <see cref="OpAmpNotification.RemovePackage"/>: the package is removed
-    /// (<paramref name="error"/> null), or why it isn't. One that isn't is reported failed, and not
-    /// removed again until it is offered and dropped again.
-    /// </summary>
-    public void PackageRemoved(string name, string? error = null) =>
-        this.Call(new Input
-        {
-            PackageRemoved = new Core.PackageRemoved
-            {
-                Name = name, Failed = error is not null, Detail = error ?? string.Empty,
-            },
-        });
 
     /// <summary>
     /// Send agent_disconnect if a message can still be sent, then stop: the task ends when the
@@ -791,15 +661,6 @@ public sealed class OpAmpClient
         Notification.KindOneofCase.ErrorResponse => new OpAmpNotification.ErrorResponse(n.ErrorResponse.Kind, n.ErrorResponse.Message),
         Notification.KindOneofCase.RemoteConfig => new OpAmpNotification.RemoteConfig(n.RemoteConfig),
         Notification.KindOneofCase.ConnectionSettings => new OpAmpNotification.ConnectionSettings(n.ConnectionSettings),
-        Notification.KindOneofCase.CustomMessage => new OpAmpNotification.CustomMessage(n.CustomMessage),
-        Notification.KindOneofCase.ServerCustomCapabilities =>
-            new OpAmpNotification.ServerCustomCapabilities(n.ServerCustomCapabilities.Capabilities.ToList()),
-        Notification.KindOneofCase.CustomMessageNotSent =>
-            new OpAmpNotification.CustomMessageNotSent(n.CustomMessageNotSent.Message, n.CustomMessageNotSent.Reason),
-        Notification.KindOneofCase.InstallPackage => new OpAmpNotification.InstallPackage(
-            n.InstallPackage.Name, n.InstallPackage.Package, this.executor.DownloadPath(n.InstallPackage.Download)),
-        Notification.KindOneofCase.RemovePackage => new OpAmpNotification.RemovePackage(n.RemovePackage.Name_),
-        Notification.KindOneofCase.Command => new OpAmpNotification.Command(n.Command),
         Notification.KindOneofCase.InstanceUidChanged => new OpAmpNotification.InstanceUidChanged(n.InstanceUidChanged.ToByteArray()),
         Notification.KindOneofCase.HeartbeatIntervalMs => new OpAmpNotification.HeartbeatInterval(
             n.HeartbeatIntervalMs > MaxSpanMs ? TimeSpan.MaxValue : TimeSpan.FromMilliseconds(n.HeartbeatIntervalMs)),
@@ -910,9 +771,9 @@ public sealed class OpAmpClient
         }
     }
 
-    /// <summary>Whether <paramref name="effect"/> starts something: a request, a connection, a download, a stream, a resolution.</summary>
+    /// <summary>Whether <paramref name="effect"/> starts something: a request, a connection, a stream, a resolution.</summary>
     internal static bool Starts(Effect effect) => effect.KindCase is Effect.KindOneofCase.HttpRequest or Effect.KindOneofCase.WsOpen
-        or Effect.KindOneofCase.Download or Effect.KindOneofCase.StreamOpen or Effect.KindOneofCase.StreamResolve;
+        or Effect.KindOneofCase.StreamOpen or Effect.KindOneofCase.StreamResolve;
 
     private async Task RunAsync()
     {
@@ -947,10 +808,9 @@ public sealed class OpAmpClient
             }
 
             // Stopped is told last: the core may hand over a notification after it in the same
-            // output (install_package, in the step that answers a save after stop), and
+            // output, and
             // nothing reaches the application after Stopped (RULE-SHELL-01).
             OpAmpNotification.Stopped? stopped = null;
-            this.streams?.Stepping(q);
             foreach (var effect in output.Effects)
             {
                 if (effect.KindCase == Effect.KindOneofCase.Notify)
@@ -979,13 +839,11 @@ public sealed class OpAmpClient
                 }
                 else if (this.streams?.Run(effect) != true)
                 {
-                    // Core mode: what isn't a stream's or a download file's (a save, a cancel, a
-                    // platform effect from a core that isn't the real one) is the executor's.
+                    // Core mode: what isn't a stream's (a save, a cancel, a platform effect from a
+                    // core that isn't the real one) is the executor's.
                     this.executor.Run(effect);
                 }
             }
-
-            this.streams?.Stepping(null);
 
             if (stopped is not null)
             {
@@ -1118,7 +976,7 @@ internal sealed record Seams
     /// </summary>
     public Action<Queued, Output>? Stepped { get; init; }
 
-    /// <summary>The file operations its saves and downloads go through (to inject faults).</summary>
+    /// <summary>The file operations its saves go through (to inject faults).</summary>
     public IFileOps? Files { get; init; }
 
     /// <summary>Its own core tap's path, instead of OPAMP_CORE_TAP's.</summary>

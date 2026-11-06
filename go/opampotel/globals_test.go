@@ -131,7 +131,8 @@ func TestAGlobalProviderSetInPlaceOfSetupsIsReportedUngoverned(t *testing.T) {
 			if st := a.remoteConfig(context.Background(), remote(everySignal)); st.GetStatus() != applied {
 				t.Fatalf("status %v", st)
 			}
-			a.lookAtGlobals() // nothing replaced: nothing reported
+			reported := len(r.effective) // the config's own
+			a.lookAtGlobals()            // nothing replaced: nothing reported
 			if len(r.components) != 0 || len(r.health) != 0 {
 				t.Fatalf("Setup's providers still global: %d inventories, %d health reports", len(r.components), len(r.health))
 			}
@@ -149,7 +150,7 @@ func TestAGlobalProviderSetInPlaceOfSetupsIsReportedUngoverned(t *testing.T) {
 				t.Fatalf("export health %v: ungoverned, and healthy all the same", child)
 			}
 			// Nothing set aside: every override stays in force, and nothing more is reported of it.
-			if got := setAside(t, a, everySignal); got != nil || len(r.effective) != 0 {
+			if got := setAside(t, a, everySignal); got != nil || len(r.effective) != reported {
 				t.Fatalf("set aside %v, %d effective configs reported", got, len(r.effective))
 			}
 			for k, sending := range sentSignals(c) {

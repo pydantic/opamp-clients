@@ -7,16 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ByteString;
-import java.nio.file.Path;
 import java.util.Random;
 import opamp.proto.v1.Opamp;
 import org.junit.jupiter.api.Test;
 
 /**
  * Noninterference of secrets, as .NET's RedactionTests: the notifications that carry what the
- * server offers (a ConnectionSettings and an InstallPackage) print the same whatever the secrets'
- * values, each as long in both. No header's value, private key, or password in an endpoint's,
- * proxy's or download's URL.
+ * server offers (a ConnectionSettings) print the same whatever the secrets' values, each as long
+ * in both. No header's value, private key, or password in an endpoint's or proxy's URL.
  */
 class RedactionTest {
   // A secret's characters: those a URL's user-info holds as they are.
@@ -68,17 +66,7 @@ class RedactionTest {
                     .setProxy(proxy(token, password))
                     .build())
             .build();
-    var pkg =
-        Opamp.PackageAvailable.newBuilder()
-            .setVersion("1.0")
-            .setFile(
-                Opamp.DownloadableFile.newBuilder()
-                    .setDownloadUrl("https://agent:" + password + "@cdn.example/pkg")
-                    .setHeaders(headers(token)))
-            .build();
-    return new Notification.ConnectionSettings(offers)
-        + "\n"
-        + new Notification.InstallPackage("pkg", pkg, Path.of("/downloads/pkg"));
+    return new Notification.ConnectionSettings(offers).toString();
   }
 
   /** Two different secrets of one length. */
@@ -117,7 +105,7 @@ class RedactionTest {
     for (String part :
         new String[] {
           "opamp.example/v1/opamp", "Authorization", "proxy.example:3128", "agent", "CERT", "CA",
-          "otlp.example/v1/logs", "db.example:5432", "cdn.example/pkg", "/downloads/pkg",
+          "otlp.example/v1/logs", "db.example:5432",
           "value: \"<redacted>\"", "private_key: \"<redacted>\"", "agent:***@"
         }) {
       assertTrue(shown.contains(part), part + " in " + shown);
@@ -129,9 +117,7 @@ class RedactionTest {
   void everyComponentIsPrinted() {
     for (Record value :
         new Record[] {
-          new Notification.ConnectionSettings(Opamp.ConnectionSettingsOffers.getDefaultInstance()),
-          new Notification.InstallPackage(
-              "pkg", Opamp.PackageAvailable.getDefaultInstance(), Path.of("/downloads/pkg"))
+          new Notification.ConnectionSettings(Opamp.ConnectionSettingsOffers.getDefaultInstance())
         }) {
       String shown = value.toString();
       for (var component : value.getClass().getRecordComponents()) {

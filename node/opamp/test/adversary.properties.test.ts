@@ -24,7 +24,7 @@
 // testdata/core/opamp_core_adversary.wasm in this repository).
 
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, get, type IncomingMessage, STATUS_CODES, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -295,25 +295,6 @@ interface SeedResult {
   verdict: Verdict | undefined;
 }
 
-/** A listing of the downloads directory: name, size and modification time of each file. */
-function listing(dir: string): string {
-  try {
-    return readdirSync(dir)
-      .sort()
-      .map((f) => {
-        try {
-          const s = statSync(join(dir, f));
-          return `${f}:${s.size}:${s.mtimeMs}`;
-        } catch {
-          return `${f}:gone`;
-        }
-      })
-      .join(" ");
-  } catch {
-    return "";
-  }
-}
-
 /** The store id in data the adversary saved ("opamp-adversary seed S store ID ..."), if any. */
 function storeId(data: Buffer): number | undefined {
   const m = /^opamp-adversary seed \d+ store (\d+) /.exec(data.subarray(0, 80).toString("latin1"));
@@ -325,7 +306,6 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
   const fail = (s: string) => failures.push(s);
   const dir = mkdtempSync(join(tmpdir(), `opamp-adversary-${seed}-`));
   const stateFile = join(dir, "state.bin");
-  const downloads = `${stateFile}.downloads`;
   const run = server.run(String(seed));
   let returned = false;
   let depth = 0;
@@ -402,7 +382,9 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
   }
   // In either mode the adversary hands the shell platform effects, for the executor's fetch and ws.
   // No proxy: core mode reads HTTP_PROXY and the like, and the local server is reached directly.
-  const config: Config = { endpoint: `http://127.0.0.1:${server.port}/opamp?seed=${seed}${query}`, stateFile, mode, proxy: false, tls };
+  // downloads=0: this client takes no packages, so the adversary, as the real core, hands it no
+  // download.
+  const config: Config = { endpoint: `http://127.0.0.1:${server.port}/opamp?seed=${seed}&downloads=0${query}`, stateFile, mode, proxy: false, tls };
   try {
     client = Client.start(
       Object.assign(config, { [TEST_CORE_MODULE]: adversary() }),
@@ -456,8 +438,7 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
   else if (result !== "ok" && !failures.includes(result)) fail(result);
   if (result !== "timeout" && !stoppedSeen) fail("stop returned, and no stopped came (RULE-SHELL-02)");
 
-  // After stop: connections close (within the window), nothing new arrives, downloads are done.
-  const before = listing(downloads);
+  // After stop: connections close (within the window), and nothing new arrives.
   const until = returnedAt + AFTER_STOP_MS;
   while (performance.now() < until) await sleep(50);
   if (run.open.size > 0) fail(`${run.open.size} connection(s) still open ${AFTER_STOP_MS} ms after stop (RULE-SHELL-07)`);
@@ -482,8 +463,6 @@ async function runSeed(server: AdversaryServer, seed: number, query: string, mod
       fail(`RULE-SHELL-07: ${all} stream connection(s) still open ${AFTER_STOP_MS} ms after stop returned (${anonymous} never said who they were)`);
     }
   }
-  const after = listing(downloads);
-  if (after !== before) fail(`a download changed after stop (RULE-SHELL-07): [${before}] -> [${after}]`);
 
   // The verdict: one, without violations, and the state file holds what was last stored.
   let verdict: Verdict | undefined;
@@ -614,7 +593,6 @@ for (const mode of MODES) {
 
 /** The cancel productions (RULE-SHELL-06), in every run's grammar. */
 const CANCELS = [
-  "cancel_download",
   "cancel_http",
   "cancel_http_done",
   "cancel_store",
@@ -623,8 +601,8 @@ const CANCELS = [
   "cancel_ws_opening",
   "stop_cancel",
 ];
-/** And those of the streams and their files, in a core mode run's. */
-const STREAM_CANCELS = ["cancel_file", "cancel_splice", "cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving"];
+/** And those of the streams, in a core mode run's. */
+const STREAM_CANCELS = ["cancel_stream_open", "cancel_stream_opening", "cancel_stream_resolving"];
 
 // RULE-SHELL-06: nothing after a cancel, a late resource released. Every cancel production is
 // enabled; each runs in focus, and then the whole batch.

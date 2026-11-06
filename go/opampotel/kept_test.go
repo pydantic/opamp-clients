@@ -24,7 +24,7 @@ func coreState(t testing.TB, doc string) []byte {
 			CoreState string `json:"core_state"`
 		} `json:"cases"`
 	}](t, "start.json")
-	const before = "a core state saved before the core kept the config applied: the policy kept before carries over"
+	const before = "a core state saved before the core kept the config applied: the policy with every control local"
 	for _, c := range start.Cases {
 		if c.Name != before {
 			continue

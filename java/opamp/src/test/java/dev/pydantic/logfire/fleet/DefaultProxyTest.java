@@ -22,7 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * With no proxy configured, the client uses the platform's proxy settings (here the JDK's
  * http.proxyHost and http.nonProxyHosts properties, which ProxySelector.getDefault() reads) on
- * HTTP, WebSocket and downloads alike; directConnection ignores them. The properties are the
+ * HTTP and WebSocket alike; directConnection ignores them. The properties are the
  * JVM's: each test puts back what was there.
  */
 // covers: RULE-PROXY-01
@@ -63,10 +63,8 @@ class DefaultProxyTest {
       Probe p = new Probe(Transport.build(null, null, false), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, p.post(origin.url("http")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(origin.url("ws")).getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(origin.url("http") + "/file").getKindCase());
       String host = "127.0.0.1:" + origin.port();
-      assertEquals(List.of("POST http://" + host + "/v1/opamp", "CONNECT " + host, "GET http://" + host + "/file"),
-          proxy.seen);
+      assertEquals(List.of("POST http://" + host + "/v1/opamp", "CONNECT " + host), proxy.seen);
     }
   }
 
@@ -77,9 +75,8 @@ class DefaultProxyTest {
       Probe p = new Probe(Transport.build(null, null, true), dir);
       assertEquals(CoreProto.Input.KindCase.HTTP_RESPONSE, p.post(origin.url("http")).getKindCase());
       assertEquals(CoreProto.Input.KindCase.WS_OPENED, p.open(origin.url("ws")).getKindCase());
-      assertEquals(CoreProto.Input.KindCase.DOWNLOAD_RESPONSE, p.download(origin.url("http") + "/file").getKindCase());
       assertTrue(proxy.seen.isEmpty(), proxy.seen.toString());
-      assertEquals(3, origin.requests.size(), origin.requests.toString());
+      assertEquals(2, origin.requests.size(), origin.requests.toString());
     }
   }
 }

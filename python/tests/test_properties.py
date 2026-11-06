@@ -3,9 +3,10 @@
 """Properties of the client around the core, over random plans (Hypothesis): the application's
 calls, some made from inside the notification callback (so they reach the client while it is
 still carrying out the step that called back), others from the event loop, over either
-transport. Whatever the plan: every custom message reaches the server once and in order, the
-server ends with the last description, sequence numbers run without a gap, and the goodbye is
-the last message."""
+transport. Whatever the plan: the healths reach the server in order (a later one may take the
+place of one not yet sent, never the other way round) and the server ends with the last, as it
+does with the last description; sequence numbers run without a gap, and the goodbye is the last
+message."""
 
 import asyncio
 import os
@@ -26,7 +27,6 @@ def expected_sequence(got) -> list[int]:
     return [0 if i < zeros else i - zeros + 1 for i in range(len(got))]
 
 UID = bytes([0x42] * 16)
-CAPABILITY = "io.example.tick"
 
 
 def description(n: int) -> pb.AgentDescription:
@@ -48,8 +48,8 @@ async def serve(app: web.Application) -> tuple[web.AppRunner, int]:
     return runner, site._server.sockets[0].getsockname()[1]
 
 
-# A step of the plan: a new description or a custom message, called from the callback or not.
-steps = st.lists(st.tuples(st.sampled_from(["describe", "send"]), st.booleans()), min_size=1, max_size=12)
+# A step of the plan: a new description or a new health, called from the callback or not.
+steps = st.lists(st.tuples(st.sampled_from(["describe", "health"]), st.booleans()), min_size=1, max_size=12)
 
 
 @pytest.mark.parametrize("mode", MODES)
@@ -61,9 +61,11 @@ def test_calls_from_anywhere_arrive_once_and_in_order(plan: list[tuple[str, bool
 
         def reply(msg: pb.AgentToServer) -> bytes:
             got.append(msg)
-            # Every answer carries a custom message, so the application is called back often.
-            tick = pb.CustomMessage(capability=CAPABILITY, type="tick", data=b"")
-            return pb.ServerToAgent(instance_uid=msg.instance_uid, custom_message=tick).SerializeToString()
+            # Every answer carries a new remote config, so the application is called back often.
+            body = str(len(got)).encode()
+            config = pb.AgentRemoteConfig(config_hash=body, config=pb.AgentConfigMap(
+                config_map={"": pb.AgentConfigObject(body=body)}))
+            return pb.ServerToAgent(instance_uid=msg.instance_uid, remote_config=config).SerializeToString()
 
         async def http(req: web.Request) -> web.Response:
             body = reply(pb.AgentToServer.FromString(await req.read()))
@@ -97,13 +99,18 @@ def test_calls_from_anywhere_arrive_once_and_in_order(plan: list[tuple[str, bool
                 client.set_description(description(done))
             else:
                 sent.append(done)
-                client.send_custom_message(pb.CustomMessage(capability=CAPABILITY, type="t", data=str(done).encode()))
+                client.set_health(pb.ComponentHealth(healthy=True, status=str(done)))
 
         def notify(n: Notification) -> None:
             # The steps due from the callback, called from inside it.
             if n.kind == "stopped" and n.error is not None:
                 errors.append(n.error)
             try:
+                # Answered, so the core hands over the next remote config (and calls back again).
+                if n.kind == "remote_config" and client is not None:
+                    client.set_remote_config_status(pb.RemoteConfigStatus(
+                        last_remote_config_hash=n.remote_config.config_hash,
+                        status=pb.RemoteConfigStatuses_APPLIED))
                 while client is not None and done < len(plan) and plan[done][1]:
                     carry_out()
             except BaseException as e:  # noqa: BLE001
@@ -111,10 +118,10 @@ def test_calls_from_anywhere_arrive_once_and_in_order(plan: list[tuple[str, bool
 
         scheme = "ws" if ws else "http"
         client = Client.start(Config(mode=mode, endpoint=f"{scheme}://127.0.0.1:{port}/v1/opamp", instance_uid=UID,
-                                     heartbeat_interval_ms=20),
-                              Status(description=description(0),
-                                     custom_capabilities=pb.CustomCapabilities(capabilities=[CAPABILITY])),
-                              notify)
+                                     heartbeat_interval_ms=20,
+                                     capabilities=pb.AgentCapabilities_AcceptsRemoteConfig
+                                     | pb.AgentCapabilities_ReportsHealth),
+                              Status(description=description(0)), notify)
         for _ in range(2000):
             if done == len(plan):
                 break
@@ -124,19 +131,20 @@ def test_calls_from_anywhere_arrive_once_and_in_order(plan: list[tuple[str, bool
         assert done == len(plan), "the plan stalled"
 
         def delivered() -> list[int]:
-            return [int(m.custom_message.data) for m in got if m.HasField("custom_message")
-                    and m.custom_message.type == "t"]
+            return [int(m.health.status) for m in got if m.HasField("health") and m.health.status]
 
         descriptions = lambda: [d for m in got if (d := described(m)) is not None]  # noqa: E731
         for _ in range(1000):
-            if delivered() == sent and descriptions() and descriptions()[-1] == last_description:
+            if (not sent or delivered()[-1:] == sent[-1:]) and descriptions() and descriptions()[-1] == last_description:
                 break
             await asyncio.sleep(0.005)
         await client.stop()
         await runner.cleanup()
 
         assert not errors, errors
-        assert delivered() == sent, f"custom messages {delivered()}, sent {sent}"
+        d = delivered()
+        assert d == sorted(set(d)) and set(d) <= set(sent), f"healths {d}, set {sent}"
+        assert d[-1:] == sent[-1:], f"healths {d}: the server hasn't the last of {sent}"
         assert descriptions()[-1] == last_description, "the server has the last description"
         assert [m.sequence_num for m in got] == expected_sequence(got), "0 until the first answer, then no gap"
         assert got[-1].HasField("agent_disconnect"), "the goodbye is last"

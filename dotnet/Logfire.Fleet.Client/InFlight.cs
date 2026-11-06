@@ -25,7 +25,7 @@ internal readonly record struct Queued(
 /// <remarks>
 /// Invariants:
 /// <list type="bullet">
-/// <item>Every effect in flight (a request, a dial, an open or closing connection, a download, a
+/// <item>Every effect in flight (a request, a dial, an open or closing connection, a
 /// save) has an entry under its id, holding the <see cref="CancellationTokenSource"/> that aborts
 /// its work.</item>
 /// <item><see cref="Cancel"/> removes the entry, cancels its token and releases what it holds.</item>

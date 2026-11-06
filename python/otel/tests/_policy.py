@@ -87,3 +87,35 @@ def overrides_in(doc: dict) -> dict:
 def off(*signals: str) -> dict:
     """signal_exports's overrides that stop each signal named."""
     return {s: {"enabled": False} for s in signals}
+
+
+class Decided:
+    """The layer's agent flow's answer to a remote config, from a fresh start with no policy kept:
+    the status, the settings handed over (`apply`, if any), the effective config after, and when
+    it asks the layer again (`refresh_at_unix_ms`, 0: never)."""
+
+    def __init__(self, out, agent_state) -> None:
+        self.status = opamp_pb2.RemoteConfigStatus()
+        self.apply = None
+        for e in out.effects:
+            kind = e.WhichOneof("effect")
+            if kind == "status":
+                self.status = e.status
+            elif kind == "apply":
+                self.apply = e.apply
+        self.effective = out.effective
+        self.refresh_at_unix_ms = agent_state.refresh_at_unix_ms
+
+    def HasField(self, name: str) -> bool:  # noqa: N802 - as a protobuf message says it
+        assert name == "apply"
+        return self.apply is not None
+
+
+def layer_decide(layer, config, host, now: int = 1_791_979_200_000, state_dir: bool = True) -> Decided:
+    """What the layer's agent flow answers to `config` under `host` at `now` (on both clocks)."""
+    from logfire_fleet_client.sdk import settings_pb2
+
+    out = layer.start(settings_pb2.AgentStart(host=host, state_dir=state_dir, endpoint="http://127.0.0.1:1",
+                                              instance_uid=bytes(16), now_unix_ms=now, now_mono_ms=now))
+    out = layer.step(settings_pb2.AgentStep(agent=out.agent, now_unix_ms=now, now_mono_ms=now, remote_config=config))
+    return Decided(out, settings_pb2.AgentState.FromString(out.agent))

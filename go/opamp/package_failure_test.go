@@ -17,6 +17,7 @@ import (
 	"github.com/open-telemetry/opamp-go/protobufs"
 
 	"github.com/pydantic/opamp-clients/go/opamp/internal/corepb"
+	"github.com/pydantic/opamp-clients/go/opamp/internal/plumb"
 )
 
 // An install's or a removal's error says how it failed: wrapped by FailedForNow it is for now,
@@ -35,20 +36,20 @@ func TestPackageAnswersSayHowTheyFailed(t *testing.T) {
 		"unknown, in a join": {errors.Join(boom, FailedLeavingUnknown(errors.New("rollback"))), corepb.PackageFailure_PACKAGE_FAILURE_UNKNOWN},
 	} {
 		t.Run(name, func(t *testing.T) {
-			in := packageInstalled("p", []byte{1}, c.err)
+			in := plumb.PackageInstalled("p", []byte{1}, c.err).GetPackageInstalled()
 			if in.Ok || in.Failure != c.want || in.Detail != c.err.Error() {
 				t.Fatalf("installed: %v, want failure %v with detail %q", in, c.want, c.err)
 			}
-			rm := packageRemoved("p", c.err)
+			rm := plumb.PackageRemoved("p", c.err).GetPackageRemoved()
 			if !rm.Failed || rm.Failure != c.want || rm.Detail != c.err.Error() {
 				t.Fatalf("removed: %v, want failure %v with detail %q", rm, c.want, c.err)
 			}
 		})
 	}
-	if in := packageInstalled("p", []byte{1}, nil); !in.Ok || in.Failure != corepb.PackageFailure_PACKAGE_FAILURE_FINAL {
+	if in := plumb.PackageInstalled("p", []byte{1}, nil).GetPackageInstalled(); !in.Ok || in.Failure != corepb.PackageFailure_PACKAGE_FAILURE_FINAL {
 		t.Fatalf("installed: %v", in)
 	}
-	if rm := packageRemoved("p", nil); rm.Failed {
+	if rm := plumb.PackageRemoved("p", nil).GetPackageRemoved(); rm.Failed {
 		t.Fatalf("removed: %v", rm)
 	}
 	if !errors.Is(FailedForNow(boom), boom) || !errors.Is(FailedLeavingUnknown(boom), boom) {
@@ -74,14 +75,14 @@ func TestAnInstallThatFailedForNowIsNotReportedFailed(t *testing.T) {
 			ts := httptest.NewServer(srv)
 			defer ts.Close()
 			answered := make(chan struct{}, 1)
-			c, err := Start(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour,
-				StateFile: filepath.Join(t.TempDir(), "state.bin"), AcceptPackages: true}, Status{}, func(c *Client, n Notification) {
+			c, err := startFull(context.Background(), Config{Mode: ModePlatform, Endpoint: ts.URL, HeartbeatInterval: time.Hour,
+				StateFile: filepath.Join(t.TempDir(), "state.bin"), plumbed: plumb.Options{AcceptPackages: true}}, Status{}, func(c *Client, n Notification) {
 				if n.Kind == InstallPackage {
 					err := errors.New("the signature service is down")
 					if forNow {
 						err = FailedForNow(err)
 					}
-					c.PackageInstalled(n.PackageName, n.Package.Hash, err)
+					c.PackageInstalled(n.x().PackageName, n.x().Package.Hash, err)
 					select {
 					case answered <- struct{}{}:
 					default:

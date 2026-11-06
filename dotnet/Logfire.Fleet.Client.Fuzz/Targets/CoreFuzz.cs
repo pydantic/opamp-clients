@@ -184,8 +184,16 @@ internal static class CoreFuzz
                     }
 
                 case 1:
-                    Layer.Value.Load(r.Bit() ? r.Blob(1024) : null);
-                    break;
+                    {
+                        var start = new Logfire.Fleet.Client.Sdk.AgentStart { StateDir = r.Bit(), InstanceUid = r.Bytes(16), NowUnixMs = r.Bit() ? 0ul : 1_791_979_200_000ul };
+                        if (r.Bit())
+                        {
+                            start.CoreState = ByteString.CopyFrom(r.Blob(1024));
+                        }
+
+                        Layer.Value.Start(start);
+                        break;
+                    }
                 case 2:
                     {
                         var m = new AgentConfigMap();
@@ -197,7 +205,10 @@ internal static class CoreFuzz
                             };
                         }
 
-                        Layer.Value.Decide(new AgentRemoteConfig { ConfigHash = r.Bytes(32), Config = m }, r.Bytes(512), r.Bytes(512), save: r.Bit() ? new Action<byte[]>(_ => { }) : null);
+                        // A remote config to an agent just started, or to a state that may not be one.
+                        var agent = r.Bit() ? r.Bytes(512)
+                            : Layer.Value.Start(new Logfire.Fleet.Client.Sdk.AgentStart { StateDir = r.Bit(), InstanceUid = ByteString.CopyFrom(new byte[16]) }).Agent;
+                        Layer.Value.Step(new Logfire.Fleet.Client.Sdk.AgentStep { Agent = agent, RemoteConfig = new AgentRemoteConfig { ConfigHash = r.Bytes(32), Config = m } });
                         break;
                     }
 

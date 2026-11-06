@@ -28,7 +28,7 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_OFF, ALWAYS_ON, ParentBased,
 
 import logfire_fleet_otel
 from _globals import sdk_globals
-from _policy import FILE, V1, config_map, full, off, overrides, overrides_in, policy
+from _policy import FILE, V1, config_map, layer_decide, full, off, overrides, overrides_in, policy
 from kept import keep_applied
 from logfire_fleet_otel import Agent, Controls, Setup, disabled_instrumentations
 
@@ -48,7 +48,9 @@ def _own_state_home(tmp_path_factory, monkeypatch):
 
 def settings(doc: str):
     """The settings as the layer hands them to the package where it built the SDK."""
-    return LAYER.load(doc.encode(), logfire_fleet_otel.sdk_host()).settings
+    d = layer_decide(LAYER, config(doc), logfire_fleet_otel.sdk_host())
+    assert d.apply is not None, d.status.error_message
+    return d.apply
 
 
 def config(body: str | None) -> opamp_pb2.AgentRemoteConfig:
@@ -118,10 +120,24 @@ def test_next_start_settings_become_the_instrumentations_switch():
     assert disabled_instrumentations(settings(policy()), "") is None
 
 
-def _reachability(endpoint: str, service: str = "", uid: uuid.UUID | None = None) -> logfire_fleet_otel.Reachability:
-    """Reachability as the agent makes it: the endpoint and the hints as the core's Setup gives them."""
-    s = Setup.from_env({"OTEL_OPAMP_ENDPOINT": endpoint, "OTEL_OPAMP_STATE_DIR": "none"})
-    return logfire_fleet_otel.Reachability(s.shown, service, uid, s.hints)
+class _Told:
+    """An agent for an endpoint, built with a service name, without a client: what it says of the
+    notifications it is told. `in_use`: the endpoint the client would say it uses now."""
+
+    def __init__(self, url: str, service: str = "", env: dict | None = None, **given) -> None:
+        self.agent = logfire_fleet_otel.Agent()
+        self.agent.prepare({"OTEL_OPAMP_ENDPOINT": url, "OTEL_OPAMP_STATE_DIR": "none", **(env or {})}, **given)
+        with self.agent._lock:
+            self.agent._built(service)
+        self.uid = self.agent.uid
+        self.in_use: str | None = None
+
+    def notified(self, n: Notification) -> None:
+        self.agent.tell(n, self.in_use)
+
+
+def _reachability(endpoint: str, service: str = "") -> _Told:
+    return _Told(endpoint, service)
 
 
 def test_settings_read_as_the_sdk_reads_its_own():
@@ -180,7 +196,6 @@ def test_live_settings_are_applied_at_once_and_reported_and_the_package_saves_no
     assert not agent.controls.send_logs
     assert effective(agent) == {"head_sampling": {"ratio": 0.5}, "signal_exports": off("logs")}
     # The client keeps the config applied, in its own state: nothing of the package's own.
-    assert not (tmp_path / "sdk-settings.json").exists()
 
 
 def described(server, configured: bool, tmp_path) -> dict:
@@ -231,23 +246,20 @@ def test_a_next_start_change_is_applied_where_the_client_keeps_state_and_refused
     assert s.status == FAILED and "needs somewhere to keep state" in s.error_message
 
 
-def test_the_settings_to_start_with_are_the_config_the_client_kept_applied_else_the_file_kept_before(tmp_path):
-    # Kept before the client kept the config applied: the package's own file carries over.
-    (tmp_path / "sdk-settings.json").write_text(policy(head_sampling={"ratio": 0.25}))
+def test_the_settings_to_start_with_are_the_config_the_client_kept_applied(tmp_path):
     agent, _ = prepared(tmp_path)
-    assert agent.controls.sampler._rate == 0.25
-    # Once the client keeps a config applied, that is where a start begins: the old file is ignored.
+    assert agent.controls.sampler._rate is None and effective(agent) == {}
     keep_applied(tmp_path, policy(head_sampling={"ratio": 0.5}).encode())
     agent, _ = prepared(tmp_path)
     assert agent.controls.sampler._rate == 0.5 and effective(agent) == {"head_sampling": {"ratio": 0.5}}
-    # A config applied with no policy: every setting the SDK's own, not the old file's.
+    # A config applied with no policy: every setting the SDK's own.
     keep_applied(tmp_path, None)
     agent, _ = prepared(tmp_path)
     assert agent.controls.sampler._rate is None and effective(agent) == {}
-    # A client state that doesn't read: the old file again.
+    # A client state that doesn't read: the SDK's own too.
     (tmp_path / "opamp-state").write_bytes(b"\xff\xff")
     agent, _ = prepared(tmp_path)
-    assert agent.controls.sampler._rate == 0.25
+    assert agent.controls.sampler._rate is None
 
 
 def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_path, monkeypatch):
@@ -268,7 +280,6 @@ def test_a_config_applied_through_the_server_is_where_the_next_start_begins(tmp_
     finally:
         agent.stop()
         server.close()
-    assert not (tmp_path / "sdk-settings.json").exists()
     again = Agent()
     again.prepare({"OTEL_OPAMP_ENDPOINT": server.endpoint, "OTEL_OPAMP_STATE_DIR": str(tmp_path)})
     assert again.controls.sampler._rate == 0.5 and not again.controls.send_logs
@@ -1034,13 +1045,16 @@ def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
     """configure()'s own span processor and a metric exporter named in code get the package's gates
     once the SDK is built, as every exporter does: a policy that turns the traces and metrics off
     and redacts is APPLIED and in force on them."""
-    answered = tmp_path / "answered"
+    answered, ended = tmp_path / "answered", tmp_path / "ended"
     offer = config(policy(signal_exports=off("traces", "metrics", "logs"), attribute_redaction={"drop": ["x"]}))
 
     def reply(msg):
         if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
             answered.touch()
         if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
+            return None
+        # Offered once the first span has ended: before that, the policy could reach it first.
+        if not ended.exists():
             return None
         return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
 
@@ -1054,6 +1068,7 @@ def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
                              metric_exporter_names=["console"])
         agent = logfire_fleet_otel.AGENT
         trace.get_tracer("t").start_span("before", attributes={{"x": "secret"}}).end()
+        pathlib.Path({str(ended)!r}).touch()
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -1464,8 +1479,8 @@ def test_the_default_state_directory_gives_way(tmp_path):
 
 def test_connecting_failing_and_recovering_are_each_said_once(caplog):
     caplog.set_level(logging.DEBUG, logger="logfire_fleet_otel")
-    uid = uuid.UUID(int=7)
-    r = _reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout", uid)
+    r = _reachability("https://user:secret@opamp.example.com/v1/opamp?token=x", "checkout")
+    uid = r.uid
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
     r.notified(Notification("connect_failed", status=401, detail="HTTP 401"))
     r.notified(Notification("connected"))
@@ -1495,20 +1510,22 @@ def test_the_first_connection_reaches_stderr_without_logging_of_the_applications
     monkeypatch.setattr(root, "handlers", [])
     monkeypatch.setattr(root, "level", logging.WARNING)
     monkeypatch.setattr(logging.getLogger("logfire_fleet_otel"), "level", logging.NOTSET)
-    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout")
     r.notified(Notification("connected"))
     r.notified(Notification("connect_failed", detail="connection refused"))
     capsys.readouterr()
     r.notified(Notification("connected"))
     assert capsys.readouterr().err == ""  # "again" stays at INFO
-    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout")
+    capsys.readouterr()
     r.notified(Notification("connected"))
     assert capsys.readouterr().err == ("OpAMP: connected to https://opamp.example.com/v1/opamp; this SDK is managed "
-                                       f"as checkout, instance {uuid.UUID(int=7)}\n")
+                                       f"as checkout, instance {r.uid}\n")
     own = logging.StreamHandler(io.StringIO())
     own.setLevel(logging.WARNING)
     monkeypatch.setattr(root, "handlers", [own])
-    r = _reachability("https://opamp.example.com/v1/opamp", "checkout", uuid.UUID(int=7))
+    r = _reachability("https://opamp.example.com/v1/opamp", "checkout")
+    capsys.readouterr()
     r.notified(Notification("connected"))
     assert capsys.readouterr().err == "" and own.stream.getvalue() == ""
 
@@ -1517,11 +1534,9 @@ def test_what_is_said_names_the_endpoint_in_use(caplog):
     """After the server moved the agent to another endpoint, what it says names the one the client
     uses now (logged without credentials), not the one configured."""
     caplog.set_level(logging.INFO, logger="logfire_fleet_otel")
-    in_use: list[str | None] = [None]  # none yet: the configured one
     r = _reachability("https://a.example.com/v1/opamp")
-    r.in_use = lambda: in_use[0]
-    r.notified(Notification("connected"))
-    in_use[0] = "https://user:secret@b.example.com/v1/opamp?token=x"
+    r.notified(Notification("connected"))  # none in use yet: the configured one
+    r.in_use = "https://user:secret@b.example.com/v1/opamp?token=x"
     r.notified(Notification("connect_failed", detail="connection refused"))
     r.notified(Notification("connected"))
     said = [rec.getMessage() for rec in caplog.records if rec.levelno >= logging.INFO]
@@ -1540,10 +1555,7 @@ def test_what_is_said_names_the_endpoint_in_use(caplog):
     ({"headers": {}}, "OTEL_OPAMP_ENDPOINT", "the headers given to configure()"),
 ])
 def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, headers_from):
-    setup = Setup.from_env({"OTEL_OPAMP_ENDPOINT": "http://other/v1/opamp", "OTEL_OPAMP_HEADERS": "a=b",
-                            "OTEL_OPAMP_STATE_DIR": "none"}, **given)
-    assert setup is not None
-    r = logfire_fleet_otel.Reachability(setup.shown, "", None, setup.hints)
+    r = _Told("http://other/v1/opamp", env={"OTEL_OPAMP_HEADERS": "a=b"}, **given)
     caplog.clear()
     for status in (401, 404, None):
         r.notified(Notification("connect_failed", status=status))
@@ -1553,15 +1565,6 @@ def test_the_warning_names_what_gave_the_server(caplog, given, endpoint_from, he
     assert f"check {headers_from} (Authorization=Bearer <token>)" in said[0]
     assert f"check {endpoint_from} (it usually ends in /v1/opamp)" in said[1]
     assert f"check {endpoint_from} and that the server is up" in said[2]
-
-
-@pytest.mark.parametrize("endpoint, logged", [
-    ("https://opamp.example.com:notaport/v1/opamp", "https://opamp.example.com:notaport/v1/opamp"),
-    ("https://[::1/v1/opamp?k=v", "https://[::1/v1/opamp"),
-    ("wss://k:s@[::1]:4320/v1/opamp#x", "wss://[::1]:4320/v1/opamp"),
-])
-def test_a_malformed_endpoint_is_logged_not_raised(endpoint, logged):
-    assert logfire_fleet_otel.shown_endpoint(endpoint, "?") == logged
 
 
 def test_an_endpoint_without_a_scheme_is_refused_and_one_the_client_cannot_speak_is_warned_about(caplog):

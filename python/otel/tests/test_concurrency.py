@@ -56,7 +56,7 @@ from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 from opentelemetry.trace import Link, NonRecordingSpan, SpanContext, SpanKind, TraceFlags
 
 import logfire_fleet_otel
-from _policy import SIGNALS, config_map, policy
+from _policy import SIGNALS, config_map, layer_decide, policy
 from logfire_fleet_otel import Controls
 
 APPLIED = opamp_pb2.RemoteConfigStatuses_APPLIED
@@ -286,7 +286,7 @@ def typed(doc: dict) -> settings_pb2.Settings:
     """The settings as the layer hands them to the package, for a server's document."""
     body = policy_of(doc)
     local = policy().encode()
-    d = LAYER.decide(opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body), local, local, HOST, NOW)
+    d = layer_decide(LAYER, opamp_pb2.AgentRemoteConfig(config=config_map(body), config_hash=body), HOST, NOW)
     assert d.status.status == APPLIED, (doc, d.status.error_message)
     return d.apply
 

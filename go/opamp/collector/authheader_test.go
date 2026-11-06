@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Pydantic Services Inc.
 // SPDX-License-Identifier: MIT
 
-package opamp
+package collector
 
 import (
 	"context"
@@ -9,20 +9,41 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/open-telemetry/opamp-go/protobufs"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/pydantic/opamp-clients/go/opamp"
 )
 
 // authServer is an OpAMP server that records each request's or upgrade's headers, and closes each
 // WebSocket connection after its first message, so the client connects again.
 type authServer struct {
-	opamp propServer
-	mu    sync.Mutex
-	seen  []http.Header
+	mu   sync.Mutex
+	seen []http.Header
+}
+
+// reply answers an AgentToServer with an empty ServerToAgent for the same instance.
+func (s *authServer) reply(body []byte) []byte {
+	m := &protobufs.AgentToServer{}
+	if err := proto.Unmarshal(body, m); err != nil {
+		return nil
+	}
+	out, _ := proto.Marshal(&protobufs.ServerToAgent{InstanceUid: m.InstanceUid})
+	return out
+}
+
+func endpoint(ts *httptest.Server, ws bool) string {
+	if ws {
+		return "ws" + strings.TrimPrefix(ts.URL, "http") + "/v1/opamp"
+	}
+	return ts.URL + "/v1/opamp"
 }
 
 func (s *authServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +53,7 @@ func (s *authServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !websocket.IsWebSocketUpgrade(r) {
 		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/x-protobuf")
-		_, _ = w.Write(s.opamp.reply(body))
+		_, _ = w.Write(s.reply(body))
 		return
 	}
 	conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
@@ -42,7 +63,7 @@ func (s *authServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 	if _, data, err := conn.ReadMessage(); err == nil && len(data) > 0 {
 		// The WebSocket framing's header byte (0), then the message.
-		_ = conn.WriteMessage(websocket.BinaryMessage, append([]byte{0}, s.opamp.reply(data[1:])...))
+		_ = conn.WriteMessage(websocket.BinaryMessage, append([]byte{0}, s.reply(data[1:])...))
 	}
 }
 
@@ -62,7 +83,7 @@ func (s *authServer) authorizations() []string {
 // with the next request or connection. The client hands them to the core (SetAuthHeaders), which
 // sends them as it sends any header.
 func TestAuthHeaderGoesWithEveryAttempt(t *testing.T) {
-	for _, mode := range []Mode{ModePlatform, ModeCore} {
+	for _, mode := range []opamp.Mode{opamp.ModePlatform, opamp.ModeCore} {
 		for _, ws := range []bool{false, true} {
 			name := string(mode) + map[bool]string{false: "/http", true: "/ws"}[ws]
 			t.Run(name, func(t *testing.T) {
@@ -72,12 +93,14 @@ func TestAuthHeaderGoesWithEveryAttempt(t *testing.T) {
 				var token atomic.Value
 				token.Store("Bearer 1")
 				cfg := Config{
-					Mode:              mode,
-					Endpoint:          endpoint(ts, ws),
-					Header:            http.Header{"Authorization": {"enrollment"}, "X-Kept": {"yes"}},
-					HeartbeatInterval: 50 * time.Millisecond,
-					AuthHeader:        func() http.Header { return http.Header{"Authorization": {token.Load().(string)}} },
-					authEvery:         10 * time.Millisecond,
+					Config: opamp.Config{
+						Mode:              mode,
+						Endpoint:          endpoint(ts, ws),
+						Header:            http.Header{"Authorization": {"enrollment"}, "X-Kept": {"yes"}},
+						HeartbeatInterval: 50 * time.Millisecond,
+					},
+					AuthHeader: func() http.Header { return http.Header{"Authorization": {token.Load().(string)}} },
+					authEvery:  10 * time.Millisecond,
 				}
 				c, err := Start(context.Background(), cfg, Status{}, nil)
 				if err != nil {
@@ -109,9 +132,11 @@ func TestAuthHeaderChangedInPlaceIsHeard(t *testing.T) {
 	token.Store("Bearer 1")
 	shared := http.Header{}
 	cfg := Config{
-		Mode:              ModePlatform,
-		Endpoint:          endpoint(ts, false),
-		HeartbeatInterval: 50 * time.Millisecond,
+		Config: opamp.Config{
+			Mode:              opamp.ModePlatform,
+			Endpoint:          endpoint(ts, false),
+			HeartbeatInterval: 50 * time.Millisecond,
+		},
 		AuthHeader: func() http.Header {
 			shared.Set("Authorization", token.Load().(string))
 			return shared

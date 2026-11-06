@@ -1,17 +1,14 @@
 # Copyright (c) 2026 Pydantic Services Inc.
 # SPDX-License-Identifier: MIT
-"""The file operations the client carries out for its core: a save's recipe and a download's
-file go through a `Files`, the real file system by default; with the core tap on, a `Journal`
+"""The file operations the client carries out for its core: a save's recipe goes through a `Files`, the real file system by default; with the core tap on, a `Journal`
 wraps it and records each operation that succeeded in the tap (kind 5, the checker's
 file records), for the checker to replay on a disk that can crash. Tests stand in for it to inject
 faults (``Client.start(_files=...)``)."""
 
 from __future__ import annotations
 
-import concurrent.futures
 import json
 import os
-import shutil
 import sys
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -82,69 +79,9 @@ class Files:
     def remove(self, path: str) -> None:
         os.remove(path)
 
-    def mkdir(self, path: str) -> bool:
-        """Make directory `path` (and its parents), readable by this user only, unless it is
-        there: whether it was made."""
-        if os.name == "nt":
-            return _windows.make_private_dir(path)
-        if os.path.isdir(path):
-            return False
-        os.makedirs(path, mode=0o700, exist_ok=True)
-        return True
-
-    def clear(self, path: str) -> bool:
-        """Delete directory `path` and everything under it: whether there was one."""
-        if not os.path.lexists(path):
-            return False
-        shutil.rmtree(path)
-        return True
-
 
 #: The real file system.
 REAL = Files()
-
-
-class AfterClear(Files):
-    """`inner`, whose files and directories are made only once `cleared` (the deletion of the
-    downloads a run before left, started beside the loop at start) is over: a download never
-    makes its file in a directory that is still being deleted. The rest goes straight through."""
-
-    def __init__(self, inner: Files, cleared: concurrent.futures.Future) -> None:
-        self._inner = inner
-        self._cleared = cleared
-
-    def _wait(self) -> None:
-        # In a worker thread (a save's, a download's): never the loop. Its failure is its own.
-        concurrent.futures.wait([self._cleared])
-
-    def create(self, path: str) -> int:
-        self._wait()
-        return self._inner.create(path)
-
-    def write(self, fd: int, bufs: Sequence[Buffer]) -> int:
-        return self._inner.write(fd, bufs)
-
-    def sync(self, fd: int) -> None:
-        self._inner.sync(fd)
-
-    def close(self, fd: int) -> None:
-        self._inner.close(fd)
-
-    def rename(self, src: str, dst: str) -> None:
-        self._inner.rename(src, dst)
-
-    def sync_dir(self, path: str) -> bool:
-        return self._inner.sync_dir(path)
-
-    def remove(self, path: str) -> None:
-        self._inner.remove(path)
-
-    def mkdir(self, path: str) -> bool:
-        self._wait()
-        return self._inner.mkdir(path)
-
-    def clear(self, path: str) -> bool:
-        return self._inner.clear(path)
 
 
 def write_all(files: Files, fd: int, data: Buffer) -> None:
@@ -161,7 +98,7 @@ def write_all(files: Files, fd: int, data: Buffer) -> None:
 class Journal(Files):
     """`inner`, each operation that succeeded recorded (`record`: the tap's kind-5 records) after
     it, with its paths relative to the state file's directory. Thread-safe as `record` is: saves
-    and downloads write from worker threads."""
+    write from worker threads."""
 
     def __init__(self, inner: Files, record: Callable[[bytes], None], state: str) -> None:
         self._inner = inner
@@ -221,15 +158,3 @@ class Journal(Files):
     def remove(self, path: str) -> None:
         self._inner.remove(path)
         self._op(op="remove", path=self._rel(path))
-
-    def mkdir(self, path: str) -> bool:
-        made = self._inner.mkdir(path)
-        if made:
-            self._op(op="mkdir", path=self._rel(path))
-        return made
-
-    def clear(self, path: str) -> bool:
-        cleared = self._inner.clear(path)
-        if cleared:
-            self._op(op="clear", path=self._rel(path))
-        return cleared

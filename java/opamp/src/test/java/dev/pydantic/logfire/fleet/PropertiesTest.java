@@ -44,24 +44,24 @@ import org.junit.jupiter.api.Test;
  * Properties of the client around the core, over random plans (a seeded generator): the
  * application's calls, spread over one to four threads of its own that call the client at the same
  * time, and the notification callback (so they reach the client while it is still carrying out the step that
- * called back), over either transport. Order is only defined per caller. Whatever the plan: every
- * custom message reaches the server exactly once, each caller's in the order it sent them; the
- * server ends with the description set last; sequence numbers run without a gap; the goodbye is the
+ * called back), over either transport. Order is only defined per caller. Whatever the plan: the
+ * healths reach the server in the order each caller set them (one set over another before it went
+ * is never sent: only the latest counts), and the server ends with the health and the description
+ * set last; sequence numbers run without a gap; the goodbye is the
  * last message; and nothing is reported as an error. OPAMP_PROP_RUNS sets the number of plans
  * (default 25); a failure prints its run's seed, and OPAMP_PROP_SEED replays that one run.
  */
 class PropertiesTest {
   private static final byte[] UID = new byte[16];
-  private static final String CAPABILITY = "io.example.tick";
 
   static {
     java.util.Arrays.fill(UID, (byte) 0x42);
   }
 
-  enum Kind { DESCRIBE, SEND }
+  enum Kind { DESCRIBE, HEALTH }
 
   /**
-   * A call: a new description or a custom message, by {@code caller} (a thread, or the callback when
+   * A call: a new description or a new health, by {@code caller} (a thread, or the callback when
    * it is the plan's thread count). {@code pause}: the caller waits first (a thread a millisecond,
    * the callback for the next notification); otherwise it goes straight on from its previous call.
    */
@@ -74,13 +74,13 @@ class PropertiesTest {
     int threads = 1 + r.nextInt(4);
     List<Step> steps = new ArrayList<>();
     for (int i = 1 + r.nextInt(16); i > 0; i--) {
-      steps.add(new Step(r.nextBoolean() ? Kind.DESCRIBE : Kind.SEND, r.nextInt(threads + 1), r.nextBoolean()));
+      steps.add(new Step(r.nextBoolean() ? Kind.DESCRIBE : Kind.HEALTH, r.nextInt(threads + 1), r.nextBoolean()));
     }
     return new Plan(threads, steps, r.nextBoolean());
   }
 
   @Test
-  void callsFromAnyThreadArriveOnceAndInOrder() throws Exception {
+  void callsFromAnyThreadArriveInOrder() throws Exception {
     String runsEnv = System.getenv("OPAMP_PROP_RUNS");
     String seedEnv = System.getenv("OPAMP_PROP_SEED");
     int runs = seedEnv != null && !seedEnv.isEmpty() ? 1
@@ -103,10 +103,16 @@ class PropertiesTest {
     List<Opamp.AgentToServer> got = new CopyOnWriteArrayList<>();
     Function<Opamp.AgentToServer, byte[]> reply = msg -> {
       got.add(msg);
-      // Every answer carries a custom message, so the application is called back often.
-      Opamp.CustomMessage tick = Opamp.CustomMessage.newBuilder().setCapability(CAPABILITY).setType("tick").build();
-      return Opamp.ServerToAgent.newBuilder().setInstanceUid(msg.getInstanceUid()).setCustomMessage(tick).build()
-          .toByteArray();
+      // Every answer but one to a config carries a new remote config, so the application is called
+      // back often (the callback answers each, so the core hands over the next); an answer to an
+      // answer would have client and server chatter on.
+      Opamp.ServerToAgent.Builder b = Opamp.ServerToAgent.newBuilder().setInstanceUid(msg.getInstanceUid());
+      if (!msg.hasRemoteConfigStatus()) {
+        b.setRemoteConfig(Opamp.AgentRemoteConfig.newBuilder()
+            .setConfigHash(ByteString.copyFromUtf8("config-" + got.size()))
+            .setConfig(Opamp.AgentConfigMap.getDefaultInstance()));
+      }
+      return b.build().toByteArray();
     };
     try (Server server = plan.ws() ? new WsServer(reply) : new HttpOpamp(reply)) {
       run(plan, plan.ws(), server.port(), got);
@@ -119,15 +125,16 @@ class PropertiesTest {
         .mapToObj(c -> IntStream.range(0, plan.steps().size()).filter(i -> plan.steps().get(i).caller() == c).boxed()
             .toList())
         .toList();
-    // What was sent, per caller, and the description set last (under the lock, with the call).
+    // What was set, per caller, and the description and health set last (under the lock, with the call).
     List<List<Integer>> sent = IntStream.rangeClosed(0, callback)
         .mapToObj(c -> (List<Integer>) new CopyOnWriteArrayList<Integer>()).toList();
     Object lock = new Object();
     AtomicInteger lastDescription = new AtomicInteger();
+    AtomicInteger lastHealth = new AtomicInteger();
     List<Object> errors = new CopyOnWriteArrayList<>();
     AtomicReference<OpampClient> client = new AtomicReference<>();
 
-    // Step i of the plan; its number (i + 1) is the description, or the custom message's data.
+    // Step i of the plan; its number (i + 1) is the description, or the health's status.
     java.util.function.IntConsumer carryOut = i -> {
       Step s = plan.steps().get(i);
       int n = i + 1;
@@ -138,8 +145,10 @@ class PropertiesTest {
         }
       } else {
         sent.get(s.caller()).add(n);
-        client.get().sendCustomMessage(Opamp.CustomMessage.newBuilder().setCapability(CAPABILITY).setType("t")
-            .setData(ByteString.copyFromUtf8(Integer.toString(n))).build());
+        synchronized (lock) {
+          lastHealth.set(n);
+          client.get().setHealth(Opamp.ComponentHealth.newBuilder().setHealthy(true).setStatus(Integer.toString(n)).build());
+        }
       }
     };
 
@@ -149,10 +158,13 @@ class PropertiesTest {
       if (n instanceof Notification.Stopped st && st.error() != null) {
         errors.add(st.error());
       }
-      if (n instanceof Notification.CustomMessageNotSent ns) {
-        errors.add(ns);
-      }
       try {
+        // Answered, so the core hands over the next remote config (and calls back again).
+        if (n instanceof Notification.RemoteConfig rc && client.get() != null) {
+          client.get().setRemoteConfigStatus(Opamp.RemoteConfigStatus.newBuilder()
+              .setLastRemoteConfigHash(rc.config().getConfigHash())
+              .setStatus(Opamp.RemoteConfigStatuses.RemoteConfigStatuses_APPLIED).build());
+        }
         // The callback's calls, from inside it: the next, and those that follow straight on.
         int k = callbackDone.get();
         if (client.get() != null && k < fromCallback.size()) {
@@ -168,9 +180,12 @@ class PropertiesTest {
 
     String endpoint = (ws ? "ws" : "http") + "://127.0.0.1:" + port + "/v1/opamp";
     client.set(OpampClient.start(
-        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.PLATFORM).heartbeatInterval(Duration.ofMillis(20)).build(),
-        new OpampClient.Status(description(0), null, null, null, null,
-            Opamp.CustomCapabilities.newBuilder().addCapabilities(CAPABILITY).build()),
+        OpampClient.Config.builder(endpoint, UID).mode(OpampClient.Mode.PLATFORM).heartbeatInterval(Duration.ofMillis(20))
+            .capabilities(Opamp.AgentCapabilities.AgentCapabilities_AcceptsRemoteConfig_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsRemoteConfig_VALUE
+                | Opamp.AgentCapabilities.AgentCapabilities_ReportsHealth_VALUE)
+            .build(),
+        OpampClient.Status.of(description(0)),
         notify));
 
     // The threads, started together.
@@ -193,8 +208,8 @@ class PropertiesTest {
       }));
     }
     java.util.function.Supplier<List<Integer>> delivered = () -> got.stream()
-        .filter(m -> m.hasCustomMessage() && m.getCustomMessage().getType().equals("t"))
-        .map(m -> Integer.parseInt(m.getCustomMessage().getData().toStringUtf8()))
+        .filter(m -> m.hasHealth() && !m.getHealth().getStatus().isEmpty() && Character.isDigit(m.getHealth().getStatus().charAt(0)))
+        .map(m -> Integer.parseInt(m.getHealth().getStatus()))
         .toList();
     java.util.function.Supplier<List<Long>> descriptions = () -> got.stream()
         .filter(Opamp.AgentToServer::hasAgentDescription)
@@ -211,7 +226,8 @@ class PropertiesTest {
           "the plan stalled; errors: " + errors);
       waitFor(() -> {
         List<Long> d = descriptions.get();
-        return delivered.get().stream().sorted().toList().equals(sent.stream().flatMap(List::stream).sorted().toList())
+        List<Integer> h = delivered.get();
+        return (lastHealth.get() == 0 || (!h.isEmpty() && h.get(h.size() - 1) == lastHealth.get()))
             && !d.isEmpty() && d.get(d.size() - 1) == lastDescription.get();
       });
     } finally {
@@ -219,13 +235,17 @@ class PropertiesTest {
     }
 
     assertEquals(List.of(), errors);
-    List<Integer> allSent = sent.stream().flatMap(List::stream).sorted().toList();
+    Set<Integer> allSent = Set.copyOf(sent.stream().flatMap(List::stream).toList());
     List<Integer> arrived = delivered.get();
-    assertEquals(allSent, arrived.stream().sorted().toList(), "every custom message exactly once");
+    assertTrue(allSent.containsAll(arrived), "only healths set arrive: " + arrived);
+    if (lastHealth.get() != 0) {
+      assertEquals(lastHealth.get(), arrived.get(arrived.size() - 1), "the server has the health set last");
+    }
     for (int c = 0; c <= callback; c++) {
       Set<Integer> theirs = Set.copyOf(sent.get(c));
-      assertEquals(sent.get(c), arrived.stream().filter(theirs::contains).toList(),
-          (c == callback ? "the callback's" : "thread " + c + "'s") + " custom messages in order");
+      List<Integer> mine = arrived.stream().filter(theirs::contains).toList();
+      assertEquals(mine.stream().sorted().toList(), mine,
+          (c == callback ? "the callback's" : "thread " + c + "'s") + " healths in order");
     }
     List<Long> d = descriptions.get();
     assertEquals((long) lastDescription.get(), d.get(d.size() - 1), "the server has the description set last");

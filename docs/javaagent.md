@@ -416,7 +416,7 @@ sent once, at start: the hash in the first message, the components in full when 
   settings in the distribution.
 - The application's own settings (`AppSettingsTest`, `AppSettingsExtensionTest`): reads before
   any config, without the agent and once a key is left out; `custom.json`'s `typed` vectors and
-  their edges; every `custom.json` case through the extension's own `Decide`, and the hosts that
+  their edges; every `custom.json` case through the extension's agent flow, and the hosts that
   do not carry it out, which refuse it; a listener told once per change and never for the same map (sent again,
   another way, beside another setting, at the end of debug mode), in order, one at a time; an
   exception caught and logged with the others still told; unsubscribing, also from inside a

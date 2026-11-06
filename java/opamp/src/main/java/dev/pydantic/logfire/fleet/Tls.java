@@ -33,7 +33,7 @@ import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509ExtendedTrustManager;
 
 /**
- * TLS settings for {@code https://} and {@code wss://} servers and for package downloads: the CA
+ * TLS settings for {@code https://} and {@code wss://} servers: the CA
  * certificates to trust, a client certificate to present, and the TLS versions allowed. Everything
  * is PEM text; certificates and keys are read when given, so a bad one fails there.
  *

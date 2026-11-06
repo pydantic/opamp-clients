@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/pydantic/opamp-clients/go/opamp"
+	"github.com/pydantic/opamp-clients/go/opamp/collector"
 	"github.com/pydantic/opamp-clients/go/statekey"
 )
 
@@ -50,9 +51,9 @@ type coreClient struct {
 
 	mu        sync.Mutex
 	host      component.Host
-	client    *opamp.Client
+	client    *collector.Client
 	caps      protobufs.AgentCapabilities
-	status    opamp.Status
+	status    collector.Status
 	callbacks types.Callbacks
 	// uid is the instance UID the extension has: the one it started with, or the last
 	// InstanceUIDChanged passed on (on the client's goroutine after Start).
@@ -132,28 +133,30 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 	if c.client != nil {
 		return errors.New("the OpAMP client was started already")
 	}
-	cfg := opamp.Config{
-		Endpoint: settings.OpAMPServerURL,
-		// Upstream's capabilities, ReportsHeartbeat among them (`reports_heartbeat`, default
-		// true): the core sends heartbeats only with the bit.
-		Capabilities: uint64(c.caps),
-		Header:       settings.Header,
-		// Platform mode: net/http carries the requests, so the collector's TLS settings, the
-		// environment's proxies and auth extensions apply as they do to its other clients.
-		Mode:                     opamp.ModePlatform,
-		HTTPClient:               httpClient,
-		AuthHeader:               authHeader,
-		StateFile:                c.cfg.StateFile,
-		StateSealer:              sealer,
-		AcceptConnectionSettings: c.cfg.Capabilities.AcceptsOpAMPConnectionSettings,
+	cfg := collector.Config{
+		Config: opamp.Config{
+			Endpoint: settings.OpAMPServerURL,
+			// Upstream's capabilities, ReportsHeartbeat among them (`reports_heartbeat`, default
+			// true): the core sends heartbeats only with the bit.
+			Capabilities: uint64(c.caps),
+			Header:       settings.Header,
+			// Platform mode: net/http carries the requests, so the collector's TLS settings, the
+			// environment's proxies and auth extensions apply as they do to its other clients.
+			Mode:                     opamp.ModePlatform,
+			HTTPClient:               httpClient,
+			StateFile:                c.cfg.StateFile,
+			StateSealer:              sealer,
+			AcceptConnectionSettings: c.cfg.Capabilities.AcceptsOpAMPConnectionSettings,
+		},
+		AuthHeader: authHeader,
 	}
 	if c.cfg.InstanceUID != "" {
 		// Configured; otherwise the core makes one, or uses the one it kept.
-		cfg.InstanceUID = [16]byte(settings.InstanceUid)
+		cfg.Config.InstanceUID = [16]byte(settings.InstanceUid)
 	}
 	if server.HTTP != nil {
 		// Over plain HTTP the heartbeat is the poll.
-		cfg.HeartbeatInterval = server.GetPollingInterval()
+		cfg.Config.HeartbeatInterval = server.GetPollingInterval()
 	}
 	c.callbacks = settings.Callbacks
 	initial := c.status
@@ -170,7 +173,7 @@ func (c *coreClient) Start(ctx context.Context, settings types.StartSettings) er
 		initial.AvailableComponents = nil
 	}
 	c.uid = [16]byte(settings.InstanceUid)
-	started, err := opamp.Start(ctx, cfg, initial, c.onNotification)
+	started, err := collector.Start(ctx, cfg, initial, c.onNotification)
 	if err != nil {
 		return err
 	}
@@ -191,7 +194,7 @@ func (c *coreClient) Stop(ctx context.Context) error {
 }
 
 // onNotification turns what the core says into the extension's callbacks.
-func (c *coreClient) onNotification(_ *opamp.Client, n opamp.Notification) {
+func (c *coreClient) onNotification(_ *collector.Client, n collector.Notification) {
 	ctx := context.Background()
 	cb := c.callbacks
 	message := func(m *types.MessageData) {
@@ -212,7 +215,7 @@ func (c *coreClient) onNotification(_ *opamp.Client, n opamp.Notification) {
 		if cb.OnError != nil {
 			cb.OnError(ctx, &protobufs.ServerErrorResponse{Type: n.ErrorType, ErrorMessage: n.Message})
 		}
-	case opamp.CustomMessage:
+	case collector.CustomMessage:
 		message(&types.MessageData{CustomMessage: n.CustomMessage})
 	case opamp.InstanceUIDChanged:
 		uid := n.InstanceUID
@@ -223,13 +226,13 @@ func (c *coreClient) onNotification(_ *opamp.Client, n opamp.Notification) {
 		// assigned.
 		c.uid = uid
 		message(&types.MessageData{AgentIdentification: &protobufs.AgentIdentification{NewInstanceUid: uid[:]}})
-	case opamp.Command:
+	case collector.Command:
 		if cb.OnCommand != nil {
 			if err := cb.OnCommand(ctx, n.Command); err != nil {
 				c.logger.Error("Failed to carry out the OpAMP server's command", zap.Error(err))
 			}
 		}
-	case opamp.CustomMessageNotSent:
+	case collector.CustomMessageNotSent:
 		c.logger.Warn("A custom message to the OpAMP server was not sent",
 			zap.String("capability", n.CustomMessage.GetCapability()), zap.String("reason", n.Detail))
 	case opamp.StatusTooLarge:

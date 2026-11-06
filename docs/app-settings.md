@@ -73,8 +73,8 @@ declared ([sdk-settings.md](sdk-settings.md#the-description)).
 
 Declared, the layer reads and checks it with the rest of the policy, and hands the values over in
 the typed settings, `Settings.custom` (a `map<string, string>`, field 16 of
-`proto/opamp/sdk/v1/settings.proto`), in every reply that carries settings: `Loaded.settings`
-(at start, from the saved policy), `Decision.apply` (APPLIED) and `Refreshed.settings`. There is
+`proto/opamp/sdk/v1/settings.proto`), in every settings the agent flow puts in force (its `apply`
+effects: at start, from the saved policy; on APPLIED; at the end of debug mode). There is
 no new call and no new WebAssembly or C export: an integration reads one more field of what it
 already gets. Debug mode leaves it alone.
 
@@ -89,7 +89,7 @@ The same values sent another way (keys in another order, `25` for `"25"`) are th
 they are no change.
 
 **Restarts.** With a state directory the client keeps the last config applied in its saved
-state, and the integrations `Load` the settings from it before the application's code runs
+state, and the integrations start from the settings in it before the application's code runs
 ([sdk-settings.md](sdk-settings.md#at-start)). The values are in it, so the values in force at exit
 are in force again from the start, before any config arrives and whether the server can be
 reached or not. Without one,
@@ -181,14 +181,14 @@ callback the application adds is told of the server's changes from then on, not 
   `python/otel/tests/test_app_settings.py`: reads before and after a config, the typed vectors,
   once per change and never for the same map, callbacks that raise, order, unsubscribing,
   threads, restarts, forked workers; Go `go/opampotel/appsettings_test.go`, the same but forked
-  workers, with every `custom.json` case through the Go wrapper's `Decide`, a Refresh, `Setup`,
+  workers, with every `custom.json` case through the Go wrapper's agent flow, the end of debug mode, `Setup`,
   and `-race`; Node.js `node/otel/test/app-settings.test.ts`: the same, rejected promises in place
   of threads and forks; Java `java/opamp-javaagent/src/test`, `AppSettingsTest` and
   `AppSettingsExtensionTest`: the same but forked workers, with every `custom.json` case through
-  the extension's `Decide`, a refresh, a failed setup, several class loaders, and the bridge
+  the extension's agent flow, the end of debug mode, a failed setup, several class loaders, and the bridge
   loaded where only the JDK is seen; .NET
   `dotnet/Logfire.Fleet.AutoInstrumentation.Tests/AppSettingsTests.cs`, the same but forked
-  workers, with every `custom.json` case through the .NET wrapper's `Decide` and the plugin's
+  workers, with every `custom.json` case through the .NET wrapper's agent flow and the plugin's
   agent).
 - End to end, `check_app_settings` in [examples/integrations.py](../examples/integrations.py):
   the example application reads the flag `example.feature` and, while it is `on`, requests

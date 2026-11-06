@@ -240,7 +240,7 @@ final class Core implements AutoCloseable {
   // 4 step out), a u32 LE length, a u64 LE monotonic time in nanoseconds, then the bytes exactly as
   // they crossed (Config, Reply, Step, Reply). A process's first core writes <path>, each later one
   // <path>.<pid>.<n>. Unset, it costs nothing. With a state file, the file operations of the
-  // client's saves and downloads go to it too: kind 5, one JSON object each (opamp-tap's
+  // client's saves go to it too: kind 5, one JSON object each (opamp-tap's
   // file records), from the threads that carry them out, so records are written under a lock.
   // The file holds the Config's headers and the credentials saved, so a new one is the user's
   // only (0600, or an ACL of the user alone), as the state file is.

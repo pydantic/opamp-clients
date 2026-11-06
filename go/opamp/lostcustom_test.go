@@ -115,9 +115,7 @@ func customMessageOnALostConnectionGoesAgain(t *testing.T, mode Mode) {
 		tr := onPipes(&cfg, mode, n)
 		var mu sync.Mutex
 		notSent := 0
-		c, err := Start(context.Background(), cfg, Status{
-			CustomCapabilities: &protobufs.CustomCapabilities{Capabilities: []string{propCapability}},
-		}, func(_ *Client, n Notification) {
+		c, err := startWith(&protobufs.CustomCapabilities{Capabilities: []string{propCapability}})(context.Background(), cfg, Status{}, func(_ *Client, n Notification) {
 			if n.Kind == CustomMessageNotSent {
 				mu.Lock()
 				notSent++

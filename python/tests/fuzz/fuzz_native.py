@@ -6,7 +6,7 @@ logfire_fleet_client._core), with any bytes on both sides of it.
 One input is a session of the native core driven through this package's own wrappers: a Config
 (any bytes, or a valid one with any saved state), then steps (any bytes, or valid Steps whose inputs
 carry any server-to-agent bytes as a response, a WebSocket message or a stream's data), and
-calls into the SDK settings layer (sdk.SdkSettings: load, decide on a remote config, describe)
+calls into the SDK settings layer (sdk.SdkSettings: the agent flow's start and a remote config step, describe)
 with any bytes. What must hold:
 
 - every call returns bytes the wrapper copied out and freed: never a crash, a leak the RSS limit
@@ -95,7 +95,7 @@ def _step(r: Reader, now: int) -> bytes:
 
 def _sdk(r: Reader, layer: SdkSettings) -> None:
     """The SDK settings layer through its wrapper (the remote config handler of every SDK set up
-    by this package): any saved document, any remote config, any resource. A refusal is a
+    by this package): any start, any agent state and remote config, any resource. A refusal is a
     ValueError; a trap (RuntimeError) is a bug."""
     k = r.byte() % 4
     try:
@@ -106,14 +106,21 @@ def _sdk(r: Reader, layer: SdkSettings) -> None:
             except DecodeError as e:
                 raise Problem(f"the SDK settings layer answered {len(raw)} bytes that aren't a Reply: {e}") from e
         elif k == 1:
-            layer.load(r.blob(1024) if r.byte() & 1 else None)
+            start = sdkpb.AgentStart(state_dir=bool(r.byte() & 1), endpoint=r.text(32), instance_uid=r.blob(16),
+                                     now_unix_ms=r.byte() * 1_000_000_000, now_mono_ms=r.byte() * 1000)
+            if r.byte() & 1:
+                start.core_state = r.blob(1024)
+            layer.start(start)
         elif k == 2:
             config = pb.AgentRemoteConfig(config_hash=r.blob(32))
             for _ in range(r.byte() % 3):
                 obj = config.config.config_map[r.pick(["logfire-sdk-policy.json", r.text(16)])]
                 obj.body = r.blob(1024)
                 obj.content_type = r.pick(["", "application/json", "text/yaml", r.text(16)])
-            layer.decide(config, r.blob(512), r.blob(512), save=(lambda doc: None) if bool(r.byte() & 1) else None)
+            # Any agent state: the one a start gave, or bytes from nowhere.
+            agent = (layer.start(sdkpb.AgentStart(now_unix_ms=1)).agent if r.byte() & 1 else r.blob(512))
+            layer.step(sdkpb.AgentStep(agent=agent, now_unix_ms=r.byte() * 1_000_000_000, now_mono_ms=r.byte() * 1000,
+                                       remote_config=config))
         else:
             names = ["sampling_rate", "send_logs", "custom", r.text(16)]
             host = sdkpb.Host(live=[r.pick(names) for _ in range(r.byte() % 3)]) if r.byte() & 1 else None

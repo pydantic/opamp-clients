@@ -24,15 +24,14 @@ internal static class FuzzInput
     public static readonly int[] Statuses = [204, 301, 302, 400, 401, 403, 404, 429, 500, 503];
 
     public static readonly ulong Capabilities = (ulong)(AgentCapabilities.AcceptsRemoteConfig | AgentCapabilities.ReportsRemoteConfig
-        | AgentCapabilities.AcceptsPackages | AgentCapabilities.ReportsPackageStatuses | AgentCapabilities.AcceptsOpAmpconnectionSettings
-        | AgentCapabilities.AcceptsRestartCommand | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig
+        | AgentCapabilities.AcceptsOpAmpconnectionSettings | AgentCapabilities.ReportsHealth | AgentCapabilities.ReportsEffectiveConfig
         | AgentCapabilities.ReportsAvailableComponents | AgentCapabilities.AcceptsOtherConnectionSettings
         | AgentCapabilities.ReportsConnectionSettingsStatus);
 
     public static readonly string[] Calls =
     [
-        "SetHealth", "SetDescription", "SetEffectiveConfig", "SetRemoteConfigStatus", "PackageInstalled", "PackageRemoved",
-        "SetConnectionSettingsStatus", "SendCustomMessage", "SetCustomCapabilities", "SetAvailableComponents", "Stop", "Nothing",
+        "SetHealth", "SetDescription", "SetEffectiveConfig", "SetRemoteConfigStatus", "SetConnectionSettingsStatus",
+        "SetAvailableComponents", "Stop", "Nothing",
     ];
 
     public static byte[] Sha256(byte[] b) => SHA256.HashData(b);
@@ -133,28 +132,6 @@ internal static class FuzzInput
                     break;
                 }
 
-            case "PackageInstalled":
-                {
-                    string name;
-                    byte[] hash;
-                    if (seen.GetValueOrDefault(typeof(OpAmpNotification.InstallPackage)) is OpAmpNotification.InstallPackage ip && r.U8() % 4 != 0)
-                    {
-                        name = ip.Name;
-                        hash = r.U8() % 4 != 0 ? ip.Package.Hash.ToByteArray() : r.Blob(16);
-                    }
-                    else
-                    {
-                        name = r.Pick(["pkg", "other", string.Empty, r.Text(16)]);
-                        hash = r.Blob(16);
-                    }
-
-                    c.PackageInstalled(name, hash, r.Bit() ? null : r.Text(32));
-                    break;
-                }
-
-            case "PackageRemoved":
-                c.PackageRemoved(seen.GetValueOrDefault(typeof(OpAmpNotification.RemovePackage)) is OpAmpNotification.RemovePackage rp && r.Bit() ? rp.Name : r.Text(16));
-                break;
             case "SetConnectionSettingsStatus":
                 {
                     var h = seen.GetValueOrDefault(typeof(OpAmpNotification.ConnectionSettings)) is OpAmpNotification.ConnectionSettings cs && r.Bit()
@@ -163,21 +140,6 @@ internal static class FuzzInput
                     {
                         LastConnectionSettingsHash = h, Status = (ConnectionSettingsStatuses)(r.U8() % 4), ErrorMessage = r.Text(32),
                     });
-                    break;
-                }
-
-            case "SendCustomMessage":
-                c.SendCustomMessage(new CustomMessage { Capability = r.Pick([Capability, r.Text(24)]), Type = r.Text(16), Data = r.Bytes(512) });
-                break;
-            case "SetCustomCapabilities":
-                {
-                    var cc = new CustomCapabilities();
-                    for (var n = r.U8() % 3; n > 0; n--)
-                    {
-                        cc.Capabilities.Add(r.Pick([Capability, r.Text(24)]));
-                    }
-
-                    c.SetCustomCapabilities(cc);
                     break;
                 }
 

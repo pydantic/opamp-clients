@@ -209,19 +209,19 @@ func toCore(n Notification) *corepb.Notification {
 	case RemoteConfig:
 		k = &corepb.Notification_RemoteConfig{RemoteConfig: n.RemoteConfig}
 	case CustomMessage:
-		k = &corepb.Notification_CustomMessage{CustomMessage: n.CustomMessage}
+		k = &corepb.Notification_CustomMessage{CustomMessage: n.x().CustomMessage}
 	case ServerCustomCapabilities:
-		k = &corepb.Notification_ServerCustomCapabilities{ServerCustomCapabilities: &protobufs.CustomCapabilities{Capabilities: n.CustomCapabilities}}
+		k = &corepb.Notification_ServerCustomCapabilities{ServerCustomCapabilities: &protobufs.CustomCapabilities{Capabilities: n.x().CustomCapabilities}}
 	case CustomMessageNotSent:
-		k = &corepb.Notification_CustomMessageNotSent{CustomMessageNotSent: &corepb.CustomMessageNotSent{Message: n.CustomMessage, Reason: n.Detail}}
+		k = &corepb.Notification_CustomMessageNotSent{CustomMessageNotSent: &corepb.CustomMessageNotSent{Message: n.x().CustomMessage, Reason: n.Detail}}
 	case InstallPackage:
-		k = &corepb.Notification_InstallPackage{InstallPackage: &corepb.InstallPackage{Name: n.PackageName, Package: n.Package}}
+		k = &corepb.Notification_InstallPackage{InstallPackage: &corepb.InstallPackage{Name: n.x().PackageName, Package: n.x().Package}}
 	case RemovePackage:
-		k = &corepb.Notification_RemovePackage{RemovePackage: &corepb.Name{Name: n.PackageName}}
+		k = &corepb.Notification_RemovePackage{RemovePackage: &corepb.Name{Name: n.x().PackageName}}
 	case ConnectionSettings:
 		k = &corepb.Notification_ConnectionSettings{ConnectionSettings: n.ConnectionSettings}
 	case Command:
-		k = &corepb.Notification_Command{Command: n.Command}
+		k = &corepb.Notification_Command{Command: n.x().Command}
 	case InstanceUIDChanged:
 		k = &corepb.Notification_InstanceUidChanged{InstanceUidChanged: slices.Clone(n.InstanceUID[:])}
 	case HeartbeatInterval:

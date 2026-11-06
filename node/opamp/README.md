@@ -41,17 +41,11 @@ Without `instanceUid` the core makes one (a UUIDv7, from the clock and Node's CS
 `stateFile`, keeps it across restarts. `client.instanceUid` is the one in use.
 
 The client keeps no time of its own. The core gives every request, connection, closing
-handshake, download and save its deadline (`requestTimeoutMs`, `connectTimeoutMs`,
-`downloadTimeoutMs`, `stopTimeoutMs`) and cancels what passes it; the client then drops it at once
-(a request or a download aborted, the download's file deleted, a connection closed, even one whose
-handshake completes after the cancel) and reports nothing more about it. `stop()` sends the
+handshake and save its deadline (`requestTimeoutMs`, `connectTimeoutMs`, `stopTimeoutMs`) and
+cancels what passes it; the client then drops it at once (a request aborted, a connection closed,
+even one whose handshake completes after the cancel) and reports nothing more about it. `stop()` sends the
 goodbye if it can and resolves when the core says it has stopped, within `stopTimeoutMs` (5 s by
 default); nothing the client started is still running then.
-
-With `acceptPackages` (and a `stateFile`) the client downloads the files the server offers. It
-follows no redirect itself: it writes whatever response comes to the file and reports its status,
-and for a redirect the `Location` resolved by the WHATWG URL parser (`new URL(location, url)`).
-The core decides whether to follow it (`docs/packages.md`, "Redirects").
 
 The client doesn't keep Node.js running (its timers and connection are unref'd, as the other
 clients run on daemon threads): the application's own work does. A program whose only work is
@@ -60,10 +54,16 @@ has stopped, the client does hold Node.js, so the goodbye is sent before the pro
 connection holds Node.js only while it is being opened and until the server first answers on it;
 in platform mode, while a request is in flight.)
 
+## What this client leaves out
+
+It is an SDK's client: it takes no packages, sends and hears no custom messages, runs no server
+commands and has no `setAuthHeaders`. A server that offers any of them is refused, as the client
+never declared the capability. The Go Supervisor and the Collector extension are the clients for
+those.
+
 ## TLS and proxies
 
-`tls` and `proxy` apply to everything the client sends, in both modes: plain HTTP, WebSocket and
-package downloads.
+`tls` and `proxy` apply to everything the client sends, in both modes: plain HTTP and WebSocket.
 
 ```ts
 import { readFileSync } from "node:fs";
@@ -120,12 +120,11 @@ The client checks these settings at `start`, and throws if it can't use them.
 ## The state file
 
 With a state file (`stateFile`) the client keeps what it needs across restarts: accepted
-connection settings, the instance UID, the last remote config, telemetry settings and packages.
+connection settings, the instance UID, the last remote config and telemetry settings.
 It holds secrets: the credentials of connection settings the server offered (bearer tokens in
 `Authorization` headers) and the private keys of telemetry settings' client certificates.
-The client writes it readable by the agent's user alone (mode 0600; downloaded packages go in a
-0700 directory beside it, `<state file>.downloads`). On Windows Node sets no access-control
-list: the file takes its directory's permissions.
+The client writes it readable by the agent's user alone (mode 0600). On Windows Node sets no
+access-control list: the file takes its directory's permissions.
 Keep it on a local disk, in a directory only the agent's user can read: not on a shared or
 network path, and not in backups or images copied anywhere less protected.
 
@@ -133,9 +132,8 @@ Saves are off the event loop (in both modes), one at a time, in the order the co
 them: a new temporary file (`<state file>.tmp`, never one left behind), written, synced, renamed
 over the state file, and the directory synced; only then does the core hear it is saved. A slow
 disk holds up neither heartbeats nor `stop`, which doesn't wait for a save already writing; a
-client started next on the same state file in the same process waits for it (and for a stopped
-client's downloads to delete their files) before it reads the file. A download's file is made
-new, never written over one already there. With `OPAMP_CORE_TAP` set, every file operation is
+client started next on the same state file in the same process waits for it before it reads the
+file. With `OPAMP_CORE_TAP` set, every file operation is
 recorded in the tap too, for the `opamp-tap` checker to check against a disk that can crash. A
 tap holds the headers sent (the enrollment key) and the credentials saved, so a new one is the
 user's only.
@@ -149,20 +147,12 @@ asked for the platform's stack). An option only one mode honours is never silent
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
 Here platform mode is `mode: "platform"`. This client takes no HTTP client of the application's, so
-the mode option is the only way to choose it. `spliceDownloads: false` is core mode's: with
-`mode: "platform"` it throws.
+the mode option is the only way to choose it.
 
 In core mode (`mode: "core"`, or no `mode`) the core speaks HTTP/1.1, WebSocket, CONNECT and
 SOCKS5 itself, over Node's TCP and TLS sockets: Node opens connections,
-starts TLS with the options above, picks the proxy, and writes package files.
+starts TLS with the options above, and picks the proxy.
 
-- Package files are written off the event loop, in order, and hashed over exactly the bytes
-  written; a file is synced before the core hears it is complete. A file the core discards or
-  cancels while a write is in flight is deleted once that write is over, and nothing more is said
-  about it. With `spliceDownloads` (the default) body bytes go from the socket to the file without
-  passing through the core, wherever the response says how many there are.
-- A socket that brings a file's bytes faster than they can be written is paused while more than
-  4 MiB wait, and resumed at 1 MiB.
 - The core has no "written" signal from a stream, and needs none: it writes one request or
   message at a time. What a peer could make the client buffer is answers to what it sends while
   it reads nothing (WebSocket pings, say). So while a socket's write buffer is full the client

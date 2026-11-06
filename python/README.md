@@ -46,8 +46,8 @@ randomness) and, with a `state_file`, keeps it across restarts. `client.instance
 in use.
 
 The client keeps no time of its own. The core gives every request, connection, closing
-handshake, download and save its deadline (`request_timeout_ms`, `connect_timeout_ms`,
-`download_timeout_ms`, `stop_timeout_ms`) and cancels what passes it; the client then drops it at
+handshake and save its deadline (`request_timeout_ms`, `connect_timeout_ms`,
+`stop_timeout_ms`) and cancels what passes it; the client then drops it at
 once and reports nothing more about it. `stop()` sends the goodbye if it can and returns when the
 core says it has stopped, within `stop_timeout_ms` (5 s by default); nothing the client started is
 still running then. Saves run on a thread beside the event loop, one at a time; a client starting
@@ -57,17 +57,17 @@ The client's methods may be called from any thread: a call from another thread i
 the event loop. `stop()` too: awaited on another thread's loop, it is carried out on the
 client's.
 
-## Packages
+## What this client leaves out
 
-With `accept_packages` (and a `state_file`) the client downloads the files the server offers.
-It follows no redirect itself: it writes whatever response comes to the file and reports its
-status, and for a redirect the `Location` resolved with `urllib.parse.urljoin`. The core decides
-whether to follow it (`docs/packages.md`, "Redirects").
+It is an SDK's client: it takes no packages, sends and hears no custom messages, runs no server
+commands and has no `set_auth_headers`. A server that offers any of them is refused, as the
+client never declared the capability. The Go Supervisor and the Collector extension are the
+clients for those.
 
 ## TLS and proxies
 
 `tls` and `proxy` in `Config` say how to reach the server. They apply to every request, every
-WebSocket and every package download, in both modes.
+WebSocket, in both modes.
 
 ```python
 from logfire_fleet_client import TLS, Proxy
@@ -134,7 +134,7 @@ CIDR notation (`10.0.0.0/8`), IPv6 ones too, but no `name:port` entries. Under C
 `socks5://` included (the proxy resolves names, as above); a bare `host:port` is an HTTP proxy.
 The value goes to the core as it is (trimmed): a scheme it can't use fails the connection rather
 than going direct, at connection time rather than at start. The client reads the environment
-once, at start. It matches each URL on its own: the server's, and each package download's. It
+once, at start, and matches the server's URL against it. It
 doesn't read the operating system's proxy settings, or `.netrc`.
 [Platform mode](#core-mode-and-platform-mode) reads the environment as `urllib` does instead.
 
@@ -146,11 +146,10 @@ Settings that can't work (a missing file, a bad key, a proxy URL without a host)
 ## The state file
 
 With a state file (`state_file`) the client keeps what it needs across restarts: accepted
-connection settings, the instance UID, the last remote config, telemetry settings and packages.
+connection settings, the instance UID, the last remote config and telemetry settings.
 It holds secrets: the credentials of connection settings the server offered (bearer tokens in
 `Authorization` headers) and the private keys of telemetry settings' client certificates.
-The client writes it readable by the agent's user alone (mode 0600; downloaded packages go in a
-0700 directory beside it, `<state file>.downloads`). On Windows Python sets no access-control
+The client writes it readable by the agent's user alone (mode 0600). On Windows Python sets no access-control
 list: the file takes its directory's permissions.
 Keep it on a local disk, in a directory only the agent's user can read: not on a shared or
 network path, and not in backups or images copied anywhere less protected.
@@ -164,30 +163,21 @@ asked for the platform's stack). An option only one mode honours is never silent
 selects that mode, or the client refuses to start with an error that says what to set instead.
 
 Here platform mode is `Config(mode="platform")`. This client takes no HTTP client of the
-application's, so the mode option is the only way to choose it. `splice_downloads=False` is core
-mode's: with `mode="platform"` it is a `ValueError`.
+application's, so the mode option is the only way to choose it.
 
 In core mode (`mode="core"`, the default) the core speaks HTTP/1.1, WebSocket, CONNECT and SOCKS5
 itself (the core's own HTTP stack, in the same library), over asyncio's TCP connections and
 TLS. Python opens connections, starts TLS with the `tls` settings above (an `https://` proxy's,
 then the server's inside it), resolves the server's name for a SOCKS5 proxy with
-`resolve_locally`, picks the proxy, runs the core's timer and writes package files. Every byte on
+`resolve_locally`, picks the proxy and runs the core's timer. Every byte on
 the wire is the core's, and the core keeps every deadline: the connect, each handshake, each
 request, stop. aiohttp isn't used.
 
 - One registry holds everything under way: each stream, the task connecting it or starting its
-  TLS, each name being resolved, each file's writes and each timer. When the core closes a stream
+  TLS, each name being resolved and each timer. When the core closes a stream
   (or gives up on it), it goes at once; a connection or TLS handshake that completes after that
   is aborted as it arrives, and the core hears nothing of it. All of `stop()` takes one stop
-  timeout (5 s): the core's own stop, then the registry letting everything go, waiting for a file
-  write in flight only for what is left of it.
-- Package files are written in a worker thread, in order, and hashed over exactly the bytes
-  written; a file is synced before the core hears it is complete. A file the core discards or
-  cancels while a write is in flight is deleted once that write is over, and nothing more is said
-  about it. With `splice_downloads` (the default) body bytes go from the socket to the file without
-  passing through the core, wherever the response says how many there are.
-- A connection that brings a file's bytes faster than they can be written stops reading while
-  more than 4 MiB wait, and reads again at 1 MiB.
+  timeout (5 s): the core's own stop, then the registry letting everything go.
 - The core has no "written" signal from a stream, and needs none: it writes one request or
   message at a time. What a peer could make the client buffer is answers to what it sends while
   it reads nothing (WebSocket pings, say). So while a connection's write buffer is over asyncio's

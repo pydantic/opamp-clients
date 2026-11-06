@@ -8,6 +8,7 @@ using OpenTelemetry;
 using Logfire.Fleet.Client;
 using Logfire.Fleet.Client.Sdk;
 using Logfire.Fleet.Core;
+using LayerLog = Logfire.Fleet.Client.Sdk.AgentLog;
 
 namespace Logfire.Fleet.Otel;
 
@@ -48,7 +49,23 @@ internal sealed record Server(
         Variables.Where(v => Switches.Contains(v) || !v.StartsWith("OTEL_OPAMP_", StringComparison.Ordinal)).ToArray();
 
     /// <summary>The endpoint as it is safe to log.</summary>
-    public string ShownEndpoint => this.Shown ?? Reachability.Shown(this.Endpoint.OriginalString, this.Endpoint.OriginalString);
+    public string ShownEndpoint => this.Shown ?? ShownFor(this.Endpoint.OriginalString, this.Endpoint.OriginalString);
+
+    /// <summary>
+    /// An endpoint as it is safe to log (no user info, query or fragment), as the core shows it;
+    /// <paramref name="otherwise"/> if the core can't say.
+    /// </summary>
+    public static string ShownFor(string endpoint, string otherwise)
+    {
+        try
+        {
+            return OpAmpSetup.Start(new SetupStart { Code = new SetupInCode { Endpoint = endpoint } }).ShownEndpoint is { Length: > 0 } s ? s : otherwise;
+        }
+        catch (CoreException)
+        {
+            return otherwise;
+        }
+    }
 
     /// <summary>What to check when the server can't be reached.</summary>
     public SetupHints Hinted => this.Hints ?? HintsFor(this.Endpoint.OriginalString);
@@ -221,15 +238,12 @@ internal sealed record AgentLog(Action<string> Info, Action<string> Warn, Action
 
 /// <summary>
 /// The SDK under the server, whatever set the SDK up (the plugin, or the hosting package): the
-/// instance UID and the settings kept in the state directory, the SDK settings layer's decisions
-/// carried out on <see cref="Controls"/>, and the client. What this SDK carries out is the
+/// instance UID kept in the state directory, the SDK settings layer's agent flow carried out on
+/// <see cref="Controls"/>, and the client. What this SDK carries out is the
 /// caller's (<c>host</c>, asked again once the providers are built).
 /// </summary>
 internal sealed class SdkAgent
 {
-    /// <summary>How often the layer is asked about export health.</summary>
-    internal static readonly TimeSpan HealthEvery = TimeSpan.FromSeconds(30);
-
     private readonly Server server;
     private readonly Func<string, string?> getenv;
     private readonly Func<bool, Host> hostNow;
@@ -241,33 +255,33 @@ internal sealed class SdkAgent
     private Host host;
     private Settings inForce = new();
 
-    // The one timer (refresh and health), and what it waits for: the end of debug mode as a
-    // monotonic deadline (refreshAt 0: none), and the next health report (once started). A
-    // Decide after a timer was armed makes its refresh stale: the generation says so.
+    // The agent flow's state, as the layer handed it over: passed back with each step. The flow
+    // decides what is in force, what to answer and report, what to say, and when to step its timer.
+    private ByteString flow = ByteString.Empty;
+
+    // The monotonic clock's reading when the flow started: the flow's clock counts from it.
+    private long startNanos;
+
+    // The one timer, for the flow's next wake (on the flow's clock; 0: none). A step after a timer
+    // was armed arms its own: the generation says the older one is stale.
     private IDisposable? timer;
-    private long refreshDeadline;
-    private ulong refreshAt;
-    private long? nextHealth;
+    private ulong wakeAt;
     private int generation;
     private bool stopped;
 
-    // Export health: the application's own health, and the layer's last report.
+    // The application's own health, and export health's entry as the flow last sent it.
     private ComponentHealth app = new() { Healthy = true };
 
     // Whether SetHealth has been called: its health is newer than the one Start is given.
     private bool appSet;
-    private HealthReport? lastHealth;
-    private Loaded atStart;
-    private ByteString current;
-    private EffectiveConfig effective;
+    private ComponentHealth? exportHealth;
+    private EffectiveConfig effective = new();
     private OpAmpClient? client;
-    private Reachability? reachability;
     private AvailableComponents? components;
 
     // Once started: what the SDK runs, as the caller reads it now, for the available components.
     // Read again by Recheck: an exporter added since is listed, and reported in export health.
     private Func<Inventory>? inventory;
-    private AvailableComponents? unsent;
 
     // The exporters last listed, governed or not: one child each in export health.
     private List<Exporter> exporters = [];
@@ -285,8 +299,9 @@ internal sealed class SdkAgent
     internal Func<List<FoundExporter>, IEnumerable<KeyValuePair<string, string>>, string, ExportersDecided> DecideExporters;
 
     /// <summary>
-    /// Load the saved settings and put them in force on <paramref name="controls"/>; name the instance.
-    /// <paramref name="hostNow"/> says what the SDK carries out (its argument: whether the providers are built).
+    /// Name the instance, start the flow, and put the settings to start with in force on
+    /// <paramref name="controls"/>. <paramref name="hostNow"/> says what the SDK carries out (its
+    /// argument: whether the providers are built).
     /// </summary>
     public SdkAgent(Server server, Func<string, string?> getenv, FileStream? stateLock, Func<bool, Host> hostNow, AgentLog log, Controls controls, Clock? clock = null)
     {
@@ -303,20 +318,28 @@ internal sealed class SdkAgent
         this.layer = new SdkSettings();
         this.DecideExporters = (found, env, protocol) => this.layer.Exporters(found, env, protocol);
         this.host = hostNow(false);
-        var now = this.clock.WallMs();
-        this.atStart = this.layer.Load(this.ReadSaved(), this.host, now, this.ReadCoreState());
-        if (this.atStart.Warning.Length > 0)
+        this.Uid = this.Identity();
+        var hints = server.Hinted;
+        var start = new AgentStart
         {
-            log.Warn(this.atStart.Warning);
+            Host = this.host,
+            StateDir = server.StateDir is not null,
+            Endpoint = server.Endpoint.OriginalString,
+            InstanceUid = ByteString.CopyFrom(Uuid.Bytes(this.Uid)),
+            Hints = new AgentHints { Refused = hints.Refused, NotFound = hints.NotFound, Unreachable = hints.Unreachable, Error = hints.Error },
+            NowUnixMs = this.clock.WallMs(),
+            NowMonoMs = 0,
+        };
+        if (this.ReadCoreState() is { } coreState)
+        {
+            start.CoreState = ByteString.CopyFrom(coreState);
         }
 
-        this.current = this.atStart.Current;
-        this.effective = this.atStart.Effective;
-        this.Put(this.atStart.Settings);
-        this.Uid = this.Identity();
         lock (this.gate)
         {
-            this.Arm(this.atStart.RefreshAtUnixMs, now);
+            this.startNanos = this.clock.Nanos();
+            this.CarryOut(this.layer.Start(start), null);
+            this.AtStart = this.inForce;
         }
     }
 
@@ -337,31 +360,43 @@ internal sealed class SdkAgent
         }
     }
 
-    /// <summary>When the layer said to ask again (the end of debug mode), in wall-clock milliseconds; 0: never.</summary>
+    /// <summary>When the flow asks the layer again (the end of debug mode), in wall-clock milliseconds; 0: never.</summary>
     public ulong RefreshAt
     {
         get
         {
             lock (this.gate)
             {
-                return this.refreshAt;
+                return this.State.RefreshAtUnixMs;
             }
         }
     }
 
-    /// <summary>The layer's last export health report (null: not asked yet).</summary>
-    public HealthReport? LastHealth
+    /// <summary>The flow's state, decoded.</summary>
+    internal AgentState State
     {
         get
         {
             lock (this.gate)
             {
-                return this.lastHealth;
+                return AgentState.Parser.ParseFrom(this.flow);
             }
         }
     }
 
-    /// <summary>The agent's health as last sent with export health in it, by the timer or <see cref="SetHealth"/>.</summary>
+    /// <summary>Export health's entry as the flow last sent it (null: not yet).</summary>
+    public ComponentHealth? ExportHealth
+    {
+        get
+        {
+            lock (this.gate)
+            {
+                return this.exportHealth;
+            }
+        }
+    }
+
+    /// <summary>The agent's health as last sent with export health in it, by the flow or <see cref="SetHealth"/>.</summary>
     public ComponentHealth? HealthSent { get; private set; }
 
     /// <summary>The available components reported (the inventory), once started.</summary>
@@ -376,8 +411,8 @@ internal sealed class SdkAgent
         }
     }
 
-    /// <summary>The settings in force at start.</summary>
-    public Settings AtStart => this.atStart.Settings;
+    /// <summary>The settings in force at start, next-start ones included.</summary>
+    public Settings AtStart { get; private set; } = new();
 
     /// <summary>The effective config, as last reported (or to be reported first).</summary>
     public EffectiveConfig Effective
@@ -421,20 +456,23 @@ internal sealed class SdkAgent
     public void Start(IEnumerable<KeyValuePair<string, object>> attributes, Func<Inventory> inventory, ComponentHealth? health = null)
     {
         var resource = attributes.ToList(); // read twice below
+        var service = Convert.ToString(resource.FirstOrDefault(a => a.Key == "service.name").Value,
+            System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
         Host described;
         ulong describedAt;
+        ComponentHealth first;
         lock (this.gate)
         {
-            // What this SDK turned out to carry out is known now: answer and report by it.
-            this.host = this.hostNow(true);
+            // What this SDK turned out to carry out is known now: the flow decides again under it,
+            // and a setting it turned out not to carry out is the SDK's own again.
             var now = this.clock.WallMs();
-            var loaded = this.layer.Load(this.ReadSaved(), this.host, now, this.ReadCoreState());
-            this.atStart = loaded;
-            this.current = loaded.Current;
-            this.effective = loaded.Effective;
-            // A setting it turned out not to carry out is the SDK's own again.
-            this.Put(loaded.Settings);
-            this.Arm(loaded.RefreshAtUnixMs, now);
+            var built = this.hostNow(true);
+            if (!built.Equals(this.host))
+            {
+                this.host = built;
+                this.Step(new AgentStep { Host = built });
+            }
+
             // By the same host and clock: what it lists of the settings is what it carries out.
             this.inventory = inventory;
             var listed = inventory();
@@ -442,6 +480,18 @@ internal sealed class SdkAgent
             this.components = this.layer.Components(listed, this.host, now);
             described = this.host;
             describedAt = now;
+            // A SetHealth that came while Start was on its way is newer than `health`: keep it.
+            if (!this.appSet && health is not null)
+            {
+                this.app = health;
+            }
+
+            // The flow is told the SDK is built: export health's first report goes with the first message.
+            this.HealthSent = null;
+            this.Step(new AgentStep { Built = new AgentBuilt { Service = service, Exporters = { this.exporters } } });
+            this.Step(this.ExportersNow());
+            first = this.HealthSent ?? this.Merged();
+            this.HealthSent = first;
         }
 
         var options = new OpAmpClientOptions
@@ -466,20 +516,6 @@ internal sealed class SdkAgent
             // is what the suppression below keeps out of the application's traces.
             Mode = OpAmpMode.Platform,
         };
-        ComponentHealth first;
-        lock (this.gate)
-        {
-            // Export health's first report goes with the first message: no second one at once.
-            // A SetHealth that came while Start was on its way is newer than `health`: keep it.
-            if (!this.appSet && health is not null)
-            {
-                this.app = health;
-            }
-
-            first = this.HealthLocked() ?? this.app;
-            this.HealthSent = first;
-        }
-
         var status = new OpAmpStatus
         {
             // By the same host and clock: the controls it lists are those it carries out.
@@ -487,12 +523,6 @@ internal sealed class SdkAgent
             Health = first,
             EffectiveConfig = this.effective,
             AvailableComponents = this.components,
-        };
-        var service = resource.FirstOrDefault(a => a.Key == "service.name").Value;
-        this.reachability = new Reachability(this.server.ShownEndpoint, this.server.Hinted,
-            Convert.ToString(service, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, this.Uid, this.log)
-        {
-            InUse = () => Volatile.Read(ref this.client)?.Endpoint,
         };
         using (SuppressInstrumentationScope.Begin())
         {
@@ -509,10 +539,6 @@ internal sealed class SdkAgent
                 {
                     started.SetHealth(late);
                 }
-
-                // Export health: every 30 s from now, on the settings' timer.
-                this.nextHealth = this.clock.Nanos() + (HealthEvery.Ticks * 100);
-                this.Rearm();
             }
         }
     }
@@ -620,65 +646,26 @@ internal sealed class SdkAgent
     /// </summary>
     public void Recheck()
     {
-        EffectiveConfig? report = null;
-        AvailableComponents? listed = null;
-        OpAmpClient? c;
         lock (this.gate)
         {
-            if (this.RelistLocked(this.clock.WallMs(), out var rehosted))
-            {
-                report = rehosted ? this.effective : null;
-                listed = this.unsent;
-                this.unsent = null;
-                if (this.HealthLocked() is { } health)
-                {
-                    // Under the gate, as SetHealth's: sent after it, this report could undo a newer
-                    // one SetHealth queued in between.
-                    this.HealthSent = health;
-                    this.client?.SetHealth(health);
-                }
-            }
-
-            c = this.client;
-        }
-
-        if (c is null)
-        {
-            return;
-        }
-
-        if (report is not null)
-        {
-            c.SetEffectiveConfig(report);
-        }
-
-        if (listed is not null)
-        {
-            c.SetAvailableComponents(listed);
+            this.RelistLocked();
         }
     }
 
     /// <summary>
-    /// The host and the exporters now, if started: when the exporters differ they are listed
-    /// again; when the host differs (it can only lose the sampler's settings), the settings in
-    /// force are what the layer decides under it (<paramref name="rehosted"/>). Whether either changed.
+    /// The host and the exporters now, if started: when the host differs (it can only lose the
+    /// sampler's settings), the flow decides again under it; when the exporters differ they are
+    /// listed again, the available components sent and the flow told (export health at once).
     /// </summary>
-    private bool RelistLocked(ulong nowUnixMs, out bool rehosted)
+    private void RelistLocked()
     {
-        rehosted = false;
         if (this.inventory is not { } listing || this.stopped)
         {
-            return false;
+            return;
         }
 
         var now = this.hostNow(true);
         var listed = listing();
-        var relisted = !listed.Exporters.SequenceEqual(this.exporters);
-        if (now.Equals(this.host) && !relisted)
-        {
-            return false;
-        }
-
         if (!now.Equals(this.host))
         {
             var lost = this.host.Live.Concat(this.host.NextStart).Except(now.Live.Concat(now.NextStart)).Order(StringComparer.Ordinal).ToList();
@@ -688,20 +675,28 @@ internal sealed class SdkAgent
                 this.log.Warn($"the SDK no longer carries out {string.Join(", ", lost)}: they are set aside");
             }
 
-            this.RefreshLocked(nowUnixMs);
-            this.Rearm();
-            rehosted = true;
+            this.Step(new AgentStep { Host = now });
         }
 
-        this.exporters = [.. listed.Exporters];
-        this.unsent = this.components = this.layer.Components(listed, now, nowUnixMs);
-        return true;
+        if (!listed.Exporters.SequenceEqual(this.exporters))
+        {
+            this.exporters = [.. listed.Exporters];
+            this.components = this.layer.Components(listed, now, this.clock.WallMs());
+            this.client?.SetAvailableComponents(this.components); // under the gate: it only queues
+            this.Step(this.ExportersNow());
+        }
     }
+
+    /// <summary>The exporters listed and the gates' counts now, as the flow takes them.</summary>
+    private AgentStep ExportersNow() => new()
+    {
+        Exporters = new AgentExporters { Exporters = { this.exporters }, Counts = this.Controls.Tally.Counts() },
+    };
 
     /// <summary>The application's health, with export health's entry as last sent (none yet: none).</summary>
     private ComponentHealth Merged()
     {
-        if (this.lastHealth?.Exporters is not { } exporters)
+        if (this.exportHealth is not { } exporters)
         {
             return this.app;
         }
@@ -723,7 +718,6 @@ internal sealed class SdkAgent
             lock (this.gate)
             {
                 this.stopped = true;
-                this.nextHealth = null;
                 this.timer?.Dispose();
                 this.timer = null;
                 c = this.client;
@@ -760,195 +754,155 @@ internal sealed class SdkAgent
         }
     }
 
-    /// <summary>Carry out the layer's decision on a remote config; the answer for the server.</summary>
-    public RemoteConfigStatus RemoteConfig(AgentRemoteConfig config)
+    /// <summary>
+    /// Answer a remote config as the flow decides (sent through <paramref name="to"/>, else the
+    /// client, if it runs); the answer for the server.
+    /// </summary>
+    public RemoteConfigStatus RemoteConfig(AgentRemoteConfig config, OpAmpClient? to = null)
     {
         lock (this.gate)
         {
-            // With a state directory the client keeps the config this applies, in its own state, and
-            // tells the server APPLIED once that is saved: nothing for the agent to save. Without one,
-            // nothing is kept, and a next-start change is refused.
-            var now = this.clock.WallMs();
             // Listed as it is now: a processor added since is reported with the answer.
-            this.RelistLocked(now, out _);
-            Action<byte[]>? save = this.server.StateDir == null ? null : _ => { };
-            var d = this.layer.Decide(config, this.current, this.atStart.Current, this.host, now, save);
-            if (d.Apply is { } apply)
+            this.RelistLocked();
+            return this.Step(new AgentStep { RemoteConfig = config }, to) ?? new RemoteConfigStatus
             {
-                this.Put(apply);
-            }
-
-            if (d.PendingRestart.Count > 0)
-            {
-                this.log.Info($"{string.Join(", ", d.PendingRestart)} changed; in force when the application restarts");
-            }
-
-            this.current = d.Current;
-            this.effective = d.Effective;
-            if (d.Apply is null && this.refreshAt != 0 && now >= this.refreshAt)
-            {
-                // FAILED, so nothing changes, but what is reported is now's: once the wall clock
-                // has passed the end of debug mode (a machine that slept, before the timer went
-                // off), it ends here, as the report says.
-                this.generation++;
-                this.RefreshLocked(now);
-                this.Rearm();
-            }
-            else
-            {
-                // A new window, or none: the timer for it replaces any earlier one.
-                this.Arm(d.RefreshAtUnixMs, now);
-            }
-
-            return d.Status;
+                LastRemoteConfigHash = config.ConfigHash,
+                Status = RemoteConfigStatuses.Failed,
+                ErrorMessage = "the settings layer gave no answer",
+            };
         }
     }
 
     /// <summary>
-    /// What is in force at <paramref name="nowUnixMs"/> (the end of debug mode): put in force, and
-    /// reported to the server if the client runs. What the timer calls; tests too.
+    /// Tell the flow what happened (one input) and carry out what it says, sending through
+    /// <paramref name="to"/>, else the client if it runs. The remote config status it gave, if any.
+    /// Under the gate: what is sent goes in the order the flow said it (the client only queues).
     /// </summary>
-    public void Refresh(ulong nowUnixMs)
+    private RemoteConfigStatus? Step(AgentStep input, OpAmpClient? to = null)
     {
-        EffectiveConfig report;
-        OpAmpClient? c;
         lock (this.gate)
         {
-            report = this.RefreshLocked(nowUnixMs);
-            this.Rearm();
-            c = this.client;
-        }
+            input.Agent = this.flow;
+            input.NowUnixMs = this.clock.WallMs();
+            input.NowMonoMs = this.Mono();
+            AgentOutput output;
+            try
+            {
+                output = this.layer.Step(input);
+            }
+            catch (CoreException e)
+            {
+                this.log.Warn($"the settings layer failed: {e.Message}");
+                return null;
+            }
 
-        c?.SetEffectiveConfig(report);
+            return this.CarryOut(output, to);
+        }
     }
 
-    private EffectiveConfig RefreshLocked(ulong nowUnixMs)
+    /// <summary>The flow's clock: the monotonic one, in milliseconds since the flow started.</summary>
+    private ulong Mono() => (ulong)Math.Max(0, (this.clock.Nanos() - this.startNanos) / 1_000_000);
+
+    /// <summary>The flow's effects, in order, and its timer for the next wake.</summary>
+    private RemoteConfigStatus? CarryOut(AgentOutput output, OpAmpClient? to)
     {
-        var r = this.layer.Refresh(this.current, this.atStart.Current, nowUnixMs, this.host);
-        if (r.Warning.Length > 0)
+        this.flow = output.Agent;
+        this.effective = output.Effective;
+        var c = to ?? this.client;
+        RemoteConfigStatus? status = null;
+        foreach (var e in output.Effects)
         {
-            this.log.Warn(r.Warning);
+            switch (e.EffectCase)
+            {
+                case AgentEffect.EffectOneofCase.Apply:
+                    this.Controls.Apply(e.Apply);
+                    this.inForce = e.Apply;
+                    break;
+                case AgentEffect.EffectOneofCase.Effective:
+                    c?.SetEffectiveConfig(e.Effective);
+                    break;
+                case AgentEffect.EffectOneofCase.Status:
+                    status = e.Status;
+                    c?.SetRemoteConfigStatus(e.Status);
+                    break;
+                case AgentEffect.EffectOneofCase.Health:
+                    // The application's own health, with export health under it.
+                    if (e.Health.ComponentHealthMap.TryGetValue("exporters", out var exporters))
+                    {
+                        this.exportHealth = exporters;
+                    }
+
+                    this.HealthSent = this.Merged();
+                    c?.SetHealth(this.HealthSent);
+                    break;
+                case AgentEffect.EffectOneofCase.SaveUid:
+                    this.Keep(e.SaveUid);
+                    break;
+                case AgentEffect.EffectOneofCase.Log:
+                    this.Say(e.Log);
+                    break;
+            }
         }
 
-        this.Put(r.Settings);
-        this.effective = r.Effective;
-        this.SetRefresh(r.RefreshAtUnixMs, nowUnixMs);
-        return r.Effective;
+        this.Arm(output.WakeAtMonoMs);
+        return status;
     }
 
-    /// <summary>
-    /// Export health now, from the gates' counts: the agent's health to send (the application's,
-    /// with the layer's <c>exporters</c> entry), or null when the layer says not to send.
-    /// </summary>
-    private ComponentHealth? HealthLocked()
+    /// <summary>A line of the flow's, said as the SDK's own.</summary>
+    private void Say(LayerLog line)
     {
-        var report = this.layer.Health(this.Controls.Tally.Counts(), this.lastHealth, this.clock.WallMs(), this.inForce, this.exporters);
-        // Passed back next time, sent or not: when not, its entry is the one last sent.
-        this.lastHealth = report;
-        return report.Send ? this.Merged() : null;
-    }
-
-    private void Put(Settings settings)
-    {
-        this.Controls.Apply(settings);
-        lock (this.gate)
+        switch (line.Level)
         {
-            this.inForce = settings;
+            case LayerLog.Types.Level.Debug:
+                this.log.Debug?.Invoke(line.Text);
+                break;
+            case LayerLog.Types.Level.Notice:
+                (this.log.Notice ?? this.log.Info)(line.Text);
+                break;
+            case LayerLog.Types.Level.Warn:
+                this.log.Warn(line.Text);
+                break;
+            case LayerLog.Types.Level.Error:
+                this.log.Error(line.Text);
+                break;
+            default:
+                this.log.Info(line.Text);
+                break;
         }
     }
 
-    /// <summary>
-    /// The layer said to ask again at <paramref name="refreshAtUnixMs"/> (0: never), at wall time
-    /// <paramref name="nowUnixMs"/>: arm the timer for it, in place of any earlier one, whose
-    /// refresh is stale from now on. The remaining time becomes a monotonic deadline: the wall
-    /// clock jumping while the process runs doesn't move it.
-    /// </summary>
-    private void Arm(ulong refreshAtUnixMs, ulong nowUnixMs)
-    {
-        this.generation++;
-        this.SetRefresh(refreshAtUnixMs, nowUnixMs);
-        this.Rearm();
-    }
-
-    private void SetRefresh(ulong refreshAtUnixMs, ulong nowUnixMs)
-    {
-        this.refreshAt = refreshAtUnixMs;
-        this.refreshDeadline = refreshAtUnixMs == 0
-            ? 0
-            : this.clock.Nanos() + (long)Math.Min(refreshAtUnixMs > nowUnixMs ? refreshAtUnixMs - nowUnixMs : 0, (ulong)TimeSpan.FromDays(2).TotalMilliseconds) * 1_000_000;
-    }
-
-    /// <summary>The one timer, for whichever comes first: the refresh, or the next health report.</summary>
-    private void Rearm()
+    /// <summary>The one timer, for the flow's next wake (on its clock; 0: none), in place of any earlier one.</summary>
+    private void Arm(ulong wake)
     {
         this.timer?.Dispose();
         this.timer = null;
-        long? due = this.refreshAt == 0 ? this.nextHealth
-            : this.nextHealth is not { } health ? this.refreshDeadline
-            : Math.Min(this.refreshDeadline, health);
-        if (this.stopped || due is not { } at)
+        this.generation++;
+        this.wakeAt = wake;
+        if (this.stopped || wake == 0)
         {
             return;
         }
 
         var generation = this.generation;
-        var delay = TimeSpan.FromTicks(Math.Max(0, at - this.clock.Nanos()) / 100);
+        var now = this.Mono();
+        var delay = TimeSpan.FromMilliseconds(Math.Min(wake > now ? wake - now : 0, (ulong)TimeSpan.FromDays(2).TotalMilliseconds));
         this.timer = this.clock.After(delay, () => this.Tick(generation));
     }
 
-    /// <summary>The timer went off: the refresh, if it is due and no Decide came since; health, if due.</summary>
+    /// <summary>The timer went off: what the SDK runs looked at again, and the flow told, with the gates' counts.</summary>
     private void Tick(int generation)
     {
         try
         {
-            EffectiveConfig? report = null;
-            AvailableComponents? listed = null;
-            OpAmpClient? c;
             lock (this.gate)
             {
                 if (this.stopped || generation != this.generation)
                 {
-                    return; // stale: a Decide since armed its own
+                    return; // stale: a step since armed its own
                 }
 
-                var now = this.clock.Nanos();
-                if (this.nextHealth is { } due && now >= due && this.RelistLocked(this.clock.WallMs(), out var rehosted))
-                {
-                    // With the health report: what the SDK runs changed since the last look.
-                    report = rehosted ? this.effective : null;
-                    listed = this.unsent;
-                    this.unsent = null;
-                }
-
-                if (this.refreshAt != 0 && now >= this.refreshDeadline)
-                {
-                    // On the monotonic deadline, the window is over whatever the wall clock says.
-                    report = this.RefreshLocked(Math.Max(this.clock.WallMs(), this.refreshAt));
-                }
-
-                if (this.nextHealth is { } next && now >= next)
-                {
-                    var health = this.HealthLocked();
-                    this.nextHealth = now + (HealthEvery.Ticks * 100);
-                    if (health is not null)
-                    {
-                        this.HealthSent = health;
-                        this.client?.SetHealth(health); // under the gate, as SetHealth's
-                    }
-                }
-
-                this.Rearm();
-                c = this.client;
-            }
-
-            if (report is not null)
-            {
-                c?.SetEffectiveConfig(report);
-            }
-
-            if (listed is not null)
-            {
-                c?.SetAvailableComponents(listed);
+                this.RelistLocked();
+                this.Step(new AgentStep { Timer = this.Controls.Tally.Counts() });
             }
         }
         catch (Exception e)
@@ -957,52 +911,97 @@ internal sealed class SdkAgent
         }
     }
 
-    /// <summary>For tests: the endpoint what the agent says of reaching its server names now.</summary>
-    internal string? EndpointSaid => this.reachability?.At();
-
-    /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
-    public void Notified(OpAmpClient client, OpAmpNotification n)
+    /// <summary>
+    /// For tests: <paramref name="action"/> under the gate, so no step of the client's thread (a
+    /// connect failure's, say) arms a new timer meanwhile: the timer armed last is the current one.
+    /// </summary>
+    internal void UnderGateForTest(Action action)
     {
-        this.reachability?.Notified(n);
-        switch (n)
+        lock (this.gate)
         {
-            case OpAmpNotification.RemoteConfig rc:
-                var status = this.RemoteConfig(rc.Config);
-                EffectiveConfig eff;
-                AvailableComponents? listed;
-                lock (this.gate)
-                {
-                    eff = this.effective;
-                    listed = this.unsent;
-                    this.unsent = null;
-                }
-
-                client.SetEffectiveConfig(eff);
-                if (listed is not null)
-                {
-                    client.SetAvailableComponents(listed);
-                }
-
-                client.SetRemoteConfigStatus(status);
-                break;
-            case OpAmpNotification.InstanceUidChanged { InstanceUid: var uid }:
-                this.Keep(uid);
-                break;
-            case OpAmpNotification.StateFromNewerVersion { Version: var version }:
-                this.log.Warn($"the saved state was written by a newer version of this SDK (state format {version}), which " +
-                    "this one can't read: it is kept as it is, and this run saves nothing");
-                break;
-            case OpAmpNotification.Stopped { Error: { } e }:
-                this.log.Error($"the client stopped; the SDK runs unmanaged: {e.Message}");
-                break;
+            action();
         }
     }
 
+    /// <summary>For tests: the timer goes off now (whenever it is armed for).</summary>
+    internal void TickForTest()
+    {
+        int generation;
+        lock (this.gate)
+        {
+            generation = this.generation;
+        }
+
+        this.Tick(generation);
+    }
+
+    /// <summary>For tests: the SDK built (as Start tells the flow), named <paramref name="service"/>.</summary>
+    internal void BuiltForTest(string service)
+    {
+        lock (this.gate)
+        {
+            this.Step(new AgentStep { Built = new AgentBuilt { Service = service, Exporters = { this.exporters } } });
+            this.Step(this.ExportersNow());
+        }
+    }
+
+    /// <summary>For tests: when the timer is armed for, on the flow's clock (0: not), and the flow's clock now.</summary>
+    internal (ulong WakeAt, ulong Now) TimerForTest
+    {
+        get
+        {
+            lock (this.gate)
+            {
+                return (this.wakeAt, this.Mono());
+            }
+        }
+    }
+
+    /// <summary>For tests: the endpoint what the agent says of reaching its server names now.</summary>
+    internal string? EndpointSaid
+    {
+        get
+        {
+            var configured = this.State.Endpoint;
+            return Volatile.Read(ref this.client)?.Endpoint is { Length: > 0 } inUse ? Server.ShownFor(inUse, configured) : configured;
+        }
+    }
+
+    /// <summary>A notification, on the client's loop: answered through <paramref name="client"/>.</summary>
+    public void Notified(OpAmpClient? client, OpAmpNotification n) => this.Tell(n, client?.Endpoint, client);
+
     /// <summary>
-    /// What this agent kept itself before the client kept the config applied (sdk-settings.json):
-    /// read only while the client's state holds no config applied.
+    /// Tell the flow of a notification; <paramref name="endpoint"/>: the one the client uses now
+    /// (null: the configured one). What the flow says to send goes through <paramref name="client"/>.
     /// </summary>
-    private byte[]? ReadSaved() => this.ReadStateFile("sdk-settings.json");
+    internal void Tell(OpAmpNotification n, string? endpoint, OpAmpClient? client = null)
+    {
+        var inUse = endpoint ?? string.Empty;
+        switch (n)
+        {
+            case OpAmpNotification.RemoteConfig rc:
+                this.RemoteConfig(rc.Config, client);
+                break;
+            case OpAmpNotification.Connected:
+                this.Step(new AgentStep { Connected = new AgentConnected { Endpoint = inUse } }, client);
+                break;
+            case OpAmpNotification.ConnectFailed f:
+                this.Step(new AgentStep
+                {
+                    ConnectFailed = new AgentConnectFailed { Endpoint = inUse, Status = (uint)(f.Status ?? 0), Detail = f.Detail ?? string.Empty },
+                }, client);
+                break;
+            case OpAmpNotification.InstanceUidChanged { InstanceUid: var uid }:
+                this.Step(new AgentStep { InstanceUidChanged = ByteString.CopyFrom(uid) }, client);
+                break;
+            case OpAmpNotification.StateFromNewerVersion { Version: var version }:
+                this.Step(new AgentStep { StateFromNewerVersion = (uint)version }, client);
+                break;
+            case OpAmpNotification.Stopped { Error: var e }:
+                this.Step(new AgentStep { Stopped = new AgentStopped { Error = e?.Message ?? string.Empty } }, client);
+                break;
+        }
+    }
 
     /// <summary>
     /// The client's saved state (opamp-state), raw: the settings to start with are the last config
@@ -1010,9 +1009,7 @@ internal sealed class SdkAgent
     /// client stopped in this process left writing (a config applied just before a stop) has
     /// landed, or this start would begin from the config before.
     /// </summary>
-    private byte[]? ReadCoreState() => this.ReadStateFile("opamp-state", OpAmpClient.ReadState);
-
-    private byte[]? ReadStateFile(string name, Func<string, byte[]>? read = null)
+    private byte[]? ReadCoreState()
     {
         if (this.server.StateDir is not { } dir)
         {
@@ -1022,17 +1019,11 @@ internal sealed class SdkAgent
         try
         {
             Directory.CreateDirectory(dir);
-            var path = Path.Combine(dir, name);
-            if (read is not null)
-            {
-                return read(path) is { Length: > 0 } kept ? kept : null;
-            }
-
-            return File.Exists(path) ? File.ReadAllBytes(path) : null;
+            return OpAmpClient.ReadState(Path.Combine(dir, "opamp-state")) is { Length: > 0 } kept ? kept : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            this.log.Warn($"saved SDK settings unreadable, using the SDK's own: {e.Message}");
+            this.log.Warn($"the client's saved state unreadable, using the SDK's own settings: {e.Message}");
             return null;
         }
     }
@@ -1041,20 +1032,20 @@ internal sealed class SdkAgent
     /// A UID the server assigned (or the client's saved state resumed) is the agent's from now on:
     /// the next start names the instance by it. This run's resource is built already.
     /// </summary>
-    private void Keep(byte[] uid)
+    private void Keep(string uid)
     {
-        if (this.server.StateDir is not { } dir || uid.Length != 16)
+        if (this.server.StateDir is not { } dir)
         {
             return;
         }
 
         try
         {
-            Write(Path.Combine(dir, OpAmpSetup.UidFile), Encoding.ASCII.GetBytes(Uuid.Format(uid)));
+            Write(Path.Combine(dir, OpAmpSetup.UidFile), Encoding.ASCII.GetBytes(uid));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            this.log.Warn($"can't save the instance UID the server assigned: {e.Message}");
+            this.Step(new AgentStep { UidNotSaved = e.Message });
         }
     }
 
