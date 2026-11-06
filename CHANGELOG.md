@@ -93,9 +93,10 @@ and date. Tests, CI and docs alone don't need a line.
 - Go, Python, Node.js, Java, .NET: every SDK runs the settings layer's agent flow, so what an
   SDK does around a policy is the same in each language: when debug mode ends, when export health
   is sent, and the lines it logs about reaching the server (#129).
-- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.16.0, which the clients now pin. Core
-  0.15.0 decides which exporters the SDK policy governs and how each is named (#109); 0.16.0 names
-  the generated Java and .NET types after Logfire Fleet (#126).
+- Go, Python, Node.js, Java, .NET, the Supervisor: on core 0.17.0 (its prerelease 0.17.0-dev.1 until
+  it is released), which the clients now pin. Core 0.15.0 decides which exporters the SDK policy
+  governs and how each is named (#109); 0.16.0 names the generated Java and .NET types after
+  Logfire Fleet (#126); 0.17.0 carries only what every SDK uses (#129).
 - Go, Python, Node.js, Java, .NET: the name each exporter is listed under, where it sends, and the
   warning for each ungoverned one are decided by the core's new `Exporters` call, the same in every
   language. An OTLP exporter built from the variables now lists its signal's path under HTTP
