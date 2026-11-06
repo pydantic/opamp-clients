@@ -17,7 +17,7 @@ from logfire_fleet_client import opamp_pb2
 from logfire_fleet_client.sdk import SdkSettings, settings_pb2
 
 import logfire_fleet_otel
-from _policy import FILE, config_map, overrides, policy
+from _policy import FILE, config_map, layer_decide, overrides, policy
 from kept import keep_applied
 from logfire_fleet_otel import Agent, app_settings
 from logfire_fleet_otel.app_settings import AppSettings
@@ -294,7 +294,7 @@ def test_the_shared_vectors_reach_the_application_as_the_layer_decides(case):
     host = logfire_fleet_otel.sdk_host()
     if "host" in case:
         host = settings_pb2.Host(live=case["host"].get("live", []), next_start=case["host"].get("next_start", []))
-    d = LAYER.decide(config(case["document"]), policy().encode(), policy().encode(), host)
+    d = layer_decide(LAYER, config(case["document"]), host)
     if "refused" in case:
         assert (d.status.status, d.status.error_message) == (FAILED, case["refused"])
         assert not d.HasField("apply")
@@ -348,7 +348,6 @@ def test_a_wrong_custom_entry_fails_the_config_and_nothing_changes(tmp_path):
     assert agent.controls.sampler._rate == 0.5
     assert effective(agent) == {"app_settings": {"values": {"a": "1"}}, "head_sampling": {"ratio": 0.5}}
     assert len(told.calls) == 1
-    assert not (tmp_path / "sdk-settings.json").exists()  # the client keeps the config applied
 
 
 def test_app_settings_left_local_put_every_key_back_to_its_default(tmp_path):
@@ -413,7 +412,8 @@ def test_a_callback_added_before_the_saved_values_load_is_told_of_them(tmp_path)
 
 def test_under_another_configurator_the_application_still_reads_its_settings(tmp_path):
     agent = prepared(tmp_path)
-    agent.host = logfire_fleet_otel.sdk_host(configured=False, governed=False)
+    with agent._lock:  # as start() tells the flow, once it sees what was built
+        agent._step(host=logfire_fleet_otel.sdk_host(configured=False, governed=False))
     # The rate is not this package's to carry out here: a policy that overrides it is refused.
     s = agent.remote_config(config(values({"a": "1"}, head_sampling={"ratio": 0.5})))
     assert s.status == FAILED

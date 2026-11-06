@@ -184,67 +184,6 @@ def slot(slots, all_taken: str) -> tuple[Path, int] | None:
     return None
 
 
-def shown_endpoint(endpoint: str, otherwise: str) -> str:
-    """An endpoint as it is safe to log (no user info, query or fragment), as the core shows it;
-    ``otherwise`` if the core can't say."""
-    try:
-        return setup.start(setup.SetupStart(code=setup.SetupInCode(endpoint=endpoint))).shown_endpoint or otherwise
-    except CoreError:
-        return otherwise
-
-
-def hint(hints: setup.SetupHints, status: int | None) -> str:
-    """What to check when the server can't be reached, by what went wrong, as the core words it:
-    it names what gave the endpoint and the headers, the argument given in code or the variable."""
-    if status in (401, 403):
-        return hints.refused
-    if status == 404:
-        return hints.not_found
-    if status is None:
-        return hints.unreachable
-    return hints.error
-
-
-class Reachability:
-    """Says when the client connects, when it can't (once a run of failures, with what to check),
-    and when it's back: setup that works or doesn't is never silent."""
-
-    def __init__(self, shown: str, service: str = "", uid: uuid.UUID | None = None,
-                 hints: setup.SetupHints | None = None) -> None:
-        self.endpoint = shown  # the configured one, as it is safe to log
-        #: The endpoint the client uses now, as the client gives it (None, or None from it: the
-        #: configured one): after the server moved the agent, the one it moved it to.
-        self.in_use: Callable[[], str | None] | None = None
-        self.hints = hints if hints is not None else setup.SetupHints()
-        self.service = service
-        self.uid = uid
-        self.ever = False
-        self.failing = False
-
-    def at(self) -> str:
-        """The endpoint the client uses now, as it is safe to log."""
-        e = self.in_use() if self.in_use is not None else None
-        return shown_endpoint(e, self.endpoint) if e else self.endpoint
-
-    def notified(self, n: Notification) -> None:
-        endpoint = self.at()
-        if n.kind == "connected":
-            if not self.ever:
-                who = f" as {self.service}" if self.service else ""
-                _notice("OpAMP: connected to %s; this SDK is managed%s, instance %s", endpoint, who, self.uid)
-            elif self.failing:
-                _log.info("OpAMP: connected to %s again", endpoint)
-            self.ever, self.failing = True, False
-        elif n.kind == "connect_failed":
-            if not self.failing:
-                why = n.detail or f"HTTP {n.status}"
-                _log.warning("OpAMP: can't reach %s (%s): %s. Retrying in the background; the SDK keeps its "
-                             "current settings meanwhile", endpoint, why, hint(self.hints, n.status))
-            else:
-                _log.debug("OpAMP: still can't reach %s: %s", endpoint, n.detail)
-            self.failing = True
-
-
 @dataclass
 class Setup:
     """Where the server is, from OTEL_OPAMP_*, as the core's Setup decides it; None when the
@@ -1224,15 +1163,16 @@ def inventory(exporters: list[settings_pb2.Exporter]) -> settings_pb2.Inventory:
 
 
 class Agent:
-    """The package's state: one per process. `app`: where the application reads its own settings."""
+    """The package's state: one per process. `app`: where the application reads its own settings.
+
+    What it does around the settings is the layer's agent flow (docs/sdk-settings.md, "The agent
+    flow"): it tells the flow what happened and carries out what the flow says, in order."""
 
     def __init__(self, app: AppSettings | None = None) -> None:
         self.controls = Controls(app=app)
         self.layer: SdkSettings | None = None
         self.setup: Setup | None = None
-        self.loaded = settings_pb2.Loaded()
         self.host = settings_pb2.Host()
-        self.current = b"{}"
         self.effective = opamp_pb2.EffectiveConfig()
         self.uid: uuid.UUID | None = None
         #: The package's Configurator (or configure_logfire) built the SDK, so the sampler is its own.
@@ -1252,25 +1192,20 @@ class Agent:
         self._warned: set[str] = set()
         self.client: Client | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
-        # Reentrant: a decision under it re-arms the timer, which takes it too.
+        # Reentrant: carrying out an effect can step the flow again (a UID not saved).
         self._lock = threading.RLock()
-        #: Wakes the timer (refresh_at_unix_ms, export health) when a decision re-arms it.
+        #: Wakes the timer when a step moves its deadline.
         self._wake = threading.Condition(self._lock)
         #: The clocks: the wall clock in milliseconds since the Unix epoch, which the layer decides
         #: debug mode by, and the monotonic one in seconds, which the timer waits on.
         self.wall_ms = lambda: time.time_ns() // 1_000_000
         self.monotonic = time.monotonic
-        #: When the layer said to call Refresh (refresh_at_unix_ms; 0: never), and that as a
-        #: monotonic deadline (None: never), so a wall-clock jump while it waits doesn't move it.
-        self._refresh_at = 0
-        self._refresh_deadline: float | None = None
+        self._mono_base = 0.0
+        #: The flow's state, as the layer last gave it, and when to step it next (monotonic; None:
+        #: never).
+        self._flow = b""
+        self._wake_at: float | None = None
         self._ticking = False
-        #: Export health: the layer's last report, and when to ask it again (monotonic).
-        self._health: settings_pb2.HealthReport | None = None
-        self._health_next = 0.0
-        self._started_ns = time.time_ns()
-        self._saved: bytes | None = None
-        self._core_state: bytes | None = None
         self._auto_instrumented = True
         self._hooked = False
         self._inherited: tuple = ()
@@ -1280,7 +1215,6 @@ class Agent:
         #: forked from it; made at the first fork (see _before_fork).
         self._relay: Path | None = None
         self._relay_owner = 0
-        self.reachability: Reachability | None = None
         #: The inventory as reported at start (available components); None before or without.
         self.components: opamp_pb2.AvailableComponents | None = None
 
@@ -1289,10 +1223,10 @@ class Agent:
         return self.setup is not None
 
     def prepare(self, env=os.environ, auto_instrumented: bool = True, **given) -> None:
-        """Before the SDK is built: load the saved settings, put them in force (next-start ones
-        through the instrumentation's own switch, which only opentelemetry-instrument reads: not
-        `auto_instrumented`, they aren't carried out), and name the instance. `given` is the server
-        as the application gave it in code (Setup.from_env)."""
+        """Before the SDK is built: name the instance, start the flow and put the settings it
+        starts with in force (next-start ones through the instrumentation's own switch, which only
+        opentelemetry-instrument reads: not `auto_instrumented`, they aren't carried out). `given`
+        is the server as the application gave it in code (Setup.from_env)."""
         self.setup = Setup.from_env(env, **given)
         if self.setup is None:
             return
@@ -1300,32 +1234,85 @@ class Agent:
         self._auto_instrumented = auto_instrumented
         # Until the SDK is built, as if this package built it; start() says what it found.
         self.host = sdk_host(auto_instrumented=auto_instrumented)
-        saved = core_state = None
+        core_state = None
         if self.setup.state_dir is not None:
             try:
                 # The client's state in it can hold credentials the server issued.
                 self.setup.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
                 # The settings to start with are the last config applied, which the client keeps in
-                # its state (opamp-state); sdk-settings.json is what this package kept itself
-                # before, read only while the client's state holds no config applied.
+                # its state (opamp-state).
                 core_state = read_if_there(self.setup.state_dir / "opamp-state")
-                saved = read_if_there(self.setup.state_dir / "sdk-settings.json")
             except OSError as e:
-                _log.warning("OpAMP: saved SDK settings unreadable, using the SDK's own: %s", e)
-        self._saved, self._core_state = saved, core_state
-        self.loaded = self.layer.load(saved, self.host, self.wall_ms(), core_state=core_state)
-        if self.loaded.warning:
-            _log.warning("OpAMP: %s", self.loaded.warning)
-        self.current = self.loaded.current
-        self.effective = self.loaded.effective
-        self._put_in_force(self.loaded.settings)
-        self._arm(self.loaded.refresh_at_unix_ms)
-        disabled = disabled_instrumentations(self.loaded.settings, env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", ""))
-        if disabled is not None:
-            env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] = disabled
+                _log.warning("OpAMP: the client's saved state unreadable, using the SDK's own settings: %s", e)
         # The UID reaches the SDK through the Configurator, not the environment: a child process
         # inherits the environment, and would join the fleet as this instance.
         self.uid = self._identity(env)
+        h = self.setup.hints
+        start = settings_pb2.AgentStart(
+            host=self.host, state_dir=self.setup.state_dir is not None, endpoint=self.setup.endpoint,
+            instance_uid=self.uid.bytes,
+            hints=settings_pb2.AgentHints(refused=h.refused, not_found=h.not_found, unreachable=h.unreachable,
+                                          error=h.error),
+            now_unix_ms=self.wall_ms(), now_mono_ms=0)
+        if core_state is not None:
+            start.core_state = core_state
+        self._mono_base = self.monotonic()
+        with self._lock:
+            self._carry_out(self.layer.start(start))
+        disabled = disabled_instrumentations(self._applied, env.get("OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", ""))
+        if disabled is not None:
+            env["OTEL_PYTHON_DISABLED_INSTRUMENTATIONS"] = disabled
+
+    def _mono_ms(self) -> int:
+        return max(int((self.monotonic() - self._mono_base) * 1000), 0)
+
+    def _step(self, **input) -> tuple[opamp_pb2.RemoteConfigStatus | None, opamp_pb2.ComponentHealth | None]:
+        """Under the lock: tell the flow what happened (one AgentStep input), and carry out what it
+        says; the remote config status and the health it gave, if any."""
+        assert self.layer is not None
+        step = settings_pb2.AgentStep(agent=self._flow, now_unix_ms=self.wall_ms(), now_mono_ms=self._mono_ms(),
+                                      **input)
+        try:
+            out = self.layer.step(step)
+        except Exception:  # noqa: BLE001 - the SDK runs on with the settings in force
+            _log.warning("OpAMP: the settings layer failed", exc_info=True)
+            return None, None
+        return self._carry_out(out)
+
+    def _carry_out(self, out: settings_pb2.AgentOutput) -> tuple[opamp_pb2.RemoteConfigStatus | None,
+                                                                 opamp_pb2.ComponentHealth | None]:
+        """Under the lock: the flow's effects, in order, and its timer for the next wake."""
+        self._flow, self.effective = out.agent, out.effective
+        status = health = None
+        client = self.client
+        for e in out.effects:
+            kind = e.WhichOneof("effect")
+            if kind == "apply":
+                self._put_in_force(e.apply)
+            elif kind == "effective":
+                if client is not None:
+                    client.set_effective_config(e.effective)
+            elif kind == "status":
+                status = e.status
+                if client is not None:
+                    client.set_remote_config_status(e.status)
+            elif kind == "health":
+                health = e.health
+                if client is not None:
+                    client.set_health(e.health)
+            elif kind == "save_uid":
+                # The client uses the UID from now on; the next start puts it in the telemetry too.
+                self.uid = uuid.UUID(e.save_uid)
+                assert self.setup is not None and self.setup.state_dir is not None
+                try:
+                    save_state(str(self.setup.state_dir / setup.UID_FILE), e.save_uid.encode())
+                except OSError as err:
+                    self._step(uid_not_saved=str(err))
+            elif kind == "log":
+                _say(e.log)
+        self._wake_at = self._mono_base + out.wake_at_mono_ms / 1000 if out.wake_at_mono_ms else None
+        self._wake.notify_all()
+        return status, health
 
     def _identity(self, env) -> uuid.UUID:
         """One UID names the instance to the server and in the telemetry: the one saved in the
@@ -1356,12 +1343,6 @@ class Agent:
                 return uuid.UUID(bytes=got.unsaved_uid)
         return uuid.UUID(bytes=got.instance_uid)
 
-    def _endpoint_in_use(self) -> str | None:
-        """The endpoint the client uses now, if a client runs. (The client is read once: a stop
-        that clears it meanwhile leaves this call with the one it read.)"""
-        client = self.client
-        return client.endpoint if client is not None else None
-
     def start(self, resource: Resource, tracer_provider=None, meter_provider=None, logger_provider=None) -> None:
         """Once the SDK is built: join the fleet, on a thread of the client's own. The providers
         are the SDK's (the global ones where not given)."""
@@ -1369,7 +1350,7 @@ class Agent:
             return
         # What was built is known now: the gates go in front of every exporter on its providers,
         # what can't be gated is reported (never refused), and the host is what this package can
-        # carry out of it. The settings loaded at start are loaded again, under the host as built.
+        # carry out of it. The flow then decides again what is in force, under the host as built.
         found = govern(self.controls, tracer_provider, meter_provider, logger_provider, log_spans=self.logfire,
                        layer=self.layer, listed_as=self._listed_as)
         self.found, self.exporters = found.found, found.exporters
@@ -1391,11 +1372,8 @@ class Agent:
             else:
                 _log.warning("OpAMP: the SDK wasn't built by this package's configurator "
                              "(OTEL_PYTHON_CONFIGURATOR=opamp picks it): %s can't be carried out", lost)
-            self.loaded = self.layer.load(self._saved, self.host, self.wall_ms(), core_state=self._core_state)
-            self.current = self.loaded.current
-            self.effective = self.loaded.effective
-            self._put_in_force(self.loaded.settings)
-            self._arm(self.loaded.refresh_at_unix_ms)
+            with self._lock:
+                self._step(host=built)
         loop = _loop_thread("opamp")
         self._loop = loop
         s = self.setup
@@ -1417,13 +1395,11 @@ class Agent:
                         # Platform mode, asked for by name: the client's requests go through aiohttp,
                         # which is what the suppressed context below keeps out of the traces.
                         mode="platform")
-        self.reachability = Reachability(s.shown, str(resource.attributes.get("service.name", "")), self.uid,
-                                         s.hints)
-        self.reachability.in_use = self._endpoint_in_use
         with self._lock:
-            first = self._export_health()  # the first report is always sent: with the agent's first message
+            # The first export health is always sent: with the agent's first message.
+            health = self._built(str(resource.attributes.get("service.name", "")))
         status = Status(description=self.layer.describe(attributes(resource), self.host, self.wall_ms()),
-                        health=self._health_message(first), effective_config=self.effective,
+                        health=health, effective_config=self.effective,
                         available_components=self._components())
 
         async def begin() -> None:
@@ -1440,8 +1416,8 @@ class Agent:
             _result(asyncio.run_coroutine_threadsafe(begin(), loop), 10)
         except Exception:  # noqa: BLE001 - the application runs on, unmanaged
             _log.exception("OpAMP: the client did not start; the SDK runs unmanaged")
-        # With a client or without: the settings loaded at start are in force, and a debug window
-        # in them ends on its own, whether the server can reach the instance or not.
+        # With a client or without: the settings in force stay, and a debug window in them ends on
+        # its own, whether the server can reach the instance or not.
         self._ticking = True
         threading.Thread(target=self._timer, name="opamp-timer", daemon=True).start()
         if not self._hooked:
@@ -1449,6 +1425,18 @@ class Agent:
             _at_exit(self.stop)
             if hasattr(os, "register_at_fork"):
                 os.register_at_fork(before=self._before_fork, after_in_child=self._forked)
+
+    def _built(self, service: str) -> opamp_pb2.ComponentHealth:
+        """Under the lock: tell the flow the SDK is built, and the exporters; the first health."""
+        self._step(built=settings_pb2.AgentBuilt(service=service, exporters=self.exporters))
+        _, health = self._exporters_now()
+        return health if health is not None else opamp_pb2.ComponentHealth(healthy=True)
+
+    def _exporters_now(self) -> tuple[opamp_pb2.RemoteConfigStatus | None, opamp_pb2.ComponentHealth | None]:
+        """Under the lock: tell the flow the exporters listed and the gates' counts now; export
+        health is built at once."""
+        return self._step(exporters=settings_pb2.AgentExporters(exporters=self.exporters,
+                                                                counts=self.controls.counts()))
 
     def _warn(self, warnings: list[str]) -> None:
         """Say, once each, what exports past the gates (the core's words): the policy is in force on
@@ -1467,10 +1455,7 @@ class Agent:
                            layer=self.layer, listed_as=self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
-            if self.client is not None:
-                components = self._components()
-                if components is not None:
-                    self.client.set_available_components(components)
+            self._report_exporters()
 
     def processor_added(self, processor, signal: str) -> None:
         """The application is adding a span (`signal` "traces") or log record ("logs") processor
@@ -1488,10 +1473,18 @@ class Agent:
             found.decide(self.layer, os.environ, self._listed_as)
             self.found, self.exporters = found.found, found.exporters
             self._warn(found.warnings)
-            if self.client is not None and self.components is not None:
-                components = self._components()
-                if components is not None:
-                    self.client.set_available_components(components)
+            if self.components is not None:
+                self._report_exporters()
+
+    def _report_exporters(self) -> None:
+        """Under the lock, once there is a client: the inventory sent again, and the exporters told
+        to the flow (export health)."""
+        if self.client is None:
+            return
+        components = self._components()
+        if components is not None:
+            self.client.set_available_components(components)
+        self._exporters_now()
 
     def _components(self) -> opamp_pb2.AvailableComponents | None:
         """The inventory, once the SDK is built, as the available components: under the same host
@@ -1528,70 +1521,19 @@ class Agent:
             shutil.rmtree(self._relay.parent, ignore_errors=True)
             self._relay = None
 
-    def _arm(self, refresh_at_unix_ms: int) -> None:
-        """One timer for the layer's refresh_at_unix_ms (0: none), in place of any earlier one: a
-        decision that came after a timer was armed replaces it, so the old one never fires (the
-        deadline is read under the same lock)."""
-        self._refresh_at = refresh_at_unix_ms
-        if refresh_at_unix_ms:
-            self._refresh_deadline = self.monotonic() + max(refresh_at_unix_ms - self.wall_ms(), 0) / 1000
-        else:
-            self._refresh_deadline = None
-        with self._wake:
-            self._wake.notify_all()
-
     def _timer(self) -> None:
-        """The timer's thread: wait for the next deadline, or a decision that moves it."""
+        """The timer's thread: wait for the flow's next wake, or a step that moves it."""
         with self._wake:
             while self._ticking:
                 wait = self._tick()
                 self._wake.wait(wait)
 
     def _tick(self) -> float | None:
-        """Under the lock: whatever is due now (the refresh, export health); how long until the
-        next deadline (None: none)."""
-        now = self.monotonic()
-        if self._refresh_deadline is not None and now >= self._refresh_deadline:
-            self._refresh()
-        if self._ticking and now >= self._health_next:
-            report = self._export_health()
-            if report.send and self.client is not None:
-                self.client.set_health(self._health_message(report))
-        deadlines = [d for d in (self._refresh_deadline, self._health_next if self._ticking else None) if d is not None]
-        return max(min(deadlines) - self.monotonic(), 0) if deadlines else None
-
-    def _export_health(self) -> settings_pb2.HealthReport:
-        """Under the lock: the layer's export health report from the gates' counts, every
-        HEALTH_INTERVAL seconds. It says whether to send it: at once on a change of health or
-        status, at most a minute apart while only the counters move."""
-        assert self.layer is not None
-        report = self.layer.health(self.controls.counts(), self._health, self.wall_ms(), self._applied,
-                                   self.exporters)
-        self._health = report
-        self._health_next = self.monotonic() + HEALTH_INTERVAL
-        return report
-
-    def _health_message(self, report: settings_pb2.HealthReport) -> opamp_pb2.ComponentHealth:
-        """The agent's health: healthy, as the application is running; export health under
-        component_health_map["exporters"], which a failing exporter makes unhealthy."""
-        health = opamp_pb2.ComponentHealth(healthy=True, start_time_unix_nano=self._started_ns)
-        health.component_health_map["exporters"].CopyFrom(report.exporters)
-        return health
-
-    def _refresh(self, now_unix_ms: int | None = None) -> None:
-        """Under the lock, at refresh_at_unix_ms: what is in force now (the end of debug mode), put
-        in force and reported, with or without the server. The monotonic deadline decides that it
-        is time: a wall clock set back meanwhile doesn't hold debug mode open."""
-        assert self.layer is not None
-        now = max(self.wall_ms(), self._refresh_at) if now_unix_ms is None else now_unix_ms
-        r = self.layer.refresh(self.current, self.loaded.current, now, self.host)
-        if r.warning:
-            _log.warning("OpAMP: %s", r.warning)
-        self._put_in_force(r.settings)
-        self.effective = r.effective
-        self._arm(r.refresh_at_unix_ms)
-        if self.client is not None:
-            self.client.set_effective_config(self.effective)
+        """Step the flow if its wake is due; how long until the next (None: none)."""
+        with self._lock:
+            if self._wake_at is not None and self.monotonic() >= self._wake_at:
+                self._step(timer=self.controls.counts())
+            return max(self._wake_at - self.monotonic(), 0) if self._wake_at is not None else None
 
     def _put_in_force(self, s: settings_pb2.Settings) -> None:
         """Carry out the live settings, here and in every process forked from here."""
@@ -1652,55 +1594,52 @@ class Agent:
 
     def _notified(self, n: Notification) -> None:
         """On the client's loop: keep it quick."""
-        if self.reachability is not None:
-            self.reachability.notified(n)
-        if n.kind == "remote_config" and self.client is not None:
-            answer = self.remote_config(n.remote_config)
-            self.client.set_effective_config(self.effective)
-            self.client.set_remote_config_status(answer)
-        elif n.kind == "instance_uid_changed":
-            self.renamed(uuid.UUID(bytes=n.instance_uid))
-        elif n.kind == "state_from_newer_version":
-            _log.warning("OpAMP: the saved state was written by a newer version of this SDK (state format %d), which "
-                         "this one can't read: it is kept as it is, and this run saves nothing", n.state_version)
-        elif n.kind == "stopped" and n.error is not None:
-            _log.error("OpAMP: the client stopped; the SDK runs unmanaged: %s", n.error)
+        client = self.client
+        self.tell(n, client.endpoint if client is not None else None)
 
-    def renamed(self, uid: uuid.UUID) -> None:
-        """The server named the instance anew: saved, so the next start uses it for both the
-        OpAMP instance UID and service.instance.id. The running SDK's resource can't change."""
-        self.uid = uid
-        if self.setup is not None and self.setup.state_dir is not None:
-            try:
-                save_state(str(self.setup.state_dir / setup.UID_FILE), str(uid).encode())
-            except OSError as e:
-                _log.warning("OpAMP: can't save the instance UID the server assigned: %s", e)
-        _log.info("OpAMP: the server named this instance %s; service.instance.id changes at the next start", uid)
+    def tell(self, n: Notification, in_use: str | None = None) -> None:
+        """Tell the flow of a notification; `in_use`: the endpoint the client uses now (None: the
+        configured one)."""
+        if self.layer is None:
+            return
+        if n.kind == "remote_config":
+            self.remote_config(n.remote_config)
+            return
+        if n.kind == "connected":
+            step = {"connected": settings_pb2.AgentConnected(endpoint=in_use or "")}
+        elif n.kind == "connect_failed":
+            step = {"connect_failed": settings_pb2.AgentConnectFailed(endpoint=in_use or "", status=n.status or 0,
+                                                                       detail=n.detail or "")}
+        elif n.kind == "instance_uid_changed":
+            step = {"instance_uid_changed": n.instance_uid}
+        elif n.kind == "state_from_newer_version":
+            step = {"state_from_newer_version": n.state_version}
+        elif n.kind == "stopped":
+            step = {"stopped": settings_pb2.AgentStopped(error=str(n.error) if n.error is not None else "")}
+        else:
+            return
+        with self._lock:
+            self._step(**step)
 
     def remote_config(self, config: opamp_pb2.AgentRemoteConfig) -> opamp_pb2.RemoteConfigStatus:
-        """Carry out the layer's decision on a remote config; the answer for the server."""
-        assert self.layer is not None and self.setup is not None
+        """Tell the flow of a remote config; the answer for the server, which goes to the client too."""
         with self._lock:
-            now = self.wall_ms()
-            # With a state directory the client keeps the config this applies, in its own state,
-            # and tells the server APPLIED once that is saved: nothing for this package to save.
-            # Without one, nothing is kept, and a next-start change is refused.
-            save = None if self.setup.state_dir is None else lambda doc: None
-            d = self.layer.decide(config, self.current, self.loaded.current, self.host, now, save)
-            if d.HasField("apply"):
-                self._put_in_force(d.apply)
-            if d.pending_restart:
-                _log.info("OpAMP: %s changed; in force when the application restarts", ", ".join(d.pending_restart))
-            self.current = d.current
-            self.effective = d.effective
-            if not d.HasField("apply") and self._refresh_at and now >= self._refresh_at:
-                # FAILED, so nothing changes, but what is reported is now's: once the wall clock
-                # has passed the end of debug mode (a machine that slept, before the monotonic
-                # timer went off), it ends here, as the report says.
-                self._refresh(now)
-            else:
-                self._arm(d.refresh_at_unix_ms)
-            return d.status
+            status, _ = self._step(remote_config=config)
+        if status is None:
+            return opamp_pb2.RemoteConfigStatus(last_remote_config_hash=config.config_hash,
+                                                status=opamp_pb2.RemoteConfigStatuses_FAILED,
+                                                error_message="the settings layer gave no answer")
+        return status
+
+
+def _say(line: settings_pb2.AgentLog) -> None:
+    """Log a line of the flow's, as this package's own."""
+    if line.level == settings_pb2.AgentLog.NOTICE:
+        _notice("OpAMP: %s", line.text)
+    else:
+        level = {settings_pb2.AgentLog.DEBUG: logging.DEBUG, settings_pb2.AgentLog.INFO: logging.INFO,
+                 settings_pb2.AgentLog.WARN: logging.WARNING}.get(line.level, logging.ERROR)
+        _log.log(level, "OpAMP: %s", line.text)
 
 
 def attributes(resource: Resource) -> list[anyvalue_pb2.KeyValue]:
@@ -1825,7 +1764,6 @@ def _at_exit(stop) -> None:
 
 
 #: How often the timer asks the layer about export health, in seconds.
-HEALTH_INTERVAL = 30.0
 
 AGENT = Agent(app=app_settings.SETTINGS)
 
