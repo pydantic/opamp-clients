@@ -88,6 +88,8 @@ and date. Tests, CI and docs alone don't need a line.
 
 ### Fixed
 
+- Node.js: the Logfire SDK's `configure({ fleet })` after its `shutdown()` joins Fleet again. The
+  client stayed stopped, so the SDK looked managed with no client running (#135).
 - Supervisor: stopping the Collector no longer races a restart. When the Collector exited just
   as the stop's kill deadline passed, the deadline's goroutine read the command a restart was
   replacing, and could have killed the new Collector. It now signals the process it was stopping

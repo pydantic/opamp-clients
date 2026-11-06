@@ -44,10 +44,13 @@ async function body(req: IncomingMessage): Promise<Uint8Array> {
 /** An OpAMP server that offers `offer` in its first answer: the statuses, instance UIDs and
  * available components hashes it hears. */
 async function configServer(offer: string) {
-  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], uids: new Set<string>(), hashes: [] as string[] };
+  const seen = { polls: 0, statuses: [] as { status: number; error: string }[], uids: new Set<string>(), hashes: [] as string[],
+    goodbyes: 0, pollsAfterGoodbye: 0 };
   const s = createServer(async (req, res) => {
     const msg = fromBinary(AgentToServerSchema, await body(req));
     seen.polls++;
+    if (seen.goodbyes > 0) seen.pollsAfterGoodbye++;
+    if (msg.agentDisconnect) seen.goodbyes++;
     seen.uids.add(Buffer.from(msg.instanceUid).toString("hex"));
     if (msg.availableComponents) seen.hashes.push(Buffer.from(msg.availableComponents.hash).toString("hex"));
     if (msg.remoteConfigStatus) {
@@ -72,8 +75,9 @@ async function configServer(offer: string) {
  * A program that sets the SDK up as the Logfire SDK does under fleet (its head sampler and resource
  * through the hook, its NodeSDK started by the hook), `times` times over, as configure() called
  * again; once `ready` it makes `spans` and exits. Its output. `otlp`: the last SDK also exports over OTLP.
+ * `restart`: each configure() again comes after a shutdown(), as the Logfire SDK's shutdown() does.
  */
-async function app(endpoint: string, spans: string, ready: () => boolean, times = 1, otlp = false) {
+async function app(endpoint: string, spans: string, ready: () => boolean, times = 1, otlp = false, restart = false) {
   const program = `
     import { createRequire } from "node:module";
     import { NodeSDK } from "@opentelemetry/sdk-node";
@@ -89,6 +93,7 @@ async function app(endpoint: string, spans: string, ready: () => boolean, times 
       if (sdk) {
         // As the Logfire SDK's configure() again: the old SDK's globals are let go first.
         trace.disable(); metrics.disable(); propagation.disable(); context.disable(); logs.disable();
+        if (${restart}) await fleet.shutdown();
         await sdk.shutdown();
       }
       fleet = logfireFleet({ endpoint: ${JSON.stringify(endpoint)}, heartbeatIntervalMs: 100, stateDir: "none" });
@@ -190,6 +195,18 @@ test("configure() again under fleet: the server is told of the exporters the new
     const { code, out } = await app(s.endpoint, "", () => s.applied() && s.seen.hashes.at(-1) === expected, 2, true);
     assert.equal(code, 0, out);
     assert.equal(s.seen.hashes.at(-1), expected, out);
+  } finally {
+    s.close();
+  }
+});
+
+test("configure() again after shutdown() under fleet: the client starts again", async () => {
+  const s = await configServer(policy({}));
+  try {
+    const { code, out } = await app(s.endpoint, "", () => s.seen.pollsAfterGoodbye > 1, 2, false, true);
+    assert.equal(code, 0, out);
+    // A goodbye from each client: the second one ran, and said goodbye at exit.
+    assert.equal(s.seen.goodbyes, 2, out);
   } finally {
     s.close();
   }
