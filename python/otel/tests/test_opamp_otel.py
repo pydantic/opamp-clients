@@ -1045,13 +1045,16 @@ def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
     """configure()'s own span processor and a metric exporter named in code get the package's gates
     once the SDK is built, as every exporter does: a policy that turns the traces and metrics off
     and redacts is APPLIED and in force on them."""
-    answered = tmp_path / "answered"
+    answered, ended = tmp_path / "answered", tmp_path / "ended"
     offer = config(policy(signal_exports=off("traces", "metrics", "logs"), attribute_redaction={"drop": ["x"]}))
 
     def reply(msg):
         if msg.HasField("remote_config_status") and msg.remote_config_status.status == APPLIED:
             answered.touch()
         if msg.HasField("remote_config_status") and msg.remote_config_status.last_remote_config_hash:
+            return None
+        # Offered once the first span has ended: before that, the policy could reach it first.
+        if not ended.exists():
             return None
         return opamp_pb2.ServerToAgent(instance_uid=msg.instance_uid, remote_config=offer)
 
@@ -1065,6 +1068,7 @@ def test_processors_and_exporters_passed_in_code_get_the_gates_too(tmp_path):
                              metric_exporter_names=["console"])
         agent = logfire_fleet_otel.AGENT
         trace.get_tracer("t").start_span("before", attributes={{"x": "secret"}}).end()
+        pathlib.Path({str(ended)!r}).touch()
         deadline = time.monotonic() + 10
         while not pathlib.Path({str(answered)!r}).exists() and time.monotonic() < deadline:
             time.sleep(0.05)
