@@ -117,6 +117,41 @@ its own NodeSDK then `manage()` (`outage-manage`: `manage.mjs`) and on the Logfi
 where the Logfire SDK sends them). The .NET integration also runs it on an SDK set up in code with
 `WithOpAmp()` (`outage-hosted`: `dotnet-otel/Hosted/`, no automatic instrumentation).
 
+Then `check_upgrade` (the check `upgrade`) runs the application on the integrations' last release,
+as published (named in [`previous-release.json`](previous-release.json): PyPI, npm, Maven Central,
+NuGet and the Go module proxy), then on this checkout, with one state directory:
+
+| What happens | What the run checks |
+|---|---|
+| the last release, against server A, which offers a policy that drops the URL | APPLIED; spans arrive with no URL |
+| this checkout starts on the same state directory, with nothing at the endpoint | its spans arrive without a URL from the first: it runs on the policy the release saved |
+| server C comes up there | the agent reports the release's UID, and the dropping policy as its effective config |
+
+Python runs it on `logfire_app.py` too (`upgrade-logfire`). Each integration keeps what the release
+build needs beside its example: Node.js `node-otel/previous/` (its own lock), Go `go-otel/previous/`
+(a `go.mod` without the `replace`), .NET `App.csproj`'s `PreviousRelease`, Java and Python the
+coordinates in the file. Move it on at each release, once the packages are on the registries.
+
+`check_slots` (the check `slots`) runs the application on the default state directory
+([docs/default-state-dir.md](../docs/default-state-dir.md)): no state directory named, and the
+user's own (`XDG_STATE_HOME`) one of the check's.
+
+| What happens | What the run checks |
+|---|---|
+| two processes start, one after the other; the server offers each a policy | two UIDs; one directory for the service under `opamp/`, with slots `1` and `2`, each holding its state |
+| the second stops and starts again while the first runs | it takes back slot 2: the same UID, on the policy it kept, with no offer |
+| both stop, and one starts | it takes slot 1: the first's UID, on the policy it kept |
+
+Python also runs `check_workers` (the check `workers`): `workers.py` forks two workers once the SDK
+is built, as gunicorn does, and only they make requests. The server hears one instance, the parent,
+and a policy it is given after the fork reaches the workers within two seconds. And the full first
+check, setup and key rotation run on `logfire_app.py` (`first-logfire`, `setup-logfire`,
+`rotation-logfire`). `manage()` stays on the outage check alone: with the application's own SDK it
+can't sample, and the first check's policies do.
+
+The nightly workflow runs every check once more over a WebSocket, for each integration, and with
+`--edot` for the three that take it.
+
 Each check is independent of the others (its own server, state directory and logs), so one can
 run alone, by name, or several side by side. A check waits on its scenario's clock (one message a
 second), not on the machine, so with `--jobs` they take about as long as the longest of them:

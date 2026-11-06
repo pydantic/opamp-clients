@@ -19,7 +19,14 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
     <PackageReference Include="OpenTelemetry.AutoInstrumentation" Version="1.17.0" Condition="'$(Edot)' != 'true'" />
-    <ProjectReference Include="../../dotnet/Logfire.Fleet.AutoInstrumentation/Logfire.Fleet.AutoInstrumentation.csproj" />
+    <ProjectReference Include="../../dotnet/Logfire.Fleet.AutoInstrumentation/Logfire.Fleet.AutoInstrumentation.csproj"
+                      Condition="'$(PreviousRelease)' == ''" />
+  </ItemGroup>
+
+  <!-- With try.py's PreviousRelease (check_upgrade): the plugin's last release from NuGet
+       (examples/previous-release.json) in place of this checkout's. -->
+  <ItemGroup Condition="'$(PreviousRelease)' != ''">
+    <PackageReference Include="Logfire.Fleet.AutoInstrumentation" Version="$(PreviousRelease)" />
   </ItemGroup>
 
   <!-- With try.py's edot option: Elastic's distribution (EDOT .NET, on automatic instrumentation

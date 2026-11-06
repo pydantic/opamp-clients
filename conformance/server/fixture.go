@@ -81,6 +81,8 @@ type fixtureAgent struct {
 	applied, answered bool
 	// components: the hash of the available components the agent sent whole.
 	components []byte
+	// reported: the remote config hash it last reported.
+	reported []byte
 }
 
 type fixture struct {
@@ -223,18 +225,18 @@ func (s *server) fixtureRespond(msg *protobufs.AgentToServer, token, url string,
 		return
 	}
 	f.mu.Lock()
+	uid := hex.EncodeToString(msg.InstanceUid)
+	a := f.agents[uid]
+	if a == nil {
+		a = &fixtureAgent{}
+		f.agents[uid] = a
+	}
 	if f.config != nil {
-		reported := []byte(nil)
-		if st := msg.RemoteConfigStatus; st != nil {
-			reported = st.LastRemoteConfigHash
+		// The hash each agent last reported, its own: one agent's APPLIED is not another's.
+		if st := msg.RemoteConfigStatus; st != nil && st.LastRemoteConfigHash != nil {
+			a.reported = st.LastRemoteConfigHash
 		}
-		s.mu.Lock()
-		if reported != nil {
-			s.reportedConfig = reported
-		}
-		differs := !bytes.Equal(s.reportedConfig, f.hash)
-		s.mu.Unlock()
-		if differs {
+		if !bytes.Equal(a.reported, f.hash) {
 			resp.RemoteConfig = &protobufs.AgentRemoteConfig{
 				Config: &protobufs.AgentConfigMap{ConfigMap: map[string]*protobufs.AgentConfigObject{
 					f.config.key: {Body: []byte(f.config.body), ContentType: f.config.contentType}}},
@@ -242,12 +244,6 @@ func (s *server) fixtureRespond(msg *protobufs.AgentToServer, token, url string,
 			}
 			info["offer_config"] = hex.EncodeToString(f.hash)
 		}
-	}
-	uid := hex.EncodeToString(msg.InstanceUid)
-	a := f.agents[uid]
-	if a == nil {
-		a = &fixtureAgent{}
-		f.agents[uid] = a
 	}
 	// Components: an agent sends the hash of its set, and the set only when asked for it.
 	if c := msg.AvailableComponents; c != nil && len(c.Hash) > 0 {

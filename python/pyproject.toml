@@ -41,3 +41,8 @@ testpaths = ["tests"]
 [tool.uv.sources]
 # Built from the repository (core/build_backend.py) for this machine.
 logfire-fleet-core = { path = "core" }
+
+[tool.uv]
+# A build of this directory is cached until one of these changes (uv's default is pyproject.toml
+# alone): without the sources, a uv run --with of the directory keeps an older build.
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.py" }]

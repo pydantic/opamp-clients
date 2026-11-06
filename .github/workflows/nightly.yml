@@ -2,7 +2,8 @@ name: Nightly
 
 # The clients' longer runs, on seeds no pull request has tried: each fuzz target for five minutes,
 # an hour of torture for every client and transport against the Go test server, thousands of runs
-# of the property, callback model and schedule tests, and the crash scenarios on LazyFS. Each job
+# of the property, callback model and schedule tests, the crash scenarios on LazyFS, and the SDK
+# integrations' end-to-end checks over a WebSocket and on Elastic's distributions. Each job
 # that runs a client fetches the core, as CI's do (scripts/fetch_core.py fetch). One more job looks
 # for a contrib Collector release newer than the forked extension and Supervisor.
 #
@@ -606,6 +607,81 @@ jobs:
   # the oldest version it declares and on the newest released, and the two SDKs that load the
   # native core (Python and .NET) on macOS and Windows. CI runs one version of each on Linux,
   # and .NET 8 and 10 both (docs/supported-versions.md has the table this keeps true).
+  # Every SDK integration's end-to-end checks (examples/<sdk>/try.py) as CI runs them on each pull
+  # request, over a WebSocket (OPAMP_EXAMPLES_TRANSPORT), and with Elastic's distributions
+  # (--edot) where an integration has one. A pull request's run: the first check alone.
+  integrations-variants:
+    name: ${{ matrix.name }}, end to end
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { sdk: go-otel, name: Go SDK setup over a WebSocket, transport: websocket }
+          - { sdk: node-otel, name: Node.js auto-instrumentation over a WebSocket, transport: websocket }
+          - { sdk: python-otel, name: Python auto-instrumentation over a WebSocket, transport: websocket }
+          - { sdk: javaagent, name: Java agent extension over a WebSocket, transport: websocket }
+          - { sdk: dotnet-otel, name: .NET automatic instrumentation over a WebSocket, transport: websocket }
+          - { sdk: python-otel, name: Python auto-instrumentation with EDOT Python, options: --edot }
+          - { sdk: javaagent, name: Java agent extension with EDOT Java, options: --edot }
+          - { sdk: dotnet-otel, name: .NET automatic instrumentation with EDOT .NET, options: --edot }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .opamp-core
+          key: opamp-core-${{ hashFiles('opamp-core.lock.json') }}
+      # Every platform's library too: the .NET images take the Linux one (scripts/native_lib.py).
+      - name: The core, fetched and verified against the lock
+        uses: ./.github/actions/core
+        with:
+          all-platforms: "true"
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      # The Go server, whatever the integration.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache-dependency-path: |
+            conformance/**/go.sum
+            go/go.sum
+            go/opampotel/go.sum
+            examples/go-otel/go.sum
+            examples/go-otel/previous/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: matrix.sdk == 'node-otel'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: |
+            node/opamp/package-lock.json
+            node/otel/package-lock.json
+            examples/node-otel/logfire/package-lock.json
+            examples/node-otel/previous/package-lock.json
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: matrix.sdk == 'python-otel'
+      - name: Every check (examples/${{ matrix.sdk }}/try.py ${{ matrix.options }})
+        env:
+          SDK: ${{ matrix.sdk }}
+          OPTIONS: ${{ matrix.options }}
+          OPAMP_EXAMPLES_TRANSPORT: ${{ matrix.transport || 'http' }}
+          ONLY: ${{ github.event_name == 'pull_request' && (matrix.sdk == 'node-otel' && 'first-cjs' || 'first') || '' }}
+        run: python3 "examples/$SDK/try.py" $OPTIONS --jobs 4 $ONLY
+      - name: Keep the runs' event logs
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        continue-on-error: true
+        with:
+          name: integrations-variants-${{ matrix.sdk }}-${{ matrix.transport || 'edot' }}
+          retention-days: 7
+          path: |
+            target/integrations/**/*.jsonl
+            target/integrations/**/*.stderr
+            target/integrations/**/*-scenario.json
+          if-no-files-found: ignore
+
   runtimes:
     name: Runtimes (${{ matrix.name }})
     runs-on: ${{ matrix.os }}

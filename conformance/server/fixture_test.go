@@ -224,3 +224,21 @@ func TestFillTimes(t *testing.T) {
 		}
 	}
 }
+
+func TestFixtureOffersToEachAgentUntilThatAgentHasIt(t *testing.T) {
+	s, _ := newFixtureServer(t, &Scenario{Faults: []Fault{
+		{OnMessage: onMessage(1), Action: "offer_config", ConfigKey: "p.json", ContentType: "application/json", Body: `{"b":2}`}}})
+	sum := sha256.Sum256([]byte(`{"b":2}`))
+	first, second := []byte("0123456789abcdef"), []byte("fedcba9876543210")
+	if r := exchange(s, &protobufs.AgentToServer{InstanceUid: first}, ""); r.RemoteConfig == nil {
+		t.Fatal("not offered to the first agent")
+	}
+	exchange(s, &protobufs.AgentToServer{InstanceUid: first, RemoteConfigStatus: &protobufs.RemoteConfigStatus{
+		LastRemoteConfigHash: sum[:], Status: protobufs.RemoteConfigStatuses_RemoteConfigStatuses_APPLIED}}, "")
+	if r := exchange(s, &protobufs.AgentToServer{InstanceUid: second}, ""); r.RemoteConfig == nil {
+		t.Fatal("not offered to a second agent once the first has it")
+	}
+	if r := exchange(s, &protobufs.AgentToServer{InstanceUid: first}, ""); r.RemoteConfig != nil {
+		t.Fatal("offered again to the first")
+	}
+}
