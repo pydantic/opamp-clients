@@ -1084,8 +1084,9 @@ jobs:
           go test -c -tags=install -o "$RUNNER_TEMP/install.test" .
           sudo OPAMP_PKG="$PWD/dist/pydantic-opamp-supervisor-0.0.0-darwin-arm64.pkg" "$RUNNER_TEMP/install.test" -test.run Install -test.v -test.timeout 12m
       - name: The released .pkg, enrolled, then upgraded in place to this one
-        # A step limit under the job's, so a hang fails this step and its log is kept (a job
-        # cancelled at its limit loses every step's log).
+        # A step limit under the job's, so a hang of the test fails this step and its log is kept. When
+        # GitHub's VM goes dark instead, nothing reports back, the job is cancelled at its own limit
+        # with no log, and windows-dark-rerun.yml re-runs it once.
         timeout-minutes: 18
         # The previous step purged what it installed, so this one starts on a clean machine.
         if: ${{ !cancelled() && steps.pkg.outcome == 'success' }}
@@ -1154,8 +1155,9 @@ jobs:
           go test -c -tags=install -o "$RUNNER_TEMP/install.test.exe" .
           OPAMP_MSI="$(cygpath -w "$PWD/dist/pydantic-opamp-supervisor-255.0.0-windows-amd64.msi")" "$RUNNER_TEMP/install.test.exe" -test.run Install -test.v -test.timeout 12m
       - name: The released .msi, enrolled, then upgraded in place to this one
-        # A step limit under the job's, so a hang fails this step and its log is kept (a job
-        # cancelled at its limit loses every step's log).
+        # A step limit under the job's, so a hang of the test fails this step and its log is kept. When
+        # GitHub's VM goes dark instead, nothing reports back, the job is cancelled at its own limit
+        # with no log, and windows-dark-rerun.yml re-runs it once.
         timeout-minutes: 18
         # The previous step purged what it installed, so this one starts on a clean machine.
         if: ${{ !cancelled() && steps.msi.outcome == 'success' }}

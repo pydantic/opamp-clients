@@ -1,0 +1,47 @@
+name: Windows installer, re-run once
+
+# GitHub's hosted Windows VMs sometimes go dark during CI's Windows installer job: the whole machine
+# stops reaching GitHub, so the job is cancelled at its 30-minute limit with no log at all. This
+# happens with the Supervisor of this checkout, with 0.9.0's Collector, and before the Supervisor
+# has started, so it isn't a failure of the code under test. When that job is the only one that
+# failed, and failed that way, on a run's first attempt, this re-runs the failed jobs once. A second
+# failure stays red. Any other failure in the run is left as it is. A hang of the tests themselves
+# doesn't look like this: the tests' own timeouts and the step's limit end it well inside the job's,
+# with a log.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: write
+  checks: read
+
+jobs:
+  rerun:
+    if: >-
+      github.repository == 'pydantic/opamp-clients' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      contains(fromJSON('["failure", "cancelled"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Re-run the failed jobs if only the Windows installer job went dark
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          jobs=$(gh api "repos/$REPO/actions/runs/$RUN/attempts/1/jobs?per_page=100" --paginate \
+            --jq '.jobs[] | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out") | [.id, .name] | @tsv')
+          echo "Failed jobs:"; echo "$jobs"
+          others=$(echo "$jobs" | cut -f2 | grep -v -x -e 'Windows installer, built, installed and enrolled' -e 'CI OK' || true)
+          if [ -n "$others" ]; then echo "Other jobs failed too; leaving the run as it is."; exit 0; fi
+          windows=$(echo "$jobs" | awk -F'\t' '$2 == "Windows installer, built, installed and enrolled" { print $1 }')
+          if [ -z "$windows" ]; then echo "The Windows installer job didn't fail."; exit 0; fi
+          if ! gh api "repos/$REPO/check-runs/$windows/annotations" --jq '.[].message' | grep -q 'exceeded the maximum execution time'; then
+            echo "The Windows installer job failed on its own (not at the job's time limit); leaving it red."; exit 0
+          fi
+          echo "The Windows installer job hit the job's time limit with the machine dark; re-running the failed jobs once."
+          gh api -X POST "repos/$REPO/actions/runs/$RUN/rerun-failed-jobs"
