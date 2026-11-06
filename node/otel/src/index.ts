@@ -1645,6 +1645,8 @@ export class Agent {
   };
   /** The flow's state, as the layer last gave it. */
   flow: Uint8Array = new Uint8Array();
+  /** The exporters' status in the health last sent: a change is logged. */
+  #exportStatus?: string;
   /** The flow's state, decoded: when it asks the layer again, and the export health it last built. */
   get state(): AgentState {
     return fromBinary(AgentStateSchema, this.flow);
@@ -1762,10 +1764,18 @@ export class Agent {
           answered.status = effect.value;
           this.client?.setRemoteConfigStatus(effect.value);
           break;
-        case "health":
+        case "health": {
           answered.health = effect.value;
+          // A change of the exporters' status is the application's to know too, in its log (from
+          // ok: the start's, when all is well, says nothing).
+          const e = effect.value.componentHealthMap?.exporters;
+          if (e && e.status !== (this.#exportStatus ?? "ok")) {
+            diag.info(`OpAMP: export health: ${e.status}${e.lastError ? ` (${e.lastError})` : ""}`);
+          }
+          this.#exportStatus = e?.status;
           this.client?.setHealth(effect.value);
           break;
+        }
         case "saveUid":
           this.#saveUid(effect.value);
           break;

@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { type Attributes, type AttributeValue, type Context, ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
+import { type Attributes, type AttributeValue, type Context, diag, DiagLogLevel, ROOT_CONTEXT, SpanKind, trace } from "@opentelemetry/api";
 import { type ExportResult } from "@opentelemetry/core";
 import { JsonLogsSerializer, JsonTraceSerializer } from "@opentelemetry/otlp-transformer";
 import { InMemoryLogRecordExporter, LoggerProvider, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
@@ -1275,7 +1275,13 @@ test("the gates count each export's result, and what they drop on purpose", () =
   assert.equal(m.counts.metrics.itemsFiltered, 1);
 });
 
-test("export health on the agent's timer: at start, a failure at once, a recovery, nothing while nothing changes", () => {
+test("export health on the agent's timer: at start, a failure at once, a recovery, nothing while nothing changes", (t) => {
+  // Each change of the exporters' status is logged once, for the application.
+  const logged: string[] = [];
+  diag.setLogger({ error: () => {}, warn: () => {}, info: (m) => void logged.push(m), debug: () => {}, verbose: () => {} },
+    DiagLogLevel.ALL);
+  t.after(() => diag.disable());
+  const health_ = () => logged.filter((m) => m.startsWith("OpAMP: export health: "));
   const agent = new TestAgent(undefined);
   const health = agent.built(""); // what the client starts with
   assert.equal(health.componentHealthMap.exporters?.status, "ok");
@@ -1295,11 +1301,14 @@ test("export health on the agent's timer: at start, a failure at once, a recover
   tick();
   assert.equal(exporters().status, "failing");
   assert.match(exporters().lastError, /^traces: connect ECONNREFUSED/);
+  assert.equal(health_().length, 1);
+  assert.match(health_()[0]!, /^OpAMP: export health: failing \(traces: connect ECONNREFUSED/);
   tick();
   assert.equal(sent.length, 1); // still failing, the counters still: nothing sent
   spans.export([span], () => {});
   tick();
   assert.equal(exporters().status, "ok");
+  assert.deepEqual(health_().slice(1), ["OpAMP: export health: ok"]);
   // send_traces false: off, not failing, sent at once at the next look.
   agent.remoteConfig(config({ signal_exports: off("traces") }));
   tick();
