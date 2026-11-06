@@ -365,18 +365,15 @@ def test_what_aiohttp_refuses_still_ends_the_effect(tmp_path) -> None:
             x.do(corepb.Effect(http_request=corepb.HttpRequest(
                 id=1, url=f"http://{base}/h", headers=odd, timeout_ms=5000, max_response_bytes=100)))
             x.do(corepb.Effect(ws_open=corepb.WsOpen(id=2, url=f"ws://{base}/w", headers=odd, max_message_bytes=100)))
-            x.do(corepb.Effect(download=corepb.Download(
-                id=3, url=f"http://{base}/d", headers=odd, max_bytes=100, timeout_ms=5000)))
             x.do(corepb.Effect(ws_open=corepb.WsOpen(id=4, url=f"ws://{base}/w", max_message_bytes=2**40)))
             x.do(corepb.Effect(ws_open=corepb.WsOpen(id=5, url=f"ws://{base}/w", max_message_bytes=0)))
-            assert await until(lambda: len(got) >= 7, 5), got
+            assert await until(lambda: len(got) >= 6, 5), got
             by = {}
             for i in got:
                 kind = i.WhichOneof("kind")
                 by.setdefault(getattr(i, kind).id, []).append(kind)
             assert by[1] == ["http_failed"]
             assert by[2] == ["ws_failed"]
-            assert by[3] == ["download_failed"]
             assert by[4] == ["ws_opened", "ws_message"], "a huge limit is no limit"
             assert by[5] == ["ws_opened", "ws_lost"], "a limit of 0 takes no message"
         finally:
@@ -430,7 +427,7 @@ def test_what_the_server_sends_that_isnt_utf8_still_reaches_the_core(tmp_path) -
     """Found by tests/fuzz/fuzz_client.py: aiohttp keeps the bytes of a header that aren't UTF-8 as
     lone surrogates (surrogateescape), which a protobuf string refuses. A response with one was
     reported as a failed request (a server that sends one, a Latin-1 Server or Set-Cookie say, was
-    never heard); a refused upgrade with one, or a download's redirect to such a Location, raised in
+    never heard); a refused upgrade with one raised in
     the effect's task, which ended with nothing reported. Each reaches the core as core mode's own
     HTTP reader takes it: what isn't UTF-8 replaced by U+FFFD (String::from_utf8_lossy)."""
     async def run() -> None:
@@ -444,8 +441,6 @@ def test_what_the_server_sends_that_isnt_utf8_still_reaches_the_core(tmp_path) -
                 writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nServer: caf\xe9\r\n\r\nok")
             elif path == b"/w":
                 writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nX-Why: \xff\xfe no\r\n\r\n")
-            else:
-                writer.write(b"HTTP/1.1 302 Found\r\nContent-Length: 0\r\nLocation: /caf\xe9/p\r\n\r\n")
             await writer.drain()
             writer.close()
 
@@ -457,15 +452,12 @@ def test_what_the_server_sends_that_isnt_utf8_still_reaches_the_core(tmp_path) -
             x.do(corepb.Effect(http_request=corepb.HttpRequest(
                 id=1, url=f"http://{base}/h", timeout_ms=5000, max_response_bytes=100)))
             x.do(corepb.Effect(ws_open=corepb.WsOpen(id=2, url=f"ws://{base}/w", max_message_bytes=100)))
-            x.do(corepb.Effect(download=corepb.Download(id=3, url=f"http://{base}/d", max_bytes=100, timeout_ms=5000)))
-            assert await until(lambda: len(got) >= 3, 5), got
+            assert await until(lambda: len(got) >= 2, 5), got
             by = {getattr(i, i.WhichOneof("kind")).id: i for i in got}
             assert by[1].WhichOneof("kind") == "http_response", by[1]
             assert ("server", "caf�") in [(h.name.lower(), h.value) for h in by[1].http_response.headers]
             assert by[2].WhichOneof("kind") == "ws_failed" and by[2].ws_failed.status == 403, by[2]
             assert ("x-why", "�� no") in [(h.name.lower(), h.value) for h in by[2].ws_failed.headers]
-            assert by[3].WhichOneof("kind") == "download_response", by[3]
-            assert by[3].download_response.location == f"http://{base}/caf�/p"
         finally:
             await x.close(1)
             server.close()

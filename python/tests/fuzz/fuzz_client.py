@@ -7,24 +7,21 @@ One input is one run of a real Client on the native core (its C interface: logfi
 on a seeded event loop with a virtual clock (tests/_sched_loop.py), in either mode:
 
 - Platform mode: the executor's aiohttp path over a fake session (responses in pieces, resets,
-  error statuses with any headers, package downloads into the state file's directory; WebSocket
+  error statuses with any headers; WebSocket
   upgrades taken or refused, messages, closes and drops);
 - Core mode: the core's own HTTP and WebSocket over _streams.py's connections, on an in-memory
-  network, the server's bytes arriving in pieces (or any bytes at all, status line included),
-  package files spliced or written by the streams' file writer.
+  network, the server's bytes arriving in pieces (or any bytes at all, status line included).
 
 The server answers each request with any bytes, a ServerToAgent built from the bytes (remote
 configs, packages with files it serves, connection settings, commands, custom messages, errors,
 a new instance UID) and perhaps damaged, an error status, or a reset. Each notification the
-callback hears makes it call the client: statuses, remote config and package answers, custom
-messages, stop. Then the application stops the client. What must hold, whatever came:
+callback hears makes it call the client: statuses, remote config answers, stop. Packages,
+commands and custom messages the server sends are the core's to refuse: this client declares none. Then the application stops the client. What must hold, whatever came:
 
 - the client never stops on its own with an error (a CoreError is this shell feeding the core
   something it refuses, or a trap; anything else is a bug here): the callback never raises;
 - callbacks one at a time, on the loop's thread, none before start returned, none after stopped;
   stopped once, last; stop returns within stop_timeout (plus a margin), raising nothing;
-- install_package names a file under the state file's downloads directory, there as the callback
-  runs, whose SHA-256 is the offer's content hash when it has one;
 - every answer the server gave reaches the core, unless the core gave up on its effect first;
 - a heartbeat interval is never negative; nothing touches the loop from another thread; no
   temporary state file is left once stop has returned.
@@ -69,11 +66,10 @@ from multidict import CIMultiDict  # noqa: E402
 import logfire_fleet_client._client as _client_mod  # noqa: E402
 import logfire_fleet_client._core as _core_mod  # noqa: E402
 import logfire_fleet_client._executor as _executor_mod  # noqa: E402
-from _fuzzlib import CALLS, CAPABILITIES, CAPABILITY, Reader, Server, call, pieces  # noqa: E402
+from _fuzzlib import CALLS, CAPABILITIES, Reader, Server, call, pieces  # noqa: E402
 from _sched_loop import Network, SeededLoop  # noqa: E402
 from _sched_world import FakeContent  # noqa: E402
 from logfire_fleet_client import Client, Config, Notification, Proxy, Status, opamp_pb2 as pb  # noqa: E402
-from logfire_fleet_client._executor import downloads_dir  # noqa: E402
 from logfire_fleet_client._proto.opamp.core.v1 import core_pb2 as corepb  # noqa: E402
 
 UNIX0 = 1_790_000_000_000
@@ -424,12 +420,10 @@ class Run:
             endpoint="ws://opamp.test/v1/opamp" if more & 2 else "http://opamp.test/v1/opamp",
             instance_uid=UID if flags & 2 else None,
             capabilities=CAPABILITIES, heartbeat_interval_ms=[100, 1000, 30_000, 0][flags >> 2 & 3],
-            request_timeout_ms=[1000, 0][flags >> 4 & 1], state_file=self.state, accept_packages=True,
+            request_timeout_ms=[1000, 0][flags >> 4 & 1], state_file=self.state,
             accept_connection_settings=bool(flags & 32), request_instance_uid=bool(flags & 64),
-            download_timeout_ms=5000, max_package_bytes=[0, 1000][flags >> 7], mode=self.mode, proxy=Proxy.DIRECT,
-            splice_downloads=bool(more & 1) or self.mode == "platform")
-        self.status = Status(
-            description=pb.AgentDescription(), custom_capabilities=pb.CustomCapabilities(capabilities=[CAPABILITY]))
+            mode=self.mode, proxy=Proxy.DIRECT)
+        self.status = Status(description=pb.AgentDescription())
         self.client: Client | None = None
         self.returned = False
         self.active = 0
@@ -479,8 +473,6 @@ class Run:
                 self.problem(f"the client stopped on its own: {n.error!r}")
             if n.kind == "heartbeat_interval" and n.heartbeat_interval_ms < 0:
                 self.problem(f"heartbeat interval {n.heartbeat_interval_ms}")
-            if n.kind == "install_package":
-                self.check_package(n)
             if n.kind == "stopped":
                 return
             r = self.r
@@ -489,21 +481,6 @@ class Run:
                     self.stop_task = self.loop.create_task(self.client.stop())
         finally:
             self.active -= 1
-
-    def check_package(self, n: Notification) -> None:
-        where = downloads_dir(self.state) + os.sep
-        if not n.path.startswith(where) or os.sep in n.path[len(where):]:
-            self.problem(f"install_package {n.package_name!r}: {n.path!r} is not in {where!r}")
-            return
-        try:
-            with open(n.path, "rb") as f:
-                got = f.read()
-        except OSError as e:
-            self.problem(f"install_package {n.package_name!r}: its file can't be read: {e}")
-            return
-        want = n.package.file.content_hash if n.package is not None else b""
-        if want and hashlib.sha256(got).digest() != want:
-            self.problem(f"install_package {n.package_name!r}: the file isn't the one offered ({len(got)} bytes)")
 
     async def main(self) -> None:
         loop = self.loop
@@ -575,14 +552,14 @@ def _u16(n: int) -> bytes:
     return bytes([n & 0xFF, n >> 8])
 
 
-# Inputs that reach the deeper paths at once: a remote config answered, a package offered,
-# downloaded and installed, connection settings offered, raw bytes, a damaged message, a reset.
+# Inputs that reach the deeper paths at once: a remote config answered, a package offered (and
+# refused), connection settings offered, raw bytes, a damaged message, a reset.
 SEEDS = [
     _seed(b"\x00", b"\0\0\0\0"),
     _seed(b"\x01", b"\1\0\0\0"),
     # Platform mode: a remote config (parts bit 2), answered from the callback.
     _seed(b"\x04", b"\2\0\0\0", b"\5", _u16(2), b"\2ab", b"\1", b"\0", b"\4conf", b"\0", b"\0", b"\1", b"\3", b"\1"),
-    # Core mode: a package (bit 4), its file served, installed and answered.
+    # Core mode: a package (bit 4) offered, which this client doesn't take.
     _seed(b"\x05", b"\3\0\0\0", b"\1", b"\5", _u16(4), b"\0", b"\1", b"\0", b"\0", b"\1", b"1", b"\2h1", b"\1", b"\0",
           b"\5hello", b"\0", b"\0", b"\0", b"\0", b"\0", b"\0", b"\1", b"\4\1\1\0"),
     # Connection settings offered (bit 8), with a new endpoint.

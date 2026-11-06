@@ -220,6 +220,9 @@ public class HealthTests
                     this.wall = walls[i];
                     this.nanos = (long)(walls[i] - walls[0]) * 1_000_000;
 
+                    // What this step sends counts from here: its remote config may send the change
+                    // of status at once, before the timer.
+                    var before = agent.Sdk.HealthSent;
                     var settings = step.TryGetProperty("settings", out var doc) ? doc.GetRawText() : Policy.Local;
                     Assert.Equal(RemoteConfigStatuses.Applied, agent.RemoteConfig(Vectors.Config(settings)).Status);
                     Kept.KeepApplied(dir, settings);
@@ -243,7 +246,6 @@ public class HealthTests
                         }));
                     }
 
-                    var before = agent.Sdk.HealthSent;
                     if (i == 0)
                     {
                         agent.Sdk.Start([new("service.name", "health-test")], () => listed);

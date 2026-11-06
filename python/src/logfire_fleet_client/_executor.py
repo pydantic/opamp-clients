@@ -10,14 +10,11 @@ from __future__ import annotations
 import asyncio
 import collections
 import concurrent.futures
-import hashlib
 import os
-import secrets
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from urllib.parse import urljoin, urlsplit
 
 import aiohttp
 import yarl
@@ -195,51 +192,6 @@ def read_state(path: str | None) -> bytes:
     return _saver(path).submit(read).result()
 
 
-def clear_downloads(files: Files, state_file: str) -> concurrent.futures.Future:
-    """Delete the downloads a run before left (the core downloads again what it still needs),
-    on the state file's saver: beside the loop, and before any save of the client starting. The
-    deletion, which a download waits for before making its file (`AfterClear`)."""
-    def clear() -> None:
-        try:
-            files.clear(downloads_dir(state_file))
-        except OSError:
-            pass  # what is left is never reused: download files are made new
-
-    return _saver(state_file).submit(clear)
-
-
-def downloads_dir(state_file: str) -> str:
-    """Where package files are downloaded, beside the state file."""
-    return state_file + ".downloads"
-
-
-def download_path(state_file: str, client: str, id_: int) -> str:
-    """The file of download `id_` of client `client` (ids start again in every client: one client
-    never touches another's files)."""
-    return os.path.join(downloads_dir(state_file), f"{client}-{id_}")
-
-
-# The ports the url crate takes as a scheme's default (the Rust client reports those as 0).
-_DEFAULT_PORTS = {"http": 80, "https": 443, "ws": 80, "wss": 443, "ftp": 21}
-
-
-def location(requested: str, given: str) -> tuple[str, corepb.Origin | None]:
-    """Where a redirect points: its Location `given` resolved against the URL `requested` by
-    urllib.parse, and that URL's origin (port 0 for the scheme's default). A Location that doesn't
-    resolve goes as given, with no origin: the core refuses it."""
-    given = lossy(given)
-    try:
-        url = urljoin(requested, given)
-        u = urlsplit(url)
-        port = u.port
-    except ValueError:
-        return given, None
-    scheme = u.scheme.lower()
-    if port is None or port == _DEFAULT_PORTS.get(scheme):
-        port = 0
-    return url, corepb.Origin(scheme=scheme, host=u.hostname or "", port=port)
-
-
 class _Conn:
     """A WebSocket connection, open or closing: a reader reporting what arrives, a writer carrying
     out the sends and the close in order."""
@@ -259,7 +211,6 @@ class _Conn:
 class _Entry:
     tasks: list[asyncio.Task] = field(default_factory=list)
     conn: _Conn | None = None
-    on_cancel: Callable[[], None] | None = None  # what else a cancel undoes (a download's file)
 
 
 class InFlight:
@@ -267,10 +218,10 @@ class InFlight:
     core. Everything here runs on the event loop, so each check-and-remove is atomic.
 
     - Every effect under way (a request, a connection being opened, an open or closing
-      connection, a download, a save) has one entry, holding its tasks and, for a connection,
+      connection, a save) has one entry, holding its tasks and, for a connection,
       its socket.
     - ``cancel`` removes the entry and aborts its work at once: its tasks are cancelled, its
-      socket dropped, a download's file deleted.
+      socket dropped.
     - Only ``report`` and ``finish`` deliver, and only while the entry is there; ``finish``
       removes it with the same check, so an effect's final result is delivered once, and
       nothing about it after a cancel.
@@ -285,12 +236,12 @@ class InFlight:
         self._entries: dict[int, _Entry] = {}
         self._closed = False
 
-    def start(self, id_: int, coro, on_cancel: Callable[[], None] | None = None) -> None:
+    def start(self, id_: int, coro) -> None:
         """Run `coro` as effect `id_`."""
         if self._closed:
             coro.close()
             return
-        entry = self._entries[id_] = _Entry(on_cancel=on_cancel)
+        entry = self._entries[id_] = _Entry()
         entry.tasks.append(asyncio.get_running_loop().create_task(coro))
 
     def report(self, id_: int, input_: corepb.Input) -> bool:
@@ -342,8 +293,6 @@ class InFlight:
                 task.cancel()
         if entry.conn is not None:
             entry.conn.drop()
-        if cancel and entry.on_cancel is not None:
-            entry.on_cancel()
 
     async def close(self, timeout: float | None) -> None:
         """Take nothing more, cancel everything, and wait up to `timeout` seconds for it to end."""
@@ -355,82 +304,6 @@ class InFlight:
             await asyncio.wait(tasks, timeout=timeout)
 
 
-class _DownloadFile:
-    """A download's file, written beside the loop (in worker threads: a slow disk holds up
-    neither heartbeats nor the application), one operation at a time, in order. Made new, and
-    deleted only if it was made. Safe to cancel: the download's task may be cancelled while an
-    operation runs; the operation still ends in its thread, noting what it did here (the file's
-    descriptor, whether it was made), and `discard` waits for it before closing and deleting the
-    file. Each operation is journaled (with the tap on) in its thread, before the task goes on:
-    before the core hears of the download's result."""
-
-    def __init__(self, files: Files, path: str) -> None:
-        self.files, self.path = files, path
-        self.fd: int | None = None
-        self.made = False
-        self.gone = False
-        self._op: asyncio.Future | None = None  # the operation in flight, or the last
-
-    async def _run(self, fn: Callable[[], None]) -> None:
-        if self.gone:
-            raise OSError("the download's file was discarded")
-        op = self._op = asyncio.ensure_future(asyncio.to_thread(fn))
-        # Its error is the task's, or (the task cancelled) no one's.
-        op.add_done_callback(lambda f: f.cancelled() or f.exception())
-        await asyncio.shield(op)
-
-    async def open(self) -> None:
-        def run() -> None:
-            self.files.mkdir(os.path.dirname(self.path))
-            # Made new: never a file already there (left by a run that crashed, say).
-            self.fd = self.files.create(self.path)
-            self.made = True
-
-        await self._run(run)
-
-    async def write(self, chunk: bytes) -> None:
-        fd = self.fd
-        assert fd is not None
-        await self._run(lambda: write_all(self.files, fd, chunk))
-
-    async def finish(self) -> None:
-        """Every byte is written: flush the file to the disk (durable before the core hears of
-        it), and close it."""
-        def run() -> None:
-            fd = self.fd
-            assert fd is not None
-            try:
-                self.files.sync(fd)
-            finally:
-                self.fd = None
-                self.files.close(fd)
-
-        await self._run(run)
-
-    async def discard(self) -> None:
-        """Once the operation in flight is over: close the file, and delete it if it was made."""
-        self.gone = True
-        if self._op is not None:
-            await asyncio.wait([self._op])
-        fd, self.fd = self.fd, None
-        path = self.path if self.made else None
-        self.made = False
-        await asyncio.to_thread(_discard_file, self.files, fd, path)
-
-
-def _discard_file(files: Files, fd: int | None, path: str | None) -> None:
-    if fd is not None:
-        try:
-            files.close(fd)
-        except OSError:
-            pass
-    if path is not None:
-        try:
-            files.remove(path)
-        except OSError:
-            pass
-
-
 class Executor:
     """Carries out effects, one kind of I/O each; what becomes of their results is InFlight's."""
 
@@ -438,28 +311,16 @@ class Executor:
                  files: Files | None = None, *,
                  sessions: Callable[[str], aiohttp.ClientSession] | None = None) -> None:
         self._state_file = state_file
-        #: The file system saves and download files go through (journaled with the core tap on).
+        #: The file system saves go through (journaled with the core tap on).
         self._files = files or REAL
-        #: The downloads' files, by id, until deleted (a failure, a cancel, a discard).
-        self._dfiles: dict[int, _DownloadFile] = {}
-        #: Deletions of download files under way: close waits for them (within its bound).
-        self._file_work: set[asyncio.Task] = set()
-        # TLS and the proxy, for requests, connections and downloads alike.
+        # TLS and the proxy, for requests and connections alike.
         self._transport = transport or Transport()
-        # Tests only: makes the sessions instead ("opamp": requests and connections,
-        # "download": package files).
+        # Tests only: makes the session instead ("opamp": requests and connections).
         self._sessions = sessions
         self._session: aiohttp.ClientSession | None = None
-        self._fetcher: aiohttp.ClientSession | None = None  # package downloads
         self._inflight = InFlight(deliver)
-        # This client's name for its download files (core mode's Streams names them so too).
-        self.client = secrets.token_hex(6)
         #: The URL of the OpAMP request or connection whose outcome came last (None: none yet).
         self.used: str | None = None
-
-    def download_path(self, id_: int) -> str:
-        """The file of download `id_`."""
-        return download_path(self._state_file or "", self.client, id_)
 
     def _http(self) -> aiohttp.ClientSession:
         if self._session is None and self._sessions is not None:
@@ -490,29 +351,13 @@ class Executor:
             if conn is not None and not conn.closing:
                 conn.closing = True
                 conn.outbox.put_nowait(None)
-        elif kind == "download":
-            id_ = effect.download.id
-            self._inflight.start(id_, self._download(effect.download), on_cancel=lambda: self._remove(id_))
-        elif kind == "discard":
-            self._remove(effect.discard.id)
         elif kind == "store":
             self._inflight.start(effect.store.id, self._store(effect.store))
         elif kind == "cancel":
-            # Abort a request, a connection being opened or a download (deleting its file); drop
+            # Abort a request or a connection being opened; drop
             # a connection, open or closing; stop waiting for a save (one already writing lands
             # whole, one not yet started never does). Nothing more about it is reported.
             self._inflight.cancel(effect.cancel.id)
-
-    def _remove(self, id_: int) -> asyncio.Task | None:
-        """Delete download `id_`'s file (if this made it), beside the loop, once the operation
-        on it in flight is over: the deletion, if there is one."""
-        f = self._dfiles.pop(id_, None)
-        if f is None:
-            return None
-        task = asyncio.get_running_loop().create_task(f.discard())
-        self._file_work.add(task)
-        task.add_done_callback(self._file_work.discard)
-        return task
 
     async def _store(self, s: corepb.Store) -> None:
         """Save beside the loop, all or nothing, after the saves asked for before."""
@@ -623,75 +468,18 @@ class Executor:
             detail = str(c.ws.exception() or "connection dropped while closing")
             self._inflight.finish(id_, corepb.Input(ws_lost=corepb.Failed(id=id_, detail=lossy(detail))))
 
-    async def _download(self, d: corepb.Download) -> None:
-        """GET a package file into its path, whatever the status, hashing it as it goes; on
-        failure nothing is left. No redirect is followed: the core decides."""
-        try:
-            status, sha256, where = await self._fetch(d)
-        except Exception as e:  # noqa: BLE001 - whatever it is, the download has failed
-            # Nothing left of it before the core hears (a cancel meanwhile lets it finish).
-            if (removing := self._remove(d.id)) is not None:
-                await asyncio.shield(removing)
-            self._inflight.finish(d.id, corepb.Input(download_failed=corepb.Failed(
-                id=d.id, detail=lossy(str(e) or type(e).__name__))))
-            return
-        response = corepb.DownloadResponse(id=d.id, status=status, sha256=sha256)
-        if where is not None:
-            response.location, origin = where
-            if origin is not None:
-                response.location_origin.CopyFrom(origin)
-        if not self._inflight.finish(d.id, corepb.Input(download_response=response)):
-            # Cancelled (or closed) while it finished: its cancel deleted the file before it was
-            # written; nothing is to be left of it.
-            self._remove(d.id)
-
-    async def _fetch(self, d: corepb.Download) -> tuple[int, bytes, tuple[str, corepb.Origin | None] | None]:
-        path = self.download_path(d.id)
-        if self._fetcher is None and self._sessions is not None:
-            self._fetcher = self._sessions("download")
-        if self._fetcher is None:
-            self._fetcher = aiohttp.ClientSession(connector=self._transport.connector(), timeout=aiohttp.ClientTimeout())
-        timeout = aiohttp.ClientTimeout(total=d.timeout_ms / 1000 or None)
-        # The server's client certificate only for a file at its own origin (the core says which).
-        tls = self._transport.ssl if d.server_origin else self._transport.elsewhere_ssl
-        async with self._fetcher.get(_url(d.url), headers=_headers(d.headers), timeout=timeout,
-                                     allow_redirects=False, ssl=tls) as resp:
-            where = None
-            if 300 <= resp.status < 400 and (given := resp.headers.get("Location")) is not None:
-                where = location(d.url, given)
-            # Its file is known before it is made: a cancel from now on deletes it.
-            f = self._dfiles[d.id] = _DownloadFile(self._files, path)
-            await f.open()
-            digest = hashlib.sha256()
-            size = 0
-            async for chunk in resp.content.iter_chunked(64 * 1024):
-                size += len(chunk)
-                if size > d.max_bytes:
-                    raise aiohttp.ClientError(f"file over {d.max_bytes} bytes")
-                digest.update(chunk)
-                await f.write(chunk)
-            await f.finish()
-            return resp.status, digest.digest(), where
-
     async def close(self, timeout: float | None = None, *, release: float | None = None) -> None:
         """Release everything: whatever is still under way is dropped, reported to no one, and a
-        save already writing lands. What was given up on (requests, connections, downloads and
-        the deletion of their files, once the file operation in flight is over) is waited for
+        save already writing lands. What was given up on (requests and connections) is waited for
         `release` seconds at most (None: `timeout`); a save still writing, `timeout` seconds at
         most (None: for ever)."""
         loop = asyncio.get_running_loop()
         if release is None:
             release = timeout
         saves_by = loop.time() + timeout if timeout is not None else None
-        released_by = loop.time() + release if release is not None else None
         await self._inflight.close(release)
-        for session in (self._session, self._fetcher):
-            if session is not None:
-                await session.close()
-        if self._file_work:
-            # Download files cancelled: deleted once their operation in flight is over.
-            left = None if released_by is None else max(0.0, released_by - loop.time())
-            await asyncio.wait(list(self._file_work), timeout=left)
+        if self._session is not None:
+            await self._session.close()
         if self._state_file is not None:
             settled = loop.run_in_executor(_saver(self._state_file), lambda: None)
             left = None if saves_by is None else max(0.0, saves_by - loop.time())

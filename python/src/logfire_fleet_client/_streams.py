@@ -4,29 +4,16 @@
 and this carries out only what needs the platform: TCP connections, TLS on them (Python's ssl,
 with the operator's CAs, certificate and versions), name resolution (only for a SOCKS5 proxy
 with resolve_locally: otherwise the proxy resolves), the proxy urllib's convention picks for a
-URL, and the files of downloads. It decides nothing: every byte it writes, the core wrote, and the
-core keeps every time (it closes a stream it gives up on, and cancels a download's file). As
-node/opamp/src/streams.ts does for Node.
+URL. It decides nothing: every byte it writes, the core wrote, and the core keeps every time (it
+closes a stream it gives up on). As node/opamp/src/streams.ts does for Node.
 
 One registry (`_InFlight`) owns everything under way: each stream (its transport, and the task
-connecting it or starting its TLS), each name being resolved, each file's writes, and each
-timer (a closed stream's linger). A close, from the core or at shutdown, ends what it names at
-once; a connection or a TLS handshake that completes after its stream was closed is aborted as
-it arrives, and reported to no one. Shutdown waits for file work at most SHUTDOWN_S.
+connecting it or starting its TLS), each name being resolved, and each timer (a closed stream's
+linger). A close, from the core or at shutdown, ends what it names at once; a connection or a TLS
+handshake that completes after its stream was closed is aborted as it arrives, and reported to no
+one.
 
-Download files are written off the event loop (a worker thread), one write at a time per file,
-in the order the bytes came: what is queued meanwhile goes in the next write, and is hashed as
-it is written. Each download ends here once, answering the shell's download_done (synced, then
-downloaded; or download_failed if a write failed: what came after is dropped, and the file
-deleted), or not at all when the core discards or cancels it first: then the file goes once the
-write in flight is over, and nothing more is said about it.
-
-Backpressure, both ways:
-- Socket to file. Once more than HIGH_WATER bytes wait for a file's writes, the stream that
-  brought the last of them stops reading (its spliced bytes, or the data the core turned into
-  download_data just then), until they are down to LOW_WATER. Nothing is dropped or reordered:
-  the kernel's window stops the server.
-- Core to socket. The core writes without hearing back (it writes one request or message at a
+Backpressure: the core writes without hearing back (it writes one request or message at a
   time, plus answers to the peer's pings and closes). While a transport's write buffer is over
   its high-water mark (asyncio's pause_writing), the stream reads nothing more, so a peer that
   doesn't read hears nothing more to answer; and a write that finds more than MAX_UNSENT bytes
@@ -37,16 +24,12 @@ Backpressure, both ways:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import os
 import socket
 from collections import deque
 from collections.abc import Callable, Coroutine
-from dataclasses import dataclass, field
 from typing import Any
 
-from ._executor import download_path, lossy
-from ._files import REAL, Files
+from ._executor import lossy
 from ._proto.opamp.core.v1 import core_pb2 as corepb
 from ._transport import Transport
 
@@ -70,15 +53,9 @@ def proxy_choice(transport: Transport) -> corepb.ProxyChoice:
 
 #: How long a closed stream has to flush what was written before it is aborted.
 LINGER_S = 2.0
-#: The most buffers one file write takes.
-MAX_WRITEV = 256
-#: Bytes waiting for a file's writes beyond which the stream they come from stops reading...
-HIGH_WATER = 4 << 20
-#: ...until they are down to this.
-LOW_WATER = 1 << 20
 #: Bytes written to a stream and not yet taken by the peer beyond which the next write fails it.
 MAX_UNSENT = 16 << 20
-#: How long shutdown waits for file work (a write in flight, a deletion) before it returns.
+#: How long shutdown waits for the tasks under way (connects, handshakes) before it returns.
 SHUTDOWN_S = 5.0
 
 
@@ -112,11 +89,9 @@ class _Stream(asyncio.Protocol):
         self.early: deque[tuple[str, Any]] = deque()
         #: The task connecting it or starting its TLS.
         self.task: asyncio.Task | None = None
-        #: Why it is not reading: how many files it waits for, and a full write buffer.
+        #: Why it is not reading: a full write buffer.
         self.holds = 0
         self.blocked = False
-        #: Its next bytes go to a download's file: which download, and how many are left.
-        self.splice: list[int] | None = None
         #: Written while pending: sent once it is ready.
         self.unsent: list[bytes] = []
         #: Its transport has closed (asyncio said connection_lost).
@@ -188,7 +163,7 @@ class _Stream(asyncio.Protocol):
 
 class _InFlight:
     """Everything under way, by owner: streams by id, names being resolved by stream id, tasks
-    (connects, TLS handshakes, resolutions, file work), timers, and closed transports still
+    (connects, TLS handshakes, resolutions), timers, and closed transports still
     flushing. `close` and `shutdown` end what is here; nothing under way is anywhere else."""
 
     def __init__(self) -> None:
@@ -221,7 +196,6 @@ class _InFlight:
         once; otherwise once what was written has gone, or LINGER_S)."""
         if self.streams.get(s.id) is s:
             del self.streams[s.id]
-        s.splice = None
         s.early.clear()
         s.unsent.clear()
         connecting = s.task is not None and not s.task.done()
@@ -261,107 +235,21 @@ class _InFlight:
         self.lingering.clear()
 
 
-@dataclass(eq=False)
-class _File:
-    """A download's file."""
-
-    id: int
-    path: str
-    fd: int | None = None
-    #: Bytes waiting for the next write, in order.
-    queue: deque[bytes] = field(default_factory=deque)
-    #: How many bytes are queued or being written.
-    unwritten: int = 0
-    #: Streams not reading until the bytes waiting are down to LOW_WATER.
-    paused: set[_Stream] = field(default_factory=set)
-    #: Of the bytes written (touched only by the write in flight).
-    hash: Any = field(default_factory=hashlib.sha256)
-    #: A write is running (the pump): only it touches fd and hash.
-    busy: bool = False
-    #: The file was made (by this: only then is it this one's to delete).
-    made: bool = False
-    #: download_done came: sync, close and answer once everything queued is written.
-    done: bool = False
-    #: Discarded or cancelled (or shut down): delete it, say nothing.
-    gone: bool = False
-    #: A write failed: the file is deleted, and download_done is answered with this.
-    error: str | None = None
-
-
-def _open_file(files: Files, path: str) -> int:
-    """A download's file, made new (never one already there, a crashed run's say), in its
-    directory, made if need be: both this user's only."""
-    files.mkdir(os.path.dirname(path))
-    return files.create(path)
-
-
-def _write_all(files: Files, fd: int, bufs: list[bytes], digest: Any) -> None:
-    """Write `bufs` in full, hashing each byte once it is written (in a worker thread)."""
-    views = [memoryview(b) for b in bufs]
-    while views:
-        n = files.write(fd, views[:MAX_WRITEV])
-        if n <= 0:
-            raise OSError("the file took none of the bytes written to it")
-        while views and n > 0:
-            v = views[0]
-            if n >= len(v):
-                digest.update(v)
-                n -= len(v)
-                views.pop(0)
-            else:
-                digest.update(v[:n])
-                views[0] = v[n:]
-                n = 0
-
-
-def _sync_close(files: Files, fd: int) -> None:
-    try:
-        files.sync(fd)
-    finally:
-        files.close(fd)
-
-
-def _discard(files: Files, fd: int | None, path: str | None) -> None:
-    """Close `fd`, if open, and delete `path`, if given (a file this made)."""
-    if fd is not None:
-        try:
-            files.close(fd)
-        except OSError:
-            pass
-    if path is not None:
-        try:
-            files.remove(path)
-        except OSError:
-            pass
-
-
 class Streams:
     """Carries out core mode's effects: `do` takes those that are its own."""
 
-    def __init__(self, deliver: Deliver, transport: Transport, state_file: str | None, *, client: str = "",
+    def __init__(self, deliver: Deliver, transport: Transport, *,
                  connect: Callable[..., Coroutine[Any, Any, tuple[asyncio.BaseTransport, Any]]] | None = None,
                  start_tls: Callable[..., Coroutine[Any, Any, asyncio.BaseTransport | None]] | None = None,
-                 getaddrinfo: Callable[..., Coroutine[Any, Any, list[Any]]] | None = None,
-                 files: Files | None = None) -> None:
+                 getaddrinfo: Callable[..., Coroutine[Any, Any, list[Any]]] | None = None) -> None:
         self._deliver = deliver
-        #: The file system download files go through (journaled with the core tap on).
-        self._fs = files or REAL
-        #: The downloads whose file was made, answered and not yet deleted (a discard deletes it).
-        self._answered: set[int] = set()
         self._transport = transport
-        self._state_file = state_file
-        #: The client's name for its download files (Executor.client): one client never touches
-        #: another's.
-        self._client = client
         loop = asyncio.get_running_loop()
         # The loop's, unless a test stands in for them.
         self._connect = connect or loop.create_connection
         self._start_tls = start_tls or loop.start_tls
         self._getaddrinfo = getaddrinfo or loop.getaddrinfo
         self._in = _InFlight()
-        self._files: dict[int, _File] = {}
-        #: The stream whose bytes the core is being given (download_data then came from it).
-        self._reading: _Stream | None = None
 
     def do(self, e: corepb.Effect) -> bool:
         """Carry out `e` if it is one of core mode's; False if it isn't."""
@@ -390,30 +278,6 @@ class Streams:
                 task.cancel()
             if (s := self._in.streams.get(c.id)) is not None:
                 self._in.close(s, c.abort)
-        elif kind == "stream_splice":
-            sp = e.stream_splice
-            if (s := self._in.streams.get(sp.id)) is not None:
-                s.splice = [sp.download, sp.bytes]
-        elif kind == "download_data":
-            self._append(e.download_data.id, e.download_data.data, self._reading)
-        elif kind == "download_done":
-            f = self._file(e.download_done.id)
-            f.done = True
-            self._pump(f)
-        elif kind in ("discard", "cancel"):
-            # A download's file the core is done with, or gave up on (cancel: its stream is closed
-            # already). A save's cancel is the Executor's: this says it isn't only this one's.
-            id_ = getattr(e, kind).id
-            f = self._files.get(id_)
-            if f is not None:
-                f.gone = True  # deleted once the write in flight is over
-                self._pump(f)
-            elif id_ in self._answered and self._state_file is not None and not self._in.closed:
-                # Answered already: only its file is left.
-                self._answered.discard(id_)
-                path = download_path(self._state_file, self._client, id_)
-                self._in.spawn(asyncio.to_thread(_discard, self._fs, None, path))
-            return kind == "discard"
         else:
             return False
         return True
@@ -517,24 +381,7 @@ class Streams:
     def _event(self, s: _Stream, kind: str, value: Any) -> None:
         """What arrived on `s`, which the core has heard is ready."""
         if kind == "data":
-            data = memoryview(value)
-            # While a splice lasts: hearing one done, the shell may ask for the next, and the bytes
-            # already read after the first are then that one's (what the core asks in answer to an
-            # input about a stream applies to the very next bytes: RULE-SHELL-05).
-            while s.splice is not None:
-                # Body bytes: straight to the file, past the core.
-                download, left = s.splice
-                n = min(left, len(data))
-                self._append(download, bytes(data[:n]), s)
-                s.splice[1] -= n
-                data = data[n:]
-                if s.splice[1] == 0:
-                    s.splice = None
-                    self._from(s, corepb.Input(stream_spliced=corepb.Id(id=s.id)))
-                # (Hearing the splice done, the shell may have closed the stream: nothing more.)
-                if not data or not self._mine(s):
-                    return
-            self._from(s, corepb.Input(stream_data=corepb.WsMessage(id=s.id, data=bytes(data))))
+            self._deliver(corepb.Input(stream_data=corepb.WsMessage(id=s.id, data=bytes(value))))
         elif kind == "eof":
             self._deliver(corepb.Input(stream_eof=corepb.Id(id=s.id)))
         else:
@@ -542,121 +389,12 @@ class Streams:
             self._in.close(s, abort=True)
             self._deliver(_failed(s.id, _detail(value, "the connection closed")))
 
-    def _from(self, s: _Stream, i: corepb.Input) -> None:
-        """Deliver `i`, what `s` read: the download_data the core makes of it came from `s`."""
-        self._reading = s
-        try:
-            self._deliver(i)
-        finally:
-            self._reading = None
-
-    # Files.
-
-    def _file(self, id_: int) -> _File:
-        f = self._files.get(id_)
-        if f is None:
-            f = _File(id_, download_path(self._state_file or "", self._client, id_))
-            self._files[id_] = f
-        return f
-
-    def _append(self, id_: int, data: bytes, src: _Stream | None) -> None:
-        """Queue `data` for the end of download `id_`'s file (made at the first); `src`: the
-        stream it came from, held while too much waits."""
-        f = self._file(id_)
-        # After a failure (or a discard), the bytes go nowhere.
-        if f.error is not None or f.gone or not data:
-            return
-        f.queue.append(bytes(data))
-        f.unwritten += len(data)
-        if src is not None and f.unwritten > HIGH_WATER and src not in f.paused:
-            f.paused.add(src)
-            src.hold()
-        self._pump(f)
-
-    @property
-    def unwritten(self) -> int:
-        """Bytes waiting for files' writes, all of them (for tests)."""
-        return sum(f.unwritten for f in self._files.values())
-
-    def _unpause(self, f: _File) -> None:
-        for s in f.paused:
-            s.release()
-        f.paused.clear()
-
-    def _pump(self, f: _File) -> None:
-        """Carry `f` forward (unless that is under way): write what is queued; then, if it is done,
-        sync and answer; if it is gone or failed, delete it."""
-        if f.busy:
-            return
-        f.busy = True
-
-        def again(_task: asyncio.Task) -> None:
-            f.busy = False
-            # What came while it finished (a download_done or a discard the answer led to).
-            if self._files.get(f.id) is f and (f.gone or f.done or (f.error is None and f.queue)):
-                self._pump(f)
-
-        self._in.spawn(self._run(f)).add_done_callback(again)
-
-    async def _run(self, f: _File) -> None:
-        try:
-            while not f.gone and f.error is None and (f.queue or (f.done and f.fd is None)):
-                if f.fd is None:
-                    f.fd = await asyncio.to_thread(_open_file, self._fs, f.path)
-                    f.made = True
-                    continue
-                bufs = [f.queue.popleft() for _ in range(min(MAX_WRITEV, len(f.queue)))]
-                await asyncio.to_thread(_write_all, self._fs, f.fd, bufs, f.hash)
-                f.unwritten -= sum(len(b) for b in bufs)
-                if f.unwritten <= LOW_WATER:
-                    self._unpause(f)
-            if f.gone or f.error is not None or not f.done:
-                if f.gone or f.error is not None:
-                    await self._remove(f)
-                return
-            # Complete: durable before the core hears of it.
-            fd, f.fd = f.fd, None
-            assert fd is not None
-            await asyncio.to_thread(_sync_close, self._fs, fd)
-            if f.gone:
-                await self._remove(f)
-                return
-            del self._files[f.id]
-            self._answered.add(f.id)
-            self._tell(corepb.Input(downloaded=corepb.Downloaded(id=f.id, sha256=f.hash.digest())))
-        except OSError as e:
-            f.error = f"writing {f.path}: {e}"
-            await self._remove(f)
-
-    async def _remove(self, f: _File) -> None:
-        """Close and delete a file that failed or is gone, then answer download_done if it came."""
-        # Nothing more is written: the streams it held read on (into nothing, until they end).
-        f.queue.clear()
-        f.unwritten = 0
-        self._unpause(f)
-        fd, f.fd = f.fd, None
-        await asyncio.to_thread(_discard, self._fs, fd, f.path if f.made else None)
-        if f.gone:
-            if self._files.get(f.id) is f:
-                del self._files[f.id]
-        elif f.done:
-            del self._files[f.id]
-            self._tell(corepb.Input(download_failed=corepb.Failed(id=f.id, detail=lossy(f.error or ""))))
-
-    def _tell(self, i: corepb.Input) -> None:
-        """Report `i`, unless this has shut down."""
-        if not self._in.closed:
-            self._deliver(i)
-
     async def shutdown(self, timeout: float | None = None) -> None:
-        """Drop every stream and resolution, and every file not complete (once its write in
-        flight is over): waits for file work `timeout` seconds at most (None: SHUTDOWN_S)."""
+        """Drop every stream and resolution: waits for the tasks under way `timeout` seconds at
+        most (None: SHUTDOWN_S)."""
         if timeout is None:
             timeout = SHUTDOWN_S
         self._in.stop_all()
-        for f in self._files.values():
-            f.gone = True
-            self._pump(f)
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout
         while self._in.tasks and (left := deadline - loop.time()) > 0:

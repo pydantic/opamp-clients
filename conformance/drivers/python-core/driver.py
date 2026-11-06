@@ -6,7 +6,6 @@ contract (conformance/DRIVERS.md)."""
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import os
 import signal
@@ -17,10 +16,6 @@ from logfire_fleet_client import TLS, Client, Config, Notification, Status, anyv
 
 
 PLATFORM = os.environ.get("OPAMP_PYTHON_MODE") == "platform"
-
-# The custom capability DRIVERS.md names: ping is answered with pong.
-ECHO = "io.opentelemetry.echo"
-
 
 def components() -> pb.AvailableComponents:
     """The components DRIVERS.md names: an OTLP receiver (with its version) and a debug exporter."""
@@ -54,8 +49,7 @@ def instance_uid() -> bytes | None:
 
 
 def tls() -> TLS:
-    """The CA to trust instead of the system's, and the client certificate, when given: for
-    messages and package downloads alike."""
+    """The CA to trust instead of the system's, and the client certificate, when given."""
     return TLS(ca_file=os.environ.get("DRIVER_CA_FILE") or None,
                cert_file=os.environ.get("DRIVER_CLIENT_CERT") or None,
                key_file=os.environ.get("DRIVER_CLIENT_KEY") or None)
@@ -110,29 +104,6 @@ async def main() -> None:
             loop.call_soon(lambda: client.set_remote_config_status(status))
         elif n.kind == "instance_uid_changed":
             emit("message", new_instance_uid=n.instance_uid.hex())
-        elif n.kind == "custom_message":
-            m = n.custom_message
-            emit("custom_message", capability=m.capability, type=m.type, data=m.data.hex())
-            if m.type == "ping":
-                pong = pb.CustomMessage(capability=ECHO, type="pong", data=m.data)
-                loop.call_soon(lambda: client.send_custom_message(pong))
-        elif n.kind == "custom_message_not_sent":
-            emit("custom_message_not_sent", reason=n.detail)
-        elif n.kind == "install_package":
-            name, pkg = n.package_name, n.package
-            try:
-                with open(n.path, "rb") as f:
-                    sha, error = hashlib.sha256(f.read()).hexdigest(), None
-            except OSError as e:
-                sha, error = None, str(e)
-            emit("install_package", name=name, version=pkg.version, sha256=sha, error=error)
-            loop.call_soon(lambda: client.package_installed(name, pkg.hash, error))
-        elif n.kind == "remove_package":
-            name = n.package_name
-            emit("remove_package", name=name)
-            loop.call_soon(lambda: client.package_removed(name))
-        elif n.kind == "server_custom_capabilities":
-            emit("server_custom_capabilities", capabilities=n.custom_capabilities)
         elif n.kind == "connection_settings":
             s = n.connection_settings
             metrics = s.own_metrics.destination_endpoint if s.HasField("own_metrics") else None
@@ -166,7 +137,6 @@ async def main() -> None:
                    max_send_bytes=int(os.environ.get("DRIVER_MAX_SEND_BYTES") or 0),
                    headers={"Authorization": f"Bearer {token}"} if token else {},
                    accept_connection_settings=accept,
-                   accept_packages=os.environ.get("DRIVER_PACKAGES") == "1",
                    request_instance_uid=os.environ.get("DRIVER_REQUEST_UID") == "1",
                    state_file=os.environ.get("DRIVER_STATE_FILE") or None,
                    tls=tls(),
@@ -179,9 +149,7 @@ async def main() -> None:
             Status(description=description(first),
                    health=pb.ComponentHealth(healthy=True, start_time_unix_nano=time.time_ns()),
                    effective_config=pb.EffectiveConfig(config_map=pb.AgentConfigMap()),
-                   available_components=components() if os.environ.get("DRIVER_COMPONENTS") == "1" else None,
-                   custom_capabilities=pb.CustomCapabilities(capabilities=[ECHO])
-                   if os.environ.get("DRIVER_CUSTOM") == "1" else None),
+                   available_components=components() if os.environ.get("DRIVER_COMPONENTS") == "1" else None),
             on_note,
         )
     except Exception as e:  # noqa: BLE001 - the contract reports anything as fatal

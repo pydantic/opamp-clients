@@ -196,7 +196,6 @@ def test_a_log_level_arrives_as_the_lowest_severity_number_to_export() -> None:
 def test_the_settings_that_match_telemetry_arrive_typed_where_the_host_declares_them() -> None:
     from logfire_fleet_client.sdk import settings_pb2
 
-    layer = SdkSettings()
     doc = policy(sampling_rules={"rules": [{"rate": 0, "kind": "server", "path": "/health*"}]},
                  log_levels={"scopes": {"com.acme.db*": "debug"}},
                  attribute_redaction={"drop": ["*token*"], "mask": ["User.Email"]},
@@ -232,7 +231,6 @@ def test_the_applications_settings_arrive_as_a_map_where_the_host_declares_them(
     """custom (docs/app-settings.md), and the shared vectors (testdata/sdk-settings/custom.json) through the module."""
     from logfire_fleet_client.sdk import settings_pb2
 
-    layer = SdkSettings()
     doc = policy(app_settings={"values": {"checkout.new_flow": "on", "limit": 25}})
     d = Flow(declaring()).decide(config(doc))
     assert d.status.status == APPLIED

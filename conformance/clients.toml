@@ -81,7 +81,7 @@ run = ["node", "{conf}/drivers/node/driver.mjs"]
 # mode (aiohttp; the driver asks for it by name, OPAMP_PYTHON_MODE=platform: the SDK's default is
 # core mode).
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "python", cmd = ["uv", "sync", "--quiet"] }
 run = ["env", "OPAMP_PYTHON_MODE=platform", "uv", "run", "--quiet", "--project", "{conf}/../python", "python", "{conf}/drivers/python-core/driver.py"]
@@ -91,7 +91,7 @@ run = ["env", "OPAMP_PYTHON_MODE=platform", "uv", "run", "--quiet", "--project",
 # HTTP/1.1, WebSocket, CONNECT and SOCKS5 itself,
 # over asyncio's TCP connections and TLS (the core's shell), and decides download redirects.
 upstream = false
-features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "custom_messages", "packages", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
+features = ["connection_settings", "remote_config_lifecycle", "core", "number_zero_until_answered", "instance_uid_kept", "telemetry_settings", "available_components", "request_instance_uid", "tls", "mtls_configured", "proxy_configured", "proxy_socks5", "file_journal", "callback_failure", "max_send_bytes"]
 transports = ["http", "ws"]
 build = { cwd = "python", cmd = ["uv", "sync", "--quiet"] }
 run = ["uv", "run", "--quiet", "--project", "{conf}/../python", "python", "{conf}/drivers/python-core/driver.py"]
